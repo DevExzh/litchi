@@ -1,0 +1,125 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-ole-common/src/xml_attributes.rs:404:
+             valid.push("n1=\"again\"".to_owned());
+             let content = format!("e {}", valid.join(" "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m 
+             let mut malformed = names(count);
+             malformed.push("n1=x".to_owned());
+Diff in /home/zhuhe/code/litchi/crates/litchi-ole-common/src/xml_attributes.rs:411:
+             let content = format!("e {}", malformed.join("\n\t "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m         }
+ 
+         let long_value = "x".repeat(4096);
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:404:
+             valid.push("n1=\"again\"".to_owned());
+             let content = format!("e {}", valid.join(" "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m 
+             let mut malformed = names(count);
+             malformed.push("n1=x".to_owned());
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:411:
+             let content = format!("e {}", malformed.join("\n\t "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m         }
+ 
+         let long_value = "x".repeat(4096);
+Diff in /home/zhuhe/code/litchi/crates/litchi-sign/src/xml_attributes.rs:404:
+             valid.push("n1=\"again\"".to_owned());
+             let content = format!("e {}", valid.join(" "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m 
+             let mut malformed = names(count);
+             malformed.push("n1=x".to_owned());
+Diff in /home/zhuhe/code/litchi/crates/litchi-sign/src/xml_attributes.rs:411:
+             let content = format!("e {}", malformed.join("\n\t "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m         }
+ 
+         let long_value = "x".repeat(4096);
+Diff in /home/zhuhe/code/litchi/crates/litchi-xldm/src/xml_attributes.rs:404:
+             valid.push("n1=\"again\"".to_owned());
+             let content = format!("e {}", valid.join(" "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m 
+             let mut malformed = names(count);
+             malformed.push("n1=x".to_owned());
+Diff in /home/zhuhe/code/litchi/crates/litchi-xldm/src/xml_attributes.rs:411:
+             let content = format!("e {}", malformed.join("\n\t "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m         }
+ 
+         let long_value = "x".repeat(4096);
+Diff in /home/zhuhe/code/litchi/crates/xml-minifier/src/xml_attributes.rs:404:
+             valid.push("n1=\"again\"".to_owned());
+             let content = format!("e {}", valid.join(" "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m 
+             let mut malformed = names(count);
+             malformed.push("n1=x".to_owned());
+Diff in /home/zhuhe/code/litchi/crates/xml-minifier/src/xml_attributes.rs:411:
+             let content = format!("e {}", malformed.join("\n\t "));
+             let element = tag(&content);
+[31m-            assert_eq!(checked(&element), quick_xml_until_error(&element), "{content}");
+[m[32m+            assert_eq!(
+[m[32m+                checked(&element),
+[m[32m+                quick_xml_until_error(&element),
+[m[32m+                "{content}"
+[m[32m+            );
+[m         }
+ 
+         let long_value = "x".repeat(4096);

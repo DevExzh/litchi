@@ -1,0 +1,127 @@
+{
+  "driver": {
+    "bytes": 1312,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/serial_execution.py",
+    "sha256": "7d46010686851badb88499f66c0e2d4aa350f3205d33b653045d5c934f77983e"
+  },
+  "rows": [
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/build.py",
+        "after"
+      ],
+      "ended": 1790545423.7350535,
+      "exit_code": 0,
+      "log": {
+        "bytes": 62,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/build-after-driver-final.log",
+        "sha256": "cdb2c276547ce487168dd8b230276e2d8ed1f2407df4285e64022188e5b21a97"
+      },
+      "name": "build-after",
+      "started": 1790545324.6457584
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/attribute_diagnostic.py",
+        "after"
+      ],
+      "ended": 1790545440.8175538,
+      "exit_code": 0,
+      "log": {
+        "bytes": 65,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/attribute-after-driver-final.log",
+        "sha256": "43f2748d623ec3884dbc9a42e0fbac3d3f590099e969cc91fa2fa83ff1d5831d"
+      },
+      "name": "attribute-after",
+      "started": 1790545423.7353785
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross_build.py",
+        "after"
+      ],
+      "ended": 1790545894.6630158,
+      "exit_code": 0,
+      "log": {
+        "bytes": 32,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-build-after-driver-final.log",
+        "sha256": "001c33778830d87322656680eb1a5e586cdeba898106271d2406c7568e0ae72d"
+      },
+      "name": "cross-build-after",
+      "started": 1790545440.8178723
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/capture.py",
+        "native"
+      ],
+      "ended": 1790546022.9401262,
+      "exit_code": 0,
+      "log": {
+        "bytes": 5730,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/native-driver-final.log",
+        "sha256": "01022843b672a29046938dcdb2383c18b057a79cec78320718a6074d47dd32c8"
+      },
+      "name": "native",
+      "started": 1790545894.6632862
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross_capture.py",
+        "native"
+      ],
+      "ended": 1790546052.630859,
+      "exit_code": 0,
+      "log": {
+        "bytes": 246,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native-driver-final.log",
+        "sha256": "6b4780afdb1f6c0fc1e6ac3c033d0cd38a472220681f2b67b81baa5b45ea88ab"
+      },
+      "name": "cross-native",
+      "started": 1790546022.940418
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/capture.py",
+        "allocation"
+      ],
+      "ended": 1790546068.2906723,
+      "exit_code": 0,
+      "log": {
+        "bytes": 1910,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/allocation-driver-final.log",
+        "sha256": "543e38f9af5784cd1c2e54244ff7ace6ad3928d020d6ed1887c50218b9a5ce96"
+      },
+      "name": "allocation",
+      "started": 1790546052.6312232
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0794/profile.py"
+      ],
+      "ended": 1790546071.352849,
+      "exit_code": 0,
+      "log": {
+        "bytes": 250,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/profile-driver-final.log",
+        "sha256": "6630941e3d93c2eacec39c3058c9df8c9601b652975d50411cd2113c77fdde33"
+      },
+      "name": "profile",
+      "started": 1790546068.2909977
+    }
+  ]
+}

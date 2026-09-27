@@ -1,0 +1,10 @@
+{
+  "production_change_retained": false,
+  "reason": "No eligible primary PPTX latency benefit; tiny XLSX full-cell scan also exceeds frozen cross-format regression veto.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/restored-source.json",
+    "sha256": "5c955428ca5da9ef4e32c8536411cd7e8fc1a1a77223c3e31ab744203f27bf4b"
+  },
+  "status": "rejected"
+}

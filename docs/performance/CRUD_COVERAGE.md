@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0794 — shared XML iterator evidence, no coverage promotion
+
+[0794](0794-xml-inline-duplicate-keys.md) Generated PPTX capture/commit/lifecycle and DOCX/XLSX read controls validate, but the candidate fails timing adoption and is restored. The experiment adds no native-producer, cold/range, concurrency, or CRUD coverage promotion.
+
 ## 0793 — existing capture allocation diagnostics
 
 [0793](0793-pptx-capture-allocation-attribution.md) Five existing generated PPTX shapes receive direct/wrapped counter controls and heap traces. Frozen attribution qualification fails; no CRUD registry row, producer, cold/range, concurrency, or capability coverage is promoted.

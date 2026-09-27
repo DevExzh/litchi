@@ -1,0 +1,15 @@
+{
+  "binaries_removed": true,
+  "removed_binaries": [
+    {
+      "bytes": 68848336,
+      "path": "/home/zhuhe/code/litchi-target-0794/before-cross",
+      "sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731"
+    },
+    {
+      "bytes": 68888424,
+      "path": "/home/zhuhe/code/litchi-target-0794/after-cross",
+      "sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f"
+    }
+  ]
+}

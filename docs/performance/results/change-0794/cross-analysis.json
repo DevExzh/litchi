@@ -1,0 +1,1030 @@
+{
+  "bootstrap": {
+    "confidence": 0.95,
+    "high_rank": 9749,
+    "low_rank": 250,
+    "resamples": 10000,
+    "seed": 794080,
+    "statistic": "median"
+  },
+  "builds": {
+    "after": {
+      "binary": {
+        "bytes": 68888424,
+        "path": "/home/zhuhe/code/litchi-target-0794/after-cross",
+        "sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f"
+      },
+      "frozen_inputs_sha256": "767f8a922c8501d221966fdb3d5b1afbe6dd5754b7087fbef8b6ff19c703aa55",
+      "lock_sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b",
+      "source_sha256": "debd197c5581258f1f179f0cf25c9a0e9978d8eae48c24d3df7d4fb9e45f80a6",
+      "tools_sha256": "b7b0d215f462cca8e85afb7291ddfd427ad0befb556543e9d2e36a7888d63c13"
+    },
+    "before": {
+      "binary": {
+        "bytes": 68848336,
+        "path": "/home/zhuhe/code/litchi-target-0794/before-cross",
+        "sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731"
+      },
+      "frozen_inputs_sha256": "767f8a922c8501d221966fdb3d5b1afbe6dd5754b7087fbef8b6ff19c703aa55",
+      "lock_sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b",
+      "source_sha256": "5c955428ca5da9ef4e32c8536411cd7e8fc1a1a77223c3e31ab744203f27bf4b",
+      "tools_sha256": "b7b0d215f462cca8e85afb7291ddfd427ad0befb556543e9d2e36a7888d63c13"
+    }
+  },
+  "counts": {
+    "analysis_rows": 8,
+    "native_reports": 12,
+    "native_samples": 2880,
+    "qualification_reports": 1,
+    "qualification_samples": 8
+  },
+  "cross_cleanup": {
+    "binaries_removed": true,
+    "removed_binaries": [
+      {
+        "bytes": 68848336,
+        "path": "/home/zhuhe/code/litchi-target-0794/before-cross",
+        "sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731"
+      },
+      {
+        "bytes": 68888424,
+        "path": "/home/zhuhe/code/litchi-target-0794/after-cross",
+        "sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f"
+      }
+    ]
+  },
+  "decision": {
+    "benefit_requirement": "none; cross-format lane is a regression veto",
+    "gate": "candidate p50 median > 1.05 and bootstrap lower bound > 1.0",
+    "rejected": true,
+    "rejected_rows": [
+      "xlsx_full_cell_scan/tiny"
+    ]
+  },
+  "plan_schema": "litchi.performance.0794.cross-format-plan.v1",
+  "reports": [
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 0,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+      "sha256": "5a9e48a2f65012b8b11f86a160c25efb8e18e6104ad8a79331a9099bae75c6fe"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 0,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+      "sha256": "51b5c8db44e3c422cde7fe977de83a7ec269e3c0d41919120928268efceb71f1"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 1,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+      "sha256": "83aca38feda0e05c797bd1798514e6b397a11c63248bc1a92f1c544d99f20dd0"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 1,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+      "sha256": "9b8986a06e5d4c6b116a85fb2ed761829dac3daa805e07c4b5d7ebec0f1c7044"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 2,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+      "sha256": "3abb1a1b1f53a0d9255cb1eeb5874bc08b8ec119348f2ce6417edfb0e356c22c"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 2,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+      "sha256": "e7f74a203e336e7533df1d9b2812f0c719ea38537f93ae47636eed2035524436"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 3,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+      "sha256": "cfc7bed55eba1a35198fd3bb9d46f5bd9eefbebafed6b45fdc8f23130a167b1c"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 3,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+      "sha256": "a26a8d905d209c1aa59cb689a1a65015b430f12bcd0cc3dc36b419b67427d843"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 4,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+      "sha256": "34cd26fa0f37edf701f7d68f44a085c636868b60035c43eb4bd837503bef2270"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 4,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+      "sha256": "8dfc860e86e5d2a68dcbd3d102d1d17dd77cf9b5f35596bd456a23b0cd98848b"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "block": 5,
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+      "sha256": "8d92eb90f108bd24206568fb3d5bc61c5333d29ed664bd51c0e277718679ac0e"
+    },
+    {
+      "binary_sha256": "01c7ed96d9670a1e27f1239d32a303ba60db6d0854007520ff343130ecb4db0f",
+      "block": 5,
+      "leg": "after",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+      "sha256": "9a5ff4ac80debcf6144479aa19c7c291dff84d3d4bfe481e8122a8cea7e00fb7"
+    },
+    {
+      "binary_sha256": "3accaaae24747f4e3b99eb3c119af30b8c1da2434e6ba75556ea16945c454731",
+      "leg": "before",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-qualification/0-before.json",
+      "qualification": true,
+      "sha256": "558a81b9aa8dc1753513625a7fd0e2f5643de7556f5426a5c7104d02cdb9dac3"
+    }
+  ],
+  "rows": [
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 1939844,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 1986060,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -2.3270193246931137,
+          "ratio": 0.9767298067530689
+        },
+        {
+          "after_p50_ns": 1927165,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 2005919,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": -3.9260807639790007,
+          "ratio": 0.96073919236021
+        },
+        {
+          "after_p50_ns": 1970654,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 2022475,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": -2.562256640996796,
+          "ratio": 0.974377433590032
+        },
+        {
+          "after_p50_ns": 1914514,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 1992584,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": -3.918028048001987,
+          "ratio": 0.9608197195199801
+        },
+        {
+          "after_p50_ns": 1989739,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 2017355,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": -1.36892118640497,
+          "ratio": 0.9863107881359503
+        },
+        {
+          "after_p50_ns": 2016385,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 2001370,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": 0.7502360882795323,
+          "ratio": 1.0075023608827953
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 0.9969065745093728,
+        "ci_low": 0.9607794559400951,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "docx_semantic_full_text",
+      "change_percent_median": -2.444637982844955,
+      "corpus": {
+        "archive_bytes": 37327,
+        "archive_member_count": 12,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "compression": "deflate",
+        "entry_bytes": 50,
+        "entry_count": 10000,
+        "generator": "litchi-docx-semantic-v1",
+        "name": "docx-semantic-large",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "uncompressed_payload_bytes": 500000,
+        "xlsx": null
+      },
+      "ratio_median": 0.9755536201715505,
+      "ratios": [
+        0.9767298067530689,
+        0.96073919236021,
+        0.974377433590032,
+        0.9608197195199801,
+        0.9863107881359503,
+        1.0075023608827953
+      ],
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 6260,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 6520,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -3.9877300613496924,
+          "ratio": 0.9601226993865031
+        },
+        {
+          "after_p50_ns": 6155,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 6530,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": -5.742725880551303,
+          "ratio": 0.942572741194487
+        },
+        {
+          "after_p50_ns": 6125,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 6460,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": -5.1857585139318925,
+          "ratio": 0.9481424148606811
+        },
+        {
+          "after_p50_ns": 6165,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 6350,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": -2.913385826771653,
+          "ratio": 0.9708661417322835
+        },
+        {
+          "after_p50_ns": 6155,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 6405,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": -3.9032006245121043,
+          "ratio": 0.960967993754879
+        },
+        {
+          "after_p50_ns": 6240,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 6435,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": -3.0303030303030276,
+          "ratio": 0.9696969696969697
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 0.9702815557146266,
+        "ci_low": 0.945357578027584,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "docx_semantic_full_text",
+      "change_percent_median": -3.9454653429308983,
+      "corpus": {
+        "archive_bytes": 8525,
+        "archive_member_count": 12,
+        "archive_sha256": "601aa1179b05c08720ef4ce810129f09260f3338f01fce3c68561ee26ecc3abc",
+        "compression": "deflate",
+        "entry_bytes": 50,
+        "entry_count": 24,
+        "generator": "litchi-docx-semantic-v1",
+        "name": "docx-semantic-tiny",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "uncompressed_payload_bytes": 1200,
+        "xlsx": null
+      },
+      "ratio_median": 0.960545346570691,
+      "ratios": [
+        0.9601226993865031,
+        0.942572741194487,
+        0.9481424148606811,
+        0.9708661417322835,
+        0.960967993754879,
+        0.9696969696969697
+      ],
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 207521,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 214716,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -3.3509379831964115,
+          "ratio": 0.9664906201680359
+        },
+        {
+          "after_p50_ns": 209491,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 212736,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": -1.525364771359805,
+          "ratio": 0.984746352286402
+        },
+        {
+          "after_p50_ns": 211731,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 212281,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": -0.259090545079399,
+          "ratio": 0.997409094549206
+        },
+        {
+          "after_p50_ns": 209261,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 210321,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": -0.5039915177276644,
+          "ratio": 0.9949600848227234
+        },
+        {
+          "after_p50_ns": 209781,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 217436,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": -3.5205761695395466,
+          "ratio": 0.9647942383046045
+        },
+        {
+          "after_p50_ns": 210181,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 208866,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": 0.6295902636139994,
+          "ratio": 1.00629590263614
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 1.001852498592673,
+        "ci_low": 0.9656424292363202,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "docx_semantic_open",
+      "change_percent_median": -1.0146781445437347,
+      "corpus": {
+        "archive_bytes": 37327,
+        "archive_member_count": 12,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "compression": "deflate",
+        "entry_bytes": 50,
+        "entry_count": 10000,
+        "generator": "litchi-docx-semantic-v1",
+        "name": "docx-semantic-large",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "uncompressed_payload_bytes": 500000,
+        "xlsx": null
+      },
+      "ratio_median": 0.9898532185545627,
+      "ratios": [
+        0.9664906201680359,
+        0.984746352286402,
+        0.997409094549206,
+        0.9949600848227234,
+        0.9647942383046045,
+        1.00629590263614
+      ],
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 57110,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 58360,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -2.1418779986291936,
+          "ratio": 0.9785812200137081
+        },
+        {
+          "after_p50_ns": 57375,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 57755,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": -0.657951692494152,
+          "ratio": 0.9934204830750585
+        },
+        {
+          "after_p50_ns": 57040,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 57940,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": -1.5533310321021787,
+          "ratio": 0.9844666896789782
+        },
+        {
+          "after_p50_ns": 56470,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 57550,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": -1.8766290182450018,
+          "ratio": 0.98123370981755
+        },
+        {
+          "after_p50_ns": 57745,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 57710,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": 0.06064806792582811,
+          "ratio": 1.0006064806792583
+        },
+        {
+          "after_p50_ns": 57575,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 57965,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": -0.6728198050547696,
+          "ratio": 0.9932718019494523
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 0.9970134818771583,
+        "ci_low": 0.979907464915629,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "docx_semantic_open",
+      "change_percent_median": -1.1130754185784797,
+      "corpus": {
+        "archive_bytes": 8525,
+        "archive_member_count": 12,
+        "archive_sha256": "601aa1179b05c08720ef4ce810129f09260f3338f01fce3c68561ee26ecc3abc",
+        "compression": "deflate",
+        "entry_bytes": 50,
+        "entry_count": 24,
+        "generator": "litchi-docx-semantic-v1",
+        "name": "docx-semantic-tiny",
+        "package_format": "DOCX/OPC/ZIP",
+        "payload_kind": "deterministic-semantic-text",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "uncompressed_payload_bytes": 1200,
+        "xlsx": null
+      },
+      "ratio_median": 0.9888692458142152,
+      "ratios": [
+        0.9785812200137081,
+        0.9934204830750585,
+        0.9844666896789782,
+        0.98123370981755,
+        1.0006064806792583,
+        0.9932718019494523
+      ],
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 14280,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 13590,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": 5.077262693156737,
+          "ratio": 1.0507726269315674
+        },
+        {
+          "after_p50_ns": 14770,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 13560,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": 8.92330383480826,
+          "ratio": 1.0892330383480826
+        },
+        {
+          "after_p50_ns": 14405,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 13715,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": 5.030987969376599,
+          "ratio": 1.050309879693766
+        },
+        {
+          "after_p50_ns": 14525,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 13710,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": 5.944566010211516,
+          "ratio": 1.0594456601021152
+        },
+        {
+          "after_p50_ns": 14450,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 13450,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": 7.434944237918217,
+          "ratio": 1.0743494423791822
+        },
+        {
+          "after_p50_ns": 14315,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 13630,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": 5.025678650036691,
+          "ratio": 1.050256786500367
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 1.0817912403636325,
+        "ci_low": 1.0502833330970665,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "xlsx_full_cell_scan",
+      "change_percent_median": 5.5109143516841375,
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "ratio_median": 1.0551091435168414,
+      "ratios": [
+        1.0507726269315674,
+        1.0892330383480826,
+        1.050309879693766,
+        1.0594456601021152,
+        1.0743494423791822,
+        1.050256786500367
+      ],
+      "reject": true,
+      "shape": "tiny"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 7839627,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 7893053,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -0.6768737014688719,
+          "ratio": 0.9932312629853113
+        },
+        {
+          "after_p50_ns": 7920963,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 7879688,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": 0.5238151561330895,
+          "ratio": 1.005238151561331
+        },
+        {
+          "after_p50_ns": 7882323,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 7858418,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": 0.3041960862860682,
+          "ratio": 1.0030419608628607
+        },
+        {
+          "after_p50_ns": 7897943,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 7838608,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": 0.7569583783243239,
+          "ratio": 1.0075695837832432
+        },
+        {
+          "after_p50_ns": 7913948,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 7864248,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": 0.6319739662330015,
+          "ratio": 1.00631973966233
+        },
+        {
+          "after_p50_ns": 7870863,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 7827943,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": 0.5482921886375447,
+          "ratio": 1.0054829218863754
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 1.0069446617227866,
+        "ci_low": 0.998136611924086,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "xlsx_full_cell_scan",
+      "change_percent_median": 0.5360536723853171,
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "ratio_median": 1.0053605367238532,
+      "ratios": [
+        0.9932312629853113,
+        1.005238151561331,
+        1.0030419608628607,
+        1.0075695837832432,
+        1.00631973966233,
+        1.0054829218863754
+      ],
+      "reject": false,
+      "shape": "dense-wide"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 52475,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 52380,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": 0.1813669339442603,
+          "ratio": 1.0018136693394426
+        },
+        {
+          "after_p50_ns": 52880,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 52675,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": 0.38917892738490334,
+          "ratio": 1.003891789273849
+        },
+        {
+          "after_p50_ns": 52670,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 52050,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": 1.1911623439000874,
+          "ratio": 1.0119116234390009
+        },
+        {
+          "after_p50_ns": 52650,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 52055,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": 1.1430218038612994,
+          "ratio": 1.011430218038613
+        },
+        {
+          "after_p50_ns": 52550,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 52310,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": 0.45880328809022597,
+          "ratio": 1.0045880328809023
+        },
+        {
+          "after_p50_ns": 52760,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 52150,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": 1.1697027804410398,
+          "ratio": 1.0116970278044104
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 1.0118043256217057,
+        "ci_low": 1.0028527293066458,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "xlsx_open_owned",
+      "change_percent_median": 0.8009125459757627,
+      "corpus": {
+        "archive_bytes": 3561,
+        "archive_member_count": 8,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 192,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-tiny",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "tiny",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 768,
+        "xlsx": {
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "rows_per_sheet": 8,
+          "sheet_count": 3,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ]
+          }
+        }
+      },
+      "ratio_median": 1.0080091254597576,
+      "ratios": [
+        1.0018136693394426,
+        1.003891789273849,
+        1.0119116234390009,
+        1.011430218038613,
+        1.0045880328809023,
+        1.0116970278044104
+      ],
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "blocks": [
+        {
+          "after_p50_ns": 1341176,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-after.json",
+          "before_p50_ns": 1343142,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/0-before.json",
+          "block": 0,
+          "change_percent": -0.14637320551363908,
+          "ratio": 0.9985362679448636
+        },
+        {
+          "after_p50_ns": 1443397,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-after.json",
+          "before_p50_ns": 1386596,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/1-before.json",
+          "block": 1,
+          "change_percent": 4.0964347221541075,
+          "ratio": 1.040964347221541
+        },
+        {
+          "after_p50_ns": 1343786,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-after.json",
+          "before_p50_ns": 1342196,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/2-before.json",
+          "block": 2,
+          "change_percent": 0.11846257923582293,
+          "ratio": 1.0011846257923582
+        },
+        {
+          "after_p50_ns": 1399332,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-after.json",
+          "before_p50_ns": 1341526,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/3-before.json",
+          "block": 3,
+          "change_percent": 4.308973512253966,
+          "ratio": 1.0430897351225397
+        },
+        {
+          "after_p50_ns": 1342786,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-after.json",
+          "before_p50_ns": 1338946,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/4-before.json",
+          "block": 4,
+          "change_percent": 0.28679274593599313,
+          "ratio": 1.00286792745936
+        },
+        {
+          "after_p50_ns": 1340426,
+          "after_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-after.json",
+          "before_p50_ns": 1402642,
+          "before_report": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-native/5-before.json",
+          "block": 5,
+          "change_percent": -4.435629333785817,
+          "ratio": 0.9556437066621418
+        }
+      ],
+      "bootstrap": {
+        "ci_high": 1.0420270411720405,
+        "ci_low": 0.9770899873035027,
+        "confidence": 0.95,
+        "high_rank": 9749,
+        "low_rank": 250,
+        "resamples": 10000,
+        "seed": 794080,
+        "statistic": "median"
+      },
+      "case": "xlsx_open_owned",
+      "change_percent_median": 0.20262766258589693,
+      "corpus": {
+        "archive_bytes": 384525,
+        "archive_member_count": 7,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "generator": "litchi-xlsx-synthetic-v1",
+        "name": "xlsx-dense-wide",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-integer-grid",
+        "shape": "dense-wide",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 524288,
+        "xlsx": {
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ]
+          }
+        }
+      },
+      "ratio_median": 1.002026276625859,
+      "ratios": [
+        0.9985362679448636,
+        1.040964347221541,
+        1.0011846257923582,
+        1.0430897351225397,
+        1.00286792745936,
+        0.9556437066621418
+      ],
+      "reject": false,
+      "shape": "dense-wide"
+    }
+  ],
+  "schema": "litchi.performance.0794.cross-format-analysis.v1",
+  "source_artifacts": {
+    "build_after": "debd197c5581258f1f179f0cf25c9a0e9978d8eae48c24d3df7d4fb9e45f80a6",
+    "build_before": "5c955428ca5da9ef4e32c8536411cd7e8fc1a1a77223c3e31ab744203f27bf4b",
+    "native": "debd197c5581258f1f179f0cf25c9a0e9978d8eae48c24d3df7d4fb9e45f80a6",
+    "qualification": "5c955428ca5da9ef4e32c8536411cd7e8fc1a1a77223c3e31ab744203f27bf4b"
+  },
+  "verification": {
+    "all_receipts_checked": true,
+    "all_report_sample_vectors_checked": true,
+    "build_receipts_checked": true,
+    "corpus_identity_checked": true,
+    "cross_cleanup_checked": true,
+    "no_profiler_or_allocator_claim": true,
+    "normal_uninstrumented_reports_only": true,
+    "plan_checked": true,
+    "semantic_runtime_gates_required": true,
+    "shared_tools_and_frozen_inputs_checked": true,
+    "source_custody_by_leg_checked": true
+  }
+}

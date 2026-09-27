@@ -1,0 +1,63 @@
+{
+  "additional_rejection_gate": {
+    "any_case_rejects": true,
+    "bootstrap95_low_above": 1.0,
+    "paired_process_p50_ratio_above": 1.05
+  },
+  "blocks": 6,
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 794080,
+    "zero_based_endpoints": [
+      250,
+      9749
+    ]
+  },
+  "cases": [
+    "docx_semantic_open",
+    "docx_semantic_full_text",
+    "xlsx_open_owned",
+    "xlsx_full_cell_scan"
+  ],
+  "cpu": 12,
+  "orders": [
+    [
+      "before",
+      "after"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "before",
+      "after"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "before",
+      "after"
+    ]
+  ],
+  "qualification_samples": 1,
+  "rows_per_report": 8,
+  "samples": 30,
+  "schema": "litchi.performance.0794.cross-format-plan.v1",
+  "scope": "Additional DOCX/XLSX public regression veto, frozen before its baseline build; no replacement of PPTX benefit/resource policy; no native timing pool across tools",
+  "semantic_shapes": [
+    "tiny",
+    "large"
+  ],
+  "warmup": 3,
+  "xlsx_shapes": [
+    "tiny",
+    "dense-wide"
+  ]
+}

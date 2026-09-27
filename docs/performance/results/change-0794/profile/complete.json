@@ -1,0 +1,19 @@
+{
+  "children": 4,
+  "decode_receipts": {
+    "bytes": 15583,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/profile/decodes.json",
+    "sha256": "4038bce49f9fcff553121bb3091662bb367ddb1d748cddd72fcded195cbd71ab"
+  },
+  "decodes": 8,
+  "receipts": {
+    "bytes": 6189,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/profile/receipts.json",
+    "sha256": "852de0f313973489a084ace325d4aa8d6e4b4edc9058bac75db2d9a9c2485b1d"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/profile/source.json",
+    "sha256": "debd197c5581258f1f179f0cf25c9a0e9978d8eae48c24d3df7d4fb9e45f80a6"
+  }
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-sign",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "litchi-formula",
+      "-p",
+      "xml-minifier",
+      "-p",
+      "litchi-ooxml-common",
+      "-p",
+      "litchi-docx",
+      "-p",
+      "litchi-xlsx",
+      "-p",
+      "litchi-pptx",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-ppt",
+      "-p",
+      "litchi-xlsb",
+      "--",
+      "--check"
+    ],
+    "ended": 1790544375.0093105,
+    "exit_code": 1,
+    "log": {
+      "bytes": 5892,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality-3/00.log",
+      "sha256": "820d1b4d3df423c5fe7e6c4e4d22650fda8fe5daec42dc324b3f4a64a31592e5"
+    },
+    "started": 1790544366.7390113
+  }
+]

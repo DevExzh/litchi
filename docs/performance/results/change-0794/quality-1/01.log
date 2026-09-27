@@ -1,0 +1,93 @@
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+error[E0603]: trait `BytesStartExt` is private
+  --> crates/litchi-crypto/src/labels.rs:11:40
+   |
+11 | use litchi_ole_common::xml_attributes::BytesStartExt as _;
+   |                                        ^^^^^^^^^^^^^ private trait
+   |
+note: the trait `BytesStartExt` is defined here
+  --> crates/litchi-ole-common/src/xml_attributes.rs:48:1
+   |
+48 | pub(crate) trait BytesStartExt {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: trait `BytesStartExt` is private
+  --> crates/litchi-crypto/src/ooxml/agile.rs:32:40
+   |
+32 | use litchi_ole_common::xml_attributes::BytesStartExt as _;
+   |                                        ^^^^^^^^^^^^^ private trait
+   |
+note: the trait `BytesStartExt` is defined here
+  --> crates/litchi-ole-common/src/xml_attributes.rs:48:1
+   |
+48 | pub(crate) trait BytesStartExt {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `checked_attributes` found for reference `&BytesStart<'_>` in the current scope
+   --> crates/litchi-crypto/src/labels.rs:454:34
+    |
+454 |     for raw_attribute in element.checked_attributes() {
+    |                                  ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `attributes` with a similar name
+    |
+454 -     for raw_attribute in element.checked_attributes() {
+454 +     for raw_attribute in element.attributes() {
+    |
+
+error[E0599]: no method named `checked_attributes` found for reference `&BytesStart<'_>` in the current scope
+   --> crates/litchi-crypto/src/labels.rs:630:31
+    |
+630 |     for raw_attribute in root.checked_attributes() {
+    |                               ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `attributes` with a similar name
+    |
+630 -     for raw_attribute in root.checked_attributes() {
+630 +     for raw_attribute in root.attributes() {
+    |
+
+error[E0599]: no method named `checked_attributes` found for reference `&BytesStart<'_>` in the current scope
+   --> crates/litchi-crypto/src/labels.rs:760:34
+    |
+760 |     for raw_attribute in element.checked_attributes() {
+    |                                  ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `attributes` with a similar name
+    |
+760 -     for raw_attribute in element.checked_attributes() {
+760 +     for raw_attribute in element.attributes() {
+    |
+
+error[E0599]: no method named `checked_attributes` found for reference `&BytesStart<'_>` in the current scope
+   --> crates/litchi-crypto/src/labels.rs:776:34
+    |
+776 |     for raw_attribute in element.checked_attributes() {
+    |                                  ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `attributes` with a similar name
+    |
+776 -     for raw_attribute in element.checked_attributes() {
+776 +     for raw_attribute in element.attributes() {
+    |
+
+error[E0599]: no method named `checked_attributes` found for reference `&BytesStart<'_>` in the current scope
+    --> crates/litchi-crypto/src/ooxml/agile.rs:1591:34
+     |
+1591 |     for raw_attribute in element.checked_attributes() {
+     |                                  ^^^^^^^^^^^^^^^^^^
+     |
+help: there is a method `attributes` with a similar name
+     |
+1591 -     for raw_attribute in element.checked_attributes() {
+1591 +     for raw_attribute in element.attributes() {
+     |
+
+Some errors have detailed explanations: E0599, E0603.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `litchi-crypto` (lib) due to 7 previous errors
+warning: build failed, waiting for other jobs to finish...
