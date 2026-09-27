@@ -192,3 +192,10 @@ and derived tables. Worktree removal is recorded after integration below.
 The [next-step note](results/change-0778/next-step.md) recommends investigating
 bounded ZIP first-read span coalescing on delayed range sources. It is a scoped
 planning recommendation, with no new result or remote-I/O performance claim.
+
+Integrated by fast-forward at `8f6ca3af97`. The owned target and filesystem
+root, copied root lock, three reference symlinks, worktree and temporary branch
+are removed. Offline validation and all six derived-table checks pass from
+main after the original worktree is gone, including the complete packet seal.
+All three unrelated main-file hashes and all pre-existing worktree records
+remain unchanged. The main dependency lock and reference checkouts are retained.
