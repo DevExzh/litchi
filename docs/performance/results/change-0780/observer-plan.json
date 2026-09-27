@@ -1,0 +1,28 @@
+{
+  "cpu": 12,
+  "heaptrack": {
+    "mode": "capabilities",
+    "samples": 1,
+    "scope": "Whole constructor diagnostic process; allocation-site check, no native timing claim.",
+    "shape": "tiny",
+    "warmup": 0
+  },
+  "perf_stat": {
+    "blocks": 3,
+    "cases": [
+      {
+        "mode": "capabilities",
+        "shape": "tiny"
+      },
+      {
+        "mode": "commit",
+        "shape": "large"
+      }
+    ],
+    "events": "instructions:u,cycles:u",
+    "samples": 30,
+    "scope": "Whole process including setup and verification; not operation-region counters.",
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0780.observers.v1"
+}

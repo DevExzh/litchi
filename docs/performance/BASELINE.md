@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0780 — Paired PPTX profile-construction costs
+
+[0780](0780-static-mce-capabilities.md) Six alternating blocks measure public capture, staged commit and lifecycle on three generated decks. Large staged commit p50 is 1.465 → 1.332 ms (paired −9.167%); large lifecycle is 31.993 → 32.663 ms (+2.398%). Separate allocator and profiler lanes verify fewer requests, not equivalent RSS savings. All distributions and flags remain available.
+
 ## 0779 — paired owned-XLSX allocation experiment
 
 [0779](0779-opc-bounded-input-growth.md) records six alternating native blocks for four phases on two workbooks plus two small-open controls (120 native processes), and separate 40-process allocator observations. Generated lifecycle paired p50 changes −0.581% while RSS changes +20.203%. The rejected candidate and raw evidence remain archived; ordinary production behavior and Full durability are unchanged.

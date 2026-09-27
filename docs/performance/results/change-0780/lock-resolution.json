@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "generate-lockfile",
+    "--offline",
+    "--manifest-path",
+    "docs/performance/results/change-0780/probe-src/Cargo.toml"
+  ],
+  "exit_code": 0,
+  "lock": {
+    "bytes": 30241,
+    "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/probe-src/Cargo.lock",
+    "sha256": "41a6bc5edd9bd648754239cd99bfdb4ea4b23fc04b05ddf33968f71464775139"
+  },
+  "summary": "130 packages; generic-array 0.14.7"
+}

@@ -1,0 +1,163 @@
+{
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0780/quality",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "--",
+        "--check"
+      ],
+      "ended": 1790493403.1257453,
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/00.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "started": 1790493398.8134415
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--all-targets"
+      ],
+      "ended": 1790493444.0269766,
+      "exit_code": 0,
+      "log": {
+        "bytes": 813,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/01.log",
+        "sha256": "6ec22168eb7076a4ab132e64c4fbfa5115b3b6fbbf80ccf8ca63807f90a71ff3"
+      },
+      "started": 1790493403.3156676
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790493751.3374224,
+      "exit_code": 0,
+      "log": {
+        "bytes": 572021,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/02.log",
+        "sha256": "79b8590a3252909a7a0cb538cc350950985f3a67b8e4a27e2b0274bc3b86d61b"
+      },
+      "started": 1790493444.2142885
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790493782.018402,
+      "exit_code": 0,
+      "log": {
+        "bytes": 2481,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/03.log",
+        "sha256": "ef6eacde3b235c4013b8de1c8188c61a626bcc02afbbf10c8a78db8e2e35b19c"
+      },
+      "started": 1790493751.5316603
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--no-deps"
+      ],
+      "ended": 1790493790.430609,
+      "exit_code": 0,
+      "log": {
+        "bytes": 642,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/04.log",
+        "sha256": "8a9944ae4466b1f4cb7ef9cf53f249be0dd09bc90d8b07628b3f5c6b6a09bc67"
+      },
+      "started": 1790493782.2133906
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "ended": 1790494061.6640897,
+      "exit_code": 0,
+      "log": {
+        "bytes": 565,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/05.log",
+        "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+      },
+      "started": 1790493790.6228063
+    }
+  ],
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/quality-1/source.json",
+    "sha256": "ff39e1324bc7ebb6eec186940f30f08e189f08f74815f935ac7d26485eeb1055"
+  }
+}

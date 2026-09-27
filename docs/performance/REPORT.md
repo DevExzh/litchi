@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0780 — Static baseline MCE capabilities retained with tradeoff
+
+[0780](0780-static-mce-capabilities.md) Public PPTX staged commit improves 5.012–9.167% across three corpora and allocation requests fall without added live memory. The large lifecycle consistently regresses 2.398%; no lifecycle speedup is claimed. Six gates pass (5,683 tests), with all 120 native/40 allocator processes, 20 spread flags and four paired metric flags retained.
+
 ## 0779 — allocation-growth candidate rejected
 
 [0779](0779-opc-bounded-input-growth.md) attributes the 0778 XLSX allocation-request total to exact per-chunk OPC reservations. The bounded-growth candidate passes six gates (3,079 tests) and reduces request volume, but generated save/lifecycle RSS rises about 20% for less than 1% lifecycle p50 improvement. The candidate is rejected, all 120 native/40 allocation processes retained, and production source restored.

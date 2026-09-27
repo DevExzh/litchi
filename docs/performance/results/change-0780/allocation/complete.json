@@ -1,0 +1,13 @@
+{
+  "children": 40,
+  "receipts": {
+    "bytes": 74578,
+    "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/allocation/receipts.json",
+    "sha256": "d3f0dd7b94901d7bdc87a4ef91d114c55e163042bc391b9c6ed18416fba1b7da"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/allocation/source.json",
+    "sha256": "ff39e1324bc7ebb6eec186940f30f08e189f08f74815f935ac7d26485eeb1055"
+  }
+}

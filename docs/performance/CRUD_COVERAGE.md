@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0780 — MCE compatibility and named PPTX edit checks
+
+[0780](0780-static-mce-capabilities.md) Five focused tests check the independent namespace oracle, layout, legacy/stream parity, custom/default/clone/extension behavior and malformed/limit parity. Captured PPTX shape-text edits reopen with exact generated text and equal output digests across both legs. Six gates pass; custom-registration latency, native Office interoperability and comprehensive CRUD remain unmeasured. No registry row is promoted.
+
 ## 0779 — ingress candidate checked, no production promotion
 
 [0779](0779-opc-bounded-input-growth.md) checks source/output identity, growth/limit/short-read/error behavior, ordinary workbook phases and two small-open controls. Six candidate gates pass, but measured memory costs cause rejection. The production source census is restored exactly; no candidate test or coverage-index status is promoted.

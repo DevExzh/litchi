@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0780 — Narrow shared-MCE progress; goal remains active
+
+[0780](0780-static-mce-capabilities.md) The retained static profile preserves the public membership contract, custom-registration fallback and checked DOCX owner layout. Paired staged-commit benefits come with a disclosed large-lifecycle regression. Six final gates and complete offline replay pass; no CRUD row, scaling, cold/range, concurrency or completed-program claim is promoted.
+
 ## 0779 — measured rejection and current-source queue correction
 
 [0779](0779-opc-bounded-input-growth.md) rejects an OPC growth candidate after matched native/allocation evidence and independent heaptrace attribution. ZIP-2 was already implemented in 0611; the stale 0778 planning recommendation is superseded. No CRUD row or completed-program claim is promoted. Cold/range/concurrency/scaling and comprehensive scenario coverage remain open.

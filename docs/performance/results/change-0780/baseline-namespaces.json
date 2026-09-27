@@ -1,0 +1,25 @@
+{
+  "namespaces": [
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+    "http://purl.oclc.org/ooxml/spreadsheetml/main",
+    "http://schemas.openxmlformats.org/presentationml/2006/main",
+    "http://purl.oclc.org/ooxml/presentationml/main",
+    "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "http://purl.oclc.org/ooxml/drawingml/main",
+    "http://schemas.openxmlformats.org/drawingml/2006/chart",
+    "http://purl.oclc.org/ooxml/drawingml/chart",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    "http://schemas.openxmlformats.org/officeDocument/2006/math",
+    "http://purl.oclc.org/ooxml/officeDocument/math",
+    "urn:schemas-microsoft-com:vml",
+    "urn:schemas-microsoft-com:office:office",
+    "http://www.w3.org/XML/1998/namespace"
+  ],
+  "uri_bytes": 834,
+  "count": 17,
+  "source": "candidate/before-model.rs",
+  "scope": "Exact fixed baseline vocabulary, including XML_NS resolved to its unchanged URI."
+}

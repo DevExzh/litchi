@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0780 — Baseline namespace allocation removed; lifecycle remains open
+
+[0780](0780-static-mce-capabilities.md) The static seventeen-URI profile removes 21 allocations / 2,398 requested bytes per constructor. Fresh public staged-commit improvements support retention, but the large lifecycle slows 2.398% and the three-corpus lifecycle geometric mean is effectively flat. Do not rank further work by constructor-only gains or claim the lifecycle bottleneck is solved.
+
 ## 0779 — cumulative realloc requests are not a latency ranking
 
 [0779](0779-opc-bounded-input-growth.md) locates 1.093 GB of generated-XLSX allocation requests in 8 KiB exact ingress growth, but direct open takes about 0.4 ms and the growth candidate improves lifecycle p50 less than 1% while costing roughly 20% peak process RSS in save/lifecycle children. The candidate is rejected. Use current profiles and retained-memory evidence to prioritize further work; ZIP-2 is already closed.
