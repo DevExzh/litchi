@@ -856,6 +856,16 @@ impl Package {
                     Err(error) => return Err(error.into()),
                 };
 
+                // The source package may already contain note parts whose
+                // relationship targets or payloads are intentionally opaque
+                // to the mutable document model. Generate replacement parts
+                // once, before rebuilding the main-part relationships, so an
+                // absent semantic note collection leaves those source edges
+                // intact while an authored collection still gets the normal
+                // generated relationship and payload.
+                let generated_footnotes_xml = mutable_doc.generate_footnotes_xml()?;
+                let generated_endnotes_xml = mutable_doc.generate_endnotes_xml()?;
+
                 // Create new temporary part for relationships
                 use litchi_opc::part::{BlobPart, Part};
                 let mut temp_part =
@@ -865,14 +875,25 @@ impl Package {
                 match self.opc.get_part(&doc_uri) {
                     Ok(existing_part) => {
                         for rel in existing_part.rels().iter() {
-                            // Skip relationships we're going to recreate dynamically
-                            if !matches!(
-                                rel.reltype(),
+                            // Skip relationships we're going to recreate dynamically.
+                            // Note relationships are only replaced when the
+                            // mutable document has corresponding authored
+                            // notes; otherwise preserve their source target
+                            // and relationship ID verbatim.
+                            let recreated = match rel.reltype() {
                                 "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
-                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
-                                    | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
-                            ) {
+                                | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" => {
+                                    true
+                                },
+                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" => {
+                                    generated_footnotes_xml.is_some()
+                                },
+                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" => {
+                                    generated_endnotes_xml.is_some()
+                                },
+                                _ => false,
+                            };
+                            if !recreated {
                                 temp_part.rels_mut().add_relationship(
                                     rel.reltype().to_string(),
                                     rel.target_ref().to_string(),
@@ -1052,7 +1073,7 @@ impl Package {
                 }
 
                 // Add footnotes parts and relationships BEFORE document XML generation
-                if let Some(footnotes_xml) = mutable_doc.generate_footnotes_xml()? {
+                if let Some(footnotes_xml) = generated_footnotes_xml {
                     let footnotes_uri = PackURI::new("/word/footnotes.xml")
                         .map_err(|e| Error::InvalidUri(format!("footnotes URI: {e}")))?;
                     let footnotes_part = BlobPart::new(
@@ -1066,7 +1087,7 @@ impl Package {
                 }
 
                 // Add endnotes parts and relationships BEFORE document XML generation
-                if let Some(endnotes_xml) = mutable_doc.generate_endnotes_xml()? {
+                if let Some(endnotes_xml) = generated_endnotes_xml {
                     let endnotes_uri = PackURI::new("/word/endnotes.xml")
                         .map_err(|e| Error::InvalidUri(format!("endnotes URI: {e}")))?;
                     let endnotes_part = BlobPart::new(

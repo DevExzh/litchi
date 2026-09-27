@@ -91,6 +91,159 @@ fn saves_and_reopens_package() {
 }
 
 #[test]
+fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let footnotes_uri = PackURI::new("/word/footnotes2.xml").unwrap();
+    let endnotes_uri = PackURI::new("/word/endnotes2.xml").unwrap();
+    let footnotes_xml = br#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:id="41"><w:p><w:r><w:t>opaque footnote payload</w:t></w:r></w:p></w:footnote></w:footnotes>"#;
+    let endnotes_xml = br#"<?xml version="1.0" encoding="UTF-8"?><w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:id="51"><w:p><w:r><w:t>opaque endnote payload</w:t></w:r></w:p></w:endnote></w:endnotes>"#;
+
+    // Start from a valid base archive, then inject the source note graph at
+    // the OPC layer so the package under test is opened from real bytes.
+    let base = Package::new().unwrap();
+    let base_bytes = litchi_opc::PackageWriter::to_bytes(&base.opc).unwrap();
+    let mut source_opc = OpcPackage::from_bytes(&base_bytes).unwrap();
+    source_opc.add_part(Box::new(BlobPart::new(
+        footnotes_uri.clone(),
+        ct::WML_FOOTNOTES.to_owned(),
+        footnotes_xml.to_vec(),
+    )));
+    source_opc.add_part(Box::new(BlobPart::new(
+        endnotes_uri.clone(),
+        ct::WML_ENDNOTES.to_owned(),
+        endnotes_xml.to_vec(),
+    )));
+    source_opc
+        .get_part_mut(&document_uri)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::FOOTNOTES.to_owned(),
+            "footnotes2.xml".to_owned(),
+            "rId7".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    source_opc
+        .get_part_mut(&document_uri)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::ENDNOTES.to_owned(),
+            "endnotes2.xml".to_owned(),
+            "rId8".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+
+    let mut source_note_edges = source_opc
+        .main_document_part()
+        .unwrap()
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::FOOTNOTES
+                    | litchi_opc::constants::relationship_type::ENDNOTES
+            )
+        })
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect::<Vec<_>>();
+    source_note_edges.sort_by(|left, right| left.0.cmp(&right.0));
+    let source_note_payloads = [
+        (
+            footnotes_uri.clone(),
+            source_opc.get_part(&footnotes_uri).unwrap().blob().to_vec(),
+        ),
+        (
+            endnotes_uri.clone(),
+            source_opc.get_part(&endnotes_uri).unwrap().blob().to_vec(),
+        ),
+    ];
+    let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
+    let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
+    package
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("appended beside opaque notes");
+    let mut output = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut output).unwrap();
+
+    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let main = reopened.opc.main_document_part().unwrap();
+    let mut reopened_note_edges = main
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::FOOTNOTES
+                    | litchi_opc::constants::relationship_type::ENDNOTES
+            )
+        })
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect::<Vec<_>>();
+    reopened_note_edges.sort_by(|left, right| left.0.cmp(&right.0));
+    assert_eq!(reopened_note_edges, source_note_edges);
+    for (uri, payload) in source_note_payloads {
+        assert_eq!(reopened.opc.get_part(&uri).unwrap().blob(), payload);
+    }
+    assert!(
+        reopened
+            .document()
+            .unwrap()
+            .text()
+            .unwrap()
+            .contains("appended beside opaque notes")
+    );
+}
+
+#[test]
+fn authored_footnote_still_generates_a_replacement_note_part() {
+    let mut package = Package::new().unwrap();
+    let document = package.document_mut().unwrap();
+    let (footnote_id, note) = document.add_footnote();
+    note.add_paragraph_with_text("generated footnote payload");
+    document
+        .add_paragraph()
+        .add_run()
+        .add_footnote_reference(footnote_id);
+
+    let mut output = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut output).unwrap();
+    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let main = reopened.opc.main_document_part().unwrap();
+    let footnote_relationships = main
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            relationship.reltype() == litchi_opc::constants::relationship_type::FOOTNOTES
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(footnote_relationships.len(), 1);
+    assert_eq!(footnote_relationships[0].target_ref(), "footnotes.xml");
+    let footnotes_uri = PackURI::new("/word/footnotes.xml").unwrap();
+    let footnotes =
+        std::str::from_utf8(reopened.opc.get_part(&footnotes_uri).unwrap().blob()).unwrap();
+    assert!(footnotes.contains("generated footnote payload"));
+}
+
+#[test]
 fn numbering_patch_publishes_through_the_package_graph() {
     let source_xml = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#;
     let numbering_uri = PackURI::new("/word/numbering.xml").unwrap();
