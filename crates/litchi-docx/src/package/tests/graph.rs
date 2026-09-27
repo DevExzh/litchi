@@ -233,12 +233,14 @@ fn authored_notes_replace_existing_strict_note_edges() {
     source_opc.add_part(Box::new(BlobPart::new(
         old_footnotes_uri,
         ct::WML_FOOTNOTES.to_owned(),
-        b"old footnotes payload".to_vec(),
+        br#"<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            .to_vec(),
     )));
     source_opc.add_part(Box::new(BlobPart::new(
         old_endnotes_uri,
         ct::WML_ENDNOTES.to_owned(),
-        b"old endnotes payload".to_vec(),
+        br#"<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            .to_vec(),
     )));
     source_opc
         .get_part_mut(&document_uri)
