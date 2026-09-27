@@ -1,0 +1,2344 @@
+{
+  "comparisons": 64541,
+  "changes": {
+    "alias_pair::invalid-expanded-duplicate::aliased": {
+      "before": "invalid-control:codec_rejected=false:stream_rejected=true",
+      "after": "invalid-control:codec_rejected=true:stream_rejected=true"
+    },
+    "aliasing::000060::mce_bare": {
+      "before": "ok:adc82896ea381edf43c570fe8fd5d4150214e879b016ecbaa702e8a6cd5cedae:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 6, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000060::mce_baseline": {
+      "before": "ok:adc82896ea381edf43c570fe8fd5d4150214e879b016ecbaa702e8a6cd5cedae:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 6, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000060::mce_understood": {
+      "before": "ok:7d4ff8f2badc95079e7ca575dba929bfee9481f7c2a529507b2c39875b2ce5a1:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000096::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000096::mce_baseline": {
+      "before": "ok:5debbb2ec5903482cbc6feb186dc4876f3a66237aa09607694204bd52bf723ae:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 7, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000096::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000150::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000150::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000150::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000151::mce_bare": {
+      "before": "ok:35887f43dc4fd375d6f0851916a1121ef3cb033f1fbcc1b8b35edc71b95ec828:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000151::mce_baseline": {
+      "before": "ok:35887f43dc4fd375d6f0851916a1121ef3cb033f1fbcc1b8b35edc71b95ec828:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000151::mce_understood": {
+      "before": "ok:35887f43dc4fd375d6f0851916a1121ef3cb033f1fbcc1b8b35edc71b95ec828:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000163::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000163::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000163::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000255::mce_bare": {
+      "before": "err:unsupported namespace required by MustUnderstand: http://www.w3.org/XML/1998/namespace",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000255::mce_baseline": {
+      "before": "err:unsupported namespace required by MustUnderstand: urn:a",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000255::mce_understood": {
+      "before": "err:unsupported namespace required by MustUnderstand: http://www.w3.org/XML/1998/namespace",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000334::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000334::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000334::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000380::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000380::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000380::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000397::mce_bare": {
+      "before": "ok:1c32c04fc68fb47f00e7cae69c1d2321e4b653f8b18be96d1a991bda3f21816e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000397::mce_baseline": {
+      "before": "ok:a600c71d296a56ffb29d20a9acc3a897b77fb0ade0f3cbc96b046369fd925fc4:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000397::mce_understood": {
+      "before": "ok:1c32c04fc68fb47f00e7cae69c1d2321e4b653f8b18be96d1a991bda3f21816e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000424::mce_bare": {
+      "before": "ok:185e04bf6fbd4bcd5d5077a934230389af3b9c956c1a78dafe2f63c94aa20b6f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 10, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000424::mce_baseline": {
+      "before": "ok:232e13eec92a55a4a98bee440ef4285e652b8927ca3f19dfc4339ee41a4ff6ac:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 8, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000424::mce_understood": {
+      "before": "ok:3212c2840eed12c038aba56e47f63229410db3bab1aac96d750d488bb86f3f08:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000470::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000506::mce_bare": {
+      "before": "ok:7bc4efc4e2ca63e53d1cf09abc360cf743b971a5372f6a3f85140e204977efa0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000506::mce_baseline": {
+      "before": "ok:7bc4efc4e2ca63e53d1cf09abc360cf743b971a5372f6a3f85140e204977efa0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000506::mce_understood": {
+      "before": "ok:7bc4efc4e2ca63e53d1cf09abc360cf743b971a5372f6a3f85140e204977efa0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000662::mce_bare": {
+      "before": "ok:2447768ab73e296c9fdcb24db6a7eb2b88ae86f70c6ed4ab7adca9ecccf44981:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 1, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000662::mce_baseline": {
+      "before": "ok:2447768ab73e296c9fdcb24db6a7eb2b88ae86f70c6ed4ab7adca9ecccf44981:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 1, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000662::mce_understood": {
+      "before": "ok:2447768ab73e296c9fdcb24db6a7eb2b88ae86f70c6ed4ab7adca9ecccf44981:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 1, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000733::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000733::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000733::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000756::mce_bare": {
+      "before": "ok:b755040c0d98f07232c705e061da6253d02f228663b417f4a4f6356b68979f4b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000756::mce_baseline": {
+      "before": "ok:b755040c0d98f07232c705e061da6253d02f228663b417f4a4f6356b68979f4b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000756::mce_understood": {
+      "before": "ok:b755040c0d98f07232c705e061da6253d02f228663b417f4a4f6356b68979f4b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000792::mce_bare": {
+      "before": "ok:5b7268bf51dd6d583d0f02109ad4393281e12346161c446b6970cf2a884695f5:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 4, ignored_attributes: 7, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000792::mce_baseline": {
+      "before": "ok:add95f06f97a5aea7d3ab81173d6a101440d319b5b5c126514b9434c223eb0da:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 8, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000792::mce_understood": {
+      "before": "ok:d39ad54ca3172065b0332e7dca3bb6b7d86d24d9cbf9bb9c9762027373d1c504:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 7, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000804::mce_bare": {
+      "before": "ok:f5da55db672f67be68e5a2bcabc56f6514fca8da30428331f50c7e6b0efd640b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000804::mce_baseline": {
+      "before": "ok:f5da55db672f67be68e5a2bcabc56f6514fca8da30428331f50c7e6b0efd640b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000804::mce_understood": {
+      "before": "ok:f5da55db672f67be68e5a2bcabc56f6514fca8da30428331f50c7e6b0efd640b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000849::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000849::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000849::mce_understood": {
+      "before": "ok:5c016860598a6758dba01202e094cbc06161c75796a2a6af27c0cd6560d11c71:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000908::mce_bare": {
+      "before": "ok:4a871fd33af1d989ca15aff4f11619767dd2951fbae3346ec832513c9938c922:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000908::mce_baseline": {
+      "before": "ok:4a871fd33af1d989ca15aff4f11619767dd2951fbae3346ec832513c9938c922:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000908::mce_understood": {
+      "before": "ok:4a871fd33af1d989ca15aff4f11619767dd2951fbae3346ec832513c9938c922:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000987::mce_bare": {
+      "before": "ok:96b648e0f01cd0980032201d49a22ac05170375578844fde94e6c716da9df800:Report { alternate_content_count: 3, selected_choices: 0, selected_fallbacks: 2, ignored_elements: 0, ignored_attributes: 12, preserved_elements: 13, preserved_attributes: 8, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000987::mce_baseline": {
+      "before": "ok:8b3718a1b368efff8fe01388396654bd37480b1e4496b3527273f5cecedd3733:Report { alternate_content_count: 3, selected_choices: 0, selected_fallbacks: 2, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 13, preserved_attributes: 8, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::000987::mce_understood": {
+      "before": "ok:9a9bf754062f3d675396d8432225083a1eada7c56cc811cec3b5b104651d1005:Report { alternate_content_count: 3, selected_choices: 0, selected_fallbacks: 2, ignored_elements: 0, ignored_attributes: 10, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001021::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001021::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001021::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001057::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001057::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001057::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001085::mce_bare": {
+      "before": "ok:324594917653d9b3bd6529cff252194a9045ff1d12f5cb1d21acd49bfb970589:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001085::mce_baseline": {
+      "before": "ok:324594917653d9b3bd6529cff252194a9045ff1d12f5cb1d21acd49bfb970589:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001085::mce_understood": {
+      "before": "ok:324594917653d9b3bd6529cff252194a9045ff1d12f5cb1d21acd49bfb970589:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001103::mce_bare": {
+      "before": "ok:fc21022b54bceb83cf38bb12456605408e405a74e08b047f9f01839c3b00ff03:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001103::mce_baseline": {
+      "before": "ok:fc21022b54bceb83cf38bb12456605408e405a74e08b047f9f01839c3b00ff03:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001103::mce_understood": {
+      "before": "ok:fc21022b54bceb83cf38bb12456605408e405a74e08b047f9f01839c3b00ff03:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001176::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001176::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001176::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001238::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001238::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001238::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001321::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001321::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001321::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001329::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: PreserveAttributes target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001329::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveAttributes target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001329::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: PreserveAttributes target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001361::mce_bare": {
+      "before": "ok:bb124a359545b35bac744be6cf48f4e9fa59944bf9fe284870fa98d7e378794e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001361::mce_baseline": {
+      "before": "ok:8411e2c94085b9b26169853965ed62abb31a1452ba35c7a6607757d5ce27fb36:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001361::mce_understood": {
+      "before": "ok:bb124a359545b35bac744be6cf48f4e9fa59944bf9fe284870fa98d7e378794e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001444::mce_bare": {
+      "before": "ok:1e4fb8303eb977886c2e44611b0b4634c6b1deee8714fb473424b5b84ac9c9b0:Report { alternate_content_count: 8, selected_choices: 0, selected_fallbacks: 1, ignored_elements: 4, ignored_attributes: 5, preserved_elements: 3, preserved_attributes: 5, unwrapped_elements: 1 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001444::mce_baseline": {
+      "before": "ok:1e4fb8303eb977886c2e44611b0b4634c6b1deee8714fb473424b5b84ac9c9b0:Report { alternate_content_count: 8, selected_choices: 1, selected_fallbacks: 1, ignored_elements: 4, ignored_attributes: 5, preserved_elements: 0, preserved_attributes: 1, unwrapped_elements: 1 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001444::mce_understood": {
+      "before": "ok:e9d7f3a6aa2a084ab17ba38c6cb4c5f9012bb1e793f9c1d94586786f3e98e360:Report { alternate_content_count: 8, selected_choices: 1, selected_fallbacks: 1, ignored_elements: 1, ignored_attributes: 8, preserved_elements: 3, preserved_attributes: 7, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001511::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001511::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001511::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001512::mce_bare": {
+      "before": "ok:ab1824beda0fdb2b177ac0befd085130a29653f57073d46ac64a800bcbd370d9:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001512::mce_baseline": {
+      "before": "ok:ab1824beda0fdb2b177ac0befd085130a29653f57073d46ac64a800bcbd370d9:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001512::mce_understood": {
+      "before": "ok:e0895132985c42eda681b057909253dc32bda1f2a573bdea0fa6fe75d4ae0de1:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001554::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001592::mce_bare": {
+      "before": "ok:192e9808e3f9b1d5aa52338d70486d47f3a4bd077e9e5f4f428be7eb613ff688:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001592::mce_baseline": {
+      "before": "ok:192e9808e3f9b1d5aa52338d70486d47f3a4bd077e9e5f4f428be7eb613ff688:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001592::mce_understood": {
+      "before": "ok:192e9808e3f9b1d5aa52338d70486d47f3a4bd077e9e5f4f428be7eb613ff688:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001599::mce_bare": {
+      "before": "ok:4ff3eb67c12f4685484a94115a85539c98086c8692efcac1ec33c352fec089bb:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 12, preserved_elements: 2, preserved_attributes: 2, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001599::mce_baseline": {
+      "before": "ok:699c59db2f52c1926ad473746c887c9f31993dc272009009abb0f7b02274de6c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001599::mce_understood": {
+      "before": "ok:4ff3eb67c12f4685484a94115a85539c98086c8692efcac1ec33c352fec089bb:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 12, preserved_elements: 2, preserved_attributes: 2, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001609::mce_bare": {
+      "before": "ok:cee90832d8c709a99ee9772d561edb9d1cfc95f1ac42c6ea78b5bba39d8374a1:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001609::mce_baseline": {
+      "before": "ok:7787c5bfdf458856f953ea15b78416a73ff1059e9e4b91dbd6905767e51764d4:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001609::mce_understood": {
+      "before": "ok:ff5c98033d79cea0dae6bfc5c7b1414afa189eff05c95f925e8fbe1cde7493a3:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001640::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001640::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001640::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001698::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001698::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001698::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001758::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveAttributes target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001835::mce_bare": {
+      "before": "ok:3cdfddbf9ddd0ab9742be884e1af25218366f2b5a6f9b6a309122e003efc3750:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 3 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001835::mce_baseline": {
+      "before": "ok:3cdfddbf9ddd0ab9742be884e1af25218366f2b5a6f9b6a309122e003efc3750:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 3 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001835::mce_understood": {
+      "before": "ok:8c5948b00c61f71cdcb233625ea252f1debc876b4eb708fb2b7a5970bab86970:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 2 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001843::mce_baseline": {
+      "before": "ok:857f82dcd7c2e6487f90930225e8dd0fefb9c5600204f9b6cf1c373fe25059c8:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 7, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001865::mce_bare": {
+      "before": "ok:4c05957dcf20c8d97fe5954358d6415fb1404819f986bc3850688f93e224b5db:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001865::mce_baseline": {
+      "before": "ok:ce95c7f080153dd12e0dda0c1005bd7832f23e00cb7df8b184ff2ab889183f4c:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001865::mce_understood": {
+      "before": "ok:4c05957dcf20c8d97fe5954358d6415fb1404819f986bc3850688f93e224b5db:Report { alternate_content_count: 1, selected_choices: 1, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001895::mce_bare": {
+      "before": "ok:569fa6b739888034fded234f8b86909639532699c76f57439b5c63416c32ad73:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001895::mce_baseline": {
+      "before": "ok:569fa6b739888034fded234f8b86909639532699c76f57439b5c63416c32ad73:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001895::mce_understood": {
+      "before": "ok:569fa6b739888034fded234f8b86909639532699c76f57439b5c63416c32ad73:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001920::mce_bare": {
+      "before": "ok:ed5ecac9f14596d41691d5dc66429cbd28968ed7c5a717d07622491f9b9a6315:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001920::mce_baseline": {
+      "before": "ok:ed5ecac9f14596d41691d5dc66429cbd28968ed7c5a717d07622491f9b9a6315:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::001920::mce_understood": {
+      "before": "ok:d1e05c5f7e2e9229c1596258e9c1763568df3b98511e33244ad094f08c78fbe7:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 2, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002023::mce_bare": {
+      "before": "ok:6f8f7aa36fb7ac9c44a629c215f281d3517c7155a55f8b7a4f2dd605e86a4853:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002023::mce_baseline": {
+      "before": "ok:6f8f7aa36fb7ac9c44a629c215f281d3517c7155a55f8b7a4f2dd605e86a4853:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002023::mce_understood": {
+      "before": "ok:dc26719417a35809f0961ba1c1208f80e738f404bc37e5cb293be026d2a1fc95:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002037::mce_bare": {
+      "before": "err:unsupported namespace required by MustUnderstand: urn:a",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002037::mce_baseline": {
+      "before": "err:unsupported namespace required by MustUnderstand: urn:a",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002037::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002044::mce_bare": {
+      "before": "ok:4fd09cedfa3162c1815ac32b87810c94c28568a45d550228321b3872b38c219f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002044::mce_baseline": {
+      "before": "ok:4fd09cedfa3162c1815ac32b87810c94c28568a45d550228321b3872b38c219f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002044::mce_understood": {
+      "before": "ok:4fd09cedfa3162c1815ac32b87810c94c28568a45d550228321b3872b38c219f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002116::mce_bare": {
+      "before": "ok:b56fa1ead20b87065ee53f1aeeb6200bfd37cb5d4fe11ecbeacbad3c742940e4:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002116::mce_baseline": {
+      "before": "ok:b56fa1ead20b87065ee53f1aeeb6200bfd37cb5d4fe11ecbeacbad3c742940e4:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002116::mce_understood": {
+      "before": "ok:b56fa1ead20b87065ee53f1aeeb6200bfd37cb5d4fe11ecbeacbad3c742940e4:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002248::mce_bare": {
+      "before": "ok:5029100c384e18ac8ed2f804682511fd78b669cb552d4f75185af886e292d98c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002248::mce_baseline": {
+      "before": "ok:5029100c384e18ac8ed2f804682511fd78b669cb552d4f75185af886e292d98c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002248::mce_understood": {
+      "before": "ok:5029100c384e18ac8ed2f804682511fd78b669cb552d4f75185af886e292d98c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002357::mce_bare": {
+      "before": "ok:23de28df4586b5c9c5a2c1f44f05571980ab0aad0343fbbc3d028f4cc51c5196:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 9, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002357::mce_baseline": {
+      "before": "ok:0f622c354137b2893173b1ce8776e7622947ca7a67b9abab64595671d5550059:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 6, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002357::mce_understood": {
+      "before": "ok:ed4e776e5bf74b9bca3e117f42557027c2578f1eb707d006e4598f7a615e467e:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 5, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002371::mce_bare": {
+      "before": "ok:eea424861f6b75beaf9c5e776a7971c7661bd714d3cac00385ee08f4f7261b69:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002371::mce_baseline": {
+      "before": "ok:eea424861f6b75beaf9c5e776a7971c7661bd714d3cac00385ee08f4f7261b69:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002371::mce_understood": {
+      "before": "ok:eea424861f6b75beaf9c5e776a7971c7661bd714d3cac00385ee08f4f7261b69:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002398::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002398::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002398::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002496::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002496::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002496::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002506::mce_bare": {
+      "before": "ok:21aa6efc665a3e42cc61bc1bb002b6fc7f8547bdd9f4df9c8d8ac6de26214333:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002506::mce_baseline": {
+      "before": "ok:21aa6efc665a3e42cc61bc1bb002b6fc7f8547bdd9f4df9c8d8ac6de26214333:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002506::mce_understood": {
+      "before": "ok:21aa6efc665a3e42cc61bc1bb002b6fc7f8547bdd9f4df9c8d8ac6de26214333:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002532::mce_bare": {
+      "before": "ok:776f9a11c7be719091b606c93a5d9fe73935a4b5d0df4c60ed07a5aa56e73c46:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 1, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002532::mce_baseline": {
+      "before": "ok:776f9a11c7be719091b606c93a5d9fe73935a4b5d0df4c60ed07a5aa56e73c46:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 1, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002532::mce_understood": {
+      "before": "ok:906220197e61e7a4b551b580f4e5692d3b06dcb61edd057820ec6ac0c7ee21fb:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 1, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002538::mce_bare": {
+      "before": "ok:c327f0b92028e4e6f1104d98c7f42a053e3db2dc0a68be40656620c6d3209be8:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002538::mce_baseline": {
+      "before": "ok:c327f0b92028e4e6f1104d98c7f42a053e3db2dc0a68be40656620c6d3209be8:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002538::mce_understood": {
+      "before": "ok:c327f0b92028e4e6f1104d98c7f42a053e3db2dc0a68be40656620c6d3209be8:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002556::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002556::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002556::mce_understood": {
+      "before": "ok:603919092a89ad9ca803d4fbc01dcc2168be5def17defc90d6f88ab94fdf9532:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002557::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002557::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002557::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002606::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002606::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002606::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveElements target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002622::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002622::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002622::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002649::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002649::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002649::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: ProcessContent target is not effectively ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002702::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002702::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002702::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002768::mce_bare": {
+      "before": "ok:1d70dfbc8a6edb07cf55374c94eb0510862d27b81d7a5d8eb9fe700f4a927444:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002768::mce_baseline": {
+      "before": "ok:1d70dfbc8a6edb07cf55374c94eb0510862d27b81d7a5d8eb9fe700f4a927444:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002768::mce_understood": {
+      "before": "ok:1d70dfbc8a6edb07cf55374c94eb0510862d27b81d7a5d8eb9fe700f4a927444:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002785::mce_bare": {
+      "before": "ok:dc62a57d039246fac4d64b76ddbf6085963c390adcb0060a9bf246bd7cbc74f9:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002785::mce_baseline": {
+      "before": "ok:dc62a57d039246fac4d64b76ddbf6085963c390adcb0060a9bf246bd7cbc74f9:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002785::mce_understood": {
+      "before": "ok:dc62a57d039246fac4d64b76ddbf6085963c390adcb0060a9bf246bd7cbc74f9:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002810::mce_bare": {
+      "before": "ok:a7edc88cd1ac01c20a37317093d9a430a958a53576c02d33232420ddd0c3cb0a:Report { alternate_content_count: 4, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 8, ignored_attributes: 5, preserved_elements: 5, preserved_attributes: 3, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002810::mce_baseline": {
+      "before": "ok:bd03bbdce6dc21b29449356c47a2d036d32bc8494de49a4d10d69a39fffbe0bb:Report { alternate_content_count: 4, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 8, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 3, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002810::mce_understood": {
+      "before": "ok:ce5b90328581c888b375bd9d28c012b7e2a2269e4afef0d603c7ae4b5a6e9354:Report { alternate_content_count: 4, selected_choices: 1, selected_fallbacks: 1, ignored_elements: 2, ignored_attributes: 8, preserved_elements: 5, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002840::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002840::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002840::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: PreserveElements target is not locally ignorable",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002862::mce_bare": {
+      "before": "ok:5d121ff89513323ae0f0a2bb6f7bbb70354d71dc0e97bd5d7cedb706a0fc7e7d:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002862::mce_baseline": {
+      "before": "ok:5d121ff89513323ae0f0a2bb6f7bbb70354d71dc0e97bd5d7cedb706a0fc7e7d:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002862::mce_understood": {
+      "before": "ok:5d121ff89513323ae0f0a2bb6f7bbb70354d71dc0e97bd5d7cedb706a0fc7e7d:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002892::mce_bare": {
+      "before": "ok:1ec01ffedeba50fd48d92f5dac78e8316f70bf585b22ea34f25d9697c917a458:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002892::mce_baseline": {
+      "before": "ok:1ec01ffedeba50fd48d92f5dac78e8316f70bf585b22ea34f25d9697c917a458:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::002892::mce_understood": {
+      "before": "ok:15540b19185e06a842c3bb4a549cd5e14fd3c063d08beab88f73ec82d6cbb6bc:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 5, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003053::mce_understood": {
+      "before": "ok:178f5d2c4b9129e98d0b09cc1067ed2ea643c1d8d3bba2a27b3ba20a78ba67d0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003067::mce_bare": {
+      "before": "ok:9fbc985597a6cc5e17405f7775361948eeb6af19ad9ac8a1bc145c5a70c3623f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003067::mce_baseline": {
+      "before": "ok:9fbc985597a6cc5e17405f7775361948eeb6af19ad9ac8a1bc145c5a70c3623f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003067::mce_understood": {
+      "before": "ok:9fbc985597a6cc5e17405f7775361948eeb6af19ad9ac8a1bc145c5a70c3623f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003153::mce_bare": {
+      "before": "ok:7b5166a581132f7f5d8b06f00fc99f3f3fba7129d3947c8642fca69f3d7e4505:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003153::mce_baseline": {
+      "before": "ok:7b5166a581132f7f5d8b06f00fc99f3f3fba7129d3947c8642fca69f3d7e4505:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003153::mce_understood": {
+      "before": "ok:7b5166a581132f7f5d8b06f00fc99f3f3fba7129d3947c8642fca69f3d7e4505:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003155::mce_bare": {
+      "before": "ok:d871c20fd9b511968d8385f9834ad12f560d8fbeafffbecd18b2ba746b7976fd:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003155::mce_baseline": {
+      "before": "ok:d871c20fd9b511968d8385f9834ad12f560d8fbeafffbecd18b2ba746b7976fd:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003155::mce_understood": {
+      "before": "ok:fb15261ef616b950eaf9647e4b43717e9a656dc9ee08eeb6ddcbaaef9ef22bfb:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003173::mce_bare": {
+      "before": "ok:737195004c334fae5fa4e37ba49fd81af2f65824c75b70e209ce24894ea3f33c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003173::mce_baseline": {
+      "before": "ok:737195004c334fae5fa4e37ba49fd81af2f65824c75b70e209ce24894ea3f33c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 1, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003173::mce_understood": {
+      "before": "ok:737195004c334fae5fa4e37ba49fd81af2f65824c75b70e209ce24894ea3f33c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003193::mce_bare": {
+      "before": "ok:9b875e4ce355018f13dee76193156184fdf67945606e00dfcc9afe6623c66442:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003193::mce_baseline": {
+      "before": "ok:9b875e4ce355018f13dee76193156184fdf67945606e00dfcc9afe6623c66442:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003193::mce_understood": {
+      "before": "ok:9b875e4ce355018f13dee76193156184fdf67945606e00dfcc9afe6623c66442:Report { alternate_content_count: 1, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003299::mce_bare": {
+      "before": "ok:aa4663d820fd8acde00683d076c3e17635450a7b6bac9d92b268243599a75a6b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 5, preserved_attributes: 3, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003299::mce_baseline": {
+      "before": "ok:aa4663d820fd8acde00683d076c3e17635450a7b6bac9d92b268243599a75a6b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 6, preserved_elements: 4, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003299::mce_understood": {
+      "before": "ok:4b4f7b136e8749575809dc08d0b74918eaa883055b34d88d529a296f5bfbe18e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 4, preserved_elements: 1, preserved_attributes: 3, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003332::mce_bare": {
+      "before": "ok:5af2df43446fa50a2d8b6bc2e2633903eb6e22d7b304b458d03e9bb52eb1ab3e:Report { alternate_content_count: 3, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 6, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 2, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003332::mce_baseline": {
+      "before": "ok:7657a271c4146c5b99cfcc4ca66f76347dbbabb46c9af52c8f0fe6ad171786da:Report { alternate_content_count: 3, selected_choices: 1, selected_fallbacks: 1, ignored_elements: 0, ignored_attributes: 4, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003332::mce_understood": {
+      "before": "ok:5af2df43446fa50a2d8b6bc2e2633903eb6e22d7b304b458d03e9bb52eb1ab3e:Report { alternate_content_count: 3, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 6, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 2, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003344::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003344::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: unbound prefix xmlns",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003344::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate PreserveAttributes target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003464::mce_bare": {
+      "before": "ok:4de3bf60781938738984bbaab8b9880805a703796500b78bdd0a57f2e9c8809c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003464::mce_baseline": {
+      "before": "ok:4de3bf60781938738984bbaab8b9880805a703796500b78bdd0a57f2e9c8809c:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 3, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003464::mce_understood": {
+      "before": "ok:f3e742ad8213691809bd51ec52c15715a268777f928610650938a0bfa9d46bcc:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 2, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003493::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003493::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003493::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: non-ignorable AlternateContent child",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003642::mce_bare": {
+      "before": "ok:e524d6e128912e47aca38e9f93fcbf16eb1019f0ac59084e9f30b91bbdbad057:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003642::mce_baseline": {
+      "before": "ok:e524d6e128912e47aca38e9f93fcbf16eb1019f0ac59084e9f30b91bbdbad057:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003642::mce_understood": {
+      "before": "ok:e524d6e128912e47aca38e9f93fcbf16eb1019f0ac59084e9f30b91bbdbad057:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003666::mce_bare": {
+      "before": "ok:6c9d889334653c079fd918edfc0ae75205c2bd967718545e077a2506ea06b41e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 7, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 1 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003666::mce_baseline": {
+      "before": "ok:90fa889e5426044c8e822797dab3bf94a5733ada826135fa5519ab52860eb64b:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3, preserved_elements: 0, preserved_attributes: 1, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003666::mce_understood": {
+      "before": "ok:6c9d889334653c079fd918edfc0ae75205c2bd967718545e077a2506ea06b41e:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 7, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 1 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003725::mce_bare": {
+      "before": "ok:d8aa4522bf1935c9e55f33e4f60e97c802357a2e3f049d751440881f09b862c0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003725::mce_baseline": {
+      "before": "ok:d8aa4522bf1935c9e55f33e4f60e97c802357a2e3f049d751440881f09b862c0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003725::mce_understood": {
+      "before": "ok:d8aa4522bf1935c9e55f33e4f60e97c802357a2e3f049d751440881f09b862c0:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003863::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003863::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003863::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: Choice/Fallback outside AlternateContent",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003923::mce_bare": {
+      "before": "ok:3fb9442fb269eae35bd343a688b913e3358f5a12611cc0e65299cf0571d0d747:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 13, preserved_elements: 10, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003923::mce_baseline": {
+      "before": "ok:8660c2f55b5c06b5369724dfce23ec7dbeee445889c9d96b3f26e5d281048dd8:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 8, preserved_elements: 10, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003923::mce_understood": {
+      "before": "ok:948faaa10d6c26723fb209b83da2bfb42e8b5fa8f134932d5bfe0964dda6e21f:Report { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 7, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003980::mce_bare": {
+      "before": "ok:5732e0fc3327ce05fe62d4657847dea11510db34e3e0e6a4ca8a8bed73dd00a8:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003980::mce_baseline": {
+      "before": "ok:5732e0fc3327ce05fe62d4657847dea11510db34e3e0e6a4ca8a8bed73dd00a8:Report { alternate_content_count: 2, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::003980::mce_understood": {
+      "before": "ok:a5f6c4eea6e675f46146ba20da6c964cdf27bbd85ac2529984449903f32ac4a5:Report { alternate_content_count: 2, selected_choices: 1, selected_fallbacks: 1, ignored_elements: 1, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0 }",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::004085::mce_bare": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::004085::mce_baseline": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    },
+    "aliasing::004085::mce_understood": {
+      "before": "err:non-conformant markup compatibility XML: duplicate ProcessContent target",
+      "after": "err:non-conformant markup compatibility XML: duplicate attribute"
+    }
+  },
+  "groups": {
+    "alias_pair": 1,
+    "aliasing": 248
+  },
+  "documents": {
+    "aliasing::000060": {
+      "input": "changed-inputs-1/aliasing-000060.xml",
+      "sha256": "3ed947428e3c6cc3a69bfce4d3d50f6d8e4350c078a9919281fe7ee1b4c4d3ef",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000096": {
+      "input": "changed-inputs-1/aliasing-000096.xml",
+      "sha256": "4be92eb77629f8c8683a1b1a137973343c8c956824fe37cfa728fdffd5024227",
+      "duplicates": [
+        {
+          "event": 16,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000150": {
+      "input": "changed-inputs-1/aliasing-000150.xml",
+      "sha256": "093095fe85c03bddd15c75c6755594ddd4988b4db103a8b83aaa5c3dc5d2f46a",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000151": {
+      "input": "changed-inputs-1/aliasing-000151.xml",
+      "sha256": "6b839fe86ef5cf7974f0ebdb29242fafda147a2d3629d7fe53fb29ff460488f3",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000163": {
+      "input": "changed-inputs-1/aliasing-000163.xml",
+      "sha256": "d5d6ad6277527c6dc13baa11d8dc1792708da1d5b82fa79a5ce5dd592a56f975",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        },
+        {
+          "event": 7,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000255": {
+      "input": "changed-inputs-1/aliasing-000255.xml",
+      "sha256": "0e5f8478a90628b1881b7e2e4f47fdfc394fa8b72f76361a8c0ff789ed79de3a",
+      "duplicates": [
+        {
+          "event": 10,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000334": {
+      "input": "changed-inputs-1/aliasing-000334.xml",
+      "sha256": "19393ce211019a2987f3792d69b41d7c14ab51a5d1f45016ef4423ce58f1bea8",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        },
+        {
+          "event": 19,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000380": {
+      "input": "changed-inputs-1/aliasing-000380.xml",
+      "sha256": "908177962471e774f5876ea52612f8f036328aa008914134fe9d4dc575bdffcf",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000397": {
+      "input": "changed-inputs-1/aliasing-000397.xml",
+      "sha256": "dbbc83896dc27f5ce4ed46ccfbc81c8ad02447278769224e4aadca6aa47bf019",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000424": {
+      "input": "changed-inputs-1/aliasing-000424.xml",
+      "sha256": "7efeda5c7bb8620f4539576919cb49fd6810401211c0d5b1bd9729f0405d51d2",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000470": {
+      "input": "changed-inputs-1/aliasing-000470.xml",
+      "sha256": "1a53b64b852bcc8c7260673a129c889b80a8f74b9d745aa067b6e76305b218e8",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000506": {
+      "input": "changed-inputs-1/aliasing-000506.xml",
+      "sha256": "f1a1f4580c1a0928c934fcc2ca823ae50660e172848cd8ac9464c26cc13d5db1",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000662": {
+      "input": "changed-inputs-1/aliasing-000662.xml",
+      "sha256": "fa1e0229a9eae64dd1423c0d9838adaf95448cf744145cdb45b4abc0cfdc2b30",
+      "duplicates": [
+        {
+          "event": 17,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000733": {
+      "input": "changed-inputs-1/aliasing-000733.xml",
+      "sha256": "8a390eceec59d622a458d37310fff5a85a63378168ae62a652bf0a2941f81d80",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000756": {
+      "input": "changed-inputs-1/aliasing-000756.xml",
+      "sha256": "b755040c0d98f07232c705e061da6253d02f228663b417f4a4f6356b68979f4b",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000792": {
+      "input": "changed-inputs-1/aliasing-000792.xml",
+      "sha256": "b806f73458df3ec00fd74aeeca532b7960311b5d95fe22da04b8fa60248baee8",
+      "duplicates": [
+        {
+          "event": 5,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000804": {
+      "input": "changed-inputs-1/aliasing-000804.xml",
+      "sha256": "9426990cd0beaedadec443b832a0388f297556e0ba05e5add5c51e1f4bdd10c8",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000849": {
+      "input": "changed-inputs-1/aliasing-000849.xml",
+      "sha256": "da447e4e713d9cec2dcae15700a7d32c23cdb4fe30a325d089f9e95ab718df6b",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000908": {
+      "input": "changed-inputs-1/aliasing-000908.xml",
+      "sha256": "7f5b422163109692d79d5846e964e35cf0b2cef8a0d68e34e62310721d2c3197",
+      "duplicates": [
+        {
+          "event": 10,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::000987": {
+      "input": "changed-inputs-1/aliasing-000987.xml",
+      "sha256": "573cac8a6d06fde3c575cdbee5ac34ce45f148bb2b48920183e7fcbd058602f7",
+      "duplicates": [
+        {
+          "event": 5,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001021": {
+      "input": "changed-inputs-1/aliasing-001021.xml",
+      "sha256": "044882f2bc3c24a060aa743dfaaf90ac5d7a60a53bbd7f91e29c5ba781812e5d",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001057": {
+      "input": "changed-inputs-1/aliasing-001057.xml",
+      "sha256": "21dfb73a6dde1f3a844241e41bf0162e7c56f48b4c12805a9d77fe57fab50f42",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001085": {
+      "input": "changed-inputs-1/aliasing-001085.xml",
+      "sha256": "f205c7090a576c1627a3dfa7de28e7da0abe686496e9dad760c0e6380618df63",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001103": {
+      "input": "changed-inputs-1/aliasing-001103.xml",
+      "sha256": "fc21022b54bceb83cf38bb12456605408e405a74e08b047f9f01839c3b00ff03",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001176": {
+      "input": "changed-inputs-1/aliasing-001176.xml",
+      "sha256": "0afb91deb6997cb01d1d0d4875da81a40990addd610e2f220044a8799e1a14ae",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001238": {
+      "input": "changed-inputs-1/aliasing-001238.xml",
+      "sha256": "f619e1138a8caf1f04e5cd013dc044de83f656da59bb3cf372d54e51a5e52fcb",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001321": {
+      "input": "changed-inputs-1/aliasing-001321.xml",
+      "sha256": "52806aebcb26a2feb18600a896cb6f2d25103495a2ee31acfc0c0d035542bfa2",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001329": {
+      "input": "changed-inputs-1/aliasing-001329.xml",
+      "sha256": "fee879fecf6cfa1356e35dd859ea26d17df08c5c4192a5523a7130d92712ca0e",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001361": {
+      "input": "changed-inputs-1/aliasing-001361.xml",
+      "sha256": "d06b6de214ad3b13be156ec05b93102c554c93a0789a57347a0f5ee28c026257",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001444": {
+      "input": "changed-inputs-1/aliasing-001444.xml",
+      "sha256": "0e54d12371ccfc93ffd0adeed6569e745b7053a2edafb7d6dd322b5265b180cd",
+      "duplicates": [
+        {
+          "event": 21,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001511": {
+      "input": "changed-inputs-1/aliasing-001511.xml",
+      "sha256": "b1eecf3cb41af2fbf239a2fef71f6a9657f30697488b562da14ee837a3b36e91",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001512": {
+      "input": "changed-inputs-1/aliasing-001512.xml",
+      "sha256": "3244335777908cf461df0aa2b49a091b7f91e9213569ff8b16f907f69e3ad0d6",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001554": {
+      "input": "changed-inputs-1/aliasing-001554.xml",
+      "sha256": "d4fc69e963d77e89b839a0b2acba84d6c5cb391ba2a28ea6bae608d1cf01a63b",
+      "duplicates": [
+        {
+          "event": 13,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001592": {
+      "input": "changed-inputs-1/aliasing-001592.xml",
+      "sha256": "1dd3e81c8050441dc98aff8a303bcf256004ed438c93209f4d4302be989c3cf3",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001599": {
+      "input": "changed-inputs-1/aliasing-001599.xml",
+      "sha256": "9e94edbf01e2c8072494cfafa19ebd33c0d70d240a52fca2a1f959eccdd152ba",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001609": {
+      "input": "changed-inputs-1/aliasing-001609.xml",
+      "sha256": "8173d4af7f09ef2c0a9ce5e8043a6d5825571cf501c271ec82f67f374e849347",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001640": {
+      "input": "changed-inputs-1/aliasing-001640.xml",
+      "sha256": "5657bca6feda21d32a9f995a4e1c2bc09aa7cf8c14a01f84ae0be9d76a0fb008",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001698": {
+      "input": "changed-inputs-1/aliasing-001698.xml",
+      "sha256": "bd1d0b1dca9b0fbb978a9f23b99f9207ad2a03530008afbece7cef867bacf3a7",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001758": {
+      "input": "changed-inputs-1/aliasing-001758.xml",
+      "sha256": "04a7e288a7f2cf4c79321c1c420c1259fdc21162f4f5c1e9d7da2ca1912ca339",
+      "duplicates": [
+        {
+          "event": 5,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001835": {
+      "input": "changed-inputs-1/aliasing-001835.xml",
+      "sha256": "8dab469737d2cbc91b39b3e2cbd71959a465c513e17928e1a383bd5ceb0290c3",
+      "duplicates": [
+        {
+          "event": 8,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001843": {
+      "input": "changed-inputs-1/aliasing-001843.xml",
+      "sha256": "b6bef762777d003a7821893adb4f5fe1d06dd5fb1a08fabde3b674baf16aca69",
+      "duplicates": [
+        {
+          "event": 12,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001865": {
+      "input": "changed-inputs-1/aliasing-001865.xml",
+      "sha256": "0c88e1f009fc667a96f068bac1054865ea57bad2519c29950ec9746d02aaff46",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001895": {
+      "input": "changed-inputs-1/aliasing-001895.xml",
+      "sha256": "0271a0e7f47b5a9e8ce48039fc1e1992af8c2129b5c8041a79b5515666e84a38",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::001920": {
+      "input": "changed-inputs-1/aliasing-001920.xml",
+      "sha256": "1fda8887c3c89b155c9a64922d45b57d594d96b9131f67d7179fd383aa7be9f0",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002023": {
+      "input": "changed-inputs-1/aliasing-002023.xml",
+      "sha256": "5b0a493008d9dadf5dad13f5706f9206e1e9d103c39e02cb2da7181ecb303b72",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002037": {
+      "input": "changed-inputs-1/aliasing-002037.xml",
+      "sha256": "04d78e090c94fefda108ca1232abb3b41543794036f48248c88413627872f24c",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002044": {
+      "input": "changed-inputs-1/aliasing-002044.xml",
+      "sha256": "3456c71ffd6dec08ebd4017a1fc1c24f8f69a63dffe33689c5a5992c53c9546b",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002116": {
+      "input": "changed-inputs-1/aliasing-002116.xml",
+      "sha256": "dee63dd8fa1a2149f1975993e063d05baa9ff66d2dd45fc9be06ce2b0304d983",
+      "duplicates": [
+        {
+          "event": 16,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        },
+        {
+          "event": 17,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002248": {
+      "input": "changed-inputs-1/aliasing-002248.xml",
+      "sha256": "0b8331b4b11996e8d600a2e4a34e44fa0d9d01e014b2553747c48051788e21ee",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002357": {
+      "input": "changed-inputs-1/aliasing-002357.xml",
+      "sha256": "58f44a6488ffd524d5f2485d6bfd11e0727e861ae835843da3eef1e96303f6c0",
+      "duplicates": [
+        {
+          "event": 13,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002371": {
+      "input": "changed-inputs-1/aliasing-002371.xml",
+      "sha256": "154a59a8621b96dd56bd65e5fb51223203542cf7ece10641472b30b32e52937a",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002398": {
+      "input": "changed-inputs-1/aliasing-002398.xml",
+      "sha256": "5b74564d40d4dbdd44b9f4bb9a3522c728e46c549f61281d36d719ce61e56604",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002496": {
+      "input": "changed-inputs-1/aliasing-002496.xml",
+      "sha256": "7348754a3193981e9f3926c579cd772e499f4bd5f49490f023a6d8384cfc5668",
+      "duplicates": [
+        {
+          "event": 15,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002506": {
+      "input": "changed-inputs-1/aliasing-002506.xml",
+      "sha256": "f09cb128d7fc1638b06f5631c175abae14c17916d010e4549c516c42c2adafe3",
+      "duplicates": [
+        {
+          "event": 13,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002532": {
+      "input": "changed-inputs-1/aliasing-002532.xml",
+      "sha256": "2fa2d8edb090db65f8190a5583fb9371074651db22aaf7090d7eaec250a5fd75",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002538": {
+      "input": "changed-inputs-1/aliasing-002538.xml",
+      "sha256": "aaf6bfbbaf778f9e97ca555ccdb77323cf4b994d4b807130fbe80347deffc495",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002556": {
+      "input": "changed-inputs-1/aliasing-002556.xml",
+      "sha256": "851c9d94f432f1ae2eeb5e211d3c17e712a0c2aec3d80098d4e3e312375f503b",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002557": {
+      "input": "changed-inputs-1/aliasing-002557.xml",
+      "sha256": "0b3cffc38be98c9191949874d1d493c722e02437199100dc5a4f46b4e3b1b8d0",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002606": {
+      "input": "changed-inputs-1/aliasing-002606.xml",
+      "sha256": "c4de3eaf55d0e25c35a61839459cb46e8de6b08f773db274cab0918d2846ba30",
+      "duplicates": [
+        {
+          "event": 8,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002622": {
+      "input": "changed-inputs-1/aliasing-002622.xml",
+      "sha256": "09cac92e857d43fee9df40c3cece519e4defe4d171de8ba44c3ac2065ba61b55",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002649": {
+      "input": "changed-inputs-1/aliasing-002649.xml",
+      "sha256": "3cf1e7a0b799051d7848f8dccc162096d3b4497e16292e848da2b2058f81cb1f",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002702": {
+      "input": "changed-inputs-1/aliasing-002702.xml",
+      "sha256": "777d220880c9dc43934d2eb8ed2122de47daba2c2f2b828bb8cc827991de0e45",
+      "duplicates": [
+        {
+          "event": 10,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002768": {
+      "input": "changed-inputs-1/aliasing-002768.xml",
+      "sha256": "b0e42263a360622140631a7b21efe90ab7e01f71492353322aad15037cf742b1",
+      "duplicates": [
+        {
+          "event": 7,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002785": {
+      "input": "changed-inputs-1/aliasing-002785.xml",
+      "sha256": "02b6cdcb82a88e10fe0b1bd591814fce3f583d7bdf1463df9683a21096313560",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002810": {
+      "input": "changed-inputs-1/aliasing-002810.xml",
+      "sha256": "ff79b82c6e9e68f8eddc0eef3cd7c0a2df62838e9fca0cd7421a778b976b33f4",
+      "duplicates": [
+        {
+          "event": 29,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002840": {
+      "input": "changed-inputs-1/aliasing-002840.xml",
+      "sha256": "da8294c60ec851114259b429fc6a3474afc695565f7ea502d88f6f5005dd9808",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002862": {
+      "input": "changed-inputs-1/aliasing-002862.xml",
+      "sha256": "b8dc56d995caf1c5dacf946516d23a1ad021f207727c81cac8554235251e19e6",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::002892": {
+      "input": "changed-inputs-1/aliasing-002892.xml",
+      "sha256": "73b2994d51036a547b2dc423910a84c93f4b57232ec425ba4c65b15587b3b90b",
+      "duplicates": [
+        {
+          "event": 6,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003053": {
+      "input": "changed-inputs-1/aliasing-003053.xml",
+      "sha256": "c6e30a0356ff09a04722ecb4f98446688c1552f153769dc4e5cf79cfcf5297d9",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "a:k",
+          "second": "b:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003067": {
+      "input": "changed-inputs-1/aliasing-003067.xml",
+      "sha256": "d6f21577a41aa42926e69de632e24012495cf1d2a82508b56d71a0a03c2791be",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003153": {
+      "input": "changed-inputs-1/aliasing-003153.xml",
+      "sha256": "b5e9da76f6b1bc17bf135c24ad6573ae5f9267d839db2a375285818e4a8c3dda",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003155": {
+      "input": "changed-inputs-1/aliasing-003155.xml",
+      "sha256": "331bc0c24128554eead624e86c371155ccbc70d741275f5d3b973916faf16831",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003173": {
+      "input": "changed-inputs-1/aliasing-003173.xml",
+      "sha256": "e404316cae782efd2804fa8026ebef6713570f3553822238a3cb3365a838acee",
+      "duplicates": [
+        {
+          "event": 5,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003193": {
+      "input": "changed-inputs-1/aliasing-003193.xml",
+      "sha256": "fee3743bc2a6b5014a5cf5186dbb49700741d2355f11c190987fa15482b79ca2",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003299": {
+      "input": "changed-inputs-1/aliasing-003299.xml",
+      "sha256": "3dbb039f0aa639eef6c52ab4f0fe346c8aaf7048602606b4d38900a2d9e73521",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003332": {
+      "input": "changed-inputs-1/aliasing-003332.xml",
+      "sha256": "b97b3d414d6c069d4e97e1414b394766b8d8b81e6b9bcb70ef2e05de4d3556ae",
+      "duplicates": [
+        {
+          "event": 28,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003344": {
+      "input": "changed-inputs-1/aliasing-003344.xml",
+      "sha256": "3e2109c5ca110b1c68c68589c55a2d06c7384f417a9b1176fc9c514a877d24c3",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003464": {
+      "input": "changed-inputs-1/aliasing-003464.xml",
+      "sha256": "88cd14dd187490732606e6c1673f94c1ec2a6217551c2fac740f9957bb6063fc",
+      "duplicates": [
+        {
+          "event": 4,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003493": {
+      "input": "changed-inputs-1/aliasing-003493.xml",
+      "sha256": "0db95986c749303421a9070f5af31e85848b8b232be0ab1a49d27f5f3f219e8c",
+      "duplicates": [
+        {
+          "event": 3,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003642": {
+      "input": "changed-inputs-1/aliasing-003642.xml",
+      "sha256": "e524d6e128912e47aca38e9f93fcbf16eb1019f0ac59084e9f30b91bbdbad057",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "b:k",
+          "second": "a:k",
+          "namespace": "urn:a",
+          "local": "k"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003666": {
+      "input": "changed-inputs-1/aliasing-003666.xml",
+      "sha256": "0f8f519c0cad72f0642628419525ebee90f3dcdba164804d61317b830400b5e7",
+      "duplicates": [
+        {
+          "event": 2,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003725": {
+      "input": "changed-inputs-1/aliasing-003725.xml",
+      "sha256": "f82a5e1194abf2c76651063c870fe8a7e9653eb08630bf6d461bf62e1539589c",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003863": {
+      "input": "changed-inputs-1/aliasing-003863.xml",
+      "sha256": "2fa8629750375db2db26db180299e35a3fb5c6ed8ab146c375e803ab06bb16e3",
+      "duplicates": [
+        {
+          "event": 21,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        },
+        {
+          "event": 27,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003923": {
+      "input": "changed-inputs-1/aliasing-003923.xml",
+      "sha256": "d726a0cd28ae6fd6de4521cef77dd9c29085bc2a392c5f125621079294bf8738",
+      "duplicates": [
+        {
+          "event": 11,
+          "first": "x:lang",
+          "second": "xml:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::003980": {
+      "input": "changed-inputs-1/aliasing-003980.xml",
+      "sha256": "9175c3097937db4f3e8bc3d983fe2859b5dd6ed7246abb9921f9fe40ea4f50c9",
+      "duplicates": [
+        {
+          "event": 7,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    },
+    "aliasing::004085": {
+      "input": "changed-inputs-1/aliasing-004085.xml",
+      "sha256": "686b12201837e90301dfa19c27930262ad4c71b00dff9f7ae5a81affba381d14",
+      "duplicates": [
+        {
+          "event": 1,
+          "first": "xml:lang",
+          "second": "x:lang",
+          "namespace": "http://www.w3.org/XML/1998/namespace",
+          "local": "lang"
+        }
+      ],
+      "unbound_attributes": [],
+      "tokenizer_error": null
+    }
+  },
+  "generator": {
+    "command": [
+      "rustc",
+      "--edition",
+      "2024",
+      "-O",
+      "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/generator-1.rs",
+      "-o",
+      "/tmp/litchi-0776-generator-1"
+    ],
+    "source_sha256": "571db3aab3144b6cb9913175fc3411e4299472cd4c482e18fd37e545192058c6",
+    "binary_sha256": "b9bd3b089e41a9c73aaab4480c787c600d6b08e95743b553c1c0f4024fa147d4",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "binary_removed": true
+  },
+  "before_outcomes": {
+    "err": 94,
+    "ok": 155
+  }
+}

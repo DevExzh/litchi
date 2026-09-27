@@ -1,0 +1,6 @@
+# Preserve raw tool output verbatim.
+*.log -diff
+*.patch -diff
+*.stdout -diff
+*.stderr -diff
+*.summary -diff

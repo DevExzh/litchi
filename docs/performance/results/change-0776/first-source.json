@@ -1,0 +1,10 @@
+{
+  "base": "22f62ee328",
+  "candidate": "2cdd75caad32d81cef7f9c4ce2bfa626864915a4",
+  "files": {
+    "crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs": "72110f1ce7162d8a2c8495181f94a985472b93d58385314dba41140d006e9736",
+    "crates/litchi-ooxml-common/src/mce/codec.rs": "c85d5bf65d0b63930918dec1a8f14cdeedfcd77981dbd79cea363176aa2d75e4",
+    "crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs": "f818e15cb653f6ef338db3b5962db14685beff087a31d02f77740d94c8e2303b",
+    "crates/litchi-ooxml-common/src/mce/mod.rs": "cf0b9c942017fdbe3b2afefac19c8af394e000d31d6ce9dbbba3e37a79db4287"
+  }
+}

@@ -1,0 +1,348 @@
+diff --git a/crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs b/crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs
+index a1b1ce3500..d2ea9ccb71 100644
+--- a/crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs
++++ b/crates/litchi-docx/src/source_backed/tail_append/mce_workspace.rs
+@@ -171,6 +171,14 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
+ 
+     let raw_attributes = string_capacity(token, attributes.checked_mul(2)?)?
+         .checked_add(vec_capacity(attributes, pair_bytes)?)?;
++    // Expanded duplicate checks keep eight (local name, qualified name, namespace identity)
++    // slots on the stack, then reserve at most one pair per source attribute.
++    // Charge both and the temporary vector owner conservatively even for the
++    // common path that never spills. No URI text is retained by this scratch.
++    let expanded_name_pair = u64::try_from(size_of::<(&str, &str, usize)>()).ok()?;
++    let expanded_attribute_names = vec_capacity(attributes, expanded_name_pair)?
++        .checked_add(expanded_name_pair.checked_mul(8)?)?
++        .checked_add(u64::try_from(size_of::<Vec<(&str, &str, usize)>>()).ok()?)?;
+     let quickxml_attributes = vec_capacity(attributes, range_bytes)?
+         .checked_add(hash_capacity(attributes, size_of::<u64>() as u64)?)?;
+ 
+@@ -278,6 +286,7 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
+         mce_frames,
+         raw_attributes,
+         quickxml_attributes,
++        expanded_attribute_names,
+         namespace_storage,
+         namespace_index,
+         hoisted_lists,
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 2f6cce4485..0c7db188a2 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -915,6 +915,7 @@ fn start(
+         }
+     }
+     let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
++    validate_expanded_attribute_duplicates(&raw, resolver(scope, &c.ns))?;
+     let parent_active = st.last().is_none_or(|f| f.active);
+     if c.opaque {
+         let hoisted = if parent_active {
+@@ -1400,6 +1401,78 @@ fn validate_alternate_attributes(
+     Ok(())
+ }
+ 
++/// Lexically different prefixes can still name the same attribute. Check
++/// before opaque/skipped branches return or directives discard attributes.
++/// Unprefixed attributes have no namespace and their lexical uniqueness was
++/// already checked; declarations cannot bind a prefix to the empty URI.
++///
++/// Up to eight prefixed names use bounded stack comparisons. Larger lists
++/// use a fallibly reserved vector and in-place sorting, never URI copies or
++/// URI-length-dependent hashing. Scratch is dropped before processing children.
++fn validate_expanded_attribute_duplicates(raw: &[Attr<'_>], ns: Resolver<'_>) -> R<()> {
++    let mut prefixed = raw.iter().filter_map(|attribute| {
++        let (prefix, local) = attribute.key.split_once(':')?;
++        (prefix != "xmlns").then_some((local, attribute.key, 0usize))
++    });
++    let Some(first) = prefixed.next() else {
++        return Ok(());
++    };
++    let Some(second) = prefixed.next() else {
++        return Ok(());
++    };
++    let mut inline = [("", "", 0usize); 8];
++    let mut used = 0;
++    let mut overflow = Vec::new();
++    for name in std::iter::once(first)
++        .chain(std::iter::once(second))
++        .chain(prefixed)
++    {
++        if used < inline.len() {
++            // Different local parts cannot collide, regardless of prefix.
++            // Resolve only possible collisions, avoiding a repeated QName
++            // validation and scope lookup for every ordinary attribute.
++            for previous in inline[..used]
++                .iter()
++                .filter(|previous| previous.0 == name.0)
++            {
++                let (left, _) = expand_parts(previous.1, ns, false)?;
++                let (right, _) = expand_parts(name.1, ns, false)?;
++                if left.id == right.id {
++                    return Err(bad("duplicate attribute"));
++                }
++            }
++            inline[used] = name;
++            used += 1;
++        } else {
++            if overflow.is_empty() {
++                reserve_exact(&mut overflow, raw.len(), "MCE expanded attribute names")?;
++                overflow.extend_from_slice(&inline);
++            }
++            overflow.push(name);
++        }
++    }
++    overflow.sort_unstable_by(|left, right| left.0.cmp(right.0));
++    let mut start = 0;
++    while start < overflow.len() {
++        let mut end = start + 1;
++        while end < overflow.len() && overflow[end].0 == overflow[start].0 {
++            end += 1;
++        }
++        if end - start > 1 {
++            let group = &mut overflow[start..end];
++            for name in &mut *group {
++                name.2 = expand_parts(name.1, ns, false)?.0.id;
++            }
++            group.sort_unstable_by_key(|name| name.2);
++            if group.windows(2).any(|pair| pair[0].2 == pair[1].2) {
++                return Err(bad("duplicate attribute"));
++            }
++        }
++        start = end;
++    }
++    Ok(())
++}
++
+ /// Resolve one qualified name against the in-scope declarations without
+ /// materializing an owned [`Name`].
+ ///
+diff --git a/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs b/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs
+new file mode 100644
+index 0000000000..3a3610ec69
+--- /dev/null
++++ b/crates/litchi-ooxml-common/src/mce/expanded_duplicates_tests.rs
+@@ -0,0 +1,211 @@
++//! Expanded-name duplicate-attribute coverage for the MCE processors.
++//!
++//! XML namespace declarations apply to the whole start tag, and XML attribute
++//! uniqueness is defined by the expanded `(namespace, local-name)` pair.  The
++//! tests here keep that rule visible at the MCE boundaries where attributes
++//! can otherwise be discarded: compatibility directives, opaque extensions,
++//! skipped elements, and unselected AlternateContent branches.
++
++use std::{borrow::Cow, convert::Infallible, io::Cursor};
++
++use super::stream::{StreamError, StreamLimits, StreamReport, process_markup_compatibility_stream};
++use super::{
++    Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, active_offsets,
++    process_markup_compatibility,
++};
++
++const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
++
++fn tree_result(xml: &str) -> Result<Vec<u8>, Error> {
++    process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &Limits::default())
++        .map(|output| output.xml.into_owned())
++}
++
++fn stream_result(xml: &str) -> Result<StreamReport, StreamError<Infallible, Infallible>> {
++    let mut input = Cursor::new(xml.as_bytes());
++    process_markup_compatibility_stream(
++        &mut input,
++        &Capabilities::new(),
++        &StreamLimits::default(),
++        |_| Ok::<(), Infallible>(()),
++    )
++}
++
++fn assert_tree_and_stream_duplicate(xml: &str) {
++    match tree_result(xml) {
++        Err(Error::NonConformant(message)) => assert_eq!(message, "duplicate attribute", "{xml}"),
++        other => panic!("expected a typed tree duplicate-attribute error, got {other:?}: {xml}"),
++    }
++
++    match stream_result(xml) {
++        Err(StreamError::Mce {
++            error: Error::NonConformant(message),
++            ..
++        }) => assert_eq!(message, "duplicate attribute", "{xml}"),
++        other => {
++            panic!("expected a typed stream duplicate-attribute error, got {other:?}: {xml}")
++        },
++    }
++}
++
++fn assert_tree_and_stream_accept(xml: &str) {
++    tree_result(xml)
++        .unwrap_or_else(|error| panic!("tree rejected legal attributes: {error}: {xml}"));
++    stream_result(xml)
++        .unwrap_or_else(|error| panic!("stream rejected legal attributes: {error:?}: {xml}"));
++}
++
++#[test]
++fn expanded_duplicates_cover_aliases_and_late_namespace_declarations() {
++    let cases = vec![
++        // Two prefixes name the same ordinary namespace and local part.
++        r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:shared" xmlns:b="urn:shared" a:k="one" b:k="two"/>"#.to_owned(),
++        // `xml` has a fixed namespace identity regardless of the alias used.
++        format!(
++            r#"<r xmlns:mc="{}" xmlns:x="{}" x:lang="one" xml:lang="two"/>"#,
++            NAMESPACE,
++            XML_NAMESPACE
++        ),
++        // MCE directive attributes are ordinary expanded XML attributes too.
++        r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:m="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:ignored" mc:Ignorable="x" m:Ignorable="x"/>"#.to_owned(),
++        // Namespace declarations apply even when they appear after the use.
++        r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:shared" a:k="one" b:k="two" xmlns:b="urn:shared"/>"#.to_owned(),
++    ];
++
++    for xml in &cases {
++        assert_tree_and_stream_duplicate(xml);
++    }
++}
++
++#[test]
++fn expanded_duplicates_are_checked_in_opaque_descendants() {
++    let mut capabilities = Capabilities::new();
++    capabilities.preserve_extension_element(Name {
++        namespace: "urn:extension".to_owned(),
++        local_name: "opaque".to_owned(),
++    });
++    let xml = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:e="urn:extension" xmlns:a="urn:shared" xmlns:b="urn:shared"><e:opaque><child a:k="one" b:k="two"/></e:opaque></r>"#;
++
++    let tree = process_markup_compatibility(xml.as_bytes(), &capabilities, &Limits::default());
++    match tree {
++        Err(Error::NonConformant(message)) => assert_eq!(message, "duplicate attribute"),
++        other => panic!("opaque descendant was not validated by the tree: {other:?}"),
++    }
++
++    let mut input = Cursor::new(xml.as_bytes());
++    let stream = process_markup_compatibility_stream(
++        &mut input,
++        &capabilities,
++        &StreamLimits::default(),
++        |_| Ok::<(), Infallible>(()),
++    );
++    assert!(matches!(
++        stream,
++        Err(StreamError::Mce {
++            error: Error::NonConformant(message),
++            ..
++        }) if message == "duplicate attribute"
++    ));
++}
++
++#[test]
++fn expanded_duplicates_are_checked_in_skipped_and_unselected_branches() {
++    let skipped = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:skipped" xmlns:a="urn:shared" xmlns:b="urn:shared" mc:Ignorable="x"><x:skip><child a:k="one" b:k="two"/></x:skip><tail/></r>"#;
++    assert_tree_and_stream_duplicate(skipped);
++
++    let unselected = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:unsupported" xmlns:a="urn:shared" xmlns:b="urn:shared"><mc:AlternateContent><mc:Choice Requires="u"><branch a:k="one" b:k="two"/></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent></r>"#;
++    assert_tree_and_stream_duplicate(unselected);
++}
++
++fn attribute_list(count: usize, distinct_namespace: bool, distinct_local: bool) -> String {
++    let mut xml = format!(r#"<r xmlns:mc="{}""#, NAMESPACE);
++    for index in 0..count {
++        let namespace = if distinct_namespace {
++            format!("urn:namespace-{index}")
++        } else {
++            "urn:shared".to_owned()
++        };
++        xml.push_str(&format!(r#" xmlns:p{index}="{namespace}""#));
++    }
++    for index in 0..count {
++        let local = if distinct_local {
++            format!("key{index}")
++        } else {
++            "key".to_owned()
++        };
++        xml.push_str(&format!(r#" p{index}:{local}="{index}""#));
++    }
++    xml.push_str("/>");
++    xml
++}
++
++fn duplicate_attribute_list(count: usize, first: usize, second: usize) -> String {
++    let mut xml = format!(r#"<r xmlns:mc="{}""#, NAMESPACE);
++    for index in 0..count {
++        xml.push_str(&format!(r#" xmlns:p{index}="urn:shared""#));
++    }
++    for index in 0..count {
++        let local = if index == second {
++            format!("key{first}")
++        } else {
++            format!("key{index}")
++        };
++        xml.push_str(&format!(r#" p{index}:{local}="{index}""#));
++    }
++    xml.push_str("/>");
++    xml
++}
++
++#[test]
++fn expanded_duplicate_validation_covers_inline_and_sorted_attribute_paths() {
++    // The 9th name spills past the eight-entry inline scratch; the last case
++    // collides only among overflow entries, after the inline names are gone.
++    for (count, first, second) in [(8, 0, 7), (9, 0, 8), (33, 16, 32)] {
++        let duplicate = duplicate_attribute_list(count, first, second);
++        assert_tree_and_stream_duplicate(&duplicate);
++    }
++}
++
++#[test]
++fn expanded_duplicate_validation_keeps_distinct_names_legal_at_each_size() {
++    for count in [8, 9, 33] {
++        // One namespace with distinct local names is legal.
++        assert_tree_and_stream_accept(&attribute_list(count, false, true));
++        // One local name in distinct namespaces is also legal.
++        assert_tree_and_stream_accept(&attribute_list(count, true, false));
++    }
++}
++
++#[test]
++fn active_offsets_rejects_the_same_expanded_duplicate_input() {
++    let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:a="urn:shared" xmlns:b="urn:shared" a:k="one" b:k="two"/>"#;
++    let offset = u32::try_from(
++        xml.iter()
++            .position(|byte| *byte == b'<')
++            .expect("root start"),
++    )
++    .expect("source offset fits");
++
++    let result = active_offsets(
++        xml,
++        &[offset],
++        &Capabilities::new(),
++        &OffsetLimits::default(),
++    );
++    assert!(matches!(
++        result,
++        Err(Error::NonConformant(message)) if message == "duplicate attribute"
++    ));
++}
++
++#[test]
++fn no_mce_inputs_remain_borrowed_and_byte_exact() {
++    // The legacy processor intentionally has a no-MCE fast path.  Expanded
++    // duplicate validation belongs to MCE processing and must not turn this
++    // unrelated input into an owned or rewritten buffer.
++    let source = br#"<r xmlns:a="urn:shared" xmlns:b="urn:shared" a:k="one" b:k="two"/>"#;
++    let output = process_markup_compatibility(source, &Capabilities::new(), &Limits::default())
++        .expect("no-MCE input uses the borrowed fast path");
++    assert!(matches!(&output.xml, Cow::Borrowed(bytes) if *bytes == source));
++    assert_eq!(output.xml.as_ref(), source);
++}
+diff --git a/crates/litchi-ooxml-common/src/mce/mod.rs b/crates/litchi-ooxml-common/src/mce/mod.rs
+index d97b328c9f..9fe8f9f384 100644
+--- a/crates/litchi-ooxml-common/src/mce/mod.rs
++++ b/crates/litchi-ooxml-common/src/mce/mod.rs
+@@ -12,6 +12,8 @@ mod scope;
+ #[cfg(test)]
+ mod bounds_tests;
+ #[cfg(test)]
++mod expanded_duplicates_tests;
++#[cfg(test)]
+ mod shared_names_tests;
+ #[cfg(test)]
+ mod tests;

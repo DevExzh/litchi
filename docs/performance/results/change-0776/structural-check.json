@@ -1,0 +1,17 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--mode",
+    "structural"
+  ],
+  "exit": 0,
+  "stdout": "OK: 10 performance claims validated (structural)\n",
+  "stderr": "",
+  "scope": "Ten existing registry claims; not validation of new 0776 measurements."
+}

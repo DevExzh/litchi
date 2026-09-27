@@ -1,0 +1,97 @@
+   Compiling getrandom v0.3.4
+   Compiling num-traits v0.2.19
+    Checking hybrid-array v0.4.14
+    Checking generic-array v0.14.9
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking digest v0.11.3
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+    Checking chrono v0.4.45
+    Checking digest v0.10.7
+    Checking tempfile v3.27.0
+    Checking sha2 v0.11.0
+    Checking either v1.18.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-core)
+    Checking rayon v1.12.0
+    Checking tinyvec v1.12.0
+    Checking sha2 v0.10.9
+    Checking unicode-normalization v0.1.25
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/soapberry-zip)
+    Checking caseless v0.2.2
+    Checking rand_core v0.9.5
+   Compiling lock_api v0.4.13
+    Checking utf8parse v0.2.2
+   Compiling parking_lot_core v0.9.11
+    Checking anstyle-parse v0.2.7
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking scopeguard v1.2.0
+    Checking anstyle-query v1.1.5
+    Checking anstyle v1.0.14
+    Checking anstream v0.6.21
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-sheet)
+    Checking errno v0.3.14
+    Checking wait-timeout v0.2.1
+    Checking clap_lex v0.6.0
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-opc)
+    Checking bumpalo v3.20.3
+    Checking strsim v0.10.0
+    Checking equivalent v1.0.2
+    Checking fnv v1.0.7
+    Checking simd-adler32 v0.3.10
+    Checking quick-error v1.2.3
+    Checking hashbrown v0.16.1
+    Checking bit-vec v0.8.0
+    Checking bit-set v0.8.0
+    Checking indexmap v2.11.4
+    Checking rusty-fork v0.3.1
+    Checking zopfli v0.8.3
+   Compiling clap_derive v4.4.7
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-ooxml-common)
+    Checking clap_builder v4.4.18
+    Checking signal-hook-registry v1.4.8
+    Checking rand_chacha v0.9.0
+    Checking parking_lot v0.12.4
+    Checking rand_xorshift v0.4.0
+    Checking rand v0.9.5
+    Checking socket2 v0.6.5
+    Checking mio v1.0.4
+   Compiling tokio-macros v2.5.0
+    Checking bytes v1.12.1
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-drawingml)
+    Checking lazy_static v1.5.0
+    Checking regex-syntax v0.8.11
+    Checking unarray v0.1.4
+    Checking pin-project-lite v0.2.17
+    Checking typed-path v0.12.3
+    Checking zip v8.6.0
+    Checking tokio v1.47.5
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-xlsx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-pptx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-docx)
+    Checking proptest v1.7.0
+    Checking clap v4.4.18
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi)
+warning: function `missing_ooxml_catalog_part_error` is never used
+   --> crates/litchi/src/detection_smart/detected.rs:612:4
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+warning: variable does not need to be mutable
+    --> crates/litchi/src/detection_smart/detected.rs:3621:13
+     |
+3621 |         let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
+     |             ----^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib test) generated 2 warnings (1 duplicate) (run `cargo fix --lib -p litchi --tests` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized] target(s) in 22.42s

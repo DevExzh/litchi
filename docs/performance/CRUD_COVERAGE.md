@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0776 — malformed MCE duplicate refusal
+
+[0776](0776-mce-expanded-attribute-duplicates.md) closes the tree expanded-attribute duplicate gap recorded in 0775, including opaque/skipped branches and active-offset processing. Seven new tests and nine final quality gates pass. No CRUD row is promoted; no-MCE passthrough and broader malformed-QName parity remain outside this validation scope.
+
 ## 0775 — parser integration does not promote CRUD coverage
 
 [0775](0775-mce-stream-integration.md) validates MCE namespace sharing and dependent OOXML owners. Its hostile/ordinary parser probes are not complete CRUD workflows; no coverage-index row is promoted. The pre-existing tree expanded-attribute duplicate gap and broader goal evidence remain open.

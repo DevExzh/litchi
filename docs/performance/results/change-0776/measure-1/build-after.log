@@ -1,0 +1,5 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/crates/litchi-docx)
+   Compiling mce-stream-probe v0.0.0 (/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/measure-1/after)
+    Finished `release` profile [optimized] target(s) in 45.20s

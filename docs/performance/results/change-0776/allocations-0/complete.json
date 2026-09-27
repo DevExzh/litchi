@@ -1,0 +1,4 @@
+{
+  "source_unchanged": true,
+  "scope": "One whole-process instrumented sample per case/leg, including startup, XML input generation, parser, observer and report serialization. Instrumented timings excluded from native statistics."
+}

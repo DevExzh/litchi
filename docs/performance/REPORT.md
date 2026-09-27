@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0776 — expanded-attribute duplicates fail closed
+
+[0776](0776-mce-expanded-attribute-duplicates.md) repairs tree MCE acceptance of aliased duplicate attributes, including inactive/opaque content, with bounded fallible scratch and DOCX accounting. Nine gates pass (5,676 tests); 64,292 of 64,541 differential outcomes are unchanged and all 249 changes have duplicate witnesses or the explicit invalid control. Both native attempts, seven final latency flags and separate allocation evidence are retained. This does not complete the non-iWork performance program.
+
 ## 0775 — shared MCE event namespaces integrated
 
 [0775](0775-mce-stream-integration.md) records nine passing gates (5,669 tests, 35 ignored), 18 paired cases and 64,541 outcomes exactly matching a text-based reference. It documents the public ExpandedName migration, three regression flags, preserved failed probe attempts and remaining parser limitations. No end-to-end Office or complete-program speedup is claimed.

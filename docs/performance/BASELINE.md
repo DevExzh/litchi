@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0776 — cost of expanded-attribute refusal
+
+[0776](0776-mce-expanded-attribute-duplicates.md) retains both paired captures: the final 18-case/108-process run reports seven latency flags, including worksheet +5.77% and synthetic 32-prefixed-attribute +19.70%, with no peak-RSS regression above 5%. Separate whole-process allocation observations show unchanged ordinary allocation counts and 4,000 additional spill allocations on the 32-attribute control. This is a measured correctness repair, not a speedup or CRUD baseline.
+
 ## 0775 — MCE stream current-source pair
 
 [0775](0775-mce-stream-integration.md) records 18 cases/108 serial process captures, nine passing gates and a complete text-based semantic reference. Long-URI event-name sharing removes repeated copies; ordinary document controls and three regression flags are explicit. This is an in-memory parser pair, not a CRUD or cold-cache baseline.

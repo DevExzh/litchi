@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0776 — duplicate gap closed; broader goal active
+
+[0776](0776-mce-expanded-attribute-duplicates.md) adds bounded expanded-attribute validation with caller memory accounting. Final gates pass; all 249 differential changes are explained by independently witnessed malformed duplicates. Seven latency regressions are disclosed and retained as correctness costs. The original dirty 0770 worktree remains untouched; its snapshot integration needs fresh evidence. Full CRUD, cold/range/scaling coverage and broader QName validation remain open.
+
 ## 0775 — MCE integration validated; program remains active
 
 [0775](0775-mce-stream-integration.md) integrates the clean 0771 candidate with source-bound gates, 108 paired timing processes and exact agreement with the pre-identity textual reference. Breaking event-name APIs, remaining extension URI costs, three regression flags and the existing tree duplicate gap are documented. Dirty 0770 work is untouched. Full CRUD, cold/range/scaling evidence and the non-iWork goal remain open.
