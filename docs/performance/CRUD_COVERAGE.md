@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0786 — category 15 finite execution-budget evidence
+
+[0786](0786-finite-execution-budget-scaling.md) Current public low-level OPC/CFB/Part read sessions now have a finite-budget scaling probe. This does not promote native-format CRUD coverage or close physical-cold, delayed-range, cross-session contention, or full-program requirements.
+
 ## 0785 — warm PPTX namespace controls
 
 [0785](0785-pptx-known-namespace-uris.md) Paired public capture, staged one-text-edit commit and full capture/edit/commit/apply/serialize cover tiny, medium, large, unknown ASCII namespace and Unicode namespace fixtures. All 255 reports / 5,595 samples verify. The generated borrowed-ingress/full-writer route is bounded evidence, not new native producer, cold/range, concurrency or complete CRUD coverage.

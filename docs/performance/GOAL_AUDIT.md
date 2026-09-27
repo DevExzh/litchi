@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0786 — bounded scaling baseline
+
+[0786](0786-finite-execution-budget-scaling.md) This batch adds current-source timing and source-observer evidence for the three explicitly scheduled read sessions under finite shared-budget dimensions. The broad performance goal remains open; no production optimization or universal scaling claim is made.
+
 ## 0785 — bounded PPTX capture improvement retained
 
 [0785](0785-pptx-known-namespace-uris.md) The frozen 15-case latency/resource/benefit policy passes; six quality gates pass with 1,235 tests and 3 ignored. Large capture/lifecycle p50 improves 8.489%/6.844%, with exact unknown-namespace preservation and unchanged allocation metrics. Cold/range sources, native producer breadth, concurrency/scaling and comprehensive CRUD remain open; ODF deferred and iWork excluded.
