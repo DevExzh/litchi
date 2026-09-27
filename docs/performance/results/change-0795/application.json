@@ -1,0 +1,13 @@
+{
+  "completed": 1790546785.6958058,
+  "manifest": {
+    "bytes": 3063,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/candidate/manifest.json",
+    "sha256": "19ac0ac98aada6dcccd04c82e29333e669c0d25d0dee6d30d1f56340b52ba4d5"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/candidate-build-source.json",
+    "sha256": "8ec877571546a8c0c3738d4eeabae24997c9f58118eae6a2d40ea56051ab4eb4"
+  }
+}

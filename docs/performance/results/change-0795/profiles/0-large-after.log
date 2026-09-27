@@ -1,0 +1,18 @@
+==824559== Callgrind, a call-graph generating cache profiler
+==824559== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==824559== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==824559== Command: /home/zhuhe/code/litchi-target-0795/after-profile --mode capture --shape large --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0795/profiles/0-large-after.json
+==824559== 
+==824559== For interactive control, run 'callgrind_control -h'.
+==824559== brk segment overflow in thread #1: can't grow to 0x4a8c000
+==824559== (see section Limitations in user manual)
+==824559== NOTE: further instances of this message will not be shown
+==824559== 
+==824559== Events    : Ir Bc Bcm Bi Bim
+==824559== Collected : 547207829 44356083 2753078 5495777 310633
+==824559== 
+==824559== I   refs:      547,207,829
+==824559== 
+==824559== Branches:       49,851,860  (44,356,083 cond + 5,495,777 ind)
+==824559== Mispredicts:     3,063,711  ( 2,753,078 cond +   310,633 ind)
+==824559== Mispred rate:          6.1% (       6.2%     +       5.7%   )

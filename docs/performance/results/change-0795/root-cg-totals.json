@@ -1,0 +1,293 @@
+{
+  "rows": [
+    {
+      "call_rows": 0,
+      "file": "0-large-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 1143,
+      "file": "0-large-after.callgrind.1",
+      "self_rows": 14841,
+      "totals": {
+        "Bc": 44356083,
+        "Bcm": 2753078,
+        "Bi": 5495777,
+        "Bim": 310633,
+        "Ir": 547207829
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-large-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 1141,
+      "file": "0-large-before.callgrind.1",
+      "self_rows": 14967,
+      "totals": {
+        "Bc": 45300910,
+        "Bcm": 2956469,
+        "Bi": 5586687,
+        "Bim": 229969,
+        "Ir": 549368835
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-medium-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 919,
+      "file": "0-medium-after.callgrind.1",
+      "self_rows": 12123,
+      "totals": {
+        "Bc": 859366,
+        "Bcm": 54455,
+        "Bi": 89691,
+        "Bim": 5460,
+        "Ir": 13706121
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-medium-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 913,
+      "file": "0-medium-before.callgrind.1",
+      "self_rows": 12085,
+      "totals": {
+        "Bc": 872978,
+        "Bcm": 58128,
+        "Bi": 90953,
+        "Bim": 4361,
+        "Ir": 13724056
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-tiny-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 871,
+      "file": "0-tiny-after.callgrind.1",
+      "self_rows": 11480,
+      "totals": {
+        "Bc": 344394,
+        "Bcm": 23584,
+        "Bi": 33682,
+        "Bim": 2094,
+        "Ir": 7745872
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-tiny-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 862,
+      "file": "0-tiny-before.callgrind.1",
+      "self_rows": 11374,
+      "totals": {
+        "Bc": 351680,
+        "Bcm": 25552,
+        "Bi": 34178,
+        "Bim": 1663,
+        "Ir": 7758062
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-large-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 1137,
+      "file": "1-large-after.callgrind.1",
+      "self_rows": 14841,
+      "totals": {
+        "Bc": 44357335,
+        "Bcm": 2747449,
+        "Bi": 5495831,
+        "Bim": 310633,
+        "Ir": 547227600
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-large-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 1155,
+      "file": "1-large-before.callgrind.1",
+      "self_rows": 15075,
+      "totals": {
+        "Bc": 45296412,
+        "Bcm": 2955275,
+        "Bi": 5586916,
+        "Bim": 230149,
+        "Ir": 549351049
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-medium-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 917,
+      "file": "1-medium-after.callgrind.1",
+      "self_rows": 12115,
+      "totals": {
+        "Bc": 859113,
+        "Bcm": 54609,
+        "Bi": 89807,
+        "Bim": 5459,
+        "Ir": 13706059
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-medium-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 895,
+      "file": "1-medium-before.callgrind.1",
+      "self_rows": 11983,
+      "totals": {
+        "Bc": 874197,
+        "Bcm": 58075,
+        "Bi": 90995,
+        "Bim": 4354,
+        "Ir": 13731167
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-tiny-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 871,
+      "file": "1-tiny-after.callgrind.1",
+      "self_rows": 11458,
+      "totals": {
+        "Bc": 344147,
+        "Bcm": 23656,
+        "Bi": 33697,
+        "Bim": 2095,
+        "Ir": 7744819
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-tiny-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 864,
+      "file": "1-tiny-before.callgrind.1",
+      "self_rows": 11428,
+      "totals": {
+        "Bc": 352389,
+        "Bcm": 25668,
+        "Bi": 34225,
+        "Bim": 1658,
+        "Ir": 7761900
+      }
+    }
+  ],
+  "scope": "Independent raw counter conservation only; no latency/cycle attribution"
+}

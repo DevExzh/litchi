@@ -1,0 +1,15 @@
+==824316== Callgrind, a call-graph generating cache profiler
+==824316== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==824316== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==824316== Command: /home/zhuhe/code/litchi-target-0795/after-profile --mode capture --shape tiny --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0795/profiles/0-tiny-after.json
+==824316== 
+==824316== For interactive control, run 'callgrind_control -h'.
+==824316== 
+==824316== Events    : Ir Bc Bcm Bi Bim
+==824316== Collected : 7745872 344394 23584 33682 2094
+==824316== 
+==824316== I   refs:      7,745,872
+==824316== 
+==824316== Branches:        378,076  (344,394 cond + 33,682 ind)
+==824316== Mispredicts:      25,678  ( 23,584 cond +  2,094 ind)
+==824316== Mispred rate:        6.8% (    6.8%     +    6.2%   )

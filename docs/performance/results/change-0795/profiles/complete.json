@@ -1,0 +1,13 @@
+{
+  "children": 12,
+  "receipts": {
+    "bytes": 29233,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/profiles/receipts.json",
+    "sha256": "f112142cc677563c44d822cf2d6e24c51e4b8b00d3fb329da5ec41b69494f1cb"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/profiles/source.json",
+    "sha256": "4754548653dc3d7b936219eed48d54e33c930d2ad4cac85b7f8a40dfa1ce455b"
+  }
+}

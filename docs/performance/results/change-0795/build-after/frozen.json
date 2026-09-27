@@ -1,0 +1,10 @@
+{
+  "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+  "build.py": "c2ee7bb9addfb282457f35199ded7e1afa52c12323705d6b203f864584c9b58e",
+  "capture.py": "77efee58e0ff19da3a338fb05fbeb15c9c1f8b2eb9ff3ea12112e58f6a1f6a4d",
+  "custody.py": "26478de07be2eef2e1c4049b10d568d74c59acbc9ecf083217f5404c74a81c6e",
+  "host.json": "d219f746dedd46b8e6487edef2cd9bc5763aa51d6d3eac7662ff9b7c90e92d84",
+  "inheritance.json": "9a5cad6917ab75fc07093d5dcd95cd67d55b6b156ef5db7e46c7b8c146987f7d",
+  "origin.json": "b1b02bc68f5e2ea5bab6044d6273761f72822090b4d32adec0e54b08bda7f7ef",
+  "plan.json": "cd093a5c69d629e72f8ff890f197689cd905173c9703e502f70ef52b7f1a690b"
+}
