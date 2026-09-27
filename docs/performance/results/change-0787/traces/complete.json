@@ -1,0 +1,8 @@
+{
+  "processes": 12,
+  "receipts": {
+    "bytes": 25499,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/receipts.json",
+    "sha256": "30c12e1f51518982a13b0dee762888cf579506d86c0ef6ab6ba1ff02ea2c6be2"
+  }
+}

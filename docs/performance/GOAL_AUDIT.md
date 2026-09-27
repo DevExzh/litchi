@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0787 — cached-Part optimization rejected by frozen memory policy
+
+[0787](0787-cached-part-scheduling.md) Correctness and latency benefits pass, but one statistically supported whole-child RSS regression rejects the candidate. All production/test source is restored and evidence retained. The broad goal remains active; OLE2/OOXML are in scope, ODF deferred and iWork excluded.
+
 ## 0786 — bounded scaling baseline
 
 [0786](0786-finite-execution-budget-scaling.md) This batch adds current-source timing and source-observer evidence for the three explicitly scheduled read sessions under finite shared-budget dimensions. The broad performance goal remains open; no production optimization or universal scaling claim is made.

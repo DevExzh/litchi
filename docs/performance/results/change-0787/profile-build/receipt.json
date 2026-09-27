@@ -1,0 +1,47 @@
+{
+  "binary": {
+    "bytes": 12907736,
+    "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile",
+    "sha256": "1258cd1794275ebbc2e0ac7eaf6b3dfcb40f47823ea3e592a29a9bf7bdb24cfa"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-src/Cargo.toml"
+  ],
+  "ended": 1790528671.495173,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0787",
+    "RUSTFLAGS": null
+  },
+  "exit_code": 0,
+  "log": {
+    "bytes": 229,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-build/build.log",
+    "sha256": "971e7b51c901e69c08c25dfd22aca07c469bde14865c252b803e67c228c61110"
+  },
+  "owner": "cached_part_profile::cached_part_region_0787",
+  "owner_symbol": {
+    "bytes": 64,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-build/owner-symbol.txt",
+    "sha256": "576ec4bb4743d97334a73d58ffc3cf508841e681dd08e65278e30625eb3b607f"
+  },
+  "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+  "probe": {
+    "bytes": 492,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-build/probe.json",
+    "sha256": "6b857e0f513f610219b98278f862a55694a7a8f0f91ebdc7bb38dff0a923c3b6"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-build/source.json",
+    "sha256": "e81a4b32dca23d018a28468aa6d14ecea22865c4cd1d9f37a85596c38d2e9edd"
+  },
+  "started": 1790528663.3345304
+}

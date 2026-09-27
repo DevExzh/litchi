@@ -1,0 +1,3 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-opc)
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/tools/perf-execution)
+    Finished `release` profile [optimized + debuginfo] target(s) in 22.91s

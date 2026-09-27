@@ -1,0 +1,57 @@
+[
+  {
+    "artifacts": {
+      "0-1.callgrind": {
+        "bytes": 537,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles/0-1.callgrind",
+        "sha256": "f6c8cdda6bc94057bba0cdccfe82148dcb860cae92c7d00053318517379f819a"
+      },
+      "0-1.log": {
+        "bytes": 2292,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles/0-1.log",
+        "sha256": "42c980a6fcd54d667c2d75bd6af5b15fe9370a143c25920e8b7bbf2f4736cc70"
+      }
+    },
+    "binary": {
+      "bytes": 12907736,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile",
+      "sha256": "1258cd1794275ebbc2e0ac7eaf6b3dfcb40f47823ea3e592a29a9bf7bdb24cfa"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles/0-1.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles/0-1.json"
+    ],
+    "driver_sha256": "b39379ab9d5a9d43222f69698386f5b888dcef64cde4f0919303ab07ded7737e",
+    "ended": 1790528731.6461961,
+    "exit_code": -11,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 0,
+    "started": 1790528729.7094326,
+    "workers": 1
+  }
+]

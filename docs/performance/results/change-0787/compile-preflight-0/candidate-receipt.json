@@ -1,0 +1,66 @@
+{
+  "change": "0787-cached-part-scheduling",
+  "base_commit": "6b47617020dd08bca196cbf3ab0b87a69aefbcb1",
+  "archive_only": true,
+  "live_production_edited": false,
+  "committed": false,
+  "cargo_or_compiler_run": false,
+  "native_or_profiler_run": false,
+  "changed_files": [
+    "crates/litchi-opc/src/source_backed.rs",
+    "crates/litchi-opc/src/source_backed/batch.rs",
+    "crates/litchi-opc/tests/source_backed_batch.rs"
+  ],
+  "artifacts": {
+    "changed_files_json": {
+      "bytes": 149,
+      "sha256": "c2585677e94d9080f094667c4269d593aaa884ff4c6b9ecb678008fe81f37f91"
+    },
+    "model_patch": {
+      "bytes": 17194,
+      "sha256": "26fee1649ddef223b0b34489a3e4df823a7070e3e0bc00eb3db3123e4fd15acb"
+    },
+    "implementation_notes": {
+      "bytes": 5344,
+      "sha256": "4cd7f809125fb8579f8043bb09ecf4c1ff7de1d5c6f01286e9fb0f25419fedd3"
+    }
+  },
+  "files": [
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "before_bytes": 919523,
+      "before_sha256": "029dac7bc5dbe173a333bd35f316ec79286e8c15432f0766bc3bbc48ce0c1df3",
+      "candidate_bytes": 924086,
+      "candidate_sha256": "c237b79364c261a0216632a5a991e2ae522622191c4fdddc2a9458776770fbe1"
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed/batch.rs",
+      "before_bytes": 42039,
+      "before_sha256": "57461fc249e7f9b6729affecd50ebf2685ddea658f0b2b2dfd67085a0eae0491",
+      "candidate_bytes": 44326,
+      "candidate_sha256": "b672957a44bd07648822c93cdf879d19f7c2ef858fc61a39bc3fbb7fdd7b2143"
+    },
+    {
+      "path": "crates/litchi-opc/tests/source_backed_batch.rs",
+      "before_bytes": 46597,
+      "before_sha256": "b6309038bcc105373b80c7dfeee4da3e3b62dc2d21f6239552f9e5fdf53d0137",
+      "candidate_bytes": 54493,
+      "candidate_sha256": "5f60ab07666005a06fe0f6a0d8a8dbaa5a4c721d8fcd59c1b29bb7c87c92faf4"
+    }
+  ],
+  "checks": {
+    "git_apply_check": {
+      "command": "git apply --check --whitespace=error docs/performance/results/change-0787/candidate/model.patch",
+      "status": "pass"
+    },
+    "rustfmt": {
+      "commands": [
+        "rustfmt --check --edition 2024 --config skip_children=true docs/performance/results/change-0787/candidate/files/crates/litchi-opc/src/source_backed.rs",
+        "rustfmt --check --edition 2024 docs/performance/results/change-0787/candidate/files/crates/litchi-opc/src/source_backed/batch.rs",
+        "rustfmt --check --edition 2024 docs/performance/results/change-0787/candidate/files/crates/litchi-opc/tests/source_backed_batch.rs"
+      ],
+      "status": "pass"
+    },
+    "live_source_status": "unchanged at base commit"
+  }
+}

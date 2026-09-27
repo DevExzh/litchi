@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0787 — category 15 paired cache-control evidence
+
+[0787](0787-cached-part-scheduling.md) Fresh and primed ordered Part reads cover three payload sizes, two task floors and widths 1/2/4/8/32. All 22,200 measured samples verify exact bytes/order and finite budgets. Rejection preserves production; native Office CRUD, cold/range and cross-session coverage remain open.
+
 ## 0786 — category 15 finite execution-budget evidence
 
 [0786](0786-finite-execution-budget-scaling.md) Current public low-level OPC/CFB/Part read sessions now have a finite-budget scaling probe. This does not promote native-format CRUD coverage or close physical-cold, delayed-range, cross-session contention, or full-program requirements.

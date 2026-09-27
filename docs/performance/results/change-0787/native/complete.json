@@ -1,0 +1,13 @@
+{
+  "children": 720,
+  "receipts": {
+    "bytes": 1505040,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/native/receipts.json",
+    "sha256": "0dfd833915bd421de07605be4b6587b46872504f5f1ea99b2cbc8b5b92457c7d"
+  },
+  "source": {
+    "bytes": 1201785,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/native/source.json",
+    "sha256": "79718078e7fc32653a482c37f2f5db687dfaddd53537e1392877f3fdca454f34"
+  }
+}

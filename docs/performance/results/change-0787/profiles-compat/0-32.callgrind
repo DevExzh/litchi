@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 192980
+cmd:  /home/zhuhe/code/litchi-target-0787/baseline-profile-compat --route parts --shape large --workers 32 --task-floor 0 --state primed --samples 1 --warmup 0 --output /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.json
+part: 2
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 130493051 - 145494589
+desc: Trigger: Program termination
+
+positions: line
+events: Ir
+summary: 0
+
+
+totals: 0

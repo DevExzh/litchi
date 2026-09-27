@@ -1,0 +1,36 @@
+{
+  "analysis": {
+    "bytes": 22733836,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/analysis.json",
+    "sha256": "1dc5a29ca23ba1a81a27c3118ceb453118004241613a77ac6fba43d5ca092bbe"
+  },
+  "candidate_retained_only_in_archive": true,
+  "decision": "reject",
+  "guard_failures": [
+    {
+      "ci95_low": 1.0321097141040307,
+      "kind": "rss",
+      "reason": "median_ratio_limit",
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "value": 1.0569690239215088,
+      "workers": 4
+    }
+  ],
+  "production_byte_identical_to_base": true,
+  "production_files": 9196,
+  "raw_audit": {
+    "bytes": 113216,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/raw-audit.json",
+    "sha256": "72802f8c4c503f4bbb28f195265471dd1afc4afaf661f5fed31190fa175449f0"
+  },
+  "reason": "Frozen whole-child RSS guard fails small/primed/floor0/workers4 despite sixteen latency benefits. No threshold change or measurement retry.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/restored-source.json",
+    "sha256": "e81a4b32dca23d018a28468aa6d14ecea22865c4cd1d9f37a85596c38d2e9edd"
+  },
+  "schema": "litchi.cached-part-disposition.0787.v1"
+}

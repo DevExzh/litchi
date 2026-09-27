@@ -1,0 +1,6 @@
+{
+  "initial_full_replay_failure": "observer (0, 'large', 'fresh', 0, 8) source counter changed: max_active",
+  "correction": "Observed peak simultaneous reads are scheduler-dependent. Retain both per-leg maxima and enforce each is bounded by requested workers, with zero for primed hits. Keep exact calls, requested/returned bytes, histograms, short-read and active-after parity.",
+  "measurement_or_policy_changed": false,
+  "raw_audit_status": "Independent 1080-report / 22200-sample audit passed before this correction; candidate fails frozen RSS guard."
+}

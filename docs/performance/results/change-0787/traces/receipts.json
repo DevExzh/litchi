@@ -1,0 +1,722 @@
+[
+  {
+    "artifacts": {
+      "0-1-fresh.json": {
+        "bytes": 11685,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-fresh.json",
+        "sha256": "27ca0e800b5d574d9d6ce7d1e2c7f68c3f8f5d38e4008f217776cf694bf85e01"
+      },
+      "0-1-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-1-fresh.strace": {
+        "bytes": 309,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-fresh.strace",
+        "sha256": "7213acbfc0b360772c5ae136a3d9677be106cdbd0e51c13a8092bf4b2e58b165"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-fresh.json"
+    ],
+    "ended": 1790528572.7075472,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528572.6661181,
+    "state": "fresh",
+    "workers": 1
+  },
+  {
+    "artifacts": {
+      "0-1-primed.json": {
+        "bytes": 11676,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-primed.json",
+        "sha256": "a5191965423673133db3d846d9e78c64f6fa99d7fd6797200fee8b978c87b053"
+      },
+      "0-1-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-1-primed.strace": {
+        "bytes": 309,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-primed.strace",
+        "sha256": "d885ad102b44700dff8cd049b7fd64e007d0587c317b0d270f668781eaaf1855"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-1-primed.json"
+    ],
+    "ended": 1790528572.9458697,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528572.8965364,
+    "state": "primed",
+    "workers": 1
+  },
+  {
+    "artifacts": {
+      "0-8-fresh.json": {
+        "bytes": 11686,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-fresh.json",
+        "sha256": "67d921bd8ac396095c064007129fd866cc523a47d8f66ff7c88d61a72763da1a"
+      },
+      "0-8-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-8-fresh.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-fresh.strace",
+        "sha256": "67af418ccd0ae195f7db589a5b7525e5c729100cbe18ece9c29bde7e70312680"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-fresh.json"
+    ],
+    "ended": 1790528573.1803365,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528573.1350224,
+    "state": "fresh",
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "0-8-primed.json": {
+        "bytes": 11681,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-primed.json",
+        "sha256": "5097280017a948354de96e3f4113b7fde9a20a81a72e29c748e538c60fb7ef22"
+      },
+      "0-8-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-8-primed.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-primed.strace",
+        "sha256": "014b6c687f2f2e541370e70b0eac64132ba4a0a5dd9dda74cb2c73bd72492cac"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-8-primed.json"
+    ],
+    "ended": 1790528573.4207377,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528573.365864,
+    "state": "primed",
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "0-32-fresh.json": {
+        "bytes": 11690,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-fresh.json",
+        "sha256": "30ba364c9a204ec9f129e7f197977766ae920a145038d298e57a2a5e35576c51"
+      },
+      "0-32-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-32-fresh.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-fresh.strace",
+        "sha256": "8caa05c9911c57dc64881ffd5118849e44b0c244cf0f101a4bb15bb59df54c83"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-fresh.json"
+    ],
+    "ended": 1790528573.6554966,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528573.6090796,
+    "state": "fresh",
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "0-32-primed.json": {
+        "bytes": 11684,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-primed.json",
+        "sha256": "7e89dea3b70a91c3c8f33db5a8a10b11db3aafb7e1aa2fe35715dfea634c9b65"
+      },
+      "0-32-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "0-32-primed.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-primed.strace",
+        "sha256": "06901e28a8031282977b2c74e95d53664ecfdbc97562d0f07e261d59213b9bb4"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/0-32-primed.json"
+    ],
+    "ended": 1790528573.904694,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 0,
+    "started": 1790528573.8450713,
+    "state": "primed",
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "1-32-fresh.json": {
+        "bytes": 11690,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-fresh.json",
+        "sha256": "f43884fc6b0972f553cc5f46ebad708c2afb9ff960e78184f5da2ef9b0b92e96"
+      },
+      "1-32-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-32-fresh.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-fresh.strace",
+        "sha256": "1a6ab1c2de8c66a433294c91b3fad761b78b257c93e72088f15815e42c868689"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-fresh.json"
+    ],
+    "ended": 1790528574.141294,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528574.094905,
+    "state": "fresh",
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "1-32-primed.json": {
+        "bytes": 11684,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-primed.json",
+        "sha256": "13a20c5ca7dab28a53bb1495011b138a091024efa8ba4e042f723acdcf3bafed"
+      },
+      "1-32-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-32-primed.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-primed.strace",
+        "sha256": "5af6dc11e4595cc76f985a2c61c52a474f5da27add92d26264dac1646ee99118"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-32-primed.json"
+    ],
+    "ended": 1790528574.387411,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528574.328923,
+    "state": "primed",
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "1-8-fresh.json": {
+        "bytes": 11686,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-fresh.json",
+        "sha256": "226971c6cd4b7d41945cc3923e27ad48ab9b06cd889d880bd0cbd260464d43cc"
+      },
+      "1-8-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-8-fresh.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-fresh.strace",
+        "sha256": "df8695df6b0889e46eaa0d24f62dfefa81870042ef66734f33664105f10fc04e"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-fresh.json"
+    ],
+    "ended": 1790528574.6213365,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528574.5767753,
+    "state": "fresh",
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "1-8-primed.json": {
+        "bytes": 11681,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-primed.json",
+        "sha256": "8113463aaaeb93fc8cfa3613cf785312b31151743d7756b7540c73c1b54ca43e"
+      },
+      "1-8-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-8-primed.strace": {
+        "bytes": 367,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-primed.strace",
+        "sha256": "eafdb8767659095d275fac1b53d828c651b012bb926be0ab0998cc0b1f82c9ce"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-8-primed.json"
+    ],
+    "ended": 1790528574.8654253,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528574.8108814,
+    "state": "primed",
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "1-1-fresh.json": {
+        "bytes": 11685,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-fresh.json",
+        "sha256": "652b49321f18179bfa1b9095ed1ecd69bf6627f39e3834f149f2078564eaa93a"
+      },
+      "1-1-fresh.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-fresh.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-1-fresh.strace": {
+        "bytes": 309,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-fresh.strace",
+        "sha256": "3ad0e871f568ecec12460fee61d21e6d83eb5f3e82ff55a62a1fcc3583871300"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-fresh.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "fresh",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-fresh.json"
+    ],
+    "ended": 1790528575.0953455,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528575.053835,
+    "state": "fresh",
+    "workers": 1
+  },
+  {
+    "artifacts": {
+      "1-1-primed.json": {
+        "bytes": 11676,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-primed.json",
+        "sha256": "7dbde09fd4b259a61b8365e46a17ec01b296eb992191a5c1532441f55571550c"
+      },
+      "1-1-primed.log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-primed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "1-1-primed.strace": {
+        "bytes": 309,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-primed.strace",
+        "sha256": "af22b0c2e9d99a388ce7e3b8e29e6493fe383be781b228b09e818713fe3667c0"
+      }
+    },
+    "binary": {
+      "bytes": 12918880,
+      "path": "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "strace",
+      "-f",
+      "-c",
+      "-e",
+      "trace=clone,clone3,futex",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-primed.strace",
+      "/home/zhuhe/code/litchi-target-0787/before-observer",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--state",
+      "primed",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/traces/1-1-primed.json"
+    ],
+    "ended": 1790528575.3313584,
+    "exit_code": 0,
+    "plan_sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+    "repeat": 1,
+    "started": 1790528575.282261,
+    "state": "primed",
+    "workers": 1
+  }
+]

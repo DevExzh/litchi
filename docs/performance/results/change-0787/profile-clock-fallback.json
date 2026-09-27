@@ -1,0 +1,10 @@
+{
+  "reason": "Callgrind SIGSEGV before region in rustix linux_raw auxv check_elf_base clock initialization;zero collectedIr",
+  "failed_lane": "profiles",
+  "failed_build": "profile-build",
+  "original_probe_archive": "profile-src-before-clock-fallback",
+  "compatibility_build": "profile-build-compat",
+  "compatibility_lane": "profiles-compat",
+  "change": "profile-only cpu_now_ns returnsNone; native tool remains unchanged",
+  "native_measurements_affected": false
+}

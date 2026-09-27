@@ -1,0 +1,6 @@
+* -text
+**/* -text
+*.log -whitespace
+**/*.log -whitespace
+*.patch -whitespace
+*.callgrind* -whitespace

@@ -1,0 +1,14 @@
+==192980== Callgrind, a call-graph generating cache profiler
+==192980== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==192980== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==192980== Command: /home/zhuhe/code/litchi-target-0787/baseline-profile-compat --route parts --shape large --workers 32 --task-floor 0 --state primed --samples 1 --warmup 0 --output /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.json
+==192980== 
+==192980== For interactive control, run 'callgrind_control -h'.
+==192980== brk segment overflow in thread #1: can't grow to 0x4a4e000
+==192980== (see section Limitations in user manual)
+==192980== NOTE: further instances of this message will not be shown
+==192980== 
+==192980== Events    : Ir
+==192980== Collected : 96902
+==192980== 
+==192980== I   refs:      96,902

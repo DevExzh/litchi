@@ -1,0 +1,1953 @@
+{
+  "schema": "litchi.execution-baseline.v1",
+  "scope": {
+    "ingress": "SourceBackedPackage owned immutable in-memory ReadAt",
+    "source": "in-memory immutable source; no disk or network",
+    "source_metrics_claim": "logical ReadAt observer only when source-metrics is enabled",
+    "timing": "first public operation after session/package metadata setup",
+    "cpu_time": "ProcessCPUTime interval is process-wide and may be slightly wider than wall timing",
+    "claims_excluded": [
+      "physical cold-cache behavior",
+      "filesystem or network latency",
+      "remote/range-source request cost",
+      "production source instrumentation overhead"
+    ]
+  },
+  "config": {
+    "route": "parts",
+    "shape": "large",
+    "workers": 32,
+    "task_floor": 0,
+    "aggregate_parallel_bytes": 65536,
+    "state": "fresh",
+    "samples": 30,
+    "warmup": 3,
+    "cpu_task_limit": 1000000
+  },
+  "corpus": {
+    "shape": "large",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ],
+    "members": [
+      {
+        "index": 0,
+        "opc_name": "custom/member00.bin",
+        "opc_uri": "/custom/member00.bin",
+        "cfb_name": "Member00",
+        "bytes": 262144,
+        "sha256": "9277d1c9aa854e59948ef917e0bd69365f40555c8ff53df18a9eb54ff188e79b"
+      },
+      {
+        "index": 1,
+        "opc_name": "custom/member01.bin",
+        "opc_uri": "/custom/member01.bin",
+        "cfb_name": "Member01",
+        "bytes": 262144,
+        "sha256": "c2601ebf93fd43d68537dea0312931dfcad90b7a4d0f2dfd09726deabfb532cd"
+      },
+      {
+        "index": 2,
+        "opc_name": "custom/member02.bin",
+        "opc_uri": "/custom/member02.bin",
+        "cfb_name": "Member02",
+        "bytes": 262144,
+        "sha256": "eea77a155525573f7343b5e0d7dc01f0417a1a6f6a18b0a5de1eab411c721ac4"
+      },
+      {
+        "index": 3,
+        "opc_name": "custom/member03.bin",
+        "opc_uri": "/custom/member03.bin",
+        "cfb_name": "Member03",
+        "bytes": 262144,
+        "sha256": "1a6477ee21defd72fcbcf8d3ba2e0ba46c833b47000c3305823fedbb7c0a00a3"
+      },
+      {
+        "index": 4,
+        "opc_name": "custom/member04.bin",
+        "opc_uri": "/custom/member04.bin",
+        "cfb_name": "Member04",
+        "bytes": 262144,
+        "sha256": "27f6d089905dd907fd49a484e0fd6e024c65481295097eddf0728a56f3a36739"
+      },
+      {
+        "index": 5,
+        "opc_name": "custom/member05.bin",
+        "opc_uri": "/custom/member05.bin",
+        "cfb_name": "Member05",
+        "bytes": 262144,
+        "sha256": "99bf7a8c4056494747f0568396fa198bf9d3e9f15548ef12a6527e0aec04a246"
+      },
+      {
+        "index": 6,
+        "opc_name": "custom/member06.bin",
+        "opc_uri": "/custom/member06.bin",
+        "cfb_name": "Member06",
+        "bytes": 262144,
+        "sha256": "bdfe3f9471bb22623652ba7647c42192413d384078a0ff188dcd00bb24c5bc99"
+      },
+      {
+        "index": 7,
+        "opc_name": "custom/member07.bin",
+        "opc_uri": "/custom/member07.bin",
+        "cfb_name": "Member07",
+        "bytes": 262144,
+        "sha256": "c424a5a776dc9e63f3d917c15e7656ff5009f1fdd7c4a4ff44b98521e884f4bc"
+      },
+      {
+        "index": 8,
+        "opc_name": "custom/member08.bin",
+        "opc_uri": "/custom/member08.bin",
+        "cfb_name": "Member08",
+        "bytes": 262144,
+        "sha256": "9694c573ac160c613383654157b3893060fb96fc50c3d194d54d611ec51bacdf"
+      },
+      {
+        "index": 9,
+        "opc_name": "custom/member09.bin",
+        "opc_uri": "/custom/member09.bin",
+        "cfb_name": "Member09",
+        "bytes": 262144,
+        "sha256": "68eaf2e4bb7817c0fc65d6982c2585ba99252a19ada8e9d58651fcf9cf6d643f"
+      },
+      {
+        "index": 10,
+        "opc_name": "custom/member10.bin",
+        "opc_uri": "/custom/member10.bin",
+        "cfb_name": "Member10",
+        "bytes": 262144,
+        "sha256": "0120c90f1f966115172a80de5ade9b8a4ae256bff1aa0ca2399fbc92478cd91c"
+      },
+      {
+        "index": 11,
+        "opc_name": "custom/member11.bin",
+        "opc_uri": "/custom/member11.bin",
+        "cfb_name": "Member11",
+        "bytes": 262144,
+        "sha256": "aef8b2516bc8ff92edc02cb50355260d88a1544354128b49df78b1e2db49e315"
+      },
+      {
+        "index": 12,
+        "opc_name": "custom/member12.bin",
+        "opc_uri": "/custom/member12.bin",
+        "cfb_name": "Member12",
+        "bytes": 262144,
+        "sha256": "8b2c0a816526855ead8ba208ef0da4bce059770880a21a4962134bb8cca67c9e"
+      },
+      {
+        "index": 13,
+        "opc_name": "custom/member13.bin",
+        "opc_uri": "/custom/member13.bin",
+        "cfb_name": "Member13",
+        "bytes": 262144,
+        "sha256": "2810be8b9604dc5f94e350a8205ba529428b0a9100092d52f75d613414fa843f"
+      },
+      {
+        "index": 14,
+        "opc_name": "custom/member14.bin",
+        "opc_uri": "/custom/member14.bin",
+        "cfb_name": "Member14",
+        "bytes": 262144,
+        "sha256": "e22ea625d6125c68fb791647256f6b7567632ac9342cfd58b2e5f0af33ea74bd"
+      },
+      {
+        "index": 15,
+        "opc_name": "custom/member15.bin",
+        "opc_uri": "/custom/member15.bin",
+        "cfb_name": "Member15",
+        "bytes": 262144,
+        "sha256": "7848df5fd6ea574c0fe677f3ae617c41634ba394c27ff92211d3b18639d98f93"
+      },
+      {
+        "index": 16,
+        "opc_name": "custom/member16.bin",
+        "opc_uri": "/custom/member16.bin",
+        "cfb_name": "Member16",
+        "bytes": 262144,
+        "sha256": "c49075bbc76c6afc4b85a6e33a578ee37c019b40b4d60162e11f3e2a2b8eff8c"
+      },
+      {
+        "index": 17,
+        "opc_name": "custom/member17.bin",
+        "opc_uri": "/custom/member17.bin",
+        "cfb_name": "Member17",
+        "bytes": 262144,
+        "sha256": "c2787cbe0dc8c7b61dacfbc13170af5fe115cd29bd6e7989c989becb27f0a0c9"
+      },
+      {
+        "index": 18,
+        "opc_name": "custom/member18.bin",
+        "opc_uri": "/custom/member18.bin",
+        "cfb_name": "Member18",
+        "bytes": 262144,
+        "sha256": "ce7e6c667f15445a22d5b203501c30f371a1138b87abd4727a61c0e9c5eacbcc"
+      },
+      {
+        "index": 19,
+        "opc_name": "custom/member19.bin",
+        "opc_uri": "/custom/member19.bin",
+        "cfb_name": "Member19",
+        "bytes": 262144,
+        "sha256": "b542505322c753dad3a62a2151bfb8c9a10b0912727dbf1eaf0bbece167e1625"
+      },
+      {
+        "index": 20,
+        "opc_name": "custom/member20.bin",
+        "opc_uri": "/custom/member20.bin",
+        "cfb_name": "Member20",
+        "bytes": 262144,
+        "sha256": "3e5147e4c94af4241f844d200709d6d47b4a873819d6f5f8fb63e846153b8871"
+      },
+      {
+        "index": 21,
+        "opc_name": "custom/member21.bin",
+        "opc_uri": "/custom/member21.bin",
+        "cfb_name": "Member21",
+        "bytes": 262144,
+        "sha256": "29b670006b7bb652877fe049f56ec65d1457109b7b62e15008b9216c59d4b420"
+      },
+      {
+        "index": 22,
+        "opc_name": "custom/member22.bin",
+        "opc_uri": "/custom/member22.bin",
+        "cfb_name": "Member22",
+        "bytes": 262144,
+        "sha256": "90148fe22870e555fe8a78df5809a3eb4078426f78339b04fe7677502dfca104"
+      },
+      {
+        "index": 23,
+        "opc_name": "custom/member23.bin",
+        "opc_uri": "/custom/member23.bin",
+        "cfb_name": "Member23",
+        "bytes": 262144,
+        "sha256": "6eacf3859f9da9cb3c23721409eeb1af3838b64c9a232c95368898d04bdd6972"
+      },
+      {
+        "index": 24,
+        "opc_name": "custom/member24.bin",
+        "opc_uri": "/custom/member24.bin",
+        "cfb_name": "Member24",
+        "bytes": 262144,
+        "sha256": "db22201cea00ac98181af4e368d531f23fe3d187fc43606395a84f8ebdb65c4f"
+      },
+      {
+        "index": 25,
+        "opc_name": "custom/member25.bin",
+        "opc_uri": "/custom/member25.bin",
+        "cfb_name": "Member25",
+        "bytes": 262144,
+        "sha256": "464b8f9bbb6fec32aaaf822b22547e86da136b349fedac010ddcdb02bb0b5831"
+      },
+      {
+        "index": 26,
+        "opc_name": "custom/member26.bin",
+        "opc_uri": "/custom/member26.bin",
+        "cfb_name": "Member26",
+        "bytes": 262144,
+        "sha256": "3f8e08fd9770c5aaa91ddc3851d5b9bf123477a6241e37d24d02059168a645b8"
+      },
+      {
+        "index": 27,
+        "opc_name": "custom/member27.bin",
+        "opc_uri": "/custom/member27.bin",
+        "cfb_name": "Member27",
+        "bytes": 262144,
+        "sha256": "7e31a498d3e6a1d9afd11a11c541c40691f284ca9d321d5f46b919384705b729"
+      },
+      {
+        "index": 28,
+        "opc_name": "custom/member28.bin",
+        "opc_uri": "/custom/member28.bin",
+        "cfb_name": "Member28",
+        "bytes": 262144,
+        "sha256": "ca652d8ad904174510bb30c68c51866fa2dc5d8faa6e8d6a2fcfdd558c0ad70f"
+      },
+      {
+        "index": 29,
+        "opc_name": "custom/member29.bin",
+        "opc_uri": "/custom/member29.bin",
+        "cfb_name": "Member29",
+        "bytes": 262144,
+        "sha256": "e148747769ea4a15ef359d9316bace004d2d6a9243120161dd69fa82330b8cb9"
+      },
+      {
+        "index": 30,
+        "opc_name": "custom/member30.bin",
+        "opc_uri": "/custom/member30.bin",
+        "cfb_name": "Member30",
+        "bytes": 262144,
+        "sha256": "796335a34fab493a3a0ab61c71922de1e370fea44a47cf997d1d5f08f890f7d0"
+      },
+      {
+        "index": 31,
+        "opc_name": "custom/member31.bin",
+        "opc_uri": "/custom/member31.bin",
+        "cfb_name": "Member31",
+        "bytes": 262144,
+        "sha256": "a881ac74cabd0879a70bb49d4d9d70dd19aa1b4baad2657d962fcf2a5bf8339a"
+      }
+    ],
+    "selected_payload_member_count": 32,
+    "opc_sha256": "17af284e30f976d81b15f5c95dcc5db80e3e508b2b412d70aa5d35175fa7fd7f",
+    "cfb_sha256": "295f4a62f103539b7a590a85302b2d75074dbb1993340ba1a5d3cc163d4b7ffe"
+  },
+  "metrics": {
+    "source_metrics_feature": false,
+    "source_metrics_scope": "CFB and source-backed Parts timed operation only; counters reset after preload",
+    "opc_external_read_at": "not-used",
+    "cpu_clock": "rustix ProcessCPUTime"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "wall_ns": 831424,
+      "cpu_ns": 4937643,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 1,
+      "wall_ns": 853603,
+      "cpu_ns": 5848940,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 2,
+      "wall_ns": 890194,
+      "cpu_ns": 5652971,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 3,
+      "wall_ns": 832414,
+      "cpu_ns": 4873300,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 4,
+      "wall_ns": 873953,
+      "cpu_ns": 6177690,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 5,
+      "wall_ns": 877774,
+      "cpu_ns": 5366060,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 6,
+      "wall_ns": 931954,
+      "cpu_ns": 6210160,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 7,
+      "wall_ns": 857864,
+      "cpu_ns": 5667122,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 8,
+      "wall_ns": 870284,
+      "cpu_ns": 5377080,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 9,
+      "wall_ns": 813883,
+      "cpu_ns": 5024530,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 10,
+      "wall_ns": 878454,
+      "cpu_ns": 5479260,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 11,
+      "wall_ns": 863844,
+      "cpu_ns": 5342970,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 12,
+      "wall_ns": 888934,
+      "cpu_ns": 6039920,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 13,
+      "wall_ns": 847634,
+      "cpu_ns": 6175420,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 14,
+      "wall_ns": 851413,
+      "cpu_ns": 5501033,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 15,
+      "wall_ns": 819274,
+      "cpu_ns": 5287340,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 16,
+      "wall_ns": 837194,
+      "cpu_ns": 4852060,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 17,
+      "wall_ns": 824983,
+      "cpu_ns": 5681070,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 18,
+      "wall_ns": 808544,
+      "cpu_ns": 5039090,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 19,
+      "wall_ns": 821834,
+      "cpu_ns": 5301348,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 20,
+      "wall_ns": 822104,
+      "cpu_ns": 4932440,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 21,
+      "wall_ns": 827523,
+      "cpu_ns": 5303080,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 22,
+      "wall_ns": 835964,
+      "cpu_ns": 5692096,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 23,
+      "wall_ns": 838784,
+      "cpu_ns": 5212880,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 24,
+      "wall_ns": 739393,
+      "cpu_ns": 4596840,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 25,
+      "wall_ns": 830213,
+      "cpu_ns": 4644360,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 26,
+      "wall_ns": 729723,
+      "cpu_ns": 4835850,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 27,
+      "wall_ns": 942734,
+      "cpu_ns": 5104485,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 28,
+      "wall_ns": 937994,
+      "cpu_ns": 4967020,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    },
+    {
+      "sample": 29,
+      "wall_ns": 876723,
+      "cpu_ns": 5399890,
+      "primed_cache_hit_control": false,
+      "verification": {
+        "ordered": true,
+        "all_member_sha256_match": true,
+        "members": 32,
+        "logical_bytes": 8388608,
+        "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+      },
+      "resources": {
+        "limits": {
+          "memory": 134217728,
+          "input_bytes": 67108864,
+          "output_bytes": 67108864,
+          "objects": 1000000,
+          "depth": 512,
+          "work": 536870912,
+          "workers": 32,
+          "io_concurrency": 32,
+          "cpu_tasks": 1000000,
+          "max_in_flight_tasks": 32,
+          "max_in_flight_bytes": 16777216
+        },
+        "before_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 0
+        },
+        "after_operation": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "after_drop": {
+          "workers": 0,
+          "io_concurrency": 0,
+          "cpu_tasks": 32
+        },
+        "worker_and_io_released": true,
+        "cpu_tasks_within_limit": true
+      },
+      "source_metrics": {
+        "availability": "unavailable-normal-build",
+        "logical_calls": null,
+        "requested_bytes": null,
+        "returned_bytes": null,
+        "short_reads": null,
+        "active_reads_after_operation": null,
+        "max_simultaneous_reads": null,
+        "request_size_histogram": null
+      }
+    }
+  ]
+}

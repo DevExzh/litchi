@@ -1,0 +1,4831 @@
+{
+  "failed_attempt": {
+    "artifacts": {
+      "0-1.callgrind": {
+        "bytes": 537,
+        "path": "profiles/0-1.callgrind",
+        "sha256": "f6c8cdda6bc94057bba0cdccfe82148dcb860cae92c7d00053318517379f819a"
+      },
+      "0-1.log": {
+        "bytes": 2292,
+        "path": "profiles/0-1.log",
+        "sha256": "42c980a6fcd54d667c2d75bd6af5b15fe9370a143c25920e8b7bbf2f4736cc70"
+      }
+    },
+    "fallback": {
+      "bytes": 472,
+      "path": "profile-clock-fallback.json",
+      "sha256": "1f55ea3f5d0c1cf058647f9ff0535cbfcfe69818ae6d62d99b7a3674964f7441"
+    },
+    "log_contains_sigsegv_before_owner": true,
+    "native_measurements_affected": false,
+    "qualified": false,
+    "raw": {
+      "events": [
+        "Ir"
+      ],
+      "part": 1,
+      "summary_ir": 0,
+      "totals_ir": 0,
+      "trigger": "Program termination"
+    },
+    "reason": "Callgrind SIGSEGV before region in rustix linux_raw auxv check_elf_base clock initialization;zero collectedIr",
+    "receipt": {
+      "bytes": 2095,
+      "path": "profiles/receipts.json",
+      "sha256": "9d1c033395ebbefccdbcf6194450bad231e0dccf2400088dcbfac38cb7b90ae6"
+    },
+    "row": {
+      "binary": {
+        "bytes": 12907736,
+        "custody_verified": true,
+        "name": "baseline-profile",
+        "sha256": "1258cd1794275ebbc2e0ac7eaf6b3dfcb40f47823ea3e592a29a9bf7bdb24cfa"
+      },
+      "exit_code": -11,
+      "repeat": 0,
+      "workers": 1
+    }
+  },
+  "origin": {
+    "base_revision": "6b47617020dd08bca196cbf3ab0b87a69aefbcb1",
+    "owned_worktree_recorded": true,
+    "target_name": "litchi-target-0787"
+  },
+  "packet": "change-0787",
+  "parser": {
+    "git_blob_sha1": "1c42922ea9ab5f3624f294f4f0e5f615775c234e",
+    "path": "../change-0784/profile_analysis.py",
+    "sha256": "70b0bb3fc665860a9aa586725d72ced75e41de06f95e3b1c5408c70998e926b6"
+  },
+  "plans": {
+    "profile": {
+      "file": {
+        "bytes": 892,
+        "path": "profile-plan.json",
+        "sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b"
+      },
+      "sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+      "value": {
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "collect_at_start": false,
+        "events": [
+          "Ir"
+        ],
+        "orders": [
+          [
+            1,
+            8,
+            32
+          ],
+          [
+            32,
+            8,
+            1
+          ]
+        ],
+        "owner_suffix": "cached_part_region_0787",
+        "repeats": 2,
+        "samples": 1,
+        "schema": "litchi.cached-part-profile.0787.v1",
+        "scope": "Currentbaseline operation-only Callgrind guestinstructions, cached ordered Partread; returnedbatchverification/drop excluded. Notnativelatency, no physicalserialfractionclaim. Threadcoveragequalifiedfromrawdata.",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 0,
+        "warmup": 0,
+        "widths": [
+          1,
+          8,
+          32
+        ]
+      }
+    },
+    "trace": {
+      "file": {
+        "bytes": 779,
+        "path": "trace-plan.json",
+        "sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa"
+      },
+      "sha256": "2c7e99dc6828959a3e941f6c09df9304d45ac2ca8e2a343f0a64e6a5d5da19fa",
+      "value": {
+        "affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "repeats": 2,
+        "samples": 1,
+        "schema": "litchi.cached-part-thread-trace.0787.v1",
+        "scope": "Wholechild clone/clone3/futex syscallcounts withseparateobserverbinary; freshversusprimed differsbyonepreloadoperation. Allsetupcorpusgenerationserial; timedsourcecountersremainoperationonly. No tracedtiming pooledwithnative. Retainattempts/errors/successes separately.",
+        "shape": "large",
+        "states": [
+          "fresh",
+          "primed"
+        ],
+        "task_floor": 0,
+        "warmup": 0,
+        "widths": [
+          1,
+          8,
+          32
+        ]
+      }
+    }
+  },
+  "profile": {
+    "binary": {
+      "bytes": 12864648,
+      "custody_verified": true,
+      "name": "baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "complete": {
+      "bytes": 287,
+      "path": "profiles-compat/complete.json",
+      "sha256": "777ad2926565aeda7fe788a9950b08e8ad36f050d38d27713db5ca365caf20f4"
+    },
+    "diagnostic_summary_by_width": {
+      "1": {
+        "diagnostic_categories": {
+          "allocation": {
+            "mean_self_ir": 183.0,
+            "repeat_values": [
+              183,
+              183
+            ]
+          },
+          "cache/hash": {
+            "mean_self_ir": 12084.0,
+            "repeat_values": [
+              12084,
+              12084
+            ]
+          },
+          "channel": {
+            "mean_self_ir": 0.0,
+            "repeat_values": [
+              0,
+              0
+            ]
+          },
+          "threading": {
+            "mean_self_ir": 0.0,
+            "repeat_values": [
+              0,
+              0
+            ]
+          }
+        },
+        "mean_summary_ir": 27877.0,
+        "owner_direct_children_ir": [
+          27872,
+          27872
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          27877,
+          27877
+        ],
+        "top_self_functions": [
+          {
+            "mean_self_ir": 6825.0,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "repeat_values": [
+              6825,
+              6825
+            ]
+          },
+          {
+            "mean_self_ir": 6176.0,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+            "repeat_values": [
+              6176,
+              6176
+            ]
+          },
+          {
+            "mean_self_ir": 6048.0,
+            "name": "core::hash::BuildHasher::hash_one",
+            "repeat_values": [
+              6048,
+              6048
+            ]
+          },
+          {
+            "mean_self_ir": 5376.0,
+            "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+            "repeat_values": [
+              5376,
+              5376
+            ]
+          },
+          {
+            "mean_self_ir": 1444.0,
+            "name": "litchi_opc::source_backed::batch::read_serial",
+            "repeat_values": [
+              1444,
+              1444
+            ]
+          },
+          {
+            "mean_self_ir": 655.0,
+            "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+            "repeat_values": [
+              655,
+              655
+            ]
+          },
+          {
+            "mean_self_ir": 632.0,
+            "name": "__memcmp_avx2_movbe",
+            "repeat_values": [
+              632,
+              632
+            ]
+          },
+          {
+            "mean_self_ir": 300.0,
+            "name": "litchi_core::execution::ExecutionContext::reserve",
+            "repeat_values": [
+              300,
+              300
+            ]
+          },
+          {
+            "mean_self_ir": 90.0,
+            "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+            "repeat_values": [
+              90,
+              90
+            ]
+          },
+          {
+            "mean_self_ir": 60.0,
+            "name": "malloc",
+            "repeat_values": [
+              60,
+              60
+            ]
+          },
+          {
+            "mean_self_ir": 58.0,
+            "name": "core::ptr::drop_in_place<litchi_opc::source_backed::batch::PreparedBatch>",
+            "repeat_values": [
+              58,
+              58
+            ]
+          },
+          {
+            "mean_self_ir": 51.0,
+            "name": "core::ptr::drop_in_place<core::option::Option<(litchi_core::budget::Reservation,litchi_core::budget::Reservation)>>",
+            "repeat_values": [
+              51,
+              51
+            ]
+          }
+        ]
+      },
+      "32": {
+        "diagnostic_categories": {
+          "allocation": {
+            "mean_self_ir": 31289.5,
+            "repeat_values": [
+              30823,
+              31756
+            ]
+          },
+          "cache/hash": {
+            "mean_self_ir": 7225.0,
+            "repeat_values": [
+              7225,
+              7225
+            ]
+          },
+          "channel": {
+            "mean_self_ir": 0.0,
+            "repeat_values": [
+              0,
+              0
+            ]
+          },
+          "threading": {
+            "mean_self_ir": 35397.0,
+            "repeat_values": [
+              35389,
+              35405
+            ]
+          }
+        },
+        "mean_summary_ir": 97562.5,
+        "owner_direct_children_ir": [
+          96897,
+          98218
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          96902,
+          98223
+        ],
+        "top_self_functions": [
+          {
+            "mean_self_ir": 12045.5,
+            "name": "_int_malloc",
+            "repeat_values": [
+              11542,
+              12549
+            ]
+          },
+          {
+            "mean_self_ir": 11037.0,
+            "name": "pthread_create@@GLIBC_2.34",
+            "repeat_values": [
+              11037,
+              11037
+            ]
+          },
+          {
+            "mean_self_ir": 7653.0,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "repeat_values": [
+              7653,
+              7653
+            ]
+          },
+          {
+            "mean_self_ir": 7379.0,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "repeat_values": [
+              7379,
+              7379
+            ]
+          },
+          {
+            "mean_self_ir": 4910.5,
+            "name": "free",
+            "repeat_values": [
+              4912,
+              4909
+            ]
+          },
+          {
+            "mean_self_ir": 3781.0,
+            "name": "_dl_allocate_tls_init",
+            "repeat_values": [
+              3781,
+              3781
+            ]
+          },
+          {
+            "mean_self_ir": 3584.0,
+            "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+            "repeat_values": [
+              3584,
+              3584
+            ]
+          },
+          {
+            "mean_self_ir": 3416.0,
+            "name": "malloc",
+            "repeat_values": [
+              3416,
+              3416
+            ]
+          },
+          {
+            "mean_self_ir": 3136.0,
+            "name": "core::hash::BuildHasher::hash_one",
+            "repeat_values": [
+              3136,
+              3136
+            ]
+          },
+          {
+            "mean_self_ir": 2730.0,
+            "name": "_dl_allocate_tls",
+            "repeat_values": [
+              2730,
+              2730
+            ]
+          },
+          {
+            "mean_self_ir": 2584.0,
+            "name": "__libc_malloc2",
+            "repeat_values": [
+              2584,
+              2584
+            ]
+          },
+          {
+            "mean_self_ir": 2382.0,
+            "name": "_int_free_merge_chunk",
+            "repeat_values": [
+              2386,
+              2378
+            ]
+          }
+        ]
+      },
+      "8": {
+        "diagnostic_categories": {
+          "allocation": {
+            "mean_self_ir": 10505.0,
+            "repeat_values": [
+              10886,
+              10124
+            ]
+          },
+          "cache/hash": {
+            "mean_self_ir": 7245.0,
+            "repeat_values": [
+              7245,
+              7245
+            ]
+          },
+          "channel": {
+            "mean_self_ir": 4581.0,
+            "repeat_values": [
+              4580,
+              4582
+            ]
+          },
+          "threading": {
+            "mean_self_ir": 13810.0,
+            "repeat_values": [
+              13822,
+              13798
+            ]
+          }
+        },
+        "mean_summary_ir": 58407.0,
+        "owner_direct_children_ir": [
+          58885,
+          57919
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          58890,
+          57924
+        ],
+        "top_self_functions": [
+          {
+            "mean_self_ir": 9539.0,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "repeat_values": [
+              9539,
+              9539
+            ]
+          },
+          {
+            "mean_self_ir": 7078.0,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "repeat_values": [
+              7078,
+              7078
+            ]
+          },
+          {
+            "mean_self_ir": 4444.0,
+            "name": "<std::sync::mpmc::waker::SyncWaker>::notify",
+            "repeat_values": [
+              4449,
+              4439
+            ]
+          },
+          {
+            "mean_self_ir": 3584.0,
+            "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+            "repeat_values": [
+              3584,
+              3584
+            ]
+          },
+          {
+            "mean_self_ir": 3148.0,
+            "name": "pthread_create@@GLIBC_2.34",
+            "repeat_values": [
+              3148,
+              3148
+            ]
+          },
+          {
+            "mean_self_ir": 3136.0,
+            "name": "core::hash::BuildHasher::hash_one",
+            "repeat_values": [
+              3136,
+              3136
+            ]
+          },
+          {
+            "mean_self_ir": 2920.0,
+            "name": "std::sync::mpmc::Sender<T>::send",
+            "repeat_values": [
+              2920,
+              2920
+            ]
+          },
+          {
+            "mean_self_ir": 2792.5,
+            "name": "free",
+            "repeat_values": [
+              2776,
+              2809
+            ]
+          },
+          {
+            "mean_self_ir": 1840.0,
+            "name": "__memcpy_avx_unaligned_erms",
+            "repeat_values": [
+              1840,
+              1840
+            ]
+          },
+          {
+            "mean_self_ir": 1699.0,
+            "name": "_int_malloc",
+            "repeat_values": [
+              1699
+            ]
+          },
+          {
+            "mean_self_ir": 1691.0,
+            "name": "malloc",
+            "repeat_values": [
+              1652,
+              1730
+            ]
+          },
+          {
+            "mean_self_ir": 1592.0,
+            "name": "_dl_allocate_tls_init",
+            "repeat_values": [
+              1592,
+              1592
+            ]
+          }
+        ]
+      }
+    },
+    "entries": [
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4362,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2264,
+            "calls": 1,
+            "inclusive_ir": 27877
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 27877,
+          "categories": {
+            "allocation": {
+              "self_ir": 183,
+              "top_functions": [
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "self_ir": 90
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 60
+                },
+                {
+                  "name": "free",
+                  "self_ir": 33
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 12084,
+              "top_functions": [
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 6048
+                },
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 5376
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 655
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 0,
+              "top_functions": []
+            },
+            "other": {
+              "self_ir": 15610,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 6825
+                },
+                {
+                  "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+                  "self_ir": 6176
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_serial",
+                  "self_ir": 1444
+                },
+                {
+                  "name": "__memcmp_avx2_movbe",
+                  "self_ir": 632
+                },
+                {
+                  "name": "litchi_core::execution::ExecutionContext::reserve",
+                  "self_ir": 300
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 0,
+              "top_functions": []
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 6825
+            },
+            {
+              "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+              "self_ir": 6176
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 6048
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 5376
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_serial",
+              "self_ir": 1444
+            },
+            {
+              "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+              "self_ir": 655
+            },
+            {
+              "name": "__memcmp_avx2_movbe",
+              "self_ir": 632
+            },
+            {
+              "name": "litchi_core::execution::ExecutionContext::reserve",
+              "self_ir": 300
+            },
+            {
+              "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "self_ir": 90
+            },
+            {
+              "name": "malloc",
+              "self_ir": 60
+            },
+            {
+              "name": "core::ptr::drop_in_place<litchi_opc::source_backed::batch::PreparedBatch>",
+              "self_ir": 58
+            },
+            {
+              "name": "core::ptr::drop_in_place<core::option::Option<(litchi_core::budget::Reservation,litchi_core::budget::Reservation)>>",
+              "self_ir": 51
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 27872,
+            "id": 4362,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4034,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 27872
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 21047,
+            "id": 4034,
+            "inclusive_ir": 27872,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_serial",
+              "callee_id": 4082,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 12484
+            },
+            "self_ir": 6825
+          },
+          {
+            "direct_children_ir": 11040,
+            "id": 4082,
+            "inclusive_ir": 12484,
+            "name": "litchi_opc::source_backed::batch::read_serial",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+              "callee_id": 4090,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 11040
+            },
+            "self_ir": 1444
+          },
+          {
+            "direct_children_ir": 4864,
+            "id": 4090,
+            "inclusive_ir": 11040,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+            "next_edge": {
+              "callee": "core::hash::BuildHasher::hash_one",
+              "callee_id": 1514,
+              "calls": 63,
+              "edge_count": 1,
+              "inclusive_ir": 4704
+            },
+            "self_ir": 6176
+          },
+          {
+            "direct_children_ir": 5376,
+            "id": 1514,
+            "inclusive_ir": 4704,
+            "name": "core::hash::BuildHasher::hash_one",
+            "next_edge": {
+              "callee": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "callee_id": 1516,
+              "calls": 1483,
+              "edge_count": 3,
+              "inclusive_ir": 5376
+            },
+            "self_ir": 6048
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 1516,
+            "inclusive_ir": 5376,
+            "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+            "self_ir": 5376
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 559,
+            "path": "profiles-compat/0-1.callgrind",
+            "sha256": "b77eb9e151f11689698039b835ee8a6158dc401f6592993606698d2dcee224dc"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 16847,
+            "path": "profiles-compat/0-1.callgrind.1",
+            "sha256": "a622784294462a9168a9b2ee0c2ef8f6d8ced731cf3d0da2f2a5899bfd26dbae"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4034,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 27872
+            }
+          ],
+          "direct_children_ir": 27872,
+          "inclusive_ir": 27877,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/0-1.callgrind.1",
+        "repeat": 0,
+        "report": {
+          "file": {
+            "bytes": 11597,
+            "path": "profiles-compat/0-1.json",
+            "sha256": "d31138f1ddd1f561416bbbb63787fe21c246b2cd963c203ffe3496ab94b0b5aa"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11676,
+              "path": "qualification-before/0-large-primed-0-1-before.json",
+              "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 41,
+          "compressed_name_declarations": 28,
+          "cost_records": 777,
+          "function_records": 28,
+          "position_kinds": {
+            "absolute": 613,
+            "relative": 126,
+            "wildcard": 38
+          },
+          "unique_functions": 28
+        },
+        "summary_ir": 27877,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 27877,
+        "workers": 1
+      },
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4922,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2264,
+            "calls": 1,
+            "inclusive_ir": 58890
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 58890,
+          "categories": {
+            "allocation": {
+              "self_ir": 10886,
+              "top_functions": [
+                {
+                  "name": "free",
+                  "self_ir": 2776
+                },
+                {
+                  "name": "_int_malloc",
+                  "self_ir": 1699
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 1652
+                },
+                {
+                  "name": "_mid_memalign",
+                  "self_ir": 1024
+                },
+                {
+                  "name": "_int_free_merge_chunk",
+                  "self_ir": 947
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 7245,
+              "top_functions": [
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 3584
+                },
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 3136
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 520
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 4580,
+              "top_functions": [
+                {
+                  "name": "std::sync::mpmc::Sender<T>::send",
+                  "self_ir": 2920
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpmc::counter::Counter<std::sync::mpmc::array::Channel<litchi_opc::source_backed::batch::WorkerCommand>>>",
+                  "self_ir": 662
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpsc::Receiver<core::result::Result<litchi_opc::source_backed::PartData,litchi_opc::error::OpcError>>>",
+                  "self_ir": 472
+                },
+                {
+                  "name": "std::sync::mpmc::array::Channel<T>::recv::{{closure}}",
+                  "self_ir": 318
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpsc::SyncSender<litchi_opc::source_backed::batch::WorkerCommand>>",
+                  "self_ir": 208
+                }
+              ]
+            },
+            "other": {
+              "self_ir": 22357,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parallel",
+                  "self_ir": 9539
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 7078
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "self_ir": 1840
+                },
+                {
+                  "name": "__memcmp_avx2_movbe",
+                  "self_ir": 632
+                },
+                {
+                  "name": "syscall",
+                  "self_ir": 468
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 13822,
+              "top_functions": [
+                {
+                  "name": "<std::sync::mpmc::waker::SyncWaker>::notify",
+                  "self_ir": 4449
+                },
+                {
+                  "name": "pthread_create@@GLIBC_2.34",
+                  "self_ir": 3148
+                },
+                {
+                  "name": "_dl_allocate_tls_init",
+                  "self_ir": 1592
+                },
+                {
+                  "name": "create_thread",
+                  "self_ir": 472
+                },
+                {
+                  "name": "<std::sys::thread::unix::Thread>::new",
+                  "self_ir": 432
+                }
+              ]
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "litchi_opc::source_backed::batch::read_parallel",
+              "self_ir": 9539
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 7078
+            },
+            {
+              "name": "<std::sync::mpmc::waker::SyncWaker>::notify",
+              "self_ir": 4449
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 3584
+            },
+            {
+              "name": "pthread_create@@GLIBC_2.34",
+              "self_ir": 3148
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 3136
+            },
+            {
+              "name": "std::sync::mpmc::Sender<T>::send",
+              "self_ir": 2920
+            },
+            {
+              "name": "free",
+              "self_ir": 2776
+            },
+            {
+              "name": "__memcpy_avx_unaligned_erms",
+              "self_ir": 1840
+            },
+            {
+              "name": "_int_malloc",
+              "self_ir": 1699
+            },
+            {
+              "name": "malloc",
+              "self_ir": 1652
+            },
+            {
+              "name": "_dl_allocate_tls_init",
+              "self_ir": 1592
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 58885,
+            "id": 4922,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4034,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 58885
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 51807,
+            "id": 4034,
+            "inclusive_ir": 58885,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parallel",
+              "callee_id": 4082,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 43073
+            },
+            "self_ir": 7078
+          },
+          {
+            "direct_children_ir": 33534,
+            "id": 4082,
+            "inclusive_ir": 43073,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "next_edge": {
+              "callee": "<std::sys::thread::unix::Thread>::new",
+              "callee_id": 4174,
+              "calls": 16,
+              "edge_count": 1,
+              "inclusive_ir": 9153
+            },
+            "self_ir": 9539
+          },
+          {
+            "direct_children_ir": 8721,
+            "id": 4174,
+            "inclusive_ir": 9153,
+            "name": "<std::sys::thread::unix::Thread>::new",
+            "next_edge": {
+              "callee": "pthread_create@@GLIBC_2.34",
+              "callee_id": 4196,
+              "calls": 16,
+              "edge_count": 1,
+              "inclusive_ir": 8337
+            },
+            "self_ir": 432
+          },
+          {
+            "direct_children_ir": 5189,
+            "id": 4196,
+            "inclusive_ir": 8337,
+            "name": "pthread_create@@GLIBC_2.34",
+            "next_edge": {
+              "callee": "0x0000000004a77750",
+              "callee_id": 4928,
+              "calls": 8,
+              "edge_count": 1,
+              "inclusive_ir": 2920
+            },
+            "self_ir": 3148
+          },
+          {
+            "direct_children_ir": 2904,
+            "id": 4928,
+            "inclusive_ir": 2920,
+            "name": "0x0000000004a77750",
+            "next_edge": {
+              "callee": "_dl_allocate_tls_init",
+              "callee_id": 462,
+              "calls": 8,
+              "edge_count": 1,
+              "inclusive_ir": 2904
+            },
+            "self_ir": 16
+          },
+          {
+            "direct_children_ir": 1312,
+            "id": 462,
+            "inclusive_ir": 2904,
+            "name": "_dl_allocate_tls_init",
+            "next_edge": {
+              "callee": "memset",
+              "callee_id": 128,
+              "calls": 24,
+              "edge_count": 1,
+              "inclusive_ir": 432
+            },
+            "self_ir": 1592
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 128,
+            "inclusive_ir": 432,
+            "name": "memset",
+            "self_ir": 432
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 559,
+            "path": "profiles-compat/0-8.callgrind",
+            "sha256": "5c911e4a1d0e5f6d32951c486e98cfba7729cdc5992da1522e7e6e3afbbbe803"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 41434,
+            "path": "profiles-compat/0-8.callgrind.1",
+            "sha256": "d7cee29f50b78f53c98a57189cc87e7ae4776a0b73b7dc1ae83cd227b8e17c44"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4034,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 58885
+            }
+          ],
+          "direct_children_ir": 58885,
+          "inclusive_ir": 58890,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/0-8.callgrind.1",
+        "repeat": 0,
+        "report": {
+          "file": {
+            "bytes": 11597,
+            "path": "profiles-compat/0-8.json",
+            "sha256": "9d974274366cab2dccdc11ca08596d8b6b0f0edcf11c28a736c9fd1450a2c4c0"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11679,
+              "path": "qualification-before/0-large-primed-0-8-before.json",
+              "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 144,
+          "compressed_name_declarations": 87,
+          "cost_records": 2414,
+          "function_records": 87,
+          "position_kinds": {
+            "absolute": 1246,
+            "relative": 1005,
+            "wildcard": 163
+          },
+          "unique_functions": 87
+        },
+        "summary_ir": 58890,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 58890,
+        "workers": 8
+      },
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4698,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2264,
+            "calls": 1,
+            "inclusive_ir": 96902
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 96902,
+          "categories": {
+            "allocation": {
+              "self_ir": 30823,
+              "top_functions": [
+                {
+                  "name": "_int_malloc",
+                  "self_ir": 11542
+                },
+                {
+                  "name": "free",
+                  "self_ir": 4912
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 3416
+                },
+                {
+                  "name": "__libc_malloc2",
+                  "self_ir": 2584
+                },
+                {
+                  "name": "_int_free_merge_chunk",
+                  "self_ir": 2386
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 7225,
+              "top_functions": [
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 3584
+                },
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 3136
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 500
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 0,
+              "top_functions": []
+            },
+            "other": {
+              "self_ir": 23465,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parallel",
+                  "self_ir": 7653
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 7379
+                },
+                {
+                  "name": "memset",
+                  "self_ir": 1728
+                },
+                {
+                  "name": "mempcpy",
+                  "self_ir": 1376
+                },
+                {
+                  "name": "unlink_chunk.isra.0",
+                  "self_ir": 1121
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 35389,
+              "top_functions": [
+                {
+                  "name": "pthread_create@@GLIBC_2.34",
+                  "self_ir": 11037
+                },
+                {
+                  "name": "_dl_allocate_tls_init",
+                  "self_ir": 3781
+                },
+                {
+                  "name": "_dl_allocate_tls",
+                  "self_ir": 2730
+                },
+                {
+                  "name": "_dl_deallocate_tls",
+                  "self_ir": 1911
+                },
+                {
+                  "name": "create_thread",
+                  "self_ir": 1888
+                }
+              ]
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "_int_malloc",
+              "self_ir": 11542
+            },
+            {
+              "name": "pthread_create@@GLIBC_2.34",
+              "self_ir": 11037
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parallel",
+              "self_ir": 7653
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 7379
+            },
+            {
+              "name": "free",
+              "self_ir": 4912
+            },
+            {
+              "name": "_dl_allocate_tls_init",
+              "self_ir": 3781
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 3584
+            },
+            {
+              "name": "malloc",
+              "self_ir": 3416
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 3136
+            },
+            {
+              "name": "_dl_allocate_tls",
+              "self_ir": 2730
+            },
+            {
+              "name": "__libc_malloc2",
+              "self_ir": 2584
+            },
+            {
+              "name": "_int_free_merge_chunk",
+              "self_ir": 2386
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 96897,
+            "id": 4698,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4026,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 96897
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 89518,
+            "id": 4026,
+            "inclusive_ir": 96897,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parallel",
+              "callee_id": 4074,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 80802
+            },
+            "self_ir": 7379
+          },
+          {
+            "direct_children_ir": 73149,
+            "id": 4074,
+            "inclusive_ir": 80802,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "next_edge": {
+              "callee": "<std::sys::thread::unix::Thread>::new",
+              "callee_id": 4160,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 34839
+            },
+            "self_ir": 7653
+          },
+          {
+            "direct_children_ir": 33111,
+            "id": 4160,
+            "inclusive_ir": 34839,
+            "name": "<std::sys::thread::unix::Thread>::new",
+            "next_edge": {
+              "callee": "pthread_create@@GLIBC_2.34",
+              "callee_id": 4182,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 31575
+            },
+            "self_ir": 1728
+          },
+          {
+            "direct_children_ir": 20538,
+            "id": 4182,
+            "inclusive_ir": 31575,
+            "name": "pthread_create@@GLIBC_2.34",
+            "next_edge": {
+              "callee": "0x0000000004a77750",
+              "callee_id": 4704,
+              "calls": 19,
+              "edge_count": 1,
+              "inclusive_ir": 6935
+            },
+            "self_ir": 11037
+          },
+          {
+            "direct_children_ir": 6897,
+            "id": 4704,
+            "inclusive_ir": 6935,
+            "name": "0x0000000004a77750",
+            "next_edge": {
+              "callee": "_dl_allocate_tls_init",
+              "callee_id": 462,
+              "calls": 19,
+              "edge_count": 1,
+              "inclusive_ir": 6897
+            },
+            "self_ir": 38
+          },
+          {
+            "direct_children_ir": 3116,
+            "id": 462,
+            "inclusive_ir": 6897,
+            "name": "_dl_allocate_tls_init",
+            "next_edge": {
+              "callee": "memset",
+              "callee_id": 128,
+              "calls": 57,
+              "edge_count": 1,
+              "inclusive_ir": 1026
+            },
+            "self_ir": 3781
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 128,
+            "inclusive_ir": 1026,
+            "name": "memset",
+            "self_ir": 1728
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 561,
+            "path": "profiles-compat/0-32.callgrind",
+            "sha256": "767e4a08ac4f5bfedff9f966bdc5ec76a7b2a74d64962de087392777821f874e"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 34243,
+            "path": "profiles-compat/0-32.callgrind.1",
+            "sha256": "a3742fb2bd7a60c1293433aa25fcc8f78d31082feebfde520c3b2190da84f4b8"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4026,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 96897
+            }
+          ],
+          "direct_children_ir": 96897,
+          "inclusive_ir": 96902,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/0-32.callgrind.1",
+        "repeat": 0,
+        "report": {
+          "file": {
+            "bytes": 11600,
+            "path": "profiles-compat/0-32.json",
+            "sha256": "759b8fb7aa7bfb907160669c22c8fd9c261657d6c4332abe2d732754059509d8"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11683,
+              "path": "qualification-before/0-large-primed-0-32-before.json",
+              "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 119,
+          "compressed_name_declarations": 84,
+          "cost_records": 1958,
+          "function_records": 84,
+          "position_kinds": {
+            "absolute": 910,
+            "relative": 915,
+            "wildcard": 133
+          },
+          "unique_functions": 84
+        },
+        "summary_ir": 96902,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 96902,
+        "workers": 32
+      },
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4676,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2254,
+            "calls": 1,
+            "inclusive_ir": 98223
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 98223,
+          "categories": {
+            "allocation": {
+              "self_ir": 31756,
+              "top_functions": [
+                {
+                  "name": "_int_malloc",
+                  "self_ir": 12549
+                },
+                {
+                  "name": "free",
+                  "self_ir": 4909
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 3416
+                },
+                {
+                  "name": "__libc_malloc2",
+                  "self_ir": 2584
+                },
+                {
+                  "name": "_int_free_merge_chunk",
+                  "self_ir": 2378
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 7225,
+              "top_functions": [
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 3584
+                },
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 3136
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 500
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 0,
+              "top_functions": []
+            },
+            "other": {
+              "self_ir": 23837,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parallel",
+                  "self_ir": 7653
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 7379
+                },
+                {
+                  "name": "memset",
+                  "self_ir": 1728
+                },
+                {
+                  "name": "unlink_chunk.isra.0",
+                  "self_ir": 1406
+                },
+                {
+                  "name": "mempcpy",
+                  "self_ir": 1376
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 35405,
+              "top_functions": [
+                {
+                  "name": "pthread_create@@GLIBC_2.34",
+                  "self_ir": 11037
+                },
+                {
+                  "name": "_dl_allocate_tls_init",
+                  "self_ir": 3781
+                },
+                {
+                  "name": "_dl_allocate_tls",
+                  "self_ir": 2730
+                },
+                {
+                  "name": "_dl_deallocate_tls",
+                  "self_ir": 1911
+                },
+                {
+                  "name": "create_thread",
+                  "self_ir": 1888
+                }
+              ]
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "_int_malloc",
+              "self_ir": 12549
+            },
+            {
+              "name": "pthread_create@@GLIBC_2.34",
+              "self_ir": 11037
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parallel",
+              "self_ir": 7653
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 7379
+            },
+            {
+              "name": "free",
+              "self_ir": 4909
+            },
+            {
+              "name": "_dl_allocate_tls_init",
+              "self_ir": 3781
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 3584
+            },
+            {
+              "name": "malloc",
+              "self_ir": 3416
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 3136
+            },
+            {
+              "name": "_dl_allocate_tls",
+              "self_ir": 2730
+            },
+            {
+              "name": "__libc_malloc2",
+              "self_ir": 2584
+            },
+            {
+              "name": "_int_free_merge_chunk",
+              "self_ir": 2378
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 98218,
+            "id": 4676,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4004,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 98218
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 90839,
+            "id": 4004,
+            "inclusive_ir": 98218,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parallel",
+              "callee_id": 4052,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 82117
+            },
+            "self_ir": 7379
+          },
+          {
+            "direct_children_ir": 74464,
+            "id": 4052,
+            "inclusive_ir": 82117,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "next_edge": {
+              "callee": "<std::sys::thread::unix::Thread>::new",
+              "callee_id": 4138,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 34839
+            },
+            "self_ir": 7653
+          },
+          {
+            "direct_children_ir": 33111,
+            "id": 4138,
+            "inclusive_ir": 34839,
+            "name": "<std::sys::thread::unix::Thread>::new",
+            "next_edge": {
+              "callee": "pthread_create@@GLIBC_2.34",
+              "callee_id": 4160,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 31575
+            },
+            "self_ir": 1728
+          },
+          {
+            "direct_children_ir": 20538,
+            "id": 4160,
+            "inclusive_ir": 31575,
+            "name": "pthread_create@@GLIBC_2.34",
+            "next_edge": {
+              "callee": "0x0000000004a77750",
+              "callee_id": 4682,
+              "calls": 19,
+              "edge_count": 1,
+              "inclusive_ir": 6935
+            },
+            "self_ir": 11037
+          },
+          {
+            "direct_children_ir": 6897,
+            "id": 4682,
+            "inclusive_ir": 6935,
+            "name": "0x0000000004a77750",
+            "next_edge": {
+              "callee": "_dl_allocate_tls_init",
+              "callee_id": 462,
+              "calls": 19,
+              "edge_count": 1,
+              "inclusive_ir": 6897
+            },
+            "self_ir": 38
+          },
+          {
+            "direct_children_ir": 3116,
+            "id": 462,
+            "inclusive_ir": 6897,
+            "name": "_dl_allocate_tls_init",
+            "next_edge": {
+              "callee": "memset",
+              "callee_id": 128,
+              "calls": 57,
+              "edge_count": 1,
+              "inclusive_ir": 1026
+            },
+            "self_ir": 3781
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 128,
+            "inclusive_ir": 1026,
+            "name": "memset",
+            "self_ir": 1728
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 561,
+            "path": "profiles-compat/1-32.callgrind",
+            "sha256": "fe602925acbb7324a5ccd845cf2360c904c0afac69bfcda17e110940b0cf52dd"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 34251,
+            "path": "profiles-compat/1-32.callgrind.1",
+            "sha256": "017e58f5060f7c381c3d9979d8bc703c1b03ad04c544f80d68ce2fa23fefc51c"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4004,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 98218
+            }
+          ],
+          "direct_children_ir": 98218,
+          "inclusive_ir": 98223,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/1-32.callgrind.1",
+        "repeat": 1,
+        "report": {
+          "file": {
+            "bytes": 11600,
+            "path": "profiles-compat/1-32.json",
+            "sha256": "5f3129b58e1db886f96267161e78a719213b7c50956864695f2981f50c3b5c5f"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11683,
+              "path": "qualification-before/0-large-primed-0-32-before.json",
+              "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 119,
+          "compressed_name_declarations": 83,
+          "cost_records": 1958,
+          "function_records": 85,
+          "position_kinds": {
+            "absolute": 911,
+            "relative": 914,
+            "wildcard": 133
+          },
+          "unique_functions": 83
+        },
+        "summary_ir": 98223,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 98223,
+        "workers": 32
+      },
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4922,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2264,
+            "calls": 1,
+            "inclusive_ir": 57924
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 57924,
+          "categories": {
+            "allocation": {
+              "self_ir": 10124,
+              "top_functions": [
+                {
+                  "name": "free",
+                  "self_ir": 2809
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 1730
+                },
+                {
+                  "name": "_mid_memalign",
+                  "self_ir": 1024
+                },
+                {
+                  "name": "_int_malloc",
+                  "self_ir": 972
+                },
+                {
+                  "name": "_int_free_merge_chunk",
+                  "self_ir": 940
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 7245,
+              "top_functions": [
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 3584
+                },
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 3136
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 520
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 4582,
+              "top_functions": [
+                {
+                  "name": "std::sync::mpmc::Sender<T>::send",
+                  "self_ir": 2920
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpmc::counter::Counter<std::sync::mpmc::array::Channel<litchi_opc::source_backed::batch::WorkerCommand>>>",
+                  "self_ir": 664
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpsc::Receiver<core::result::Result<litchi_opc::source_backed::PartData,litchi_opc::error::OpcError>>>",
+                  "self_ir": 472
+                },
+                {
+                  "name": "std::sync::mpmc::array::Channel<T>::recv::{{closure}}",
+                  "self_ir": 318
+                },
+                {
+                  "name": "core::ptr::drop_in_place<std::sync::mpsc::SyncSender<litchi_opc::source_backed::batch::WorkerCommand>>",
+                  "self_ir": 208
+                }
+              ]
+            },
+            "other": {
+              "self_ir": 22175,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parallel",
+                  "self_ir": 9539
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 7078
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "self_ir": 1840
+                },
+                {
+                  "name": "__memcmp_avx2_movbe",
+                  "self_ir": 632
+                },
+                {
+                  "name": "syscall",
+                  "self_ir": 444
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 13798,
+              "top_functions": [
+                {
+                  "name": "<std::sync::mpmc::waker::SyncWaker>::notify",
+                  "self_ir": 4439
+                },
+                {
+                  "name": "pthread_create@@GLIBC_2.34",
+                  "self_ir": 3148
+                },
+                {
+                  "name": "_dl_allocate_tls_init",
+                  "self_ir": 1592
+                },
+                {
+                  "name": "create_thread",
+                  "self_ir": 472
+                },
+                {
+                  "name": "<std::sys::thread::unix::Thread>::new",
+                  "self_ir": 432
+                }
+              ]
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "litchi_opc::source_backed::batch::read_parallel",
+              "self_ir": 9539
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 7078
+            },
+            {
+              "name": "<std::sync::mpmc::waker::SyncWaker>::notify",
+              "self_ir": 4439
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 3584
+            },
+            {
+              "name": "pthread_create@@GLIBC_2.34",
+              "self_ir": 3148
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 3136
+            },
+            {
+              "name": "std::sync::mpmc::Sender<T>::send",
+              "self_ir": 2920
+            },
+            {
+              "name": "free",
+              "self_ir": 2809
+            },
+            {
+              "name": "__memcpy_avx_unaligned_erms",
+              "self_ir": 1840
+            },
+            {
+              "name": "malloc",
+              "self_ir": 1730
+            },
+            {
+              "name": "_dl_allocate_tls_init",
+              "self_ir": 1592
+            },
+            {
+              "name": "_mid_memalign",
+              "self_ir": 1024
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 57919,
+            "id": 4922,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4028,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 57919
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 50841,
+            "id": 4028,
+            "inclusive_ir": 57919,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parallel",
+              "callee_id": 4076,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 42107
+            },
+            "self_ir": 7078
+          },
+          {
+            "direct_children_ir": 32568,
+            "id": 4076,
+            "inclusive_ir": 42107,
+            "name": "litchi_opc::source_backed::batch::read_parallel",
+            "next_edge": {
+              "callee": "<std::sys::thread::unix::Thread>::new",
+              "callee_id": 4168,
+              "calls": 16,
+              "edge_count": 1,
+              "inclusive_ir": 9153
+            },
+            "self_ir": 9539
+          },
+          {
+            "direct_children_ir": 8721,
+            "id": 4168,
+            "inclusive_ir": 9153,
+            "name": "<std::sys::thread::unix::Thread>::new",
+            "next_edge": {
+              "callee": "pthread_create@@GLIBC_2.34",
+              "callee_id": 4190,
+              "calls": 16,
+              "edge_count": 1,
+              "inclusive_ir": 8337
+            },
+            "self_ir": 432
+          },
+          {
+            "direct_children_ir": 5189,
+            "id": 4190,
+            "inclusive_ir": 8337,
+            "name": "pthread_create@@GLIBC_2.34",
+            "next_edge": {
+              "callee": "0x0000000004a77750",
+              "callee_id": 4928,
+              "calls": 8,
+              "edge_count": 1,
+              "inclusive_ir": 2920
+            },
+            "self_ir": 3148
+          },
+          {
+            "direct_children_ir": 2904,
+            "id": 4928,
+            "inclusive_ir": 2920,
+            "name": "0x0000000004a77750",
+            "next_edge": {
+              "callee": "_dl_allocate_tls_init",
+              "callee_id": 462,
+              "calls": 8,
+              "edge_count": 1,
+              "inclusive_ir": 2904
+            },
+            "self_ir": 16
+          },
+          {
+            "direct_children_ir": 1312,
+            "id": 462,
+            "inclusive_ir": 2904,
+            "name": "_dl_allocate_tls_init",
+            "next_edge": {
+              "callee": "memset",
+              "callee_id": 128,
+              "calls": 24,
+              "edge_count": 1,
+              "inclusive_ir": 432
+            },
+            "self_ir": 1592
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 128,
+            "inclusive_ir": 432,
+            "name": "memset",
+            "self_ir": 432
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 559,
+            "path": "profiles-compat/1-8.callgrind",
+            "sha256": "58d3af60f5f8a73d3a09b7c3bf0a1dda58fafd0b14f6b05cdaa5209a972ce1ee"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 41874,
+            "path": "profiles-compat/1-8.callgrind.1",
+            "sha256": "9384a3a8e85d4db5d02a4a76af4bfb9af16c70e798074ac4b24274c7c72dd004"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4028,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 57919
+            }
+          ],
+          "direct_children_ir": 57919,
+          "inclusive_ir": 57924,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/1-8.callgrind.1",
+        "repeat": 1,
+        "report": {
+          "file": {
+            "bytes": 11597,
+            "path": "profiles-compat/1-8.json",
+            "sha256": "d1d30b8f7478e8a8e1eec684376557471f4c0417d0dc1360b588dda82a152b95"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11679,
+              "path": "qualification-before/0-large-primed-0-8-before.json",
+              "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 148,
+          "compressed_name_declarations": 91,
+          "cost_records": 2456,
+          "function_records": 91,
+          "position_kinds": {
+            "absolute": 1239,
+            "relative": 1049,
+            "wildcard": 168
+          },
+          "unique_functions": 91
+        },
+        "summary_ir": 57924,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 57924,
+        "workers": 8
+      },
+      {
+        "ancestry": [
+          {
+            "callee": "cached_part_profile::cached_part_region_0787",
+            "callee_id": 4354,
+            "caller": "cached_part_profile::run_sample",
+            "caller_id": 2264,
+            "calls": 1,
+            "inclusive_ir": 27877
+          }
+        ],
+        "diagnostic": {
+          "all_self_ir": 27877,
+          "categories": {
+            "allocation": {
+              "self_ir": 183,
+              "top_functions": [
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "self_ir": 90
+                },
+                {
+                  "name": "malloc",
+                  "self_ir": 60
+                },
+                {
+                  "name": "free",
+                  "self_ir": 33
+                }
+              ]
+            },
+            "cache/hash": {
+              "self_ir": 12084,
+              "top_functions": [
+                {
+                  "name": "core::hash::BuildHasher::hash_one",
+                  "self_ir": 6048
+                },
+                {
+                  "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+                  "self_ir": 5376
+                },
+                {
+                  "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+                  "self_ir": 655
+                },
+                {
+                  "name": "cached_part_profile::cached_part_region_0787",
+                  "self_ir": 5
+                }
+              ]
+            },
+            "channel": {
+              "self_ir": 0,
+              "top_functions": []
+            },
+            "other": {
+              "self_ir": 15610,
+              "top_functions": [
+                {
+                  "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+                  "self_ir": 6825
+                },
+                {
+                  "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+                  "self_ir": 6176
+                },
+                {
+                  "name": "litchi_opc::source_backed::batch::read_serial",
+                  "self_ir": 1444
+                },
+                {
+                  "name": "__memcmp_avx2_movbe",
+                  "self_ir": 632
+                },
+                {
+                  "name": "litchi_core::execution::ExecutionContext::reserve",
+                  "self_ir": 300
+                }
+              ]
+            },
+            "threading": {
+              "self_ir": 0,
+              "top_functions": []
+            }
+          },
+          "disconnected_positive_self_functions": 0,
+          "disconnected_top_self_functions": [],
+          "top_self_functions": [
+            {
+              "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "self_ir": 6825
+            },
+            {
+              "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+              "self_ir": 6176
+            },
+            {
+              "name": "core::hash::BuildHasher::hash_one",
+              "self_ir": 6048
+            },
+            {
+              "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "self_ir": 5376
+            },
+            {
+              "name": "litchi_opc::source_backed::batch::read_serial",
+              "self_ir": 1444
+            },
+            {
+              "name": "<cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version",
+              "self_ir": 655
+            },
+            {
+              "name": "__memcmp_avx2_movbe",
+              "self_ir": 632
+            },
+            {
+              "name": "litchi_core::execution::ExecutionContext::reserve",
+              "self_ir": 300
+            },
+            {
+              "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+              "self_ir": 90
+            },
+            {
+              "name": "malloc",
+              "self_ir": 60
+            },
+            {
+              "name": "core::ptr::drop_in_place<litchi_opc::source_backed::batch::PreparedBatch>",
+              "self_ir": 58
+            },
+            {
+              "name": "core::ptr::drop_in_place<core::option::Option<(litchi_core::budget::Reservation,litchi_core::budget::Reservation)>>",
+              "self_ir": 51
+            }
+          ]
+        },
+        "dominant_path": [
+          {
+            "direct_children_ir": 27872,
+            "id": 4354,
+            "inclusive_ir": null,
+            "name": "cached_part_profile::cached_part_region_0787",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4026,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 27872
+            },
+            "self_ir": 5
+          },
+          {
+            "direct_children_ir": 21047,
+            "id": 4026,
+            "inclusive_ir": 27872,
+            "name": "litchi_opc::source_backed::batch::read_parts_ordered",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::batch::read_serial",
+              "callee_id": 4074,
+              "calls": 2,
+              "edge_count": 1,
+              "inclusive_ir": 12484
+            },
+            "self_ir": 6825
+          },
+          {
+            "direct_children_ir": 11040,
+            "id": 4074,
+            "inclusive_ir": 12484,
+            "name": "litchi_opc::source_backed::batch::read_serial",
+            "next_edge": {
+              "callee": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+              "callee_id": 4082,
+              "calls": 64,
+              "edge_count": 1,
+              "inclusive_ir": 11040
+            },
+            "self_ir": 1444
+          },
+          {
+            "direct_children_ir": 4864,
+            "id": 4082,
+            "inclusive_ir": 11040,
+            "name": "litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture",
+            "next_edge": {
+              "callee": "core::hash::BuildHasher::hash_one",
+              "callee_id": 1514,
+              "calls": 63,
+              "edge_count": 1,
+              "inclusive_ir": 4704
+            },
+            "self_ir": 6176
+          },
+          {
+            "direct_children_ir": 5376,
+            "id": 1514,
+            "inclusive_ir": 4704,
+            "name": "core::hash::BuildHasher::hash_one",
+            "next_edge": {
+              "callee": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+              "callee_id": 1516,
+              "calls": 1483,
+              "edge_count": 3,
+              "inclusive_ir": 5376
+            },
+            "self_ir": 6048
+          },
+          {
+            "direct_children_ir": 0,
+            "id": 1516,
+            "inclusive_ir": 5376,
+            "name": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write",
+            "self_ir": 5376
+          }
+        ],
+        "events": [
+          "Ir"
+        ],
+        "final": {
+          "events": [
+            "Ir"
+          ],
+          "file": {
+            "bytes": 559,
+            "path": "profiles-compat/1-1.callgrind",
+            "sha256": "c72a7031f413313c2d77f633d7171f612a7f9cc45c6e8132e621441b2d2cae2c"
+          },
+          "part": 2,
+          "summary_ir": 0,
+          "totals_ir": 0,
+          "trigger": "Program termination"
+        },
+        "numbered": {
+          "file": {
+            "bytes": 16847,
+            "path": "profiles-compat/1-1.callgrind.1",
+            "sha256": "7517f587b6a8cbf6d76e9f156f37cbf87a3b53dab3a986d74b65c7f506f71633"
+          },
+          "part": 1,
+          "trigger": "--dump-after=cached_part_profile::cached_part_region_0787"
+        },
+        "owner": {
+          "caller": "cached_part_profile::run_sample",
+          "calls": 1,
+          "direct_children": [
+            {
+              "callee": "litchi_opc::source_backed::batch::read_parts_ordered",
+              "callee_id": 4026,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 27872
+            }
+          ],
+          "direct_children_ir": 27872,
+          "inclusive_ir": 27877,
+          "name": "cached_part_profile::cached_part_region_0787",
+          "partition_exact": true,
+          "self_ir": 5
+        },
+        "raw": "profiles-compat/1-1.callgrind.1",
+        "repeat": 1,
+        "report": {
+          "file": {
+            "bytes": 11597,
+            "path": "profiles-compat/1-1.json",
+            "sha256": "1d26cd89152c3b27ba7338df7281403625c5197082ce75e0a61041afcc395722"
+          },
+          "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+          "qualification_before": {
+            "file": {
+              "bytes": 11676,
+              "path": "qualification-before/0-large-primed-0-1-before.json",
+              "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+          },
+          "source_metrics": {
+            "logical_calls": null,
+            "max_simultaneous_reads": null,
+            "requested_bytes": null,
+            "returned_bytes": null,
+            "short_reads": null
+          },
+          "verification": {
+            "logical_bytes": 8388608,
+            "members": 32,
+            "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+          }
+        },
+        "statistics": {
+          "call_edge_records": 41,
+          "compressed_name_declarations": 28,
+          "cost_records": 777,
+          "function_records": 28,
+          "position_kinds": {
+            "absolute": 613,
+            "relative": 126,
+            "wildcard": 38
+          },
+          "unique_functions": 28
+        },
+        "summary_ir": 27877,
+        "thread_coverage": {
+          "note": "Callgrind worker roots may be disconnected from the owner ancestry; this is a guest-Ir cost diagnostic.",
+          "owner_graph_only": true,
+          "owner_inclusive_all_threads": false,
+          "physical_worker_fraction": false
+        },
+        "totals_ir": 27877,
+        "workers": 1
+      }
+    ],
+    "lane": "profiles-compat",
+    "qualified": true,
+    "receipts": {
+      "bytes": 16266,
+      "path": "profiles-compat/receipts.json",
+      "sha256": "5a92eb29c0658fb4f457a649f1e1eaba05a175851bf0b98265afd97ae725d439"
+    },
+    "scope": "operation-only Ir inside one exact Callgrind owner region; worker roots may be disconnected",
+    "summary_by_width": {
+      "1": {
+        "mean_summary_ir": 27877.0,
+        "owner_direct_children_ir": [
+          27872,
+          27872
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          27877,
+          27877
+        ]
+      },
+      "32": {
+        "mean_summary_ir": 97562.5,
+        "owner_direct_children_ir": [
+          96897,
+          98218
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          96902,
+          98223
+        ]
+      },
+      "8": {
+        "mean_summary_ir": 58407.0,
+        "owner_direct_children_ir": [
+          58885,
+          57919
+        ],
+        "owner_self_ir": [
+          5,
+          5
+        ],
+        "repeat_values": [
+          58890,
+          57924
+        ]
+      }
+    }
+  },
+  "profile_builds": {
+    "compatibility": {
+      "binary": {
+        "bytes": 12864648,
+        "custody_verified": true,
+        "name": "baseline-profile-compat",
+        "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "profile-src/Cargo.toml"
+      ],
+      "owner": "cached_part_profile::cached_part_region_0787",
+      "owner_symbol": {
+        "bytes": 64,
+        "path": "profile-build-compat/owner-symbol.txt",
+        "sha256": "6e126885f4f21aa2a7e53a5748d2303322da9c5aafa8a0a603102e404a775c74"
+      },
+      "probe": {
+        "bytes": 492,
+        "path": "profile-build-compat/probe.json",
+        "sha256": "a343d2b359d32551492fb9b2c0801d48adb4e5fbe5dd53e398315b8e59a6864f"
+      },
+      "probe_archive": {
+        "directory": "profile-src",
+        "files": [
+          {
+            "path": "profile-src/Cargo.lock",
+            "sha256": "93a1e7b103f7d4055945faaeda3f3b0d2e225778dffc7447a3ef640f2327e232"
+          },
+          {
+            "path": "profile-src/Cargo.toml",
+            "sha256": "2b4e6c6761120c9d5db01cbc8df8a9d56183b36a1c66757a71772660500b1222"
+          },
+          {
+            "path": "profile-src/Cargo.toml.template",
+            "sha256": "c7333b45313594c15f5d84246613474d514ad223761c3fa8cbc3af78a7221df0"
+          },
+          {
+            "path": "profile-src/README.md",
+            "sha256": "44bf84ecbe633a55c59135cd08ffe28d99d477fe72039f653b6e7103bfb11ef0"
+          },
+          {
+            "path": "profile-src/src/main.rs",
+            "sha256": "ce20a92b205cadf965ebed4cbbd355cf7090bf5b48e983ff3cddcd2ce5799930"
+          }
+        ]
+      },
+      "production_source_equal": true,
+      "receipt": {
+        "bytes": 1909,
+        "path": "profile-build-compat/receipt.json",
+        "sha256": "6256fea65730c567324362c635ef5461affe0fa458633c065c41d619fc336694"
+      },
+      "source": {
+        "bytes": 1182921,
+        "path": "profile-build-compat/source.json",
+        "sha256": "e81a4b32dca23d018a28468aa6d14ecea22865c4cd1d9f37a85596c38d2e9edd"
+      }
+    },
+    "failed_baseline": {
+      "binary": {
+        "bytes": 12907736,
+        "custody_verified": true,
+        "name": "baseline-profile",
+        "sha256": "1258cd1794275ebbc2e0ac7eaf6b3dfcb40f47823ea3e592a29a9bf7bdb24cfa"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "profile-src/Cargo.toml"
+      ],
+      "owner": "cached_part_profile::cached_part_region_0787",
+      "owner_symbol": {
+        "bytes": 64,
+        "path": "profile-build/owner-symbol.txt",
+        "sha256": "576ec4bb4743d97334a73d58ffc3cf508841e681dd08e65278e30625eb3b607f"
+      },
+      "probe": {
+        "bytes": 492,
+        "path": "profile-build/probe.json",
+        "sha256": "6b857e0f513f610219b98278f862a55694a7a8f0f91ebdc7bb38dff0a923c3b6"
+      },
+      "probe_archive": {
+        "directory": "profile-src-before-clock-fallback",
+        "files": [
+          {
+            "path": "profile-src-before-clock-fallback/Cargo.lock",
+            "sha256": "93a1e7b103f7d4055945faaeda3f3b0d2e225778dffc7447a3ef640f2327e232"
+          },
+          {
+            "path": "profile-src-before-clock-fallback/Cargo.toml",
+            "sha256": "2b4e6c6761120c9d5db01cbc8df8a9d56183b36a1c66757a71772660500b1222"
+          },
+          {
+            "path": "profile-src-before-clock-fallback/Cargo.toml.template",
+            "sha256": "c7333b45313594c15f5d84246613474d514ad223761c3fa8cbc3af78a7221df0"
+          },
+          {
+            "path": "profile-src-before-clock-fallback/README.md",
+            "sha256": "deeb67c84a58adaea555c19adc59bcb82b2afebd6b7bcd12cd4e4e5802d947bb"
+          },
+          {
+            "path": "profile-src-before-clock-fallback/src/main.rs",
+            "sha256": "8225a7601b8da864ff18c58eaccfac4ae0477bbe2d7edc5aaf8a4a9a48f22f98"
+          }
+        ]
+      },
+      "production_source_equal": true,
+      "receipt": {
+        "bytes": 1873,
+        "path": "profile-build/receipt.json",
+        "sha256": "b4280243de51c63d40a06f5f38e1ef36a589542b9b8b14a15645f5121a03cd9f"
+      },
+      "source": {
+        "bytes": 1182921,
+        "path": "profile-build/source.json",
+        "sha256": "e81a4b32dca23d018a28468aa6d14ecea22865c4cd1d9f37a85596c38d2e9edd"
+      }
+    }
+  },
+  "schema": "litchi.cached-part-profile-analysis.0787.v1",
+  "scope": {
+    "claims_excluded": [
+      "native wall-time or latency claims",
+      "physical worker fractions or serial-fraction claims",
+      "owner-inclusive-all-threads claim when worker roots are disconnected",
+      "trace wall time pooled with native or profile measurements"
+    ],
+    "profile": "operation-only Callgrind Ir for cached_part_region_0787; exact owner graph and immediate-child partition",
+    "trace": "whole-child clone/clone3/futex syscall counts with source-counter pairs"
+  },
+  "source": {
+    "binaries": {
+      "native": {
+        "bytes": 12907224,
+        "custody_verified": true,
+        "name": "before-native",
+        "sha256": "8c1c40bd4ac1a56d08de7b34e5409633a8f504c1da7c51f10639d94d1e683e1b"
+      },
+      "observer": {
+        "bytes": 12918880,
+        "custody_verified": true,
+        "name": "before-observer",
+        "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+      }
+    },
+    "logs": [
+      {
+        "bytes": 2910,
+        "path": "build-before/native.log",
+        "sha256": "317be5b606bb6245d33e461a3f32280bae05f34b54cdf8116bc34884cfecfd84"
+      },
+      {
+        "bytes": 201,
+        "path": "build-before/observer.log",
+        "sha256": "90e903bfe93c50f05d6c5103d62d7a3f907c116f1ab017dc3881e49d530725ab"
+      }
+    ],
+    "manifest": {
+      "bytes": 2488,
+      "path": "build-before/build.json",
+      "sha256": "dc243bb20ec510c1de4e04840b2f5305da9ec445ce322d48d62860029a60dd38"
+    },
+    "production_file_count": 9196,
+    "production_manifest_sha256": "6a37cf84ff4008c2175d24886811ca56b6365f0f8a6a8b6b5e94b1040f5bec12",
+    "production_revision": "6b47617020dd08bca196cbf3ab0b87a69aefbcb1",
+    "source": {
+      "bytes": 1201785,
+      "path": "build-before/source.json",
+      "sha256": "6a37cf84ff4008c2175d24886811ca56b6365f0f8a6a8b6b5e94b1040f5bec12"
+    },
+    "tool_file_count": 4,
+    "tool_manifest_sha256": "1839ad799bad0cd8f3226a471295ca3844598d970063d744986e8f29fbe6b755"
+  },
+  "traces": {
+    "after": {
+      "available": true,
+      "binary": {
+        "bytes": 12938560,
+        "custody_verified": true,
+        "name": "after-observer",
+        "sha256": "800524eced9e591b38fda300e6772aef7795fc442f6812bd87eb116c73a53a53"
+      },
+      "complete": {
+        "bytes": 285,
+        "path": "traces-after/complete.json",
+        "sha256": "a109a7e6b6b2669a6ec607d97808cfb4879e2d556e05da971a13d4b50375d6f1"
+      },
+      "directory": "traces-after",
+      "entries": [
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11685,
+              "path": "traces-after/0-1-fresh.json",
+              "sha256": "c621c87f3c49b0e9babe561e5aba65c3a92ca8cae8f7264d4161000fa4c8cc58"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11684,
+                "path": "qualification-before/0-large-fresh-0-1-before.json",
+                "sha256": "0ef62ab1653ea5adc290d29f3bed48dd624771f219304885561534a0d21fd39e"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces-after/0-1-fresh.strace",
+              "sha256": "701fbc53abfd424a94f084c5552c1050be2c135554d505716a725c80fa89890d"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11676,
+              "path": "traces-after/0-1-primed.json",
+              "sha256": "a1f6a07a61d9b13d9fd3b4d4b75d1ffaf8cae46874869db53f522c0083639cf6"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11676,
+                "path": "qualification-before/0-large-primed-0-1-before.json",
+                "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces-after/0-1-primed.strace",
+              "sha256": "701fbc53abfd424a94f084c5552c1050be2c135554d505716a725c80fa89890d"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11686,
+              "path": "traces-after/0-8-fresh.json",
+              "sha256": "eb0ce2492ebac6df19dabe75f24cf8e834487a5c31ecc1796abf28dc23fc8539"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11685,
+                "path": "qualification-before/0-large-fresh-0-8-before.json",
+                "sha256": "4842f1f04feda41c67f80cf386b51366c7f4c8e4f522d23d0e64467cc8c8ff5f"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/0-8-fresh.strace",
+              "sha256": "c766b6205792fe9e9f60fc63106445dd4bf1c1b73ae01fe12dd6d82f89c80435"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 226,
+                "errors": 16,
+                "successes": 210
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11677,
+              "path": "traces-after/0-8-primed.json",
+              "sha256": "209e0d73d447c9ca9864da0bd8e7c16646d868da85caedd7d06ee40249c788f6"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11679,
+                "path": "qualification-before/0-large-primed-0-8-before.json",
+                "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/0-8-primed.strace",
+              "sha256": "5a470ce5d8e3442d4cf5570479c03e96c2a8a1ee6d0fcd5002123b71fe38d7d6"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 226,
+                "errors": 20,
+                "successes": 206
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11690,
+              "path": "traces-after/0-32-fresh.json",
+              "sha256": "31ce015d08ccd6e361cfc4cc1b7582a1b725ce7fc97684469924078bfd21f3fa"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11689,
+                "path": "qualification-before/0-large-fresh-0-32-before.json",
+                "sha256": "26f730d20e758a0102a31d735f12144dc992be152b600d5ffee1ca448c613211"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/0-32-fresh.strace",
+              "sha256": "7cb3c6c9242e30b1084ae8e778a10ead9c19ce36bbab7ea92528404873394d39"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 79,
+                "errors": 6,
+                "successes": 73
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11679,
+              "path": "traces-after/0-32-primed.json",
+              "sha256": "5811ba8b4fc1ada23bba031017c5a54fc5da966ac621ae0707e092f368ec0ab4"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11683,
+                "path": "qualification-before/0-large-primed-0-32-before.json",
+                "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/0-32-primed.strace",
+              "sha256": "41afc4836625841c5a47a191dbf6c5970df0b045696237dd252dd614d9679ac3"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 53,
+                "errors": 4,
+                "successes": 49
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11690,
+              "path": "traces-after/1-32-fresh.json",
+              "sha256": "f38b82b2932dccea33380727d34be7792aeafbc3c7db135c74868d94f723c72c"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11689,
+                "path": "qualification-before/0-large-fresh-0-32-before.json",
+                "sha256": "26f730d20e758a0102a31d735f12144dc992be152b600d5ffee1ca448c613211"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/1-32-fresh.strace",
+              "sha256": "e42582258e9abfc985763a60dfb99d173f188a910c7adf006a7ac545c817c942"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 51,
+                "errors": 3,
+                "successes": 48
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11679,
+              "path": "traces-after/1-32-primed.json",
+              "sha256": "416cacc8b84a12c330c2f7eee7e552dec2f0efdc0e1f2533833fd42625fb557f"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11683,
+                "path": "qualification-before/0-large-primed-0-32-before.json",
+                "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/1-32-primed.strace",
+              "sha256": "8594401c612169046cd10cd2115b12eb75c53cb4867316ee4ebbf46a37f7d3fe"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 76,
+                "errors": 6,
+                "successes": 70
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11686,
+              "path": "traces-after/1-8-fresh.json",
+              "sha256": "b3797e50c6be3a88cdc5b738a89964a78a1a756473de8c5ee41f0f9e13f35e9b"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11685,
+                "path": "qualification-before/0-large-fresh-0-8-before.json",
+                "sha256": "4842f1f04feda41c67f80cf386b51366c7f4c8e4f522d23d0e64467cc8c8ff5f"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/1-8-fresh.strace",
+              "sha256": "1632f9599c024bb7391f7e443dc014c48e90f3bc4f8fc2208e7e8ef592b015df"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 239,
+                "errors": 29,
+                "successes": 210
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11676,
+              "path": "traces-after/1-8-primed.json",
+              "sha256": "7701dc74beaf0c09679ec05d99e21371e0268bf1355e2ccb1528678102958fdf"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11679,
+                "path": "qualification-before/0-large-primed-0-8-before.json",
+                "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces-after/1-8-primed.strace",
+              "sha256": "9cf9d7e4cc4aa5fdb2fe7cf465516402148a5bbdc7203588a51bbfd2da112ab9"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 246,
+                "errors": 32,
+                "successes": 214
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11685,
+              "path": "traces-after/1-1-fresh.json",
+              "sha256": "8e494babab456e97e283d8cc77cf05783f5d07a0a550b23e23c64f2301320aa2"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11684,
+                "path": "qualification-before/0-large-fresh-0-1-before.json",
+                "sha256": "0ef62ab1653ea5adc290d29f3bed48dd624771f219304885561534a0d21fd39e"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces-after/1-1-fresh.strace",
+              "sha256": "0cc32a2ad298f1817859f1edacdf4f312a53d0e8fff59a3e2a0e054b632b4c1e"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11676,
+              "path": "traces-after/1-1-primed.json",
+              "sha256": "9a31e5f7daf1400ee9cbebdf2d214dd6b6a62f83ca963425151bc762d6e1602d"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11676,
+                "path": "qualification-before/0-large-primed-0-1-before.json",
+                "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces-after/1-1-primed.strace",
+              "sha256": "7213acbfc0b360772c5ae136a3d9677be106cdbd0e51c13a8092bf4b2e58b165"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        }
+      ],
+      "expected_clone3_model": "W fresh and 2W primed before; W fresh and W primed after; W=1 is zero",
+      "pairs": [
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 0,
+          "expected_primed": 0,
+          "fresh_one_operation_clone3_successes": 0,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 0,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 1
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 8,
+          "expected_primed": 8,
+          "fresh_one_operation_clone3_successes": 8,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 8,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 8
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 32,
+          "expected_primed": 32,
+          "fresh_one_operation_clone3_successes": 32,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 32,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 32
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 0,
+          "expected_primed": 0,
+          "fresh_one_operation_clone3_successes": 0,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 0,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 1
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 8,
+          "expected_primed": 8,
+          "fresh_one_operation_clone3_successes": 8,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 8,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 8
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 32,
+          "expected_primed": 32,
+          "fresh_one_operation_clone3_successes": 32,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 32,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 32
+        }
+      ],
+      "receipts": {
+        "bytes": 25838,
+        "path": "traces-after/receipts.json",
+        "sha256": "0978ede8c749afe7018f6f627b5c1ab36aa60010a3e5d7ba06acfccd255e8e99"
+      },
+      "scope": "whole-child clone/clone3/futex syscall summary; attempts, errors, and successes retained",
+      "trace_wall_time_pooled": false
+    },
+    "before": {
+      "available": true,
+      "binary": {
+        "bytes": 12918880,
+        "custody_verified": true,
+        "name": "before-observer",
+        "sha256": "89a4a51506ea667b0956d1b8224f21ff13674b281934dac7c67ced5cb02940a6"
+      },
+      "complete": {
+        "bytes": 279,
+        "path": "traces/complete.json",
+        "sha256": "277ab27b3a2bbf57c418f2727b2ef5d2153a3de776528330c528724548933f10"
+      },
+      "directory": "traces",
+      "entries": [
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11685,
+              "path": "traces/0-1-fresh.json",
+              "sha256": "27ca0e800b5d574d9d6ce7d1e2c7f68c3f8f5d38e4008f217776cf694bf85e01"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11684,
+                "path": "qualification-before/0-large-fresh-0-1-before.json",
+                "sha256": "0ef62ab1653ea5adc290d29f3bed48dd624771f219304885561534a0d21fd39e"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces/0-1-fresh.strace",
+              "sha256": "7213acbfc0b360772c5ae136a3d9677be106cdbd0e51c13a8092bf4b2e58b165"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11676,
+              "path": "traces/0-1-primed.json",
+              "sha256": "a5191965423673133db3d846d9e78c64f6fa99d7fd6797200fee8b978c87b053"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11676,
+                "path": "qualification-before/0-large-primed-0-1-before.json",
+                "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces/0-1-primed.strace",
+              "sha256": "d885ad102b44700dff8cd049b7fd64e007d0587c317b0d270f668781eaaf1855"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11686,
+              "path": "traces/0-8-fresh.json",
+              "sha256": "67d921bd8ac396095c064007129fd866cc523a47d8f66ff7c88d61a72763da1a"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11685,
+                "path": "qualification-before/0-large-fresh-0-8-before.json",
+                "sha256": "4842f1f04feda41c67f80cf386b51366c7f4c8e4f522d23d0e64467cc8c8ff5f"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/0-8-fresh.strace",
+              "sha256": "67af418ccd0ae195f7db589a5b7525e5c729100cbe18ece9c29bde7e70312680"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 232,
+                "errors": 17,
+                "successes": 215
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 16,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11681,
+              "path": "traces/0-8-primed.json",
+              "sha256": "5097280017a948354de96e3f4113b7fde9a20a81a72e29c748e538c60fb7ef22"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11679,
+                "path": "qualification-before/0-large-primed-0-8-before.json",
+                "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/0-8-primed.strace",
+              "sha256": "014b6c687f2f2e541370e70b0eac64132ba4a0a5dd9dda74cb2c73bd72492cac"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 16,
+                "errors": 0,
+                "successes": 16
+              },
+              "futex": {
+                "attempts": 338,
+                "errors": 36,
+                "successes": 302
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11690,
+              "path": "traces/0-32-fresh.json",
+              "sha256": "30ba364c9a204ec9f129e7f197977766ae920a145038d298e57a2a5e35576c51"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11689,
+                "path": "qualification-before/0-large-fresh-0-32-before.json",
+                "sha256": "26f730d20e758a0102a31d735f12144dc992be152b600d5ffee1ca448c613211"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/0-32-fresh.strace",
+              "sha256": "8caa05c9911c57dc64881ffd5118849e44b0c244cf0f101a4bb15bb59df54c83"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 66,
+                "errors": 6,
+                "successes": 60
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 64,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 0,
+          "report": {
+            "file": {
+              "bytes": 11684,
+              "path": "traces/0-32-primed.json",
+              "sha256": "7e89dea3b70a91c3c8f33db5a8a10b11db3aafb7e1aa2fe35715dfea634c9b65"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11683,
+                "path": "qualification-before/0-large-primed-0-32-before.json",
+                "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/0-32-primed.strace",
+              "sha256": "06901e28a8031282977b2c74e95d53664ecfdbc97562d0f07e261d59213b9bb4"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 64,
+                "errors": 0,
+                "successes": 64
+              },
+              "futex": {
+                "attempts": 66,
+                "errors": 3,
+                "successes": 63
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 32,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11690,
+              "path": "traces/1-32-fresh.json",
+              "sha256": "f43884fc6b0972f553cc5f46ebad708c2afb9ff960e78184f5da2ef9b0b92e96"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11689,
+                "path": "qualification-before/0-large-fresh-0-32-before.json",
+                "sha256": "26f730d20e758a0102a31d735f12144dc992be152b600d5ffee1ca448c613211"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/1-32-fresh.strace",
+              "sha256": "1a6ab1c2de8c66a433294c91b3fad761b78b257c93e72088f15815e42c868689"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              },
+              "futex": {
+                "attempts": 57,
+                "errors": 4,
+                "successes": 53
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 64,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11684,
+              "path": "traces/1-32-primed.json",
+              "sha256": "13a20c5ca7dab28a53bb1495011b138a091024efa8ba4e042f723acdcf3bafed"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11683,
+                "path": "qualification-before/0-large-primed-0-32-before.json",
+                "sha256": "8c1154ff3b2658e0fa541f873be36f0da844f0832da05eb609084d945a3d927a"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/1-32-primed.strace",
+              "sha256": "5af6dc11e4595cc76f985a2c61c52a474f5da27add92d26264dac1646ee99118"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 64,
+                "errors": 0,
+                "successes": 64
+              },
+              "futex": {
+                "attempts": 59,
+                "errors": 4,
+                "successes": 55
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 32
+        },
+        {
+          "expected_clone3_successes": 8,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11686,
+              "path": "traces/1-8-fresh.json",
+              "sha256": "226971c6cd4b7d41945cc3923e27ad48ab9b06cd889d880bd0cbd260464d43cc"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11685,
+                "path": "qualification-before/0-large-fresh-0-8-before.json",
+                "sha256": "4842f1f04feda41c67f80cf386b51366c7f4c8e4f522d23d0e64467cc8c8ff5f"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/1-8-fresh.strace",
+              "sha256": "df8695df6b0889e46eaa0d24f62dfefa81870042ef66734f33664105f10fc04e"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 8,
+                "errors": 0,
+                "successes": 8
+              },
+              "futex": {
+                "attempts": 247,
+                "errors": 29,
+                "successes": 218
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 16,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11681,
+              "path": "traces/1-8-primed.json",
+              "sha256": "8113463aaaeb93fc8cfa3613cf785312b31151743d7756b7540c73c1b54ca43e"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11679,
+                "path": "qualification-before/0-large-primed-0-8-before.json",
+                "sha256": "62213f1a273b6da278cbafd316e7bb3cf38b9e0fe3b1d34f48fc957580f4d383"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 367,
+              "path": "traces/1-8-primed.strace",
+              "sha256": "eafdb8767659095d275fac1b53d828c651b012bb926be0ab0998cc0b1f82c9ce"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 16,
+                "errors": 0,
+                "successes": 16
+              },
+              "futex": {
+                "attempts": 334,
+                "errors": 39,
+                "successes": 295
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 8
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 64,
+            "max_simultaneous_reads": 1,
+            "requested_bytes": 146041,
+            "returned_bytes": 146041,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11685,
+              "path": "traces/1-1-fresh.json",
+              "sha256": "652b49321f18179bfa1b9095ed1ecd69bf6627f39e3834f149f2078564eaa93a"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11684,
+                "path": "qualification-before/0-large-fresh-0-1-before.json",
+                "sha256": "0ef62ab1653ea5adc290d29f3bed48dd624771f219304885561534a0d21fd39e"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 64,
+              "max_simultaneous_reads": 1,
+              "requested_bytes": 146041,
+              "returned_bytes": 146041,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "fresh",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces/1-1-fresh.strace",
+              "sha256": "3ad0e871f568ecec12460fee61d21e6d83eb5f3e82ff55a62a1fcc3583871300"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        },
+        {
+          "expected_clone3_successes": 0,
+          "paired_source_counters": {
+            "logical_calls": 0,
+            "max_simultaneous_reads": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0,
+            "short_reads": 0
+          },
+          "repeat": 1,
+          "report": {
+            "file": {
+              "bytes": 11676,
+              "path": "traces/1-1-primed.json",
+              "sha256": "7dbde09fd4b259a61b8365e46a17ec01b296eb992191a5c1532441f55571550c"
+            },
+            "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3",
+            "qualification_before": {
+              "file": {
+                "bytes": 11676,
+                "path": "qualification-before/0-large-primed-0-1-before.json",
+                "sha256": "832014b4d4ebd6074517e74eb851abb7596bc02a35569a6f47bed03ee3898681"
+              },
+              "output_fingerprint": "b7a34e0030272a7d194c92144fdf759f5393c67c7dfd96293d5361b60d0fe2b3"
+            },
+            "source_metrics": {
+              "logical_calls": 0,
+              "max_simultaneous_reads": 0,
+              "requested_bytes": 0,
+              "returned_bytes": 0,
+              "short_reads": 0
+            },
+            "verification": {
+              "logical_bytes": 8388608,
+              "members": 32,
+              "sequence_sha256": "a238675779a8f3525cc743bcf06d07d2db3742b1c2b9c7bc962aa49b4b4f6a11"
+            }
+          },
+          "state": "primed",
+          "strace": {
+            "file": {
+              "bytes": 309,
+              "path": "traces/1-1-primed.strace",
+              "sha256": "af22b0c2e9d99a388ce7e3b8e29e6493fe383be781b228b09e818713fe3667c0"
+            },
+            "syscalls": {
+              "clone": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "clone3": {
+                "attempts": 0,
+                "errors": 0,
+                "successes": 0
+              },
+              "futex": {
+                "attempts": 32,
+                "errors": 0,
+                "successes": 32
+              }
+            }
+          },
+          "trace_wall_time_pooled": false,
+          "workers": 1
+        }
+      ],
+      "expected_clone3_model": "W fresh and 2W primed before; W fresh and W primed after; W=1 is zero",
+      "pairs": [
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 0,
+          "expected_primed": 0,
+          "fresh_one_operation_clone3_successes": 0,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 0,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 1
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 8,
+          "expected_primed": 16,
+          "fresh_one_operation_clone3_successes": 8,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 16,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 8
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 32,
+          "expected_primed": 64,
+          "fresh_one_operation_clone3_successes": 32,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 64,
+          "primed_source_calls": 0,
+          "repeat": 0,
+          "source_counter_pair_exact": true,
+          "workers": 32
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 0,
+          "expected_primed": 0,
+          "fresh_one_operation_clone3_successes": 0,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 0,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 1
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 8,
+          "expected_primed": 16,
+          "fresh_one_operation_clone3_successes": 8,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 16,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 8
+        },
+        {
+          "clone3_pair_exact": true,
+          "expected_fresh": 32,
+          "expected_primed": 64,
+          "fresh_one_operation_clone3_successes": 32,
+          "fresh_source_calls": 64,
+          "primed_preload_plus_one_operation_clone3_successes": 64,
+          "primed_source_calls": 0,
+          "repeat": 1,
+          "source_counter_pair_exact": true,
+          "workers": 32
+        }
+      ],
+      "receipts": {
+        "bytes": 25499,
+        "path": "traces/receipts.json",
+        "sha256": "30c12e1f51518982a13b0dee762888cf579506d86c0ef6ab6ba1ff02ea2c6be2"
+      },
+      "scope": "whole-child clone/clone3/futex syscall summary; attempts, errors, and successes retained",
+      "trace_wall_time_pooled": false
+    }
+  },
+  "verification": {
+    "profile_events_ir": true,
+    "profile_exact_owner_call": true,
+    "profile_one_numbered_dump_per_case": true,
+    "profile_output_identity_matches_qualification_before": true,
+    "profile_owner_immediate_partition_exact": true,
+    "profile_summary_equals_all_self_ir": true,
+    "profile_termination_dump_zero": true,
+    "trace_clone3_counts_exact": true,
+    "trace_source_counter_pairs_exact": true,
+    "trace_wall_time_pooled": false
+  }
+}

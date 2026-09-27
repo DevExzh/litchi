@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0787 — cached scheduler mechanism confirmed, memory guard blocks adoption
+
+[0787](0787-cached-part-scheduling.md) Avoiding private thread creation after all-ready cache admission removes most cache-hit latency. Whole-child small/primed width-4 RSS nevertheless increases 5.70%; the candidate is rejected. Attribute that memory effect before reconsidering, without treating guest instruction counts as native CPU fractions.
+
 ## 0786 — finite-budget scheduling evidence
 
 [0786](0786-finite-execution-budget-scaling.md) The 120-case matrix separates small, large and mixed payload eligibility from requested width. The 64 KiB per-task floor serializes the one-batch small/mixed fixtures; primed ordered Parts provide a no-source-read cache-hit control. See the report for measured follow-up priorities.

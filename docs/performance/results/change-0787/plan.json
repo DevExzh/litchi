@@ -1,0 +1,516 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "bootstrap": {
+    "confidence": 0.95,
+    "resamples": 10000,
+    "seed": 787078
+  },
+  "cases": [
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    }
+  ],
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "qualification": {
+    "blocks": 1,
+    "samples": 1,
+    "warmup": 0
+  },
+  "schema": "litchi.cached-part-scheduling.0787.v1",
+  "scope": "Fresh paired before/after current public ordered Part reads under finite budgets; all cached and all cold controls, no physical-cold or full-format CRUD claim. Native tool byte-identical to0786; historicallatencies notpooled."
+}

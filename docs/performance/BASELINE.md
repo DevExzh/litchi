@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0787 — paired cached-Part scheduling experiment
+
+[0787](0787-cached-part-scheduling.md) A 60-case before/after matrix retains six native paired blocks, separate source observers, current baseline Callgrind diagnostics and before/after thread counts. All output/resource checks and six quality gates pass; a small cached RSS guard failure prevents adoption.
+
 ## 0786 — finite execution-budget scaling
 
 [0786](0786-finite-execution-budget-scaling.md) A standalone read-session matrix measures OPC, CFB and ordered Parts at widths 1/2/4/8/32 under finite worker, I/O and CPU-task budgets. Fresh and primed states, task-floor controls, native timing and separate source observations are retained.

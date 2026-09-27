@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0787 — cached-Part candidate rejected
+
+[0787](0787-cached-part-scheduling.md) Sixteen cache-hit cases reduce paired p50 by 96.75–99.03%, but small/primed/floor-0/width-4 peak RSS rises 5.70% with a confidence interval above one. The frozen policy rejects the candidate; all production source is restored. Exact 1,080-report/22,200-sample evidence and all individual cases remain replayable.
+
 ## 0786 — current low-level execution baseline
 
 [0786](0786-finite-execution-budget-scaling.md) The current-source read-session matrix closes a timing-evidence gap after 0676. It adds a reusable benchmark with deterministic payloads and bounded execution; production source is unchanged. Measured scaling, negative results and descriptive Amdahl fits are reported individually.

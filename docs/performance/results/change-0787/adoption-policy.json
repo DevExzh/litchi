@@ -1,0 +1,30 @@
+{
+  "benefit": {
+    "at_least_one_case_required": true,
+    "ci95_high_below": 1,
+    "eligible_state": "primed",
+    "eligible_workers": [
+      2,
+      4,
+      8,
+      32
+    ],
+    "minimum_improvement_percent": 3
+  },
+  "correctness": "alloutputidentities/sourcecounts/finiteCPUtasks/permitreleases exactlymatchbaseline; productiongatesandfocusedadversarialtests pass",
+  "cpu": "retainCPUtime/utilization, notactualworkercount; notadoptionmetric",
+  "frozen_before_build": true,
+  "latency": {
+    "any_case_violation_rejects": true,
+    "maximum_median_paired_ratio": 1.05,
+    "reject_when_ci95_low_exceeds": 1
+  },
+  "rss": {
+    "any_case_violation_rejects": true,
+    "maximum_median_paired_ratio": 1.05,
+    "reject_when_ci95_low_exceeds": 1,
+    "scope": "whole-childpeakRSS; notoperationallocation"
+  },
+  "schema": "litchi.cached-part-adoption.0787.v1",
+  "tails": "retainall p95/p99 and individual >5%flag review; no automatictailimprovementclaim"
+}

@@ -1,0 +1,392 @@
+[
+  {
+    "artifacts": {
+      "0-1.callgrind": {
+        "bytes": 559,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.callgrind",
+        "sha256": "b77eb9e151f11689698039b835ee8a6158dc401f6592993606698d2dcee224dc"
+      },
+      "0-1.callgrind.1": {
+        "bytes": 16847,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.callgrind.1",
+        "sha256": "a622784294462a9168a9b2ee0c2ef8f6d8ced731cf3d0da2f2a5899bfd26dbae"
+      },
+      "0-1.json": {
+        "bytes": 11597,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.json",
+        "sha256": "d31138f1ddd1f561416bbbb63787fe21c246b2cd963c203ffe3496ab94b0b5aa"
+      },
+      "0-1.log": {
+        "bytes": 904,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.log",
+        "sha256": "f02ca39275d0d357928bed145bd84901a1fef211627482cbd47e70c7c10e137e"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-1.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528835.721514,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 0,
+    "started": 1790528833.4718058,
+    "workers": 1
+  },
+  {
+    "artifacts": {
+      "0-8.callgrind": {
+        "bytes": 559,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.callgrind",
+        "sha256": "5c911e4a1d0e5f6d32951c486e98cfba7729cdc5992da1522e7e6e3afbbbe803"
+      },
+      "0-8.callgrind.1": {
+        "bytes": 41434,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.callgrind.1",
+        "sha256": "d7cee29f50b78f53c98a57189cc87e7ae4776a0b73b7dc1ae83cd227b8e17c44"
+      },
+      "0-8.json": {
+        "bytes": 11597,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.json",
+        "sha256": "9d974274366cab2dccdc11ca08596d8b6b0f0edcf11c28a736c9fd1450a2c4c0"
+      },
+      "0-8.log": {
+        "bytes": 904,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.log",
+        "sha256": "9dd9c03d2e5859ce80d607da69ead51024d2b2c78aca7a17b523f0339e8095c4"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-8.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528838.1397924,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 0,
+    "started": 1790528835.9122248,
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "0-32.callgrind": {
+        "bytes": 561,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.callgrind",
+        "sha256": "767e4a08ac4f5bfedff9f966bdc5ec76a7b2a74d64962de087392777821f874e"
+      },
+      "0-32.callgrind.1": {
+        "bytes": 34243,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.callgrind.1",
+        "sha256": "a3742fb2bd7a60c1293433aa25fcc8f78d31082feebfde520c3b2190da84f4b8"
+      },
+      "0-32.json": {
+        "bytes": 11600,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.json",
+        "sha256": "759b8fb7aa7bfb907160669c22c8fd9c261657d6c4332abe2d732754059509d8"
+      },
+      "0-32.log": {
+        "bytes": 906,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.log",
+        "sha256": "924db2e56a2b3e6742f390c611e5979c7a962fbb5f0513df519bc9d6970a94c3"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/0-32.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528840.602734,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 0,
+    "started": 1790528838.333446,
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "1-32.callgrind": {
+        "bytes": 561,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.callgrind",
+        "sha256": "fe602925acbb7324a5ccd845cf2360c904c0afac69bfcda17e110940b0cf52dd"
+      },
+      "1-32.callgrind.1": {
+        "bytes": 34251,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.callgrind.1",
+        "sha256": "017e58f5060f7c381c3d9979d8bc703c1b03ad04c544f80d68ce2fa23fefc51c"
+      },
+      "1-32.json": {
+        "bytes": 11600,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.json",
+        "sha256": "5f3129b58e1db886f96267161e78a719213b7c50956864695f2981f50c3b5c5f"
+      },
+      "1-32.log": {
+        "bytes": 906,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.log",
+        "sha256": "c2e50bd5a0343c7e9efcf9c3bb4f2e9d6c6f3fa22bbe9b845bcaab24d2a171eb"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "32",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-32.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528843.0555124,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 1,
+    "started": 1790528840.7978575,
+    "workers": 32
+  },
+  {
+    "artifacts": {
+      "1-8.callgrind": {
+        "bytes": 559,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.callgrind",
+        "sha256": "58d3af60f5f8a73d3a09b7c3bf0a1dda58fafd0b14f6b05cdaa5209a972ce1ee"
+      },
+      "1-8.callgrind.1": {
+        "bytes": 41874,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.callgrind.1",
+        "sha256": "9384a3a8e85d4db5d02a4a76af4bfb9af16c70e798074ac4b24274c7c72dd004"
+      },
+      "1-8.json": {
+        "bytes": 11597,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.json",
+        "sha256": "d1d30b8f7478e8a8e1eec684376557471f4c0417d0dc1360b588dda82a152b95"
+      },
+      "1-8.log": {
+        "bytes": 904,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.log",
+        "sha256": "94ac8ab9d82be44ab764ef662cc611c7d59593d9b67b160ea07cec7fa72b6cbb"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "8",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528845.5423021,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 1,
+    "started": 1790528843.2464826,
+    "workers": 8
+  },
+  {
+    "artifacts": {
+      "1-1.callgrind": {
+        "bytes": 559,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.callgrind",
+        "sha256": "c72a7031f413313c2d77f633d7171f612a7f9cc45c6e8132e621441b2d2cae2c"
+      },
+      "1-1.callgrind.1": {
+        "bytes": 16847,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.callgrind.1",
+        "sha256": "7517f587b6a8cbf6d76e9f156f37cbf87a3b53dab3a986d74b65c7f506f71633"
+      },
+      "1-1.json": {
+        "bytes": 11597,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.json",
+        "sha256": "1d26cd89152c3b27ba7338df7281403625c5197082ce75e0a61041afcc395722"
+      },
+      "1-1.log": {
+        "bytes": 904,
+        "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.log",
+        "sha256": "b266cd42bb7a90798456f40ce11525faf908436fd44723dad4024d555a9c6cd2"
+      }
+    },
+    "binary": {
+      "bytes": 12864648,
+      "path": "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "sha256": "c3546764c159ef3710b5dfd3047ee12f87a3f7bcd71d67f4f41e08bae5add6df"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+      "valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=no",
+      "--toggle-collect=cached_part_profile::cached_part_region_0787",
+      "--zero-before=cached_part_profile::cached_part_region_0787",
+      "--dump-after=cached_part_profile::cached_part_region_0787",
+      "--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.callgrind",
+      "/home/zhuhe/code/litchi-target-0787/baseline-profile-compat",
+      "--route",
+      "parts",
+      "--shape",
+      "large",
+      "--workers",
+      "1",
+      "--task-floor",
+      "0",
+      "--state",
+      "primed",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-1.json"
+    ],
+    "driver_sha256": "80484e041a6d94dd9b4e45de54a45f1e703a3a0899a624c4a68f17975267368d",
+    "ended": 1790528847.9781113,
+    "exit_code": 0,
+    "plan_sha256": "877271cc4889d812596dd7ab46aeea38019bbf20d791a1de391089316ae6f47b",
+    "repeat": 1,
+    "started": 1790528845.7356231,
+    "workers": 1
+  }
+]
