@@ -6,7 +6,12 @@
 //! collection.  The caller can populate [`Profile`] from a guarded source
 //! preflight and reserve the returned number before invoking the codec.
 
-use std::{collections::HashSet, mem::size_of, ops::Range, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    mem::size_of,
+    ops::Range,
+    sync::Arc,
+};
 
 use litchi_ooxml_common::mce::{Capabilities, Name, Report};
 use quick_xml::Reader;
@@ -182,6 +187,27 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
     let quickxml_attributes = vec_capacity(attributes, range_bytes)?
         .checked_add(hash_capacity(attributes, size_of::<u64>() as u64)?)?;
 
+    // The fail-fast iterator keeps quick-xml's first 32 names, then adds an
+    // ordered borrowed-name index and a boxed owner. Keep the previous
+    // quick-xml allowance above as a conservative overlap charge. At more
+    // than 32 entries the pinned B-tree's minimum five entries per non-root
+    // node make four entry slots per name cover nodes and child links.
+    let ordered_attribute_check = if attributes > 32 {
+        attributes
+            .checked_mul(u64::try_from(size_of::<(&[u8], usize)>()).ok()?)?
+            .checked_mul(ORDERED_INDEX_SLOTS_PER_ENTRY)?
+            .checked_add(u64::try_from(size_of::<BTreeMap<&[u8], usize>>()).ok()?)?
+            .checked_add(usize_bytes)?
+            .checked_add(
+                u64::try_from(size_of::<
+                    litchi_ooxml_common::xml::attributes::CheckedAttributes<'_>,
+                >())
+                .ok()?,
+            )?
+    } else {
+        0
+    };
+
     let namespace_storage =
         string_capacity(namespace_bytes, namespace_declarations.checked_mul(2)?)?
             .checked_add(vec_sum_capacity(
@@ -286,6 +312,7 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
         mce_frames,
         raw_attributes,
         quickxml_attributes,
+        ordered_attribute_check,
         expanded_attribute_names,
         namespace_storage,
         namespace_index,
