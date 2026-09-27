@@ -115,3 +115,22 @@ across 119 suites. These are candidate results; restoration is verified by exact
 source identity, not presented as a new production test run.
 
 No CRUD row is promoted. The non-iWork performance goal remains active.
+
+
+## Integration and cleanup
+
+Integrated by fast-forward through `005f279fd5`, following the independent
+Heaptrack attribution commit `d862e596c2`. All changes are performance
+documentation and evidence; production source remains identical to
+`345b81ce8a`. The 627-file packet seal matches committed bytes. Offline
+validation and all five derived-table checks pass from the main workspace
+both before and after removal of the original worktree and executables.
+
+The owned build target (3,926,342,433 file bytes), copied root lock, three
+reference symlinks, worktree and temporary branch were removed. Exact binary
+path/size/SHA witnesses remain in `cleanup.json`. The candidate owner also
+confirmed removal of its `/tmp/litchi-0779-patch-check.*` checkout and temporary
+patch/log files. All pre-existing worktrees and the three unrelated main-tree
+files retain their original state. Raw patch context whitespace is preserved
+as evidence; other changed files pass the whitespace check. The sealed packet
+is unchanged by this integration note.
