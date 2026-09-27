@@ -1,0 +1,28 @@
+{
+  "baseline_helper": {
+    "bytes": 11417,
+    "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs",
+    "sha256": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821"
+  },
+  "candidate_helper": {
+    "bytes": 17905,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/candidate/after/litchi-opc-xml_attributes.rs",
+    "sha256": "692eae80ee27c4fcd2137625b5f07c576114b6d50a1c7af3c15cbe4f1a271f2e"
+  },
+  "candidate_seal": {
+    "bytes": 116356,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/seal.json",
+    "sha256": "69584f97d1e63cd072b3e3d7297ce8b0dab615cce0838c74a3c129b5a1f8af8c"
+  },
+  "parser": {
+    "bytes": 18529,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/callgrind_parser.py",
+    "sha256": "4a32c35c5e90aa290b4b983091ba4ed86569b4322c7ea4d0292e8d4ae4e6ad2e"
+  },
+  "previous_seal": {
+    "bytes": 14616,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/seal.json",
+    "sha256": "0b47b204157a80a54fb236413c438d8f3e9c4685b23b49f8c34b97ff07f89f3c"
+  },
+  "quality": "Exact helpers source-bound to0794quality; no freshproductiontestclaim"
+}

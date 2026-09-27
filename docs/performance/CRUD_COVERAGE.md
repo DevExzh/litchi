@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0796 — direct helper diagnostics, no coverage promotion
+
+[0796](0796-xml-attribute-boundary-diagnostic.md) Hot repeated XML attribute inputs isolate construction and error/growth boundaries. This adds no document producer, CRUD, cold/range, or concurrency coverage. Production is unchanged.
+
 ## 0795 — diagnostic capture profiles, no coverage promotion
 
 [0795](0795-xml-duplicate-key-instruction-profile.md) Exact baseline/rejected-candidate PPTX capture profiles retain generated tiny/medium/large identity. The OPC helper is exercised; no native-producer, cold/range, concurrency, or CRUD support row is promoted. Production remains the baseline.

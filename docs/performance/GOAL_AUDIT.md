@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0796 — early duplicate rejection remains necessary
+
+[0796](0796-xml-attribute-boundary-diagnostic.md) Locked probe gates, 248 qualified counter owners, 496 independently conserved dumps, and independent sample/checksum/native audits pass. Long duplicate values expose extra lexical work; 0794 remains rejected.
+
 ## 0795 — instruction evidence narrows the next experiment
 
 [0795](0795-xml-duplicate-key-instruction-profile.md) All twelve multi-counter owner profiles qualify, but two unresolved native owner frames block phase fractions. Guest total instruction savings are small despite 0794 allocation reductions. Stale candidate build artifacts were detected and rebuilt before capture. Exact production restoration, three parser tests, raw audits, and cleanup preserve the rejected disposition.

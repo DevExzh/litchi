@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0796 — attribute boundary diagnostics retain rejection
+
+[0796](0796-xml-attribute-boundary-diagnostic.md) All 992 reports/22,568 samples validate. Thirty-one construction and eight consumption rows trigger diagnostic regression flags; these micro-input results do not establish workflow speed or adoption. Production is unchanged.
+
 ## 0795 — rejected-candidate instruction and branch profiles
 
 [0795](0795-xml-duplicate-key-instruction-profile.md) Sixteen reports/412 outputs pass source and semantic checks. All five Callgrind counters conserve across twelve regions; native phase fractions fail qualification due to two unresolved frames. No production optimization or native speedup is claimed, and the 0794 rejection remains authoritative.

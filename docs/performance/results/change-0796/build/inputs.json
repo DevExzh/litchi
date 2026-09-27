@@ -1,0 +1,25 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "45da615f3ff51312ebb629ab7e55d14331a0ebfad4b2f82f314862050ad01fd5",
+    "capture.py": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d",
+    "custody.py": "2e0b3749ece294748b5d9c7df92859f833053c6172fd19d1eabe87a932c6dd49",
+    "fixture_check.py": "e57b6a54a51d93caee549d00b92299de42fc2e4c45b954c15f9d6d2251145a63",
+    "fixtures.json": "8682bbea017e3a6ef78161d198b8a021fe202e15a1cc30df0550a9b92b1ec197",
+    "host.json": "83459c382732c84ff2136bf3a34499c12872103cfb29a790a3874112ae74d698",
+    "inheritance.json": "88d296e001c436c582db2e02f7e81cecee073eafebf14b62ca001e45d19df826",
+    "lock-generation.json": "db741c4f31473c06e012156bdd19fd9adaa73561590f0bcb93ee31b92fed9bb5",
+    "lock-generation.log": "80c79ba0b92c0c7696dbee779e03f63558db41c667090bd908f83dbb224990e2",
+    "origin.json": "a4f42c6af38cb8db37f7725f935b3da5d9a67484ebe9459f48af9050798fbd8a",
+    "plan.json": "bd5908a236a4b0fa89379b9f2d2f9d08ac17e9d814c944105403efee24d762e1"
+  },
+  "probe": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "README.md": "bf16f8863e12c4c6ff537ff1a84895aa04cc4b2d9faa15e4107ac1ae410717d1",
+    "src/baseline.rs": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "src/candidate.rs": "692eae80ee27c4fcd2137625b5f07c576114b6d50a1c7af3c15cbe4f1a271f2e",
+    "src/main.rs": "de375ef103d2790ca4c0d94b31e1fc232a5dd4ad17b2e929b344921190d381e8"
+  }
+}
