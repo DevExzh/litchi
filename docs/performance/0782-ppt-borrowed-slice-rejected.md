@@ -74,9 +74,15 @@ python3 -B docs/performance/results/change-0782/decision_audit.py
 
 New measurements require a fresh checkout of the recorded base, fresh packet/output directories and target, retained workspace/probe locks, identical probe/template/plans, and new source/binary receipts. Render the manifest for the new path. Run `build.py before`, `probe_tests.py`, `capture.py qualification`, `observers.py heaptrack-before`, and `heap_decode.py before` before applying `candidate/applied-model.patch`. Then run `quality.py`, `build.py after`, `capture.py native`, `capture.py allocation`, `observers.py heaptrack-after`, `heap_decode.py after`, and `observers.py perf` serially. Do not overwrite retained artifacts or relabel old receipts. Generate observer/main analyses, test summary and decision/source custody, then tables and the seal. The packet-specific decision audit records this run’s four violations; a new run needs its own reviewed decision, not copied results.
 
-All four executable identities were verified before removing the owned build
-target (1,981,285,708 file bytes). Complete replay passes with cleanup witnesses
-after removal. Final sealing, commit integration and owned-worktree cleanup
-are recorded below after verification. The seal covers 693 payload files;
-sealed replay, all five tables and the decision audit pass. The broader
-performance goal remains active.
+Commit `8307452c01` was fast-forwarded into `feat/office-format-completeness`.
+The seal covers 693 payload files; all 694 packet Git blobs, including the seal,
+were checked before commit. All four executable identities were verified before
+removing the owned build target (1,981,285,708 file bytes). The owned worktree
+and `perf/0782-ppt-borrowed-slice` branch are also removed. The preexisting
+worktree inventory and hashes of the three unrelated main-checkout files remain
+unchanged.
+
+Complete sealed replay, all five tables and the independent decision audit pass
+from the main checkout after target and worktree removal. The audit confirms
+four latency guard violations. No production candidate changes are retained;
+the broader performance goal remains active.
