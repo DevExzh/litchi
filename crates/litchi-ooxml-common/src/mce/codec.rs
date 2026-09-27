@@ -875,9 +875,10 @@ fn start(
         .min(ATTRIBUTES_PER_ELEMENT_CEILING);
     let mut attributes = 0usize;
     for a in e.checked_attributes() {
-        // Counted before the item is inspected: quick-xml has checked this
-        // attribute's name against the tag's earlier ones, a cost that grows
-        // with their number, so the limit bounds that work for the tag.
+        // Counted before the item is inspected: the first 32 names use
+        // quick-xml's bounded linear check and later names use the ordered
+        // map check, so the limit bounds all duplicate-check work for the
+        // tag.
         attributes = attributes
             .checked_add(1)
             .ok_or_else(|| limit("attributes per element"))?;

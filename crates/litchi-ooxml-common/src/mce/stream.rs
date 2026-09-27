@@ -39,6 +39,7 @@ use super::model::{
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{NO_NAMESPACE, Scope, Uri, UriId, XMLNS_URI, has_duplicate_prefix};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml_name::{self, QualifiedName};
 
 const DEFAULT_MAX_EVENTS: usize = 1_000_000;
@@ -2738,7 +2739,7 @@ impl<'a> Processor<'a> {
             )
         };
         let max_attributes = max_attributes.min(ATTRIBUTES_PER_ELEMENT_CEILING);
-        for attribute in element.attributes().with_checks(false) {
+        for attribute in element.unchecked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;
             attr_bytes = attr_bytes
