@@ -10,8 +10,8 @@
 //! without directives pays for none.
 //!
 //! The namespace key is generic: the in-memory processor uses namespace
-//! identities (`scope::UriId`), so a lookup costs the same whatever the length
-//! of the namespace URI; the stream uses the URI itself.
+//! identities (`scope::UriId`), as does the stream. A directive lookup does
+//! not hash namespace URI text for each name.
 
 use core::borrow::Borrow;
 use core::hash::Hash;

@@ -32,8 +32,8 @@ pub struct Name {
 /// A document chooses its namespace URIs, and one declaration can put any
 /// number of names in its namespace. The stream copies a URI once, when a
 /// declaration binds it, and every name it expands in that namespace refers
-/// to that copy, so a name costs the same whatever the length of its URI:
-/// cloning a `NamespaceUri` never copies the URI.
+/// to that copy. Cloning a `NamespaceUri` never copies the URI; public text
+/// hashing and comparisons between independent allocations can still read it.
 ///
 /// It reads as its text: it dereferences to `str`, and compares, orders,
 /// hashes, displays and debug-prints exactly as that text does. The empty
@@ -240,8 +240,9 @@ impl From<NamespaceUri> for String {
 /// stream.
 ///
 /// Its namespace is a [`NamespaceUri`], which shares the stream's one copy of
-/// the URI, so the stream's events cost the same whatever the length of the
-/// URIs a document chooses. [`Name`] is the owned form that the processing
+/// the URI, avoiding a URI copy for every event name. Registered-extension
+/// checks and caller observers can still read or copy that text. [`Name`] is
+/// the owned form that the processing
 /// policy ([`Capabilities`]) takes.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct ExpandedName {
