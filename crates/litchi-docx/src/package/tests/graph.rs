@@ -1,5 +1,10 @@
 use super::*;
 
+const STRICT_FOOTNOTES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/footnotes";
+const STRICT_ENDNOTES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/endnotes";
+
 #[derive(Default)]
 struct ForwardOnlySink(Vec<u8>);
 
@@ -118,7 +123,7 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
         .unwrap()
         .rels_mut()
         .try_add_relationship(
-            litchi_opc::constants::relationship_type::FOOTNOTES.to_owned(),
+            STRICT_FOOTNOTES_RELATIONSHIP.to_owned(),
             "footnotes2.xml".to_owned(),
             "rId7".to_owned(),
             TargetMode::Internal,
@@ -129,7 +134,7 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
         .unwrap()
         .rels_mut()
         .try_add_relationship(
-            litchi_opc::constants::relationship_type::ENDNOTES.to_owned(),
+            STRICT_ENDNOTES_RELATIONSHIP.to_owned(),
             "endnotes2.xml".to_owned(),
             "rId8".to_owned(),
             TargetMode::Internal,
@@ -146,6 +151,8 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
                 relationship.reltype(),
                 litchi_opc::constants::relationship_type::FOOTNOTES
                     | litchi_opc::constants::relationship_type::ENDNOTES
+                    | STRICT_FOOTNOTES_RELATIONSHIP
+                    | STRICT_ENDNOTES_RELATIONSHIP
             )
         })
         .map(|relationship| {
@@ -187,6 +194,8 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
                 relationship.reltype(),
                 litchi_opc::constants::relationship_type::FOOTNOTES
                     | litchi_opc::constants::relationship_type::ENDNOTES
+                    | STRICT_FOOTNOTES_RELATIONSHIP
+                    | STRICT_ENDNOTES_RELATIONSHIP
             )
         })
         .map(|relationship| {
@@ -214,15 +223,57 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
 }
 
 #[test]
-fn authored_footnote_still_generates_a_replacement_note_part() {
-    let mut package = Package::new().unwrap();
-    let document = package.document_mut().unwrap();
-    let (footnote_id, note) = document.add_footnote();
-    note.add_paragraph_with_text("generated footnote payload");
-    document
-        .add_paragraph()
-        .add_run()
-        .add_footnote_reference(footnote_id);
+fn authored_notes_replace_existing_strict_note_edges() {
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let old_footnotes_uri = PackURI::new("/word/footnotes2.xml").unwrap();
+    let old_endnotes_uri = PackURI::new("/word/endnotes2.xml").unwrap();
+    let base = Package::new().unwrap();
+    let base_bytes = litchi_opc::PackageWriter::to_bytes(&base.opc).unwrap();
+    let mut source_opc = OpcPackage::from_bytes(&base_bytes).unwrap();
+    source_opc.add_part(Box::new(BlobPart::new(
+        old_footnotes_uri,
+        ct::WML_FOOTNOTES.to_owned(),
+        b"old footnotes payload".to_vec(),
+    )));
+    source_opc.add_part(Box::new(BlobPart::new(
+        old_endnotes_uri,
+        ct::WML_ENDNOTES.to_owned(),
+        b"old endnotes payload".to_vec(),
+    )));
+    source_opc
+        .get_part_mut(&document_uri)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            STRICT_FOOTNOTES_RELATIONSHIP.to_owned(),
+            "footnotes2.xml".to_owned(),
+            "rId7".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    source_opc
+        .get_part_mut(&document_uri)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            STRICT_ENDNOTES_RELATIONSHIP.to_owned(),
+            "endnotes2.xml".to_owned(),
+            "rId8".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
+    let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
+    {
+        let document = package.document_mut().unwrap();
+        let (footnote_id, footnote) = document.add_footnote();
+        footnote.add_paragraph_with_text("generated footnote payload");
+        let (endnote_id, endnote) = document.add_endnote();
+        endnote.add_paragraph_with_text("generated endnote payload");
+        let paragraph = document.add_paragraph();
+        paragraph.add_run().add_footnote_reference(footnote_id);
+        paragraph.add_run().add_endnote_reference(endnote_id);
+    }
 
     let mut output = Cursor::new(Vec::new());
     package.to_plain_stream(&mut output).unwrap();
@@ -237,10 +288,33 @@ fn authored_footnote_still_generates_a_replacement_note_part() {
         .collect::<Vec<_>>();
     assert_eq!(footnote_relationships.len(), 1);
     assert_eq!(footnote_relationships[0].target_ref(), "footnotes.xml");
+    let endnote_relationships = main
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            relationship.reltype() == litchi_opc::constants::relationship_type::ENDNOTES
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(endnote_relationships.len(), 1);
+    assert_eq!(endnote_relationships[0].target_ref(), "endnotes.xml");
+    assert_eq!(
+        main.rels()
+            .iter()
+            .filter(|relationship| {
+                relationship.reltype() == STRICT_FOOTNOTES_RELATIONSHIP
+                    || relationship.reltype() == STRICT_ENDNOTES_RELATIONSHIP
+            })
+            .count(),
+        0
+    );
     let footnotes_uri = PackURI::new("/word/footnotes.xml").unwrap();
     let footnotes =
         std::str::from_utf8(reopened.opc.get_part(&footnotes_uri).unwrap().blob()).unwrap();
     assert!(footnotes.contains("generated footnote payload"));
+    let endnotes_uri = PackURI::new("/word/endnotes.xml").unwrap();
+    let endnotes =
+        std::str::from_utf8(reopened.opc.get_part(&endnotes_uri).unwrap().blob()).unwrap();
+    assert!(endnotes.contains("generated endnote payload"));
 }
 
 #[test]
