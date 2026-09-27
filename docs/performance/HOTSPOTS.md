@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0784 — repeated namespace validation is the next candidate
+
+[0784](0784-pptx-initial-capture-profile.md) Recovered capture-owner stacks include notes XML scanning 1,031/1,029 times and nested notes::resolved 146/150 times. An unresolved interior frame prevents native phase-fraction claims. Exact known-URI byte matches could remove repeated UTF-8 validation while all unknown values retain existing checks. Review and fresh public paired measurements must precede adoption; guest SHA percentages are not native CPU fractions.
+
 ## 0783 — capture dominates the large PPTX diagnostic
 
 [0783](0783-pptx-lifecycle-phase-attribution.md) Initial capture occupies about 69% of the instrumented 100×100 workflow; serialization leads tiny/medium cases. Next profile initial capture with an operation-local boundary before selecting another optimization. A systematic phase/control timing difference remains disclosed; no particular parser, notes validator or fingerprint cost is proven by phase timing alone.

@@ -1,0 +1,68 @@
+{
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 784078
+  },
+  "cpu": 12,
+  "native": {
+    "orders": [
+      [
+        "control",
+        "profile"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "control",
+        "profile"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "control",
+        "profile"
+      ]
+    ],
+    "samples": 30,
+    "shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "warmup": 3
+  },
+  "owner": "pptx_capture_probe::capture_region_0784",
+  "profile": {
+    "collect_at_start": false,
+    "events": [
+      "Ir"
+    ],
+    "expected_numbered_parts": 1,
+    "orders": [
+      [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      [
+        "large",
+        "medium",
+        "tiny"
+      ]
+    ],
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0
+  },
+  "purpose": "Current operation-local initial PPTX capture guest instruction attribution; no production or historical-regression causality claim",
+  "schema": "litchi.performance.0784.v1",
+  "scope": "Wrapper calls only opened_presentation, returns snapshot; setup, serialization, verification, retained owner destruction excluded. Native controls estimate wrapper/codegen perturbation; Callgrind timing is not native latency. Exact matching symbol, nonzero region, one dump and calls, source/output parity required."
+}

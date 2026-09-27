@@ -1,0 +1,260 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling typenum v1.20.1
+   Compiling syn v3.0.6
+   Compiling stable_deref_trait v1.2.1
+   Compiling cfg-if v1.0.5
+   Compiling serde_core v1.0.229
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling synstructure v0.14.0
+   Compiling zerovec-derive v0.11.6
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.3
+   Compiling zerofrom v0.1.8
+   Compiling displaydoc v0.2.7
+   Compiling yoke v0.8.3
+   Compiling crossbeam-utils v0.8.23
+   Compiling zerovec v0.11.8
+   Compiling litemap v0.8.3
+   Compiling crossbeam-epoch v0.9.21
+   Compiling writeable v0.6.4
+   Compiling tinystr v0.8.4
+   Compiling libc v0.2.189
+   Compiling icu_locale_core v2.3.0
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling hybrid-array v0.4.15
+   Compiling crossbeam-deque v0.8.8
+   Compiling icu_properties_data v2.3.0
+   Compiling getrandom v0.4.3
+   Compiling autocfg v1.5.1
+   Compiling smallvec v1.16.2
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.3.0
+   Compiling rand_core v0.10.1
+   Compiling num-traits v0.2.19
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling zmij v1.0.23
+   Compiling cpufeatures v0.3.1
+   Compiling serde v1.0.229
+   Compiling zeroize v1.9.0
+   Compiling rayon-core v1.13.0
+   Compiling memchr v2.8.3
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling serde_derive v1.0.229
+   Compiling thiserror v2.0.21
+   Compiling zerocopy v0.8.58
+   Compiling crc32fast v1.5.2
+   Compiling serde_json v1.0.151
+   Compiling rustix v1.1.5
+   Compiling const-oid v0.10.2
+   Compiling rustversion v1.0.23
+   Compiling quick-xml v0.41.0
+   Compiling digest v0.11.3
+   Compiling digest v0.10.7
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.21
+   Compiling bitflags v2.13.2
+   Compiling syn v2.0.119
+   Compiling linux-raw-sys v0.12.1
+   Compiling either v1.18.0
+   Compiling zlib-rs v0.6.8
+   Compiling itoa v1.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling once_cell v1.21.4
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling chrono v0.4.45
+   Compiling flate2 v1.1.10
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rayon v1.12.0
+   Compiling rand v0.10.3
+   Compiling idna_adapter v1.2.2
+   Compiling sha2 v0.11.0
+   Compiling fastrand v2.5.0
+   Compiling tinyvec v1.13.3
+   Compiling debug_unsafe v0.1.4
+   Compiling fast-float2 v0.2.4
+   Compiling percent-encoding v2.3.2
+   Compiling base64 v0.22.1
+   Compiling form_urlencoded v1.2.2
+   Compiling unicode-normalization v0.1.25
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling atoi_simd v0.18.1
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling idna v1.1.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling url v2.5.8
+   Compiling caseless v0.2.2
+   Compiling ryu v1.0.23
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0784/probe-src)
+warning: unused variable: `source_bytes`
+   --> src/main.rs:466:21
+    |
+466 | fn run_capabilities(source_bytes: &[u8], _index: usize) -> Result<OperationResult, Box<dyn Error>> {
+    |                     ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_source_bytes`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `enable` is never used
+  --> src/allocation_metrics.rs:89:8
+   |
+89 | pub fn enable() {
+   |        ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `record_allocation` is never used
+  --> src/allocation_metrics.rs:94:8
+   |
+94 | pub fn record_allocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: function `record_deallocation` is never used
+  --> src/allocation_metrics.rs:99:8
+   |
+99 | pub fn record_deallocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_reallocation` is never used
+   --> src/allocation_metrics.rs:104:8
+    |
+104 | pub fn record_reallocation(old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_failed_allocation` is never used
+   --> src/allocation_metrics.rs:109:8
+    |
+109 | pub fn record_failed_allocation() {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Snapshot` is never constructed
+   --> src/allocation_metrics.rs:116:12
+    |
+116 | pub struct Snapshot {
+    |            ^^^^^^^^
+
+warning: function `snapshot` is never used
+   --> src/allocation_metrics.rs:132:8
+    |
+132 | pub fn snapshot() -> Snapshot {
+    |        ^^^^^^^^
+
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:198:15
+    |
+198 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+
+warning: field `segment_before` is never read
+   --> src/allocation_metrics.rs:291:5
+    |
+285 | struct ActiveRegion {
+    |        ------------ field in this struct
+...
+291 |     segment_before: CountersSnapshot,
+    |     ^^^^^^^^^^^^^^
+
+warning: methods `split` and `finish_split` are never used
+   --> src/allocation_metrics.rs:315:19
+    |
+306 | impl Region {
+    | ----------- methods in this implementation
+...
+315 |     pub(crate) fn split(&mut self) -> Option<Sample> {
+    |                   ^^^^^
+...
+351 |     pub(crate) fn finish_split(mut self) -> (Option<Sample>, Option<Sample>) {
+    |                   ^^^^^^^^^^^^
+
+warning: struct `CallbackEntryGuard` is never constructed
+   --> src/allocation_metrics.rs:487:8
+    |
+487 | struct CallbackEntryGuard;
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: associated function `enter` is never used
+   --> src/allocation_metrics.rs:490:8
+    |
+489 | impl CallbackEntryGuard {
+    | ----------------------- associated function in this implementation
+490 |     fn enter(observer_invalid: &AtomicBool) -> Option<Self> {
+    |        ^^^^^
+
+warning: multiple methods are never used
+   --> src/allocation_metrics.rs:514:8
+    |
+513 | impl Counters {
+    | ------------- methods in this implementation
+514 |     fn snapshot(&self) -> CountersSnapshot {
+    |        ^^^^^^^^
+...
+561 |     fn split_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
+    |        ^^^^^^^^^^^^
+...
+618 |     fn update_region_peak(&self, observer: &mut ObserverState, live: u64) {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+626 |     fn enter_callback(&self) -> Option<CallbackEntryGuard> {
+    |        ^^^^^^^^^^^^^^
+...
+630 |     fn add(&self, counter: &AtomicU64, value: u64) {
+    |        ^^^
+...
+636 |     fn live_add(&self, value: u64) -> Option<u64> {
+    |        ^^^^^^^^
+...
+646 |     fn live_sub(&self, value: u64) {
+    |        ^^^^^^^^
+...
+652 |     fn update_peak(&self, live: u64) {
+    |        ^^^^^^^^^^^
+...
+667 |     fn allocation(&self, size: usize) {
+    |        ^^^^^^^^^^
+...
+675 |     fn allocation_locked(&self, size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^
+...
+687 |     fn deallocation(&self, size: usize) {
+    |        ^^^^^^^^^^^^
+...
+695 |     fn deallocation_locked(&self, size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+705 |     fn reallocation(&self, old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^
+...
+713 |     fn reallocation_locked(&self, old_size: usize, new_size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+733 |     fn failed_allocation(&self) {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `checked_add` is never used
+   --> src/allocation_metrics.rs:742:4
+    |
+742 | fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+warning: function `checked_sub` is never used
+   --> src/allocation_metrics.rs:749:4
+    |
+749 | fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+warning: `mce-capabilities-probe` (bin "pptx-capture-probe") generated 16 warnings (run `cargo fix --bin "pptx-capture-probe" -p mce-capabilities-probe` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 32s

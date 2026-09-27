@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0784 — qualified capture profiles guide a narrow optimization
+
+[0784](0784-pptx-initial-capture-profile.md) Recovered capture-owner stacks contain notes XML scanning far more often than fingerprinting on the large shape-heavy fixture; an unresolved frame prevents native phase-fraction claims. Namespace resolution is a nested candidate cost; fingerprinting is smaller than software-SHA Callgrind shares suggest. All 1,486 measured outputs match the inherited source/output/semantic identities. Production code remains unchanged.
+
 ## 0783 — current PPTX lifecycle attribution
 
 [0783](0783-pptx-lifecycle-phase-attribution.md) The large generated PPTX workflow spends about 69% of diagnostic time in capture and 23% in serialization; staged commit is about 4%. Current phase/control measurements guide a capture profile but neither explain the 0780 regression nor establish a production speedup. Production code remains unchanged.

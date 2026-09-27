@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0784 — current capture diagnostics, no capability promotion
+
+[0784](0784-pptx-initial-capture-profile.md) The existing three generated PPTX capture shapes have paired native controls and scoped guest profiles; the large case adds native sampled ancestry. These measurements do not promote registry rows or cover native producers, physical cold/range sources, concurrency or scaling.
+
 ## 0783 — diagnostic coverage only
 
 [0783](0783-pptx-lifecycle-phase-attribution.md) The existing generated PPTX single-text-edit lifecycle now has consecutive phase timing and a feature-off control across three sizes. No registry row is promoted, no new public CRUD capability is claimed, and native-producer/provider/scaling coverage remains open.

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0784 — direct capture profile qualifies the next mechanism
+
+[0784](0784-pptx-initial-capture-profile.md) The initial PPTX capture owner now has replayable exact-region guest instructions and qualified native sampled ancestry. Failed ordinary DWARF qualification is disclosed and retained; a separate frame-pointer diagnostic supplies usable stacks. Broader CRUD/provider/scaling and actual candidate adoption remain open.
+
 ## 0783 — phase ranking narrows the next investigation
 
 [0783](0783-pptx-lifecycle-phase-attribution.md) Current PPTX capture/edit/commit/apply/serialization timing supplies a bounded next-profile choice, with control-build perturbation evidence and 1,080 verified outputs. It does not close historical-regression causality, broad CRUD metric, producer, cold/range, or concurrency/scaling requirements.

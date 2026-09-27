@@ -1,0 +1,1 @@
+0000000000194ea0 t pptx_capture_probe::capture_region_0784

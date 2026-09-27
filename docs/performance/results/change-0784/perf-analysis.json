@@ -1,0 +1,226 @@
+{
+  "fraction_refusal_reason": "Frozen plan forbids phase fractions with unresolved stacks; ordinary DWARF has zero exact owners and one FP qualified stack has an unresolved interior. Retain exact observed counts only.",
+  "lanes": {
+    "perf": [
+      {
+        "exclusive_partition_period": {
+          "fingerprint": 0,
+          "notes_scan": 0,
+          "other_capture": 0
+        },
+        "exclusive_partition_samples": {
+          "fingerprint": 0,
+          "notes_scan": 0,
+          "other_capture": 0
+        },
+        "nested_inclusive_samples": {
+          "litchi_pptx::notes::resolved": 0,
+          "sha2::sha256::x86_sha::compress": 0
+        },
+        "owner_qualified_samples": 0,
+        "qualified_period_total": 0,
+        "qualified_stacks_with_unknown_interior": 0,
+        "repeat": 0,
+        "top_sampled_leaf_symbols": [],
+        "unqualified_samples": 3233,
+        "whole_process_samples": 3233
+      },
+      {
+        "exclusive_partition_period": {
+          "fingerprint": 0,
+          "notes_scan": 0,
+          "other_capture": 0
+        },
+        "exclusive_partition_samples": {
+          "fingerprint": 0,
+          "notes_scan": 0,
+          "other_capture": 0
+        },
+        "nested_inclusive_samples": {
+          "litchi_pptx::notes::resolved": 0,
+          "sha2::sha256::x86_sha::compress": 0
+        },
+        "owner_qualified_samples": 0,
+        "qualified_period_total": 0,
+        "qualified_stacks_with_unknown_interior": 0,
+        "repeat": 1,
+        "top_sampled_leaf_symbols": [],
+        "unqualified_samples": 3158,
+        "whole_process_samples": 3158
+      }
+    ],
+    "perf-fp": [
+      {
+        "exclusive_partition_period": {
+          "fingerprint": 859019008,
+          "notes_scan": 9125368035,
+          "other_capture": 301472476
+        },
+        "exclusive_partition_samples": {
+          "fingerprint": 97,
+          "notes_scan": 1031,
+          "other_capture": 34
+        },
+        "nested_inclusive_samples": {
+          "litchi_pptx::notes::resolved": 146,
+          "sha2::sha256::x86_sha::compress": 95
+        },
+        "owner_qualified_samples": 1162,
+        "qualified_period_total": 10285859519,
+        "qualified_stacks_with_unknown_interior": 1,
+        "repeat": 0,
+        "top_sampled_leaf_symbols": [
+          [
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            220
+          ],
+          [
+            "litchi_pptx::notes::codec::scan_processed_xml",
+            166
+          ],
+          [
+            "litchi_pptx::notes::resolved",
+            146
+          ],
+          [
+            "sha2::sha256::x86_sha::compress",
+            94
+          ],
+          [
+            "litchi_pptx::notes::codec::inspect_element",
+            54
+          ],
+          [
+            "core::str::converts::from_utf8",
+            51
+          ],
+          [
+            "quick_xml::reader::Reader<R>::read_event_impl",
+            48
+          ],
+          [
+            "quick_xml::events::attributes::IterState::next",
+            40
+          ],
+          [
+            "quick_xml::events::attributes::IterState::check_for_duplicates",
+            36
+          ],
+          [
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            35
+          ],
+          [
+            "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+            34
+          ],
+          [
+            "quick_xml::reader::state::ReaderState::emit_start",
+            29
+          ],
+          [
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            29
+          ],
+          [
+            "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            28
+          ],
+          [
+            "__memcmp_evex_movbe",
+            15
+          ]
+        ],
+        "unqualified_samples": 2125,
+        "whole_process_samples": 3287
+      },
+      {
+        "exclusive_partition_period": {
+          "fingerprint": 823536604,
+          "notes_scan": 9100453067,
+          "other_capture": 274345256
+        },
+        "exclusive_partition_samples": {
+          "fingerprint": 93,
+          "notes_scan": 1029,
+          "other_capture": 31
+        },
+        "nested_inclusive_samples": {
+          "litchi_pptx::notes::resolved": 150,
+          "sha2::sha256::x86_sha::compress": 91
+        },
+        "owner_qualified_samples": 1153,
+        "qualified_period_total": 10198334927,
+        "qualified_stacks_with_unknown_interior": 0,
+        "repeat": 1,
+        "top_sampled_leaf_symbols": [
+          [
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            189
+          ],
+          [
+            "litchi_pptx::notes::codec::scan_processed_xml",
+            153
+          ],
+          [
+            "litchi_pptx::notes::resolved",
+            150
+          ],
+          [
+            "sha2::sha256::x86_sha::compress",
+            91
+          ],
+          [
+            "core::str::converts::from_utf8",
+            69
+          ],
+          [
+            "quick_xml::reader::Reader<R>::read_event_impl",
+            63
+          ],
+          [
+            "quick_xml::events::attributes::IterState::next",
+            52
+          ],
+          [
+            "litchi_pptx::notes::codec::inspect_element",
+            50
+          ],
+          [
+            "quick_xml::reader::state::ReaderState::emit_start",
+            33
+          ],
+          [
+            "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+            30
+          ],
+          [
+            "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+            29
+          ],
+          [
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+            27
+          ],
+          [
+            "quick_xml::events::attributes::IterState::check_for_duplicates",
+            25
+          ],
+          [
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+            20
+          ],
+          [
+            "quick_xml::escape::unescape",
+            17
+          ]
+        ],
+        "unqualified_samples": 2133,
+        "whole_process_samples": 3286
+      }
+    ]
+  },
+  "phase_fraction_claim_authorized": false,
+  "qualification_owner": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+  "scope": "Only exact fully qualified owner stacks count. Native frame-pointer diagnostic and ordinary failed-unwind traces remain separate. Warmup and measured captures both included. Only observed sample and period counts are reported; no phase fractions authorized; nested costs not additive; no production speedup or population confidence claim."
+}

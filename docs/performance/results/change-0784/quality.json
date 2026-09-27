@@ -1,0 +1,19 @@
+{
+  "format": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "docs/performance/results/change-0784/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0784/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "scope": "Evidence probe only; production source unchanged. Ordinary control/profile and frame-pointer diagnostic release builds pass; inherited16unusedhelpers warnings retained. No fresh production test gate claim."
+}

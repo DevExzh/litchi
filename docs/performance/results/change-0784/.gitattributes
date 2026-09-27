@@ -1,0 +1,8 @@
+# Preserve raw evidence bytes and hashes across checkout.
+* -text
+**/* -text
+# Tool-emitted raw records retain significant original bytes, including spaces.
+*.callgrind* -whitespace
+*.log -whitespace
+*.flat.txt -whitespace
+large-inclusive.txt -whitespace
