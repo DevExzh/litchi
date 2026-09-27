@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0773 — explicit synchronization policy integrated
+
+[0773](0773-save-durability-integration.md) completes the owner-authorized durability integration: Full remains the default, while explicit FileOnly/NoSync calls omit requested synchronization work. Fresh traces and current-source regression gates pass. The XLS writer length-field branch remains separate integration work; this change does not establish a wall-clock speedup.
+
 ## 0772 — mutated OPC publication remains an unqualified attribution opportunity
 
 [0772](0772-opc-mutated-save-current-baseline.md) measures the four-4-MiB incompressible corpus at 59.403 ms median process p50. Its one ordinary-binary profile has zero samples with the exact timed caller, so no sampled Deflate fraction or removable-cost estimate is admitted. Source inspection excludes repeated old-target decoding from the timed loop.

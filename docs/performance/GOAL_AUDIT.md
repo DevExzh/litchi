@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0773 — durability integration closed; program remains active
+
+[0773](0773-save-durability-integration.md) integrates the existing 0761 policy with fresh source-bound gates and paired syscall evidence, superseding incomplete old scratch claims. The full harness passes 555 tests with one ignored. Default behavior and output bytes are preserved. XLS writer integration, physical cold-cache, remote/range, scaling and complete CRUD coverage remain open; the non-iWork goal is not complete.
+
 ## 0772 — source-grounded OPC investigation; attribution not established
 
 [0772](0772-opc-mutated-save-current-baseline.md) confirms the current publication cost but rejects an ordinary-stack profile that never recovers the exact timed caller. Old-target decoding occurs outside this selector’s clock, so skipping it is not a supported optimization of these timings. The non-iWork goal remains active. Owner decisions from 0756 were resolved by [0758](0758-owner-decisions-2026-09-24.md); integration of the existing durability and XLS-writer branches remains separate work.

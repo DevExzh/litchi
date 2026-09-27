@@ -117,3 +117,8 @@ external worktrees remain untouched.
 This closes durability integration, not the non-iWork performance goal. The
 unintegrated XLS writer length-field branch remains a separate next step;
 physical cold-cache, remote/range and concurrency evidence remain open.
+
+After merging the tested commits, the owned integration worktree, its copied
+root lock and its reference-corpus symlinks were removed. Original corpus
+directories and external worktrees were preserved. Merged production sources
+and every sealed packet byte were checked against the tested commits.

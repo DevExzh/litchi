@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0773 — current durability syscall comparison
+
+[0773](0773-save-durability-integration.md) captures 24 baseline and 96 integrated save windows across twelve routes and existing/absent destinations. Default and Full retain two syncs; FileOnly performs one and NoSync none, with one replacement and identical output bytes throughout. These are paired debug-build syscall observations, with no latency, allocation or RSS claim.
+
 ## 0772 — current owned OPC publication observations
 
 [0772](0772-opc-mutated-save-current-baseline.md) records three fresh serial processes across eight corpora for exact no-op and one-byte-mutated publication (432 samples). The large incompressible mutation has a median process p50 of 59.403 ms. This is current-source descriptive evidence, with two no-op spread flags, no historical ratio, and no new optimization claim.
