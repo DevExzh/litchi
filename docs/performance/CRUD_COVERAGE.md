@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0791 — existing capture shapes profiled again
+
+[0791](0791-pptx-current-capture-profile.md) The three generated borrowed-input PPTX capture shapes have current owner-scoped instruction and native ancestry evidence. This promotes no CRUD registry row and adds no native producer, cold/range, concurrency, or lifecycle timing coverage.
+
 ## 0790 — external measurement control only
 
 [0790](0790-fork-launcher-calibration.md) The standalone fork launcher adds no Office CRUD capability, native producer evidence, or coverage promotion. Its 100-child calibration supports category-15 memory-measurement interpretation only.

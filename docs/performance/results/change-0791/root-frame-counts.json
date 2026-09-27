@@ -1,0 +1,201 @@
+{
+  "rows": [
+    {
+      "all_samples": 3143,
+      "qualified_samples": 1066,
+      "repeat": 0,
+      "selected_nested": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 186,
+        "core::str::converts::from_utf8": 50,
+        "litchi_pptx::notes::codec::inspect_element": 318,
+        "litchi_pptx::notes::codec::scan_processed_xml": 935,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 8,
+        "litchi_pptx::notes::resolved": 5,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 96,
+        "quick_xml::events::attributes::IterState::next": 134
+      },
+      "top_leaf": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          168
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          163
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          94
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          81
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          78
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          66
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          50
+        ],
+        [
+          "core::str::converts::from_utf8",
+          50
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          36
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          30
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          25
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          22
+        ],
+        [
+          "__memcmp_evex_movbe",
+          20
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          20
+        ],
+        [
+          "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>",
+          16
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          14
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+          13
+        ],
+        [
+          "alloc::raw_vec::RawVec<T,A>::grow_one",
+          11
+        ],
+        [
+          "cfree@GLIBC_2.2.5",
+          11
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::resolve_prefix",
+          11
+        ]
+      ],
+      "unknown_interior": 1
+    },
+    {
+      "all_samples": 3153,
+      "qualified_samples": 1068,
+      "repeat": 1,
+      "selected_nested": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 148,
+        "core::str::converts::from_utf8": 63,
+        "litchi_pptx::notes::codec::inspect_element": 289,
+        "litchi_pptx::notes::codec::scan_processed_xml": 929,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 5,
+        "litchi_pptx::notes::resolved": 4,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 92,
+        "quick_xml::events::attributes::IterState::next": 120
+      },
+      "top_leaf": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          174
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          141
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          88
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          74
+        ],
+        [
+          "core::str::converts::from_utf8",
+          63
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          58
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          44
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          43
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          38
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          36
+        ],
+        [
+          "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>",
+          34
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          33
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          29
+        ],
+        [
+          "__memcmp_evex_movbe",
+          27
+        ],
+        [
+          "cfree@GLIBC_2.2.5",
+          21
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          17
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          17
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+          13
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::One::find_raw",
+          11
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw",
+          10
+        ]
+      ],
+      "unknown_interior": 2
+    }
+  ],
+  "scope": "Exact-owner no-inline native frame counts. Nested counts overlap, warmup included, no population phase fraction or speedup claim."
+}

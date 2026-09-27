@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0791 — current PPTX capture attribution
+
+[0791](0791-pptx-current-capture-profile.md) Current-source native controls, six exact-region guest profiles, and two frame-pointer native profiles retain 44 reports/1,286 measured outputs. The large wrapper is 3.512% slower; all ten spread flags and unresolved-frame limitations are explicit.
+
 ## 0790 — ordinary-fork memory control
 
 [0790](0790-fork-launcher-calibration.md) A 96-child matrix and four direct wait4 traces remove inherited startup high water in all ordinary direct children and reproduce resource-counter/residency gaps. Three traced controls fail the frozen “must decrease” criterion; all failures and topology limits remain explicit.

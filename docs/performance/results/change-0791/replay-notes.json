@@ -1,0 +1,14 @@
+{
+  "offline_corrections": [
+    "Historical parser packet root rebound before parsing current absolute raw paths; initial one-off failed before writing output.",
+    "Current source revision bound separately from inherited identical production file manifest.",
+    "Binary identity serialization kept stable before and after cleanup; captured command paths checked against origin.",
+    "Root native frame census converts Counter tuples to JSON lists for replay equality; retained counts unchanged.",
+    "Root function census extended to retain inspector direct edges cited by the report.",
+    "Python executable is python3 on this host.",
+    "Raw Callgrind trailing spaces preserved verbatim; packet attributes exempt raw profiler files from whitespace lint."
+  ],
+  "primary_capture_retries": 0,
+  "raw_captures_changed": false,
+  "verification_scope": "Fresh release builds and probe fmt; inherited warnings retained; no fresh production test-suite claim."
+}

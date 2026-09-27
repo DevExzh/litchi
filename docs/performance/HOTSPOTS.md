@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0791 — attribute iteration remains a current capture cost
+
+[0791](0791-pptx-current-capture-profile.md) Current native stacks include notes scanning 935/929 times and checked attribute iteration 186/148 times under 1,066/1,068 exact capture-owner stacks. Namespace-helper counts are 5/4. Test an exact-empty-attribute-tail shortcut after element validation before broader scanner changes; no benefit is yet claimed.
+
 ## 0790 — launcher history isolated in ordinary controls
 
 [0790](0790-fork-launcher-calibration.md) An ordinary-fork control starts at 1,360–1,480 KiB instead of inherited 17–19 MiB. Direct wait4 still differs from observed RSS by up to 1,528 KiB in the named 32-worker case. Future qualifications must distinguish ordinary and traced launch topologies.

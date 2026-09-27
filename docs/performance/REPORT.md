@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0791 — current profiles rank the next candidate
+
+[0791](0791-pptx-current-capture-profile.md) The post-known-URI profile supports a narrow attribute-iteration experiment. Native wrapper perturbation and unresolved frames prevent precise phase-share or speedup claims. Production source remains unchanged, all outputs validate, and the cached-Part rejection remains authoritative.
+
 ## 0790 — fork calibration retained with a failed criterion
 
 [0790](0790-fork-launcher-calibration.md) All 100 children and seven launcher checks validate, but three traced controls violate one predeclared startup comparison. The result is retained as a failed overall qualification with useful ordinary-matrix evidence, not an adoption or production improvement.

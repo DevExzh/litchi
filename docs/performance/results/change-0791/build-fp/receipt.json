@@ -1,0 +1,42 @@
+{
+  "binary": {
+    "bytes": 13699000,
+    "path": "/home/zhuhe/code/litchi-target-0791/profile-fp",
+    "sha256": "ffb83408df7ceb18d8a860a5cb66cbc94beea5b8bca825cfc4d46bb73d0aa60f"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0791/probe-src/Cargo.toml",
+    "--features",
+    "capture-profile"
+  ],
+  "ended": 1790537403.1841357,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0791",
+    "RUSTFLAGS": "-C force-frame-pointers=yes"
+  },
+  "exit_code": 0,
+  "log": {
+    "bytes": 8780,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0791/build-fp/build.log",
+    "sha256": "cdd00a0698884e277f193146ba5f41291e44fbe88b542811690cd2568cb3d0fc"
+  },
+  "plan": {
+    "bytes": 656,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0791/perf-fp-plan.json",
+    "sha256": "7f44f88948065ca05dae9afdc704a6c3fd502c7055077d004dc9d17c89870192"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0791/build/source.json",
+    "sha256": "8f03d0d89f11a5d0f0fe397141b28f0d7b08af4f76a34ff60668e7450529ee81"
+  },
+  "started": 1790537310.62317
+}
