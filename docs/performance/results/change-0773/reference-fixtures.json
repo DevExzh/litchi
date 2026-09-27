@@ -1,0 +1,25 @@
+{
+  "links": [
+    {
+      "link": "3rdparty/libreoffice-core",
+      "source": "/home/zhuhe/code/litchi/3rdparty/libreoffice-core",
+      "reference_head": "6074e10e57905103f1639dc06b88e65675a48227"
+    },
+    {
+      "link": "3rdparty/poi",
+      "source": "/home/zhuhe/code/litchi/3rdparty/poi",
+      "reference_head": "6074e10e57905103f1639dc06b88e65675a48227"
+    },
+    {
+      "link": "3rdparty/Open-XML-SDK",
+      "source": "/home/zhuhe/code/litchi/3rdparty/Open-XML-SDK",
+      "reference_head": "6074e10e57905103f1639dc06b88e65675a48227"
+    }
+  ],
+  "compile_fixture": {
+    "path": "/home/zhuhe/code/litchi/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72"
+  },
+  "reason": "Missing ignored corpus in new worktree. First symlink attempt failed because 3rdparty parent directory was absent. Quality attempt1 was inadvertently started after that failure; links were installed while it ran. Its full logs remain retained; subsequent source guards and gates decide validity.",
+  "reference_revision_caveat": "The reference_head values are the enclosing Litchi repository HEAD observed during setup, not independently verified upstream corpus checkout revisions. The compile fixture is separately content-hashed."
+}

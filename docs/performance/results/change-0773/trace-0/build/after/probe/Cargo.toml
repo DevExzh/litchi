@@ -1,0 +1,23 @@
+[package]
+name = "durability-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# The after leg only: the save_with_durability windows.
+levels = []
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-core" }
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-opc" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-cfb", features = ["write"] }
+litchi-docx = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-docx" }
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-xlsx" }
+litchi-pptx = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-pptx" }
+litchi-xlsb = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-xlsb" }
+litchi-doc = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-doc" }
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-xls" }
+litchi-ppt = { path = "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-ppt" }
+
+[workspace]

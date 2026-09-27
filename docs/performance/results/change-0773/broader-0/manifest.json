@@ -1,0 +1,99 @@
+{
+  "source_file": "broader-0/source.json",
+  "source_sha256": "fa9ae2c7b7d8fd74d8f050a5270ae05357a57003692418f4d83604d93c556a41",
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-doc",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-ppt",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "started": 1790470043.7973378,
+      "ended": 1790470383.7659738,
+      "log": "broader-0/00.log",
+      "sha256": "417a808bd996560e80b7fdd89c0193a5d8b3154769732f0bba6153a75b7726e5"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-ole-common",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-crypto",
+        "-p",
+        "litchi-vba",
+        "-p",
+        "litchi-sign",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "started": 1790470384.0169,
+      "ended": 1790470425.7756267,
+      "log": "broader-0/01.log",
+      "sha256": "797a4f35d2e5610404e83942459d9fe057ee93dbbccfbdf273619063b268bde0"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi",
+        "--offline",
+        "--locked",
+        "--features",
+        "doc,docx,ppt,pptx,xls,xlsx,xlsb,odt",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "started": 1790470426.0300567,
+      "ended": 1790470517.8963978,
+      "log": "broader-0/02.log",
+      "sha256": "d406ddaff9d2a7e699186de795fd40a16ec570ad0db9a7afb059cf2dae0ff3ad"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--offline",
+        "--locked",
+        "--lib",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "started": 1790470518.148269,
+      "ended": 1790471335.9827695,
+      "log": "broader-0/03.log",
+      "sha256": "5d1af0ab772ab98edc5724b07cf99c0989a699054dc27be92c208825f423b7de"
+    }
+  ]
+}

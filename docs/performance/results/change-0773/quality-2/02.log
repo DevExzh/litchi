@@ -1,0 +1,2154 @@
+   Compiling cfg-if v1.0.4
+   Compiling typenum v1.20.1
+   Compiling libc v0.2.189
+   Compiling syn v2.0.114
+   Compiling num-traits v0.2.19
+   Compiling libm v0.2.16
+   Compiling zerocopy v0.8.56
+   Compiling zeroize v1.9.0
+   Compiling hybrid-array v0.4.14
+   Compiling serde_core v1.0.229
+   Compiling rand_core v0.10.1
+   Compiling cpufeatures v0.3.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling const-oid v0.10.2
+   Compiling smallvec v1.16.0
+   Compiling digest v0.11.3
+   Compiling serde v1.0.229
+   Compiling zmij v1.0.19
+   Compiling getrandom v0.4.3
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling once_cell v1.21.4
+   Compiling itoa v1.0.18
+   Compiling serde_json v1.0.149
+   Compiling thiserror v2.0.18
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling fast-float2 v0.2.4
+   Compiling const-oid v0.9.6
+   Compiling base64 v0.22.1
+   Compiling crossbeam-utils v0.8.22
+   Compiling generic-array v0.14.9
+   Compiling crossbeam-epoch v0.9.20
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-core)
+   Compiling subtle v2.6.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling rayon-core v1.13.0
+   Compiling either v1.18.0
+   Compiling rayon v1.12.0
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling zerocopy-derive v0.8.56
+   Compiling base64ct v1.6.0
+   Compiling fixedbitset v0.5.7
+   Compiling pem-rfc7468 v0.7.0
+   Compiling digest v0.10.7
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-cfb)
+   Compiling der v0.7.10
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling linux-raw-sys v0.12.1
+   Compiling bitflags v2.13.1
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.3.4
+   Compiling ff v0.13.1
+   Compiling fastrand v2.5.0
+   Compiling base16ct v0.2.0
+   Compiling cpufeatures v0.2.17
+   Compiling sec1 v0.7.3
+   Compiling tempfile v3.27.0
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling elliptic-curve v0.13.8
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling spin v0.9.9
+   Compiling lazy_static v1.5.0
+   Compiling rfc6979 v0.4.0
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling ecdsa v0.16.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling primeorder v0.13.6
+   Compiling sha1 v0.10.7
+   Compiling pkcs1 v0.7.5
+   Compiling zlib-rs v0.6.7
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling crc32fast v1.5.1
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/xml-minifier-macros)
+   Compiling x509-cert v0.2.5
+   Compiling debug_unsafe v0.1.4
+   Compiling atoi_simd v0.18.1
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-sign)
+   Compiling flate2 v1.1.10
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 30.11s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_cfb-821592234c8b0475)
+
+running 451 tests
+test allocation_validation_tests::hostile_reported_length_is_rejected_before_header_read ... ok
+test allocation_validation_tests::hostile_allocation_table_count_is_rejected_before_sector_index_or_read ... ok
+test allocation_validation_tests::hostile_difat_and_minifat_counts_are_rejected_before_index_allocation ... ok
+test allocation_validation_tests::hostile_count_metadata_is_rejected_before_index_allocation ... ok
+test allocation_validation_tests::larger_explicit_ingress_preserves_defaults_and_version_three_size_limit ... ok
+test allocation_validation_tests::hostile_version_4_directory_count_is_rejected_before_index_allocation ... ok
+test allocation_validation_tests::allocation_table_budget_accepts_exact_and_rejects_one_byte_under ... ok
+test allocation_validation_tests::ignores_the_unused_tail_of_the_header_difat ... ok
+test allocation_validation_tests::low_level_default_ingress_limit_is_finite ... ok
+test allocation_validation_tests::low_level_ingress_accepts_exact_limit_and_rejects_max_plus_one ... ok
+test allocation_validation_tests::open_rejects_fat_stream_cycles_and_invalid_markers ... ok
+test allocation_validation_tests::open_rejects_minifat_cycles_and_invalid_markers ... ok
+test allocation_validation_tests::open_rejects_fat_stream_short_excess_and_terminal_markers ... ok
+test allocation_validation_tests::opens_files_whose_length_is_not_a_whole_number_of_sectors ... ok
+test allocation_validation_tests::opens_version_3_files_with_an_uninitialized_stream_size_high_word ... ok
+test allocation_validation_tests::open_rejects_minifat_stream_short_excess_and_terminal_markers ... ok
+test allocation_validation_tests::opens_real_world_word_compound_files ... ok
+test allocation_validation_tests::rejects_difat_start_count_disagreement ... ok
+test allocation_validation_tests::rejects_directory_and_fat_sector_overlap ... ok
+test allocation_validation_tests::rejects_fat_sector_without_fatsect_marker ... ok
+test allocation_validation_tests::rejects_version_3_directory_sector_count ... ok
+test allocation_validation_tests::rejects_incorrect_minifat_sector_count ... ok
+test allocation_validation_tests::still_rejects_a_header_difat_list_shorter_than_its_count ... ok
+test directory_name::tests::ascii_case_insensitive_names_compare_equal ... ok
+test allocation_validation_tests::still_rejects_sectors_that_start_past_the_end_of_the_file ... ok
+test allocation_validation_tests::version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries ... ok
+test directory_name::tests::ascii_lookup_comparison_matches_owned_ordering_for_unicode_stored_names ... ok
+test directory_name::tests::ascii_lookup_key_falls_back_for_unicode_and_long_names ... ok
+test directory_name::tests::equality_uses_cfb_simple_uppercase_mapping ... ok
+test directory_name::tests::comparison_keys_are_unchanged_for_representative_names ... ok
+test directory_name::tests::invalid_names_never_compare_equal ... ok
+test directory_name::tests::keys_hash_and_compare_with_cfb_name_identity ... ok
+test directory_name::tests::keys_keep_supplementary_scalars_distinct_and_ordered ... ok
+test directory_name::tests::keys_reject_invalid_directory_names ... ok
+test directory_name::tests::refusals_are_unchanged ... ok
+test directory_name::tests::supplementary_scalars_remain_utf16_surrogate_pairs ... ok
+test allocation_validation_tests::version_4_directory_byte_limit_is_checked_before_chain_allocation ... ok
+test directory_name::tests::validation_counts_utf16_code_units ... ok
+test directory_name::tests::unicode_and_utf16_length_boundaries_match_the_general_reference ... ok
+test directory_name::tests::validation_precedence_matches_the_general_reference ... ok
+test directory_validation_tests::accepts_black_height_mismatch_but_rejects_stream_children ... ok
+test directory_validation_tests::rejects_invalid_names_types_and_colors ... ok
+test file::tests::batched_minifat_reads_keep_typed_errors_and_their_order ... ok
+test file::tests::batched_fat_reads_keep_typed_errors_and_their_order ... ok
+test file::tests::claim_sector_checks_physical_boundaries_without_failure_mutation ... ok
+test file::tests::claim_sector_repeated_claims_preserve_exact_owner_and_error ... ok
+test file::tests::contiguous_minifat_sectors_are_read_one_run_at_a_time ... ok
+test directory_name::tests::giant_name_is_rejected_before_full_utf16_collection ... ok
+test file::tests::a_minifat_run_longer_than_the_scratch_is_read_in_bounded_pieces ... ok
+test file::chain_work_tests::a_reader_frees_an_oversized_chain_buffer_after_each_read ... ok
+test file::tests::bounded_directory_visitor_charges_zero_budget_before_reserving ... ok
+test file::chain_work_tests::a_mini_stream_read_puts_its_chain_buffers_back ... ok
+test file::tests::detects_cycles_in_allocation_chains ... ok
+test file::tests::direct_ranges_cover_boundaries_and_preserve_truncated_sector_zero_fill ... ok
+test file::tests::contiguous_fat_sectors_are_read_one_run_at_a_time ... ok
+test file::tests::direct_ranges_are_cursor_independent_local_and_retry_interrupted_reads ... ok
+test file::tests::direct_ranges_reject_bad_metadata_without_unbounded_traversal ... ok
+test file::tests::batched_sector_reads_place_noncontiguous_sectors_in_order ... ok
+test directory_validation_tests::accepts_non_black_tree_roots_but_rejects_invalid_ordering ... ok
+test directory_validation_tests::accepts_interoperable_root_color_values ... ok
+test file::tests::direct_ranges_validate_bounds_before_payload_io_and_allow_exact_eof ... ok
+test file::tests::direct_ranges_follow_fragmented_fat_and_minifat_chains ... ok
+test file::tests::directory_name_decoder_checks_utf16_extents_without_panicking ... ok
+test file::mini_stream_end_tests::a_partial_mini_sector_inside_a_chain_is_refused_at_open ... ok
+test file::tests::fat_stream_read_zero_fills_a_truncated_final_sector ... ok
+test file::tests::fat_stream_chain_errors_remain_typed_and_ordered ... ok
+test file::tests::fat_stream_reads_only_the_declared_logical_size ... ok
+test file::tests::fat_stream_replays_fragmented_chain_in_order_at_exact_size ... ok
+test file::tests::direct_ranges_propagate_seek_and_read_failures_and_match_open_stream ... ok
+test file::tests::batched_fat_reads_zero_fill_a_truncated_final_sector ... ok
+test file::tests::a_fat_run_longer_than_the_scratch_is_read_in_bounded_pieces ... ok
+test file::tests::minifat_stream_chain_errors_remain_typed_and_ordered ... ok
+test file::tests::minifat_stream_replays_fragmented_chain_in_order_at_exact_size ... ok
+test file::tests::isolated_fat_sectors_still_cost_one_read_each ... ok
+test file::tests::malformed_large_declarations_do_not_unwind ... ok
+test file::tests::lookup_refuses_a_missing_validated_name_cache_entry ... ok
+test file::tests::physical_layout_checks_every_role_and_fat_marker ... ok
+test file::tests::physical_layout_preserves_prefix_order_and_padding_contract ... ok
+test file::tests::parsed_name_cache_is_sid_aligned_with_directory_entries ... ok
+test file::tests::lookup_uses_cfb_simple_uppercase_comparison ... ok
+test file::tests::lookup_uses_ascii_case_equivalence ... ok
+test file::tests::rejects_chain_lengths_before_reserving_chain_storage ... ok
+test file::tests::read_sector_into_zero_fills_a_truncated_final_sector ... ok
+test file::tests::rejects_minifat_buffer_size_overflow_before_reading_a_sector ... ok
+test file::tests::rejects_difat_counts_beyond_the_physical_file_before_reserving ... ok
+test file::tests::preserves_nonzero_stream_directory_timestamps_from_legacy_sources ... ok
+test file::tests::rejects_cyclic_directory_trees ... ok
+test file::tests::read_only_directory_visitor_resolves_without_sibling_materialization ... ok
+test file::tests::rejects_sector_reads_past_the_physical_file ... ok
+test file::tests::rejects_invalid_header_shifts_and_versions_without_panicking ... ok
+test file::tests::reusable_chain_scratch_preserves_early_and_late_end_errors ... ok
+test file::tests::rejects_self_referential_difat_chains ... ok
+test file::tests::reusable_chain_scratch_reserves_growth_before_walking ... ok
+test file::tests::returns_not_found_for_missing_and_invalid_caller_names ... ok
+test file::tests::reusable_chain_scratch_resets_after_cycle_and_reuses_after_error ... ok
+test file::tests::reusable_chain_scratch_resets_after_success_and_empty_chain ... ok
+test file::tests::reusable_chain_scratch_reuses_buffers_for_different_lengths ... ok
+test file::tests::reports_minifat_allocation_failure_without_panicking ... ok
+test file::tests::scratch_differential_matches_owned_chain_helper_and_resets ... ok
+test file::tests::tolerates_nonfree_fat_padding_beyond_the_physical_file ... ok
+test file::tests::scratch_to_end_clears_only_what_it_set_and_reuses_its_buffers ... ok
+test file::chain_work_tests::a_reader_reuses_its_chain_buffers_across_reads_and_errors ... ok
+test overlay_tests::duplicate_length_and_limit_failures_are_typed ... ok
+test file::tests::scratch_to_end_matches_the_owned_chain_helper_and_resets ... ok
+test file::tests::the_sector_batch_scratch_is_bounded_by_the_longest_run_it_will_hold ... ok
+test overlay_tests::caller_bracketed_identity_still_reopens_the_composed_candidate ... ok
+test overlay_tests::fragmented_fat_chain_yields_sorted_nonoverlapping_publication ... ok
+test file::tests::bounded_directory_visitor_stops_before_collecting_wide_siblings ... ok
+test file::tests::finds_exact_names_in_a_wide_sibling_tree ... ok
+test overlay_tests::atomic_path_preflight_failure_leaves_destination_and_directory_unchanged ... ok
+test file::mini_stream_end_tests::a_real_producer_stream_ending_in_the_partial_mini_sector_reads ... ok
+test overlay_tests::caller_bracketed_identity_is_the_empty_splice_digest_in_one_scan ... ok
+test directory_name::tests::uppercase_matches_unicode_mapping_for_every_char ... ok
+test file::tests::validates_v4_range_lock_marker_and_rejects_chain_pointers ... ok
+test directory_validation_tests::accepts_writer_generated_red_black_directories ... ok
+test directory_name::tests::ascii_construction_matches_the_general_reference_for_every_byte_and_pair ... ok
+test overlay_tests::atomic_path_late_stable_token_mutation_leaves_destination_unchanged ... ok
+test overlay_tests::atomic_path_publication_replaces_after_complete_staging ... ok
+test overlay_tests::atomic_save_skips_only_the_duplicate_post_emission_source_scan ... ok
+test overlay_tests::hostile_read_during_emission_reports_exact_sink_prefix ... ok
+test overlay_tests::direct_write_to_retains_three_complete_source_scans ... ok
+test overlay_tests::fingerprint_requests_are_coalesced_without_widening_publication_chunks ... ok
+test overlay_tests::noop_direct_write_catches_a_mutation_inside_the_emission_scan ... ok
+test overlay_tests::noop_direct_write_catches_a_late_stable_token_mutation ... ok
+test overlay_tests::generic_atomic_save_still_hashes_its_emission ... ok
+test overlay_tests::exact_and_empty_noops_copy_the_source_byte_for_byte ... ok
+test overlay_tests::hostile_read_overreport_during_emission_reports_the_exact_sink_prefix ... ok
+test overlay_tests::noop_plan_catches_a_stable_token_mutation_between_planning_scans ... ok
+test overlay_tests::noop_plan_publishes_the_exact_source_bytes ... ok
+test overlay_tests::public_owned_arc_source_publishes_exactly ... ok
+test overlay_tests::owned_composed_view_and_direct_write_take_no_recheck_scan ... ok
+test overlay_tests::owned_atomic_save_reads_only_its_emission ... ok
+test overlay_tests::noop_plan_retains_every_complete_source_scan ... ok
+test overlay_tests::mini_overlay_preserves_a_neighbor_in_the_same_host_sector ... ok
+test overlay_tests::only_the_unbracketed_digest_survives_an_index_damaged_under_the_read ... ok
+test overlay_tests::unbracketed_source_fingerprint_is_the_same_digest_with_no_reopen ... ok
+test publish_tests::a_substituted_temporary_is_refused_before_rename_at_every_level ... ok
+test publish_tests::committed_converts_into_the_typed_core_variant ... ok
+test overlay_tests::owned_overlay_planning_elides_only_the_final_complete_fingerprint ... ok
+test overlay_tests::generic_composed_view_still_rechecks_both_digests ... ok
+test overlay_tests::noop_plan_reports_the_source_digest_as_both_identities ... ok
+test publish_tests::no_sync_never_attempts_a_synchronization_it_skips ... ok
+test publish_tests::a_late_generic_source_change_is_refused_before_rename_at_every_level ... ok
+test overlay_tests::version_four_sector_geometry_publishes_mini_and_fat_overlays ... ok
+test publish_tests::file_sync_failure_leaves_the_destination_and_removes_the_temporary ... ok
+test shared::tests::a_checkpoint_cannot_cross_streams_or_move_a_read_backward ... ok
+test allocation_validation_tests::opens_the_complete_legacy_office_compound_file_corpus ... ok
+test shared::tests::a_checkpoint_does_not_bypass_source_freshness_fences ... ok
+test shared::tests::a_checkpoint_cannot_cross_two_minifat_streams_with_the_same_table ... ok
+test shared::tests::a_checkpoint_from_another_owner_is_ignored_even_for_equal_stream_identity ... ok
+test publish_tests::sequential_identity_cleanup_holds_at_every_level ... ok
+test shared::tests::a_checkpoint_does_not_change_corrupt_chain_errors ... ok
+test shared::tests::a_cursor_hint_does_not_change_a_refusal_or_its_text ... ok
+test shared::tests::a_checkpoint_restores_a_fat_position_after_the_borrowed_hint_is_dropped ... ok
+test shared::tests::a_cursor_hint_costs_one_chain_walk_where_unhinted_construction_costs_one_per_cursor ... ok
+test shared::tests::a_checkpoint_restores_fat_and_minifat_chains_without_changing_io ... ok
+test shared::tests::a_cursor_hint_past_the_requested_offset_is_ignored ... ok
+test shared::tests::a_cursor_hint_bound_to_another_reader_is_ignored ... ok
+test shared::tests::a_cursor_hint_does_not_change_a_refusal_on_a_malformed_chain ... ok
+test shared::tests::a_cursor_hint_taken_from_another_stream_is_ignored ... ok
+test shared::tests::a_cursor_without_read_ahead_reads_and_fences_once_per_call ... ok
+test shared::tests::a_failed_fill_does_not_commit_the_cursor ... ok
+test shared::tests::a_cursor_hint_actually_resumes_the_walk ... ok
+test shared::tests::a_hint_costs_one_chain_walk_where_an_unhinted_read_costs_one_per_call ... ok
+test shared::tests::a_hint_does_not_change_a_refusal_or_its_text ... ok
+test shared::tests::a_hint_taken_from_another_stream_is_ignored ... ok
+test shared::tests::a_hint_past_the_requested_offset_is_ignored ... ok
+test shared::tests::a_hint_bound_to_another_reader_is_ignored ... ok
+test shared::tests::a_read_larger_than_the_ceiling_bypasses_the_window ... ok
+test shared::tests::a_hinted_cursor_on_a_fragmented_fat_chain_matches_an_unhinted_one ... ok
+test shared::tests::an_empty_checkpoint_restores_as_a_cold_hint ... ok
+test shared::tests::a_window_with_no_ceiling_reads_exactly_as_the_bare_cursor_does ... ok
+test shared::tests::an_open_observes_the_source_twice_around_its_parse ... ok
+test shared::tests::an_expired_checkpoint_from_a_dropped_owner_starts_a_fresh_walk ... ok
+test publish_tests::parent_sync_failure_is_committed_only_under_full ... ok
+test shared::tests::an_open_refuses_a_changed_source_over_a_failed_length ... ok
+test shared::tests::an_open_refuses_a_changed_source_over_its_input_limit ... ok
+test shared::tests::bounded_ranges_read_only_the_requested_mini_and_fat_bytes ... ok
+test shared::tests::bounded_ranges_cover_boundaries_and_reject_out_of_range_without_io ... ok
+test shared::tests::bulk_preflight_failures_do_not_consume_minifat_direct_state ... ok
+test shared::tests::a_hinted_minifat_cursor_matches_an_unhinted_one_across_a_stream ... ok
+test shared::tests::bulk_preload_materializes_once_and_repeated_eligible_open_is_cached ... ok
+test shared::tests::bulk_reads_charge_work_before_starting_payload_reads ... ok
+test shared::tests::bulk_reads_enforce_byte_and_context_budget_caps ... ok
+test shared::tests::bulk_multi_minifat_batch_converges_on_one_root_cache ... ok
+test shared::tests::bulk_reads_observe_mid_read_cancellation_atomically ... ok
+test shared::tests::bulk_reads_observe_preexisting_cancellation_atomically ... ok
+test shared::tests::bulk_reads_honor_task_cap_and_use_a_local_pool_when_eligible ... ok
+test shared::tests::a_hinted_fat_cursor_matches_an_unhinted_one_across_a_stream ... ok
+test shared::tests::bulk_reads_preserve_input_order_and_match_serial_reads ... ok
+test shared::tests::bulk_session_skips_pool_when_only_bounded_batches_are_ineligible ... ok
+test shared::tests::bulk_reads_refuse_zero_io_before_the_first_payload_read ... ok
+test shared::tests::bulk_reads_reject_source_change_without_returning_partial_results ... ok
+test shared::tests::bulk_reads_use_caller_facility_and_release_operation_worker_width ... ok
+test overlay_tests::overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes ... ok
+test shared::tests::cache_takeover_preserves_epoch_and_intent_until_waiters_leave ... ok
+test shared::tests::cache_request_published_before_direct_failure_remains_permanent ... ok
+test shared::tests::cache_failure_retries_cache_without_returning_to_direct ... ok
+test shared::tests::cancelled_bulk_read_releases_worker_and_io_admissions ... ok
+test shared::tests::bulk_single_minifat_keeps_direct_width_one_and_two ... ok
+test shared::tests::case_aliases_resolve_to_the_same_direct_target_sid ... ok
+test shared::tests::checked_reads_observe_the_source_version_exactly_once ... ok
+test shared::tests::completed_without_handoff_designates_a_retry_owner ... ok
+test shared::tests::cached_bulk_pool_caps_later_io_narrowing ... ok
+test shared::tests::concurrent_range_reads_are_independent_and_source_positional ... ok
+test shared::tests::contiguous_minifat_ranges_coalesce_to_one_exact_read_for_common_sector_sizes ... ok
+test shared::tests::delayed_old_epoch_waiter_drop_does_not_decrement_new_handoff ... ok
+test shared::tests::deep_minifat_ranges_use_the_prevalidated_root_chain_index ... ok
+test shared::tests::delayed_same_sid_waiter_and_different_sid_takeover_converge ... ok
+test shared::tests::different_minifat_target_takes_cache_and_a_b_a_stays_cached ... ok
+test shared::tests::direct_epoch_exhaustion_fails_closed_to_root_cache ... ok
+test shared::tests::direct_open_rejects_a_mini_sector_start_outside_the_captured_file ... ok
+test shared::tests::direct_open_zero_fills_a_truncated_final_root_sector_like_the_cache ... ok
+test shared::tests::eligible_minifat_open_repeats_same_target_without_root_cache ... ok
+test shared::tests::direct_owner_unwind_wakes_same_sid_waiter_via_raii ... ok
+test shared::tests::failed_cache_takeover_during_direct_read_leaves_retryable_cache_state ... ok
+test shared::tests::failed_direct_marker_wakes_same_sid_waiter_for_a_retry ... ok
+test shared::tests::failed_ministream_initialization_can_retry ... ok
+test shared::tests::fat_interleave_does_not_change_the_active_minifat_direct_target ... ok
+test shared::tests::fat_range_read_error_prefers_source_change_from_post_read_fence ... ok
+test shared::tests::fat_range_read_errors_preserve_stable_source_error_and_retry_successfully ... ok
+test shared::tests::first_cursor_read_after_open_reports_a_change_from_its_trailing_fence ... ok
+test shared::tests::force_cache_requests_before_a_delayed_direct_read_finishes ... ok
+test shared::tests::fragmented_fat_ranges_follow_logical_chain_order ... ok
+test shared::tests::fragmented_minifat_chain_keeps_logical_order_and_separates_physical_runs ... ok
+test shared::tests::full_fat_range_uses_one_exact_contiguous_chain_read ... ok
+test shared::tests::intent_before_registration_gets_a_bounded_handoff ... ok
+test shared::tests::intent_count_transition_reasserts_the_same_word_bit ... ok
+test shared::tests::malformed_minifat_chain_is_refused_without_root_materialization ... ok
+test shared::tests::late_intent_terminalizes_failure_and_completed_without_handoff ... ok
+test shared::tests::minifat_direct_thresholds_cover_zero_ratio_and_size_cutoffs ... ok
+test shared::tests::minifat_range_read_error_prefers_source_change_from_post_read_fence ... ok
+test shared::tests::minifat_range_reads_do_not_consume_the_direct_repeat_state ... ok
+test shared::tests::minifat_ranges_handle_short_and_interrupted_positional_reads ... ok
+test shared::tests::next_chain_sector_matches_legacy_boundary_matrix ... ok
+test shared::tests::open_stream_fat_control_keeps_full_contiguous_chain_read ... ok
+test shared::tests::one_hint_serves_both_a_hinted_read_and_a_hinted_cursor ... ok
+test shared::tests::open_stream_selected_minifat_preserves_fragmented_logical_order ... ok
+test file::chain_work_tests::end_chain_scratch_matches_fresh_maps_over_random_call_sequences ... ok
+test shared::tests::concurrent_reads_restore_independent_local_hints_from_one_checkpoint ... ok
+test shared::tests::claimant_is_serialized_through_owner_terminal_release ... ok
+test shared::tests::open_stream_selected_minifat_reads_one_exact_cross_sector_range ... ok
+test shared::tests::owner_completion_before_and_after_intent_never_strands_a_late_caller ... ok
+test shared::tests::open_stream_selected_minifat_refuses_source_change_during_payload_read ... ok
+test shared::tests::concurrent_eligible_opens_share_one_direct_range_without_cache ... ok
+test publish_tests::every_route_makes_exactly_its_level_synchronizations_and_identical_bytes ... ok
+test shared::tests::a_hinted_read_matches_an_unhinted_one_at_a_4096_byte_sector_size ... ok
+test shared::tests::poisoned_singleflight_state_returns_a_typed_error ... ok
+test shared::tests::range_reads_refuse_source_changes_before_publication ... ok
+test shared::tests::range_source_failures_are_retryable_and_do_not_materialize_mini_stream ... ok
+test shared::tests::persistent_io_failure_with_multiple_waiters_designates_retries ... ok
+test shared::tests::public_minifat_range_keeps_truncated_eof_error_and_destination_tail ... ok
+test shared::tests::persistent_structural_failure_with_multiple_waiters_designates_retries ... ok
+test shared::tests::preserves_existing_parser_corruption_checks ... ok
+test shared::tests::a_hinted_minifat_read_matches_an_unhinted_one ... ok
+test shared::tests::read_ahead_matches_a_plain_cursor_on_a_minifat_stream ... ok
+test shared::tests::read_ahead_never_reads_past_the_declared_stream ... ok
+test shared::tests::read_ahead_over_reads_at_most_one_growth_step ... ok
+test shared::tests::read_ahead_reports_a_mutation_at_the_next_fill_not_at_a_served_read ... ok
+test shared::tests::read_ahead_reports_a_mutation_taken_before_its_first_fill ... ok
+test shared::tests::read_ahead_serves_a_framed_walk_from_one_fill_per_run ... ok
+test shared::tests::read_exact_reports_the_payload_error_when_the_fence_also_fails ... ok
+test shared::tests::rejects_a_source_that_changes_during_structural_open ... ok
+test shared::tests::read_ahead_skips_inside_the_window_without_reading ... ok
+test shared::tests::rejects_a_source_that_changes_during_payload_read ... ok
+test shared::tests::rejects_input_before_parsing_when_over_the_finite_limit ... ok
+test shared::tests::regular_stream_reads_are_concurrent_without_a_shared_cursor ... ok
+test shared::tests::read_exact_reports_a_fence_failure_after_a_successful_read ... ok
+test shared::tests::read_ahead_matches_a_plain_cursor_on_a_fragmented_chain ... ok
+test shared::tests::same_sid_source_change_wakes_waiter_without_cache_or_retry_read ... ok
+test overlay_tests::operation_shape_matches_generic_and_owned_overlay_policy ... ok
+test overlay_tests::short_and_interrupted_sink_writes_complete_exactly ... ok
+test overlay_tests::stable_token_mutation_of_an_emitted_chunk_is_caught_before_success ... ok
+test shared::tests::shared_lookup_does_not_bypass_missing_or_mismatched_name_cache ... ok
+test shared::tests::shared_lookup_keeps_utf16_length_before_ascii_comparison_key ... ok
+test shared::tests::serial_bulk_failure_releases_worker_and_io_admissions ... ok
+test shared::tests::selected_ministream_reads_are_bounded_and_same_target_repeats_stay_direct ... ok
+test shared::tests::same_target_repeat3_and_repeat8_keep_exact_direct_ranges ... ok
+test shared::tests::same_sid_singleflight_covers_36_and_4095_with_aliases_and_isolation ... ok
+test shared::tests::shared_limits_reuse_typed_low_level_limit_validation ... ok
+test shared::tests::same_sid_structural_failure_wakes_waiter_without_cache ... ok
+test shared::tests::shared_limit_rejects_oversized_source_before_positional_reads ... ok
+test shared::tests::shared_lookup_preserves_nested_storage_and_implicit_root_semantics ... ok
+test shared::tests::shared_open_propagates_allocation_table_byte_limit ... ok
+test shared::tests::shared_validation_reuses_selected_directory_byte_limit ... ok
+test shared::tests::stream_cursor_forward_skip_rejects_backward_and_out_of_bounds_moves ... ok
+test shared::tests::shared_lookup_matches_unicode_cached_case_and_preserves_simple_uppercase ... ok
+test shared::tests::stream_cursor_fat_sequential_reads_match_ranges_without_restarting_chain ... ok
+test shared::tests::stream_cursor_fragmented_fat_reads_match_logical_order ... ok
+test shared::tests::stream_cursor_minifat_handles_partial_root_tail_like_range_reader ... ok
+test shared::tests::selected_minifat_open_refuses_short_or_excess_chain_without_materialization ... ok
+test shared::tests::shared_open_propagates_directory_byte_limit ... ok
+test shared::tests::stream_cursor_minifat_parity_leaves_cache_unmaterialized ... ok
+test shared::tests::stream_cursor_skip_does_not_fence_but_next_read_rejects_mutation ... ok
+test shared::tests::waiter_drop_before_owner_release_clears_slot_before_repeat_overlap ... ok
+test shared::tests::zero_cpu_budget_refuses_before_building_a_bulk_pool ... ok
+test shared::tests::stream_cursor_reports_source_changes_around_hostile_reads ... ok
+test shared::tests::the_read_ahead_ceiling_is_clamped_to_the_published_bound ... ok
+test splice_tests::invalid_fat_and_minifat_topology_is_rejected_at_validated_ingress ... ok
+test shared::tests::cursor_chain_sector_matches_legacy_boundary_matrix_and_error_order ... ok
+test splice_tests::length_range_overlap_and_expected_preconditions_are_checked ... ok
+test splice_tests::owner_validation_error_returns_no_plan_and_keeps_its_native_type ... ok
+test stream_compare_tests::a_failed_root_load_is_not_kept_and_is_repeated_like_open_stream ... ok
+test splice_tests::stable_token_mutation_after_initial_precondition_read_is_rejected ... ok
+test splice_tests::owner_validation_is_closed_by_the_final_stable_token_fingerprint ... ok
+test shared::tests::a_hinted_read_of_a_fragmented_fat_chain_matches_an_unhinted_one ... ok
+test splice_tests::owned_owner_validated_planning_elides_only_the_final_complete_fingerprint ... ok
+test stream_compare_tests::short_final_sectors_reach_the_readback_verdict ... ok
+test splice_tests::mini_splice_planning_does_not_materialize_the_root_mini_stream ... ok
+test splice_tests::fragmented_fat_stream_ranges_are_mapped_in_logical_order ... ok
+test splice_tests::owner_validation_shares_the_fenced_target_and_preserves_typed_results ... ok
+test splice_tests::sequential_publication_reopens_with_the_existing_reader ... ok
+test overlay_tests::hostile_sink_progress_is_typed ... ok
+test shared::tests::a_hinted_fat_read_matches_an_unhinted_one_over_every_partition ... ok
+test overlay_tests::version_and_stable_token_byte_changes_are_caught_before_output ... ok
+test stream_move_tests::forward_and_inverse_refuse_a_stale_source ... ok
+test stream_move_tests::rejects_storage_moves_duplicate_sources_missing_parents_and_invalid_names ... ok
+test stream_move_tests::evaluates_final_casefold_collisions_atomically_and_allows_swaps ... ok
+test splice_tests::composed_view_handles_short_and_interrupted_reads_and_is_concurrent ... ok
+test validation_tests::allocation_table_byte_limit_is_a_blocked_cfb_validation_ingress ... ok
+test validation_tests::configured_input_ceiling_blocks_without_calling_the_input_malformed ... ok
+test validation_tests::directory_byte_limit_is_a_blocked_cfb_validation_ingress ... ok
+test validation_tests::directory_topology_rejection_is_a_structured_issue ... ok
+test validation_tests::fat_topology_rejection_is_a_deterministic_structured_issue ... ok
+test validation_tests::report_limits_are_enforced_before_retention ... ok
+test validation_tests::shared_view_revalidation_refuses_a_changed_source_version ... ok
+test validation_tests::shared_view_revalidation_reuses_selected_allocation_table_limit ... ok
+test writer::core::tests::allocation_errors_preserve_resource_and_source ... ok
+test validation_tests::source_instability_and_io_failure_remain_errors ... ok
+test writer::core::tests::allocation_table_planning_is_checked_and_converges ... ok
+test validation_tests::version_change_between_preflight_and_canonical_ingress_is_an_error ... ok
+test validation_tests::valid_source_completes_the_single_truthful_ingress_capability ... ok
+test writer::core::tests::delete_storage_rejects_root_and_missing_paths_atomically ... ok
+test writer::core::tests::metadata_crossing_range_lock_expands_fat_capacity ... ok
+test splice_tests::every_finite_limit_accepts_exactly_the_bound_and_rejects_above_it ... ok
+test writer::core::tests::owned_stream_retains_payload_allocation_through_write ... ok
+test writer::core::tests::path_table_reservation_reports_overflow_without_mutation ... ok
+test writer::core::tests::delete_storage_removes_descendants_and_clsids_without_prefix_collisions ... ok
+test writer::core::tests::serialization_normalizes_the_sink_position ... ok
+test writer::core::tests::test_create_storage ... ok
+test writer::core::tests::move_storage_retains_stream_payload_allocations_and_insertion_order ... ok
+test writer::core::tests::test_create_stream ... ok
+test overlay_tests::owned_vec_source_is_sealed_and_publishes_the_generic_bytes ... ok
+test splice_tests::first_middle_last_and_multi_stream_splices_preserve_every_other_byte ... ok
+test writer::core::tests::save_reports_committed_when_parent_sync_fails ... ok
+test writer::core::tests::test_create_writer ... ok
+test writer::core::tests::save_preserves_existing_destination_when_serialization_fails ... ok
+test writer::core::tests::test_encode_name ... ok
+test writer::core::tests::version_four_size_limit_includes_the_header_sector ... ok
+test writer::core::tests::explicit_storage_order_is_deterministic_across_writer_instances ... ok
+test writer::core::tests::version_three_limits_are_checked_without_large_allocations ... ok
+test writer::difat::tests::difat_sector_range_is_checked_without_allocation ... ok
+test writer::difat::tests::invalid_sector_geometry_is_typed ... ok
+test writer::difat::tests::test_difat_calculation ... ok
+test writer::difat::tests::test_no_difat_needed ... ok
+test writer::directory::tests::serializes_maximum_utf16_name_without_truncation ... ok
+test writer::directory::tests::test_directory_builder ... ok
+test writer::directory::tests::test_root_entry ... ok
+test writer::difat::tests::test_difat_generation ... ok
+test writer::difat::tests::test_difat_4096_sectors ... ok
+test writer::directory::tests::failed_serialization_does_not_mutate_sibling_tree ... ok
+test writer::directory::tests::rejects_invalid_and_ambiguous_sibling_names ... ok
+test writer::directory::tests::test_stream_entry ... ok
+test writer::difat::tests::test_difat_multiple_sectors ... ok
+test writer::fat::tests::invalid_sector_geometry_is_typed ... ok
+test writer::fat::tests::test_allocate_chain ... ok
+test writer::fat::tests::sector_limit_uses_maxregsect_as_an_exclusive_count ... ok
+test file::chain_work_tests::sector_chain_scratch_matches_fresh_maps_over_random_call_sequences ... ok
+test shared::tests::shared_lookup_matches_frozen_oracle_across_wide_tree_and_refusals ... ok
+test writer::fat::tests::test_mark_fat_sectors ... ok
+test writer::fat::tests::test_validate_good_fat ... ok
+test writer::fat::tests::test_empty_chain ... ok
+test writer::header::tests::invalid_sector_geometry_is_typed ... ok
+test writer::header::tests::test_header_generation ... ok
+test writer::header::tests::test_sector_size_4096 ... ok
+test writer::fat::tests::test_sector_size ... ok
+test writer::header::tests::test_sector_size_512 ... ok
+test writer::layout::validation_tests::plan_derived_limit_failures_decline_and_resource_failures_do_not ... ok
+test writer::core::tests::chain_publication_coalesces_contiguous_sectors_and_splits_at_the_lock ... ok
+test writer::layout::validation_tests::header_and_table_faults_are_refused ... ok
+test writer::layout::validation_tests::a_directory_chain_run_past_its_image_declines ... ok
+test writer::layout::validation_tests::overlapping_and_cyclic_chains_are_refused ... ok
+test writer::layout::validation_tests::mini_stream_faults_are_refused_and_padding_is_not_compared ... ok
+test writer::minifat::tests::allocation_rejects_invalid_sector_geometry_before_mutation ... ok
+test writer::minifat::tests::allocation_rejects_ministream_cutoff_before_mutation ... ok
+test writer::minifat::tests::empty_minifat_rejects_invalid_sector_geometry ... ok
+test writer::minifat::tests::serialized_minifat_rejects_invalid_sector_geometry ... ok
+test writer::minifat::tests::test_allocate_mini_chain ... ok
+test writer::minifat::tests::test_empty_mini_chain ... ok
+test writer::minifat::tests::test_generate_minifat_sectors ... ok
+test writer::minifat::tests::test_multiple_allocations ... ok
+test writer::sequential::tests::detected_temp_substitution_is_not_deleted_by_cleanup ... ok
+test writer::layout::validation_tests::the_synthetic_plan_reuses_the_source_and_both_validators_accept_it ... ok
+test writer::sequential::tests::exact_two_gib_and_reserved_sector_boundaries_are_explicit ... ok
+test splice_tests::no_op_inverse_and_stale_source_contracts_are_exact ... ok
+test writer::sequential::tests::four_k_geometry_covers_fat_and_difat_transition ... ok
+test writer::sequential::tests::metadata_crossing_range_lock_expands_fat_capacity ... ok
+test writer::layout::validation_tests::byte_identical_placements_are_accepted_by_both ... ok
+test writer::sequential::tests::physical_output_preserves_buffered_writes_and_inserts_only_the_lock_hole ... ok
+test writer::sequential::tests::version_four_range_lock_adds_one_physical_sector_after_the_fixed_id ... ok
+test writer::sequential::tests::failed_replace_cleans_only_unpublished_temporary_file ... ok
+test writer::tests::fresh_root_creation_time_is_checked_and_source_replay_is_explicit ... ok
+test writer::sequential::tests::parent_sync_failure_reports_committed_and_keeps_destination ... ok
+test writer::tests::test_boundary_conditions ... ok
+test writer::tests::known_legacy_fixture_directory_metadata_round_trips_exactly ... ok
+test writer::tests::test_delete_storage_removes_descendants_when_serialized ... ok
+test writer::tests::test_invalid_sector_size ... ok
+test writer::tests::test_directory_state_and_filetimes_round_trip_without_clock_access ... ok
+test writer::tests::test_list_streams_after_write ... ok
+test writer::tests::test_owned_streams_preserve_borrowed_wire_layout ... ok
+test writer::tests::test_write_empty_stream ... ok
+test writer::tests::test_save_preserves_directory_when_atomic_replace_fails ... ok
+test writer::tests::test_save_atomically_overwrites_existing_file ... ok
+test stream_move_tests::moves_and_renames_a_batch_without_touching_payload_or_allocation_sectors ... ok
+test writer::tests::test_write_multiple_streams ... ok
+test writer::tests::test_write_owned_streams_round_trip ... ok
+test stream_move_tests::version_four_directory_fragments_are_bounded_before_collection ... ok
+test writer::tests::test_write_mixed_sizes ... ok
+test writer::tests::test_write_simple_ole_file ... ok
+test writer::tests::test_write_large_stream ... ok
+test writer::tests::test_write_sector_size_4096 ... ok
+test writer::tests::test_write_update_delete ... ok
+test writer::tests::test_write_to_file ... ok
+test writer::tests::test_write_with_minifat ... ok
+test writer::layout::validation_tests::wrong_lengths_are_refused ... ok
+test file::tests::lists_deep_directory_trees_without_call_stack_growth ... ok
+test stream_move_tests::no_op_and_every_finite_limit_are_exact ... ok
+test writer::layout::validation_tests::wrong_contents_are_refused ... ok
+test writer::fat::tests::version_four_range_lock_is_reserved_and_chain_crossing_skips_it ... ok
+test writer::directory::tests::builds_valid_red_black_trees_for_adversarial_sibling_counts ... ok
+test stream_compare_tests::many_mini_stream_files_reach_the_readback_verdict ... ok
+test directory_name::tests::ascii_length_boundaries_match_the_general_reference ... ok
+test file::mini_stream_end_tests::root_sizes_around_a_partial_last_mini_sector_follow_the_byte_bound ... ok
+test stream_compare_tests::the_root_mini_stream_is_loaded_once_and_each_contiguous_stream_compared_once ... ok
+test writer::sequential::tests::version_four_counting_publication_crosses_range_lock_without_retaining_payload ... ok
+test file::mini_stream_end_tests::seeded_mini_layouts_follow_the_byte_bound ... ok
+test writer::layout::validation_tests::version_4_plans_reach_the_readback_verdict ... ok
+test writer::layout::validation_tests::random_faults_reach_the_readback_verdict ... ok
+test overlay_tests::sealed_and_generic_plans_publish_identical_bytes_and_digests ... ok
+test stream_compare_tests::every_fixture_stream_reaches_the_readback_verdict ... ok
+test file::mini_stream_end_tests::every_admitted_fixture_stream_reads_through_every_reader ... ok
+test file::chain_work_tests::validating_open_clears_chain_maps_in_proportion_to_the_chains ... ok
+test file::chain_work_tests::reading_every_stream_collects_chains_in_proportion_to_the_chains ... ok
+test file::mini_stream_end_tests::root_sizes_around_each_fixture_mini_stream_end_follow_the_byte_bound ... ok
+test file::mini_stream_end_tests::every_stream_of_an_admitted_faulted_file_reads_through_every_reader ... ok
+test file::chain_work_tests::stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files ... ok
+test stream_compare_tests::corrupted_files_reach_the_readback_verdict ... ok
+test writer::layout::validation_tests::real_fixture_plans_reach_the_readback_verdict ... ok
+test file::chain_work_tests::reads_through_one_reader_match_a_fresh_reader_per_stream_on_faulted_tables ... ok
+test writer::layout::validation_tests::many_mini_stream_plans_reach_the_readback_verdict ... ok
+test overlay_tests::sealed_and_generic_plans_agree_across_fingerprint_and_publication_chunks ... ok
+
+test result: ok. 451 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.69s
+
+     Running tests/range_lock.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/range_lock-1e03f71e8e534828)
+
+running 2 tests
+test v4_payload_chain_crosses_the_lock_and_rejects_an_inbound_lock_edge ... ok
+test v4_metadata_crossing_uses_the_exact_fat_fixed_point ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.92s
+
+     Running tests/sector_layout_corpus.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/sector_layout_corpus-679e586095ac9e05)
+
+running 7 tests
+test reused_layout_determinism_child ... ok
+test reused_layout_is_deterministic_across_processes ... ok
+test a_mutated_source_never_steers_the_layout ... ok
+test a_reused_layout_is_deterministic ... ok
+test source_layout_measurement_with_aa_floor ... ok
+test sector_layout_counts_over_the_corpus ... ok
+test every_ole2_fixture_agrees_stream_by_stream_under_both_policies ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/sector_layout_metadata.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/sector_layout_metadata-7a7848c59dbe2215)
+
+running 6 tests
+test shared_metadata_registration_matches_the_copying_form ... ok
+test supplied_metadata_is_authoritative_for_entries_left_unset ... ok
+test changed_root_metadata_declines_to_the_from_scratch_writer ... ok
+test changed_supplied_metadata_declines_to_the_from_scratch_writer ... ok
+test reuse_with_matching_supplied_metadata_keeps_the_layout ... ok
+test reuse_without_supplied_metadata_keeps_the_source_values ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sector_layout_smoke.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/sector_layout_smoke-5825d33d5f25a50d)
+
+running 11 tests
+test a_changed_stream_set_declines ... ok
+test reused_v3_zero_length_stream_masks_high_size_word ... ok
+test rewrite_policy_declines_and_matches_today ... ok
+test explicit_zero_clsids_clear_source_directory_fields ... ok
+test reuse_handles_mini_to_regular_cutoff_migration ... ok
+test reuse_handles_regular_to_mini_cutoff_migration ... ok
+test shape_fallback_preserves_adopted_clsids_until_explicitly_changed ... ok
+test reuse_keeps_sectors_for_a_same_length_edit ... ok
+test shrinking_a_mini_stream_clears_former_payload_from_root_padding ... ok
+test reuse_appends_when_a_stream_outgrows_its_allocation ... ok
+test shrinking_a_stream_reclaims_its_sectors ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sequential_writer.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/sequential_writer-efa8e4aad824ab3d)
+
+running 15 tests
+test cancellation_after_header_reports_an_exact_prefix ... ok
+test planning_limits_do_not_call_sink ... ok
+test atomic_save_overwrites_existing_destination ... ok
+test atomic_save_reopens_candidate_before_replace ... ok
+test mixed_minifat_fat_nested_storage_clsids_reopen ... ok
+test interrupted_retries_recheck_cancellation_before_retrying ... ok
+test output_limit_accepts_exact_and_rejects_one_under_without_sink_calls ... ok
+test sequential_fresh_root_creation_time_rejects_nonzero_without_mutation ... ok
+test sequential_directory_metadata_is_exact_and_defaults_are_zeroed ... ok
+test short_nonseek_sink_matches_reference_bytes ... ok
+test source_length_failures_are_typed_and_leave_prefix_evidence ... ok
+test sink_zero_and_flush_failures_report_progress ... ok
+test sector_size_4096_and_current_writer_wire_parity ... ok
+test exact_fat_boundary_has_no_difat_and_one_over_has_difat ... ok
+test difat_boundary_streams_without_retaining_source_payload ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/writer_storage_determinism.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/writer_storage_determinism-e2d76f961e969cec)
+
+running 6 tests
+test single_storage_output_is_byte_identical_to_the_pre_fix_writer ... ok
+test the_deterministic_nested_output_is_a_conforming_compound_file ... ok
+test the_deterministic_output_is_a_conforming_compound_file ... ok
+test storage_declaration_order_does_not_change_the_bytes ... ok
+test nested_storages_serialize_to_one_digest_across_hasher_seeds ... ok
+test eight_sibling_storages_serialize_to_one_digest_across_hasher_seeds ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/writer_storage_move.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/writer_storage_move-c6a458c153527f0f)
+
+running 6 tests
+test root_self_descendant_and_missing_parent_refusals_are_atomic ... ok
+test accepts_case_only_rename_but_refuses_other_case_insensitive_collisions ... ok
+test refuses_oversized_untrusted_names_before_admitting_a_move ... ok
+test explicit_limits_accept_exact_bounds_and_refuse_one_less_atomically ... ok
+test moves_complete_subtree_without_reallocating_or_reordering_stream_payloads ... ok
+test refuses_an_oversized_existing_path_before_canonical_allocation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_core-6848fa55f1fe1376)
+
+running 193 tests
+test binary::tests::test_parse_utf16le ... ok
+test binary::tests::test_parse_windows1252 ... ok
+test binary::tests::test_read_u16_le ... ok
+test bounded::tests::validates_in_const_context_without_panicking ... ok
+test budget::tests::a_lease_claims_chunks_and_hands_units_out_locally ... ok
+test binary::tests::test_read_u32_le ... ok
+test budget::tests::a_refund_wider_than_a_chunk_returns_the_excess_at_once ... ok
+test bounded::tests::reports_invalid_type_ranges ... ok
+test budget::tests::a_reservation_holds_one_handle_whatever_the_depth ... ok
+test budget::tests::a_claim_near_a_limit_shrinks_to_the_room_at_every_level ... ok
+test budget::tests::a_lease_releases_when_dropped_even_while_unwinding ... ok
+test budget::tests::child_failure_rolls_back_every_level ... ok
+test budget::tests::a_reservation_outlives_the_budget_handles_that_made_it ... ok
+test budget::tests::committed_reservation_preserves_hierarchical_charge ... ok
+test budget::tests::deep_hierarchies_roll_back_exactly ... ok
+test budget::tests::execution_io_builder_composes_all_runtime_dimensions ... ok
+test budget::tests::merged_reservation_can_commit_part_of_combined_amount ... ok
+test budget::tests::reservations_can_commit_an_exact_short_write ... ok
+test budget::tests::concurrent_consumption_never_exceeds_limit ... ok
+test budget::tests::merge_refuses_amount_overflow_without_mutating_either_token ... ok
+test budget::tests::reservations_release_capacity ... ok
+test budget::tests::scoped_reservations_charge_commit_and_release_exactly_as_owned_ones ... ok
+test detection::rtf::tests::test_detect_rtf_from_reader ... ok
+test detection::rtf::tests::test_detect_rtf_invalid ... ok
+test budget::tests::partial_and_zero_commits_release_every_level ... ok
+test detection::rtf::tests::test_detect_rtf_minimal ... ok
+test detection::rtf::tests::test_detect_rtf_valid ... ok
+test detection::simd_utils::tests::test_check_office_signatures ... ok
+test detection::simd_utils::tests::test_contains_all_patterns ... ok
+test detection::simd_utils::tests::test_content_type_matches ... ok
+test detection::simd_utils::tests::test_contains_any_pattern ... ok
+test detection::simd_utils::tests::test_content_type_matches_any ... ok
+test detection::simd_utils::tests::test_find_pattern ... ok
+test detection::simd_utils::tests::test_parallel_signature_check ... ok
+test budget::tests::refunds_return_units_to_the_lease_and_release_settles_every_level ... ok
+test budget::tests::limits_refuse_at_exactly_one_over_at_the_innermost_refusing_level ... ok
+test budget::tests::concurrent_reservations_never_exceed_limit ... ok
+test detection::simd_utils::tests::test_check_office_signatures_accepts_minimum_signature_lengths ... ok
+test budget::tests::reservations_merge_preserves_parent_and_child_accounting ... ok
+test detection::simd_utils::tests::test_long_signatures ... ok
+test detection::simd_utils::tests::test_short_signatures ... ok
+test durability::tests::full_is_the_default_and_syncs_both_file_and_directory ... ok
+test durability::tests::labels_are_stable_and_distinct ... ok
+test durability::tests::weaker_levels_drop_only_their_named_synchronizations ... ok
+test execution::tests::cancellation_precedes_budget_charges ... ok
+test budget::tests::reservations_refuse_different_chains_and_resources_without_accounting_changes ... ok
+test execution::tests::lease_charges_check_cancellation_first_and_charge_the_shared_hierarchy ... ok
+test execution::tests::context_charges_shared_hierarchical_budget ... ok
+test budget::tests::siblings_see_pre_claimed_units_and_no_level_passes_its_limit ... ok
+test execution::tests::limits_expose_every_explicit_policy_choice ... ok
+test execution::tests::lease_refusals_are_the_exact_typed_resource_limit ... ok
+test execution::tests::limits_reject_parallel_threshold_above_byte_cap ... ok
+test execution::tests::limits_reject_task_floor_above_byte_cap ... ok
+test execution::tests::limits_reject_worker_count_above_task_cap ... ok
+test execution::tests::public_handles_are_send_and_sync ... ok
+test budget::tests::zero_amount_reservations_merge_without_charging ... ok
+test hex::tests::test_decode_basic ... ok
+test hex::tests::test_decode_empty ... ok
+test hex::tests::test_decode_invalid_char ... ok
+test hex::tests::test_decode_invalid_length ... ok
+test execution::tests::source_cancellation_is_visible_to_another_thread ... ok
+test hex::tests::test_decode_lowercase ... ok
+test hex::tests::test_decode_mixed_case ... ok
+test hex::tests::test_decode_with_whitespace ... ok
+test hex::tests::test_decode_large ... ok
+test detection::rtf::tests::test_detect_rtf_too_short ... ok
+test detection::simd_utils::tests::test_format_signature_mask_operations ... ok
+test metadata::tests::test_metadata_has_data ... ok
+test mso_crc32::tests::cache_covers_the_full_byte_domain ... ok
+test id::tests::test_generate_guid_braced_format ... ok
+test budget::tests::reservations_merge_for_clone_handles_without_changing_counters ... ok
+test mso_crc32::tests::chunked_and_one_shot_computation_are_equivalent ... ok
+test detection::simd_utils::tests::test_signature_matches ... ok
+test detection::simd_utils::tests::test_signature_matches_any ... ok
+test patch::tests::history_bounds_transitions_and_preserves_undo_redo_order ... ok
+test patch::tests::construction_retains_and_enforces_patch_limits ... ok
+test hex::tests::test_hex_char_to_nibble ... ok
+test patch::tests::join_refuses_to_truncate_conflict_details ... ok
+test patch::tests::joined_sub_edits_accept_only_disjoint_effects_in_id_order ... ok
+test patch::tests::join_reports_read_write_conflict_and_returns_rejected_work ... ok
+test patch::tests::semantic_object_keys_obey_value_string_bounds ... ok
+test patch::tests::inverse_reverses_operation_order_and_seal_drops_reverse_data ... ok
+test patch::tests::serialization_preflight_refuses_an_oversized_envelope ... ok
+test patch::tests::noncanonical_json_is_rejected_even_when_it_parses ... ok
+test mso_crc32::tests::independent_known_vectors ... ok
+test mso_crc32::tests::exact_xml_byte_vector ... ok
+test patch::tests::short_base64_preflight_reports_a_conservative_upper_bound ... ok
+test patch::tests::shared_blob_limit_failures_leave_the_bundle_unchanged ... ok
+test patch::tests::parsing_enforces_every_explicit_json_bound ... ok
+test patch::tests::sub_edit_effects_are_canonical_and_bounded ... ok
+test patch::tests::three_way_lineage_failure_returns_both_branches ... ok
+test patch::tests::patch_fingerprint_is_deterministic_and_content_sensitive ... ok
+test patch::tests::blob_wire_size_is_rejected_before_identifier_or_base64_processing ... ok
+test patch::tests::three_way_plan_preserves_disjoint_work_and_requires_resolution ... ok
+test patch::tests::blobs_are_addressed_deduplicated_and_bounded ... ok
+test patch::tests::shared_blobs_retain_the_allocation_and_preserve_borrowed_wire ... ok
+test sheet::types::tests::test_empty_constant ... ok
+test sheet::types::tests::test_from_conversions ... ok
+test sheet::types::tests::test_infer_from_str_empty ... ok
+test sheet::types::tests::test_infer_from_str_boolean ... ok
+test patch::tests::reversible_wire_is_canonical_and_round_trips ... ok
+test sheet::types::tests::test_infer_from_str_integer ... ok
+test sheet::types::tests::test_infer_from_str_float ... ok
+test selector::tests::ergonomic_inputs_do_not_require_raw_ids ... ok
+test sheet::types::tests::test_infer_from_str_string ... ok
+test simd::cmp::tests::test_is_all_zero ... ok
+test simd::cmp::tests::test_simd_alternating_patterns ... ok
+test selector::tests::owned_names_adapt_to_the_callers_scope ... ok
+test simd::cmp::tests::test_simd_edge_cases ... ok
+test patch::tests::tight_semantic_limits_round_trip_for_both_patch_modes ... ok
+test simd::cmp::tests::test_simd_eq_u8 ... ok
+test sheet::types::tests::test_as_float ... ok
+test simd::cmp::tests::test_simd_identical_elements ... ok
+test sheet::types::tests::test_as_str ... ok
+test sheet::types::tests::test_cell_value_formula ... ok
+test simd::cmp::tests::test_simd_ne_u8 ... ok
+test sheet::types::tests::test_cell_value_variants ... ok
+test simd::cmp::tests::test_simd_large_data ... ok
+test patch::tests::conflict_set_retains_format_owned_deterministic_order ... ok
+test selector::tests::identity_mapping_does_not_touch_semantic_selectors ... ok
+test simd::cmp::tests::test_scalar_fallback ... ok
+test simd::cmp::tests::test_simd_boundary_values ... ok
+test simd::cmp::tests::test_simd_vs_scalar_consistency ... ok
+test simd::cmp::tests::test_simd_various_sizes ... ok
+test simd::cmp::tests::test_is_all_zero_comprehensive ... ok
+test simd::fmt::tests::test_case_consistency ... ok
+test simd::fmt::tests::test_edge_cases ... ok
+test simd::fmt::tests::test_all_x86_implementations_match ... ok
+test simd::fmt::tests::test_format_hex_with_separator ... ok
+test simd::fmt::tests::test_hex_encode_basic ... ok
+test simd::fmt::tests::test_hex_encode_empty ... ok
+test simd::fmt::tests::test_hex_encode_lower ... ok
+test simd::fmt::tests::test_scalar_vs_simd ... ok
+test simd::fmt::tests::test_x86_avx2_directly ... ok
+test simd::fmt::tests::test_x86_avx512_directly ... ok
+test simd::fmt::tests::test_x86_sse2_directly ... ok
+test simd::fmt::tests::test_simd_variants_comprehensive ... ok
+test simd::fmt::tests::test_x86_sse41_directly ... ok
+test simd::fmt::tests::test_x86_ssse3_directly ... ok
+test simd::fmt::tests::test_various_sizes ... ok
+test simd::xor::tests::test_xor_16_bytes ... ok
+test simd::xor::tests::test_xor_32_bytes_inplace ... ok
+test simd::xor::tests::test_xor_16_bytes_rejects_short_destination - should panic ... ok
+test simd::xor::tests::test_xor_16_bytes_rejects_short_source - should panic ... ok
+test simd::xor::tests::test_xor_reversibility ... ok
+test simd::xor::tests::test_xor_32_bytes_inplace_rejects_short_input - should panic ... ok
+test source::tests::custom_adapters_can_report_versions ... ok
+test source::tests::exact_read_reports_eof ... ok
+test source::tests::owned_clones_keep_snapshot_identity ... ok
+test source::tests::positional_reads_are_independent ... ok
+test style::color::tests::test_constants ... ok
+test style::color::tests::test_display ... ok
+test style::color::tests::test_from_hex_rgb ... ok
+test style::color::tests::test_from_hex_rrggbb ... ok
+test style::color::tests::test_from_name ... ok
+test style::color::tests::test_from_str ... ok
+test style::color::tests::test_invalid_hex ... ok
+test style::color::tests::test_invalid_name ... ok
+test style::color::tests::test_to_hex_string ... ok
+test text_output::tests::detects_a_nondeterministic_replay_factory ... ok
+test style::color::tests::test_new_color ... ok
+test text_output::tests::interrupted_writes_retry_and_write_zero_is_truthful ... ok
+test text_output::tests::joined_byte_limit_refuses_before_any_output ... ok
+test text_output::tests::limits_refuse_the_next_complete_object_before_output ... ok
+test style::color::tests::test_to_hex ... ok
+test text_output::tests::joined_objects_preflight_multibyte_output_and_empty_policy ... ok
+test text_output::tests::reports_exact_multibyte_partial_sink_progress ... ok
+test text_output::tests::writes_deterministic_separators_and_counts_complete_objects ... ok
+test unit::tests::test_comparison ... ok
+test unit::tests::test_display ... ok
+test unit::tests::test_parse_length ... ok
+test unit::tests::test_to_centimeters ... ok
+test unit::tests::test_to_inches ... ok
+test unit::tests::test_to_pixels ... ok
+test validation::tests::aggregate_text_boundary_is_exact ... ok
+test validation::tests::completeness_is_separate_from_severity_and_clone_shares_storage ... ok
+test validation::tests::exact_text_boundaries_are_accepted_and_above_is_rejected ... ok
+test validation::tests::canonical_ordering_duplicate_rejection_and_stable_id ... ok
+test validation::tests::stopped_by_requires_a_distinct_declared_capability ... ok
+test xml::compact::tests::kinds_have_stable_concise_messages ... ok
+test xml::compact::tests::preserves_kind_and_offset_without_format_dependencies ... ok
+test validation::tests::exact_count_boundaries_are_accepted_and_above_is_rejected ... ok
+test validation::tests::serialized_json_is_deterministic_and_content_free_evidence_is_typed ... ok
+test xml::escape::tests::escape_and_unescape_round_trip ... ok
+test validation::tests::report_and_json_order_are_independent_of_input_order ... ok
+test xml::escape::tests::escape_matches_every_special_byte_without_rescanning ... ok
+test xml::escape::tests::unescape_matches_leftmost_longest_without_rescanning ... ok
+test xml::origin::tests::offsets_and_positions_are_inverse_and_checked ... ok
+test xml::origin::tests::only_a_complete_leading_utf8_mark_moves_the_origin ... ok
+test budget::tests::concurrent_leases_and_reservations_keep_a_shared_hierarchy_exact ... ok
+test budget::tests::concurrent_owned_and_scoped_reservations_keep_a_shared_hierarchy_exact ... ok
+test budget::tests::a_lease_never_holds_more_than_one_chunk ... ok
+test budget::tests::a_sole_lease_holder_is_refused_exactly_as_exact_accounting_refuses ... ok
+
+test result: ok. 193 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/file_source.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/file_source-d613c6e18d6b71ac)
+
+running 8 tests
+test accepts_owned_file_and_rejects_directory_paths ... ok
+test reads_exact_ranges_and_reports_short_eof ... ok
+test open_explicitly_follows_symlinks_to_regular_files ... ok
+test positional_reads_do_not_move_a_shared_file_cursor ... ok
+test truncation_changes_length_and_metadata_version ... ok
+test replacing_path_does_not_retarget_an_open_source ... ok
+test writing_through_an_independent_handle_changes_the_version ... ok
+test clones_share_identity_and_support_concurrent_cursor_free_reads ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_opc-7efbe4eb7f320dd9)
+
+running 608 tests
+test accounting::tests::output_counter_overflow_is_typed_and_checked ... ok
+test accounting::tests::merge_copies_all_low_level_counters_without_retaining_the_source_type ... ok
+test atomic::tests::committed_converts_into_the_typed_core_variant ... ok
+test atomic::tests::caller_owned_write_error_is_not_erased ... ok
+test atomic::tests::a_failed_write_after_staging_leaves_the_destination_untouched ... ok
+test atomic::tests::directory_sync_failure_reports_that_replacement_already_committed ... ok
+test atomic::tests::failed_finalization_leaves_the_destination_untouched ... ok
+test atomic::tests::no_sync_never_attempts_the_file_sync_it_skips ... ok
+test atomic::tests::replacement_preserves_existing_file_permissions ... ok
+test atomic::tests::each_level_makes_exactly_its_synchronizations ... ok
+test atomic::tests::file_sync_failure_leaves_the_destination_and_removes_the_temporary ... ok
+test atomic::tests::symbolic_link_destinations_are_refused_without_touching_the_target ... ok
+test atomic::tests::successful_finalization_replaces_the_destination ... ok
+test atomic::tests::parent_sync_failure_is_committed_only_under_full ... ok
+test atomic::tests::weaker_levels_keep_every_destination_check_and_failure_rule ... ok
+test atomic::tests::weaker_levels_preserve_permissions_and_refuse_symbolic_links ... ok
+test content_type::tests::rejects_invalid_override_part_name ... ok
+test content_type::tests::requires_the_content_types_root_and_required_attributes ... ok
+test error::tests::accounting_overflow_is_not_misclassified_as_unsupported ... ok
+test content_type::tests::validates_mime_grammar_without_whitespace_or_comments ... ok
+test error::tests::allocation_zip_errors_remain_typed ... ok
+test error::tests::execution_io_errors_survive_zip_error_conversion ... ok
+test content_type::tests::rejects_case_equivalent_defaults_and_overrides ... ok
+test content_type::tests::honors_content_type_resource_limits_at_exact_boundaries ... ok
+test content_type::tests::override_precedes_case_insensitive_extension_default ... ok
+test error::tests::public_execution_error_from_a_format_sink_remains_typed ... ok
+test error::tests::publication_capability_errors_retain_typed_core_classification ... ok
+test error::tests::spool_error_display_is_content_free_and_retains_the_provider_source ... ok
+test execution::tests::explicit_owned_open_rejects_input_limit_before_zip_and_input_charge ... ok
+test execution::tests::explicit_owned_open_rejects_malformed_zip_before_input_charge ... ok
+test limits::tests::builder_rejects_zero_and_keeps_defaults_checked ... ok
+test members::tests::capacity_planning_is_fallible ... ok
+test members::tests::accepts_distinct_names_and_rejects_the_three_conflicts ... ok
+test members::tests::detects_derived_names_declared_in_either_order ... ok
+test members::tests::maps_ordinary_members_and_rejects_junk_names ... ok
+test members::tests::sibling_folders_sharing_a_prefix_do_not_conflict ... ok
+test execution::tests::explicit_open_keeps_ordinary_payloads_out_of_lazy_cache ... ok
+test atomic::tests::every_level_publishes_identical_bytes ... ok
+test execution::tests::read_limits_reject_before_execution_input_is_charged ... ok
+test execution::tests::explicit_zip_read_preflights_oversized_members_before_cpu_admission ... ok
+test execution::tests::zero_cpu_budget_refuses_before_retaining_a_zip_pool ... ok
+test execution::tests::explicit_zip_read_refuses_zero_io_before_member_payload_read ... ok
+test execution::tests::zip_byte_cap_that_splits_every_batch_does_not_retain_a_pool ... ok
+test execution::tests::explicit_open_observes_pre_cancellation ... ok
+test execution::tests::explicit_zip_sessions_share_root_worker_admission_and_release_on_drop ... ok
+test execution::tests::explicit_open_refuses_insufficient_in_flight_memory ... ok
+test package::content_types::tests::adds_overrides_without_normalizing_unrelated_manifest_bytes ... ok
+test package::content_types::tests::borrowed_content_types_plan_expands_prefixed_empty_root_and_rejects_one_under ... ok
+test package::content_types::tests::borrowed_content_types_plan_rejects_retained_override_duplicate_but_allows_selected_replacement ... ok
+test package::content_types::tests::borrowed_content_types_plan_reports_exact_mixed_output_and_removes_default ... ok
+test package::content_types::tests::default_empty_root_exact_cap_and_one_under_fail_before_output_allocation ... ok
+test execution::tests::explicit_owned_open_retains_exact_source_authorization ... ok
+test package::content_types::tests::expands_self_closing_types_and_batches_overrides_as_one_root ... ok
+test package::content_types::tests::default_removal_selector_collapses_xml_token_whitespace_but_preserves_nbsp ... ok
+test package::content_types::tests::self_closing_types_preserve_trailing_lexical_members ... ok
+test package::content_types::tests::removes_part_and_relationship_overrides_without_losing_lexical_context ... ok
+test package::compressed_transfer::tests::a_stored_member_stays_stored_and_drops_source_descriptor_timestamp_and_extras ... ok
+test package::compressed_transfer::tests::a_zip64_framed_member_transfers_with_fresh_zip32_framing ... ok
+test package::compressed_transfer::tests::a_member_padded_with_empty_stored_blocks_is_not_eligible ... ok
+test package::content_types::tests::matches_case_insensitive_part_names_and_refuses_nonempty_overrides ... ok
+test package::content_types::tests::prefixed_empty_root_exact_cap_preserves_prefix_and_typed_readback ... ok
+test package::content_types::tests::preserves_a_prefixed_types_namespace_when_batching_overrides ... ok
+test atomic::tests::staged_writes_reach_the_destination_in_order ... ok
+test package::compressed_transfer::tests::members_whose_names_normalize_to_one_name_are_refused_at_open ... ok
+test package::compressed_transfer::tests::a_refused_decode_index_is_not_taken_for_a_verdict_about_the_bytes ... ok
+test package::content_types::tests::many_small_overrides_use_exact_escaped_cap_without_selector_overcharge ... ok
+test package::compressed_transfer::tests::the_admitted_read_limits_are_reported_while_the_source_archive_is_retained ... ok
+test package::payload_reuse_tests::custom_donor_cannot_claim_an_arc_inconsistent_with_its_visible_payload ... ok
+test package::payload_reuse_tests::malformed_reuse_input_keeps_the_typed_zip_error ... ok
+test package::compressed_transfer::tests::a_corrupt_compressed_stream_is_refused_with_a_typed_error ... ok
+test package::payload_reuse_tests::custom_donor_blob_arc_cannot_inject_payload_bytes ... ok
+test package::payload_reuse_tests::input_limit_is_refused_before_donor_payload_callbacks ... ok
+test package::compressed_transfer::tests::a_capture_that_does_not_decode_to_the_payload_is_refused ... ok
+test package::compressed_transfer::tests::a_data_descriptor_that_disagrees_is_refused ... ok
+test package::relationships::tests::canonical_relationship_plan_defers_source_less_xml_and_honors_exact_caps ... ok
+test package::compressed_transfer::tests::a_local_header_that_disagrees_with_its_central_record_is_not_eligible ... ok
+test package::relationships::tests::relationship_batch_removal_keeps_absent_member_presence_on_noop ... ok
+test package::compressed_transfer::tests::bytes_after_the_final_block_disprove_the_capture_deterministically ... ok
+test package::compressed_transfer::tests::signed_packages_are_ineligible_and_refused_by_policy ... ok
+test package::relationships::tests::borrowed_relationship_plan_expands_prefixed_empty_root_and_honors_exact_cap ... ok
+test execution::tests::explicit_opens_match_serial_parts_deterministically ... ok
+test package::relationships::tests::borrowed_relationship_plan_reports_exact_mixed_output_and_preserves_prefix ... ok
+test package::relationships::tests::empty_relationship_batch_enforces_requested_output_limit ... ok
+test package::relationships::tests::relationship_batch_expands_empty_root_without_dropping_trailing_members ... ok
+test package::relationships::tests::relationship_chunks_escape_each_field_without_changing_utf8 ... ok
+test package::relationships::tests::relationship_batch_removal_missing_duplicate_and_empty_batches_are_bounded_noops ... ok
+test package::compressed_transfer::tests::a_crc_mismatch_is_refused_with_a_typed_error ... ok
+test package::relationships::tests::bounded_relationship_capture_checks_retained_and_authored_quotas ... ok
+test package::compressed_transfer::tests::a_transferred_part_that_replaces_a_source_member_is_regenerated_from_its_capture ... ok
+test package::compressed_transfer::tests::a_caller_defined_part_is_not_built_in ... ok
+test package::tests::bounded_package_constructors_reject_oversized_input ... ok
+test package::payload_reuse_tests::reused_payloads_isolate_donor_output_and_clone_mutations ... ok
+test package::relationships::tests::relationship_batch_append_copies_source_once_and_keeps_comments ... ok
+test package::tests::content_types_source_rejects_unused_relationship_override ... ok
+test package::payload_reuse_tests::matching_binary_and_xml_payloads_share_all_owned_views_and_target_output ... ok
+test package::relationships::tests::relationship_batch_removal_preserves_pi_comments_namespaces_and_paired_tags ... ok
+test package::payload_reuse_tests::mismatched_bytes_and_larger_donor_capacity_keep_decoded_payload ... ok
+test package::tests::bounded_content_types_capture_checks_retained_and_authored_quota_boundaries ... ok
+test package::tests::candidate_signature_policy_checks_source_provenance_and_disposition ... ok
+test package::tests::every_durability_level_publishes_the_exact_source_and_keeps_its_authorization ... ok
+test package::relationships::tests::bounded_relationship_replacement_checks_token_before_mutation ... ok
+test package::tests::clone_shares_owned_source_but_revocation_is_independent ... ok
+test package::tests::font_embedding_policy_has_only_three_valid_states ... ok
+test package::relationships::tests::relationship_append_accepts_exact_final_size_for_paired_and_empty_roots ... ok
+test package::tests::authored_content_types_token_is_deterministic_without_source_manifest ... ok
+test package::tests::owned_constructors_check_input_limit_before_zip_validation ... ok
+test package::relationships::tests::relationship_tokens_reject_lexically_stale_sources_and_different_owners ... ok
+test package::compressed_transfer::tests::ineligible_parts_are_classified_without_decoding_and_refused_by_type ... ok
+test package::tests::exact_source_sha256_memo_is_bound_to_its_archive ... ok
+test package::relationships::tests::relationship_tokens_preserve_empty_member_presence_and_refuse_signed_changes ... ok
+test package::tests::bounded_content_types_replacement_checks_token_before_mutation ... ok
+test package::tests::moves_owned_archive_into_package_reader ... ok
+test package::tests::batch_source_token_replacement_preserves_absent_relationship_member ... ok
+test package::tests::mutable_api_entries_revoke_owned_source_even_on_failure_or_noop ... ok
+test package::tests::owned_constructors_report_malformed_zip_after_bounded_read ... ok
+test package::tests::package_clone_shares_clean_payloads_and_detaches_mutation ... ok
+test package::tests::relationship_provenance_uses_empty_sentinel_and_exact_owned_bytes ... ok
+test package::tests::resolves_one_internal_strict_main_document_part ... ok
+test package::tests::content_types_source_token_restores_removed_override_after_reopen ... ok
+test package::tests::exact_source_sha256_is_the_digest_of_the_published_bytes ... ok
+test package::tests::signature_detection_covers_orphans_and_relationship_targets ... ok
+test package::tests::owned_constructors_preserve_mixed_storage_and_exact_source ... ok
+test package::compressed_transfer::tests::the_transfer_rechecks_the_read_limits_the_archive_was_admitted_under ... ok
+test package::relationships::tests::source_relationship_plan_tracks_changed_new_empty_and_mixed_case_owners ... ok
+test package::tests::content_types_source_retains_existing_relationship_overrides_after_unrelated_edit ... ok
+test package::compressed_transfer::tests::a_capture_is_framed_only_for_the_allocation_it_was_verified_against ... ok
+test package::relationships::tests::source_relationship_plan_reports_retained_comments_and_exact_caps ... ok
+test package::tests::part_relationship_mutation_retains_signature_policy_tracking ... ok
+test package::tests::relationship_and_option_mutable_apis_revoke_owned_source ... ok
+test package::compressed_transfer::tests::an_eager_owned_package_issues_the_same_capture_as_a_deferred_one ... ok
+test package::tests::source_xml_provenance_requires_the_ingress_allocation ... ok
+test package::tests::test_main_document_part ... ok
+test package::tests::removing_origin_relationship_does_not_bypass_signature_detection ... ok
+test package::tests::package_retains_ingress_limits_through_clone_and_edits ... ok
+test package::tests::try_add_part_rejects_conflicts_without_replacing_the_original ... ok
+test packuri::tests::detects_equivalent_and_derived_part_names ... ok
+test packuri::tests::test_base_uri ... ok
+test packuri::tests::resolves_internal_targets_without_allowing_root_escape ... ok
+test packuri::tests::rejects_ambiguous_or_noncanonical_part_names ... ok
+test packuri::tests::test_ext ... ok
+test packuri::tests::test_filename ... ok
+test packuri::tests::test_idx ... ok
+test packuri::tests::test_packuri_new ... ok
+test part::tests::test_is_xml_content_type ... ok
+test part::tests::test_xml_part ... ok
+test packuri::tests::test_membername ... ok
+test phys_pkg::tests::bounded_ingress_rejects_before_zip_parsing ... ok
+test part::tests::extract_text_ignores_self_closing_targets_and_nested_elements ... ok
+test part::tests::part_factory_shared_load_preserves_allocation_for_xml_and_binary ... ok
+test phys_pkg::tests::generated_opc_plan_checks_descriptor_budget_before_name_allocations ... ok
+test part::tests::test_blob_part ... ok
+test part::tests::blob_part_new_shared_preserves_allocation ... ok
+test phys_pkg::tests::generated_opc_plan_refuses_wrong_name_before_output_and_requires_completion ... ok
+test phys_pkg::tests::dedicated_xml_reads_do_not_consume_generic_part_budgets ... ok
+test phys_pkg::tests::generated_opc_plan_validates_pack_uri_literals_and_index_endpoints ... ok
+test phys_pkg::tests::corrupt_present_parts_stay_zip_errors_and_bulk_reads_do_not_hide_them ... ok
+test phys_pkg::tests::metadata_spool_append_failure_wraps_prior_output_progress ... ok
+test phys_pkg::tests::metadata_spool_failure_retains_source_and_partial_output_progress ... ok
+test phys_pkg::tests::corrupt_parallel_read_releases_part_count_and_byte_reservations ... ok
+test phys_pkg::tests::metadata_spool_limit_maps_to_typed_opc_error ... ok
+test package::tests::test_open_package ... ok
+test phys_pkg::tests::maps_zip_member_limit_to_opc_resource ... ok
+test phys_pkg::tests::metadata_spool_preflight_after_prior_output_wraps_limit ... ok
+test phys_pkg::tests::owned_borrowed_readers_share_part_materialization_budget ... ok
+test phys_pkg::tests::owned_part_writer_reports_typed_partial_progress ... ok
+test package::tests::relationship_source_at_raw_limit_does_not_use_expanding_canonical_cache ... ok
+test package::tests::shared_ingress_matches_owned_ingress_without_copying ... ok
+test phys_pkg::tests::part_materializations_enforce_exact_max_parts_bound ... ok
+test phys_pkg::tests::owned_part_name_conflict_is_rejected_before_local_header_output ... ok
+test phys_pkg::tests::public_owned_reader_still_validates_zip_at_construction ... ok
+test package::compressed_transfer::tests::the_full_writer_still_publishes_a_transferred_part_from_its_decoded_bytes ... ok
+test phys_pkg::tests::post_materialization_failure_releases_its_declared_reservation ... ok
+test phys_pkg::tests::target_limit_cannot_exceed_the_universal_xml_attribute_limit ... ok
+test phys_pkg::tests::part_reads_enforce_declared_per_part_and_total_budgets ... ok
+test phys_pkg::tests::generated_opc_plan_translates_absolute_names_and_all_routes ... ok
+test phys_pkg::tests::sequential_part_materializations_charge_distinct_and_repeated_uris ... ok
+test pkgreader::physical_part_tests::recognizes_only_reserved_relationship_members ... ok
+test phys_pkg::tests::relationship_reads_share_count_and_byte_budgets_without_charging_failures ... ok
+test phys_pkg::tests::physical_writer_rejects_duplicate_equivalent_and_derived_names ... ok
+test pkgreader::tests::eager_declared_part_preflight_rejects_before_bulk_reader_invocation ... ok
+test phys_pkg::tests::metadata_spool_preserves_bytes_and_reopens ... ok
+test pkgreader::tests::package_rejects_multiple_core_properties_relationships ... ok
+test pkgreader::tests::missing_relationship_parts_are_optional_but_malformed_xml_is_not ... ok
+test pkgreader::tests::eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads ... ok
+test phys_pkg::tests::test_multiple_parts ... ok
+test pkgreader::tests::corrupt_required_parts_report_zip_errors ... ok
+test pkgreader::tests::invalid_internal_relationship_targets_are_rejected ... ok
+test phys_pkg::tests::parallel_result_reservation_rejects_capacity_overflow_without_allocating ... ok
+test phys_pkg::tests::metadata_spool_preserves_duplicate_equivalent_and_derived_refusals ... ok
+test pkgreader::tests::eager_serialized_parts_preserve_mixed_storage_and_shared_identity ... ok
+test phys_pkg::tests::repeated_single_item_parallel_batches_charge_max_parts ... ok
+test phys_pkg::tests::parallel_part_reads_are_exact_or_fail_without_partial_results ... ok
+test phys_pkg::tests::test_round_trip ... ok
+test pkgreader::tests::public_reader_probe_rejects_overreported_reads_without_panicking ... ok
+test phys_pkg::tests::owned_part_writer_streams_and_recovers_the_physical_writer ... ok
+test pkgreader::tests::rejects_equivalent_and_derived_physical_part_names ... ok
+test package::compressed_transfer::tests::the_transfer_capture_never_captures_a_disagreeing_descriptor ... ok
+test pkgreader::tests::relationship_metrics_follow_trimmed_ingress_event_policy ... ok
+test pkgreader::tests::relationships_manifest_requires_schema_root_and_direct_children ... ok
+test pkgreader::tests::rejects_apache_poi_derived_part_name_fixture ... ok
+test pkgreader::tests::relationship_targets_preserve_fragments_and_typed_modes ... ok
+test pkgreader::tests::relationships_require_attributes_ids_and_exact_target_modes ... ok
+test pkgreader::tests::read_limits_bound_physical_and_retained_parts_before_parallel_loading ... ok
+test pkgreader::tests::structural_member_uses_owned_fallback_for_indexed_archive ... ok
+test pkgreader::tests::test_content_type_map ... ok
+test pkgreader::physical_part_tests::eager_serialized_parts_retain_archive_payload_allocation ... ok
+test pkgreader::tests::structural_member_keeps_stored_payload_borrowed ... ok
+test pkgreader::tests::rejects_poi_relationships_entity_fixture ... ok
+test pkgwriter::tests::authored_content_type_quota_precedes_oversized_value_retention ... ok
+test pkgwriter::tests::bounded_authored_content_types_match_legacy_bytes_and_exact_limits ... ok
+test pkgreader::tests::structural_member_reuses_lazy_shared_decompression_allocation ... ok
+test pkgreader::tests::read_limits_bound_relationship_resources_at_exact_boundaries ... ok
+test pkgwriter::tests::incomplete_stream_errors_report_accepted_bytes ... ok
+test pkgreader::physical_part_tests::preserves_unreferenced_physical_part_across_round_trip ... ok
+test pkgwriter::tests::incomplete_exact_source_stream_reports_accepted_bytes ... ok
+test pkgwriter::tests::generic_signature_infrastructure_removal_stays_policy_gated ... ok
+test pkgwriter::tests::changed_owned_signed_source_refuses_before_output ... ok
+test pkgreader::tests::serial_eager_payload_error_precedes_later_relationship_error_and_preflight ... ok
+test pkgwriter::tests::exact_source_xml_bytes_may_remain_opaque ... ok
+test pkgwriter::tests::override_selector_quota_precedes_invalid_content_type_parsing ... ok
+test pkgwriter::tests::owned_source_round_trips_exactly_to_bytes_and_stream ... ok
+test pkgwriter::tests::open_and_reader_retain_owned_source_but_borrowed_bytes_do_not ... ok
+test pkgwriter::tests::filesystem_write_replaces_only_with_a_finalized_package ... ok
+test pkgwriter::tests::adding_a_part_still_rebuilds_the_content_types_manifest ... ok
+test pkgreader::tests::a_session_is_kept_only_for_packages_above_the_member_threshold ... ok
+test pkgwriter::tests::a_relationship_collection_moved_between_parts_cannot_reuse_its_proof ... ok
+test pkgwriter::tests::every_member_this_writer_authors_is_compact ... ok
+test pkgwriter::tests::invalid_packages_never_replace_an_existing_artifact ... ok
+test pkgwriter::tests::part_edit_revokes_exact_source_and_republishes_edited_package ... ok
+test pkgwriter::tests::exact_source_streaming_respects_the_64_kib_chunk_bound ... ok
+test pkgwriter::tests::publication_plan_failure_leaves_sequential_sink_untouched ... ok
+test pkgwriter::tests::rejects_invalid_part_content_type_before_writing ... ok
+test pkgwriter::tests::targeted_output_entry_count_checks_checked_arithmetic ... ok
+test pkgwriter::tests::refuses_malformed_authored_xml_bytes_before_publication ... ok
+test package::relationships::tests::relationship_removal_round_trip_preserves_context_and_restores_source_xml ... ok
+test pkgwriter::tests::package_relationship_changes_still_regenerate_the_package_member ... ok
+test pkgwriter::tests::test_content_types_xml ... ok
+test pkgwriter::tests::real_package_enumeration_covers_all_xml_bearing_members ... ok
+test pkgwriter::tests::revoked_part_mutation_preserves_explicit_empty_relationship_member ... ok
+test pkgwriter::tests::borrowed_ingress_preserves_relationship_xml_and_invalidates_changed_edges ... ok
+test pkgwriter::tests::removing_a_part_still_rebuilds_the_content_types_manifest ... ok
+test pkgwriter::tests::replacement_with_identical_edges_uses_its_own_relationship_xml ... ok
+test pkgwriter::tests::a_pristine_relationships_proof_publishes_what_the_byte_compare_publishes ... ok
+test pkgwriter::tests::publishes_every_noncompact_spelling_the_authored_contract_refuses ... ok
+test pkgwriter::tests::replaced_content_types_token_is_published_on_every_route ... ok
+test pkgreader::tests::preserves_poi_special_relationship_targets_across_round_trip ... ok
+test package::compressed_transfer::tests::replacing_or_retyping_a_transferred_part_discards_its_capture ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_prefix_conflict ... ok
+test pkgwriter::tests::topology_add_rejects_relationship_member_prefix_conflict ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_derived_relationship_name_conflict ... ok
+test package::compressed_transfer::tests::a_deflated_member_transfers_its_exact_compressed_span_in_fresh_sized_framing ... ok
+test pkgwriter::tests::topology_add_rejects_part_descending_from_existing_relationship_member ... ok
+test phys_pkg::tests::total_archive_entry_limit_includes_directory_records ... ok
+test pkgwriter::tests::replacing_relationship_owner_does_not_inherit_old_member_provenance ... ok
+test prepared::tests::prepared_source_matches_the_declared_content_type_case_insensitively ... ok
+test prepared::tests::prepared_source_refuses_a_blank_content_type ... ok
+test prepared::tests::prepared_source_refuses_a_changed_source_before_reporting_a_version ... ok
+test prepared::tests::prepared_source_refuses_a_content_type_the_package_does_not_declare ... ok
+test rel::tests::canonical_chunk_visitor_stops_on_consumer_failure ... ok
+test rel::tests::a_captured_serialization_matches_what_publication_would_write ... ok
+test pkgwriter::tests::untouched_borrowed_signed_source_refuses_without_exact_bytes ... ok
+test rel::tests::canonical_chunks_match_serialization_without_collecting_output ... ok
+test rel::tests::establishing_nothing_keeps_the_open_time_capture ... ok
+test prepared::tests::prepared_source_refuses_adoption_after_the_source_revision_changes ... ok
+test rel::tests::every_value_mutation_drops_the_open_time_capture ... ok
+test rel::tests::fallible_insertion_never_replaces_a_duplicate_id ... ok
+test rel::tests::fallible_relationship_xml_is_deterministic_across_insertion_order ... ok
+test rel::tests::fallible_relationship_xml_preserves_empty_output ... ok
+test rel::tests::fallible_relationship_xml_matches_the_canonical_literal ... ok
+test rel::tests::target_components_are_preserved_while_the_path_resolves ... ok
+test rel::tests::test_get_or_add ... ok
+test rel::tests::test_next_r_id ... ok
+test rel::tests::test_relationship_creation ... ok
+test prepared::tests::prepared_source_reports_the_live_revision_while_the_source_is_stable ... ok
+test prepared::tests::prepared_source_retains_the_validated_main_part_content_type ... ok
+test pkgwriter::tests::topology_add_with_unknown_non_part_refuses_normalization ... ok
+test pkgwriter::tests::targeted_save_preserves_comments_extras_descriptors_order_and_non_parts ... ok
+test sign::tests::rejects_spoofs_duplicates_and_keeps_failed_edits_atomic ... ok
+test sign::tests::safe_default_rejects_fixture_sha1 ... ok
+test rel::tests::sized_relationship_xml_matches_large_mixed_escaped_owner ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_checks_cancellation_before_callback_and_releases_memory ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_does_not_admit_payload_to_part_cache ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_enforces_part_limit_before_callback ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_managed_accounting_is_precise_and_not_cached ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_preserves_typed_source_change_transport_error ... ok
+test source_backed::content_types_plan::tests::empty_root_without_changes_is_an_exact_noop ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_returns_custom_callback_error_after_verification ... ok
+test source_backed::content_types_plan::tests::exact_final_byte_cap_is_admitted_before_materialization ... ok
+test source_backed::content_types_plan::tests::plan_expands_self_closing_root_before_output_allocation ... ok
+test source_backed::content_types_plan::tests::plan_rejects_unknown_direct_children_instead_of_counting_them ... ok
+test source_backed::content_types_plan::tests::prefixed_root_uses_same_qname_for_inserted_override ... ok
+test source_backed::content_types_plan::tests::plan_reports_exact_lexical_output_before_materialization ... ok
+test source_backed::content_types_plan::tests::prefixed_self_closing_root_expands_with_prefixed_close ... ok
+test source_backed::read_ahead::structural_run_tests::a_run_covers_the_union_of_its_members_spans_with_no_hole ... ok
+test source_backed::read_ahead::structural_run_tests::a_single_member_run_is_not_admitted ... ok
+test source_backed::read_ahead::structural_run_tests::adjoining_spans_join_one_run_and_a_gap_starts_another ... ok
+test source_backed::read_ahead::structural_run_tests::admission_stops_at_the_retained_ceiling ... ok
+test source_backed::read_ahead::structural_run_tests::an_empty_member_list_admits_nothing ... ok
+test source_backed::read_ahead::structural_run_tests::a_run_above_the_single_read_ceiling_is_dropped ... ok
+test source_backed::read_ahead::structural_run_tests::spans_out_of_order_admit_nothing ... ok
+test source_backed::read_ahead::structural_run_tests::runs_are_disjoint_and_strictly_increasing ... ok
+test sign::tests::verifies_certificate_from_a_related_der_part ... ok
+test source_backed::read_ahead::tests::already_cancelled_managed_waiter_does_not_wait_for_a_blocked_fill ... ok
+test source_backed::read_ahead::tests::empty_and_eof_reads_do_not_call_provider_or_retain_zero_returns ... ok
+test source_backed::read_ahead::tests::concurrent_forward_readers_share_one_fill_and_transition_does_not_deadlock ... ok
+test source_backed::read_ahead::tests::forward_fills_once_and_returns_a_positive_crossing_prefix ... ok
+test source_backed::read_ahead::tests::interrupted_read_consumes_work_and_cancellation_drops_publication ... ok
+test source_backed::read_ahead::tests::managed_fill_charges_accepted_bytes_and_releases_memory_on_transition ... ok
+test source_backed::read_ahead::tests::managed_input_budget_shrinks_the_physical_fill_and_stops_at_zero ... ok
+test source_backed::read_ahead::tests::memory_admission_failure_releases_reservation_and_empty_source_has_no_buffer ... ok
+test source_backed::read_ahead::tests::near_u64_maximum_ranges_use_checked_endpoints_and_preserve_sentinels ... ok
+test sign::tests::signed_package_survives_zip_round_trip ... ok
+test source_backed::read_ahead::tests::poisoned_state_is_recovered_when_exact_transition_drains_memory ... ok
+test source_backed::read_ahead::tests::policy_is_exact_by_default_and_rejects_unbounded_values ... ok
+test source_backed::read_ahead::tests::provider_diagnostics_callback_observes_retained_capacity_without_deadlock ... ok
+test source_backed::read_ahead::tests::short_and_zero_physical_returns_are_bounded_and_not_reused_past_end ... ok
+test source_backed::read_ahead::tests::source_change_invalidates_an_unmonitored_positive_window ... ok
+test source_backed::read_ahead::tests::provider_panic_repairs_fill_state_and_transition_releases_memory ... ok
+test source_backed::read_ahead::tests::version_callback_reentrancy_is_refused_before_recursive_source_callbacks ... ok
+test source_backed::read_session::tests::foreign_part_view_is_rejected_before_source_work ... ok
+test source_backed::read_session::tests::malformed_crc_and_size_failures_can_retry_without_publication ... ok
+test source_backed::read_session::tests::managed_deflate_quota_refusal_is_preflighted_and_keeps_session_cold ... ok
+test source_backed::read_session::tests::managed_session_cancellation_and_payload_handles_release_budget ... ok
+test source_backed::read_session::tests::unmanaged_session_reads_mixed_compression_and_cache_hits_are_free ... ok
+test source_backed::selected_part_stream_api_tests::execution_io_error_round_trips_through_source_mapping ... ok
+test source_backed::selected_part_stream_api_tests::output_accounting_overflow_is_deferred_until_finalization ... ok
+test source_backed::selected_part_stream_api_tests::selected_part_stream_api_is_sink_oriented ... ok
+test source_backed::read_session::tests::stale_source_is_refused_and_session_can_be_reused_after_freshness_restored ... ok
+test source_backed::source_xml_hint_tests::each_identity_and_policy_field_is_required_for_a_hint_hit ... ok
+test source_backed::source_xml_hint_tests::eligible_hint_comparison_consumes_its_bounded_work_charge ... ok
+test source_backed::source_xml_hint_tests::equal_bytes_in_a_distinct_allocation_still_take_the_hint_hit ... ok
+test source_backed::source_xml_hint_tests::original_bytes_are_checked_after_all_metadata_matches ... ok
+test source_backed::splice::tests::cancellation_with_pending_fragment_prefix_stays_typed ... ok
+test source_backed::splice::tests::candidate_xml_authorization_is_bound_to_proof_target_and_limits ... ok
+test source_backed::splice::tests::consumed_bytes_are_emitted_once_per_adapter_window ... ok
+test source_backed::splice::tests::finish_does_not_flush_after_recorded_failure ... ok
+test source_backed::splice::tests::initial_xml_audits_refuse_malformed_source_candidate_and_limits ... ok
+test source_backed::splice::tests::previously_verified_xml_mode_raw_drains_exact_candidate ... ok
+test source_backed::splice::tests::previously_verified_xml_raw_drain_retains_work_limit_prefix ... ok
+test source_backed::splice::tests::previously_verified_xml_replay_keeps_xml_admission_reservation ... ok
+test source_backed::splice::tests::replay_digest_catches_payload_mutation_at_window_boundary ... ok
+test source_backed::splice::tests::replay_faults_inside_second_callback_discard_retained_prefix ... ok
+test source_backed::splice::tests::replay_reader_overreport_is_rejected_before_buffer_use ... ok
+test sign::tests::compatibility_reports_partial_coverage_and_strict_rejects_it ... ok
+test source_backed::splice::tests::authored_payload_version_checks_are_bounded_and_digests_are_exact ... ok
+test source_backed::splice::tests::replay_retained_prefix_short_sink_is_not_flushed_twice ... ok
+test sign::tests::resource_limits_reject_hostile_signature_graphs_atomically ... ok
+test source_backed::splice::tests::replay_short_read_error_flushes_retained_prefix ... ok
+test source_backed::splice::tests::replay_work_failure_flushes_retained_prefix_before_typed_error ... ok
+test source_backed::splice::tests::short_replay_does_not_read_ahead_of_parser_consumption ... ok
+test source_backed::splice::tests::source_mutation_after_batched_sink_write_is_source_first ... ok
+test source_backed::splice::tests::short_sink_preserves_accepted_prefix_across_batched_windows ... ok
+test source_backed::splice::tests::short_replay_reads_fill_one_window_before_sink_output ... ok
+test source_backed::splice::tests::source_version_checks_are_bounded_by_adapter_windows ... ok
+test source_backed::splice::tests::work_limit_flushes_prior_consumed_fragment_prefix ... ok
+test source_backed::tests::a_changed_source_outranks_a_missing_part ... ok
+test source_backed::tests::a_completed_stream_stops_monitoring_later_positional_reads ... ok
+test source_backed::tests::a_nested_monitored_scope_does_not_end_the_scope_around_it ... ok
+test source_backed::tests::a_cold_part_read_keeps_its_complete_observation_bracket ... ok
+test pkgwriter::tests::every_structural_encoding_doctype_and_budget_refusal_survives_with_no_output ... ok
+test sign::tests::signs_resigns_and_unsigns_with_deterministic_names ... ok
+test source_backed::tests::a_stream_monitors_every_positional_read_it_takes ... ok
+test source_backed::tests::a_source_change_at_every_observation_of_a_cold_read_is_still_source_changed ... ok
+test source_backed::tests::a_warm_part_read_observes_the_source_twice ... ok
+test source_backed::tests::aggregate_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::borrowed_materialization_preserves_opaque_xml_like_eager_unmarshal ... ok
+test source_backed::tests::borrowed_materialization_preserves_source_and_matches_eager_graph ... ok
+test source_backed::tests::borrowed_materialization_rejects_cancellation_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_rejects_managed_package_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_rejects_source_changed_during_payload_and_keeps_no_partial_result ... ok
+test source_backed::tests::borrowed_materialization_rejects_stale_source_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_reports_malformed_payload_without_partial_result ... ok
+test source_backed::tests::borrowed_materialization_retains_cached_payload_allocation_after_source_drop ... ok
+test source_backed::tests::a_cancelled_scheduled_publication_publishes_nothing ... ok
+test source_backed::tests::borrowed_materialization_with_accounting_does_not_charge_preloaded_cache_hits ... ok
+test source_backed::tests::borrowed_signed_materialization_retains_publication_policy ... ok
+test source_backed::tests::cache_cleanup_is_exact_identity_scoped_and_late_success_cannot_resurrect ... ok
+test source_backed::tests::cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values ... ok
+test source_backed::tests::cache_hits_pin_payloads_and_failures_are_not_retained ... ok
+test source_backed::tests::cache_limits_reject_zero_bounds ... ok
+test source_backed::tests::canonical_relationship_length_matches_fallible_serializer ... ok
+test source_backed::tests::cancellation_takes_precedence_over_accounted_archive_failure_and_releases_flight ... ok
+test source_backed::tests::casefold_lookup_index_handles_unsorted_parts_without_changing_iteration_order ... ok
+test source_backed::tests::catalog_entry_id_resolves_to_the_same_payload_as_its_member_name ... ok
+test package::tests::bounded_content_types_checks_retained_provenance_before_fallback ... ok
+test source_backed::tests::checked_counter_delta_preserves_event_counts_without_gauge_subtraction ... ok
+test source_backed::tests::checked_counter_delta_rejects_a_regression ... ok
+test source_backed::tests::checked_counter_overflow_fails_closed_snapshot ... ok
+test source_backed::tests::catalog_reports_non_parts_and_conversion_matches_loaded_parts ... ok
+test source_backed::tests::combined_capture_provisional_failure_releases_cache_and_capture_reservations ... ok
+test source_backed::tests::combined_capture_and_ordinary_read_share_the_exact_loader_payload ... ok
+test source_backed::tests::consuming_materialization_rejects_managed_package_before_payload_reads ... ok
+test pkgwriter::tests::adding_relationship_member_to_existing_part_preserves_and_appends ... ok
+test source_backed::tests::consuming_materialization_retains_cached_payload_allocation ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_malformed_read_progress ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_source_change_read_progress ... ok
+test source_backed::tests::consuming_materialization_with_accounting_refuses_managed_package_before_reads ... ok
+test source_backed::tests::content_type_override_insertion_uses_the_parsed_root_close_span ... ok
+test source_backed::tests::consuming_materialization_with_accounting_reports_mixed_cold_payload_work ... ok
+test source_backed::tests::exact_source_publication_checks_one_fewer_version_per_copy_chunk ... ok
+test pkgwriter::tests::package_relationship_edit_regenerates_using_raw_source_name ... ok
+test source_backed::tests::managed_allocation_admission_bypass_returns_correct_bytes_without_retention ... ok
+test source_backed::tests::external_relationship_removal_overlay_changes_only_owner_and_rels_member ... ok
+test source_backed::read_ahead::tests::exact_transition_waits_for_a_gated_fill_and_future_reads_are_exact ... ok
+test source_backed::tests::managed_budget_rejects_before_payload_io_and_reports_content_free_failure ... ok
+test source_backed::tests::managed_cache_does_not_evict_externally_pinned_entry_and_bypasses_retention ... ok
+test pkgwriter::tests::revoked_noop_uses_preservation_copy_all ... ok
+test pkgwriter::tests::non_suffix_part_and_relationship_removals_preserve_retained_members ... ok
+test source_backed::tests::managed_cache_eviction_releases_unpinned_reservation_before_next_read ... ok
+test source_backed::tests::managed_cache_reserves_declared_payload_and_releases_on_package_drop ... ok
+test source_backed::tests::managed_cache_respects_hierarchical_parent_memory_limit ... ok
+test source_backed::tests::managed_cancellation_after_decompression_prevents_publication ... ok
+test source_backed::tests::managed_cache_hit_honors_cancellation_without_releasing_cached_budget ... ok
+test source_backed::tests::managed_constructor_honors_pre_cancellation_without_source_reads ... ok
+test source_backed::tests::managed_cancellation_between_cache_admission_and_source_read_is_typed ... ok
+test source_backed::tests::managed_cancellation_before_preservation_source_read_is_typed ... ok
+test source_backed::tests::external_relationship_removal_overlay_refuses_ids_and_limits_before_output ... ok
+test pkgwriter::tests::appended_suffix_removal_restores_exact_source_bytes ... ok
+test source_backed::tests::managed_cumulative_output_retry_exhaustion_refuses_second_exact_publication ... ok
+test source_backed::tests::managed_changed_overlay_charges_exact_accepted_output_bytes ... ok
+test pkgwriter::tests::projected_zip64_descriptor_targeted_save_preserves_untouched_member ... ok
+test source_backed::tests::managed_exact_output_limit_accepts_exact_small_artifact ... ok
+test source_backed::tests::managed_failed_cold_load_consumes_work_and_input_but_releases_retained_objects ... ok
+test source_backed::tests::managed_exact_noop_overlay_charges_physical_output_bytes ... ok
+test source_backed::tests::managed_exact_noop_refuses_the_first_output_write_at_zero_limit ... ok
+test source_backed::tests::managed_exact_output_limit_one_under_refuses_before_small_artifact_output ... ok
+test source_backed::tests::managed_exact_publication_refuses_memory_window_before_output_and_releases ... ok
+test source_backed::tests::managed_input_budget_refusal_counts_only_the_terminal_read_reservation ... ok
+test source_backed::tests::managed_flush_failure_reports_exact_output_charge_as_incomplete ... ok
+test source_backed::tests::managed_input_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_open_checks_cancellation_after_indexing_before_catalog_publication ... ok
+test source_backed::tests::managed_object_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::managed_input_bytes_are_exact_for_chunked_reads_and_cache_hits_are_free ... ok
+test pkgwriter::tests::targeted_relationship_and_content_type_changes_regenerate_only_their_closure ... ok
+test source_backed::tests::managed_output_charge_reaches_hierarchical_parent_and_child_budgets ... ok
+test source_backed::tests::managed_failed_loader_releases_reservations_before_waiter_retry ... ok
+test source_backed::tests::managed_output_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_large_exact_publication_refuses_mid_stream_with_exact_partial_charge ... ok
+test source_backed::tests::managed_overreporting_sink_does_not_commit_output_budget ... ok
+test source_backed::tests::managed_oversized_bypass_releases_comparison_memory_before_exact_publication ... ok
+test source_backed::tests::managed_partial_sink_failure_commits_only_accepted_output_bytes ... ok
+test source_backed::tests::managed_sibling_caches_compete_for_parent_memory_before_payload_io ... ok
+test source_backed::tests::managed_publication_checks_before_output_and_between_copy_chunks ... ok
+test pkgwriter::tests::unsupported_prefixed_source_refuses_normalization_before_output ... ok
+test source_backed::tests::managed_short_interrupted_source_copy_charges_only_accepted_bytes ... ok
+test source_backed::tests::managed_source_change_drops_reservation_and_does_not_retain_payload ... ok
+test source_backed::tests::managed_work_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::managed_source_change_after_accepted_output_preserves_partial_accounting ... ok
+test source_backed::tests::mandatory_xml_is_opened_but_ordinary_payload_corruption_is_deferred ... ok
+test source_backed::tests::normal_open_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::multi_part_overlay_all_noop_preserves_signed_source_identity ... ok
+test source_backed::tests::multi_part_overlay_checks_set_bounds_duplicates_and_aggregate_limits ... ok
+test pkgwriter::tests::unsupported_owned_source_revoked_noop_refuses_before_output ... ok
+test source_backed::tests::multi_part_overlay_changes_only_selected_raw_members_and_reopens ... ok
+test pkgwriter::tests::topology_part_add_preserves_source_and_appends_deterministic_members ... ok
+test pkgwriter::tests::trailing_source_bytes_refuse_normalization_before_targeted_preservation ... ok
+test pkgwriter::tests::zip64_targeted_stream_failure_reports_partial_output ... ok
+test source_backed::tests::one_part_overlay_enforces_replacement_limits_without_output ... ok
+test source_backed::tests::one_part_overlay_bounds_writes_and_reports_partial_sink_failure ... ok
+test source_backed::tests::one_part_overlay_refuses_unsupported_physical_layout_before_output ... ok
+test source_backed::tests::one_part_overlay_exact_noop_preserves_every_source_byte ... ok
+test source_backed::tests::ordered_source_reads_refuse_zero_io_before_payload_reads ... ok
+test source_backed::tests::ordered_source_reads_use_caller_facility_and_preserve_order ... ok
+test source_backed::tests::one_part_overlay_reports_source_changes_before_and_during_output ... ok
+test source_backed::tests::one_part_overlay_raw_copies_every_unselected_member_and_reopens ... ok
+test source_backed::tests::one_part_overlay_rejects_invalid_xml_and_signed_changes_before_output ... ok
+test source_backed::tests::part_lookup_prefers_exact_names_and_matches_ascii_case_insensitive_targets ... ok
+test source_backed::tests::owned_bytes_open_keeps_ordinary_payloads_deferred ... ok
+test source_backed::tests::ordered_serial_read_failure_releases_worker_and_io_admissions ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_flight_guard ... ok
+test source_backed::tests::part_view_declared_size_is_metadata_only ... ok
+test source_backed::tests::performance_diagnostics_cache_and_flight_scopes_are_reported ... ok
+test pkgwriter::tests::zip64_source_targeted_save_preserves_untouched_records_and_tail ... ok
+test source_backed::tests::part_view_declared_size_checks_source_and_cancellation ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_does_not_abandon_loader_flight ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_guard_and_cache_recovers ... ok
+test source_backed::tests::multi_part_relationship_removal_checks_combined_part_and_archive_totals ... ok
+test source_backed::tests::performance_diagnostics_reentrancy_contract_refuses_before_lock ... ok
+test source_backed::tests::performance_diagnostics_failure_retry_and_cancellation_are_balanced ... ok
+test source_backed::tests::overlay_mixed_storage_has_semantic_parity_and_managed_cold_work ... ok
+test source_backed::tests::performance_diagnostics_poison_preserves_error_and_event_pair ... ok
+test source_backed::tests::performance_diagnostics_started_nested_publication_flight_panic_recovers ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_snapshot ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_through_wrapper ... ok
+test source_backed::tests::performance_diagnostics_started_panic_has_no_finished_and_cache_recovers ... ok
+test source_backed::tests::prepared_topology_empty_plan_keeps_exact_source_fast_path_without_candidate ... ok
+test source_backed::tests::performance_diagnostics_same_part_loader_and_waiter_are_balanced ... ok
+test source_backed::tests::provisional_publication_cancellation_rolls_back_everything ... ok
+test source_backed::tests::preservation_index_propagates_typed_limit_allocation_and_io_errors ... ok
+test source_backed::tests::performance_diagnostics_uncontended_hit_reports_only_cache_lock ... ok
+test source_backed::tests::shared_overlay_preserves_duplicate_and_limit_refusals_before_output ... ok
+test source_backed::tests::prepared_topology_removal_updates_effective_membership_and_content_types ... ok
+test source_backed::tests::shared_overlay_reports_partial_sink_failure_with_bounded_writes ... ok
+test source_backed::tests::prepared_topology_stale_fence_rejects_readback_and_publication_before_output ... ok
+test source_backed::tests::source_artifact_copy_rejects_overreporting_sink_without_false_progress ... ok
+test source_backed::tests::provisional_publication_source_change_rolls_back_everything ... ok
+test source_backed::tests::source_artifact_paths_reject_overreported_read_counts_without_output ... ok
+test source_backed::tests::source_backed_catalog_enforces_part_limits_during_ordered_admission ... ok
+test source_backed::tests::prepared_topology_exposes_complete_effective_graph_and_publishes_same_overlays ... ok
+test source_backed::tests::retained_gauge_aggregation_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_relationship_typing_and_non_parts ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_max_parts_error ... ok
+test source_backed::tests::source_catalog_still_rejects_case_equivalent_part_names ... ok
+test sign::tests::verifies_real_poi_and_microsoft_office_fixtures ... ok
+test source_backed::tests::shared_single_overlay_matches_vec_changed_and_signed_noop_publication ... ok
+test source_backed::tests::shared_multi_overlay_matches_vec_and_reopens ... ok
+test source_backed::tests::source_content_types_handle_charges_work_and_releases_memory_on_drop ... ok
+test source_backed::tests::source_content_types_handle_checks_caller_limit_before_budget_charge ... ok
+test source_backed::tests::performance_diagnostics_started_flight_panic_does_not_strand_waiter ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_derived_or_equivalent_conflicts ... ok
+test source_backed::tests::source_content_types_handle_checks_cancellation_before_read ... ok
+test source_backed::tests::source_relationship_handle_absence_is_fenced_without_budget_charge ... ok
+test source_backed::tests::source_relationship_handle_charges_work_and_releases_memory_on_drop ... ok
+test source_backed::tests::source_relationship_handle_checks_cancellation_before_read ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_part_admission ... ok
+test source_backed::tests::topology_add_part_shared_reuses_payload_and_matches_add_validation ... ok
+test source_backed::tests::source_content_types_handle_releases_reservations_when_source_changes_during_read ... ok
+test source_backed::tests::source_change_takes_precedence_over_archive_failure_and_releases_flight ... ok
+test source_backed::tests::source_backed_catalog_open_does_not_read_ordinary_payloads ... ok
+test source_backed::tests::source_changes_reject_metadata_cache_and_conversion_access ... ok
+test source_backed::tests::source_signature_query_is_metadata_only_and_conservative ... ok
+test source_backed::tests::topology_adds_external_relationship_with_exact_uri_reference ... ok
+test source_backed::tests::topology_add_part_inserts_lossless_content_type_override ... ok
+test source_backed::tests::topology_adds_package_relationship_to_new_part ... ok
+test source_backed::read_ahead::tests::managed_waiter_polls_cancellation_while_fill_remains_blocked ... ok
+test source_backed::tests::topology_appends_default_namespace_noncanonical_relationships_losslessly ... ok
+test source_backed::tests::provisional_publication_waiter_joins_and_stable_hit_reuses_allocation ... ok
+test source_backed::tests::topology_appends_prefixed_noncanonical_relationships_losslessly_and_reopens ... ok
+test source_backed::tests::topology_canonical_relationship_publication_honors_tight_limit_before_output ... ok
+test source_backed::tests::topology_canonical_relationship_publication_honors_memory_admission ... ok
+test source_backed::tests::topology_changed_replacement_reads_source_payload_once ... ok
+test source_backed::tests::topology_exact_external_replacement_preserves_noncanonical_source ... ok
+test source_backed::tests::topology_external_wrappers_refuse_internal_relationships_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_cancellation ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_limits_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_replace_refuses_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_append_honors_memory_admission ... ok
+test source_backed::tests::topology_internal_replace_requires_and_preserves_internal_mode ... ok
+test source_backed::tests::topology_noncanonical_relationship_remove_last_keeps_empty_member_and_opaque_context ... ok
+test source_backed::tests::topology_noncanonical_relationship_unknown_markup_refuses_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_parser_rejects_dtd_namespace_and_root_forms ... ok
+test source_backed::tests::unmanaged_exact_source_publication_remains_unbudgeted ... ok
+test source_backed::tests::topology_signed_part_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::topology_signed_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::topology_noncanonical_relationship_remove_preserves_source_and_reopens ... ok
+test source_backed::tests::topology_source_xml_addition_rechecks_cancellation_after_initial_validation ... ok
+test source_backed::tests::validation_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_replaces_and_removes_external_relationships ... ok
+test source_backed::tests::topology_source_xml_addition_charges_one_xml_validation_pass ... ok
+test source_backed::tests::topology_noncanonical_relationship_inverse_add_retains_source_context ... ok
+test source_backed::tests::topology_relationship_publication_honors_configured_reopen_limits ... ok
+test xml_splice::owned::tests::bounded_owned_xml_capture_checks_member_name_and_fixed_size_before_xml ... ok
+test xml_splice::owned::tests::batched_attribute_updates_reject_ambiguous_spans_names_and_values ... ok
+test xml_splice::owned::tests::batched_attribute_updates_preserve_source_and_admit_exact_output_size ... ok
+test xml_splice::owned::tests::batched_element_updates_reject_overlaps_bad_targets_and_unowned_fragments ... ok
+test source_backed::tests::topology_source_xml_addition_rechecks_source_version_after_initial_validation ... ok
+test xml_splice::owned::tests::batched_element_updates_preserve_source_and_expand_empty_parents_once ... ok
+test source_backed::tests::zip64_one_part_overlay_preserves_raw_unknown_members_and_cold_work ... ok
+test source_backed::tests::validation_archive_index_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_zip64_add_remove_preserves_untouched_records_and_tail ... ok
+test source_backed::tests::try_cache_diagnostics_matches_compatibility_snapshot_when_healthy ... ok
+test xml_splice::owned::tests::bounded_owned_xml_capture_checks_part_quota_before_malformed_source ... ok
+test xml_splice::owned::tests::owned_xml_publication_obeys_signature_policy ... ok
+test xml_splice::owned::tests::child_sequences_reject_cross_parent_and_unowned_content ... ok
+test xml_splice::owned::tests::child_sequence_append_expands_empty_parent_and_enforces_exact_size ... ok
+test xml_splice::owned::tests::shared_xml_bytes_retain_allocation_without_exposing_token_mutation ... ok
+test xml_splice::owned::tests::child_sequences_preserve_parent_slots_and_retained_subtree_context ... ok
+test source_backed::tests::an_exhausted_cpu_task_budget_refuses_before_any_output_byte ... ok
+test xml_splice::publication_proof_tests::content_type_and_lineage_guards_precede_proof_reuse ... ok
+test xml_splice::publication_proof_tests::destination_identity_is_checked_for_replacements ... ok
+test xml_splice::owned::tests::owned_xml_inserts_attributes_without_rewriting_the_parent_tag ... ok
+test xml_splice::publication_proof_tests::different_limits_still_require_the_validator_memory_reservation ... ok
+test xml_splice::publication_proof_tests::equal_limit_proof_hit_needs_no_parser_memory_but_keeps_work_bounded ... ok
+test xml_splice::publication_proof_tests::equal_original_and_derived_proofs_cover_replacement_and_addition ... ok
+test pkgwriter::tests::targeted_partial_sink_failure_reports_accepted_bytes ... ok
+test xml_splice::owned::tests::owned_xml_element_edits_preserve_source_context_and_audit_new_markup ... ok
+test xml_splice::publication_proof_tests::proof_work_refusal_is_typed_and_does_not_partially_charge ... ok
+test pkgwriter::tests::targeted_part_mutation_raw_copies_every_other_member ... ok
+test xml_splice::tests::contextual_authored_audit_charges_depth_from_markup_shape ... ok
+test pkgwriter::tests::targeted_streaming_keeps_generated_writes_bounded ... ok
+test xml_splice::owned::tests::owned_xml_attribute_proof_preserves_ingress_and_supports_inverse_publication ... ok
+test xml_splice::tests::contextual_authored_audit_honors_cancellation_without_leaking_reservations ... ok
+test xml_splice::publication_proof_tests::source_revision_invalidates_a_previously_valid_publication_proof ... ok
+test xml_splice::tests::authored_classifier_keeps_compact_fast_path_and_requires_source_for_whitespace ... ok
+test xml_splice::tests::contextual_authored_audit_releases_temporary_resources_on_success_and_error ... ok
+test xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually ... ok
+test xml_splice::tests::insertion_and_replacement_ranges_touching_are_conflicts ... ok
+test xml_splice::tests::source_validator_allows_unprefixed_xml_and_utf8_declaration ... ok
+test xml_splice::publication_proof_tests::lower_xml_limits_take_the_full_validator_path ... ok
+test xml_splice::tests::source_validator_rejects_namespace_and_lexical_ambiguities ... ok
+test xml_splice::tests::contextual_authored_audit_rejects_low_memory_before_wrapper_allocation ... ok
+test source_backed::tests::managed_open_omits_casefold_lookup_index_and_keeps_linear_fallback ... ok
+test source_backed::tests::casefold_lookup_index_is_retained_at_measured_large_catalog_threshold ... ok
+test package::compressed_transfer::tests::an_incompressible_member_from_a_default_encoder_stays_eligible ... ok
+test source_backed::tests::a_caller_facility_runs_every_task_and_keeps_the_bytes ... ok
+test source_backed::tests::a_serial_scheduled_publication_reserves_no_worker_permits ... ok
+test source_backed::tests::concurrent_cold_reads_share_one_archive_load_and_one_arc ... ok
+test source_backed::tests::managed_same_part_waiters_share_one_reservation_and_flight ... ok
+test source_backed::tests::managed_waiter_cancellation_does_not_block_or_publish_loader_payload ... ok
+test xml_splice::owned::tests::owned_xml_proof_rejects_arbitrary_authored_bytes_and_attribute_injection ... ok
+test source_backed::tests::a_scheduled_publication_is_byte_identical_at_every_wave_width ... ok
+test source_backed::tests::multi_part_relationship_removal_has_exact_and_one_over_aggregate_bounds ... ok
+test pkgwriter::tests::streams_large_packages_to_a_non_seekable_bounded_chunk_sink ... ok
+test package::tests::ordinary_save_keeps_explicitly_admitted_large_content_types_source ... ok
+test pkgreader::tests::sessioned_structural_reads_match_one_shot_reads_across_the_ooxml_corpus ... ok
+test source_backed::tests::topology_add_at_zip32_entry_count_boundary_promotes_source_backed_source ... ok
+test package::relationships::tests::source_canonical_capture_rejects_the_fixed_owned_xml_ceiling_before_materialization ... ok
+test pkgwriter::tests::topology_add_at_zip32_entry_count_boundary_promotes_owned_source ... ok
+
+test result: ok. 608 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.71s
+
+     Running tests/byte_order_marked_parts.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/byte_order_marked_parts-537a10255ddd588e)
+
+running 5 tests
+test owned_xml_part_ranges_are_byte_ranges_of_marked_bytes ... ok
+test a_marked_malformed_replacement_is_refused_at_its_physical_offset ... ok
+test a_local_replacement_of_a_marked_part_publishes_like_the_unmarked_one ... ok
+test eager_round_trip_of_marked_manifests_matches_the_unmarked_round_trip ... ok
+test topology_publication_splices_marked_manifests_like_unmarked_ones ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/caller_xml_publication_audit.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/caller_xml_publication_audit-7925f2b1a202b981)
+
+running 5 tests
+test replaced_content_types_tokens_are_audited_before_installation ... ok
+test replaced_relationship_tokens_are_audited_before_installation ... ok
+test batch_source_tokens_are_audited_before_any_mutation ... ok
+test added_owned_xml_parts_are_audited_before_insertion ... ok
+test manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+
+     Running tests/digital_signatures.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/digital_signatures-a1bef6d8ee5a8df1)
+
+running 2 tests
+test digital_signature_mutable_opc_access_drops_stale_signatures ... ok
+test digital_signature_accessors_verify_real_microsoft_packages ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/external_zip64_source.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/external_zip64_source-32ba19bdd3c62d3e)
+
+running 1 test
+test independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member ... ignored, requires an independently generated corpus at LITCHI_0415_PYTHON_ZIP
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/forced_zip64_failures.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/forced_zip64_failures-4c549c6d783bae64)
+
+running 6 tests
+test forced_zip64_metadata_limit_rejects_source_before_catalog_publication ... ok
+test forced_zip64_overlay_part_limit_rejects_before_sink_output ... ok
+test forced_zip64_managed_cancellation_rejects_before_first_sink_write ... ok
+test forced_zip64_overlay_reports_partial_sequential_sink_failure ... ok
+test forced_zip64_managed_output_limit_rejects_before_first_sink_write ... ok
+test forced_zip64_overlay_reports_source_version_change_before_output_and_midstream ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/lazy_part_decode.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/lazy_part_decode-d2689423297f0a0d)
+
+running 5 tests
+test metadata_and_exact_noop_leave_owned_payloads_cold ... ok
+test part_metadata_separates_absence_from_a_failed_decode_without_decoding ... ok
+test fallible_access_decodes_only_the_selected_owned_part ... ok
+test batch_relationship_to_a_corrupt_present_part_targets_an_existing_part ... ok
+test failed_first_access_is_stable_and_never_becomes_an_empty_generated_part ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/metadata_edit_plans.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/metadata_edit_plans-d9d2b74b14e8962c)
+
+running 7 tests
+test new_owner_canonical_plan_reports_actual_output_before_materialization ... ok
+test content_type_default_selectors_use_only_xml_token_whitespace ... ok
+test content_type_plan_reports_exact_events_for_default_to_override_replacement ... ok
+test relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output ... ok
+test content_type_override_conflicts_are_refused_during_planning ... ok
+test mixed_relationship_plan_counts_removed_paired_tokens_and_preserves_unrelated_bytes ... ok
+test relationship_plan_admits_exact_events_before_materialization_for_all_root_forms ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/non_part_classification.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/non_part_classification-9edb6e2ca174092a)
+
+running 8 tests
+test rejects_multiple_case_equivalent_content_types_members ... ok
+test rejects_referenced_part_without_content_type_mapping ... ok
+test reports_unreferenced_untyped_member_without_losing_the_real_parts ... ok
+test accepts_the_content_types_stream_under_a_case_variant_name ... ok
+test a_part_resolves_when_its_stored_name_differs_only_by_case ... ok
+test reports_members_whose_names_cannot_denote_a_part ... ok
+test keeps_dangling_relationships_without_inventing_their_target_part ... ok
+test types_relationship_parts_from_the_reserved_name_but_rejects_contradictions ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/operation_accounting.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/operation_accounting-5c4956e55d075629)
+
+running 13 tests
+test crc_failure_keeps_the_cold_read_counters_and_does_not_cache ... ok
+test exact_source_publication_reports_actual_raw_and_output_acceptance ... ok
+test deflate_crc_failure_retains_accounting_and_retries_physical_work ... ok
+test exact_source_partial_sink_preserves_checked_progress ... ok
+test streaming_bypasses_cache_and_data_remains_cold ... ok
+test changed_overlay_partial_sink_keeps_raw_and_output_progress ... ok
+test repeated_streaming_repeats_physical_work_without_cache_hits ... ok
+test cold_stored_and_deflated_part_reads_are_accounted_but_cache_hits_are_not ... ok
+test streamed_partial_sink_preserves_physical_and_output_accounting ... ok
+test streamed_stored_and_deflated_parts_are_accounted_without_cache_materialization ... ok
+test same_flight_loader_owns_physical_accounting ... ok
+test singular_changed_overlay_distinguishes_raw_and_generated_payloads ... ok
+test singular_exact_noop_overlay_accounts_raw_publication_and_cache_selection ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_catalog_probe.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/package_catalog_probe-1293aa069d5c9f1c)
+
+running 6 tests
+test reader_failure_restores_the_cursor_without_fabricating_a_catalog ... ok
+test probe_limit_errors_are_typed_and_restore_the_cursor ... ok
+test malformed_probe_is_an_unknown_catalog_error_and_restores_the_cursor ... ok
+test default_probe_reads_zip_metadata_and_structural_members_only ... ok
+test archive_total_entry_limit_is_consistent_across_ingress_paths ... ok
+test limited_probe_matches_eager_and_source_catalog_semantics ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phys_pkg_borrowed.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/phys_pkg_borrowed-2ccd9a1af40372d2)
+
+running 10 tests
+test phys_pkg_borrowed_deflate_returns_none_and_owned_blob_is_exact ... ok
+test phys_pkg_borrowed_enforces_part_limit_without_materialization_charge ... ok
+test phys_pkg_borrowed_normalizes_pack_uri_to_zip_member_name ... ok
+test phys_pkg_borrowed_missing_part_is_typed_error ... ok
+test phys_pkg_borrowed_store_returns_source_slice_with_identity ... ok
+test phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc ... ok
+test phys_pkg_borrowed_slice_lifetime_tracks_input_source ... ok
+test phys_pkg_borrowed_rejects_encrypted_store_and_deflate ... ok
+test phys_pkg_target_reads_preserve_unrelated_encryption_behavior ... ok
+test phys_pkg_owned_reads_reject_strong_and_local_only_encryption ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/prepared_topology.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/prepared_topology-5274054987acd826)
+
+running 29 tests
+test managed_low_input_limit_refuses_source_open ... ok
+test exact_noop_preparation_is_source_byte_exact_and_has_no_candidate ... ok
+test content_types_byte_cap_refuses_new_mapping_before_candidate ... ok
+test managed_low_memory_refuses_preparation_before_candidate ... ok
+test borrowed_noop_does_not_invoke_callback_and_keeps_source_usable ... ok
+test effective_relationship_graph_cap_rejects_one_new_internal_target_before_candidate ... ok
+test borrowed_prepared_callback_source_change_is_refused_after_callback ... ok
+test stale_source_refuses_even_empty_preparation ... ok
+test managed_low_work_limit_refuses_candidate_before_callback ... ok
+test prepared_precompressed_token_keeps_managed_reservation_until_publication_drop ... ok
+test removed_part_is_absent_from_effective_content_type_lookup ... ok
+test managed_borrowed_candidate_keeps_prepared_payload_reserved_during_callback ... ok
+test borrowed_candidate_refuses_transferred_source_change_after_callback ... ok
+test replacement_only_candidate_uses_source_content_type_without_manifest_reparse ... ok
+test prepared_source_xml_token_keeps_managed_reservation_until_publication_drop ... ok
+test managed_low_output_limit_reports_sink_accounting ... ok
+test callback_failure_writes_no_bytes_and_prepared_value_remains_publishable ... ok
+test trailing_archive_bytes_refuse_changed_candidate_but_preserve_exact_noop ... ok
+test managed_prepared_candidate_reads_and_publishes_with_reservations_attached ... ok
+test shrinking_effective_candidate_is_accepted_at_exact_source_caps ... ok
+test borrowed_prepared_callback_failure_leaves_source_reusable ... ok
+test prepared_publication_reports_sequential_sink_failure_accounting ... ok
+test combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap ... ok
+test source_change_after_prepare_refuses_candidate_and_publication_before_sink_bytes ... ok
+test borrowed_prepared_candidate_keeps_source_usable_and_matches_consuming_publish ... ok
+test prepare_effective_graph_publish_and_reopen_are_consistent ... ok
+test canonical_relationship_append_and_removal_accept_exact_final_boundaries ... ok
+test whitespace_rich_noncanonical_relationship_append_and_removal_accept_exact_boundaries ... ok
+test large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_cap ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/prepared_topology_empty_roots.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/prepared_topology_empty_roots-ddbaac566d970637)
+
+running 3 tests
+test first_mapping_preserves_prefixed_paired_root_and_comments ... ok
+test first_mapping_expands_empty_default_and_prefixed_content_types_roots ... ok
+test first_relationship_expands_empty_default_and_prefixed_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/python_zip64_source.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/python_zip64_source-c5ec3b79dffa144f)
+
+running 1 test
+test python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_members ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/reader_origin_contract.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/reader_origin_contract-d8696b3453a705cd)
+
+running 6 tests
+test a_buffered_reader_removes_only_a_mark_its_first_fill_holds ... ok
+test a_second_mark_is_character_data_not_origin ... ok
+test error_positions_address_marked_input_through_the_origin ... ok
+test utf16_marks_are_not_consumed_by_this_build ... ok
+test namespace_and_buffered_readers_share_the_slice_readers_origin ... ok
+test slice_reader_positions_address_marked_input_through_the_origin ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/relationship_reuse_publication.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/relationship_reuse_publication-510094ad67be3726)
+
+running 4 tests
+test the_fixture_is_not_spelled_the_way_this_crate_serializes_relationships ... ok
+test establishing_a_new_relationship_still_republishes_the_member ... ok
+test reusing_a_package_relationship_publishes_what_taking_the_seam_publishes ... ok
+test reusing_a_part_relationship_publishes_what_taking_the_seam_publishes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/relationship_selection_determinism.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/relationship_selection_determinism-28721a3e912f297e)
+
+running 7 tests
+test a_fresh_target_still_takes_the_next_free_identifier ... ok
+test an_external_duplicate_does_not_satisfy_an_internal_reuse ... ok
+test reuse_of_a_unique_match_is_unchanged ... ok
+test internal_reuse_picks_the_same_relationship_on_every_build ... ok
+test external_reuse_picks_the_same_relationship_on_every_build ... ok
+test external_reuse_is_independent_of_insertion_order ... ok
+test corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/source_artifact_restore.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_artifact_restore-717d6075ae57a070)
+
+running 13 tests
+test restore_rejects_finite_output_cap_before_output ... ok
+test restore_reports_exact_prefix_for_short_sink ... ok
+test restore_observes_original_context_cancellation_after_an_exact_short_prefix ... ok
+test managed_restore_charges_shared_output_once_and_releases_memory_lease ... ok
+test restore_rejects_wrong_hashes_and_lengths_before_output ... ok
+test restore_uses_current_context_for_all_io_work_and_output ... ok
+test restore_rehashes_original_after_output_started_when_version_is_stable ... ok
+test restore_succeeds_with_independently_reopened_artifacts ... ok
+test restore_detects_both_artifact_versions_during_authentication ... ok
+test managed_restore_releases_workspace_on_memory_hash_and_sink_failures ... ok
+test restore_detects_both_artifact_versions_from_write_and_flush_callbacks ... ok
+test restore_rejects_truncated_and_overreported_providers_before_output ... ok
+test restore_observes_cancellation_before_output_and_from_sink_callbacks ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_backed_batch.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_backed_batch-4e57170b433ae94b)
+
+running 14 tests
+test batch_request_count_limit_remains_a_typed_read_limit ... ok
+test batch_empty_one_worker_and_oversized_single_part_use_serial_fallbacks ... ok
+test batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights ... ok
+test batch_source_mutation_during_a_gated_load_returns_source_changed ... ok
+test batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers ... ok
+test batch_short_read_provider_preserves_exact_bytes ... ok
+test batch_preserves_request_order_duplicates_and_exact_serial_bytes ... ok
+test batch_work_limit_preserves_the_dynamic_resource_limit_scope ... ok
+test warm_batch_holds_structural_memory_until_the_returned_batch_drops ... ok
+test managed_batch_releases_finite_memory_and_object_reservations_after_drop ... ok
+test batch_reports_low_ordinal_failure_and_does_not_start_a_later_wave ... ok
+test batch_parallel_overlap_obeys_task_and_byte_caps ... ok
+test deflated_multi_part_batch_decodes_varied_payloads_on_an_explicit_two_mib_stack ... ok
+test batch_below_parallel_threshold_uses_serial_fallback ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s
+
+     Running tests/source_backed_batch_reuse.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_backed_batch_reuse-a19cf73122415512)
+
+running 4 tests
+test provider_panic_is_a_typed_terminal_batch_error ... ok
+test batch_reuses_at_most_configured_worker_threads_across_many_waves ... ok
+test duplicate_waiter_recovers_after_a_gated_provider_panic ... ok
+test separate_batch_operations_do_not_reuse_worker_threads ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_path.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_backed_path-f20b37460d1d24d2)
+
+running 3 tests
+test path_default_catalog_and_selected_data_match_from_vec_without_eager_unselected_read ... ok
+test path_source_reports_external_change_without_retargeting_or_stale_hydration ... ok
+test path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_limits ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_reader.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_backed_reader-ff14496b72c5875f)
+
+running 6 tests
+test reader_ingress_rejects_invalid_read_count_without_panicking ... ok
+test reader_ingress_rejects_input_above_max_input_bytes ... ok
+test indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress ... ok
+test reader_ingress_retries_one_interrupted_read ... ok
+test reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold ... ok
+test stream_to_keeps_raw_source_and_sink_io_errors_typed ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_topology.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_backed_topology-637f94d70745a7bb)
+
+running 39 tests
+test managed_cancellation_before_topology_publication_writes_nothing ... ok
+test topology_plan_rejects_duplicate_and_invalid_relationship_requests ... ok
+test empty_overlay_and_deletion_batch_is_an_exact_source_copy ... ok
+test empty_topology_plan_is_an_exact_source_copy ... ok
+test topology_plan_has_a_finite_exact_and_one_over_part_bound ... ok
+test deletion_preserves_untouched_raw_records_and_compressed_payload_bytes ... ok
+test malformed_exact_replacement_is_a_byte_exact_noop ... ok
+test case_equivalent_physical_names_refuse_changed_publication ... ok
+test deletion_does_not_rewrite_content_types_or_relationships ... ok
+test source_admission_refuses_an_encrypted_entry ... ok
+test noncanonical_existing_relationship_replacements_are_refused_before_output ... ok
+test source_admission_checks_strong_and_local_only_encryption_flags ... ok
+test signed_exact_noop_replacement_is_byte_exact_but_topology_change_is_refused ... ok
+test topology_publication_refuses_trailing_data_before_writing ... ok
+test one_existing_part_can_be_deleted_without_affecting_reopenable_package ... ok
+test signed_part_deletion_is_refused_before_sink_write ... ok
+test raw_signature_non_part_materialization_is_owned_mutation_locked ... ok
+test topology_addition_of_root_signature_part_is_refused_before_output ... ok
+test replacement_and_deletion_are_published_in_one_sequential_output ... ok
+test topology_addition_of_signature_content_type_spoof_is_refused_before_output ... ok
+test missing_duplicate_equivalent_and_overlapping_deletions_fail_before_sink_write ... ok
+test topology_remove_part_refuses_dangling_inbound_relationship_before_output ... ok
+test topology_addition_of_signature_relationship_or_target_is_refused_before_output ... ok
+test orphan_non_part_signature_member_is_mutation_locked ... ok
+test topology_publication_reports_incomplete_output_after_partial_sink_progress ... ok
+test signature_content_type_spoof_is_mutation_locked ... ok
+test unsigned_source_empty_topology_plan_remains_an_exact_copy ... ok
+test topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output ... ok
+test topology_publish_refuses_collisions_dangling_targets_and_duplicate_existing_ids ... ok
+test noncanonical_content_types_are_preserved_while_new_overrides_are_sorted ... ok
+test topology_remove_part_detaches_inbound_relationship_and_omits_owned_members ... ok
+test existing_canonical_relationships_are_regenerated_with_new_relationships ... ok
+test noncanonical_existing_relationships_allow_append_preserving_source ... ok
+test topology_publication_reports_sink_failures_with_partial_output_state ... ok
+test case_and_nested_signature_member_paths_are_mutation_locked ... ok
+test topology_publish_replaces_adds_and_links_parts_atomically ... ok
+test untouched_zip_records_retain_extras_comments_and_payload_records ... ok
+test case_equivalent_relationship_owners_group_once_and_refuse_duplicate_ids ... ok
+test topology_output_is_deterministic_and_reopens_after_repeated_publication ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_part_splice.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_part_splice-020f9af78c29ac4b)
+
+running 29 tests
+test central_record_oracle_detects_metadata_changes_outside_local_record ... ok
+test candidate_limit_is_refused_without_output ... ok
+test authored_fragment_refusals_release_memory_and_preserve_typed_limits ... ok
+test exact_noop_authenticates_source_and_candidate_hashes_and_archive_limit ... ok
+test authored_fragment_zero_fill_checks_cancellation_between_work_chunks ... ok
+test authored_fragment_cannot_transfer_a_foreign_package_budget ... ok
+test cancellation_is_observed_before_plan_and_write ... ok
+test mismatched_proof_fields_are_refused_before_publication ... ok
+test malformed_source_or_candidate_is_rejected_before_output ... ok
+test interrupted_splice_source_observes_cancellation_before_retry ... ok
+test raw_record_oracle_includes_descriptor_mode_compressed_payload ... ok
+test signed_non_noop_refuses_before_output ... ok
+test source_version_mutation_is_refused_before_output ... ok
+test exact_noop_copies_malformed_and_signed_source_byte_for_byte ... ok
+test source_mutation_after_the_first_sink_write_wins_over_publication ... ok
+test binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs ... ok
+test accounting_reports_two_fresh_decoded_reader_passes ... ok
+test interrupted_splice_source_retries_without_double_charging_input ... ok
+test splice_memory_quotas_are_typed_and_release_after_success_or_failure ... ok
+test authored_fragment_transfers_one_reservation_and_publishes_reversibly ... ok
+test publication_inverse_uses_current_candidate_output_budget ... ok
+test publication_inverse_shared_context_charges_retained_archive_once ... ok
+test partial_and_flush_sink_failures_preserve_typed_progress ... ok
+test store_and_deflate_splices_preserve_opaque_members_without_caching_target ... ok
+test publication_inverse_observes_candidate_cancellation_during_write_and_flush ... ok
+test publication_inverse_requires_the_authenticated_candidate_artifact ... ok
+test publication_inverse_rechecks_candidate_freshness_during_write_and_flush ... ok
+test large_binary_fragment_refuses_scoped_work_before_preparation_succeeds ... ok
+test large_binary_fragment_observes_managed_cancellation_between_work_chunks ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/source_part_splice_replay.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_part_splice_replay-648a3553c267e0cc)
+
+running 21 tests
+test replay_expected_artifact_noop_releases_preview_memory_and_charges_once ... ok
+test replay_zero_window_limit_is_rejected_before_retaining_the_plan ... ok
+test replay_reader_cancellation_is_reported_as_typed_cancelled ... ok
+test replay_provider_change_on_measurement_stops_before_sink_output ... ok
+test replay_source_change_after_sink_progress_is_incomplete ... ok
+test mutable_replay_proof_cannot_expand_a_bounded_candidate_reader ... ok
+test replay_provider_open_and_mid_read_errors_are_typed ... ok
+test replay_opens_fresh_readers_for_candidate_measurement_and_emission ... ok
+test replay_short_sink_reports_exact_partial_output ... ok
+test replay_rejects_truncated_extra_and_hash_changed_readers_before_output ... ok
+test replay_expected_artifact_preview_failure_keeps_caller_sink_empty ... ok
+test concurrent_replay_publications_charge_one_window_per_live_reader ... ok
+test replay_expected_artifact_change_during_measurement_writes_zero_bytes ... ok
+test replay_expected_artifact_change_during_emission_is_incomplete ... ok
+test replay_reader_error_during_publication_reports_accepted_output ... ok
+test replay_store_and_deflate_preserve_opaque_members_and_target_bytes ... ok
+test replay_512_byte_window_handles_multi_window_source_and_payload ... ok
+test replay_expected_artifact_accepts_exact_store_and_deflate_output ... ok
+test replay_expected_artifact_charges_one_managed_output_artifact ... ok
+test replay_expected_artifact_mismatch_writes_zero_bytes ... ok
+test prepared_replay_authenticates_late_length_and_hash_failures_in_every_pass ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/source_part_transfer.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_part_transfer-635e85199bc41b42)
+
+running 25 tests
+test cancellation_during_compressed_capture_returns_cancelled_without_token ... ok
+test encrypted_store_with_zero_crc_is_refused_during_admission ... ok
+test combined_capture_exact_budget_and_one_under_are_transactional ... ok
+test decoded_mismatch_and_corrupt_crc_are_rejected_before_publication ... ok
+test combined_capture_retains_signed_encrypted_and_corrupt_refusals ... ok
+test retained_capture_writer_budget_refusal_does_not_consume_capture ... ok
+test rooted_signature_infrastructure_is_refused_before_token_or_output ... ok
+test exact_managed_capture_budget_succeeds_and_one_byte_less_refuses ... ok
+test retained_empty_capture_keeps_metadata_charged_across_repeated_promotion ... ok
+test retained_capture_rechecks_source_and_cancellation_before_writer_admission ... ok
+test source_revision_change_after_view_drop_refuses_before_first_sink_write ... ok
+test combined_capture_pins_decoded_budget_after_package_and_data_drop ... ok
+test cross_source_transfer_reuses_exact_verified_store_member ... ok
+test output_limit_is_checked_before_any_destination_output ... ok
+test source_cancellation_during_destination_sink_preserves_partial_prefix ... ok
+test sequential_sink_failure_reports_incomplete_output_after_partial_prefix ... ok
+test source_revision_change_during_destination_sink_is_typed_and_partial ... ok
+test combined_capture_short_reads_bypass_and_mid_read_refusals_release_reservations ... ok
+test retained_capture_charges_each_writer_and_publishes_concurrently_without_reads ... ok
+test source_revision_change_after_final_sink_write_is_incomplete_with_exact_prefix ... ok
+test combined_native_image_capture_preserves_compressed_member_after_source_drop ... ok
+test native_poi_video_image_transfer_reuses_exact_compressed_member ... ok
+test retained_empty_capture_charges_long_source_metadata ... ok
+test native_poi_slide_trailing_byte_refuses_authorized_transfer ... ok
+test combined_capture_cold_io_and_warm_cache_preserve_exact_output ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/source_read_ahead.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_read_ahead-eb2f44a48acb1ecf)
+
+running 16 tests
+test managed_read_ahead_accounts_physical_input_and_retained_window_memory ... ok
+test source_version_change_is_a_typed_publication_error_before_output ... ok
+test exact_source_save_preserves_unknown_member_after_known_payload_read ... ok
+test retained_source_artifact_does_not_pin_the_read_ahead_window ... ok
+test batch_replacement_and_deletion_preserve_unknown_physical_records ... ok
+test source_read_policy_is_bounded_and_exact_is_the_default_control ... ok
+test package_publication_callback_refuses_before_recursive_source_version_fence ... ok
+test one_part_external_relationship_removal_disables_opt_in_reads_before_publication ... ok
+test batch_external_relationship_removal_disables_opt_in_reads_before_publication ... ok
+test source_xml_capture_permanently_disables_opt_in_reads ... ok
+test exact_restore_noop_permanently_releases_the_opt_in_window ... ok
+test non_empty_topology_publication_disables_opt_in_reads_and_adds_a_typed_part ... ok
+test publication_disables_read_ahead_before_output_and_keeps_future_reads_exact ... ok
+test managed_changed_overlay_releases_window_before_first_write_and_preserves_unknown_records ... ok
+test precompressed_topology_addition_disables_opt_in_reads_before_physical_transfer ... ok
+test expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_replacement_audit.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_replacement_audit-bd1cb2b41a421d48)
+
+running 4 tests
+test a_refused_original_is_reported_before_its_replacement ... ok
+test a_substituted_defect_outside_the_edit_is_still_audited_and_refused ... ok
+test a_local_edit_publishes_the_replacement_and_leaves_every_other_member_exact ... ok
+test a_defect_inside_the_edited_element_is_refused_with_the_complete_audit_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/source_xml_census.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_xml_census-76f1288f344907d0)
+
+running 1 test
+test every_well_formed_fixture_member_passes_the_source_audit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.13s
+
+     Running tests/source_xml_hint.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_xml_hint-62335bef7e1e6d06)
+
+running 11 tests
+test different_part_and_content_type_hints_return_the_target_original ... ok
+test derived_hint_returns_current_original_and_keeps_derived_bytes_live ... ok
+test different_content_type_hint_falls_back_even_with_equal_source_version ... ok
+test different_limits_hint_falls_back_to_validation_under_current_limits ... ok
+test malformed_current_source_is_revalidated_after_foreign_hint_mismatch ... ok
+test matching_original_hint_reuses_exact_bytes_without_extra_budget_work ... ok
+test source_revision_change_during_hint_read_is_refused_after_read ... ok
+test source_revision_change_before_hint_read_is_refused ... ok
+test equal_version_foreign_lineage_falls_back_to_current_original ... ok
+test cancellation_before_and_during_hint_read_remains_typed_and_budgeted ... ok
+test signed_and_encrypted_packages_refuse_hints_before_payload_transfer ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_xml_publication.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/source_xml_publication-b3e6cbc36b569276)
+
+running 14 tests
+test an_exact_no_op_still_precedes_both_audits ... ok
+test managed_source_xml_refuses_retained_fragment_capacity_over_budget ... ok
+test managed_source_xml_honors_cancellation_and_releases_memory_gauge ... ok
+test identical_source_splice_retains_original_authority_and_exact_output ... ok
+test destination_depth_and_event_limits_refuse_source_xml_additions ... ok
+test source_provenance_rejects_foreign_lineage_and_stale_ranges_without_output ... ok
+test source_splice_rejects_reedit_and_overlapping_ranges_without_second_output ... ok
+test the_authored_classifier_still_separates_compact_from_formatted_xml ... ok
+test eager_replacement_preserves_a_utf8_bom_and_still_refuses_a_doctype_before_output ... ok
+test source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment ... ok
+test empty_fragment_deletes_only_the_authorized_source_range ... ok
+test original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal ... ok
+test noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact ... ok
+test marked_xml_members_in_real_packages_pass_the_source_audit_unchanged ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/structural_prefetch.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/structural_prefetch-93762bc887840aa1)
+
+running 13 tests
+test a_run_read_never_covers_an_ordinary_part_payload ... ok
+test a_scattered_package_costs_no_more_reads ... ok
+test the_prefetch_is_released_when_the_catalog_is_built ... ok
+test a_forward_window_open_keeps_its_own_counters ... ok
+test the_untyped_member_admission_verdict_does_not_move ... ok
+test the_fixtures_above_really_do_coalesce ... ok
+test one_read_serves_a_contiguous_run_of_structural_members ... ok
+test source_observations_do_not_move ... ok
+test a_refused_run_read_falls_back_to_per_member_reads ... ok
+test a_managed_open_keeps_the_exact_grammar ... ok
+test a_relationship_budget_refuses_identically_inside_a_run ... ok
+test a_malformed_relationship_part_keeps_its_error_anywhere_in_a_run ... ok
+test a_duplicate_relationship_id_keeps_its_error_anywhere_in_a_run ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/tolerated_archive_junk.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/tolerated_archive_junk-c547a200c4ab87ca)
+
+running 4 tests
+test dangling_relationship_target_leaves_the_rest_of_the_document_intact ... ok
+test ds_store_does_not_block_the_document ... ok
+test excel_trash_folder_does_not_block_the_workbook ... ok
+test content_types_stream_stored_under_a_case_variant_name_still_opens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/validation.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/validation-975872fd178c03b3)
+
+running 13 tests
+test duplicate_physical_entries_are_reported_as_structural_rejection ... ok
+test physical_relationship_part_limits_belong_to_catalog_admission ... ok
+test io_and_source_change_failures_remain_errors ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/verified_publication.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/verified_publication-9b0f1c92789a70e5)
+
+running 6 tests
+test a_payload_replaced_after_its_proof_is_audited ... ok
+test a_custom_part_without_its_own_verified_storage_drops_the_proof ... ok
+test every_route_audits_the_bytes_it_publishes ... ok
+test a_consistent_custom_part_publishes_on_the_owned_source_route ... ok
+test a_verified_payload_publishes_exactly_what_the_unproven_route_publishes ... ok
+test a_custom_part_cannot_borrow_a_proof_for_other_bytes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xml_bytes_publication.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/xml_bytes_publication-0ecbe3ed71fd8fc3)
+
+running 2 tests
+test shared_xml_add_checks_exact_caller_cap_and_retains_allocation ... ok
+test shared_xml_replace_checks_source_and_limits_before_mutation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/zip_admission_ingress.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/zip_admission_ingress-fc3bf61692d42138)
+
+running 5 tests
+test a_disagreeing_descriptor_is_refused_at_open_in_memory_and_at_first_read_positionally ... ok
+test payload_crc_mismatch_with_consistent_headers_moves_to_first_decode ... ok
+test benign_streaming_members_with_zero_local_crc_open_everywhere ... ok
+test every_ingress_refuses_encryption_on_an_unread_member ... ok
+test a_sized_members_local_crc_is_not_compared_at_open ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_cfb
+
+running 15 tests
+test crates/litchi-cfb/src/writer/core.rs - writer::core (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::DIFSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::ENDOFCHAIN (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::NOSTREAM (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::FATSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::MAXREGSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_storage (line 987) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_stream (line 679) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::save (line 2017) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::set_root_clsid (line 596) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::RANGE_LOCK_SECTOR_V4 (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/directory.rs - writer::directory::DirectoryEntryBuilder::set_clsid (line 193) ... ignored
+test crates/litchi-cfb/src/writer/core.rs - writer::core::SECTOR_SIZE_V4 (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::STGTY_ROOT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::new (line 358) ... ok
+
+test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.19s
+   Doc-tests litchi_core
+
+running 45 tests
+test crates/litchi-core/src/binary.rs - binary::parse_windows1252_string_len (line 305) ... ok
+test crates/litchi-core/src/binary.rs - binary::read_f64_le (line 173) ... ok
+test crates/litchi-core/src/binary.rs - binary::parse_utf16le_string (line 212) ... ok
+test crates/litchi-core/src/binary.rs - binary::parse_utf16le_string_len (line 252) ... ok
+test crates/litchi-core/src/binary.rs - binary::read_i32_le (line 147) ... ok
+test crates/litchi-core/src/binary.rs - binary::read_i16_le (line 85) ... ok
+test crates/litchi-core/src/binary.rs - binary::parse_windows1252_string (line 287) ... ok
+test crates/litchi-core/src/binary.rs - binary::read_u16_le (line 48) ... ok
+test crates/litchi-core/src/binary.rs - binary::read_u32_le (line 111) ... ok
+test crates/litchi-core/src/detection/simd_utils.rs - detection::simd_utils::check_office_signatures (line 265) ... ok
+test crates/litchi-core/src/detection/rtf.rs - detection::rtf::detect_rtf_format (line 39) ... ok
+test crates/litchi-core/src/detection/simd_utils.rs - detection::simd_utils::parallel_signature_check (line 204) ... ok
+test crates/litchi-core/src/detection/simd_utils.rs - detection::simd_utils::signature_matches (line 108) ... ok
+test crates/litchi-core/src/hex.rs - hex::decode (line 27) ... ok
+test crates/litchi-core/src/detection/simd_utils.rs - detection::simd_utils::find_pattern (line 313) ... ok
+test crates/litchi-core/src/simd/cmp.rs - simd::cmp::is_all_zero (line 2206) ... ok
+test crates/litchi-core/src/detection/simd_utils.rs - detection::simd_utils::signature_matches_any (line 154) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::hex_fmt (line 65) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::hex_fmt_lower (line 82) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor (line 12) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::format_hex_with_separator (line 634) ... ok
+test crates/litchi-core/src/simd/mod.rs - simd (line 41) ... ok
+test crates/litchi-core/src/simd/cmp.rs - simd::cmp (line 22) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::hex_encode_lower (line 128) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::from_str (line 257) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::to_hex (line 175) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::new (line 50) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::from_name (line 127) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length (line 12) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::hex_encode (line 110) ... ok
+test crates/litchi-core/src/simd/cmp.rs - simd::cmp::simd_eq_u8 (line 2139) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::from_str (line 283) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::to_pixels (line 173) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::to_hex_string (line 190) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::to_centimeters (line 247) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt (line 40) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::from_hex (line 71) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_inches (line 54) ... ok
+test crates/litchi-core/src/xml/escape.rs - xml::escape::escape_xml (line 11) ... ok
+test crates/litchi-core/src/xml/escape.rs - xml::escape::unescape_xml (line 74) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::to_inches (line 211) ... ok
+test crates/litchi-core/src/xml/origin.rs - xml::origin::ReaderOrigin (line 32) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length (line 107) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_emus (line 39) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_cm (line 79) ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+all doctests ran in 0.21s; merged doctests compilation took 0.19s
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 2252) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 961) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 2314) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 1177) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 2362) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-opc/src/source_backed.rs - source_backed::SourceBackedPackage::with_prepared_topology (line 7988) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.33s; merged doctests compilation took 0.30s

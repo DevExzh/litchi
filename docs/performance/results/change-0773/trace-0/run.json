@@ -1,0 +1,593 @@
+{
+  "build_rows": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/before/probe/Cargo.toml"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended": 1790471477.0092134,
+      "log": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/before-build.log",
+      "log_sha256": "7a97ecc1349b6409c38660da7aa196cd833ba123de081ad8fa256a97fd075322",
+      "returncode": 0,
+      "started": 1790471408.2817066
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/after/probe/Cargo.toml",
+        "--features",
+        "levels"
+      ],
+      "cwd": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration",
+      "ended": 1790471542.0735006,
+      "log": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/after-build.log",
+      "log_sha256": "eeb7b58bdf731ab06b5c1db33631885181eebbff7c809489091b37f18ec207b6",
+      "returncode": 0,
+      "started": 1790471477.0094128
+    }
+  ],
+  "fixture": {
+    "after": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/test-data/ooxml/xlsb/sample.xlsb",
+    "before": "/home/zhuhe/code/litchi/test-data/ooxml/xlsb/sample.xlsb",
+    "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+  },
+  "legs": {
+    "after": {
+      "command": [
+        "strace",
+        "-f",
+        "-s",
+        "256",
+        "-yy",
+        "-o",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/after.strace",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/binary/after-durability-probe",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/tracedir",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/test-data/ooxml/xlsb/sample.xlsb"
+      ],
+      "cwd": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration",
+      "ended": 1790471545.8649747,
+      "expected_windows": 96,
+      "features": [
+        "levels"
+      ],
+      "leg": "after",
+      "output_sha256": {
+        "cfb-overlay-generic+create-file-only.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic+create-full.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic+create-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic+create-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic-file-only.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic-full.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned+create-file-only.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned+create-full.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned+create-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned+create-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned-file-only.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned-full.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-sequential+create-file-only.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential+create-full.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential+create-no-sync.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential+create-save.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential-file-only.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential-full.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential-no-sync.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential-save.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-writer+create-file-only.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer+create-full.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer+create-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer+create-save.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer-file-only.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer-full.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer-no-sync.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer-save.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "doc+create-file-only.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc+create-full.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc+create-no-sync.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc+create-save.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc-file-only.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc-full.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc-no-sync.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc-save.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "docx+create-file-only.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx+create-full.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx+create-no-sync.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx+create-save.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx-file-only.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx-full.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx-no-sync.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx-save.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "opc+create-file-only.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc+create-full.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc+create-no-sync.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc+create-save.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc-file-only.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc-full.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc-no-sync.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc-save.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "ppt+create-file-only.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt+create-full.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt+create-no-sync.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt+create-save.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt-file-only.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt-full.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt-no-sync.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt-save.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "pptx+create-file-only.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx+create-full.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx+create-no-sync.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx+create-save.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx-file-only.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx-full.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx-no-sync.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx-save.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "xls+create-file-only.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls+create-full.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls+create-no-sync.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls+create-save.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls-file-only.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls-full.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls-no-sync.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls-save.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xlsb+create-file-only.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb+create-full.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb+create-no-sync.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb+create-save.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb-file-only.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb-full.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb-no-sync.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb-save.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsx+create-file-only.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx+create-full.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx+create-no-sync.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx+create-save.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx-file-only.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx-full.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx-no-sync.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx-save.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        }
+      },
+      "published": "published/after",
+      "returncode": 0,
+      "started": 1790471545.3120823,
+      "stderr": "after.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "after.stdout",
+      "stdout_sha256": "51ab62cad30c8690f020126ad0145a1eba3d795ee8517f2bea63f12971576871",
+      "trace": "after.strace",
+      "trace_sha256": "e3455d9ef0e011fb833ccc39423267080f9ec6b204b6aac807dc73583ce96fdd"
+    },
+    "before": {
+      "command": [
+        "strace",
+        "-f",
+        "-s",
+        "256",
+        "-yy",
+        "-o",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/before.strace",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/binary/before-durability-probe",
+        "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/tracedir",
+        "/home/zhuhe/code/litchi/test-data/ooxml/xlsb/sample.xlsb"
+      ],
+      "cwd": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration",
+      "ended": 1790471543.8383036,
+      "expected_windows": 24,
+      "features": [],
+      "leg": "before",
+      "output_sha256": {
+        "cfb-overlay-generic+create-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-generic-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned+create-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-overlay-owned-save.out": {
+          "bytes": 7680,
+          "sha256": "7be43fea5581810b9cc2811873d895513e8b04383c623a53fc0a6181fc2ef27e"
+        },
+        "cfb-sequential+create-save.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-sequential-save.out": {
+          "bytes": 6656,
+          "sha256": "1493b23d1690cd2624a281565d862b9dc4f284d91dd81524c2521717708c96fc"
+        },
+        "cfb-writer+create-save.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "cfb-writer-save.out": {
+          "bytes": 7680,
+          "sha256": "62441eeb476258dfee8238450b5b0a607658a578ce05d3e94bd2fa576cc4dd1e"
+        },
+        "doc+create-save.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "doc-save.out": {
+          "bytes": 15360,
+          "sha256": "00d37b5737c23ebd639cdf97a83d7b734028b3e3f031d0fd684da0c140af3a4b"
+        },
+        "docx+create-save.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "docx-save.out": {
+          "bytes": 8421,
+          "sha256": "88cb9ab37d84d9f597488aea36ae69d610c884c0b54d8cd567df58d893d6426b"
+        },
+        "opc+create-save.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "opc-save.out": {
+          "bytes": 8596,
+          "sha256": "80638882f91b747965a48bb31df6c6d8e6615cfaea61a38c27e970f974210427"
+        },
+        "ppt+create-save.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "ppt-save.out": {
+          "bytes": 7168,
+          "sha256": "0db847b7f343f914860695e78aedaa55b685b69acf4e5685cfa8d8a8777e2618"
+        },
+        "pptx+create-save.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "pptx-save.out": {
+          "bytes": 28892,
+          "sha256": "b78ea3f3026712d62a6d1115fa3157ce4b847d45bc8134306b790002f22a2cee"
+        },
+        "xls+create-save.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xls-save.out": {
+          "bytes": 4096,
+          "sha256": "e286d83fd92f63e5a99e5272dd17d01c120c98b73ee91f13530b89bce7489772"
+        },
+        "xlsb+create-save.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsb-save.out": {
+          "bytes": 10843,
+          "sha256": "8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b"
+        },
+        "xlsx+create-save.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        },
+        "xlsx-save.out": {
+          "bytes": 2077,
+          "sha256": "55f12476f7b54eb64b9f946750cb5ce25eee5db4393e8f43c0205d25202a64bc"
+        }
+      },
+      "published": "published/before",
+      "returncode": 0,
+      "started": 1790471543.6147306,
+      "stderr": "before.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "before.stdout",
+      "stdout_sha256": "b9988f954184103bb3554702bce584f9f69539ce02c61e4c1a677b5f81446e85",
+      "trace": "before.strace",
+      "trace_sha256": "ac831299c3353f9a8542f7a2264a39597efabfa00192d2a92feae8662ddc87c6"
+    }
+  },
+  "schema": 1,
+  "source_heads": {
+    "after": "339572acbf570b2614cfa346e73b8f8d6da358f4",
+    "before": "d5aaecabed2a2e2b6b816ffc14a28fd746a479a0"
+  },
+  "toolchain": "1.95.0"
+}

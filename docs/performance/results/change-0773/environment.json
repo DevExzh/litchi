@@ -1,0 +1,25 @@
+{
+  "observed_utc": "2026-09-27T00:57:04.659338+00:00",
+  "scope": "Integration validation environment; no latency comparison claimed",
+  "platform": "Linux-7.0.0-1012-aws-x86_64-with-glibc2.43",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+  "profile_overrides": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "inherited_environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null,
+    "LD_PRELOAD": null
+  },
+  "workspace_inputs": {
+    "Cargo.toml": "7f4e0f5079a7704901e4dbe0d702388a3b07f59dddb3ca49d303cacc6d868e42",
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    ".cargo/config.toml": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+  }
+}
