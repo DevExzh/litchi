@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--offline",
+    "--locked",
+    "--features",
+    "allocator-metrics",
+    "--all-targets",
+    "--",
+    "--test-threads=2"
+  ],
+  "library_ignored": 1,
+  "library_passed": 556,
+  "log": "quality-0/02.log",
+  "log_sha256": "0edfd96605e3e2a22a63e2b1f7a8576d83ece4a4f0221dbdc98a1138d46b98eb",
+  "overall_exit_code": 101,
+  "scope": "Full library suite passed. Following binary global allocator tests failed under test-threads=2 (live_bytes assertion plus two poisoned locks). Retry binary suites only with test-threads=1; no production or harness source changes.",
+  "source_sha256": "c278f024ec2147f19536d317ab68179283451903a218362c0f8b678d64892733"
+}

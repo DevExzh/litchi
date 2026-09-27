@@ -1,0 +1,17 @@
+diff --git a/tools/perf-baseline/src/ordinary_save.rs b/tools/perf-baseline/src/ordinary_save.rs
+index 0ebcae765f..d4480cae79 100644
+--- a/tools/perf-baseline/src/ordinary_save.rs
++++ b/tools/perf-baseline/src/ordinary_save.rs
+@@ -1706,10 +1706,10 @@ fn edit_target(corpus: &SaveCorpus) -> EditTarget {
+         xlsx_sheet: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_sheet.clone()),
+         xlsx_address: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_address.clone()),
+         pptx_slide: (corpus.format == Format::Pptx)
+-            .then(|| corpus.pptx_target)
++            .then_some(corpus.pptx_target)
+             .and_then(|target| target.map(|(slide, _)| slide)),
+         pptx_shape: (corpus.format == Format::Pptx)
+-            .then(|| corpus.pptx_target)
++            .then_some(corpus.pptx_target)
+             .and_then(|target| target.map(|(_, shape)| shape)),
+     }
+ }

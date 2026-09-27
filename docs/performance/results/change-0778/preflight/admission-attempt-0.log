@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/admit.py", line 17, in <module>
+    result = oracle.check_manifest(p / 'artifacts-0/manifest.json', require_qualification=True)
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/oracle.py", line 1298, in check_manifest
+    rows.append(check_case(normalized, base, index, plan, plan_case))
+                ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/oracle.py", line 1055, in check_case
+    preservation = check_preservation(source, output, closure, f"{where}.{policy}")
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/oracle.py", line 836, in check_preservation
+    require(not unexpected,
+    ~~~~~~~^^^^^^^^^^^^^^^^
+            f"{where} changed members outside the fixed mutation closure: {sorted(unexpected)}")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/oracle.py", line 103, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/oracle.py", line 98, in fail
+    raise OracleError(message)
+oracle.OracleError: cases[1].default changed members outside the fixed mutation closure: ['xl/workbook.xml']

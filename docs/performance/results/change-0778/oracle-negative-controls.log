@@ -1,0 +1,9 @@
+printer-override-content-type: REJECTED: negative.printer-override-content-type content-type table changed outside the exact owned normalization
+missing-retained-printer-override: REJECTED: negative.missing-retained-printer-override content-type table changed outside the exact owned normalization
+extra-content-type-declaration: REJECTED: negative.extra-content-type-declaration content-type table changed outside the exact owned normalization
+unrelated-default-content-type: REJECTED: negative.unrelated-default-content-type content-type table changed outside the exact owned normalization
+workbook-attribute: REJECTED: negative.workbook-attribute workbook structure or attributes changed outside calcPr
+unrelated-workbook-relationship: REJECTED: negative.unrelated-workbook-relationship authorized relationship rewrite changed graph semantics in 'xl/_rels/workbook.xml.rels'
+unrelated-content-type: REJECTED: negative.unrelated-content-type content-type table changed outside the exact owned normalization
+calcPr-flag: REJECTED: negative.calcPr-flag output calcPr does not match the exact dirty-calculation contract
+baseline printer-settings normalization: ACCEPTED

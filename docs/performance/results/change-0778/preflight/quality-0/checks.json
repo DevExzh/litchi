@@ -1,0 +1,55 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790483182.2834685,
+    "exit_code": 0,
+    "log": "quality-0/00.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "started": 1790483181.3828135
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--all-targets"
+    ],
+    "ended": 1790483241.9221852,
+    "exit_code": 0,
+    "log": "quality-0/01.log",
+    "log_sha256": "4da2592cff995369baba12c466b3deee8349f52c7c07c2a496f5f4d8bfc6639d",
+    "started": 1790483182.474387
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--all-targets",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790484176.0659933,
+    "exit_code": 101,
+    "log": "quality-0/02.log",
+    "log_sha256": "0edfd96605e3e2a22a63e2b1f7a8576d83ece4a4f0221dbdc98a1138d46b98eb",
+    "started": 1790483242.1149566
+  }
+]

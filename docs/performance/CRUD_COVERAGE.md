@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0778 — named ordinary-save edits and refusal checked
+
+[0778](0778-ordinary-save-durability.md) checks paragraph append, one decoded cell replacement, shape-text replacement and exact altChunk refusal across four policies plus stream output. DOCX note edges and payloads are preserved after unrelated edits. Fourteen quality gates pass; edited-part style/lexical semantics and native Office interoperability remain outside the oracle. No registry row is promoted.
+
 ## 0777 — explicit XML attribute policies validated
 
 [0777](0777-xml-attribute-integration.md) validates 545 fail-fast migrations, explicit lenient/counting exceptions, and synchronized low-level adapters. Nine quality gates pass with 10,519 tests; 228,716 reader outcomes are unchanged and real/mutated attribute equivalence finds zero mismatches. No CRUD row is promoted; allocator recovery and full malformed-input parity remain outside the claim.

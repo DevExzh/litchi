@@ -1,0 +1,24 @@
+{
+  "admission": {
+    "bytes": 1331145,
+    "path": "admission.json",
+    "sha256": "2ae77dea5c36762ae7bca91cadb2101796160e70deb794781afd332ce238a47e"
+  },
+  "export_manifest": {
+    "bytes": 32809,
+    "path": "artifacts-0/manifest.json",
+    "sha256": "f194ff5cd9d95ed4b88c5737e6bdfd9ac29f6ae84c466cd3603250e882b0c5c1"
+  },
+  "export_receipt": {
+    "bytes": 3149,
+    "path": "export.json",
+    "sha256": "58a4f3884bdd691ff51b5870f0bbe62645baf4c619e2a3cde572b3afdc5895af"
+  },
+  "oracle_pass": true,
+  "oracle_report": {
+    "bytes": 2014355,
+    "path": "oracle.json",
+    "sha256": "6b3dea75746b5ecf207c5cfe58cd0fbfd042483e471e65695828af978447d6e0"
+  },
+  "qualification_identities_sha256": "c34d823321ba1379088d1af682cda33a0ce46e80a5ba0f2a6979d5c87cd7fc7c"
+}

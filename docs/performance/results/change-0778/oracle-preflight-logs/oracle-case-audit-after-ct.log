@@ -1,0 +1,7 @@
+generated-docx: PASS changed=['word/document.xml'] target={'main_part': 'word/document.xml'}
+generated-xlsx: PASS changed=['xl/workbook.xml', 'xl/worksheets/sheet1.xml'] target={'main_part': 'xl/workbook.xml', 'xlsx_sheet': 'Sheet1', 'xlsx_address': 'A1'}
+generated-pptx: PASS changed=['ppt/slides/slide1.xml'] target={'main_part': 'ppt/presentation.xml', 'pptx_slide': 0, 'pptx_shape': 0}
+numbered-list: FAIL: cases[3].default authorized relationship rewrite changed graph semantics in 'word/_rels/document.xml.rels'
+alt-chunk-header: PASS changed=[] target={'main_part': 'word/document.xml'}
+conditional-formatting: PASS changed=['[Content_Types].xml', 'xl/_rels/workbook.xml.rels', 'xl/calcChain.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml'] target={'main_part': 'xl/workbook.xml', 'xlsx_sheet': 'Home', 'xlsx_address': 'A1'}
+slide-section: PASS changed=['ppt/slides/slide2.xml'] target={'main_part': 'ppt/presentation.xml', 'pptx_slide': 1, 'pptx_shape': 1}

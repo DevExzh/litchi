@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0778 — note preservation fixed; durability costs measured
+
+[0778](0778-ordinary-save-durability.md) fixes DOCX note relationships lost during paragraph edits. Fourteen gates pass (2,492 tests), and 35 exported outputs pass independent preservation checks. The current-source matrix retains 280 native and 140 allocation processes, 50 spread flags and 28 policy-correct traces. Weaker durability lowers observed latency without changing default Full; no default-contract speedup is claimed.
+
 ## 0777 — bounded fail-fast XML attribute checks integrated
 
 [0777](0777-xml-attribute-integration.md) supplies deterministic ordered duplicate checks above 32 names, preserves first-error reader behavior, and charges DOCX MCE scratch. Nine gates pass (10,519 tests); 228,716 reader outcomes are unchanged, with zero attribute-equivalence mismatches. All four native latency flags and two RSS flags are disclosed alongside separate instruction/allocation observations. Full non-iWork program completion remains open.

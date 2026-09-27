@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0778 — current-source ordinary-save policy matrix
+
+[0778](0778-ordinary-save-durability.md) records seven corpora, four policies, four native process blocks and separate allocation/trace/user-counter lanes. Generated DOCX lifecycle p50 is 5.758 ms default, 3.894 ms FileOnly and 0.865 ms NoSync; these differ in persistence guarantees. Default versus Full tails vary despite equivalent semantics. This is warm, absent-destination evidence with no historical speedup or device-floor claim.
+
 ## 0777 — paired XML attribute hardening costs
 
 [0777](0777-xml-attribute-integration.md) records 19 cases and 114 timed processes. Ordinary worksheet/document p50 changes are +0.36%/+1.34%; accepted OPC controls have four latency flags, including 22.811 → 35.151 µs (+54.10%) at 256 extra namespace declarations. Two RSS flags and separate instruction/allocation observations are disclosed. Three larger OPC controls measure existing namespace-limit refusals, not accepted-input scaling. This is parser evidence, not a complete CRUD baseline.

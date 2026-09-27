@@ -1,0 +1,6 @@
+[generated-xlsx-medium] closure=['[Content_Types].xml', 'xl/_rels/workbook.xml.rels', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml']
+ preservation=PASS ['xl/workbook.xml', 'xl/worksheets/sheet1.xml'] removed= []
+ semantic=PASS {'workbook_structure_equal': True, 'source_calcPr': None, 'output_calcPr': {'calcId': '0', 'fullCalcOnLoad': 'true', 'calcCompleted': 'false', 'calcOnSave': 'true', 'forceFullCalc': 'true'}, 'calcPr_contract': {'calcId': '0', 'fullCalcOnLoad': 'true', 'calcCompleted': 'false', 'calcOnSave': 'true', 'forceFullCalc': 'true'}, 'content_types_semantics_equal_outside_calcChain': True, 'calcChain_source_present': False}
+[real-002-xlsx] closure=['[Content_Types].xml', 'xl/_rels/workbook.xml.rels', 'xl/calcChain.xml', 'xl/sharedStrings.xml', 'xl/workbook.xml', 'xl/worksheets/_rels/sheet1.xml.rels', 'xl/worksheets/sheet1.xml']
+ preservation=PASS ['[Content_Types].xml', 'xl/_rels/workbook.xml.rels', 'xl/calcChain.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml'] removed= ['xl/calcChain.xml']
+ semantic=FAIL real-002-xlsx content-type table changed outside exact calcChain override removal

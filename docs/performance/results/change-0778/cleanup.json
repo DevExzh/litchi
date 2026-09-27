@@ -1,0 +1,37 @@
+{
+  "binaries": {
+    "allocation": {
+      "bytes": 68763728,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/litchi-perf-baseline-alloc",
+      "sha256": "f3b7ff77a5fa2d870668e8c109c3e3e46d7dca684f2844cb2b900031835c151c"
+    },
+    "export": {
+      "bytes": 16951440,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/ordinary_save_artifacts",
+      "sha256": "594a1cf0306df1b24679a7c02c8700fe8fa4ea22bcb448cc33fff02c4e8149e3"
+    },
+    "native": {
+      "bytes": 68888160,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/litchi-perf-baseline",
+      "sha256": "4de6d61eb9a4c6174c74fa0b1a8f87721ac6dbb23b0240c47a96ed47aa496995"
+    }
+  },
+  "completed_unix": 1790489345.2706347,
+  "executables_verified_before_removal": true,
+  "main_unrelated_files_unchanged": true,
+  "scope": "Only owned 0778 target and filesystem root; copied lock, reference symlinks and owned worktree removed after integration and recorded in report.",
+  "source_unchanged": true,
+  "targets": [
+    {
+      "bytes": 6799132270,
+      "path": "/home/zhuhe/code/litchi-target-0778",
+      "removed": true
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-0778-fs",
+      "removed": true
+    }
+  ],
+  "verified": true
+}

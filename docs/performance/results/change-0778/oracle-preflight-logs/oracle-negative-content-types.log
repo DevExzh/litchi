@@ -1,0 +1,5 @@
+printer-override-content-type: REJECTED: negative.printer-override-content-type content-type table changed outside the exact owned normalization
+missing-retained-printer-override: REJECTED: negative.missing-retained-printer-override content-type table changed outside the exact owned normalization
+extra-content-type-declaration: REJECTED: negative.extra-content-type-declaration content-type table changed outside the exact owned normalization
+unrelated-default-content-type: REJECTED: negative.unrelated-default-content-type content-type table changed outside the exact owned normalization
+baseline printer-settings normalization: ACCEPTED

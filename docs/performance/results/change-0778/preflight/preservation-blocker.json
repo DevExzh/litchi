@@ -1,0 +1,40 @@
+{
+  "default": {
+    "note_relationships": [],
+    "parts": {
+      "word/endnotes.xml": {
+        "bytes": 1530,
+        "sha256": "810a35859563fe6a4feb406e19791f70a6c487e4332c0e415fa72cc6c2abe741"
+      },
+      "word/footnotes.xml": {
+        "bytes": 1536,
+        "sha256": "c630c3ba2c6b4430b9024e5a17e87d5e5dc54997170edf833a0689c700addebe"
+      }
+    }
+  },
+  "disposition": "Reject preflight; retained note parts lose reachability through main-document relationships after unrelated paragraph append. No native or allocation capture admitted.",
+  "source": {
+    "note_relationships": [
+      {
+        "Id": "rId8",
+        "Target": "endnotes.xml",
+        "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
+      },
+      {
+        "Id": "rId7",
+        "Target": "footnotes.xml",
+        "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+      }
+    ],
+    "parts": {
+      "word/endnotes.xml": {
+        "bytes": 1530,
+        "sha256": "810a35859563fe6a4feb406e19791f70a6c487e4332c0e415fa72cc6c2abe741"
+      },
+      "word/footnotes.xml": {
+        "bytes": 1536,
+        "sha256": "c630c3ba2c6b4430b9024e5a17e87d5e5dc54997170edf833a0689c700addebe"
+      }
+    }
+  }
+}

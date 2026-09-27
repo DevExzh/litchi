@@ -1,0 +1,34 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--offline",
+    "--locked",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "ordinary_save::tests::artifact_export_generated_matrix_matches_reference_and_refuses_reuse",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "ended": 1790484981.2497182,
+  "exit_code": 0,
+  "log": {
+    "bytes": 527,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/library-followup.log",
+    "sha256": "ae86dc45e02f53090a93890e3fc4a473751ed2a3e9663f136dbd9d52001eeee9"
+  },
+  "only_source_difference": {
+    "bytes": 903,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/library-followup.diff",
+    "sha256": "07823b9be1f6a05adc23a77c49654d20b00ceaf6d224f29230dc14da40b3067b"
+  },
+  "predecessor_source_sha256": "c278f024ec2147f19536d317ab68179283451903a218362c0f8b678d64892733",
+  "replacement_count": 2,
+  "scope": "Final-source focused exporter retest after exact two-line then_some Clippy correction; full library suite passed on predecessor.",
+  "source_sha256": "352b4b536a4ae8b96e1579824ab642c5852562f07f6a3ef7d7ef6f298ae1537b",
+  "started": 1790484958.9369001
+}
