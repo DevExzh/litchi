@@ -13,6 +13,7 @@ pub mod bom;
 pub mod bounded;
 pub mod budget;
 pub mod detection;
+pub mod durability;
 pub mod error;
 /// Runtime-neutral execution policy, cancellation, and resource charging.
 pub mod execution;
@@ -50,6 +51,7 @@ pub use budget::{
     Budget, Lease, Limits, Profile, Reservation, Resource, ResourceLimit, ScopedReservation,
 };
 pub use detection::FileFormat;
+pub use durability::Durability;
 pub use error::{Error, Result};
 pub use execution::{
     AffinityPolicy, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,

@@ -110,7 +110,30 @@ impl Writer {
 }
 impl Writer {
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
-        self.build_ole_writer()?.save(path)?;
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Saves the document atomically at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic replacement; a weaker level only skips the parent-directory
+    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
+    /// guarantees `Durability` states.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the file cannot be written
+    /// or replaced. Only `Durability::Full` can report that the destination
+    /// was replaced but its directory could not be synchronized.
+    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<(), WriteError> {
+        self.build_ole_writer()?
+            .save_with_durability(path, durability)?;
         Ok(())
     }
 

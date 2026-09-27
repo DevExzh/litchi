@@ -54,6 +54,8 @@ mod directory_validation_tests;
 #[cfg(test)]
 mod overlay_tests;
 #[cfg(test)]
+mod publish_tests;
+#[cfg(test)]
 mod splice_tests;
 #[cfg(test)]
 mod stream_compare_tests;

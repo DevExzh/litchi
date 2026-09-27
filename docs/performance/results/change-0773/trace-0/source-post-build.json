@@ -1,0 +1,16 @@
+{
+  "after": {
+    "observed_head": "339572acbf570b2614cfa346e73b8f8d6da358f4",
+    "phase": "after-build",
+    "repo": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration",
+    "source_sha256": "944487a36651984ba9a81558888496401434f525e99009e99675bac8dadcd530",
+    "workspace_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "before": {
+    "observed_head": "d5aaecabed2a2e2b6b816ffc14a28fd746a479a0",
+    "phase": "after-build",
+    "repo": "/home/zhuhe/code/litchi",
+    "source_sha256": "9f651f8dee19e65f671dd5a51a943fcbaf1a22d19a4f178000cd87dcb81bbffa",
+    "workspace_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  }
+}

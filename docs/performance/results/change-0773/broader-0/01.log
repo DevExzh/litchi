@@ -1,0 +1,1049 @@
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-core)
+   Compiling tempfile v3.27.0
+   Compiling elliptic-curve v0.13.8
+   Compiling hashbrown v0.16.1
+   Compiling equivalent v1.0.2
+   Compiling bumpalo v3.20.3
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-opc)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-ole-common)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-crypto)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-vba)
+   Compiling simd-adler32 v0.3.10
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-ooxml-common)
+   Compiling zopfli v0.8.3
+   Compiling indexmap v2.11.4
+   Compiling typed-path v0.12.3
+   Compiling zip v8.6.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling rsa v0.9.10
+   Compiling p256 v0.13.2
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0773-durability-integration/crates/litchi-sign)
+    Finished `test` profile [unoptimized] target(s) in 16.17s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_crypto-25d958cd266fceeb)
+
+running 73 tests
+test integrity::tests::crc_is_incremental_and_can_verify_an_info_stream ... ok
+test integrity::tests::future_versions_are_ignored_without_interpreting_payload ... ok
+test integrity::tests::invalid_header_is_rejected ... ok
+test integrity::tests::version_zero_round_trips_with_reserved_bytes ... ok
+test labels::tests::dtd_and_reserved_writer_bits_are_rejected ... ok
+test labels::tests::a_byte_order_marked_stream_parses_and_reports_like_an_unmarked_one ... ok
+test labels::tests::malformed_and_conflicting_metadata_is_rejected ... ok
+test labels::tests::removed_label_is_a_typed_tombstone ... ok
+test labels::tests::typed_labels_round_trip_in_normative_attribute_order ... ok
+test labels::tests::unknown_extension_is_preserved_exactly ... ok
+test legacy_rc4::tests::header_verifier_uses_one_continuous_cipher_and_rejects_wrong_password ... ok
+test legacy_rc4::tests::invalid_bounds_fail_before_mutation ... ok
+test legacy_rc4::tests::parser_rejects_truncation_extension_and_wrong_version ... ok
+test legacy_rc4::tests::password_derivation_matches_apache_poi_vector ... ok
+test legacy_rc4::tests::passwords_over_the_normative_limit_are_rejected ... ok
+test legacy_rc4::tests::absolute_offsets_rekey_at_boundaries_for_both_consumers ... ok
+test ooxml::agile::tests::agile_reader_accepts_sha1_alias_but_authoring_stays_canonical ... ok
+test ooxml::agile::tests::agile_reader_supports_the_known_mixed_wrapper_hash_profile ... ok
+test ooxml::agile::tests::agile_sha1_accepts_literal_salt_size_integrity_key ... ok
+test ooxml::agile::tests::agile_wrong_password_and_tampering_are_typed ... ok
+test ooxml::agile::tests::agile_xml_limits_reject_malformed_depth_nodes_and_spin ... ok
+test ooxml::agile::tests::missing_data_integrity_requires_explicit_read_opt_in ... ok
+test ooxml::agile::tests::mixed_wrapper_hash_compatibility_stays_narrow ... ok
+test ooxml::agile::tests::parses_independent_agile_wrapper_and_data_key_sizes ... ok
+test ooxml::container::tests::accepts_the_narrow_libreoffice_no_dataspaces_profile ... ok
+test ooxml::container::tests::agile_encryption_name_must_remain_null ... ok
+test ooxml::container::tests::cfb_allocation_failure_keeps_its_typed_category ... ok
+test ooxml::container::tests::encrypted_package_declared_size_is_limited_before_materialization ... ok
+test ooxml::container::tests::encryption_info_declared_size_is_limited_before_materialization ... ok
+test ooxml::container::tests::explicit_cfb_allocation_table_limit_reaches_the_container_reader ... ok
+test ooxml::container::tests::explicit_cfb_directory_limit_reaches_the_container_reader ... ok
+test ooxml::container::tests::output_limit_stops_before_growth ... ok
+test ooxml::container::tests::standard_encryption_info_overrides_mismatched_transform_parameters ... ok
+test ooxml::container::tests::standard_transform_name_follows_the_selected_aes_profile ... ok
+test ooxml::container::tests::wrapper_has_the_normative_strong_encryption_graph ... ok
+test ooxml::container::tests::wrapper_reports_output_ceiling_as_typed_limit ... ok
+test ooxml::standard::tests::parses_the_published_ms_offcrypto_3_8_header_vector ... ok
+test ooxml::standard::tests::standard_aes_key_sizes_round_trip ... ok
+test ooxml::standard::tests::standard_wrong_password_is_typed ... ok
+test ooxml::standard::tests::valid_aes_profiles_are_admitted_to_the_parser ... ok
+test ooxml::tests::authoring_requires_a_nonempty_password ... ok
+test ooxml::tests::bounded_reader_stops_after_one_detection_byte ... ok
+test ooxml::tests::inspect_distinguishes_plain_from_malformed_cfb ... ok
+test ooxml::tests::opened_debug_never_discloses_package_bytes ... ok
+test ooxml::tests::ordinary_input_ignores_irrelevant_password_policy ... ok
+test ooxml::tests::ordinary_input_moves_without_reallocation ... ok
+test ooxml::tests::password_limit_counts_unicode_scalar_values ... ok
+test ooxml::tests::policy_rejects_schema_exceeding_spin_limit ... ok
+test ooxml::tests::rekey_rejects_plain_input_and_password_debug_is_redacted ... ok
+test protected::tests::document_envelope_is_zero_copy_and_round_trips ... ok
+test protected::tests::malformed_envelopes_are_rejected ... ok
+test protected::tests::viewer_length_describes_compressed_plaintext ... ok
+test rc4::tests::block_cipher_offset_matches_constant_memory_chunking ... ok
+test rc4::tests::block_cipher_supports_office_key_sizes_and_offsets ... ok
+test rc4::tests::header_enforces_rc4_cryptoapi_fixed_fields ... ok
+test rc4::tests::typed_header_builder_round_trips_and_rejects_invalid_flags ... ok
+test spaces::tests::classifies_binary_irm_with_optional_viewer_chain ... ok
+test spaces::tests::core_streams_round_trip ... ok
+test spaces::tests::encryption_metadata_edit_does_not_touch_encrypted_payload ... ok
+test spaces::tests::encryption_transform_round_trip_preserves_typed_parameters ... ok
+test spaces::tests::end_user_license_round_trip_preserves_inert_xml ... ok
+test spaces::tests::inspects_and_classifies_complete_ooxml_irm_graph ... ok
+test spaces::tests::irm_transform_round_trip_preserves_license ... ok
+test spaces::tests::ooxml_read_compatibility_accepts_native_header_quirks_only ... ok
+test spaces::tests::ooxml_read_compatibility_does_not_skip_reserved_field_validation ... ok
+test spaces::tests::ooxml_transform_length_compatibility_is_limited_to_strong_encryption ... ok
+test spaces::tests::package_rebuild_preserves_unrelated_streams_and_empty_storages ... ok
+test spaces::tests::rejects_custom_xml_promotion_without_irm ... ok
+test spaces::tests::rejects_malformed_lengths_padding_counts_and_drm_identity ... ok
+test spaces::tests::snapshot_noop_replays_exact_dataspaces_source ... ok
+test spaces::tests::snapshot_rejects_oversized_opaque_stream_before_materialization ... ok
+test spaces::tests::transaction_changes_definition_and_rejects_stale_patch_sources ... ok
+test ooxml::agile::tests::agile_profiles_round_trip_with_authenticated_integrity ... ok
+
+test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.37s
+
+     Running tests/agile_allocations.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/agile_allocations-fb742d99814ea543)
+
+running 1 test
+test agile_segment_iv_derivation_does_not_allocate_per_segment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/native_ooxml_encryption.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/native_ooxml_encryption-ecf05c47ff21b647)
+
+running 3 tests
+test apache_poi_60320_mixed_wrapper_profile_opens ... ignored, requires the Apache POI 60320 fixture checkout
+test libreoffice_standard_without_dataspaces_requires_explicit_compatibility ... ignored, requires the native Office/LibreOffice corpus checkout
+test native_office_profiles_open_with_default_graph_validation ... ignored, requires the native Office/LibreOffice corpus checkout
+
+test result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ooxml_interoperability.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/ooxml_interoperability-a18070b565d7ee4a)
+
+running 4 tests
+test ooxml_read_compatibility_normalizes_msoffcrypto_zero_block_graph ... ok
+test opens_independent_standard_aes192_and_aes256_vectors ... ok
+test opens_independent_agile_sha512_and_mixed_key_size_vectors ... ok
+test rekey_preserves_an_opened_non_default_profile ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.76s
+
+     Running tests/real_office_encryption.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/real_office_encryption-ffcb665aba9f4147)
+
+running 3 tests
+test authenticates_apache_poi_cryptoapi_word_fixture ... ok
+test inspects_apache_poi_xor_workbook_without_claiming_unsupported_decryption ... ok
+test authenticates_apache_poi_cryptoapi_powerpoint_fixture ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_ole_common-7048bb4629ea6b35)
+
+running 167 tests
+test custom_xml::tests::accepts_and_preserves_utf16_xml_streams ... ok
+test custom_xml::tests::failed_edits_and_malformed_or_limited_candidates_are_atomic ... ok
+test custom_xml::tests::no_op_commit_reuses_the_exact_source_and_patch_is_empty ... ok
+test custom_xml::tests::property_xml_and_compact_storage_name_round_trip ... ok
+test custom_xml::tests::inverse_and_stale_patch_application_are_source_checked ... ok
+test custom_xml::tests::reads_real_word_custom_xml_store ... ok
+test custom_xml::tests::rejects_conflicting_markers_bad_shape_and_hostile_xml ... ok
+test custom_xml::tests::synthetic_store_round_trips_with_modified_promotion ... ok
+test custom_xml::tests::transaction_edits_store_item_and_properties_without_losing_opaque_bytes ... ok
+test custom_xml::tests::zero_count_limits_can_disable_items_and_schema_references ... ok
+test object::cfb_path::tests::cfb_name_comparison_is_litchi_cfbs_directory_comparison ... ok
+test object::cfb_path::tests::path_rejects_names_that_cannot_be_directory_entries ... ok
+test object::directory::tests::catalog_preserves_unknown_raw_entries_and_exact_no_op_source ... ok
+test object::directory::tests::class_id_codec_preserves_cfb_byte_order ... ok
+test object::directory::tests::catalog_validation_is_bounded_and_failure_atomic ... ok
+test object::directory::tests::decodes_storage_class_id_and_rejects_stream_only_fields ... ok
+test object::directory::tests::decodes_stream_identity_and_links_without_payload_allocation ... ok
+test object::directory::tests::invalid_relationships_are_rejected_before_publication ... ok
+test object::directory::tests::directory_patch_rejects_stale_sources_and_round_trips_inverse ... ok
+test object::directory::tests::metadata_is_small_and_copyable ... ok
+test object::directory::tests::metadata_and_containment_edits_are_typed_and_raw_preserving ... ok
+test object::directory::tests::preserves_a_nonzero_storage_start_sector_until_a_typed_edit ... ok
+test object::directory::tests::projects_nonzero_stream_filetimes_without_conversion ... ok
+test object::directory::tests::projects_raw_state_and_filetimes_without_conversion ... ok
+test object::directory::tests::sid_zero_root_name_and_kind_are_immutable ... ok
+test object::directory::tests::typed_metadata_edit_preserves_filetime_lexical_values ... ok
+test object::link::tests::embedded_header_round_trips_without_inventing_optional_fields ... ok
+test object::link::tests::invalid_typed_edits_leave_the_transaction_unchanged ... ok
+test object::link::tests::linked_metadata_is_typed_and_unknown_tail_is_retained ... ok
+test object::link::tests::malformed_known_fields_are_rejected ... ok
+test object::link::tests::patch_checks_fingerprint_and_exact_source_range ... ok
+test object::link::tests::snapshot_no_op_commit_replays_exact_source_bytes ... ok
+test object::link::tests::transaction_publishes_typed_edits_and_preserves_unknown_tail ... ok
+test object::link::tests::typed_edits_change_only_owned_fields ... ok
+test object::patch::tests::equal_artifacts_are_a_noop ... ok
+test property_set::alternate_stream::tests::control_edits_retain_reserved2_while_changing_state_and_clsid_presence ... ok
+test object::patch::tests::patch_requires_its_source_and_round_trips_inverse ... ok
+test property_set::alternate_stream::tests::control_packet_preserves_reserved2_and_opaque_optional_clsid ... ok
+test property_set::alternate_stream::tests::control_packet_rejects_other_sizes_and_nonzero_reserved1 ... ok
+test property_set::alternate_stream::tests::fresh_control_packets_zero_reserved_words_and_select_packet_size ... ok
+test property_set::alternate_stream::tests::non_simple_name_keeps_standard_binding_names_distinct_from_cfb_paths ... ok
+test property_set::alternate_stream::tests::non_simple_name_canonicalizes_binding_aliases_to_the_wire_name ... ok
+test property_set::alternate_stream::tests::non_simple_name_matches_the_property_bag_alternate_stream_example ... ok
+test property_set::alternate_stream::tests::non_simple_name_rejects_wrong_prefix_and_invalid_binding_suffix ... ok
+test property_set::alternate_stream::tests::property_bag_example_control_packet_is_the_eight_byte_absent_clsid_form ... ok
+test property_set::binding::tests::generic_binding_codec_matches_an_independent_packet_guid_vector ... ok
+test property_set::binding::tests::generic_binding_names_reject_bad_alphabet_and_trailing_bits ... ok
+test property_set::binding::tests::generic_binding_names_round_trip_without_heap_storage ... ok
+test property_set::binding::tests::named_bindings_use_the_ms_oleps_cfb_names ... ok
+test property_set::binding::tests::property_bag_binding_matches_the_ms_oleps_example ... ok
+test property_set::codec::binary::composite_tests::parses_the_checked_in_heading_pair_wire_example ... ok
+test property_set::codec::binary::composite_tests::parses_unaligned_ansi_parts_without_inventing_padding ... ok
+test property_set::codec::binary::composite_tests::preserves_generic_variant_vectors_outside_the_well_known_pid ... ok
+test property_set::codec::binary::composite_tests::preserves_unknown_property_values_outside_the_well_known_pids ... ok
+test property_set::codec::binary::composite_tests::rejects_odd_heading_counts_and_bounded_count_amplification ... ok
+test property_set::codec::binary::composite_tests::rejects_mismatched_heading_totals ... ok
+test property_set::codec::binary::composite_tests::round_trips_ansi_heading_pairs_and_unaligned_doc_parts ... ok
+test property_set::codec::binary::composite_tests::round_trips_unicode_composites_with_relative_string_padding ... ok
+test property_set::codec::binary::tests::arrays_reject_wrong_shape_and_scalar_values ... ok
+test property_set::codec::binary::tests::array_values_round_trip_with_row_major_dimensions ... ok
+test property_set::codec::binary::tests::bounded_preflight_rejects_unrepresentable_wire_offsets_without_materializing ... ok
+test property_set::codec::binary::tests::bounded_serialization_accepts_exact_stream_bytes_and_rejects_one_under ... ok
+test property_set::codec::binary::tests::bounded_serialization_preserves_composites_and_opaque_values ... ok
+test property_set::codec::binary::tests::bounded_serialization_rejects_giant_blob_before_output_materialization ... ok
+test property_set::codec::binary::tests::facade_round_trips_typed_property_values ... ok
+test property_set::codec::binary::tests::homogeneous_vector_round_trip_uses_its_scalar_type ... ok
+test property_set::codec::binary::tests::narrow_vectors_and_arrays_pad_the_scalar_sequence_once ... ok
+test property_set::codec::binary::tests::variant_array_round_trip_preserves_element_types ... ok
+test property_set::codec::binary::tests::versioned_stream_rejects_special_property_identifiers ... ok
+test property_set::codec::binary::tests::bounded_serialization_preserves_ansi_and_unicode_boundaries ... ok
+test property_set::codec::binary::tests::versioned_stream_round_trip_uses_the_typed_inert_selector ... ok
+test property_set::codec::tests::outer_typed_property_padding_is_ignored_while_blob_data_is_preserved ... ok
+test property_set::codec::tests::reader_opens_a_guid_derived_binding_without_a_format_specific_path ... ok
+test property_set::codec::tests::typed_property_codec_preserves_scalar_values ... ok
+test property_set::document_summary::tests::known_pid_types_and_required_invariants_are_checked ... ok
+test property_set::codec::tests::editor_preserves_nested_streams_with_matching_leaf_names ... ok
+test property_set::document_summary::tests::opaque_pidssi_payloads_survive_typed_edits_and_wire_round_trip ... ok
+test property_set::document_summary::tests::patch_requires_the_exact_source_and_failed_edits_are_transactional ... ok
+test property_set::document_summary::tests::typed_pidssi_round_trip_uses_contextual_accessors ... ok
+test property_set::document_summary::tests::typed_string_edits_are_bounded_and_follow_the_section_codepage ... ok
+test property_set::non_simple::tests::copied_path_budget_rejects_a_wide_directory_before_catalog_retention ... ok
+test property_set::non_simple::tests::every_indirect_variant_checks_its_cfb_element_kind_and_versioned_tail ... ok
+test property_set::non_simple::tests::changed_stream_preserves_empty_storage_and_inverse ... ok
+test property_set::non_simple::tests::every_new_indirect_variant_rejects_a_replaced_property_id_mismatch ... ok
+test property_set::non_simple::tests::invalid_indirect_property_identifier_is_rejected_before_serialization ... ok
+test property_set::non_simple::tests::generic_property_parser_keeps_indirect_type_opaque ... ok
+test property_set::non_simple::tests::limits_reject_oversized_indirect_stream_before_render ... ok
+test property_set::non_simple::tests::ordinary_open_is_lazy_and_noop_shares_exact_source ... ok
+test property_set::non_simple::tests::output_limit_accepts_exact_rendered_size_and_rejects_one_byte_less ... ok
+test property_set::non_simple::tests::owned_input_limit_is_checked_before_arc_conversion ... ok
+test property_set::non_simple::tests::owner_closure_validates_opaque_indirect_variant_tags ... ok
+test property_set::non_simple::tests::physical_and_typed_crud_commit_atomically ... ok
+test property_set::non_simple::tests::physical_paths_use_cfb_unicode_name_matching_and_reject_reserved_characters ... ok
+test property_set::non_simple::tests::output_layout_preflight_covers_empty_mini_and_regular_stream_boundaries ... ok
+test property_set::non_simple::tests::root_clsid_mismatch_is_checked_when_contents_is_requested ... ok
+test property_set::non_simple::tests::rejected_physical_edits_do_not_materialize_or_disturb_a_staged_edit ... ok
+test property_set::non_simple::tests::storage_variant_keeps_empty_storage_and_reversible_source ... ok
+test property_set::non_simple::tests::typed_indirect_values_bind_case_insensitive_and_preserve_selector_spelling ... ok
+test property_set::summary_information::tests::absence_is_distinct_from_explicit_empty_zero_and_false_like_values ... ok
+test property_set::summary_information::tests::filetime_conversions_and_reversible_patches_are_source_checked ... ok
+test property_set::summary_information::tests::missing_codepage_and_wrong_identity_are_rejected ... ok
+test property_set::summary_information::tests::typed_pid_values_round_trip_without_reimplementing_wire_grammar ... ok
+test property_set::summary_information::tests::codepage_and_typed_values_are_checked_before_publication ... ok
+test property_set::summary_information::tests::unknown_properties_survive_typed_edits_and_round_trip_in_order ... ok
+test property_set::summary_information::tests::unicode_codepage_uses_the_codepage_aware_lpwstr_variant ... ok
+test property_set::tests::filetime_conversion_is_checked ... ok
+test property_set::tests::generic_versioned_stream_values_remain_opaque_and_byte_exact ... ok
+test property_set::tests::parses_typed_stream_and_unsigned_codepage ... ok
+test property_set::tests::parses_variant_vectors_and_preserves_unknown_values ... ok
+test property_set::tests::property_set_pages_are_checked_before_mutation ... ok
+test property_set::tests::projects_existing_document_properties_fixture ... ok
+test property_set::tests::reads_apache_poi_named_custom_properties ... ok
+test property_set::tests::reads_apache_poi_two_section_unicode_properties ... ok
+test property_set::tests::reads_undefined_filetime_and_word90_fixtures ... ok
+test property_set::tests::rejects_duplicate_offsets_and_truncated_values ... ok
+test property_set::tests::rejects_unicode_and_vector_allocation_overflows ... ok
+test property_set::tests::unsupported_indirect_stream_properties_remain_inert_and_opaque ... ok
+test property_set::tests::reads_non_dword_and_zero_length_property_fixtures ... ok
+test property_set::tests::validates_the_version_one_behavior_property ... ok
+test property_set::tests::version_one_round_trips_versioned_numeric_properties ... ok
+test property_set::tests::versioned_stream_name_must_match_its_property_identifier ... ok
+test property_set::user_defined::tests::compact_fixture_round_trips_and_preserves_the_stored_hash ... ok
+test property_set::user_defined::tests::decode_limits_accept_exact_boundaries_and_reject_one_over ... ok
+test property_set::user_defined::tests::edits_preserve_existing_identity_order_unknown_values_and_remove_cleanly ... ok
+test property_set::user_defined::tests::fixtures_enforce_exact_bounds_and_malformed_inner_fields ... ok
+test property_set::user_defined::tests::hash_is_case_insensitive_and_constructor_uses_the_should_algorithm ... ok
+test property_set::user_defined::tests::hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding ... ok
+test property_set::user_defined::tests::independent_compact_fixtures_have_exact_tags_hash_and_alignment ... ok
+test property_set::user_defined::tests::limits_cover_link_count_string_and_aggregate_units ... ok
+test property_set::user_defined::tests::insertion_establishes_required_scaffolding_and_edits_rollback ... ok
+test property_set::user_defined::tests::malformed_values_are_lazy_and_bounded ... ok
+test property_set::user_defined::tests::reserved_names_are_case_insensitive_and_never_numeric_piddsi ... ok
+test property_set::user_defined::tests::property_stream_outer_hyperlink_padding_is_ignored_before_typed_overlay ... ok
+test property_set::user_defined::tests::wrong_section_is_rejected_without_interpreting_piddsi ... ok
+test smart_tags::tests::parses_store_prefix_and_resolves_indexed_bag ... ok
+test smart_tags::tests::rejects_bad_counts_references_reserved_fields_and_truncation ... ok
+test smart_tags::tests::serializes_store_and_bags_exactly_and_refuses_lossy_ansi ... ok
+test smart_tags::tests::snapshot_enforces_exact_bag_count_and_source_size ... ok
+test smart_tags::tests::snapshot_retains_exact_source_and_all_bags_for_a_noop ... ok
+test smart_tags::tests::stale_sources_and_invalid_or_oversized_edits_are_rejected_atomically ... ok
+test smart_tags::tests::typed_property_edits_preserve_unknown_strings_and_other_bags ... ok
+test source_backed_overlay::tests::wrapper_publishes_only_the_validated_equal_length_splice ... ok
+test source_backed_overlay::tests::wrapper_publishes_only_the_validated_equal_length_stream ... ok
+test toolbar::tests::control_header_matches_ms_oshared_example_bytes ... ok
+test toolbar::tests::control_header_preserves_unknown_type_and_rejects_bad_construction ... ok
+test toolbar::tests::control_header_roundtrips_optional_dimensions ... ok
+test toolbar::tests::control_snapshot_edits_text_icon_and_flags_without_losing_opaque_bytes ... ok
+test toolbar::tests::flag_models_preserve_unknown_and_reserved_bits ... ok
+test toolbar::tests::general_info_and_extra_data_roundtrip_without_allocating_decoded_strings ... ok
+test toolbar::tests::general_info_rejects_fields_without_their_presence_flags ... ok
+test toolbar::tests::toolbar_control_edits_fail_atomically_and_opaque_payloads_stay_inert ... ok
+test toolbar::tests::toolbar_control_no_op_is_exact_and_stale_sources_are_rejected ... ok
+test toolbar::tests::toolbar_header_roundtrips_and_keeps_prefix_parsing ... ok
+test toolbar::tests::toolbar_header_validates_fixed_fields_and_menu_restrictions ... ok
+test toolbar::tests::wstring_decodes_borrowed_utf16_and_serializes_exactly ... ok
+test toolbar::tests::wstring_rejects_invalid_lengths_nuls_and_surrogates ... ok
+test vba_signature::tests::blob_snapshot_noop_retains_the_exact_source_allocation ... ok
+test vba_signature::tests::configured_payload_budgets_are_enforced_before_retention ... ok
+test source_backed_overlay::tests::wrapper_retains_every_existing_protected_component_refusal ... ok
+test vba_signature::tests::edits_reject_limits_and_unrepresentable_word_sizes_atomically ... ok
+test vba_signature::tests::malformed_boundaries_reserved_fields_and_overlaps_are_rejected ... ok
+test vba_signature::tests::property_blob_exposes_payloads_and_preserves_unknown_bytes ... ok
+test vba_signature::tests::property_payload_replacement_updates_offsets_and_preserves_unknown_fields ... ok
+test vba_signature::tests::property_single_payload_resize_rewrites_aligned_outer_size ... ok
+test vba_signature::tests::stale_application_is_rejected_without_mutating_the_stale_snapshot ... ok
+test vba_signature::tests::word_blob_uses_its_distinct_offset_base_and_keeps_padding ... ok
+test vba_signature::tests::word_payload_replacement_updates_utf16_outer_sizes_and_preserves_padding ... ok
+
+test result: ok. 167 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/dataspaces.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/dataspaces-b96f57f402896bf4)
+
+running 3 tests
+test accepts_exact_and_under_dataspaces_stream_limits ... ok
+test rejects_zero_and_above_ceiling_limits_before_lookup ... ok
+test rejects_oversized_dataspaces_stream_before_payload_io ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/object.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/object-cf92993097d4cae3)
+
+running 30 tests
+test added_storage_uses_zero_metadata_for_nonzero_source_root ... ok
+test add_and_remove_use_explicit_targets ... ok
+test batched_stream_replacement_is_atomic_and_reuses_allocations ... ok
+test commit_exposes_snapshot_and_reversible_patch ... ok
+test changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors ... ok
+test discovers_only_host_selected_storage_and_keeps_metadata_opaque ... ok
+test discovery_resolves_case_variant_target_paths_to_stored_cfb_names ... ok
+test failed_replacement_is_transactional ... ok
+test malformed_format_metadata_is_retained_without_common_classification ... ok
+test editor_edit_preserves_directory_metadata_for_unchanged_entries ... ok
+test missing_target_is_a_checked_discovery_error ... ok
+test no_op_editor_round_trip_is_byte_identical ... ok
+test object_add_and_replace_preflight_limits_are_failure_atomic ... ok
+test prepared_replacement_commit_supports_forward_and_inverse_patch ... ok
+test rendered_batch_checks_max_streams_before_equal_repeated_items ... ok
+test rendered_batch_empty_and_equal_inputs_return_none_without_publication ... ok
+test prepared_replacement_admission_is_bounded_and_source_bound ... ok
+test rendered_batch_matches_recomputed_output_under_both_layout_policies ... ok
+test rendered_batch_preserves_repeated_path_last_value ... ok
+test replacement_preserves_target_storage_metadata_while_mapping_clsid ... ok
+test same_length_overlay_declines_noncanonical_v3_empty_size_word ... ok
+test same_length_editor_edit_uses_source_backed_copy_through ... ok
+test selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults ... ok
+test shared_stream_replacement_reuses_validated_allocation ... ok
+test snapshots_share_streams_and_edit_independently ... ok
+test target_catalog_is_explicit_and_rejects_ambiguous_paths ... ok
+test target_paths_follow_cfb_name_limits_and_simple_uppercase_identity ... ok
+test targeted_replace_preserves_unrelated_streams_and_opaque_reference ... ok
+test uniquely_owned_noop_editor_retains_the_consumed_vec_allocation ... ok
+test sealed_copy_through_publishes_the_generic_overlay_bytes ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/object_link.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/object_link-59311f88785420bd)
+
+running 2 tests
+test selected_objects_expose_shared_link_metadata ... ok
+test link_edits_publish_atomically_and_preserve_opaque_streams ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/object_path_case_folding.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/object_path_case_folding-fbc92db71a766734)
+
+running 2 tests
+test case_distinct_supplementary_siblings_resolve_to_their_own_storage ... ok
+test removing_one_siblings_stream_leaves_the_other ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/object_stream_delete.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/object_stream_delete-4866b30d9f53c9f6)
+
+running 8 tests
+test batch_reports_absence_preserves_unrelated_bytes_and_is_reversible ... ok
+test configured_capture_boundaries_remain_in_force_for_deletion ... ok
+test deletion_composes_with_add_and_replace_in_one_editor ... ok
+test missing_empty_and_invalid_deletions_are_exact_atomic_noops ... ok
+test protected_packages_are_refused_before_stream_deletion_can_begin ... ok
+test removes_first_middle_last_and_only_stream_without_removing_storages ... ok
+test supplementary_plane_case_pairs_are_distinct_stream_names ... ok
+test duplicates_limit_and_late_invalid_paths_leave_the_editor_unchanged ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/object_streams.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/object_streams-0b7bc150e9ec4a14)
+
+running 6 tests
+test absent_typed_streams_still_validate_explicit_limits ... ok
+test malformed_known_stream_is_rejected_without_owner_publication ... ok
+test object_and_snapshot_expose_typed_ole2_streams_without_name_scans ... ok
+test native_owner_edit_and_explicit_limits_preserve_directory_metadata ... ok
+test typed_owner_edits_are_noop_source_checked_and_reversible ... ok
+test presentation_count_limit_is_independent_of_toc_entry_limit ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/ole1.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/ole1-39748003d279490c)
+
+running 16 tests
+test decoded_ole_inline_fixture_uses_opaque_native_empty_presentation_profile ... ignored, requires the externally supplied decoded LibreOffice native corpus
+test edits_preserve_signed_dimensions_and_reserved_metafile_words ... ok
+test canonical_authoring_covers_all_five_presentation_forms ... ok
+test fresh_authoring_preflights_all_strings_at_their_caller_bound ... ok
+test fresh_authoring_enforces_registered_clipboard_and_link_path_rules ... ok
+test limits_are_checked_before_admission_and_stale_patch_is_rejected ... ok
+test linked_source_keeps_network_encoding_and_updates_only_requested_field ... ok
+test malformed_lp_values_and_invalid_limits_are_rejected_before_editing ... ok
+test missing_embedded_presentation_requires_explicit_compatibility ... ok
+test nested_format_zero_requires_explicit_empty_header_compatibility_and_is_source_only ... ok
+test nonzero_link_reserved_is_preserved_for_noop_but_refuses_typed_rewrites ... ok
+test registered_optional_name_is_rejected_when_two_complete_grammars_match ... ok
+test registered_without_name_is_distinguished_and_source_only ... ok
+test source_noop_shares_arc_and_patch_is_exactly_reversible ... ok
+test source_reader_preserves_noncanonical_clipboard_and_topic_forms_without_typed_rewrite ... ok
+test unicode_registered_name_retains_exact_utf16le_payload ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ole_streams.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/ole_streams-443e718ee5d47cf3)
+
+running 17 tests
+test alternate_standard_clipboard_marker_survives_typed_rewrite ... ok
+test native_stream_edit_is_source_checked_and_bounded ... ok
+test non_nani_toc_signature_requires_zero_count_and_preserves_tail ... ok
+test presentation_edit_reparses_and_inverse_restores_exact_source ... ok
+test named_stream_validation_and_real_cfb_object_integration ... ok
+test presentation_edits_and_serialization_use_retained_limits ... ok
+test presentation_limits_reject_oversized_encoded_fields_before_use ... ok
+test presentation_noop_shares_source_and_metafile_reserved_bytes_are_typed ... ok
+test presentation_reads_toc_and_retains_unknown_tail ... ok
+test primary_registered_bound_is_separate_from_toc_registered_formats ... ok
+test registered_clipboard_format_is_bounded_and_lossless ... ok
+test signed_dimensions_from_stream_and_reverted_edits_preserve_source_allocation ... ok
+test target_device_checks_offsets_and_complete_devmode_bounds ... ok
+test toc_edits_switch_non_nani_sources_to_nani_but_keep_unknown_tail ... ok
+test toc_entry_round_trips_and_rejects_trailing_bytes ... ok
+test toc_insert_remove_authoring_sets_nani_and_matching_count ... ok
+test toc_entry_count_uses_configured_limit_instead_of_presentation_name_limit ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/property_set_editor.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/property_set_editor-8557d9881d6f93db)
+
+running 5 tests
+test drm_viewer_content_storages_are_rejected_at_root_and_nested_case_insensitively ... ok
+test generated_property_sets_round_trip_all_office_value_families ... ok
+test mutations_are_atomic_ordered_and_noops_are_byte_exact ... ok
+test poi_and_libreoffice_fixtures_preserve_exact_noop_bytes ... ok
+test protected_containers_are_rejected_at_root_and_nested_case_insensitively ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_ooxml_common-2c32bc771b061e95)
+
+running 369 tests
+test binding_tracker::tests::cache_eviction_and_invalidation_follow_the_innermost_declaration ... ok
+test binding_tracker::tests::crowded_scopes_resolve_as_quick_xml_does ... ok
+test binding_tracker::tests::declaration_limit_accepts_exactly_256_and_rejects_257 ... ok
+test binding_tracker::tests::cached_resolution_matches_quick_xml_on_random_documents ... ok
+test binding_tracker::tests::lookups_stay_bounded_whatever_kind_of_declaration_fills_the_scope ... ok
+test binding_tracker::tests::indexed_resolution_matches_quick_xml_on_dense_documents ... ok
+test binding_tracker::tests::the_prefix_index_is_built_by_a_lookup_past_its_bound_and_kept_in_step ... ok
+test binding_tracker::tests::the_xmlns_prefilter_finds_every_declaration ... ok
+test custom::tests::absent_package_properties_are_empty_but_orphans_are_errors ... ok
+test custom::tests::all_supported_values_round_trip_deterministically_in_pid_order ... ok
+test custom::tests::byte_depth_node_name_and_text_limits_are_enforced ... ok
+test custom::tests::case_insensitive_duplicate_names_are_rejected_on_insert_and_read ... ok
+test custom::tests::concise_crud_moves_values_and_orders_names ... ok
+test custom::tests::dtd_unknown_entities_and_malformed_xml_are_rejected ... ok
+test custom::tests::exhausted_pid_space_allows_replacement_but_not_allocation ... ok
+test custom::tests::filetime_is_rfc3339_not_a_numeric_windows_counter ... ok
+test custom::tests::forbidden_and_malformed_format_ids_are_rejected ... ok
+test custom::tests::illegal_xml_characters_are_rejected_before_writing ... ok
+test custom::tests::malformed_and_duplicate_pids_are_rejected ... ok
+test custom::tests::malformed_package_graphs_are_never_treated_as_absent ... ok
+test custom::tests::names_use_canonical_unicode_caseless_identity ... ok
+test custom::tests::non_finite_floats_are_rejected_on_insert_and_read ... ok
+test custom::tests::package_write_read_and_clear_remove_the_complete_graph ... ok
+test custom::tests::powerpoint_locations_require_escaped_names_and_host_boundaries ... ok
+test custom::tests::property_count_is_bounded ... ok
+test custom::tests::reserved_sensitivity_properties_follow_the_explicit_specification ... ok
+test custom::tests::root_namespace_and_property_cardinality_are_strict ... ok
+test custom::tests::word_marking_properties_require_their_documented_text_grammar ... ok
+test custom_data::codec::tests::accepts_document_bom_and_declaration_but_rejects_fragment_prologs ... ok
+test custom_data::codec::tests::allows_empty_id_and_xstring_round_trip ... ok
+test custom_data::codec::tests::arbitrary_prefix_and_entity_namespace_are_admitted ... ok
+test custom_data::codec::tests::attribute_count_limits_refuse_the_same_tags ... ok
+test custom_data::codec::tests::extension_uri_entity_lexeme_is_retained ... ok
+test custom_data::codec::tests::inherited_extension_prefixes_are_admitted_for_source_projection ... ok
+test custom_data::codec::tests::preserves_source_extension_markup ... ok
+test custom_data::codec::tests::rejects_cdata_outside_the_document_root ... ok
+test custom_data::codec::tests::rejects_embedded_prolog_and_direct_non_whitespace ... ok
+test custom_data::codec::tests::rejects_raw_cdata_delimiter_in_opaque_text ... ok
+test custom_data::codec::tests::rejects_strict_sml_extension_in_x14_extension_list ... ok
+test custom_data::codec::tests::repeated_attribute_names_are_refused_where_quick_xml_reports_them ... ok
+test binding_tracker::tests::short_lived_declarations_cost_no_index_upkeep ... ok
+test custom_xml::tests::attribute_whitespace_round_trips_without_normalization_loss ... ok
+test custom_xml::tests::enforces_guid_depth_size_and_content_type_caps ... ok
+test custom_xml::tests::exact_noop_does_not_unsign_or_rewrite ... ok
+test custom_xml::tests::failed_add_is_transactional ... ok
+test custom_xml::tests::loads_poi_and_libreoffice_reference_fixtures ... ok
+test custom_xml::tests::mce_selects_fallback_schema_reference ... ok
+test custom_xml::tests::package_writer_round_trips_without_interpreting_payload ... ok
+test custom_xml::tests::properties_edits_retain_future_markup ... ok
+test custom_xml::tests::rejects_invalid_declarations_attributes_and_xml_characters ... ok
+test custom_xml::tests::rejects_malformed_properties_payloads_and_package_graphs ... ok
+test custom_xml::tests::strict_writer_is_deterministic_and_round_trips ... ok
+test custom_xml::tests::transaction_crud_is_source_checked_and_failure_atomic ... ok
+test custom_xml::tests::transaction_preserves_opaque_payload_and_relationship_topology ... ok
+test embedded::tests::accepts_chart_packages_but_not_chart_objects ... ok
+test embedded::tests::accepts_strict_relationships_and_returns_external_targets_inertly ... ok
+test embedded::tests::accepts_word_template_and_macro_main_sources ... ok
+test embedded::tests::applies_kind_specific_xlsb_source_policy ... ok
+test embedded::tests::custom_limits_are_checked_and_payload_budget_is_aggregate ... ok
+test embedded::tests::duplicate_internal_targets_are_validated_and_charged_once ... ok
+test embedded::tests::ignores_orphans_preserves_duplicate_occurrences_and_sorts_deterministically ... ok
+test embedded::tests::inventories_all_seven_real_world_fixtures_without_opening_payloads ... ok
+test embedded::tests::preserves_malformed_and_recursive_payload_bytes_opaquely ... ok
+test embedded::tests::preserves_server_specific_object_content_types_without_sniffing ... ok
+test embedded::tests::rejects_forbidden_payload_relationships_and_default_relationship_limit ... ok
+test embedded::tests::rejects_missing_targets_invalid_sources_and_package_root_relationships ... ok
+test embedded::tests::rejects_query_and_fragment_components_on_internal_targets ... ok
+test embedded::tests::source_duplicate_canonical_targets_are_ordered_and_charged_once ... ok
+test embedded::tests::source_limits_stale_sources_and_cancellation_fail_closed ... ok
+test embedded::tests::source_scan_matches_eager_metadata_on_real_fixtures ... ok
+test embedded::tests::source_scan_reads_no_payload_until_selected_data_or_stream ... ok
+test external_link::tests::accepts_long_path_families ... ok
+test external_link::tests::accepts_microsoft_resolution_origin_families ... ok
+test external_link::tests::accepts_the_standard_transitional_and_strict_types ... ok
+test external_link::tests::rejects_unrelated_relationship_types ... ok
+test external_link::tests::the_list_has_no_duplicates ... ok
+test mce::alternative::tests::accepts_nested_markup_and_arbitrary_prefixes ... ok
+test mce::alternative::tests::enforces_byte_depth_node_and_branch_budgets ... ok
+test mce::alternative::tests::rejects_invalid_branch_grammar_and_unsafe_markup ... ok
+test mce::alternative::tests::retains_one_exact_source_and_exposes_typed_branches ... ok
+test mce::alternative::tests::selects_first_supported_choice_then_fallback_without_discarding_inactive_data ... ok
+test mce::bounds_tests::a_declaration_flood_at_the_limit_costs_a_lookup_per_declaration ... ok
+test mce::bounds_tests::a_duplicate_flood_is_refused_at_the_limit_before_its_duplicates ... ok
+test mce::bounds_tests::a_long_namespace_uri_is_read_once_per_declaration_not_per_name ... ok
+test mce::bounds_tests::an_empty_elements_declarations_leave_the_scope_when_the_raw_flow_recovers ... ok
+test mce::bounds_tests::directive_targets_at_scale_match_exact_names_and_wildcards ... ok
+test mce::bounds_tests::hoisting_many_shadowed_declarations_onto_many_children_is_output_bound ... ok
+test custom_data::codec::tests::tags_of_many_repeated_names_are_refused_as_before ... ok
+test mce::bounds_tests::no_configuration_admits_more_than_the_ceiling ... ok
+test mce::bounds_tests::the_codec_admits_a_tag_at_the_limit_and_refuses_one_more ... ok
+test mce::bounds_tests::the_stream_applies_the_tighter_of_its_two_attribute_limits ... ok
+test mce::codec::marker_exhaustion_test::all_marker_salts_preserve_the_exact_refusal ... ok
+test mce::codec::search_equivalence_tests::larger_binary_and_mce_patterns_match_scalar_windows ... ok
+test mce::codec::search_equivalence_tests::small_binary_words_match_scalar_windows_exhaustively ... ok
+test mce::patterns::tests::exact_and_namespace_targets_match_as_a_scan_of_both_would ... ok
+test mce::scope::tests::duplicate_prefixes_are_found_in_any_position ... ok
+test mce::scope::tests::equal_uris_share_one_identity_while_any_binding_holds_it ... ok
+test mce::scope::tests::lookups_past_the_walked_window_use_the_index ... ok
+test mce::scope::tests::nested_bindings_shadow_and_truncation_restores_them ... ok
+test mce::scope::tests::packed_prefixes_are_equal_exactly_when_the_prefixes_are ... ok
+test mce::scope::tests::truncating_an_element_without_declarations_removes_nothing ... ok
+test mce::tests::codec_tests::active_offset_allocation_error_retains_allocator_source ... ok
+test mce::tests::codec_tests::active_offset_markers_skip_source_collisions ... ok
+test mce::tests::codec_tests::active_offsets_fast_path_preserves_order_and_duplicates ... ok
+test mce::tests::codec_tests::active_offsets_reject_invalid_offsets_and_resource_limits ... ok
+test mce::tests::codec_tests::active_offsets_select_choice_and_fallback_in_caller_order ... ok
+test mce::tests::codec_tests::alternate_content_allows_ignorable_foreign_children_without_reordering_branches ... ok
+test mce::tests::codec_tests::alternate_content_enforces_element_specific_attribute_constraints ... ok
+test mce::tests::codec_tests::choice_fallback ... ok
+test mce::tests::codec_tests::deep_scopes_do_not_clone_effective_namespace_or_directive_sets ... ok
+test mce::tests::codec_tests::directive_token_limit_accepts_exact_and_rejects_over ... ok
+test mce::tests::codec_tests::dtd_external_identifiers_and_custom_entities_are_never_expanded ... ok
+test mce::tests::codec_tests::fast_borrowed ... ok
+test mce::tests::codec_tests::ignore_and_unwrap ... ok
+test mce::tests::codec_tests::input_and_borrowed_output_limits_are_preflighted ... ok
+test mce::tests::codec_tests::marker_at_the_last_position_routes_truncated_xml_to_the_parser ... ok
+test mce::tests::codec_tests::marker_in_comment_and_text_routes_through_owned_parser_output ... ok
+test mce::tests::codec_tests::marker_in_malformed_utf8_attribute_is_not_treated_as_a_fast_path_noop ... ok
+test mce::tests::codec_tests::marker_search_advances_past_repeated_candidates_and_trailing_prefixes ... ok
+test mce::tests::codec_tests::marker_search_keeps_short_near_matches_and_arbitrary_bytes_borrowed ... ok
+test mce::tests::codec_tests::marker_search_matches_each_single_byte_substitution ... ok
+test mce::tests::codec_tests::marker_search_matches_every_start_with_arbitrary_byte_surroundings ... ok
+test mce::tests::codec_tests::marker_search_preflights_input_then_output_limits ... ok
+test mce::tests::codec_tests::process_content_accepts_effective_ignorable_and_namespace_wildcards ... ok
+test mce::tests::codec_tests::redundant_ignorable_keeps_inherited_process_content ... ok
+test mce::tests::codec_tests::security_and_limits ... ok
+test mce::tests::codec_tests::transformed_output_limit_is_exact_across_buffer_growth ... ok
+test mce::tests::fixture_tests::libreoffice_pptx_emits_only_fallback_shape ... ok
+test mce::tests::fixture_tests::poi_styles_select_unsupported_vendor_fallbacks ... ok
+test mce::tests::namespace_emission_contract_tests::a_child_redeclaration_shadows_the_hoisted_binding ... ok
+test mce::tests::namespace_emission_contract_tests::alternate_content_hoists_wrapper_and_branch_declarations ... ok
+test mce::tests::namespace_emission_contract_tests::amortized_output_growth_keeps_the_bound_exact ... ok
+test mce::tests::namespace_emission_contract_tests::an_inner_span_is_no_longer_self_contained_but_becomes_so_at_the_boundary ... ok
+test mce::tests::namespace_emission_contract_tests::an_unchanged_start_tag_is_copied_from_the_source ... ok
+test mce::tests::namespace_emission_contract_tests::an_unwrapped_element_hoists_its_default_namespace_onto_its_content ... ok
+test mce::tests::namespace_emission_contract_tests::borrowed_attribute_values_still_round_trip_through_normalization ... ok
+test mce::tests::namespace_emission_contract_tests::each_namespace_is_declared_once_and_every_name_still_resolves ... ok
+test mce::tests::namespace_emission_contract_tests::element_qname_refusal_precedes_its_directive_refusal ... ok
+test mce::tests::namespace_emission_contract_tests::hoisted_declarations_reach_every_emitted_child_of_a_dropped_wrapper ... ok
+test mce::tests::namespace_emission_contract_tests::nested_dropped_wrappers_hoist_the_innermost_binding ... ok
+test mce::tests::namespace_emission_contract_tests::process_content_still_refuses_a_wrapper_that_binds_a_prefix ... ok
+test mce::tests::namespace_emission_contract_tests::skipped_branches_do_not_leak_declarations_into_the_output ... ok
+test mce::tests::namespace_emission_contract_tests::the_borrowed_name_resolver_keeps_every_refusal_identity ... ok
+test mce::tests::namespace_emission_contract_tests::the_output_bound_is_no_longer_consumed_by_redundant_redeclaration ... ok
+test mce::tests::namespace_emission_contract_tests::the_xml_prefix_is_never_redeclared_in_the_output ... ok
+test mce::tests::preservation_tests::empty_namespace_scopes_accept_the_exact_inherited_binding_bound ... ok
+test mce::tests::preservation_tests::extension_profiles_match_expanded_default_and_prefixed_names ... ok
+test mce::tests::preservation_tests::inherited_namespaces_survive_an_empty_scope_and_an_empty_default_reset ... ok
+test mce::tests::preservation_tests::inherited_opaque_profile_keeps_unrecognized_descendants_and_mce_markup ... ok
+test mce::tests::preservation_tests::inherited_scope_survives_selected_alt_and_unwrapped_branch_rebindings ... ok
+test mce::tests::preservation_tests::nested_context_errors_keep_first_refusal_precedence ... ok
+test mce::tests::preservation_tests::opaque_and_skipped_scopes_keep_the_nearest_emitted_namespace ... ok
+test mce::tests::preservation_tests::preservation_tokens_respect_the_shared_directive_bound ... ok
+test mce::tests::preservation_tests::preserves_elements_but_still_processes_their_content_and_attributes ... ok
+test mce::tests::preservation_tests::preserves_exact_and_wildcard_attributes_by_expanded_name ... ok
+test mce::tests::preservation_tests::rebinding_a_prefix_shadows_inherited_ignorable_and_preservation_rules ... ok
+test mce::tests::preservation_tests::redundant_ignorable_redeclaration_retains_inherited_preservation ... ok
+test mce::tests::preservation_tests::rejects_invalid_preservation_tokens_and_duplicates ... ok
+test mce::tests::preservation_tests::same_element_namespace_bindings_resolve_before_qname_and_directive_refusals ... ok
+test mce::tests::preservation_tests::understood_attributes_are_not_discarded_and_spoofed_directives_do_not_apply ... ok
+test mce::tests::self_contained_fragment_tests::a_default_namespace_undeclared_by_an_ancestor_is_not_reinstated ... ok
+test mce::tests::self_contained_fragment_tests::a_document_with_no_declaration_borrows_its_span ... ok
+test mce::tests::self_contained_fragment_tests::a_range_outside_the_document_is_refused_by_name ... ok
+test mce::tests::self_contained_fragment_tests::a_sibling_declaration_does_not_leak_into_the_span ... ok
+test mce::tests::self_contained_fragment_tests::a_span_that_redeclares_a_prefix_keeps_its_own_binding ... ok
+test mce::tests::self_contained_fragment_tests::an_empty_element_span_takes_its_declarations_before_the_slash ... ok
+test mce::tests::self_contained_fragment_tests::an_escaped_namespace_value_round_trips ... ok
+test mce::tests::self_contained_fragment_tests::an_intermediate_declaration_is_carried_too ... ok
+test mce::tests::self_contained_fragment_tests::the_namespace_binding_bound_is_enforced ... ok
+test mce::tests::self_contained_fragment_tests::the_root_declarations_reach_a_deep_span ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_callbacks_disable_independently_and_are_retained ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_event_and_count_limits_are_exact_and_typed ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_expands_rebound_and_unqualified_attributes ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_later_failures_keep_callback_errors_as_secondary ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_prefix_reader_handles_split_bom_and_replays_prefix ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_processes_preserves_and_keeps_opaque_content ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_projects_namespaced_events_and_counts_them ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_raw_sees_inactive_branches_active_sees_selection ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_bad_document_boundaries ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_custom_references_in_hidden_branches_and_prolog ... ok
+test mce::tests::streaming_0360_tests::streaming_0360_rejects_direct_alternate_content_data ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_alias_attributes_are_raw_before_expanded_duplicate_error ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_duplicate_ordinary_attributes_are_raw_before_primary_error ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_namespace_syntax_and_limits_fail_before_raw_delivery ... ok
+test mce::tests::streaming_0361_raw_attribute_tests::streaming_0361_raw_callback_error_is_secondary_to_duplicate_error ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_deep_expanded_names_have_exact_context_bound ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_input_failure_after_recovery_retains_raw_error ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_one_byte_recovery_resolves_nested_namespaces_and_pops_scopes ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_opaque_extension_emits_lexical_mce_content ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_opaque_extension_survives_recovery_state ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_raw_recovers_after_semantic_failure_and_wins_secondary ... ok
+test mce::tests::streaming_0361_raw_recovery_tests::streaming_0361_semantic_failure_without_later_errors_is_not_a_report ... ok
+test mce::tests::streaming_0410_name_ownership_tests::streaming_0410_expanded_name_bound_remains_exact ... ok
+test mce::tests::streaming_0410_name_ownership_tests::streaming_0410_owned_names_survive_raw_and_active_callbacks ... ok
+test mce::tests::streaming_0658_active_stop_tests::a_continuing_observer_is_indistinguishable_from_the_plain_entry_point ... ok
+test mce::tests::streaming_0658_active_stop_tests::a_primary_failure_on_a_later_event_is_unreachable_once_the_stream_has_stopped ... ok
+test mce::tests::streaming_0658_active_stop_tests::a_stop_ends_the_stream_at_that_event_and_reports_success ... ok
+test mce::tests::streaming_0658_active_stop_tests::a_stop_never_suppresses_a_failure_already_observed_on_that_event ... ok
+test mce::tests::streaming_0658_active_stop_tests::a_stopped_stream_does_not_run_the_end_of_document_checks ... ok
+test mce::tests::streaming_0658_active_stop_tests::an_observer_error_before_a_stop_still_surfaces ... ok
+test package_encryption::tests::encrypted_provenance_requires_its_retained_mode ... ok
+test package_encryption::tests::mark_encrypted_updates_plain_provenance ... ok
+test package_encryption::tests::plain_provenance_allows_ordinary_output ... ok
+test properties::keyword::tests::rejects_oversized_language_before_whitespace_collapse ... ok
+test properties::keyword::tests::validates_language_without_rewriting_its_lexical_form ... ok
+test properties::read::tests::keywords_preserve_mixed_content_and_language_annotations ... ok
+test properties::read::tests::matches_poi_success_timezone_and_m4_conformance_fixtures ... ok
+test properties::read::tests::parses_all_schema_fields_without_normalizing_lexical_values ... ok
+test properties::read::tests::poi_no_core_is_empty_and_multiple_relationships_fail_during_package_load ... ok
+test properties::read::tests::rejects_external_dangling_and_wrong_content_type_relationships ... ok
+test properties::read::tests::rejects_invalid_keyword_children_and_language_placement ... ok
+test properties::read::tests::rejects_property_text_beyond_the_declared_budget ... ok
+test properties::read::tests::rejects_wrong_root_duplicates_invalid_values_dtd_and_entities ... ok
+test properties::read::tests::revision_is_a_lossless_string_including_empty_values ... ok
+test properties::read::tests::selects_only_relationship_target_and_allows_absence ... ok
+test properties::read::tests::shared_writer_round_trips_through_strict_parser ... ok
+test properties::read::tests::source_reader_matches_eager_for_present_absent_and_strict_properties ... ok
+test properties::read::tests::source_reader_matches_eager_graph_failures ... ok
+test properties::read::tests::w3cdtf_supports_partial_and_unzoned_forms_but_xsi_type_is_literal ... ok
+test properties::tests::builder_and_struct_update_stay_concise ... ok
+test properties::tests::slot_tracks_only_real_edit_intent ... ok
+test properties::tests::xml_escapes_text_and_rejects_forbidden_characters ... ok
+test properties::time::tests::accepts_every_w3cdtf_member_and_retains_lexical_form ... ok
+test properties::time::tests::chrono_conversion_is_ergonomic_without_inventing_unzoned_utc ... ok
+test properties::time::tests::datetime_requires_a_full_valid_date_and_time ... ok
+test properties::time::tests::non_ascii_lexical_values_fail_without_panicking ... ok
+test properties::time::tests::rejects_oversized_times_before_whitespace_collapse ... ok
+test properties::write::tests::allocates_around_an_unrelated_canonical_part ... ok
+test properties::write::tests::bounded_output_rejects_oversized_append_before_mutation ... ok
+test properties::write::tests::distinguishes_present_empty_from_absence ... ok
+test properties::write::tests::equal_put_through_slot_preserves_exact_bytes_and_signature ... ok
+test properties::write::tests::preserves_strict_dialect_and_byte_identical_write_is_a_noop ... ok
+test mce::bounds_tests::lookups_do_not_walk_shadowed_declarations ... ok
+test properties::write::tests::revision_writer_validates_even_empty_and_opaque_lexical_values ... ok
+test properties::write::tests::shared_inbound_allows_read_and_update_but_blocks_clear_before_mutation ... ok
+test properties::write::tests::unknown_payload_blocks_write_but_graph_safe_clear_sanitizes_it ... ok
+test properties::write::tests::update_preserves_outbound_extensions_and_clear_leaves_extension_parts ... ok
+test properties::write::tests::writes_reads_and_clears_nonstandard_target ... ok
+test relationships::tests::accepts_transitional_and_strict_relationship_attributes ... ok
+test relationships::tests::rejects_duplicate_relationship_attributes ... ok
+test relationships::tests::relationship_ids_use_the_xml_ncname_domain ... ok
+test ribbon::tests::aggregate_image_relationships_are_bounded ... ok
+test ribbon::tests::failed_mutations_leave_graph_bytes_and_signatures_untouched ... ok
+test ribbon::tests::fixed_slots_borrow_package_bytes_and_prefer_modern ... ok
+test ribbon::tests::identical_put_is_a_signature_and_allocation_preserving_noop ... ok
+test ribbon::tests::image_cycles_are_collected_unless_reachable_from_a_kept_part ... ok
+test ribbon::tests::modern_vocabulary_updates_in_place ... ok
+test ribbon::tests::name_collisions_do_not_copy_the_moved_payload ... ok
+test ribbon::tests::relationship_location_cardinality_and_root_family_are_strict ... ok
+test ribbon::tests::remove_collects_unreferenced_ribbon_and_image_parts ... ok
+test ribbon::tests::remove_preserves_shared_ribbon_and_image_parts ... ok
+test ribbon::tests::ribbon_outbound_relationships_are_internal_images_only ... ok
+test ribbon::tests::shared_ribbon_is_forked_before_update ... ok
+test ribbon::tests::xml_bytes_depth_nodes_entities_and_namespaces_are_bounded ... ok
+test ribbon::tests::xml_declarations_characters_namespaces_and_inert_instructions_are_strict ... ok
+test spreadsheet_xml_maps::tests::a_declaration_inside_a_repeated_attribute_value_no_longer_hides_a_binding ... ok
+test spreadsheet_xml_maps::tests::borrowed_projection_serializes_and_patches_without_payload_clones ... ok
+test spreadsheet_xml_maps::tests::caller_limits_cover_every_bounded_resource ... ok
+test spreadsheet_xml_maps::tests::detects_conformance_and_canonicalizes_boolean_words ... ok
+test spreadsheet_xml_maps::tests::enforces_office_map_and_binding_boundaries ... ok
+test spreadsheet_xml_maps::tests::exposes_the_codec_limits ... ok
+test spreadsheet_xml_maps::tests::opaque_payload_roots_keep_their_bytes_and_gain_only_undeclared_bindings ... ok
+test properties::write::tests::rejects_keyword_item_and_encoded_xml_budgets_before_package_mutation ... ok
+test spreadsheet_xml_maps::tests::parses_validates_and_serializes_both_conformance_families ... ok
+test spreadsheet_xml_maps::tests::rejects_numeric_map_and_file_binding_booleans ... ok
+test spreadsheet_xml_maps::tests::schema_language_is_ignored_but_preserved_by_source_patch ... ok
+test spreadsheet_xml_maps::tests::opaque_payload_roots_of_many_repeated_names_keep_their_bytes ... ok
+test spreadsheet_xml_maps::tests::source_patch_enforces_the_exact_output_boundary ... ok
+test spreadsheet_xml_maps::tests::serializes_a_large_catalog_with_amortized_growth ... ok
+test spreadsheet_xml_maps::tests::source_patch_preserves_comments_extensions_and_canonicalizes_edits ... ok
+test spreadsheet_xml_maps::tests::source_patch_preserves_unmodeled_markup ... ok
+test vba::tests::late_content_type_failure_rolls_back_vba_removal ... ok
+test vba::tests::maps_every_supported_main_part_kind_both_directions ... ok
+test vba::tests::project_part_reads_through_the_bounded_vba_owner ... ok
+test vba::tests::rejects_dangling_inbound_references_to_canonical_word_targets_atomically ... ok
+test web::codec::tests::namespace_codec_keeps_extension_fragments_self_contained ... ok
+test web::codec::tests::relationship_codec_rejects_mixed_conformance_attributes ... ok
+test web::codec::tests::semantic_codec_uses_canonical_floating_point_lexical_form ... ok
+test web::package::durable::durable_intent_tests::intent_aggregates_distinct_snapshot_resources ... ok
+test web::package::durable::durable_intent_tests::intent_charges_xml_derived_and_direct_strings_cumulatively ... ok
+test web::package::durable::durable_intent_tests::intent_deduplicates_case_folded_shared_snapshot_resources ... ok
+test web::package::durable::durable_intent_tests::intent_enforces_aggregate_xml_before_parsing_a_later_field ... ok
+test web::package::durable::durable_intent_tests::intent_rejects_add_in_extension_in_pane_slot_before_retention ... ok
+test web::package::durable::durable_tests::a_closure_expecting_a_part_reports_its_decode_failure_not_absence ... ok
+test web::package::durable::durable_tests::a_closure_expecting_absence_refuses_a_present_part_that_fails_to_decode ... ok
+test web::package::durable::durable_tests::closure_accepts_members_within_per_kind_quotas ... ok
+test web::package::durable::durable_tests::closure_enforces_aggregate_decoded_string_quota ... ok
+test web::package::durable::durable_tests::closure_enforces_aggregate_xml_payload_quota ... ok
+test web::package::durable::durable_tests::closure_enforces_per_kind_and_relationship_quotas ... ok
+test web::package::durable::durable_tests::closure_rejects_ascii_case_equivalent_part_records ... ok
+test web::package::durable::durable_tests::closure_rejects_non_boolean_member_presence ... ok
+test web::package::durable::durable_tests::closure_rejects_package_root_as_a_part_record ... ok
+test web::package::durable::durable_tests::source_reconstruction_sees_a_present_part_whose_payload_fails_to_decode ... ok
+test web::package::durable::scope::tests::incomplete_and_duplicate_scopes_are_refused ... ok
+test web::package::durable::scope::tests::streamed_canonical_relationships_match_closure_fallback ... ok
+test web::package::durable::scope::tests::streamed_scope_matches_retained_wcs2_reference_for_both_directions ... ok
+test web::package::durable::scope::tests::streaming_hash_has_exact_byte_boundary ... ok
+test web::package::transaction::transaction_tests::inverse_restores_content_types_relationships_and_xml_after_reopen ... ok
+test web::package::transaction::transaction_tests::source_bound_noop_checks_source_and_inverse_before_returning_false ... ok
+test web::tests::absent_feature_skips_the_bounded_full_graph_index ... ok
+test web::tests::absent_snapshot_metadata_no_ops_do_not_create_a_snapshot ... ok
+test web::tests::accepts_every_ct_blip_effect_kind_and_rejects_invalid_markup ... ok
+test web::tests::accepts_mce_alternate_content_and_strict_relationship_attributes ... ok
+test web::tests::aggregate_xml_and_retained_string_budgets_bound_put_and_load ... ok
+test web::tests::authored_extension_lists_validate_namespace_placement_and_security ... ok
+test web::tests::byte_identical_put_is_a_signature_preserving_no_op ... ok
+test web::tests::case_equivalent_existing_parts_are_rejected_before_put_mutates ... ok
+test web::tests::changed_shared_task_pane_part_is_rejected_without_mutation ... ok
+test web::tests::checked_update_crud_covers_collections_metadata_and_all_ext_sites ... ok
+test web::tests::conflicting_case_equivalent_snapshot_resources_are_rejected_atomically ... ok
+test web::tests::custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic ... ok
+test web::tests::custom_function_metadata_rejects_wrong_namespaces_duplicates_and_missing_values ... ok
+test web::tests::custom_function_metadata_respects_item_bounds ... ok
+test web::tests::enforces_input_and_list_caps ... ok
+test web::tests::explicit_limits_bound_both_put_and_load ... ok
+test web::tests::file_references_require_an_atomic_nonempty_location ... ok
+test web::tests::inherited_namespace_expansion_is_charged_before_fragment_retention ... ok
+test web::tests::internal_linked_image_is_typed_and_round_trips ... ok
+test web::tests::internal_web_relationship_targets_reject_queries_and_fragments ... ok
+test web::tests::loads_local_omex_and_registry_fixtures_inertly ... ok
+test web::tests::office_safe_parser_rejects_a_storeless_file_reference ... ok
+test web::tests::package_and_authored_relationship_metadata_share_the_string_budget ... ok
+test web::tests::package_crud_round_trips_embedded_and_linked_snapshots ... ok
+test web::tests::package_crud_round_trips_every_inert_extension_list ... ok
+test web::tests::package_graph_limits_bound_index_allocation_relationships_and_deletion ... ok
+test web::tests::package_store_rejects_resource_mismatches_without_mutation ... ok
+test web::tests::panes_edit_is_checked_canonical_and_transactional ... ok
+test web::tests::panes_push_canonicalizes_equivalent_resources_within_one_pane ... ok
+test web::tests::panes_push_rejects_conflicting_resources_within_one_pane_atomically ... ok
+test web::tests::panes_push_rekeys_colliding_hidden_relationship_ids ... ok
+test web::tests::parses_and_mutates_owexml_custom_function_metadata_inertly ... ok
+test web::tests::part_name_allocation_probes_are_operation_wide ... ok
+test web::tests::patch_rechecks_shared_graph_protection_before_mutation ... ok
+test web::tests::patch_rejects_changed_root_and_part_before_mutation ... ok
+test web::tests::patch_rejects_new_inbound_relationship_to_absent_destination ... ok
+test web::tests::preserves_all_extension_list_sites_with_inherited_namespaces_and_mixed_content ... ok
+test web::tests::put_patch_is_exact_reversible_and_arc_shared ... ok
+test web::tests::rejects_dtd_bad_order_bad_store_and_nonfinite_width ... ok
+test web::tests::rejects_external_wrong_content_type_and_dangling_package_graphs ... ok
+test web::tests::rejects_invalid_snapshot_compression_and_effect_order ... ok
+test web::tests::remove_patch_restores_exact_shared_parts ... ok
+test web::tests::semantic_facade_authors_selects_and_removes_without_raw_ids ... ok
+test web::tests::semantic_snapshot_authoring_rejects_bad_mime_and_uri_reference ... ok
+test web::tests::shared_task_pane_ingress_protects_descendant_add_in ... ok
+test web::tests::shared_task_pane_ingress_protects_descendant_image ... ok
+test web::tests::snapshot_compression_and_effect_trees_round_trip ... ok
+test web::tests::strict_writer_is_deterministic_and_round_trips ... ok
+test xml::attributes::tests::a_duplicate_with_whitespace_in_its_value_is_skipped_whole ... ok
+test xml::attributes::tests::a_tag_of_repeated_names_costs_n_log_n_comparisons ... ok
+test xml::attributes::tests::an_attribute_glued_to_a_duplicate_is_not_lost ... ok
+test xml::attributes::tests::count_up_to_stops_at_the_bound_and_ignores_duplicates ... ok
+test xml::attributes::tests::duplicates_report_the_positions_the_checked_iterator_reports ... ok
+test xml::attributes::tests::seen_names_switch_to_an_ordered_index_without_losing_names ... ok
+test xml::attributes::tests::syntax_errors_pass_through ... ok
+test xml::attributes::tests::well_formed_tags_yield_what_the_checked_iterator_yields ... ok
+test xml::tests::duplicate_unqualified_attributes_are_rejected ... ok
+test xml::tests::ncname_accepts_unicode_and_rejects_colons_or_invalid_starts ... ok
+test xml::tests::omml_namespace_scan_silently_stops_at_malformed_attributes ... ok
+test xml::tests::omml_tracker_matches_nsreader_on_event_and_namespace_adversaries ... ok
+test xml::tests::omml_tracker_preserves_explicit_structural_bounds ... ok
+test xml::tests::omml_tracker_preserves_malformed_token_and_unterminated_errors ... ok
+test xml::tests::rejects_omml_structural_depth_over_bound ... ok
+test xml::tests::rejects_unterminated_omml_without_emitting_partial_content ... ok
+test xml::tests::scans_exact_transitional_and_strict_omml_ranges ... ok
+test xml::tests::xsd_token_atom_collapses_only_schema_whitespace_without_allocating ... ok
+test xml_name::tests::parses_and_writes_prefixed_and_unprefixed_qnames_without_duplicate_storage ... ok
+test xml_name::tests::rejects_empty_parts_multiple_colons_and_invalid_starts ... ok
+test xml_name::tests::validates_unicode_ncname_and_name_grammar ... ok
+test spreadsheet_xml_maps::tests::source_patch_honors_relaxed_limits_above_default ... ok
+
+test result: ok. 369 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.57s
+
+     Running tests/core_properties.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/core_properties-382cb7a78b4f8be2)
+
+running 2 tests
+test absent_core_properties_are_idempotent ... ok
+test strict_core_properties_preserve_the_selected_graph ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/custom_data.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/custom_data-10ad1942c83f4842)
+
+running 24 tests
+test duplicate_required_attributes_and_direct_extension_owners_are_rejected ... ok
+test empty_id_and_st_xstring_escape_round_trip_including_supplementary_scalar ... ok
+test extension_grammar_accepts_transitional_sml_ext_optional_uri_and_one_wildcard ... ok
+test extension_grammar_rejects_strict_sml_direct_ext ... ok
+test extension_output_preflight_covers_shrink_and_empty_root_expansion ... ok
+test extension_and_source_rewrite_limits_use_exact_output_boundaries ... ok
+test full_documents_allow_bom_and_declaration_but_embedded_fragments_do_not ... ok
+test identical_raw_extensions_keep_their_own_inherited_namespace_context ... ok
+test extension_removal_removes_the_whole_opening_range_and_keeps_siblings ... ok
+test lowered_limits_accept_exact_boundaries_and_reject_one_under ... ok
+test malformed_extension_fragments_are_rejected_before_source_splice ... ok
+test malformed_whole_documents_and_direct_container_grammar_fail_closed ... ok
+test namespace_aliases_and_entity_escaped_uri_resolve_by_expanded_name ... ok
+test non_xml_nbsp_is_not_accepted_as_container_whitespace ... ok
+test inherited_bindings_cover_opaque_descendants_and_replacement_fragments ... ok
+test parser_event_limit_is_exact_and_one_under_for_minimal_properties ... ok
+test raw_less_than_in_attribute_values_is_rejected_but_escaped_less_than_is_valid ... ok
+test reserved_namespace_bindings_and_empty_prefixed_bindings_are_rejected ... ok
+test public_surface_accepts_schema_minimum_and_retains_opaque_extension_bytes ... ok
+test scalar_semantic_noop_preserves_lexical_source_bytes ... ok
+test source_uid_shrink_has_an_independent_output_ceiling ... ok
+test source_validation_rejects_unbound_prefix_without_real_context ... ok
+test source_rewrites_change_only_the_requested_root_id_or_extension_span ... ok
+test uid_utf16_units_are_exact_for_one_supplementary_scalar ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/markup_compatibility.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/markup_compatibility-2b8802f2f7f15259)
+
+running 1 test
+test alternate_content_selects_the_fallback_branch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mce_namespace_search.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/mce_namespace_search-250fea7a433784e0)
+
+running 9 tests
+test absent_namespace_bytes_are_borrowed_without_xml_or_utf8_validation ... ok
+test every_namespace_byte_mutation_and_near_match_remain_borrowed ... ok
+test exact_namespace_at_raw_boundaries_retains_parser_errors ... ok
+test exact_namespace_occurrences_cross_search_boundary_offsets ... ok
+test input_limit_precedes_output_limit_and_both_paths_report_exact_resources ... ok
+test exact_namespace_occurrences_in_xml_contexts_enter_the_parser ... ok
+test real_alternate_content_processing_still_selects_the_fallback ... ok
+test repeated_namespace_occurrences_remain_owned_and_unmodified ... ok
+test string_and_part_arc_wrappers_preserve_ownership_contract ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ribbon.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/ribbon-e0911c5cb62d0642)
+
+running 4 tests
+test rejects_a_root_that_does_not_match_its_relationship_family ... ok
+test keeps_fixed_family_slots_with_modern_precedence ... ok
+test updates_the_modern_family_in_place ... ok
+test stores_borrows_and_roundtrips_local_ribbon_xml ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/web_extension_packages.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/web_extension_packages-f9cb8cd2d19708fb)
+
+running 3 tests
+test package_graph_discovers_local_task_panes_without_activation ... ok
+test package_authoring_and_removal_round_trip_inert_task_panes ... ok
+test public_web_facade_updates_and_round_trips_crud ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_sign-57f8917c789d2766)
+
+running 18 tests
+test cfb::tests::clean_finish_returns_the_original_allocation ... ok
+test cfb::tests::cfb_directory_count_and_depth_are_bounded_before_mutation ... ok
+test cfb::tests::default_add_rejects_partial_existing_coverage_atomically ... ok
+test cfb::tests::deterministic_names_and_storage_clsids_are_preserved ... ok
+test cfb::tests::signature_name_search_is_bounded_and_fills_the_first_gap ... ok
+test cfb::tests::failed_resign_is_atomic ... ok
+test tests::limits_reject_invalid_values ... ok
+test tests::signing_time_is_typed_at_construction ... ok
+test xml::tests::active_xml_and_duplicate_ids_are_rejected ... ok
+test xml::tests::author_checks_certificate_and_escaped_output_limits_before_growth ... ok
+test cfb::tests::signs_verifies_tampers_and_clears ... ok
+test xml::tests::binary_profile_round_trips_without_copying_borrowed_payloads ... ok
+test xml::tests::exact_manifest_coverage_is_required ... ok
+test xml::tests::manifest_must_be_inside_the_signed_package_object ... ok
+test xml::tests::external_certificate_supplies_an_absent_verification_key ... ok
+test xml::tests::public_canonicalizer_uses_the_safe_bounded_parser ... ok
+test xml::tests::package_profile_binds_poi_and_microsoft_optional_objects ... ok
+test xml::tests::rsa_signer_round_trips_without_reparsing_the_private_key ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.30s
+
+     Running tests/cfb_signatures.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/cfb_signatures-461922cae9eef490)
+
+running 5 tests
+test malformed_legacy_encrypted_and_resource_hostile_containers_are_rejected ... ok
+test producer_fixtures_are_noop_exact ... ok
+test rsa_and_ecdsa_signatures_round_trip_with_chain_time_and_multiple_streams ... ok
+test no_op_clear_and_resign_are_atomic_and_preserve_payload_streams ... ok
+test stale_payload_is_reported_without_conflating_certificate_trust ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.09s
+
+     Running tests/real_package_signatures.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/real_package_signatures-926e0eb04b35eb4e)
+
+running 2 tests
+test real_microsoft_package_signatures_require_compatible_weak_algorithm_policy ... ok
+test real_microsoft_package_signatures_verify_through_public_xml_api ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/litchi_vba-eb920e2e19e6c73c)
+
+running 42 tests
+test build::tests::obfuscation_round_trips_the_unprotected_state_fields ... ok
+test build::tests::designer_frames_require_baseclass_modules_and_round_trip_as_baseclass ... ok
+test build::tests::output_limit_stops_before_full_payload_allocation ... ok
+test build::tests::owned_payload_admission_closes_project_and_dir_structure ... ok
+test build::tests::owned_payload_admission_eagerly_validates_project_and_project_wm ... ok
+test build::tests::project_wm_contains_ordered_mbcs_and_unicode_name_pairs ... ok
+test build::tests::payload_validation_and_extraction_preserve_the_input_allocation ... ok
+test build::tests::rejects_invalid_names_codepages_text_and_resource_limits ... ok
+test build::tests::rejects_malformed_reference_abnf_known_framing_ids_and_limits ... ok
+test build::tests::references_are_typed_and_reopenable_without_resolution ... ok
+test build::tests::writes_nested_legacy_project_and_non_ascii_codepage_text ... ok
+test codec::tests::decodes_normative_spec_examples ... ok
+test codec::tests::decodes_raw_chunk ... ok
+test codec::tests::encoder_enforces_input_and_output_limits ... ok
+test codec::tests::encodes_normative_spec_examples ... ok
+test codec::tests::encoding_is_deterministic_and_prefers_nearest_equal_match ... ok
+test codec::tests::enforces_output_limit_before_copy_expansion ... ok
+test build::tests::writes_complete_cache_free_project_and_reopens_every_module ... ok
+test codec::tests::rejects_invalid_back_reference_and_truncation ... ok
+test codec::tests::raw_partial_chunk_has_spec_required_zero_padding ... ok
+test codec::tests::round_trips_across_copy_token_bit_partition_boundaries ... ok
+test dir::tests::non_ascii_reference_preflight_preserves_encoding_and_limits ... ok
+test dir::tests::parses_typed_module_directory ... ok
+test dir::tests::reader_ignores_reserved_words_and_accepts_hexdig_case_variants ... ok
+test dir::tests::rejects_missing_top_level_directory_terminator ... ok
+test dir::tests::rejects_module_count_over_limit ... ok
+test dir::tests::source_bound_reference_name_edits_preserve_ignored_wire_fields ... ok
+test dir::tests::unknown_reference_payloads_obey_string_limits ... ok
+test project::tests::borrowed_standalone_reader_returns_typed_cfb_errors ... ok
+test project::tests::cached_and_exact_noop_paths_recheck_limits ... ok
+test project::tests::opens_project_and_decompresses_inert_source ... ok
+test project::tests::parses_and_edits_typed_project_text_records ... ok
+test project::tests::parses_bounded_vbframe_properties_without_interpreting_code ... ok
+test project::tests::parses_project_lk_license_records_with_raw_boolean_values ... ok
+test project::tests::project_text_noops_preserve_exact_source_and_grammar_is_case_insensitive ... ok
+test project::tests::project_text_rejects_duplicate_window_flags_and_unsigned_hexint32 ... ok
+test project::tests::reads_borrowed_standalone_project_with_a_preparse_size_bound ... ok
+test project::tests::rejects_module_offset_past_stream ... ok
+test project::tests::rejects_project_lk_version_truncation_trailing_and_count_limits ... ok
+test project::tests::version_stream_requires_header_but_ignores_header_values_and_cache ... ok
+test tests::owned_outputs_are_send_and_sync ... ok
+test codec::tests::round_trips_empty_boundary_and_multiple_chunks ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/real_ooxml_fixtures.rs (/home/zhuhe/code/litchi-target-0773-quality/debug/deps/real_ooxml_fixtures-75bd803effe4cab6)
+
+running 5 tests
+test real_excel_cfb_project_exposes_references_and_project_wm ... ok
+test real_excel_vba_source_is_bounded_and_lossless ... ok
+test real_powerpoint_vba_source_is_bounded_and_lossless ... ok
+test real_word_vba_source_is_bounded_and_lossless ... ok
+test real_excel_form_project_exposes_designer_frame_metadata ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_crypto
+
+running 2 tests
+test crates/litchi-crypto/src/spaces.rs - spaces (line 7) - compile ... ok
+test crates/litchi-crypto/src/ooxml/mod.rs - ooxml::Limits (line 77) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-crypto/src/rc4.rs - rc4::Context (line 66) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.15s
+   Doc-tests litchi_ole_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_ooxml_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_sign
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_vba
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

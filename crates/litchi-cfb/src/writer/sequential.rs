@@ -9,21 +9,27 @@
 //! the number of directory or allocation-table entries: metadata grows with
 //! the declared topology and is rejected before serialized buffers are built.
 
+#[cfg(test)]
+use super::atomic_replace;
 use super::difat::DifatBuilder;
 use super::directory::DirectoryBuilder;
 use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
-use super::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
+#[cfg(test)]
+use super::publish::path_identity;
+use super::{PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged};
 use crate::consts::{
     DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
 };
 use crate::directory_name::directory_name_data;
 use crate::file::{OleError, OleFile};
-use litchi_core::CancellationToken;
+use litchi_core::{CancellationToken, Durability};
 use std::fmt;
-use std::fs::{self, File};
-use std::io::{self, BufWriter, ErrorKind, Read, Write};
+#[cfg(test)]
+use std::fs;
+use std::fs::File;
+use std::io::{self, ErrorKind, Read, Write};
 use std::path::Path;
 
 const MINI_STREAM_CUTOFF: u64 = 4096;
@@ -36,135 +42,6 @@ const DEFAULT_MAX_PATH_BYTES: u64 = 256 * 1024;
 const DEFAULT_MAX_STREAM_BYTES: u64 = 2 * 1024 * 1024 * 1024 - 1;
 const DEFAULT_MAX_METADATA_BYTES: u64 = 256 * 1024 * 1024;
 const DEFAULT_MAX_OUTPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TempFileIdentity {
-    #[cfg(unix)]
-    Unix { device: u64, inode: u64 },
-    #[cfg(windows)]
-    Windows { volume: u32, index: u64 },
-    // Targets without a native file identity get only a length discriminator.
-    // The public save contract therefore requires a trusted/private parent;
-    // this fallback is not protection against a hostile shared directory.
-    #[cfg(not(any(unix, windows)))]
-    Fallback { length: u64 },
-}
-
-fn file_identity(file: &File) -> io::Result<TempFileIdentity> {
-    identity_from_metadata(&file.metadata()?)
-}
-
-fn path_identity(path: &Path) -> io::Result<TempFileIdentity> {
-    let metadata = fs::symlink_metadata(path)?;
-    if !metadata.file_type().is_file() {
-        return Err(io::Error::new(
-            ErrorKind::InvalidData,
-            "CFB temporary path is not a regular file",
-        ));
-    }
-    identity_from_metadata(&metadata)
-}
-
-fn identity_from_metadata(metadata: &fs::Metadata) -> io::Result<TempFileIdentity> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-
-        return Ok(TempFileIdentity::Unix {
-            device: metadata.dev(),
-            inode: metadata.ino(),
-        });
-    }
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-
-        let volume = metadata.volume_serial_number().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "CFB temporary file has no volume identity",
-            )
-        })?;
-        let index = metadata.file_index().ok_or_else(|| {
-            io::Error::new(
-                ErrorKind::Unsupported,
-                "CFB temporary file has no file identity",
-            )
-        })?;
-        return Ok(TempFileIdentity::Windows { volume, index });
-    }
-
-    #[cfg(not(any(unix, windows)))]
-    {
-        Ok(TempFileIdentity::Fallback {
-            length: metadata.len(),
-        })
-    }
-}
-
-fn ensure_temp_identity(temporary_path: &Path, expected: TempFileIdentity) -> io::Result<()> {
-    let observed = path_identity(temporary_path)?;
-    if observed == expected {
-        Ok(())
-    } else {
-        Err(io::Error::new(
-            ErrorKind::AlreadyExists,
-            "CFB temporary path changed while staged output was open",
-        ))
-    }
-}
-
-fn cleanup_owned_temp(temporary_path: &Path, expected: TempFileIdentity) {
-    // Best-effort identity checking preserves a known replacement.  The save
-    // contract still requires a trusted/private parent because portable,
-    // path-based cleanup and replacement cannot close a hostile-directory
-    // race between this check and the filesystem operation.
-    if path_identity(temporary_path).is_ok_and(|observed| observed == expected) {
-        drop(fs::remove_file(temporary_path));
-    }
-}
-
-struct TemporaryCleanupGuard<'a> {
-    path: &'a Path,
-    identity: Option<TempFileIdentity>,
-    published: bool,
-}
-
-impl<'a> TemporaryCleanupGuard<'a> {
-    fn new(path: &'a Path) -> Self {
-        Self {
-            path,
-            identity: None,
-            published: false,
-        }
-    }
-
-    fn set_identity(&mut self, identity: TempFileIdentity) {
-        self.identity = Some(identity);
-    }
-
-    fn mark_published(&mut self) {
-        self.published = true;
-    }
-}
-
-impl Drop for TemporaryCleanupGuard<'_> {
-    fn drop(&mut self) {
-        if self.published {
-            return;
-        }
-
-        if let Some(identity) = self.identity {
-            cleanup_owned_temp(self.path, identity);
-        } else {
-            // Identity acquisition failed before we could compare the path.
-            // This exact-name cleanup is correct only under save's
-            // trusted/private-parent contract, but prevents an orphaned temp.
-            drop(fs::remove_file(self.path));
-        }
-    }
-}
 
 /// What a forward-only sink may already contain after a failed publication.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -387,6 +264,43 @@ impl SequentialWriteReport {
     pub const fn bytes(self) -> u64 {
         self.output_bytes
     }
+}
+
+/// Reopens a complete staged artifact through the ordinary CFB reader before
+/// it may replace a destination.
+///
+/// Validation reads through a clone of the file this save created, never by
+/// reopening the mutable temporary pathname: a sibling process may unlink and
+/// recreate that name while the artifact is staged. Both handles are closed
+/// before the replacement, which Windows requires.
+fn validate_staged_candidate(
+    staged_file: &File,
+    report: SequentialWriteReport,
+) -> Result<(), SequentialWriteError> {
+    let staged = || SequentialWriteProgress::Complete {
+        bytes: report.output_bytes,
+    };
+    let candidate = staged_file
+        .try_clone()
+        .map_err(|source| SequentialWriteError::Stage {
+            source,
+            progress: staged(),
+            report,
+        })?;
+    let validated = OleFile::open(candidate).map_err(|error| match error {
+        OleError::Io(source) => SequentialWriteError::Stage {
+            source,
+            progress: staged(),
+            report,
+        },
+        source => SequentialWriteError::CandidateValidation {
+            source,
+            progress: staged(),
+            report,
+        },
+    })?;
+    drop(validated);
+    Ok(())
 }
 
 /// Typed failures from the predeclared-layout writer.
@@ -1160,13 +1074,36 @@ impl<'a> SequentialOleWriter<'a> {
     /// a sibling temporary file.  Existing destination contents and metadata
     /// (including permission bits) are therefore not preserved; callers that
     /// require a specific mode should apply it after a successful save.
+    ///
+    /// This is [`Self::save_with_durability`] at [`Durability::Full`]: the
+    /// staged file is synchronized before the replacement and the parent
+    /// directory after it.
     pub fn save<P: AsRef<Path>>(
         self,
         path: P,
     ) -> Result<SequentialWriteReport, SequentialWriteError> {
-        self.save_with_hooks(path, atomic_replace, sync_parent)
+        self.save_with_durability(path, Durability::Full)
     }
 
+    /// Saves atomically at a caller-chosen [`Durability`].
+    ///
+    /// Every level writes the same bytes, validates the staged candidate
+    /// through the ordinary CFB reader, checks the temporary file's identity
+    /// and replaces the destination exactly as [`Self::save`] does, under the
+    /// same trusted-parent contract. A weaker level only skips the staged
+    /// file's synchronization ([`Durability::NoSync`]) or the parent
+    /// directory's ([`Durability::FileOnly`] and [`Durability::NoSync`]), with
+    /// the crash guarantees [`Durability`] states. Only [`Durability::Full`]
+    /// can return [`SequentialWriteError::Committed`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        self,
+        path: P,
+        durability: Durability,
+    ) -> Result<SequentialWriteReport, SequentialWriteError> {
+        self.save_with_steps(path.as_ref(), durability, &mut SystemSteps)
+    }
+
+    #[cfg(test)]
     fn save_with_hooks<P, A, S>(
         self,
         path: P,
@@ -1178,120 +1115,53 @@ impl<'a> SequentialOleWriter<'a> {
         A: FnOnce(&Path, &Path) -> io::Result<()>,
         S: FnOnce(&Path) -> io::Result<()>,
     {
-        let destination = path.as_ref();
-        let parent = parent_directory(destination);
-        let (temporary_path, file) =
-            create_sibling_temp_file(destination).map_err(SequentialWriteError::Planning)?;
-        let mut cleanup = TemporaryCleanupGuard::new(&temporary_path);
-        let temporary_identity = match file_identity(&file) {
-            Ok(identity) => {
-                cleanup.set_identity(identity);
-                identity
-            },
-            Err(source) => {
-                // Drop the open handle before the guard attempts exact-name
-                // cleanup (notably required by Windows file-sharing rules).
-                drop(file);
-                return Err(SequentialWriteError::Planning(OleError::Io(source)));
-            },
-        };
-        (|| {
-            let mut buffered = BufWriter::new(file);
-            let report = self.write_to(&mut buffered)?;
-            buffered
-                .flush()
-                .map_err(|source| SequentialWriteError::Flush {
-                    source,
-                    progress: SequentialWriteProgress::CompleteUnflushed {
-                        bytes: report.output_bytes,
-                    },
-                })?;
-            let staged_file =
-                buffered
-                    .into_inner()
-                    .map_err(|error| SequentialWriteError::Flush {
-                        source: error.into_error(),
-                        progress: SequentialWriteProgress::CompleteUnflushed {
-                            bytes: report.output_bytes,
-                        },
-                    })?;
-            staged_file
-                .sync_all()
-                .map_err(|source| SequentialWriteError::Stage {
-                    source,
-                    progress: SequentialWriteProgress::Complete {
-                        bytes: report.output_bytes,
-                    },
-                    report,
-                })?;
+        self.save_with_steps(
+            path.as_ref(),
+            Durability::Full,
+            &mut super::testing::HookSteps::new(replace, sync),
+        )
+    }
 
-            // Validate through a clone of the file we created, never by
-            // reopening the mutable temporary pathname.  A sibling process
-            // may unlink and recreate that name while we are staging.
-            let candidate =
-                staged_file
-                    .try_clone()
-                    .map_err(|source| SequentialWriteError::Stage {
-                        source,
-                        progress: SequentialWriteProgress::Complete {
-                            bytes: report.output_bytes,
-                        },
-                        report,
-                    })?;
-            let validated = OleFile::open(candidate).map_err(|error| match error {
-                OleError::Io(source) => SequentialWriteError::Stage {
-                    source,
-                    progress: SequentialWriteProgress::Complete {
-                        bytes: report.output_bytes,
-                    },
-                    report,
-                },
-                source => SequentialWriteError::CandidateValidation {
-                    source,
-                    progress: SequentialWriteProgress::Complete {
-                        bytes: report.output_bytes,
-                    },
-                    report,
-                },
-            })?;
-            // Windows requires all validation handles to be closed before the
-            // sibling can replace the destination name.
-            drop(validated);
-            drop(staged_file);
-
-            // Best-effort identity checking rejects a known replacement and
-            // lets cleanup preserve it.  The public save contract requires a
-            // trusted/private parent because portable path APIs cannot close
-            // every hostile-directory race.
-            ensure_temp_identity(&temporary_path, temporary_identity).map_err(|source| {
-                SequentialWriteError::Stage {
-                    source,
-                    progress: SequentialWriteProgress::Complete {
-                        bytes: report.output_bytes,
-                    },
-                    report,
-                }
-            })?;
-
-            replace(&temporary_path, destination).map_err(|source| {
-                SequentialWriteError::Stage {
-                    source,
-                    progress: SequentialWriteProgress::Complete {
-                        bytes: report.output_bytes,
-                    },
-                    report,
-                }
-            })?;
-            cleanup.mark_published();
-            sync(parent).map_err(|source| SequentialWriteError::Committed {
+    pub(crate) fn save_with_steps<S: PublishSteps>(
+        self,
+        destination: &Path,
+        durability: Durability,
+        steps: &mut S,
+    ) -> Result<SequentialWriteReport, SequentialWriteError> {
+        publish_staged(
+            destination,
+            durability,
+            TemporaryIdentity::Checked,
+            steps,
+            |staging| self.write_to(staging),
+            |staged_file, report| validate_staged_candidate(staged_file, *report),
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) => SequentialWriteError::Planning(error),
+            PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, staged } => SequentialWriteError::Flush {
                 source,
-                report,
-                progress: SequentialWriteProgress::Complete {
-                    bytes: report.output_bytes,
+                progress: SequentialWriteProgress::CompleteUnflushed {
+                    bytes: staged.output_bytes,
                 },
-            })?;
-            Ok(report)
-        })()
+            },
+            PublishFailure::SyncFile { source, staged }
+            | PublishFailure::Identity { source, staged }
+            | PublishFailure::Replace { source, staged } => SequentialWriteError::Stage {
+                source,
+                progress: SequentialWriteProgress::Complete {
+                    bytes: staged.output_bytes,
+                },
+                report: staged,
+            },
+            PublishFailure::Committed { source, staged } => SequentialWriteError::Committed {
+                source,
+                report: staged,
+                progress: SequentialWriteProgress::Complete {
+                    bytes: staged.output_bytes,
+                },
+            },
+        })
     }
 
     fn own_path(

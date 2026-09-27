@@ -36,6 +36,11 @@ best-effort identity-aware cleanup of the temporary artifact. Caller-owned
 non-atomic sinks report incomplete output and
 bytes written.
 
+> **Amended 2026-09-24** (section "2026-09-24 amendment: caller-selected save
+> durability" below): "flush/fsync as supported" is the default `Full`
+> durability of every ordinary save; a caller may explicitly select a weaker
+> level for one save.
+
 Every finalized document supports a sequential non-seekable sink by planning
 sizes and layout first or using explicit scratch storage. Preserve-mode save
 raw-copies unchanged compressed ZIP entries or CFB streams when possible.
@@ -2419,3 +2424,40 @@ with its reason by the code that opens it. Reservations, `consume` and every
 charge made outside a lease are unchanged. ADR 0031's reservation dimensions
 (`Workers`, `IoConcurrency`) are admission-time reservations, not charges, and
 are not leased.
+
+## 2026-09-24 amendment: caller-selected save durability
+
+Authorized by the owner's decision recorded in
+[change 0758](../performance/0758-owner-decisions-2026-09-24.md) (decision 5,
+"Accept the opt-in save policy") and written by change
+[0761](../performance/0761-save-durability-policy.md). It amends one phrase of
+§Output above, "flush/fsync as supported", and nothing else.
+
+Full durability remains the default and is what every ordinary `save` does,
+with unchanged bytes, and with unchanged system calls on success and on every
+failure before the replacement: the staged temporary artifact is flushed and
+synchronized before the atomic replacement, and the destination's parent
+directory is synchronized after it where the platform supports that. A caller
+may select a weaker level for one save, and only by passing an explicit
+`litchi_core::Durability` to a `*_with_durability` method: `FileOnly` skips the
+parent-directory synchronization, and `NoSync` also skips the temporary
+artifact's synchronization. The level is a per-call argument. It is never read
+from the environment, a global or thread-local value, or a package's stored
+save preferences, so selecting one changes no preference and revokes no
+exact-source authorization.
+
+Every level keeps the rest of §Output: the sibling temporary artifact, every
+check the route makes before publishing, validation and finalization before
+replacement, the one
+atomic replacement, a destination left untouched by any failure or
+cancellation before that replacement, best-effort identity-aware cleanup of the
+temporary artifact, and typed errors. A level never attempts a step it skips,
+so it cannot fail at one; only `Full` can report that the destination was
+replaced before its directory synchronization failed. What a weaker level gives
+up is durability across an operating-system crash or power loss after the save
+has returned: after `FileOnly` the destination names what it named before the
+save or the complete new artifact, and the replacement itself may be lost;
+after `NoSync` nothing is promised, and on a filesystem that does not write
+file data before the rename that exposes it the destination may be truncated. A process crash
+needs no synchronization at any level. The `litchi_core::Durability`
+documentation states each level's guarantees and is the normative list.

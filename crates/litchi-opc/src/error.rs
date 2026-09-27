@@ -570,7 +570,6 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::MultipleCorePropertiesRelationships
             | OpcError::XmlPublication { .. }
             | OpcError::SourceChanged { .. }
-            | OpcError::Committed { .. }
             | OpcError::IncompleteOutput { .. }
             | OpcError::QuickXmlError(_)
             | OpcError::Utf8Error(_)
@@ -595,6 +594,7 @@ impl From<OpcError> for litchi_core::Error {
             error @ OpcError::InvalidSourcePartSpliceLimit { .. } => {
                 litchi_core::Error::Unsupported(error.to_string())
             },
+            OpcError::Committed { source } => litchi_core::Error::Committed(source),
         }
     }
 }

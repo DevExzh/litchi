@@ -514,7 +514,26 @@ impl Package {
 
     /// Atomically save the validated package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        Ok(PackageWriter::write(path, &self.0)?)
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically save the validated package to a filesystem path at a
+    /// caller-chosen [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// publishes the same bytes through the same sibling temporary file and
+    /// rename; a weaker level only skips the parent-directory sync
+    /// (`FileOnly`) or both synchronizations (`NoSync`), with the crash
+    /// guarantees `Durability` states. The level is never stored on the
+    /// package.
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        Ok(PackageWriter::write_with_durability(
+            path, &self.0, durability,
+        )?)
     }
 
     fn worksheet_uri(&self, index: usize) -> Result<Option<litchi_opc::PackURI>> {

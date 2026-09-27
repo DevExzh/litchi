@@ -1,0 +1,53 @@
+{
+  "completed_at_unix": 1790471771.4167564,
+  "all_native_sessions_terminal": true,
+  "binary_identity_before_removal": [
+    {
+      "binary": "/home/zhuhe/code/litchi-target-0773-trace-before/debug/durability-probe",
+      "bytes": 31647512,
+      "sha256": "04121d7f99eb57fd91676eeee2a6a8acaa3860d957921040dbab8ed710a12222"
+    },
+    {
+      "binary": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/binary/before-durability-probe",
+      "bytes": 31647512,
+      "sha256": "04121d7f99eb57fd91676eeee2a6a8acaa3860d957921040dbab8ed710a12222"
+    },
+    {
+      "binary": "/home/zhuhe/code/litchi-target-0773-quality/debug/durability-probe",
+      "bytes": 31831744,
+      "sha256": "a13b6adc6e229a41ef79725c881f0d6460e6c5da9ddfb80d1db584aec8e0a32f"
+    },
+    {
+      "binary": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/binary/after-durability-probe",
+      "bytes": 31831744,
+      "sha256": "a13b6adc6e229a41ef79725c881f0d6460e6c5da9ddfb80d1db584aec8e0a32f"
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0773-quality",
+      "files": 36441,
+      "logical_file_bytes": 16656149843,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0773-trace-before",
+      "files": 1512,
+      "logical_file_bytes": 1057564879,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/binary",
+      "files": 2,
+      "logical_file_bytes": 63479256,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/tracedir",
+      "files": 96,
+      "logical_file_bytes": 921192,
+      "removed": true
+    }
+  ],
+  "preserved": "Original 0761/0766 and other external worktrees, original reference corpora, main unrelated files; published trace outputs are retained as evidence."
+}

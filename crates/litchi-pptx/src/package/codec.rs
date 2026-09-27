@@ -283,10 +283,36 @@ impl Package {
 
     /// Save the package atomically through the OPC writer.
     ///
+    /// This is [`Self::save_with_durability`] at
+    /// [`Durability::Full`](litchi_core::Durability::Full).
+    ///
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Save the package atomically through the OPC writer at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// Every level publishes the same bytes through the same sibling
+    /// temporary file and rename, and a failure before the rename leaves the
+    /// destination untouched. A weaker level only skips the parent-directory
+    /// sync (`FileOnly`) or both the file and directory syncs (`NoSync`),
+    /// with the crash guarantees `Durability` states. The level applies to
+    /// this call only and is never stored on the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written. Only
+    /// `Durability::Full` can report that the destination was replaced but
+    /// its directory could not be synchronized.
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
@@ -295,7 +321,7 @@ impl Package {
                 source,
             })?;
         self.flush_presentation()?;
-        PackageWriter::write(path, &self.opc)?;
+        PackageWriter::write_with_durability(path, &self.opc, durability)?;
         Ok(())
     }
 

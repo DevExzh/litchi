@@ -3088,6 +3088,17 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
 These selectors take no timing, allocation, physical-I/O, cold-cache or speedup
 claim. They are a descriptive baseline.
 
+**Save durability (change 0761).** `--save-durability full|file-only|no-sync`
+makes the `lifecycle` and `atomic_publish` phases time
+`save_with_durability(path, level)` instead of `save(path)`: `file-only` skips
+the parent-directory sync and `no-sync` also skips the temporary file's
+`sync_all` (`litchi_core::Durability`). Every other step, and every published
+byte, is unchanged; each sample must still reproduce the corpus's reference
+digest. The report's `ordinary_save.save_durability` names the level and
+`atomic_publication_steps` lists that level's steps. Without the flag the
+documented `save` runs and the report is unchanged. The flag is refused for the
+`edit` and `counting_publish` phases and without an ordinary-save selector.
+
 ## Opt-in marker-bearing corpora and their controls (change 0664)
 
 Change [0649](../../docs/performance/0649-pptx-opened-transaction-real-deck-edit.md)
