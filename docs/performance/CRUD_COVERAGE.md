@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0773 — filesystem publication policy and failure coverage
+
+[0773](0773-save-durability-integration.md) validates the explicit policy across OPC/CFB and seven Office format owners. Twelve traced routes cover both existing and absent destinations; full owner, dependency, facade and harness suites pass, including typed publication failures and preservation checks. Encrypted saves and DOCX tail append remain Full-only; ODF/iWork policy expansion is outside scope.
+
 ## 0772 — existing OPC publication selectors recaptured
 
 [0772](0772-opc-mutated-save-current-baseline.md) recaptures `opc_noop_save` and `opc_mutated_save` across their existing generated matrix. It does not promote any coverage-index row: independent raw-member proofs and reported output digests remain prerequisites for accepting a preservation optimization. No filesystem, cold-cache, allocator, or concurrent lane is established.

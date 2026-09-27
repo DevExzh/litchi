@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0773 — explicit save durability integrated and verified
+
+[0773](0773-save-durability-integration.md) integrates the owner-authorized Full/FileOnly/NoSync API while retaining Full for ordinary saves. Fresh paired traces verify 2/1/0 syncs, one replacement and equal output bytes across twelve routes and both destination states. Current regression gates pass; the initial verifier failure and its offline correction are retained. Owned build targets were removed after identity checks. No speedup or memory claim is made.
+
 ## 0772 — current OPC publication baseline and rejected profile
 
 [0772](0772-opc-mutated-save-current-baseline.md) retains source/binary custody, three serial captures, replayed statistics, all spread flags, and an explicitly rejected caller qualification. No production or harness source changed and no candidate was accepted. The owned build target was removed after identity checks; raw profile data remains losslessly archived.
