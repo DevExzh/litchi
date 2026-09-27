@@ -1,0 +1,40 @@
+{
+  "tested_source": "88cb5bf0fa",
+  "final_source": "fbb579914c",
+  "only_rust_comments_changed": true,
+  "patch_sha256": "8302964ed2fca0bc43900d54e30ab85e7efb79298a0cc331cb759a2bbd5eaad4",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ooxml-common",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "log": "comment-check-0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": 1790475143.6303673,
+      "ended": 1790475143.9588873
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-ooxml-common",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit": 0,
+      "log": "comment-check-1.log",
+      "sha256": "1454584b07ee6ae56678bd2a20f918c90b56f349befc420916c202c17089073e",
+      "started": 1790475143.9589,
+      "ended": 1790475149.777075
+    }
+  ]
+}

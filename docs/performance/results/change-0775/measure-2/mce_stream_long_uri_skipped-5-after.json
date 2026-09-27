@@ -1,0 +1,16 @@
+{
+  "case": "mce_stream_long_uri_skipped",
+  "elapsed_ns": [
+    2574011,
+    2138249,
+    2148369
+  ],
+  "input_bytes": 1072618,
+  "input_sha256": "312dd803bc6dd30bfa979161199be5abbb5a066745d68dcd9f0210211b871aa5",
+  "outcomes": [
+    "ok:(4001, 3):(2, 0):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 4000, ignored_attributes: 1, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 4002 }"
+  ],
+  "p50_ns": 2148369,
+  "samples": 3,
+  "warmup": 1
+}

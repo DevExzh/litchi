@@ -1,0 +1,19 @@
+{
+  "base": "92dfbe0bd5",
+  "candidate": "fbb579914c4b8fea1499485fb4e4fb06c42a8828",
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/mod.rs": "d0c3b7d51fc71ec2d855457e7faae15fd4c5c2b095f39095cc8d2e527d985c26",
+    "crates/litchi-ooxml-common/src/mce/model.rs": "f582b60e15a5ba51fc8c457dc9df2a225c3fbf831feafa82ad5bd8dc3f0a3eba",
+    "crates/litchi-ooxml-common/src/mce/patterns.rs": "b982c0c1e31ac83b4ae8fb75ddb101f1f73b5b4ee8de01c508947d330fe1f15d",
+    "crates/litchi-ooxml-common/src/mce/scope.rs": "579513e80008bd4dddea4f8e0f603a963e0646fd6e24db4f558459c5b48cbfc2",
+    "crates/litchi-ooxml-common/src/mce/shared_names_tests.rs": "19e0d6ecbee822afd9eda8e2e561023040c17b5f1511809619a028e976c90b8d",
+    "crates/litchi-ooxml-common/src/mce/stream.rs": "9b5d74d57ebae4a7c5789e4b3fa08731aaf237e7178031dcae08f45334692496",
+    "crates/litchi-ooxml-common/src/mce/tests.rs": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76",
+    "crates/litchi-xlsx/src/raw/strings.rs": "5da9e946e517a372759864b21b5fb6d8df66b4ba3d601f4dcd0c02efe0477a9c",
+    "crates/litchi-xlsx/src/raw/styles.rs": "902550ae1075b2fbc975f679c2e9b3a4559d38490d3cbb353c2e17a1a419aeb6",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs": "803ebd97b2fca2a6508958d88eef7f45748d67a33ea732721240b40a7549b37a",
+    "tools/perf-baseline/src/bin/xml_attribute_bounds.rs": "70c961b848bd7b9b7f6e8b8c7950fe13f2765e1cc8b8cf6604576b7049a4847e"
+  },
+  "full_gates_source": "88cb5bf0fa",
+  "followup": "comment-only-followup.patch"
+}

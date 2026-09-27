@@ -1,0 +1,57 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/model.rs b/crates/litchi-ooxml-common/src/mce/model.rs
+index 384d381f42..33f6d144ab 100644
+--- a/crates/litchi-ooxml-common/src/mce/model.rs
++++ b/crates/litchi-ooxml-common/src/mce/model.rs
+@@ -32,8 +32,8 @@ pub struct Name {
+ /// A document chooses its namespace URIs, and one declaration can put any
+ /// number of names in its namespace. The stream copies a URI once, when a
+ /// declaration binds it, and every name it expands in that namespace refers
+-/// to that copy, so a name costs the same whatever the length of its URI:
+-/// cloning a `NamespaceUri` never copies the URI.
++/// to that copy. Cloning a `NamespaceUri` never copies the URI; public text
++/// hashing and comparisons between independent allocations can still read it.
+ ///
+ /// It reads as its text: it dereferences to `str`, and compares, orders,
+ /// hashes, displays and debug-prints exactly as that text does. The empty
+@@ -240,8 +240,9 @@ impl From<NamespaceUri> for String {
+ /// stream.
+ ///
+ /// Its namespace is a [`NamespaceUri`], which shares the stream's one copy of
+-/// the URI, so the stream's events cost the same whatever the length of the
+-/// URIs a document chooses. [`Name`] is the owned form that the processing
++/// the URI, avoiding a URI copy for every event name. Registered-extension
++/// checks and caller observers can still read or copy that text. [`Name`] is
++/// the owned form that the processing
+ /// policy ([`Capabilities`]) takes.
+ #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+ pub struct ExpandedName {
+diff --git a/crates/litchi-ooxml-common/src/mce/patterns.rs b/crates/litchi-ooxml-common/src/mce/patterns.rs
+index 9c8b319f19..ea8a90b9c2 100644
+--- a/crates/litchi-ooxml-common/src/mce/patterns.rs
++++ b/crates/litchi-ooxml-common/src/mce/patterns.rs
+@@ -10,8 +10,8 @@
+ //! without directives pays for none.
+ //!
+ //! The namespace key is generic: the in-memory processor uses namespace
+-//! identities (`scope::UriId`), so a lookup costs the same whatever the length
+-//! of the namespace URI; the stream uses the URI itself.
++//! identities (`scope::UriId`), as does the stream. A directive lookup does
++//! not hash namespace URI text for each name.
+ 
+ use core::borrow::Borrow;
+ use core::hash::Hash;
+diff --git a/crates/litchi-ooxml-common/src/mce/shared_names_tests.rs b/crates/litchi-ooxml-common/src/mce/shared_names_tests.rs
+index 103e2b7d2b..c675a1bdbc 100644
+--- a/crates/litchi-ooxml-common/src/mce/shared_names_tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/shared_names_tests.rs
+@@ -1,7 +1,7 @@
+ //! Record 0771: the MCE stream's names share their namespace URI, so its
+-//! work per element, attribute and directive token does not depend on the
+-//! length of that URI, and every check it makes of a name through namespace
+-//! identities decides what the same check through URI text decided.
++//! event-name sharing and directive checks avoid per-name URI copies and
++//! hashing. Registered-extension checks and observer work are outside this
++//! property. Checks through namespace identities preserve URI-text equality.
+ //!
+ //! Work is bounded by counting, not timing: the namespace-URI bytes the scope
+ //! hashes, compares or examines for facts, the bytes the stream copies

@@ -1,0 +1,29 @@
+{
+  "base": "92dfbe0bd5",
+  "candidate": "88cb5bf0fa4385540bb2e46859e14ead7af0e9d3",
+  "original_commits": [
+    "d9bb20bf83",
+    "ab615e08f6",
+    "6154a06398"
+  ],
+  "conflicts": false,
+  "files": {
+    "crates/litchi-ooxml-common/src/mce/mod.rs": "d0c3b7d51fc71ec2d855457e7faae15fd4c5c2b095f39095cc8d2e527d985c26",
+    "crates/litchi-ooxml-common/src/mce/model.rs": "ad6e344e587698201253e2df12d341b748e2cef5acd3e3f67f1d9cfdab1110d7",
+    "crates/litchi-ooxml-common/src/mce/scope.rs": "579513e80008bd4dddea4f8e0f603a963e0646fd6e24db4f558459c5b48cbfc2",
+    "crates/litchi-ooxml-common/src/mce/shared_names_tests.rs": "efc11a265aa86771d00b4fe681c2b1db694e24f2a1f3605b6a1de82f0effbc0f",
+    "crates/litchi-ooxml-common/src/mce/stream.rs": "9b5d74d57ebae4a7c5789e4b3fa08731aaf237e7178031dcae08f45334692496",
+    "crates/litchi-ooxml-common/src/mce/tests.rs": "a65612e2ad07e6ffccde2d5a3f7293256425924dc2a3552a525ad11fe6d6dd76",
+    "crates/litchi-xlsx/src/raw/strings.rs": "5da9e946e517a372759864b21b5fb6d8df66b4ba3d601f4dcd0c02efe0477a9c",
+    "crates/litchi-xlsx/src/raw/styles.rs": "902550ae1075b2fbc975f679c2e9b3a4559d38490d3cbb353c2e17a1a419aeb6",
+    "crates/litchi-xlsx/src/raw/worksheet/x14ac.rs": "803ebd97b2fca2a6508958d88eef7f45748d67a33ea732721240b40a7549b37a",
+    "tools/perf-baseline/src/bin/xml_attribute_bounds.rs": "70c961b848bd7b9b7f6e8b8c7950fe13f2765e1cc8b8cf6604576b7049a4847e"
+  },
+  "workspace_inputs": {
+    "Cargo.toml": "7f4e0f5079a7704901e4dbe0d702388a3b07f59dddb3ca49d303cacc6d868e42",
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    ".cargo/config.toml": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+  },
+  "scope": "0770 original worktree has uncommitted review edits and is untouched; 0771 original worktree is preserved."
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "kind": "differential",
+    "leg": "before",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0775-release-before/release/mce-stream-probe",
+      "differential",
+      "--generated",
+      "4096",
+      "--aliasing",
+      "4096",
+      "--json",
+      "/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/docs/performance/results/change-0775/measure-0/differential-before.json",
+      "test-data/ooxml/docx",
+      "test-data/ooxml/xlsx",
+      "test-data/ooxml/pptx"
+    ],
+    "exit": 1,
+    "started": 1790475497.0734658,
+    "ended": 1790475498.5230465,
+    "report": "differential-before.json",
+    "report_sha256": "82938eae0bb176267b65836129611d2458d7bc2c2fa9cd73d83a9e6636015fd2",
+    "log": "differential-before.log",
+    "log_sha256": "46222c5048ffe46c6cd68112a0e3c9305107a737b8ada714023312a01f684b0e"
+  }
+]
