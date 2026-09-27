@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0782 — Guarded experiment rejects another representation
+
+[0782](0782-ppt-borrowed-slice-rejected.md) enforces the predeclared all-case latency/resource guard, rejecting optional borrowed text after many-short and Unicode regressions. Allocation removal is confirmed without claiming latency causality or retained-memory savings. Full CRUD metrics, cold/range/concurrency/scaling and broader budget work remain open; OLE2/OOXML remain active, ODF deferred and iWork excluded.
+
 ## 0781 — CI evidence flow repaired; general optimization rejected
 
 [0781](0781-ppt-text-ownership-and-ci-matrix.md) closes stale default-matrix and coverage-artifact wiring in performance CI with actual local report validation. A measured PPT copy-removal candidate is rejected after consistent short-text regressions despite large-text gains. Complete replay binds qualification corrections, 120 native/40 allocator processes, separate profilers, and source restoration. Full CRUD metrics, cold/range/concurrency/scaling and broader budget work remain open. OLE2/OOXML remain active, ODF deferred, and iWork excluded.

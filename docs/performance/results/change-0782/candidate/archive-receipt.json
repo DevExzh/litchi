@@ -1,0 +1,97 @@
+{
+  "schema": "litchi.performance.0782.archive-receipt.v1",
+  "base_commit": "f1df64d15a8f2711e554f58acb413b06d56ef1ca",
+  "candidate": "Option<&text str> PPT UserShapeData fresh serialization",
+  "archive_only": true,
+  "cargo_or_native_run": false,
+  "changed_files": [
+    "crates/litchi-ppt/src/writer/core/codec.rs",
+    "crates/litchi-ppt/src/writer/core/package.rs",
+    "crates/litchi-ppt/src/writer/core/tests.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+    "crates/litchi-ppt/src/writer/escher/model.rs",
+    "crates/litchi-ppt/src/writer/escher/semantic.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs"
+  ],
+  "files": [
+    {
+      "path": "files/crates/litchi-ppt/src/writer/core/codec.rs",
+      "bytes": 20836,
+      "sha256": "7f453675adf9258303af5f8e8a0ae1fe4f5a5699229798127e2bbde9b82817fa"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/core/package.rs",
+      "bytes": 51587,
+      "sha256": "badb166ee253c80d5bfa3b2faf7fb0f86e317e5deeb19d7fbe75dcecae033de4"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/core/tests.rs",
+      "bytes": 28327,
+      "sha256": "74f3e08f7128dd58f27b9386749bfd9078dda3db219d01d10cd81b8d89a018b2"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+      "bytes": 9587,
+      "sha256": "ba8ef8192bf1992fa20b7a9b0555deaa6f1d5f6c5d2fe61aa753fd2392735642"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/codec/group.rs",
+      "bytes": 4228,
+      "sha256": "7882bb79da431d61efade55368edc97ceb4df7e1596e46a91c72dda0d3a35e6b"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+      "bytes": 5855,
+      "sha256": "f8891e0b1616cb1c6c9e2dd2de80ad83221481e2f4547f9bda80fc5b1c97ff24"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+      "bytes": 10740,
+      "sha256": "28abfdec9e65491fe53274fa0b4c7a7d6ecd65afc99898c51ede4c3b75c96b2f"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+      "bytes": 2838,
+      "sha256": "b82828219643d848ea83d3814bedf6c3404233900c384f4943fb865505f39e22"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/model.rs",
+      "bytes": 20411,
+      "sha256": "fbe3723b4dbae425664f03b2e2ddd10ed9b5f183948472b2bb432a3c06989d90"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/semantic.rs",
+      "bytes": 3299,
+      "sha256": "26941995cd59539bc024ab722901c53e91af7365c099a8b9ec40f56f1d956700"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+      "bytes": 5016,
+      "sha256": "d95a3ba9825526b28fa5a7b4766637e0072e24d0094cb31417f735d6d2d590e3"
+    },
+    {
+      "path": "files/crates/litchi-ppt/src/writer/escher/tests/legacy.rs",
+      "bytes": 29137,
+      "sha256": "079ddcf258f502f926a31cc8a7995bfbe8f1162a8594f742e618a0ae4d714520"
+    }
+  ],
+  "artifacts": {
+    "model.patch": {
+      "bytes": 18824,
+      "sha256": "35a7af255660310db93214333b2b58247bcf2cf85fc9b6a85bfa3c4476d9f4bf"
+    },
+    "changed-files.json": {
+      "bytes": 659,
+      "sha256": "6cd27fd62fbd54478ff8bdcde7d9ecc548c0b597f29e31d3c5baab3a2a381c81"
+    },
+    "implementation-notes.md": {
+      "bytes": 6846,
+      "sha256": "4f54b91c00e380ecbaa26799be137bf367fcd1dc4bb03cc6eb57d9161574056f"
+    }
+  }
+}

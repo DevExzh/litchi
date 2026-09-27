@@ -1,0 +1,29 @@
+{
+  "executables": [
+    {
+      "bytes": 9821568,
+      "path": "/home/zhuhe/code/litchi-target-0782/before-allocation",
+      "sha256": "c3a5112f8be2ac8fd92f946f89cfe9dc060a56be883418447d1d46dc8da62dac"
+    },
+    {
+      "bytes": 9617336,
+      "path": "/home/zhuhe/code/litchi-target-0782/before-native",
+      "sha256": "abdc91201aa256da331a92a6c999f8a366bbdc4e297204809741c9fc09b7259b"
+    },
+    {
+      "bytes": 9819392,
+      "path": "/home/zhuhe/code/litchi-target-0782/after-allocation",
+      "sha256": "d65c230d6468d69f392f059298736159896021c5616d6658078c3bdb746186a8"
+    },
+    {
+      "bytes": 9615088,
+      "path": "/home/zhuhe/code/litchi-target-0782/after-native",
+      "sha256": "5b4f32ad1c591b40719d913802cdd2a6b598aeb4293906eb7d2360f715bce8ee"
+    }
+  ],
+  "executables_verified_before_removal": true,
+  "removed_target": "/home/zhuhe/code/litchi-target-0782",
+  "removed_target_file_bytes": 1981285708,
+  "verified": true,
+  "worktree_cleanup": "Recorded after integration in the report outside this sealed packet."
+}

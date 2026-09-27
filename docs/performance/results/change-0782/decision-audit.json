@@ -1,0 +1,94 @@
+{
+  "decision": "reject",
+  "latency_guard_failures": [
+    "many/write",
+    "many/lifecycle",
+    "unicode/write",
+    "unicode/lifecycle"
+  ],
+  "resource_guard_failures": [],
+  "rows": [
+    {
+      "all_blocks_regress": false,
+      "case": "tiny/write",
+      "ci_high": 0.987059213587496,
+      "ci_low": 0.9574425588438706,
+      "median_ratio": 0.9643830966307722,
+      "persistent_regression": false
+    },
+    {
+      "all_blocks_regress": false,
+      "case": "tiny/lifecycle",
+      "ci_high": 0.97344261744944,
+      "ci_low": 0.9457452900516996,
+      "median_ratio": 0.9632325308279507,
+      "persistent_regression": false
+    },
+    {
+      "all_blocks_regress": true,
+      "case": "many/write",
+      "ci_high": 1.1359184312083217,
+      "ci_low": 1.1101636938780175,
+      "median_ratio": 1.128968279149801,
+      "persistent_regression": true
+    },
+    {
+      "all_blocks_regress": true,
+      "case": "many/lifecycle",
+      "ci_high": 1.1233236072854051,
+      "ci_low": 1.1084984166656313,
+      "median_ratio": 1.1108909861867486,
+      "persistent_regression": true
+    },
+    {
+      "all_blocks_regress": false,
+      "case": "payload/write",
+      "ci_high": 0.795278261488958,
+      "ci_low": 0.7359845315012044,
+      "median_ratio": 0.7567189321127155,
+      "persistent_regression": false
+    },
+    {
+      "all_blocks_regress": false,
+      "case": "payload/lifecycle",
+      "ci_high": 0.8183325744502533,
+      "ci_low": 0.771904681186308,
+      "median_ratio": 0.783583992315735,
+      "persistent_regression": false
+    },
+    {
+      "all_blocks_regress": true,
+      "case": "unicode/write",
+      "ci_high": 1.2094762780398924,
+      "ci_low": 1.2022149086828438,
+      "median_ratio": 1.2065020756720428,
+      "persistent_regression": true
+    },
+    {
+      "all_blocks_regress": true,
+      "case": "unicode/lifecycle",
+      "ci_high": 1.1925442090619605,
+      "ci_low": 1.189756444828423,
+      "median_ratio": 1.1906936270698623,
+      "persistent_regression": true
+    },
+    {
+      "all_blocks_regress": false,
+      "case": "rich/write",
+      "ci_high": 1.0197724497724496,
+      "ci_low": 0.9900726167374696,
+      "median_ratio": 1.0012128441454524,
+      "persistent_regression": false
+    },
+    {
+      "all_blocks_regress": false,
+      "case": "rich/lifecycle",
+      "ci_high": 0.99967235968047,
+      "ci_low": 0.9843146109455971,
+      "median_ratio": 0.9913460667244729,
+      "persistent_regression": false
+    }
+  ],
+  "schema": "litchi.performance.0782.decision-audit.v1",
+  "scope": "Within-run raw p50 arithmetic and frozen guard; no causal or historical timing attribution."
+}

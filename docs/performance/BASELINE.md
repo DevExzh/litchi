@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0782 — Fresh borrowed-slice PPT pair
+
+[0782](0782-ppt-borrowed-slice-rejected.md) repeats the ten-case fresh-writer matrix with current baseline and candidate builds: 120 native and 40 allocator processes. ASCII payload write/lifecycle improves 24.328%/21.642%, while many-short cases regress 12.897%/11.089% and Unicode 20.650%/19.069%. The candidate is rejected and baseline source restored; historical 0781 timings are not pooled.
+
 ## 0781 — Paired fresh-PPT text ownership experiment
 
 [0781](0781-ppt-text-ownership-and-ci-matrix.md) retains 120 native and 40 allocation processes across five generated decks and two public writer scopes. The rejected candidate improves payload write/lifecycle paired p50 by 25.555%/19.186%, but regresses many-short-text write/lifecycle by 12.121%/10.551% in every block. Exact source/output and raw text preservation pass; baseline production source is restored. Separate CI captures validate 41 smoke and 213 full rows.

@@ -1,0 +1,77 @@
+{
+  "schema": "litchi.ppt.borrowed-text-probe.v1",
+  "tool": "ppt-borrowed-text-probe-0781",
+  "mode": "write",
+  "shape": "unicode",
+  "slides": 16,
+  "boxes_per_slide": 4,
+  "text_boxes": 64,
+  "timing_scope": "Writer::write_to only; Writer construction and slide/text-box authoring are outside the clock",
+  "source": {
+    "bytes": 2970340,
+    "sha256": "fdad40dd832c62fb5b6fcaba1e819719354ea81b9bef9ce2898878b72037ab7b"
+  },
+  "expected_semantic_text_bytes": 2969614,
+  "expected_raw_text_bytes": 2969678,
+  "warmup": 0,
+  "samples_requested": 1,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 3021873,
+      "metrics": {
+        "boxes_per_slide": 4,
+        "elapsed_ns": 3021873,
+        "slides": 16
+      },
+      "source_sha256": "fdad40dd832c62fb5b6fcaba1e819719354ea81b9bef9ce2898878b72037ab7b",
+      "output": {
+        "bytes": 5181952,
+        "sha256": "99ab72f2a287c3f6524a9f17e974a589be4b538994579d5be8edb43d74670956"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 1903,
+        "deallocation_calls": 1362,
+        "reallocation_calls": 540,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 27825564,
+        "deallocated_bytes": 17547164,
+        "live_bytes_before": 14075157,
+        "live_bytes_after": 24353557,
+        "peak_live_bytes_before": 19975472,
+        "peak_live_bytes_after": 30489455,
+        "region_peak_live_bytes": 30489455
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 16,
+        "expected_slide_count": 16,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 2969614,
+        "expected_semantic_text_sha256": "6ec30aa67a41a1eea6bf72cfcfe6fe091817b0e80c28dcefad5327d6bf1c72d8",
+        "semantic_text_bytes": 2969614,
+        "semantic_text_sha256": "6ec30aa67a41a1eea6bf72cfcfe6fe091817b0e80c28dcefad5327d6bf1c72d8",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 2969678,
+        "expected_raw_text_sha256": "a1f8e6a00a2ed81109d31e2cc23768f0e22657c08b68f6c6217a17d2bb1fd319",
+        "raw_text_bytes": 2969678,
+        "raw_text_sha256": "a1f8e6a00a2ed81109d31e2cc23768f0e22657c08b68f6c6217a17d2bb1fd319",
+        "raw_text_box_count": 64,
+        "expected_raw_text_box_count": 64,
+        "raw_text_atom_count": 64,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

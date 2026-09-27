@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0782 — Fresh PPT checks without production promotion
+
+[0782](0782-ppt-borrowed-slice-rejected.md) verifies both writer routes, borrowed source lifetime, rich mutation isolation, centered fallback, grouped text and existing text goldens. The inherited raw oracle preserves Unicode trailing spaces across 170 primary reports and 3,730 samples. Measured rejection restores baseline source and tests. No existing-document, native Office or coverage-index promotion follows.
+
 ## 0781 — Active CI coverage contract restored
 
 [0781](0781-ppt-text-ownership-and-ci-matrix.md) validates actual smoke/full harness reports against the default identity manifest and checks the active v2 coverage index against the full report and source selectors. The PPT probe checks exact source/output identities, normalized reader text, and untrimmed serialized text including Unicode trailing spaces. Candidate production code and tests are restored to baseline after measured rejection. No registry status is promoted; fresh-writer evidence does not establish existing-document CRUD or native Office interoperability.

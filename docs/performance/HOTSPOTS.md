@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0782 — Simpler borrowed field still misses the guard
+
+[0782](0782-ppt-borrowed-slice-rejected.md) removes transient plain-text conversion allocations with an optional borrowed slice, but four public cases violate the frozen latency guard. Smaller field layout and fewer requests do not establish a useful general speedup. Further work requires operation or generated-code attribution before another representation trial; no cause is inferred from cross-run values.
+
 ## 0781 — String-copy removal has a short-text tradeoff
 
 [0781](0781-ppt-text-ownership-and-ci-matrix.md) confirms 192 conversion allocations / 7,680,000 requested bytes disappear across three payload writes, yet the Cow representation consistently slows the many-short-text public workload. Net retained and peak-above-entry live bytes are unchanged. The candidate is rejected; do not infer a latency cause or adopt it solely from allocation counts. A simpler borrowed representation requires separate design and fresh evidence.

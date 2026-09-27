@@ -1,0 +1,20 @@
+{
+  "benefit_requirement": "Useful public-workflow improvement supported by its own paired distribution; allocation-count reduction alone is insufficient.",
+  "correctness": "Exact source/output and semantic/raw-text parity, source ownership tests, complete PPT quality gates.",
+  "frozen_before_candidate_build_and_paired_capture": true,
+  "latency_control_guard": {
+    "cases": "all ten cases in the frozen plan",
+    "disposition_if_present": "against adoption; do not hide by aggregate gains or resample",
+    "metric": "paired native process-p50 after/before ratios",
+    "persistent_regression": "median ratio > 1.05 and bootstrap 95% CI lower bound > 1.0"
+  },
+  "resource_guard": {
+    "metrics": [
+      "net_live",
+      "peak_above_entry"
+    ],
+    "requirement": "No added retained or peak-above-entry live bytes in repeated allocation controls."
+  },
+  "schema": "litchi.performance.0782.adoption-policy.v1",
+  "scope": "Decision policy, not a performance result or attribution claim."
+}
