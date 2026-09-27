@@ -1,0 +1,6 @@
+{
+  "reason": "Rust could not infer Sum result type in fixture-only insert_attributes capacity calculation; annotated usize. No measured path changed.",
+  "failed_attempt": "failed-build-before-1",
+  "original_receipt_prefix": "build-before/",
+  "no_measurements_started": true
+}

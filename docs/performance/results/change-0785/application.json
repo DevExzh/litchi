@@ -1,0 +1,6 @@
+{
+  "source_file": "crates/litchi-pptx/src/notes/mod.rs",
+  "sha256": "7e5f2cabdde77d41e1fabbcc0cdef2028238a6f390abb8d537e375fb5061ede1",
+  "matches_reviewed_archive": true,
+  "diff": " crates/litchi-pptx/src/notes/mod.rs | 186 +++++++++++++++++++++++++++++++++++-\n 1 file changed, 184 insertions(+), 2 deletions(-)\n"
+}

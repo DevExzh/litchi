@@ -1,0 +1,27 @@
+{
+  "allocation_count_alone_sufficient": false,
+  "benefit": {
+    "at_least_one_case_required": true,
+    "bootstrap95_high_below": 1.0,
+    "eligible_modes": [
+      "capture",
+      "lifecycle"
+    ],
+    "minimum_improvement_percent": 3.0
+  },
+  "frozen_before_build": true,
+  "latency": {
+    "any_case_violation_rejects": true,
+    "bootstrap95_low_must_exceed": 1.0,
+    "maximum_ratio": 1.05,
+    "metric": "paired process p50",
+    "resamples": 10000,
+    "seed": 785078
+  },
+  "memory": {
+    "net_live_increase_allowed": 0,
+    "peak_above_entry_increase_allowed": 0
+  },
+  "scope": "All15cases includingvendorfallbackcontrols; diagnostichelpergains aloneinsufficient.",
+  "useful_public_workflow_benefit_required": true
+}

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0785 — bounded PPTX capture improvement retained
+
+[0785](0785-pptx-known-namespace-uris.md) The frozen 15-case latency/resource/benefit policy passes; six quality gates pass with 1,235 tests and 3 ignored. Large capture/lifecycle p50 improves 8.489%/6.844%, with exact unknown-namespace preservation and unchanged allocation metrics. Cold/range sources, native producer breadth, concurrency/scaling and comprehensive CRUD remain open; ODF deferred and iWork excluded.
+
 ## 0784 — direct capture profile qualifies the next mechanism
 
 [0784](0784-pptx-initial-capture-profile.md) The initial PPTX capture owner now has replayable exact-region guest instructions and qualified native sampled ancestry. Failed ordinary DWARF qualification is disclosed and retained; a separate frame-pointer diagnostic supplies usable stacks. Broader CRUD/provider/scaling and actual candidate adoption remain open.

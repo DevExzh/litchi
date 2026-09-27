@@ -1,0 +1,72 @@
+[
+  {
+    "binary": {
+      "bytes": 14024960,
+      "path": "/home/zhuhe/code/litchi-target-0785/before-native",
+      "sha256": "37a5bc1651ac70903e851908ed444e838bdfab3e356554bb6c8c384e4594e5a4"
+    },
+    "leg": "before",
+    "records": [
+      {
+        "assembly": {
+          "bytes": 6827,
+          "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/assembly/before-0.asm.txt",
+          "sha256": "e17478240aa47dc6138a747eba978661fab16ef4047a71cc2ae7c33af589fb59"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--no-show-raw-insn",
+          "--disassemble=_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E",
+          "/home/zhuhe/code/litchi-target-0785/before-native"
+        ],
+        "symbol": "_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E"
+      }
+    ],
+    "symbol_command": [
+      "nm",
+      "--defined-only",
+      "/home/zhuhe/code/litchi-target-0785/before-native"
+    ],
+    "symbols": {
+      "bytes": 71,
+      "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/assembly/before.symbols.txt",
+      "sha256": "4fb3eec476e203d06ce09bf900762be778e81e376d80e01cfd3adcb4bfedbc55"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 14025872,
+      "path": "/home/zhuhe/code/litchi-target-0785/after-native",
+      "sha256": "ac6813dfec24b18fabdea129cac13ced1d374195425b2707092d11594b7fc9c6"
+    },
+    "leg": "after",
+    "records": [
+      {
+        "assembly": {
+          "bytes": 8963,
+          "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/assembly/after-0.asm.txt",
+          "sha256": "f3f30e331feaf68d5d8ce04f255b603c855736fb4221f39a4bb7134195e2a83e"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--no-show-raw-insn",
+          "--disassemble=_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E",
+          "/home/zhuhe/code/litchi-target-0785/after-native"
+        ],
+        "symbol": "_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E"
+      }
+    ],
+    "symbol_command": [
+      "nm",
+      "--defined-only",
+      "/home/zhuhe/code/litchi-target-0785/after-native"
+    ],
+    "symbols": {
+      "bytes": 71,
+      "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/assembly/after.symbols.txt",
+      "sha256": "d0ef7edc7396a81dbab31a0b4d9f23f36d75784bb4ed31ec43982d2288236d26"
+    }
+  }
+]

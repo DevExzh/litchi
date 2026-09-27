@@ -52,12 +52,33 @@ CASES = (
 )
 MODES = tuple(sorted({case["mode"] for case in CASES}))
 SHAPES = ("tiny", "medium", "large", "vendor", "unicode-vendor")
+SHAPE_DIMENSIONS = {
+    "tiny": (3, 4),
+    "medium": (12, 8),
+    "large": (100, 100),
+    "vendor": (12, 8),
+    "unicode-vendor": (12, 8),
+}
 ORDINARY_CASES = tuple(
     {"shape": shape, "mode": mode}
     for shape in ("tiny", "medium", "large")
     for mode in ("capture", "commit", "lifecycle")
 )
 HISTORICAL_PACKET = "docs/performance/results/change-0780"
+PRODUCTION_PATHSPEC = (
+    "crates",
+    "Cargo.toml",
+    "clippy.toml",
+    ".cargo/config.toml",
+    "rust-toolchain.toml",
+)
+FROZEN_INPUT_FILES = (
+    "adoption-policy.json",
+    "architecture-inputs.json",
+    "build.py",
+    "capture.py",
+    "plan.json",
+)
 NATIVE_METRICS = ("p50", "mean", "p95", "p99")
 ALLOCATION_FIELDS = (
     "allocation_calls",
@@ -136,6 +157,14 @@ def sha256(path: Path) -> str:
 
 def is_sha(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(c in HEX for c in value)
+
+
+def is_git_revision(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 40 and all(c in HEX for c in value)
+
+
+def digest_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
 def nonnegative_int(value: Any, label: str) -> None:
@@ -297,6 +326,112 @@ def load_plan() -> dict[str, Any]:
     require(len(set(allowlist)) == len(allowlist), "source allowlist contains duplicates")
     plan["source_allowlist"] = allowlist
     return plan
+
+
+def _git_output(arguments: list[str], label: str) -> str:
+    try:
+        return subprocess.check_output(["git", *arguments], cwd=ROOT, text=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        fail(f"cannot read {label}: {error}")
+
+
+def _git_blob_bytes(revision: str, names: Iterable[str], label: str) -> dict[str, bytes]:
+    """Read immutable Git blobs in one batch and return their exact bytes."""
+
+    ordered = list(names)
+    require(is_git_revision(revision), f"{label} revision is invalid")
+    require(len(set(ordered)) == len(ordered), f"{label} contains duplicate paths")
+    require(all(name and "\n" not in name and "\0" not in name for name in ordered),
+            f"{label} contains an invalid path")
+    request = "".join(f"{revision}:{name}\n" for name in ordered).encode()
+    try:
+        completed = subprocess.run(
+            ["git", "cat-file", "--batch"], cwd=ROOT, input=request,
+            stdout=subprocess.PIPE, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        fail(f"cannot read {label} Git blobs: {error}")
+    data = completed.stdout
+    offset = 0
+    result: dict[str, bytes] = {}
+    for name in ordered:
+        end = data.find(b"\n", offset)
+        require(end >= 0, f"{label} Git blob header is truncated: {name}")
+        header = data[offset:end].split()
+        require(len(header) == 3 and is_git_revision(header[0].decode(errors="replace"))
+                and header[1] == b"blob", f"{label} Git blob is not a blob: {name}")
+        try:
+            size = int(header[2])
+        except ValueError:
+            fail(f"{label} Git blob size is invalid: {name}")
+        offset = end + 1
+        require(size >= 0 and offset + size <= len(data),
+                f"{label} Git blob is truncated: {name}")
+        result[name] = data[offset:offset + size]
+        offset += size
+        require(data[offset:offset + 1] == b"\n",
+                f"{label} Git blob terminator is missing: {name}")
+        offset += 1
+    require(offset == len(data), f"{label} Git blob batch has trailing data")
+    return result
+
+
+def _git_blob_digests(revision: str, names: Iterable[str], label: str) -> dict[str, str]:
+    return {name: digest_bytes(value)
+            for name, value in _git_blob_bytes(revision, names, label).items()}
+
+
+def load_revision_transition(builds: dict[str, Any]) -> dict[str, Any]:
+    """Prove that the successful baseline build was a docs-only descendant."""
+
+    path = PACKET / "revision-transition.json"
+    value = read_json(path)
+    require(isinstance(value, dict), "revision transition is malformed")
+    base = origin().get("base")
+    require(value.get("base") == base and is_git_revision(base),
+            "revision transition base changed")
+    build_revision = value.get("build_revision")
+    require(is_git_revision(build_revision), "revision transition build revision is invalid")
+    require(builds["before"]["source"]["revision"] == build_revision,
+            "before census revision differs from recorded build revision")
+    commits = value.get("commits")
+    require(isinstance(commits, list) and commits, "revision transition commit custody is incomplete")
+    commit_ids: list[str] = []
+    for commit in commits:
+        require(isinstance(commit, str) and commit, "revision transition commit is malformed")
+        commit_id = commit.split(maxsplit=1)[0]
+        require(is_git_revision(commit_id), "revision transition commit ID is invalid")
+        commit_ids.append(commit_id)
+    require(build_revision in commit_ids, "revision transition commit custody is incomplete")
+    require(value.get("production_diff_empty") is True,
+            "revision transition production-diff marker changed")
+    _git_output(["merge-base", "--is-ancestor", base, build_revision],
+                "revision transition ancestry")
+    changed = _git_output(
+        ["diff", "--name-only", f"{base}..{build_revision}", "--", *PRODUCTION_PATHSPEC],
+        "production revision diff",
+    ).splitlines()
+    require(changed == [], f"docs-only revision changed production files: {changed}")
+    expected_files = builds["before"]["source"]["files"]
+    base_files = _git_output(
+        ["ls-tree", "-r", "--name-only", base, "--", *PRODUCTION_PATHSPEC],
+        "base production census",
+    ).splitlines()
+    require(sorted(base_files) == sorted(expected_files),
+            "base production file census differs from before census")
+    base_digests = _git_blob_digests(base, base_files, "base production census")
+    require(base_digests == expected_files, "base production blob hashes differ from before census")
+    return {
+        "receipt": _file_identity(path),
+        "base": base,
+        "build_revision": build_revision,
+        "commits": list(commits),
+        "commit_ids": commit_ids,
+        "ancestor_checked": True,
+        "production_diff_empty": True,
+        "base_file_census_matches": True,
+        "base_blob_hashes_checked": len(base_digests),
+    }
 
 
 def _cleanup_has(cleanup: Any, receipt: dict[str, Any]) -> bool:
@@ -486,6 +621,24 @@ def expected_build_command(leg: str, feature: str | None) -> list[str]:
     return command
 
 
+def load_frozen_inputs(directory: Path, label: str) -> dict[str, str]:
+    path = directory / "frozen-inputs.json"
+    value = read_json(path)
+    require(isinstance(value, dict) and set(value) == set(FROZEN_INPUT_FILES),
+            f"{label} frozen input set changed")
+    result: dict[str, str] = {}
+    for name in FROZEN_INPUT_FILES:
+        digest = value.get(name)
+        require(is_sha(digest), f"{label} frozen input digest is invalid: {name}")
+        input_path = PACKET / name
+        require(input_path.is_file() and not input_path.is_symlink(),
+                f"{label} frozen input is missing: {name}")
+        require(sha256(input_path) == digest,
+                f"{label} frozen input changed: {name}")
+        result[name] = digest
+    return result
+
+
 def load_builds(plan: dict[str, Any]) -> tuple[dict[str, Any], Any, bool]:
     cleanup, cleanup_verified = load_cleanup()
     fixed_release_profile()
@@ -494,6 +647,7 @@ def load_builds(plan: dict[str, Any]) -> tuple[dict[str, Any], Any, bool]:
         directory = PACKET / f"build-{leg}"
         build = read_json(directory / "build.json")
         require(isinstance(build, dict), f"{leg} build manifest is malformed")
+        frozen_inputs = load_frozen_inputs(directory, leg)
         source_path = artifact_path(build.get("source"), f"{leg} build source")
         source = source_manifest(read_json(source_path), f"{leg} build source")
         inventory = build.get("probe")
@@ -535,7 +689,8 @@ def load_builds(plan: dict[str, Any]) -> tuple[dict[str, Any], Any, bool]:
                 f"{leg} build environment changed")
         builds[leg] = {"manifest": build, "source": source,
                        "source_path": source_path, "probe": inventory,
-                       "lock": lock, "binaries": binaries}
+                       "lock": lock, "binaries": binaries,
+                       "frozen_inputs": frozen_inputs}
     before = builds["before"]["source"]["files"]
     after = builds["after"]["source"]["files"]
     changed = sorted(name for name in set(before) | set(after) if before.get(name) != after.get(name))
@@ -548,6 +703,8 @@ def load_builds(plan: dict[str, Any]) -> tuple[dict[str, Any], Any, bool]:
             "probe lock changed between builds")
     require(builds["before"]["probe"] == builds["after"]["probe"],
             "probe source changed between builds")
+    require(builds["before"]["frozen_inputs"] == builds["after"]["frozen_inputs"],
+            "frozen build inputs changed between legs")
     for lane in ("native", "allocation", "qualification"):
         path = PACKET / lane / "source.json"
         if path.is_file():
@@ -555,6 +712,37 @@ def load_builds(plan: dict[str, Any]) -> tuple[dict[str, Any], Any, bool]:
             require(source_files_equal(source_manifest(read_json(path), f"{lane} source"), expected),
                     f"{lane} source census differs from expected build")
     return builds, cleanup, cleanup_verified
+
+
+def load_architecture_inputs() -> dict[str, Any]:
+    """Bind the 35 architecture references to both live files and origin Git blobs."""
+
+    path = PACKET / "architecture-inputs.json"
+    value = read_json(path)
+    require(isinstance(value, dict) and len(value) == 35,
+            "architecture input cardinality changed")
+    files: dict[str, str] = {}
+    for name, digest in value.items():
+        require(isinstance(name, str) and name and not name.startswith("/"),
+                "architecture input path is invalid")
+        require(is_sha(digest), f"architecture input digest is invalid: {name}")
+        live = ROOT / name
+        require(live.is_file() and not live.is_symlink(),
+                f"architecture input is missing: {name}")
+        require(sha256(live) == digest, f"architecture input changed in live files: {name}")
+        files[name] = digest
+    base = origin().get("base")
+    require(is_git_revision(base), "origin base revision is invalid")
+    git_digests = _git_blob_digests(base, files, "architecture inputs")
+    require(git_digests == files, "architecture input origin Git blobs changed")
+    return {
+        "receipt": _file_identity(path),
+        "revision": base,
+        "count": len(files),
+        "files": files,
+        "live_files_match": True,
+        "origin_blob_hashes_match": True,
+    }
 
 
 QUALITY_COMMANDS = (
@@ -750,18 +938,130 @@ def load_baseline_fixture_parity() -> dict[str, Any]:
             "rows": sorted(result_rows, key=lambda row: row["case"])}
 
 
+def load_historical_qualification() -> dict[str, Any]:
+    """Check the sealed 0780 qualification census against the origin Git tree."""
+
+    packet = ROOT / HISTORICAL_PACKET
+    base = origin().get("base")
+    require(is_git_revision(base), "historical qualification origin revision is invalid")
+    prefix = f"{HISTORICAL_PACKET}/"
+    metadata = [
+        f"{prefix}plan.json",
+        f"{prefix}seal.json",
+        f"{prefix}qualification/complete.json",
+        f"{prefix}qualification/receipts.json",
+    ]
+    git_metadata = _git_blob_bytes(base, metadata, "historical qualification metadata")
+    for name, contents in git_metadata.items():
+        current = ROOT / name
+        require(current.is_file() and not current.is_symlink(),
+                f"historical qualification file is missing: {name}")
+        require(sha256(current) == digest_bytes(contents),
+                f"historical qualification Git anchor changed: {name}")
+    plan_path, seal_path, complete_path, receipts_path = metadata
+    try:
+        plan = json.loads(git_metadata[plan_path])
+        seal = json.loads(git_metadata[seal_path])
+        complete = json.loads(git_metadata[complete_path])
+        receipts = json.loads(git_metadata[receipts_path])
+    except ValueError as error:
+        fail(f"historical qualification Git JSON is malformed: {error}")
+    require(isinstance(plan, dict) and plan.get("schema") == "litchi.performance.0780.v1",
+            "historical 0780 plan is malformed")
+    cases = plan.get("cases")
+    require(isinstance(cases, list) and len(cases) == 10,
+            "historical 0780 case cardinality changed")
+    ordinary = [case for case in cases
+                if isinstance(case, dict)
+                and case.get("mode") in {"capture", "commit", "lifecycle"}]
+    diagnostic = [case for case in cases
+                  if isinstance(case, dict) and case.get("mode") == "capabilities"]
+    require(len(ordinary) == 9 and len(diagnostic) == 1
+            and diagnostic[0].get("shape") == "tiny",
+            "historical 0780 ordinary/diagnostic case split changed")
+    require(all(isinstance(case, dict) and isinstance(case.get("shape"), str)
+                and isinstance(case.get("mode"), str) for case in cases),
+            "historical 0780 case identity is malformed")
+    require(isinstance(complete, dict) and complete.get("children") == 10,
+            "historical 0780 qualification child cardinality changed")
+    require(isinstance(receipts, list) and len(receipts) == 10,
+            "historical 0780 qualification receipt cardinality changed")
+    require(isinstance(seal, dict) and seal.get("schema") == "litchi.performance.0780.seal.v1"
+            and isinstance(seal.get("files"), dict),
+            "historical 0780 seal is malformed")
+    sealed = seal["files"]
+    expected_cases = {
+        f"0-{case['shape']}-{case['mode']}-before"
+        for case in cases
+    }
+    require(len(expected_cases) == 10, "historical 0780 case identities changed")
+    report_paths = [f"{prefix}qualification/{case}.json" for case in sorted(expected_cases)]
+    git_reports = _git_blob_bytes(base, report_paths, "historical qualification reports")
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in receipts:
+        require(isinstance(row, dict), "historical 0780 qualification receipt is malformed")
+        require(row.get("lane") == "qualification" and row.get("block") == 0
+                and row.get("leg") == "before",
+                "historical 0780 qualification receipt identity changed")
+        case = f"0-{row.get('shape')}-{row.get('mode')}-{row.get('leg')}"
+        require(case in expected_cases and case not in seen,
+                f"historical 0780 qualification case changed: {case}")
+        seen.add(case)
+        report = packet / "qualification" / f"{case}.json"
+        relative = f"qualification/{case}.json"
+        report_receipt = row.get("report")
+        require(isinstance(report_receipt, dict)
+                and Path(str(report_receipt.get("path", ""))).name == f"{case}.json"
+                and report.is_file() and not report.is_symlink(),
+                f"historical 0780 report receipt changed: {case}")
+        require(relative in sealed and sealed[relative] == sha256(report),
+                f"historical 0780 sealed report changed: {case}")
+        git_name = f"{prefix}{relative}"
+        require(digest_bytes(git_reports[git_name]) == sha256(report),
+                f"historical 0780 report Git anchor changed: {case}")
+        require(report_receipt.get("bytes") == report.stat().st_size
+                and report_receipt.get("sha256") == sha256(report),
+                f"historical 0780 report receipt digest changed: {case}")
+        rows.append({
+            "case": case,
+            "report": relative,
+            "sha256": sha256(report),
+            "git_sha256": digest_bytes(git_reports[git_name]),
+        })
+    require(seen == expected_cases, "historical 0780 qualification case set changed")
+    return {
+        "packet": HISTORICAL_PACKET,
+        "git_revision": base,
+        "metadata_files": len(metadata),
+        "plan_cases": len(cases),
+        "ordinary_cases": len(ordinary),
+        "diagnostic_cases": len(diagnostic),
+        "qualification_reports": len(rows),
+        "seal_schema": seal.get("schema"),
+        "sealed_reports": sorted(rows, key=lambda row: row["case"]),
+        "sealed_git_comparison": True,
+    }
+
+
 def load_adoption_policy() -> dict[str, Any]:
     """Bind the frozen decision guard without turning it into a result."""
 
     policy_path = PACKET / "adoption-policy.json"
     value = read_json(policy_path)
     require(isinstance(value, dict), "adoption policy is malformed")
-    require(value.get("schema") == "litchi.performance.0785.adoption-policy.v1",
-            "adoption policy schema changed")
+    require(set(value) == {
+        "allocation_count_alone_sufficient", "benefit", "frozen_before_build",
+        "latency", "memory", "scope", "useful_public_workflow_benefit_required",
+    } and "schema" not in value, "adoption policy fields changed")
     require(value.get("frozen_before_build") is True,
             "adoption policy freeze marker changed")
     latency = value.get("latency")
     require(isinstance(latency, dict)
+            and set(latency) == {
+                "any_case_violation_rejects", "bootstrap95_low_must_exceed",
+                "maximum_ratio", "metric", "resamples", "seed",
+            }
             and latency.get("metric") == "paired process p50"
             and latency.get("maximum_ratio") == 1.05
             and latency.get("bootstrap95_low_must_exceed") == 1.0
@@ -771,18 +1071,24 @@ def load_adoption_policy() -> dict[str, Any]:
             "adoption latency guard changed")
     memory = value.get("memory")
     require(isinstance(memory, dict)
+            and set(memory) == {"net_live_increase_allowed", "peak_above_entry_increase_allowed"}
             and memory.get("net_live_increase_allowed") == 0
             and memory.get("peak_above_entry_increase_allowed") == 0,
             "adoption memory guard changed")
     benefit = value.get("benefit")
     require(isinstance(benefit, dict)
+            and set(benefit) == {
+                "at_least_one_case_required", "bootstrap95_high_below",
+                "eligible_modes", "minimum_improvement_percent",
+            }
             and benefit.get("minimum_improvement_percent") == 3.0
             and benefit.get("bootstrap95_high_below") == 1.0
             and benefit.get("eligible_modes") == ["capture", "lifecycle"]
             and benefit.get("at_least_one_case_required") is True,
             "adoption benefit requirement changed")
     require(value.get("allocation_count_alone_sufficient") is False
-            and value.get("useful_public_workflow_benefit_required") is True,
+            and value.get("useful_public_workflow_benefit_required") is True
+            and isinstance(value.get("scope"), str) and value["scope"],
             "adoption rationale changed")
     return {"receipt": _file_identity(policy_path), "policy": value}
 
@@ -833,6 +1139,41 @@ def source_identity(report: dict[str, Any], job: dict[str, Any], label: str) -> 
     if "marker" in report and expected_marker:
         require(report.get("marker") == expected_marker,
                 f"{label} marker identity changed")
+
+
+def fixture_identity(report: dict[str, Any], job: dict[str, Any], label: str) -> None:
+    """Check the generated fixture, including the six per-text vendor attrs."""
+
+    slides, shapes_per_slide = SHAPE_DIMENSIONS[job["shape"]]
+    require(report.get("slides") == slides
+            and report.get("shapes_per_slide") == shapes_per_slide,
+            f"{label} fixture dimensions changed")
+    fixture = report.get("fixture")
+    require(isinstance(fixture, dict), f"{label} fixture metadata is missing")
+    vendor = job["shape"] in {"vendor", "unicode-vendor"}
+    expected_injection = {
+        "vendor": "same-length-known-uri-near-misses",
+        "unicode-vendor": "same-length-valid-utf8-unknown-uris",
+    }.get(job["shape"], "none")
+    require(fixture.get("injection") == expected_injection,
+            f"{label} fixture injection changed")
+    expected_tags = slides * shapes_per_slide if vendor else 0
+    expected_parts = slides if vendor else 0
+    require(fixture.get("slide_parts") == expected_parts
+            and fixture.get("replaced_text_tags") == expected_tags,
+            f"{label} fixture text coverage changed")
+    for key in ("namespace_uris", "attribute_names"):
+        values = fixture.get(key)
+        require(isinstance(values, list), f"{label} fixture {key} is missing")
+        if vendor:
+            require(len(values) == 6 and all(isinstance(value, str) and value for value in values)
+                    and len(set(values)) == 6,
+                    f"{label} fixture {key} cardinality changed")
+        else:
+            require(values == [], f"{label} ordinary fixture {key} changed")
+    require(fixture.get("namespace_declarations") == (6 if vendor else 0)
+            and fixture.get("namespaced_attributes") == (6 if vendor else 0),
+            f"{label} fixture namespace cardinality changed")
 
 
 def stats(values: Iterable[int | float]) -> dict[str, Any]:
@@ -900,11 +1241,9 @@ def validate_report(report: dict[str, Any], job: dict[str, Any], kind: str,
     require(report.get("timing_scope") == TIMING_SCOPES[job["mode"]],
             f"{label} timing scope changed")
     source_identity(report, job, label)
+    fixture_identity(report, job, label)
     require(report.get("samples_requested") == job["samples"]
             and report.get("warmup") == job["warmup"], f"{label} sample configuration changed")
-    for key in ("expected_semantic_text_bytes", "expected_raw_text_bytes"):
-        if key in report:
-            nonnegative_int(report[key], f"{label} {key}")
     samples = report.get("samples")
     require(isinstance(samples, list) and len(samples) == job["samples"],
             f"{label} sample count changed")
@@ -946,69 +1285,37 @@ def validate_report(report: dict[str, Any], job: dict[str, Any], kind: str,
         require(isinstance(verification, dict) and verification.get("semantic_check") is True,
                 f"{label} sample {index} semantic verification failed")
         require(verification.get("reopened") is True, f"{label} output was not reopened")
-        semantic_evidence = False
         output = sample.get("output")
         require(isinstance(output, dict) and is_sha(output.get("sha256")),
                 f"{label} output identity is missing")
         nonnegative_int(output.get("bytes"), f"{label} output bytes")
         outputs.append((output["bytes"], output["sha256"]))
-        if "slide_count" in verification:
-            require(verification.get("slide_count") == report.get("slides")
-                    and verification.get("expected_slide_count") == report.get("slides")
-                    and verification.get("slide_count_match") is True,
-                    f"{label} slide readback changed")
-        if "exact_text_match" in verification:
-            require(verification.get("exact_text_match") is True,
-                    f"{label} semantic text readback changed")
-            semantic_evidence = True
-        if "expected_text" in verification or "actual_text" in verification:
-            require(isinstance(verification.get("expected_text"), str)
-                    and isinstance(verification.get("actual_text"), str)
-                    and verification.get("expected_text") == verification.get("actual_text"),
-                    f"{label} semantic text readback changed")
-            semantic_evidence = True
-        expected_bytes = report.get("expected_semantic_text_bytes")
-        if expected_bytes is not None:
-            expected_sha = verification.get("expected_semantic_text_sha256")
-            semantic_bytes = verification.get("semantic_text_bytes")
-            semantic_sha = verification.get("semantic_text_sha256")
-            nonnegative_int(expected_bytes, f"{label} expected semantic bytes")
-            nonnegative_int(verification.get("expected_semantic_text_bytes"),
-                            f"{label} sample expected semantic bytes")
-            require(verification.get("expected_semantic_text_bytes") == expected_bytes
-                    and semantic_bytes == expected_bytes
-                    and is_sha(expected_sha) and is_sha(semantic_sha)
-                    and semantic_sha == expected_sha,
-                    f"{label} semantic digest does not match expected readback")
-            semantic_evidence = True
-        if "readback_bytes" in verification or "readback_sha256" in verification:
-            require(verification.get("readback_bytes") == output["bytes"]
-                    and verification.get("readback_sha256") == output["sha256"],
-                    f"{label} readback digest does not match output")
-        if "raw_text_check" in verification:
-            require(verification.get("raw_text_check") is True
-                    and verification.get("raw_text_match") is True
-                    and verification.get("raw_text_boxes_match") is True,
-                    f"{label} raw text oracle changed")
-            semantic_evidence = True
-            for key in ("raw_text_box_count", "expected_raw_text_box_count",
-                        "raw_text_atom_count"):
-                nonnegative_int(verification.get(key), f"{label} {key}")
-            expected_raw_bytes = report.get("expected_raw_text_bytes")
-            nonnegative_int(expected_raw_bytes, f"{label} expected raw text bytes")
-            require(verification.get("raw_text_box_count")
-                    == verification.get("expected_raw_text_box_count")
-                    and verification.get("raw_text_bytes") == expected_raw_bytes
-                    and verification.get("expected_raw_text_bytes") == expected_raw_bytes
-                    and is_sha(verification.get("expected_raw_text_sha256"))
-                    and is_sha(verification.get("raw_text_sha256"))
-                    and verification.get("raw_text_sha256")
-                    == verification.get("expected_raw_text_sha256"),
-                    f"{label} raw text oracle changed")
-        if "marker_matches" in verification and job["mode"] in {"commit", "lifecycle"}:
-            require(verification.get("marker_matches") is True,
-                    f"{label} marker verification failed")
-        require(semantic_evidence, f"{label} full semantic readback evidence is missing")
+        require(isinstance(verification.get("expected_text"), str)
+                and isinstance(verification.get("actual_text"), str)
+                and verification.get("expected_text") == verification.get("actual_text"),
+                f"{label} semantic text readback changed")
+        nonnegative_int(verification.get("semantic_text_bytes"),
+                        f"{label} semantic text bytes")
+        require(is_sha(verification.get("semantic_text_sha256")),
+                f"{label} semantic text digest is missing")
+        require(verification.get("readback_bytes") == output["bytes"]
+                and verification.get("readback_sha256") == output["sha256"],
+                f"{label} readback digest does not match output")
+        vendor = job["shape"] in {"vendor", "unicode-vendor"}
+        if vendor:
+            require(verification.get("unknown_namespace_check") is True
+                    and verification.get("unknown_namespace_occurrences")
+                    == SHAPE_DIMENSIONS[job["shape"]][0]
+                    * SHAPE_DIMENSIONS[job["shape"]][1],
+                    f"{label} unknown namespace oracle changed")
+        else:
+            require(verification.get("unknown_namespace_check") is None
+                    and verification.get("unknown_namespace_occurrences") is None,
+                    f"{label} ordinary namespace oracle changed")
+        expected_marker_matches = True if job["mode"] in {"commit", "lifecycle"} else None
+        require("marker_matches" in verification
+                and verification.get("marker_matches") is expected_marker_matches,
+                f"{label} marker verification failed")
         allocation = sample.get("allocation")
         if kind == "native":
             require(allocation is None, f"{label} native report contains allocation metrics")
@@ -1398,6 +1705,9 @@ def analyze() -> dict[str, Any]:
     plan = load_plan()
     builds, cleanup, cleanup_verified = load_builds(plan)
     before_source, after_source = builds["before"]["source"], builds["after"]["source"]
+    revision_transition = load_revision_transition(builds)
+    architecture_inputs = load_architecture_inputs()
+    historical_qualification = load_historical_qualification()
     disposition = load_disposition(before_source, after_source)
     quality = check_quality(after_source)
     test_summary = check_test_summary(quality)
@@ -1414,6 +1724,9 @@ def analyze() -> dict[str, Any]:
     }
     require(len(digests) == len(SHAPES), "source digest shape coverage changed")
     all_entries = (*native_entries, *allocation_entries, *qualification_entries)
+    sample_count = sum(item["stats"]["count"] for item in all_entries)
+    require(len(all_entries) == 255 and sample_count == 5595,
+            "aggregate report or sample cardinality changed")
     for item in all_entries:
         require(item["source_sha256"] == digests[item["identity"]["shape"]],
                 "source digest changed between lanes")
@@ -1428,8 +1741,18 @@ def analyze() -> dict[str, Any]:
         "schema": "litchi-0785-known-uri-analysis-v1",
         "plan_schema": plan["schema"], "quality": quality,
         "test_summary": test_summary,
+        "counts": {
+            "reports": len(all_entries),
+            "samples": sample_count,
+            "native_reports": len(native_entries),
+            "allocation_reports": len(allocation_entries),
+            "qualification_reports": len(qualification_entries),
+        },
         "fixture_parity": fixture_parity,
         "baseline_fixture_parity": baseline_fixture_parity,
+        "revision_transition": revision_transition,
+        "architecture_inputs": architecture_inputs,
+        "historical_qualification": historical_qualification,
         "adoption_policy": adoption_policy,
         "decision_guards": guards,
         "source": {"before": before_source, "after": after_source,
@@ -1455,6 +1778,11 @@ def analyze() -> dict[str, Any]:
         "verification": {
             "plan_cardinality_and_alternating_order_checked": True,
             "source_binary_probe_lock_fixture_receipts_checked": True,
+            "frozen_inputs_checked": True,
+            "revision_transition_checked": True,
+            "architecture_inputs_checked": True,
+            "historical_qualification_git_checked": True,
+            "aggregate_counts_checked": True,
             "probe_contract_checked": True,
             "fixture_output_parity_checked": True,
             "baseline_fixture_parity_replayed": True,

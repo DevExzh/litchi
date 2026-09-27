@@ -1,0 +1,7 @@
+{
+  "reason": "Frozen probe removed unused capabilities diagnostic and its direct common-crate dependency. Cargo --locked refused inherited root package dependency list before compiling. Only that root dependency entry is removed; all dependency package versions remain unchanged.",
+  "failed_attempt": "failed-build-before-0",
+  "original_receipt_prefix": "build-before/",
+  "corrected_lock_sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+  "no_measurements_started": true
+}

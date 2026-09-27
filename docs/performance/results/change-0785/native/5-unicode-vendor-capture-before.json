@@ -1,0 +1,917 @@
+{
+  "schema": "litchi.pptx.namespace-uri-probe.v1",
+  "tool": "namespace-uri-probe-0785",
+  "mode": "capture",
+  "shape": "unicode-vendor",
+  "slides": 12,
+  "shapes_per_slide": 8,
+  "timing_scope": "Package::opened_presentation only",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 42370,
+    "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+  },
+  "fixture": {
+    "injection": "same-length-valid-utf8-unknown-uris",
+    "slide_parts": 12,
+    "replaced_text_tags": 96,
+    "namespace_declarations": 6,
+    "namespaced_attributes": 6,
+    "namespace_uris": [
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+    ],
+    "attribute_names": [
+      "vP:probeP",
+      "vPS:probePS",
+      "vA:probeA",
+      "vAS:probeAS",
+      "vR:probeR",
+      "vRS:probeRS"
+    ]
+  },
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 570333,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 570333,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 567822,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 567822,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 578903,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 578903,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 576812,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576812,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 566633,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 566633,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 581372,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 581372,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 584043,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 584043,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 571242,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 571242,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 577893,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 577893,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 579682,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 579682,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 569563,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 569563,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 570292,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 570292,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 582052,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 582052,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 576173,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576173,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 566792,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 566792,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 576213,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576213,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 578402,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 578402,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 566473,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 566473,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 575612,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 575612,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 580213,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 580213,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 573002,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 573002,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 569333,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 569333,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 576732,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576732,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 576402,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576402,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 571992,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 571992,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 576062,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576062,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 576363,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 576363,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 564932,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 564932,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 569713,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 569713,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 577123,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 577123,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42370,
+        "readback_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-native",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

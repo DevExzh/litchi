@@ -1,0 +1,21 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/probe-src/Cargo.toml",
+      "--locked"
+    ],
+    "ended": 1790523693.0977209,
+    "exit_code": 101,
+    "log": {
+      "bytes": 5955,
+      "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/build-before/native.log",
+      "sha256": "27a25140be5dec7ac65d67caf4e084f6bacb303b19c0ee0ee740e90b47602a99"
+    },
+    "started": 1790523609.8713343
+  }
+]

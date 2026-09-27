@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0785 — warm PPTX namespace controls
+
+[0785](0785-pptx-known-namespace-uris.md) Paired public capture, staged one-text-edit commit and full capture/edit/commit/apply/serialize cover tiny, medium, large, unknown ASCII namespace and Unicode namespace fixtures. All 255 reports / 5,595 samples verify. The generated borrowed-ingress/full-writer route is bounded evidence, not new native producer, cold/range, concurrency or complete CRUD coverage.
+
 ## 0784 — current capture diagnostics, no capability promotion
 
 [0784](0784-pptx-initial-capture-profile.md) The existing three generated PPTX capture shapes have paired native controls and scoped guest profiles; the large case adds native sampled ancestry. These measurements do not promote registry rows or cover native producers, physical cold/range sources, concurrency or scaling.
