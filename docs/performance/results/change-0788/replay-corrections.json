@@ -10,7 +10,8 @@
     "Parse the installed heaptrack temporary-memory-allocation label; distinguish rounded print sizes from exact histogram and unmerged peak-stack sums.",
     "Verify restored production against both qualified baseline and live filesystem bytes.",
     "Use exact executable cleanup witnesses after target removal; serialize stable custody_verified rather than environment-dependent present or custody-mode fields.",
-    "Refresh the aggregate analysis reference after the memory-analysis custody representation changed; all native statistics remain identical."
+    "Refresh the aggregate analysis reference after the memory-analysis custody representation changed; all native statistics remain identical.",
+    "After checkout removal, retain captured absolute build-command arguments in serialized analysis; normalize paths only for validation. This fixes relocation without changing any raw evidence or derived statistical outputs."
   ],
   "raw_measurements_modified": false,
   "scope": "Offline verifier and presentation corrections; no native reports, raw traces, snapshots, schedule, plan, or adoption decision changed."

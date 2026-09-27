@@ -841,7 +841,7 @@ def load_build(leg: str, plan: dict[str, Any], base_files: dict[str, str],
             "environment": {key: env.get(key) for key in
                              ("CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL",
                               "RUSTFLAGS", "RUSTUP_TOOLCHAIN")},
-            "commands": [normalise_command(row["command"]) for row in rows]}
+            "commands": [list(row["command"]) for row in rows]}
 
 
 def load_quality(after: dict[str, Any], base_files: dict[str, str]) -> dict[str, Any]:
