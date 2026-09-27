@@ -8,6 +8,13 @@
 //! copies of each tag: a repeated name at several positions, before and after
 //! the 32nd name, malformed values and names. This binary needs the changed
 //! library; it is not built for the base.
+//!
+//! `attribute_checks_equivalence --bench quick-xml|checked --rounds R ROOT...`
+//! collects every start tag of the XML members under the roots once, then
+//! iterates every tag's attributes `R` times with quick-xml's checked
+//! iterator or with `checked_attributes`, stopping at the first error as a
+//! fail-fast reader does. Two runs with different `R` under `perf stat` give
+//! the instructions per pass of each iterator over the same tags.
 
 #![forbid(unsafe_code)]
 
@@ -148,6 +155,12 @@ fn mutations(content: &str, names: &[String], first_end: Option<usize>) -> Vec<S
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(index) = args.iter().position(|arg| arg == "--bench") {
+        return bench(
+            &args,
+            args.get(index + 1).ok_or("--bench needs an iterator")?,
+        );
+    }
     let json = args
         .iter()
         .position(|arg| arg == "--json")
@@ -253,6 +266,108 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         Err(format!("{} mismatches", tally.mismatches.len()).into())
     }
+}
+
+/// Every start tag of the XML members under the roots: its content and the
+/// length of its name.
+fn collect_tags(roots: &[PathBuf]) -> Result<Vec<(String, usize)>, Box<dyn Error>> {
+    let mut packages = Vec::new();
+    for root in roots {
+        collect_packages(root, &mut packages)?;
+    }
+    packages.sort();
+    let mut tags = Vec::new();
+    for path in &packages {
+        let Ok(bytes) = std::fs::read(path) else {
+            continue;
+        };
+        let Ok(archive) = ArchiveReader::new(&bytes) else {
+            continue;
+        };
+        let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+        for name in names {
+            let lower = name.to_ascii_lowercase();
+            if !(lower.ends_with(".xml") || lower.ends_with(".rels") || lower.ends_with(".vml")) {
+                continue;
+            }
+            let Ok(member) = archive.read(&name) else {
+                continue;
+            };
+            let mut reader = Reader::from_reader(member.as_slice());
+            loop {
+                let event = match reader.read_event() {
+                    Ok(Event::Eof) | Err(_) => break,
+                    Ok(event) => event,
+                };
+                if let Event::Start(tag) | Event::Empty(tag) = event
+                    && let Ok(content) = std::str::from_utf8(&tag)
+                {
+                    tags.push((content.to_owned(), tag.name().as_ref().len()));
+                }
+            }
+        }
+    }
+    Ok(tags)
+}
+
+fn bench(args: &[String], iterator: &str) -> Result<(), Box<dyn Error>> {
+    use litchi_opc::xml_attributes::BytesStartExt as _;
+    let rounds: usize = args
+        .iter()
+        .position(|arg| arg == "--rounds")
+        .and_then(|index| args.get(index + 1))
+        .ok_or("--rounds is required")?
+        .parse()?;
+    let mut roots = Vec::new();
+    let mut skip = false;
+    for arg in args {
+        if skip {
+            skip = false;
+            continue;
+        }
+        if arg.starts_with("--") {
+            skip = true;
+            continue;
+        }
+        roots.push(PathBuf::from(arg));
+    }
+    let tags: Vec<BytesStart<'_>> = collect_tags(&roots)?
+        .into_iter()
+        .map(|(content, name_len)| BytesStart::from_content(content, name_len))
+        .collect();
+    let mut checksum = 0usize;
+    let started = std::time::Instant::now();
+    for _ in 0..rounds {
+        for tag in &tags {
+            match iterator {
+                "quick-xml" => {
+                    for attribute in tag.attributes() {
+                        let Ok(attribute) = attribute else { break };
+                        checksum = checksum.wrapping_add(attribute.key.as_ref().len());
+                    }
+                },
+                "checked" => {
+                    for attribute in tag.checked_attributes() {
+                        let Ok(attribute) = attribute else { break };
+                        checksum = checksum.wrapping_add(attribute.key.as_ref().len());
+                    }
+                },
+                _ => return Err(format!("unknown iterator {iterator}").into()),
+            }
+        }
+    }
+    let elapsed = started.elapsed();
+    println!(
+        "{}",
+        serde_json::json!({
+            "iterator": iterator,
+            "tags": tags.len(),
+            "rounds": rounds,
+            "elapsed_ns": elapsed.as_nanos(),
+            "checksum": std::hint::black_box(checksum),
+        })
+    );
+    Ok(())
 }
 
 fn collect_packages(root: &Path, packages: &mut Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
