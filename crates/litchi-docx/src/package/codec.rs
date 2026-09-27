@@ -31,6 +31,11 @@ use litchi_core::Durability;
 use litchi_opc::OpcError;
 use std::sync::Arc;
 
+const STRICT_FOOTNOTES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/footnotes";
+const STRICT_ENDNOTES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/endnotes";
+
 impl Package {
     /// Create a new empty .docx package.
     ///
@@ -885,12 +890,12 @@ impl Package {
                                 | "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" => {
                                     true
                                 },
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" => {
+                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+                                | STRICT_FOOTNOTES_RELATIONSHIP => {
                                     generated_footnotes_xml.is_some()
                                 },
-                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes" => {
-                                    generated_endnotes_xml.is_some()
-                                },
+                                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes"
+                                | STRICT_ENDNOTES_RELATIONSHIP => generated_endnotes_xml.is_some(),
                                 _ => false,
                             };
                             if !recreated {
