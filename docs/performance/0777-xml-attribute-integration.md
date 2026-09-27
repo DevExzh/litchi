@@ -331,3 +331,23 @@ not establish CRUD coverage, physical cold-cache behavior, caller-supplied
 range-source behavior, sequential non-seek output, concurrent scaling,
 parallel execution efficiency, or native Office interoperability. Those audits
 remain active after this batch, and iWork work is outside this report's scope.
+
+## Integration and cleanup follow-through
+
+Main was fast-forwarded to `8ac869e5f8` after review, complete packet validation,
+and byte-for-byte verification of all 732 staged evidence files, including the
+seal itself. All 305 frozen candidate source/config hashes match main. The
+quality source is `4884539345`; the capture candidate `1e334ffba9` adds only
+its capture harness documentation and probe archive.
+
+The three owned build targets were removed after source, fixture, package
+inventory, and executable checks. The owned 0777 integration worktree, its
+copied root lock, three reference symlinks, and merged temporary branch were
+then removed. Offline validation passes from main with that worktree and the
+executables absent. The sealed packet was not changed during this follow-through.
+
+The original 0770 worktree and its six reviewed uncommitted edits remain
+unchanged; all other pre-existing worktrees are retained. The unrelated
+`FORMAT_IMPLEMENTATION_REVIEW.md`, `UNIFIED_OPS_API_DESIGN.md`, and
+`matrix-analysis.json` keep their original hashes. The main checkout's own
+lock and references remain in place. The broader non-iWork goal remains active.
