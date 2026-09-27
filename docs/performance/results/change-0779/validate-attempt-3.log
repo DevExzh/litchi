@@ -1,0 +1,15 @@
+{
+  "allocation_children": 32,
+  "allocation_regression_flags": 17,
+  "allocation_spread_flags": 0,
+  "native_children": 96,
+  "native_regression_flags": 9,
+  "native_spread_flags": 11,
+  "optional_file_inventory_seal": false,
+  "qualification_children": 8,
+  "quality_gates": 6,
+  "small_allocation_children": 8,
+  "small_allocation_spread_flags": 0,
+  "small_native_children": 24,
+  "small_native_spread_flags": 12
+}

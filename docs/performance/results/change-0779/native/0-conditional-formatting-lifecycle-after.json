@@ -1,0 +1,445 @@
+{
+  "schema": "litchi.xlsx.allocation-probe.v1",
+  "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+  "source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+    "bytes": 654688,
+    "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+  },
+  "sheet": "Home",
+  "address": "A1",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "phase": "lifecycle",
+  "timing_scope": "Workbook::open, semantic A1 edit and commit, then save_with_durability(destination, NoSync)",
+  "durability": "no-sync",
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 3237024,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 3236774,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 3246604,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 3235454,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 3240504,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 3228234,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 3240074,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 3242394,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 3227004,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 3228254,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 3240804,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 3253204,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 3234484,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 3233144,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 3247604,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 3262404,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 3228014,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 3277154,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 3230324,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 3228293,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 3251174,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 3253114,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 3254824,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 3236094,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 3227734,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 3230244,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 3244674,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 3240764,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 3256334,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 3245734,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "litchi-xlsx-allocation-probe-0779",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

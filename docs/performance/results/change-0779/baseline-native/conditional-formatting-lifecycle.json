@@ -1,0 +1,67 @@
+{
+  "schema": "litchi.xlsx.allocation-probe.v1",
+  "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+  "source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+    "bytes": 654688,
+    "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+  },
+  "sheet": "Home",
+  "address": "A1",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "phase": "lifecycle",
+  "timing_scope": "Workbook::open, semantic A1 edit and commit, then save_with_durability(destination, NoSync)",
+  "durability": "no-sync",
+  "warmup": 1,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 3259074,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 3231554,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 3261324,
+      "published_bytes": 652357,
+      "published_sha256": "c7d26c4a406ce6b1044acee33301212db08f68b39250bf7c7804aec5d1e474bb",
+      "verification": {
+        "reopened": true,
+        "sheet": "Home",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "litchi-xlsx-allocation-probe-0779",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

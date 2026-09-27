@@ -189,9 +189,11 @@ build target; `cleanup.json` retains exact executable witnesses. The sealed
 packet retains raw captures, rejected preflight evidence, independent reviews
 and derived tables. Worktree removal is recorded after integration below.
 
-The [next-step note](results/change-0778/next-step.md) recommends investigating
-bounded ZIP first-read span coalescing on delayed range sources. It is a scoped
-planning recommendation, with no new result or remote-I/O performance claim.
+The historical [next-step note](results/change-0778/next-step.md) is superseded
+by the [0779 current-source correction](0779-opc-bounded-input-growth.md): ZIP
+first-read coalescing already landed in 0611, with later structural prefetch.
+The sealed note is retained as history and is not an outstanding implementation
+recommendation.
 
 Integrated by fast-forward at `8f6ca3af97`. The owned target and filesystem
 root, copied root lock, three reference symlinks, worktree and temporary branch

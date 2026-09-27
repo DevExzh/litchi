@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0779 — paired owned-XLSX allocation experiment
+
+[0779](0779-opc-bounded-input-growth.md) records six alternating native blocks for four phases on two workbooks plus two small-open controls (120 native processes), and separate 40-process allocator observations. Generated lifecycle paired p50 changes −0.581% while RSS changes +20.203%. The rejected candidate and raw evidence remain archived; ordinary production behavior and Full durability are unchanged.
+
 ## 0778 — current-source ordinary-save policy matrix
 
 [0778](0778-ordinary-save-durability.md) records seven corpora, four policies, four native process blocks and separate allocation/trace/user-counter lanes. Generated DOCX lifecycle p50 is 5.758 ms default, 3.894 ms FileOnly and 0.865 ms NoSync; these differ in persistence guarantees. Default versus Full tails vary despite equivalent semantics. This is warm, absent-destination evidence with no historical speedup or device-floor claim.

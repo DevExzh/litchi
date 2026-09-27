@@ -1,0 +1,24 @@
+{
+  "allocation_processes": 40,
+  "before_source": {
+    "bytes": 115646,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/candidate/before-phys_pkg.rs",
+    "sha256": "3dfa9ec92c0d090b0bc753ecacc63f263975a470c267b79b03ae1c5898ac3ab8"
+  },
+  "candidate_quality_gates": 6,
+  "candidate_source": {
+    "bytes": 123198,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/candidate/applied-phys_pkg.rs",
+    "sha256": "d2999dc30261ba7278c2d3d0277be9ee32fbc4941aa2e354a380482ed3b2f7d1"
+  },
+  "native_processes": 120,
+  "production_change_retained": false,
+  "reason": "Paired lifecycle p50 gains are below one percent while generated save/lifecycle whole-process RSS rises about 20%, generated retained allocation rises 6\u20137%, and the 8 KiB boundary control retains about 24% more. Cumulative requested bytes are not physical-copy or latency evidence.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/restored-source.json",
+    "sha256": "778067a6add24f995779eec509584024860cb843ad1f9d4921e6cb3b504df894"
+  },
+  "source_file": "crates/litchi-opc/src/phys_pkg.rs",
+  "status": "rejected"
+}

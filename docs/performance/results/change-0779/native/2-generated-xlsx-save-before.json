@@ -1,0 +1,445 @@
+{
+  "schema": "litchi.xlsx.allocation-probe.v1",
+  "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+  "source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+    "bytes": 4226429,
+    "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+  },
+  "sheet": "Sheet1",
+  "address": "A1",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "phase": "save",
+  "timing_scope": "Workbook::save_with_durability(destination, NoSync) only; open and edit are outside the clock",
+  "durability": "no-sync",
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 2033898,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1999319,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1990638,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 1979209,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 1973729,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 1993058,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 1980779,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 1978639,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 2016829,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 1969968,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 1991239,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 1974289,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 1970258,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 1986669,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 1988709,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 1995999,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 1987088,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 1982408,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 1985839,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 1973988,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 1980499,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 1982628,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 1983578,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 1976459,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 1979039,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 1959128,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 1976359,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 1980998,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 1973888,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 1982279,
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "verification": {
+        "reopened": true,
+        "sheet": "Sheet1",
+        "address": "A1",
+        "expected": "litchi-perf-0638-ordinary-save",
+        "actual": "litchi-perf-0638-ordinary-save",
+        "marker_matches": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "litchi-xlsx-allocation-probe-0779",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

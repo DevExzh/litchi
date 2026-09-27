@@ -1,0 +1,146 @@
+[
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+      "--sheet",
+      "Sheet1",
+      "--phase",
+      "open",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-open.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-open.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 980,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-open.json",
+      "sha256": "63aec57c24715d2ac9aa245d1922e5ba58a58c9a0747621f5c756348a7054b53"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+      "--sheet",
+      "Sheet1",
+      "--phase",
+      "lifecycle",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-lifecycle.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-lifecycle.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 2185,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/generated-xlsx-lifecycle.json",
+      "sha256": "6253e7a0139d16b0d52793fd5a3ac13bd6f5474f7ee9695986702aa17ef70623"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+      "--sheet",
+      "Home",
+      "--phase",
+      "open",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-open.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-open.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 972,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-open.json",
+      "sha256": "05913eb9c858ddf36c25bc4109c056d9c469691c6356190435e941ca5c77638b"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+      "--sheet",
+      "Home",
+      "--phase",
+      "lifecycle",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-lifecycle.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-lifecycle.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 2165,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/baseline-native/conditional-formatting-lifecycle.json",
+      "sha256": "2940e77f334ca34ed7945014baa6d561a387a798a34a5399ec2843c3f575c8e8"
+    }
+  }
+]

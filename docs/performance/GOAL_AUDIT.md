@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0779 — measured rejection and current-source queue correction
+
+[0779](0779-opc-bounded-input-growth.md) rejects an OPC growth candidate after matched native/allocation evidence and independent heaptrace attribution. ZIP-2 was already implemented in 0611; the stale 0778 planning recommendation is superseded. No CRUD row or completed-program claim is promoted. Cold/range/concurrency/scaling and comprehensive scenario coverage remain open.
+
 ## 0778 — ordinary-save evidence extended; goal remains active
 
 [0778](0778-ordinary-save-durability.md) adds independently checked ordinary-save artifacts and current-source policy measurements, repairing a preflight-discovered DOCX note graph defect. Default Full remains unchanged. Full CRUD, cold/range/concurrency/scaling and broader memory-budget work remain open; no coverage row or complete-program claim is promoted.

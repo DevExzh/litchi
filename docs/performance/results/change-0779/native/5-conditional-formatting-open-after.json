@@ -1,0 +1,145 @@
+{
+  "schema": "litchi.xlsx.allocation-probe.v1",
+  "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+  "source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+    "bytes": 654688,
+    "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+  },
+  "sheet": "Home",
+  "address": "A1",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "phase": "open",
+  "timing_scope": "Workbook::open(source) only",
+  "durability": null,
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1173335
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1164055
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1153195
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 1151375
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 1150795
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 1141055
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 1144385
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 1148295
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 1144585
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 1157535
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 1144775
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 1145405
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 1148545
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 1163225
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 1162385
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 1144595
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 1142515
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 1150365
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 1135255
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 1146435
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 1170675
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 1142375
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 1150455
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 1144825
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 1146795
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 1139315
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 1139705
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 1144595
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 1144015
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 1149775
+    }
+  ],
+  "allocator": {
+    "binary": "litchi-xlsx-allocation-probe-0779",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

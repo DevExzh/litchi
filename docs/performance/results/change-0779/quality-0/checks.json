@@ -1,0 +1,129 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-xlsx",
+      "--",
+      "--check"
+    ],
+    "ended": 1790490420.0088162,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790490417.8016548
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790490455.0884361,
+    "exit_code": 0,
+    "log": {
+      "bytes": 6770,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/01.log",
+      "sha256": "31c932068a5fb5327d5991b9979d97e4e558a01ef022541caf46cba03d1d8a1a"
+    },
+    "started": 1790490420.199814
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790490619.5121164,
+    "exit_code": 0,
+    "log": {
+      "bytes": 308365,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/02.log",
+      "sha256": "31e69c7606d10be7371ab2de2558c7f9fcf26cb09aabe790fe4daad78512b2e6"
+    },
+    "started": 1790490455.2798052
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790490646.3292854,
+    "exit_code": 0,
+    "log": {
+      "bytes": 2199,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/03.log",
+      "sha256": "aef7968236ec79043d1441a0b9b5cf1e1c37d16f2e1c58aaeb3e4b76a1e8c6a8"
+    },
+    "started": 1790490619.6991699
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "ended": 1790490651.9065032,
+    "exit_code": 0,
+    "log": {
+      "bytes": 398,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/04.log",
+      "sha256": "a546147696a4f3eadfdad315071d92cdf11729ddacd5ebc5e560a9d501d25e3b"
+    },
+    "started": 1790490646.5206375
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "ended": 1790490919.312143,
+    "exit_code": 0,
+    "log": {
+      "bytes": 565,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/quality-0/05.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "started": 1790490652.098311
+  }
+]
