@@ -1,0 +1,12 @@
+{
+  "command": [
+    "cargo",
+    "generate-lockfile",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/probe-src/Cargo.toml"
+  ],
+  "exit_code": 0,
+  "stderr": "     Locking 138 packages to latest Rust 1.95.0 compatible versions\n      Adding generic-array v0.14.7 (available: v0.14.9)\n      Adding zerocopy v0.8.57 (available: v0.8.58)\n",
+  "stdout": ""
+}

@@ -1,0 +1,43 @@
+{
+  "binary_archive": [
+    {
+      "archived": {
+        "bytes": 9423024,
+        "path": "/home/zhuhe/code/litchi-target-0781/initial-before-allocation",
+        "sha256": "877672f6883f87827847082ea4b810cda90b7d6c68d129e3e955f751d9c9874b"
+      },
+      "original": {
+        "bytes": 9423024,
+        "path": "/home/zhuhe/code/litchi-target-0781/before-allocation",
+        "sha256": "877672f6883f87827847082ea4b810cda90b7d6c68d129e3e955f751d9c9874b"
+      }
+    },
+    {
+      "archived": {
+        "bytes": 9222472,
+        "path": "/home/zhuhe/code/litchi-target-0781/initial-before-native",
+        "sha256": "9cfe2c7f486351eeda0457682df76bdafd0e3f3a1d23c6da24b1edee5def8cd2"
+      },
+      "original": {
+        "bytes": 9222472,
+        "path": "/home/zhuhe/code/litchi-target-0781/before-native",
+        "sha256": "9cfe2c7f486351eeda0457682df76bdafd0e3f3a1d23c6da24b1edee5def8cd2"
+      }
+    }
+  ],
+  "initial_probe_files": {
+    "initial-probe/Cargo.lock": "c91e04df1fc8e132b49f327a725c284b92d3e2ff1d98f979fa1e49bec9526bc3",
+    "initial-probe/Cargo.toml": "f378e64f361738237b5829128815bc1b10ffcd5cc01a80cd31e589ef860723a7",
+    "initial-probe/Cargo.toml.template": "c109f56304de723583c3361edbac09025374d12eb6c58933dce646b0299c60d9",
+    "initial-probe/src/allocation_metrics.rs": "440ca9ee4dd3abe4f30e7a65ba5d1b7428f0a50012114202a4e1bd1057c9461c",
+    "initial-probe/src/counting_allocator.rs": "e347aebb3c863cb447b41211be42fcedfc7b4ab9a43a82f919fb1db15344538d",
+    "initial-probe/src/main.rs": "0898052c3c157b84a355144ff34691d9930919cb92e6ca833611d774d248c681"
+  },
+  "primary_paired_captures_started": false,
+  "production_source_changed": false,
+  "reason": "Unicode qualification exposed the reader per-atom trim rule: 64 authored trailing spaces differ in semantic extraction. Fixture remains unchanged; corrected probe will add independent untrimmed raw-text atom verification and a separate semantic extraction oracle.",
+  "receipt_relocations": {
+    "build-before": "build-before-initial",
+    "qualification": "qualification-initial"
+  }
+}

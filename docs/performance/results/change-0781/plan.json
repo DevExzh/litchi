@@ -1,0 +1,83 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "cases": [
+    {
+      "mode": "write",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "write",
+      "shape": "many"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "many"
+    },
+    {
+      "mode": "write",
+      "shape": "payload"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "payload"
+    },
+    {
+      "mode": "write",
+      "shape": "unicode"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "unicode"
+    },
+    {
+      "mode": "write",
+      "shape": "rich"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "rich"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0781.v1",
+  "scope": "Warm in-memory fresh PPT writer; public write-only and fixture-to-publication lifecycle; no filesystem/cold/concurrency claim."
+}

@@ -1,0 +1,23 @@
+{
+  "conversion": {
+    "allocation_events": 192,
+    "allocation_info_records": 1,
+    "deallocated_bytes": 7680000,
+    "deallocation_events": 192,
+    "requested_bytes": 7680000,
+    "symbol": "convert_shape_to_escher_with_sound_mapping"
+  },
+  "crosscheck": true,
+  "scope": "Whole-process allocation ancestry diagnostic; not timed phase attribution.",
+  "totals": {
+    "allocation_events": 15665,
+    "deallocated_bytes": 362287246,
+    "deallocation_events": 15664,
+    "requested_bytes": 362287790
+  },
+  "trace": {
+    "bytes": 47402,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/heaptrack-before/trace.zst",
+    "sha256": "813ae0bfa9619367c54d363df29928c7b9923fb19b1c8003202804392e16679a"
+  }
+}

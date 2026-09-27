@@ -1,0 +1,149 @@
+{
+  "before_sources": {
+    "crates/litchi-ppt/src/writer/core/codec.rs": {
+      "bytes": 20793,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/core/codec.rs",
+      "sha256": "2e4845b5c386de6df236494f0bc4f29756b7da1b69b0cffda1acaaa2d8d09a98"
+    },
+    "crates/litchi-ppt/src/writer/core/package.rs": {
+      "bytes": 51579,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/core/package.rs",
+      "sha256": "39cc8a3d63e4b9d7eba53fb2b0150f2c05fa8f0eeda5e7125e73ac5bc91a57a9"
+    },
+    "crates/litchi-ppt/src/writer/core/tests.rs": {
+      "bytes": 27029,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/core/tests.rs",
+      "sha256": "b680781d140706b05136d018b527c4d834f323f25dcd47266802c4d2a2e5b62b"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs": {
+      "bytes": 9517,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+      "sha256": "43c6674baf53e6dc69947fc6cbd1f4d91c08b7d7d34adfc08bf4e993a84e7ff2"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs": {
+      "bytes": 4212,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/codec/group.rs",
+      "sha256": "68b64bf79d7a05a6b1e172b52829d3c70227e8d642cfda010b86f7ea452964f0"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs": {
+      "bytes": 5851,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+      "sha256": "d2142b311e3e2d35af64a28ef300c9b077e74347d8cdd98b058bfc4b59b12a39"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs": {
+      "bytes": 10713,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+      "sha256": "35c64874c970df3b26738741ef464aa6a68015fc90c21b427684e684f8ee48cf"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs": {
+      "bytes": 2826,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+      "sha256": "49e4dd10845a56491897e87e6fbf6732cea3a537dbda77a805b0877107ce7c4c"
+    },
+    "crates/litchi-ppt/src/writer/escher/model.rs": {
+      "bytes": 20386,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/model.rs",
+      "sha256": "ad9f6a906d96a424ec671998b08d8f43c0e46cc097af71254785a6c9e14b5263"
+    },
+    "crates/litchi-ppt/src/writer/escher/semantic.rs": {
+      "bytes": 3180,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/semantic.rs",
+      "sha256": "3690925f3ce466ecf32787c7a51076f6d95d539964e0905e65b16ec32333b018"
+    },
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs": {
+      "bytes": 4094,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+      "sha256": "9c24b134f085ca9ebbfdd0828d98a56c4811bd4a5ca5076676ab3e3afaa5412d"
+    },
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs": {
+      "bytes": 29149,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/before/crates/litchi-ppt/src/writer/escher/tests/legacy.rs",
+      "sha256": "123e5a026180db41085f70d0b337a53e3348502a5d9d5b350327e8f207089346"
+    }
+  },
+  "candidate_sources": {
+    "crates/litchi-ppt/src/writer/core/codec.rs": {
+      "bytes": 20877,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/core/codec.rs",
+      "sha256": "501324a7c17f5a2919961f4883533555f6c6b1d9904a8b5a9b8fe2a80a3cc767"
+    },
+    "crates/litchi-ppt/src/writer/core/package.rs": {
+      "bytes": 51587,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/core/package.rs",
+      "sha256": "badb166ee253c80d5bfa3b2faf7fb0f86e317e5deeb19d7fbe75dcecae033de4"
+    },
+    "crates/litchi-ppt/src/writer/core/tests.rs": {
+      "bytes": 28297,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/core/tests.rs",
+      "sha256": "0064cdb49ade6e92c1fa1d185bc4cb2945c8d3318a3f39d018497d0a223d9701"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs": {
+      "bytes": 9587,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+      "sha256": "ba8ef8192bf1992fa20b7a9b0555deaa6f1d5f6c5d2fe61aa753fd2392735642"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs": {
+      "bytes": 4228,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/codec/group.rs",
+      "sha256": "7882bb79da431d61efade55368edc97ceb4df7e1596e46a91c72dda0d3a35e6b"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs": {
+      "bytes": 5855,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+      "sha256": "f8891e0b1616cb1c6c9e2dd2de80ad83221481e2f4547f9bda80fc5b1c97ff24"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs": {
+      "bytes": 10750,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+      "sha256": "0e79993e04dcaed88220e65cd23255ea82fdbcd1ff07604733499856d2e0d083"
+    },
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs": {
+      "bytes": 2838,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+      "sha256": "b82828219643d848ea83d3814bedf6c3404233900c384f4943fb865505f39e22"
+    },
+    "crates/litchi-ppt/src/writer/escher/model.rs": {
+      "bytes": 20438,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/model.rs",
+      "sha256": "b22ff0302549dc2cccd5bdd589b5398fd76b836f0b2e46a3b11903d9bf4a808e"
+    },
+    "crates/litchi-ppt/src/writer/escher/semantic.rs": {
+      "bytes": 3338,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/semantic.rs",
+      "sha256": "63e63a8fa41b895067431a3aa70839b591cf5a424a2c36953f61343ab821e8f2"
+    },
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs": {
+      "bytes": 4913,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+      "sha256": "36f6b5b61ec3d64ead074af79033feabc554adba0ad43353198a27db3a078858"
+    },
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs": {
+      "bytes": 29144,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/candidate/applied/crates/litchi-ppt/src/writer/escher/tests/legacy.rs",
+      "sha256": "97aea4eb57de97e5928c661130bcd3d494da4fed3d70958dba12f8089b37a5e9"
+    }
+  },
+  "ci_repair_retained": true,
+  "production_change_retained": false,
+  "reason": "Consistent many-short-text public write and lifecycle regressions of 12.121% and 10.551% across six paired blocks outweigh adoption of this representation as a general fresh-writer optimization. Payload and Unicode benefits remain documented; net retained and peak-above-entry live bytes are unchanged. No attribution of the latency regression to a specific representation mechanism is claimed.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/restored-source.json",
+    "sha256": "e15ff3e531570299847944382c03a3b38a155756ba8be0a2b3ddd3984bbc37a6"
+  },
+  "source_file": [
+    "crates/litchi-ppt/src/writer/core/codec.rs",
+    "crates/litchi-ppt/src/writer/core/package.rs",
+    "crates/litchi-ppt/src/writer/core/tests.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+    "crates/litchi-ppt/src/writer/escher/model.rs",
+    "crates/litchi-ppt/src/writer/escher/semantic.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs"
+  ],
+  "status": "rejected"
+}

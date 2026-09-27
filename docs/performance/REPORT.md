@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0781 — CI matrix repaired; PPT candidate rejected
+
+[0781](0781-ppt-text-ownership-and-ci-matrix.md) replaces stale 37-case/201-row CI assertions with manifest-backed 41-case/213-row validation and consistently selects the active CRUD v2 index. Six CI gates pass with 75 tests. The PPT candidate passes six quality gates (1,286 tests) but is rejected for consistent 10–12% short-text regressions; all measured gains, flags, failed preflight history, and archived source remain available.
+
 ## 0780 — Static baseline MCE capabilities retained with tradeoff
 
 [0780](0780-static-mce-capabilities.md) Public PPTX staged commit improves 5.012–9.167% across three corpora and allocation requests fall without added live memory. The large lifecycle consistently regresses 2.398%; no lifecycle speedup is claimed. Six gates pass (5,683 tests), with all 120 native/40 allocator processes, 20 spread flags and four paired metric flags retained.

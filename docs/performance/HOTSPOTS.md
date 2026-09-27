@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0781 — String-copy removal has a short-text tradeoff
+
+[0781](0781-ppt-text-ownership-and-ci-matrix.md) confirms 192 conversion allocations / 7,680,000 requested bytes disappear across three payload writes, yet the Cow representation consistently slows the many-short-text public workload. Net retained and peak-above-entry live bytes are unchanged. The candidate is rejected; do not infer a latency cause or adopt it solely from allocation counts. A simpler borrowed representation requires separate design and fresh evidence.
+
 ## 0780 — Baseline namespace allocation removed; lifecycle remains open
 
 [0780](0780-static-mce-capabilities.md) The static seventeen-URI profile removes 21 allocations / 2,398 requested bytes per constructor. Fresh public staged-commit improvements support retention, but the large lifecycle slows 2.398% and the three-corpus lifecycle geometric mean is effectively flat. Do not rank further work by constructor-only gains or claim the lifecycle bottleneck is solved.

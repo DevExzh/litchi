@@ -456,7 +456,7 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
     def test_crud_coverage_index_is_validated_and_uploaded_with_full_baseline(self) -> None:
         expected_arguments = (
             r"python3\s+tools/validate_crud_coverage_index\.py\b",
-            r"--index\s+docs/performance/crud-coverage-index-v1\.json",
+            r"--index\s+docs/performance/crud-coverage-index-v2\.json",
             r"--catalog\s+docs/performance/results/perf-corpus-manifest-v2\.json",
             r"--selector-source\s+tools/perf-baseline/src/lib\.rs",
             r"--checklist\s+docs/CRUD_Scenario_Checklist\.md",
@@ -482,7 +482,7 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
         self.assertEqual(len(uploads), 1)
         self.assertRegex(
             uploads[0],
-            r"(?m)^\s*target/perf/crud-coverage-index-v1\.json\s*$",
+            r"(?m)^\s*target/perf/crud-coverage-index-v2\.json\s*$",
         )
 
         full_steps = _steps(self.jobs["full"])
@@ -508,7 +508,7 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
         timing_run = _run_body(timing_contract)
         for expression in (
             r"python3\s+tools/validate_crud_coverage_index\.py\b",
-            r"--index\s+docs/performance/crud-coverage-index-v1\.json",
+            r"--index\s+docs/performance/crud-coverage-index-v2\.json",
             r"--catalog\s+target/perf/container-baseline\.corpus-manifest-v2\.json",
             r"--selector-source\s+tools/perf-baseline/src/lib\.rs",
             r"--checklist\s+docs/CRUD_Scenario_Checklist\.md",
@@ -517,10 +517,10 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
         ):
             self.assertRegex(timing_run, expression)
         self.assertIn(
-            "cp docs/performance/crud-coverage-index-v1.json \\",
+            "cp docs/performance/crud-coverage-index-v2.json \\",
             timing_run,
         )
-        self.assertIn("target/perf/crud-coverage-index-v1.json", timing_run)
+        self.assertIn("target/perf/crud-coverage-index-v2.json", timing_run)
         upload_index = next(
             index
             for index, step in enumerate(full_steps)
@@ -537,10 +537,12 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
     def test_crud_coverage_index_files_are_in_push_and_pull_request_path_triggers(self) -> None:
         required_paths = (
             "docs/CRUD_Scenario_Checklist.md",
-            "docs/performance/crud-coverage-index-v1.json",
+            "docs/performance/crud-coverage-index-v2.json",
             "docs/performance/CRUD_COVERAGE.md",
             "tools/validate_crud_coverage_index.py",
             "tools/test_crud_coverage_index.py",
+            "tools/validate_perf_default_matrix.py",
+            "tools/test_validate_perf_default_matrix.py",
         )
         for event in ("push", "pull_request"):
             section = _top_level_section(self.workflow, event)
@@ -550,6 +552,43 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
                     rf"(?m)^\s*-\s*['\"]?{re.escape(path)}['\"]?\s*(?:#.*)?$",
                     msg=f"{event} path filter must include {path}",
                 )
+
+    def test_default_matrix_report_checks_use_authoritative_manifest(self) -> None:
+        expected_manifest = (
+            r"--manifest\s+"
+            r"docs/performance/results/perf-regression-default-manifest-v1\.json"
+        )
+        expected_steps = {
+            "smoke": ("Run deterministic smoke baseline", "smoke", "2"),
+            "full": ("Validate full baseline report shape", "full", "15"),
+        }
+        for job_name, (step_name, mode, samples) in expected_steps.items():
+            steps = [
+                step for step in _steps(self.jobs[job_name]) if step_name in step
+            ]
+            self.assertEqual(len(steps), 1, job_name)
+            run = _run_body(steps[0])
+            self.assertRegex(
+                run,
+                r"python3\s+tools/validate_perf_default_matrix\.py\b",
+            )
+            self.assertRegex(run, expected_manifest)
+            self.assertRegex(run, rf"--mode\s+{mode}\b")
+            self.assertRegex(run, rf"--samples\s+{samples}\b")
+            if mode == "smoke":
+                self.assertRegex(run, r"--shape\s+tiny\b")
+                self.assertRegex(run, r"--payload\s+compressible\b")
+
+        self.assertNotRegex(
+            self.workflow,
+            r'len\(report\["results"\]\)\s*==\s*(?:37|201)',
+            "default matrix checks must derive row counts from the manifest",
+        )
+        self.assertNotRegex(
+            self.workflow,
+            r'len\(\{item\["case"\].*==\s*(?:37|201)',
+            "default matrix checks must derive case counts from the manifest",
+        )
 
     def test_full_resource_profile_uses_bounded_prebuilt_release_harness(self) -> None:
         profile_steps = [

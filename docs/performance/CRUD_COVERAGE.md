@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0781 — Active CI coverage contract restored
+
+[0781](0781-ppt-text-ownership-and-ci-matrix.md) validates actual smoke/full harness reports against the default identity manifest and checks the active v2 coverage index against the full report and source selectors. The PPT probe checks exact source/output identities, normalized reader text, and untrimmed serialized text including Unicode trailing spaces. Candidate production code and tests are restored to baseline after measured rejection. No registry status is promoted; fresh-writer evidence does not establish existing-document CRUD or native Office interoperability.
+
 ## 0780 — MCE compatibility and named PPTX edit checks
 
 [0780](0780-static-mce-capabilities.md) Five focused tests check the independent namespace oracle, layout, legacy/stream parity, custom/default/clone/extension behavior and malformed/limit parity. Captured PPTX shape-text edits reopen with exact generated text and equal output digests across both legs. Six gates pass; custom-registration latency, native Office interoperability and comprehensive CRUD remain unmeasured. No registry row is promoted.

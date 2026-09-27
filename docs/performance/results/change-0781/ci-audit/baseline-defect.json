@@ -1,0 +1,21 @@
+{
+  "active_index": "crud-coverage-index-v2.json",
+  "finding": "Default matrix assertions contradict the authoritative manifest and Case::DEFAULT; full report validation still selects historical coverage index.",
+  "harness_default_case_count": 41,
+  "manifest": {
+    "bytes": 42578,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/perf-regression-default-manifest-v1.json",
+    "sha256": "dbb78ed0a6891beb68753d3436a8df4ff1d564b2729f8bb08f9d1ee85d18e77c"
+  },
+  "manifest_case_count": 41,
+  "manifest_full_result_count": 213,
+  "workflow": {
+    "bytes": 136013,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-audit/before-workflow.yml",
+    "sha256": "617e4ee8ccc018c75f107f1296f761888b8541b18d8658a51977ea3ca67e3c8e"
+  },
+  "workflow_full_expected_cases": 37,
+  "workflow_full_expected_results": 201,
+  "workflow_index": "crud-coverage-index-v1.json",
+  "workflow_smoke_expected_cases": 37
+}
