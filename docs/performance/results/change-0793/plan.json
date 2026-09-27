@@ -1,0 +1,72 @@
+{
+  "controls": {
+    "orders": [
+      [
+        "control",
+        "profile",
+        "allocation",
+        "profile-allocation"
+      ],
+      [
+        "profile-allocation",
+        "allocation",
+        "profile",
+        "control"
+      ]
+    ],
+    "repeats": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "cpu": 12,
+  "heaptrack": {
+    "binary": "profile",
+    "cost_type": "allocations",
+    "filter": "capture_region_0793",
+    "merge_backtraces": false,
+    "orders": [
+      [
+        "tiny",
+        "medium",
+        "large",
+        "vendor",
+        "unicode-vendor"
+      ],
+      [
+        "unicode-vendor",
+        "vendor",
+        "large",
+        "medium",
+        "tiny"
+      ]
+    ],
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "repeats": 2,
+    "samples": 1,
+    "shorten_templates": false,
+    "warmup": 0
+  },
+  "limits": [
+    "Elapsed times are diagnostic only; no timing comparison or profiler speedup claim",
+    "Heaptrack peak is whole-process intercepted allocation peak, not operation peak or RSS",
+    "Nested stack costs overlap; no summing ancestor buckets as disjoint shares",
+    "If qualification fails retain failure and do not infer owner allocation fractions"
+  ],
+  "purpose": "Current PPTX capture allocation attribution, no production candidate or native speedup claim",
+  "qualification": [
+    "All source/output/semantic oracles match sealed0792 qualification and its current production source",
+    "Control versus wrapper operation allocation counters identical for all samples per shape",
+    "All process flamegraph counts sum to printed heaptrack allocation count and histogram count",
+    "Owner-filtered stacks equal exact-owner subset of whole-process allocation stacks",
+    "Owner allocation count equals successful operation allocation_calls plus reallocation_calls from counter lane",
+    "Require nonzero owner attribution and public opened_presentation descendant before naming operation allocation contributors"
+  ],
+  "schema": "litchi.performance.0793.v1",
+  "shapes": [
+    "tiny",
+    "medium",
+    "large",
+    "vendor",
+    "unicode-vendor"
+  ]
+}

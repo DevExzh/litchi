@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0793 — current capture allocation controls
+
+[0793](0793-pptx-capture-allocation-attribution.md) Fresh diagnostic controls and heap traces retain 50 reports/130 samples. All ten frozen allocation reconciliations fail because the formula counts reallocations twice; the source-corrected comparison is supplementary only. No timing baseline is replaced.
+
 ## 0792 — empty attribute-tail optimization retained
 
 [0792](0792-pptx-empty-attribute-tail.md) Fresh six-block pairs show large PPTX capture −5.211% and lifecycle −6.937% p50; 255 reports/5,595 measured samples pass identity checks. All 90 allocation sample pairs retain equal calls, bytes, net live, and peak above entry.

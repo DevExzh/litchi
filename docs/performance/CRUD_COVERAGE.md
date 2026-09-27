@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0793 — existing capture allocation diagnostics
+
+[0793](0793-pptx-capture-allocation-attribution.md) Five existing generated PPTX shapes receive direct/wrapped counter controls and heap traces. Frozen attribution qualification fails; no CRUD registry row, producer, cold/range, concurrency, or capability coverage is promoted.
+
 ## 0792 — existing PPTX workloads improved
 
 [0792](0792-pptx-empty-attribute-tail.md) The existing generated capture, staged-commit, and lifecycle matrix gains a retained scanner optimization, with ASCII/Unicode vendor controls. This adds no native-producer, cold/range, concurrent, or CRUD capability coverage.

@@ -1,0 +1,2347 @@
+reading file "/home/zhuhe/code/litchi/docs/performance/results/change-0793/heaptrack/0-vendor-profile.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0793/profile --mode capture --shape vendor --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0793/heaptrack/0-vendor-profile.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+492 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:411
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::root_conformance_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::hca8a0e91c59b4d25
+    at src/notes/codec.rs:334
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::iter::traits::iterator::Iterator::find::check::_$u7b$$u7b$closure$u7d$$u7d$::ha35ca7a9d8d2bee1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2945
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::_$u7b$$u7b$closure$u7d$$u7d$::he5e989718863fd8f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:220
+  _$LT$core..ops..index_range..IndexRange$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h6a36b2348ea8d81e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/index_range.rs:170
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::hbe8e0ce511a30445
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:215
+  _$LT$core..array..iter..IntoIter$LT$T$C$_$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::ha2384923883c258f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter.rs:263
+  core::iter::traits::iterator::Iterator::find::h7c2df2e20a1b9926
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2949
+  litchi_pptx::notes::codec::root_conformance_from_processed::h6c354ae48718b1ee
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:334
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hb54222ccaa0043e0
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1145
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::h61d70c64bc257785
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1165
+  core::bool::_$LT$impl$u20$bool$GT$::then::hcf7e2dd4ba2e6df3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs:66
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1141
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+216 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:391
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::root_conformance_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::hca8a0e91c59b4d25
+    at src/notes/codec.rs:334
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::iter::traits::iterator::Iterator::find::check::_$u7b$$u7b$closure$u7d$$u7d$::ha35ca7a9d8d2bee1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2945
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::_$u7b$$u7b$closure$u7d$$u7d$::he5e989718863fd8f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:220
+  _$LT$core..ops..index_range..IndexRange$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h6a36b2348ea8d81e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/index_range.rs:170
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::hbe8e0ce511a30445
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:215
+  _$LT$core..array..iter..IntoIter$LT$T$C$_$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::ha2384923883c258f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter.rs:263
+  core::iter::traits::iterator::Iterator::find::h7c2df2e20a1b9926
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2949
+  litchi_pptx::notes::codec::root_conformance_from_processed::h6c354ae48718b1ee
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:334
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hb54222ccaa0043e0
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1145
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::h61d70c64bc257785
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1165
+  core::bool::_$LT$impl$u20$bool$GT$::then::hcf7e2dd4ba2e6df3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs:66
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1141
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+128 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:411
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_xml::h69ffbeb620137de2
+    at src/notes/codec.rs:347
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::validate_resource_xml::hd61b08fcabc9ed0f
+    at src/notes/codec.rs:303
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_index_with_slide_root_proofs::h38f641f07e5a7085
+    at src/notes/package.rs:562
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_snapshot_with_slide_root_proofs::h14a1cd3f82550252
+    at src/notes/package.rs:323
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:819
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+120 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:54
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:477
+  _RNvNtCslNYArtu3iFV_5alloc5alloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:135
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:239
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:342
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator4grow
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:454
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:555
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:391
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::root_conformance_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::hca8a0e91c59b4d25
+    at src/notes/codec.rs:334
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::iter::traits::iterator::Iterator::find::check::_$u7b$$u7b$closure$u7d$$u7d$::ha35ca7a9d8d2bee1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2945
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::_$u7b$$u7b$closure$u7d$$u7d$::he5e989718863fd8f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:220
+  _$LT$core..ops..index_range..IndexRange$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h6a36b2348ea8d81e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/index_range.rs:170
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::hbe8e0ce511a30445
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:215
+  _$LT$core..array..iter..IntoIter$LT$T$C$_$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::ha2384923883c258f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter.rs:263
+  core::iter::traits::iterator::Iterator::find::h7c2df2e20a1b9926
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2949
+  litchi_pptx::notes::codec::root_conformance_from_processed::h6c354ae48718b1ee
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:334
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hb54222ccaa0043e0
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1145
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::h61d70c64bc257785
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1165
+  core::bool::_$LT$impl$u20$bool$GT$::then::hcf7e2dd4ba2e6df3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs:66
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1141
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+103 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:411
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_xml::h69ffbeb620137de2
+    at src/notes/codec.rs:347
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::validate_resource_xml::hd61b08fcabc9ed0f
+    at src/notes/codec.rs:303
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_index_with_slide_root_proofs::h38f641f07e5a7085
+    at src/notes/package.rs:528
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_snapshot_with_slide_root_proofs::h14a1cd3f82550252
+    at src/notes/package.rs:323
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:819
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..rel..Relationship$u20$as$u20$core..clone..Clone$GT$::clone::h9b4e12420a771683
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:51
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..rel..Relationship$u20$as$u20$core..clone..Clone$GT$::clone::h9b4e12420a771683
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:48
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..rel..Relationship$u20$as$u20$core..clone..Clone$GT$::clone::h9b4e12420a771683
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:54
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..rel..Relationship$u20$as$u20$core..clone..Clone$GT$::clone::h9b4e12420a771683
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:57
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+53 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$core..option..Option$LT$T$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h1d86535a13216b40
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:2263
+  _$LT$litchi_opc..rel..Relationship$u20$as$u20$core..clone..Clone$GT$::clone::h9b4e12420a771683
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:60
+  core::clone::Clone::clone::h801977e01b5f4fee
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h74abb15ee6d7c842
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h82add44bfe8718b4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h42b5a773d1598fcd
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h9880fba2c4303a02
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf22ef5af8e259732
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:241
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+50 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:391
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_xml::h69ffbeb620137de2
+    at src/notes/codec.rs:347
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::validate_resource_xml::hd61b08fcabc9ed0f
+    at src/notes/codec.rs:303
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_index_with_slide_root_proofs::h38f641f07e5a7085
+    at src/notes/package.rs:562
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_snapshot_with_slide_root_proofs::h14a1cd3f82550252
+    at src/notes/package.rs:323
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:819
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+36 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:54
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:477
+  _RNvNtCslNYArtu3iFV_5alloc5alloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:135
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:239
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:342
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator4grow
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:454
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:555
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h4e65c9b0372bb6c2
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::h90a404b7c6347ad9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::reserve::h74a751edb1e0525d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  alloc::vec::Vec$LT$T$C$A$GT$::reserve::h29555f7d2baf5722
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  alloc::vec::Vec$LT$T$C$A$GT$::append_elements::h087e97b1f38d9dcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$alloc..vec..spec_extend..SpecExtend$LT$$RF$T$C$core..slice..iter..Iter$LT$T$GT$$GT$$GT$::spec_extend::h49210e1bae66ac13
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  alloc::vec::Vec$LT$T$C$A$GT$::extend_from_slice::hcdc550bb00b61bb1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3500
+  quick_xml::name::NamespaceResolver::add::h4f049b869a21ae33
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:692
+  quick_xml::name::NamespaceResolver::push::h06206ec663f8da46
+    at src/name.rs:722
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::process_event::h4883015485a1526b
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:83
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h1f3eae9a88b4119c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:70
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$$RF$$u5b$u8$u5d$$GT$::read_resolved_event::h2cd683600c2876d0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:583
+  litchi_pptx::parts::slide::root_name_from_xml::hd1a233d264277373
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:38
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at src/parts/slide.rs:1137
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+36 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:54
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:477
+  _RNvNtCslNYArtu3iFV_5alloc5alloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:135
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:239
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:342
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator4grow
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:454
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:555
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h4e65c9b0372bb6c2
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::h90a404b7c6347ad9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::reserve::h74a751edb1e0525d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  alloc::vec::Vec$LT$T$C$A$GT$::reserve::h29555f7d2baf5722
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  alloc::vec::Vec$LT$T$C$A$GT$::append_elements::h087e97b1f38d9dcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$alloc..vec..spec_extend..SpecExtend$LT$$RF$T$C$core..slice..iter..Iter$LT$T$GT$$GT$$GT$::spec_extend::h49210e1bae66ac13
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  alloc::vec::Vec$LT$T$C$A$GT$::extend_from_slice::hcdc550bb00b61bb1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3500
+  quick_xml::name::NamespaceResolver::add::h4f049b869a21ae33
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:692
+  quick_xml::name::NamespaceResolver::push::h06206ec663f8da46
+    at src/name.rs:722
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::process_event::h4883015485a1526b
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:83
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h1f3eae9a88b4119c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:70
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$$RF$$u5b$u8$u5d$$GT$::read_resolved_event::h2cd683600c2876d0
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:583
+  litchi_pptx::namespace::presentation_name::h1a86e30a41ee2dfd
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/namespace.rs:54
+  litchi_pptx::parts::slide::c_sld_name_from_xml::h6a0319e640e6f560
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:64
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1140
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+36 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:54
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:477
+  _RNvNtCslNYArtu3iFV_5alloc5alloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:135
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:239
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:342
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator4grow
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:454
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:555
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h4e65c9b0372bb6c2
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::h90a404b7c6347ad9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::reserve::h74a751edb1e0525d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  alloc::vec::Vec$LT$T$C$A$GT$::reserve::h29555f7d2baf5722
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  alloc::vec::Vec$LT$T$C$A$GT$::append_elements::h087e97b1f38d9dcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$alloc..vec..spec_extend..SpecExtend$LT$$RF$T$C$core..slice..iter..Iter$LT$T$GT$$GT$$GT$::spec_extend::h49210e1bae66ac13
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  alloc::vec::Vec$LT$T$C$A$GT$::extend_from_slice::hcdc550bb00b61bb1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3500
+  quick_xml::name::NamespaceResolver::add::h4f049b869a21ae33
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:692
+  quick_xml::name::NamespaceResolver::push::h06206ec663f8da46
+    at src/name.rs:722
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::process_event::h4883015485a1526b
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:83
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h1f3eae9a88b4119c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:70
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$$RF$$u5b$u8$u5d$$GT$::read_event::h834619a1d9f0c39b
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:519
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:381
+  litchi_pptx::notes::codec::root_conformance_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::hca8a0e91c59b4d25
+    at src/notes/codec.rs:334
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::iter::traits::iterator::Iterator::find::check::_$u7b$$u7b$closure$u7d$$u7d$::ha35ca7a9d8d2bee1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2945
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::_$u7b$$u7b$closure$u7d$$u7d$::he5e989718863fd8f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:220
+  _$LT$core..ops..index_range..IndexRange$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h6a36b2348ea8d81e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/index_range.rs:170
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::hbe8e0ce511a30445
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:215
+  _$LT$core..array..iter..IntoIter$LT$T$C$_$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::ha2384923883c258f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter.rs:263
+  core::iter::traits::iterator::Iterator::find::h7c2df2e20a1b9926
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2949
+  litchi_pptx::notes::codec::root_conformance_from_processed::h6c354ae48718b1ee
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:334
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hb54222ccaa0043e0
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1145
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::h61d70c64bc257785
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1165
+  core::bool::_$LT$impl$u20$bool$GT$::then::hcf7e2dd4ba2e6df3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs:66
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1141
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+36 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:54
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc13___rdl_realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:477
+  _RNvNtCslNYArtu3iFV_5alloc5alloc7realloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:135
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:239
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:342
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator4grow
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:454
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:555
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h4e65c9b0372bb6c2
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:666
+  alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::h90a404b7c6347ad9
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:673
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::reserve::h74a751edb1e0525d
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:340
+  alloc::vec::Vec$LT$T$C$A$GT$::reserve::h29555f7d2baf5722
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1446
+  alloc::vec::Vec$LT$T$C$A$GT$::append_elements::h087e97b1f38d9dcd
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:2879
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$alloc..vec..spec_extend..SpecExtend$LT$$RF$T$C$core..slice..iter..Iter$LT$T$GT$$GT$$GT$::spec_extend::h49210e1bae66ac13
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs:56
+  _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..iter..traits..collect..Extend$LT$$RF$T$GT$$GT$::extend::h9cc5b216e6c0cea8
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:4167
+  quick_xml::reader::state::ReaderState::emit_start::hf904e622dc69c85c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:347
+  quick_xml::reader::Reader$LT$R$GT$::read_until_close::h98071a354cf5c117
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:465
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::Reader$LT$R$GT$::read_event_impl::h15eb4798599f504c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:369
+  quick_xml::reader::ns_reader::NsReader$LT$R$GT$::read_event_impl::h1f3eae9a88b4119c
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:69
+    in /home/zhuhe/code/litchi-target-0793/profile
+  quick_xml::reader::ns_reader::NsReader$LT$$RF$$u5b$u8$u5d$$GT$::read_event::h834619a1d9f0c39b
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:519
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:381
+  litchi_pptx::notes::codec::root_conformance_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::hca8a0e91c59b4d25
+    at src/notes/codec.rs:334
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::iter::traits::iterator::Iterator::find::check::_$u7b$$u7b$closure$u7d$$u7d$::ha35ca7a9d8d2bee1
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2945
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::_$u7b$$u7b$closure$u7d$$u7d$::he5e989718863fd8f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:220
+  _$LT$core..ops..index_range..IndexRange$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h6a36b2348ea8d81e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/index_range.rs:170
+  core::array::iter::iter_inner::PolymorphicIter$LT$$u5b$core..mem..maybe_uninit..MaybeUninit$LT$T$GT$$u5d$$GT$::try_fold::hbe8e0ce511a30445
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter/iter_inner.rs:215
+  _$LT$core..array..iter..IntoIter$LT$T$C$_$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::ha2384923883c258f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/array/iter.rs:263
+  core::iter::traits::iterator::Iterator::find::h7c2df2e20a1b9926
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:2949
+  litchi_pptx::notes::codec::root_conformance_from_processed::h6c354ae48718b1ee
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:334
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::_$u7b$$u7b$closure$u7d$$u7d$::hb54222ccaa0043e0
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1145
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::_$u7b$$u7b$closure$u7d$$u7d$::h61d70c64bc257785
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1165
+  core::bool::_$LT$impl$u20$bool$GT$::then::hcf7e2dd4ba2e6df3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs:66
+  litchi_pptx::parts::slide::SlidePart::finish_from_processed::hf9d83f585dbede72
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/parts/slide.rs:1141
+  litchi_pptx::parts::slide::SlidePart::from_part_with_name_with_capture::had0e07725ebddace
+    at src/parts/slide.rs:1128
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::presentation::package::capture_slides_inner::h50816605c0f14c9a
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:97
+  litchi_pptx::presentation::package::capture_slides_with_mce::hf420c77b7d4a90d2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/package.rs:62
+  litchi_pptx::presentation::model::Presentation::capture_slides_with_mce::h12b81fccf079f910
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/presentation/model.rs:239
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/model.rs:749
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+34 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h8c28919c49fe7382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:558
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_amortized::h123d988e32697a23
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:527
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::raw_vec::RawVecInner$LT$A$GT$::grow_one::h2130958c2c449e0a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:491
+  alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hb7d4bbd2bb9cc51f
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:188
+  alloc::vec::Vec$LT$T$C$A$GT$::push_mut::h153e1ede14e97382
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:1029
+    in /home/zhuhe/code/litchi-target-0793/profile
+  alloc::vec::Vec$LT$T$C$A$GT$::push::h8c36e1132fa3ed5a
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:992
+  quick_xml::events::attributes::IterState::check_for_duplicates::hc29a780476240719
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:1151
+  quick_xml::events::attributes::IterState::next::hb7fbf1130318bdd2
+    at src/events/attributes.rs:1287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::hbc7838bec304c737
+    at /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:698
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$litchi_opc..xml_attributes..CheckedAttributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h3bd132bb11dea51e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs:231
+  litchi_pptx::notes::codec::inspect_element::h79d3363bc9ed7fbd
+    at src/notes/codec.rs:477
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_processed_xml::hb7ed65b605767ccb
+    at src/notes/codec.rs:391
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::scan_xml::h69ffbeb620137de2
+    at src/notes/codec.rs:347
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::codec::validate_resource_xml::hd61b08fcabc9ed0f
+    at src/notes/codec.rs:303
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_index_with_slide_root_proofs::h38f641f07e5a7085
+    at src/notes/package.rs:528
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::notes::package::load_snapshot_with_slide_root_proofs::h14a1cd3f82550252
+    at src/notes/package.rs:323
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:819
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+33 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:235
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+33 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$litchi_opc..packuri..PackURI$u20$as$u20$core..clone..Clone$GT$::clone::h691f0d8e1d1a0b28
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/packuri.rs:19
+  core::clone::Clone::clone::h73e6dd6ffbbafc36
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::hb237711d8fe5c373
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h84df320cb7000d17
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h435bb8042432b8a8
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h05dfd33f026c4ae9
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h44b5f70a6dcb90e8
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:396
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+33 calls to allocation functions with 0B peak consumption from
+  _RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvCsfLfy6EI15iL_7___rustc11___rdl_alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:455
+  _RNvNtCslNYArtu3iFV_5alloc5alloc5alloc
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:95
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global18alloc_impl_runtime
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:190
+  _RNvMNtCslNYArtu3iFV_5alloc5allocNtB2_6Global10alloc_impl
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:312
+  _RNvXs_NtCslNYArtu3iFV_5alloc5allocNtB4_6GlobalNtNtCsgEmfK2I1SDS_4core5alloc9Allocator8allocate
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:429
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:464
+  _RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:433
+  _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:177
+  _RNvMsF_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechE16with_capacity_inB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:965
+  _RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:448
+  _RINvMNtCslNYArtu3iFV_5alloc5sliceSh9to_vec_inNtNtB5_5alloc6GlobalEB5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs:400
+  _RNvXsa_NtCslNYArtu3iFV_5alloc3vecINtB5_3VechENtNtCsgEmfK2I1SDS_4core5clone5Clone5cloneB7_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:3749
+  _RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2352
+  _$LT$core..option..Option$LT$T$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h1d86535a13216b40
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:2263
+  _$LT$litchi_opc..rel..Relationships$u20$as$u20$core..clone..Clone$GT$::clone::h1e3e996b5ef9a4fa
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/rel.rs:238
+  _$LT$litchi_opc..part..XmlPart$u20$as$u20$core..clone..Clone$GT$::clone::h87147dc4cd5c0165
+    at src/part.rs:423
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _$LT$T$u20$as$u20$litchi_opc..part..PartClone$GT$::clone_part::hf5ff037824644021
+    at src/part.rs:37
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_opc::part::_$LT$impl$u20$core..clone..Clone$u20$for$u20$alloc..boxed..Box$LT$dyn$u20$litchi_opc..part..Part$u2b$core..marker..Sync$u2b$core..marker..Send$GT$$GT$::clone::hfb91a14080e81e4e
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/part.rs:43
+    in /home/zhuhe/code/litchi-target-0793/profile
+  core::clone::Clone::clone::hae07ef0680b561a3
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/clone.rs:236
+  hashbrown::raw::RawTable$LT$T$C$A$GT$::clone_from_impl::h461dc88e6269a8ab
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3469
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$hashbrown..raw..RawTableClone$GT$::clone_from_spec::h4fb5c011847d025c
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3418
+  _$LT$hashbrown..raw..RawTable$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h22bd1a8e4827ffb4
+    at /rust/deps/hashbrown-0.16.1/src/raw/mod.rs:3337
+  _$LT$hashbrown..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h3b5fe3a5ecc31149
+    at /rust/deps/hashbrown-0.16.1/src/map.rs:194
+  _$LT$std..collections..hash..map..HashMap$LT$K$C$V$C$S$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h301289127b92d39c
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs:1398
+  _$LT$litchi_opc..package..OpcPackage$u20$as$u20$core..clone..Clone$GT$::clone::ha54244c71594e028
+    at /home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs:391
+  litchi_pptx::opened::model::capture_internal::h965d2865a0e675e2
+    at src/opened/model.rs:831
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation_with_limits::hda804ff47489b8f1
+    at src/package/model.rs:0
+    in /home/zhuhe/code/litchi-target-0793/profile
+  litchi_pptx::package::model::Package::opened_presentation::ha0360c6e94353e35
+    at /home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::capture_region_0793::h70e79e8c11807074
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:394
+  namespace_uri_probe::run_capture::h4c09f4f0575599d6
+    at src/main.rs:357
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::run_one::hb13ba1911b83e791
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:341
+  namespace_uri_probe::run::hdbc690e144543b88
+    at src/main.rs:282
+    in /home/zhuhe/code/litchi-target-0793/profile
+  namespace_uri_probe::main::h111c17325c103c7d
+    at /home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs:247
+  core::ops::function::FnOnce::call_once::he47c61c7854c5b96
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:250
+    in /home/zhuhe/code/litchi-target-0793/profile
+  std::sys::backtrace::__rust_begin_short_backtrace::hbbaaf18b7eebb54e
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:166
+  std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::h9d2de9d185a04994
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:206
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RNvXs0_NtNtNtCsgEmfK2I1SDS_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtBb_6marker4SyncNtNtNtBb_5panic11unwind_safe13RefUnwindSafeEL_INtB7_6FnOnceuE9call_onceCsjrHSEGnQ3l9_3std
+    at library/core/src/ops/function.rs:287
+    in /home/zhuhe/code/litchi-target-0793/profile
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtB13_6marker4SyncNtNtNtB13_5panic11unwind_safe13RefUnwindSafeEL_lEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindlRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBU_6marker4SyncNtNtNtBU_5panic11unwind_safe13RefUnwindSafeEL_EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindRDINtNtNtCsgEmfK2I1SDS_4core3ops8function2FnuEp6OutputlNtNtBP_6marker4SyncNtNtNtBP_5panic11unwind_safe13RefUnwindSafeEL_lEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNCNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal0B5_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:175
+  _RINvNvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:581
+  _RINvNtCsjrHSEGnQ3l9_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs:544
+  _RINvNtCsjrHSEGnQ3l9_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panic.rs:359
+  _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+    at /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:171
+  main
+    in /home/zhuhe/code/litchi-target-0793/profile
+
+
+
+PEAK MEMORY CONSUMERS
+
+
+total runtime: 0.16s.
+calls to allocation functions: 33002 (211551/s)
+temporary memory allocations: 10930 (70064/s)
+peak heap memory consumption: 1.23M
+peak RSS (including heaptrack overhead): 8.71M
+total memory leaked: 544B

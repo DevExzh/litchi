@@ -1,0 +1,19 @@
+{
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0793"
+  },
+  "gates": 3,
+  "receipts": {
+    "bytes": 1736,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/quality/receipts.json",
+    "sha256": "a04b5374ba82c2e00cb3055bc50c3a7681c9a6469b5710560a169536d32cf824"
+  },
+  "scope": "Fresh evidence-probe tests; no production changes or fresh production-suite claim",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/build/source.json",
+    "sha256": "cc7b1867ae7368dc6d67e8ccab0d2ce30327ff154a7dfe395ca1246afedc5fd3"
+  }
+}

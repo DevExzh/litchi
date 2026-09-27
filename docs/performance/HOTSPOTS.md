@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0793 — duplicate-key allocation path investigated
+
+[0793](0793-pptx-capture-allocation-attribution.md) Large capture contains 61,342 raw wrapper-nested duplicate-check allocation calls in each trace. The frozen counter reconciliation fails through double-counted reallocations; no allocation fraction is authorized. Investigate bounded inline duplicate-key storage only under a corrected, predeclared qualification and full public regression matrix.
+
 ## 0792 — known-empty attribute iteration removed
 
 [0792](0792-pptx-empty-attribute-tail.md) The notes scanner now skips checked-iterator setup/advancement for exactly empty raw tails after element validation. Large generated capture improves 5.211%; event parsing, namespace checks, and attribute-bearing work remain. No new instruction-share claim.

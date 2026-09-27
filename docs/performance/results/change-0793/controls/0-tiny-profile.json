@@ -1,0 +1,120 @@
+{
+  "schema": "litchi.pptx.namespace-uri-probe.v1",
+  "tool": "namespace-uri-probe-0785",
+  "mode": "capture",
+  "shape": "tiny",
+  "slides": 3,
+  "shapes_per_slide": 4,
+  "timing_scope": "Package::opened_presentation only",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 31530,
+    "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+  },
+  "fixture": {
+    "injection": "none",
+    "slide_parts": 0,
+    "replaced_text_tags": 0,
+    "namespace_declarations": 0,
+    "namespaced_attributes": 0,
+    "namespace_uris": [],
+    "attribute_names": []
+  },
+  "warmup": 0,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 279741,
+      "metrics": {
+        "captured_shapes_per_slide": 4,
+        "captured_slides": 3,
+        "elapsed_ns": 279741,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "output": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 635,
+        "semantic_text_sha256": "6aedd71fcadb7fc1f6c9668ebad4c0edecba456b16251ebd32dff382980d0de1",
+        "readback_bytes": 31530,
+        "readback_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+        "marker_matches": null,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 238921,
+      "metrics": {
+        "captured_shapes_per_slide": 4,
+        "captured_slides": 3,
+        "elapsed_ns": 238921,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "output": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 635,
+        "semantic_text_sha256": "6aedd71fcadb7fc1f6c9668ebad4c0edecba456b16251ebd32dff382980d0de1",
+        "readback_bytes": 31530,
+        "readback_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+        "marker_matches": null,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 236301,
+      "metrics": {
+        "captured_shapes_per_slide": 4,
+        "captured_slides": 3,
+        "elapsed_ns": 236301,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "output": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 635,
+        "semantic_text_sha256": "6aedd71fcadb7fc1f6c9668ebad4c0edecba456b16251ebd32dff382980d0de1",
+        "readback_bytes": 31530,
+        "readback_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+        "marker_matches": null,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "profile",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

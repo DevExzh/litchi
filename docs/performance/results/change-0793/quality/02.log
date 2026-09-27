@@ -1,0 +1,24 @@
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src)
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:198:15
+    |
+198 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mce-capabilities-probe` (bin "namespace-uri-probe" test) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 6.19s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0793/release/deps/namespace_uri_probe-c6e6a626d34ff5e2)
+
+running 7 tests
+test counting_allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test counting_allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test counting_allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test counting_allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... ok
+test counting_allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+test tests::namespace_injection_keeps_non_text_tags_and_places_declarations_on_root ... ok
+test tests::unicode_uris_are_valid_utf8_and_preserve_known_uri_byte_lengths ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+

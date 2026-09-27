@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0793 — allocation evidence retained with protocol failure
+
+[0793](0793-pptx-capture-allocation-attribution.md) All 50 diagnostic reports/130 samples preserve identity and readback; four builds and 35 probe tests pass. The allocation formula double-counts reallocations in all ten traces. The failed gate and supplementary source explanation are retained, with no production or speedup claim.
+
 ## 0792 — PPTX scanner improvement retained
 
 [0792](0792-pptx-empty-attribute-tail.md) Large generated capture and lifecycle improve 5.211% and 6.937% by paired p50 with confidence intervals below one. No frozen latency or allocation-resource guard fails; six quality gates and 1,238 tests pass (three ignored). A layout-dependent constant-address test was corrected with its failure retained.

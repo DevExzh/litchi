@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0793 — allocation semantics clarified
+
+[0793](0793-pptx-capture-allocation-attribution.md) Current capture traces and counter source identify a double-counted reallocation term in the frozen protocol. Retaining that failure advances measurement correctness and narrows the next XML experiment without a production change. OLE2/OOXML active, ODF deferred, iWork excluded; comprehensive completion remains open.
+
 ## 0792 — measured scanner work removal retained
 
 [0792](0792-pptx-empty-attribute-tail.md) The empty-attribute-tail branch passes the frozen native benefit and resource guards while retaining XML checks and independent oracle tests. This advances existing PPTX performance work; comprehensive completion remains open. OLE2/OOXML active, ODF deferred, iWork excluded.
