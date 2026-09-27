@@ -158,3 +158,7 @@ reference capture. Offline validation checks these receipts, recomputes the
 statistics and compares the entire reference result map. Owned temporary
 build targets are removed only after binary identity verification. Original
 0770/0771/reference worktrees and unrelated main files remain untouched.
+
+After integration, the owned worktree, copied root lock and reference symlinks
+were removed. Final production and sealed packet bytes were verified in main;
+the three unrelated main files remain byte-for-byte unchanged.

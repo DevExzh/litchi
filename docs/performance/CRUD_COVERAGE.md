@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0775 — parser integration does not promote CRUD coverage
+
+[0775](0775-mce-stream-integration.md) validates MCE namespace sharing and dependent OOXML owners. Its hostile/ordinary parser probes are not complete CRUD workflows; no coverage-index row is promoted. The pre-existing tree expanded-attribute duplicate gap and broader goal evidence remain open.
+
 ## 0774 — XLS registration refusal and aggregate reference bounds
 
 [0774](0774-xls-writer-integration.md) adds current-source evidence for checked string/count/index registration, deterministic accepted-input round trips, formula replacement, and aggregate ExternSheet refusal at 1,371 references. Final XLS tests pass 1,655 cases with one ignored; a separate 1,024-workbook property run passes. Dedicated near-limit tests for every internal-reference activation transition remain an explicit coverage opportunity.

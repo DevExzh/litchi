@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0775 — shared MCE event namespaces integrated
+
+[0775](0775-mce-stream-integration.md) records nine passing gates (5,669 tests, 35 ignored), 18 paired cases and 64,541 outcomes exactly matching a text-based reference. It documents the public ExpandedName migration, three regression flags, preserved failed probe attempts and remaining parser limitations. No end-to-end Office or complete-program speedup is claimed.
+
 ## 0774 — checked XLS fields with fresh performance evidence
 
 [0774](0774-xls-writer-integration.md) rejects selected unrepresentable fields before registration and preflights cumulative external/internal references. Review removed a retained formula cache while keeping the static tokenizer function table. The 20,000-formula probe measures 20.071 → 14.131 ms and 48,078,704 → 33,140,823 whole-process allocated bytes; the numeric control is stable. Final gates pass, failed setup evidence is retained, and owned targets are cleaned. API changes and measurement limits are documented.

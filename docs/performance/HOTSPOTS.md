@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0775 — repeated stream URI copies removed
+
+[0775](0775-mce-stream-integration.md) reduces the named long-URI attribute probe from 2,253.992 to 1.739 ms median process p50 and about 1.96 GiB to 11 MiB peak process RSS. Real-document controls stay below 5% regressions; short-extension microcases and low-alias RSS have disclosed flags. Registered-extension checks still copy URI text and remain separate work.
+
 ## 0774 — XLS field checks integrated; repeated tokenizer map removed
 
 [0774](0774-xls-writer-integration.md) closes the pending XLS integration with aggregate external-reference preflight. A static fourteen-entry function table avoids repeated map construction. Review removed the unbudgeted retained token cache; formula validation and serialization both encode, yet the paired formula probe improves with lower total allocation calls/bytes. Broader writer budgets and representative workbook distributions remain open.

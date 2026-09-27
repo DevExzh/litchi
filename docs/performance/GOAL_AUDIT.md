@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0775 — MCE integration validated; program remains active
+
+[0775](0775-mce-stream-integration.md) integrates the clean 0771 candidate with source-bound gates, 108 paired timing processes and exact agreement with the pre-identity textual reference. Breaking event-name APIs, remaining extension URI costs, three regression flags and the existing tree duplicate gap are documented. Dirty 0770 work is untouched. Full CRUD, cold/range/scaling evidence and the non-iWork goal remain open.
+
 ## 0774 — reviewed XLS integration complete; broader goal remains open
 
 [0774](0774-xls-writer-integration.md) integrates the pending 0766 work, fixes a review-found aggregate reference gap, removes unbudgeted formula-token retention, and validates final source with owner/facade/harness build gates and paired native/allocation evidence. No historical probe claim is adopted. Writer-wide resource budgets, broader corpora, cold/range/scaling evidence and full CRUD completion remain unproved; the non-iWork goal stays active.
