@@ -147,4 +147,11 @@ Origin is `4d89ccf28d`; successful builds record `2cdbdd3c33`, after two
 archive/analysis-only commits in the experiment worktree. Their production tree
 is identical to origin, checked by the revision-transition receipt.
 All four executable hashes were verified before removing the owned target
-(2,686,542,684 file bytes). Final integration and replay are recorded below.
+(2,686,542,684 file bytes). Integration is complete: `b6046fde88` was fast-forwarded onto
+`feat/office-format-completeness`, including its two archive/analysis commits.
+All 874 packet Git blobs (873 payloads plus the seal) matched their staged
+byte hashes. The owned worktree, branch, copied workspace lock and three
+reference links were then removed after exact identity checks. All preexisting
+worktrees and the three unrelated local-file hashes remain unchanged. Full
+sealed replay, five CSV checks and the independent raw audit pass from the
+main workspace after both the original worktree and target are absent.
