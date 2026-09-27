@@ -1604,6 +1604,410 @@ pub(crate) fn run_case_with_durability(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Untimed artifact export
+// ---------------------------------------------------------------------------
+
+/// Versioned, untimed artifacts for an ordinary-save corpus.
+///
+/// This deliberately lives beside the timed implementation so it can use the
+/// exact same `build_corpus`, `Owner::edit`, `Owner::save_at`, and
+/// `Owner::write_to` workload. It is not part of the timed result schema.
+#[derive(Debug, Serialize)]
+struct OrdinarySaveArtifactManifest {
+    schema_version: u32,
+    kind: &'static str,
+    generator: &'static str,
+    output_directory: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filesystem_root: Option<String>,
+    cases: Vec<OrdinarySaveArtifactCase>,
+}
+
+#[derive(Debug, Serialize)]
+struct OrdinarySaveArtifactCase {
+    case_id: String,
+    format: &'static str,
+    origin: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_path: Option<String>,
+    corpus: CorpusManifest,
+    source_archive: ArtifactFile,
+    source_archive_bytes: usize,
+    source_archive_sha256: String,
+    published_bytes: usize,
+    published_sha256: String,
+    edit_description: String,
+    edit_target: EditTarget,
+    edit_admitted: bool,
+    edit_outcome: String,
+    /// A refused DOCX is required to remain byte-identical to its source;
+    /// retaining this explicit gate makes the altChunk preservation contract
+    /// independently checkable from the archive files.
+    refused_output_source_exact: bool,
+    policy_outputs: Vec<ArtifactPolicyOutput>,
+    /// Sequential `write_to` control, kept separate from the four filesystem
+    /// durability policies.
+    stream_output: ArtifactPolicyOutput,
+}
+
+#[derive(Debug, Serialize)]
+struct EditTarget {
+    main_part: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_sheet: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_slide: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_shape: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct ArtifactPolicyOutput {
+    /// `default`, `full`, `file-only`, `no-sync`, or `stream`.
+    policy: &'static str,
+    /// `save`, `save_with_durability`, or the sequential sink entry point.
+    publication: &'static str,
+    output: ArtifactFile,
+    bytes: usize,
+    sha256: String,
+    matches_reference: bool,
+    matches_source: bool,
+    source_unchanged: bool,
+    reopen_admitted: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ArtifactFile {
+    /// Relative to the export directory for generated artifacts.
+    path: String,
+    bytes: usize,
+    sha256: String,
+}
+
+fn artifact_file(output_directory: &Path, path: &Path, bytes: &[u8]) -> ArtifactFile {
+    let relative = path
+        .strip_prefix(output_directory)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned();
+    ArtifactFile {
+        path: relative,
+        bytes: bytes.len(),
+        sha256: sha256_hex(bytes),
+    }
+}
+
+fn edit_target(corpus: &SaveCorpus) -> EditTarget {
+    EditTarget {
+        main_part: corpus.format.main_part(),
+        xlsx_sheet: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_sheet.clone()),
+        xlsx_address: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_address.clone()),
+        pptx_slide: (corpus.format == Format::Pptx)
+            .then(|| corpus.pptx_target)
+            .and_then(|target| target.map(|(slide, _)| slide)),
+        pptx_shape: (corpus.format == Format::Pptx)
+            .then(|| corpus.pptx_target)
+            .and_then(|target| target.map(|(_, shape)| shape)),
+    }
+}
+
+fn check_source_unchanged(
+    corpus: &SaveCorpus,
+    source_before: &[u8],
+) -> Result<bool, Box<dyn Error>> {
+    let source_after = fs::read(corpus.workspace.source())?;
+    if source_after != source_before {
+        return Err(format!(
+            "{} ordinary-save export changed its source archive after publication",
+            corpus.format.as_str()
+        )
+        .into());
+    }
+    Ok(true)
+}
+
+fn check_reopen(format: Format, path: &Path) -> Result<bool, Box<dyn Error>> {
+    let owner = Owner::open(format, path).map_err(|error| {
+        format!(
+            "{} ordinary-save export output {} could not be reopened: {error}",
+            format.as_str(),
+            path.display()
+        )
+    })?;
+    drop(owner);
+    Ok(true)
+}
+
+fn validate_export_bytes(
+    corpus: &SaveCorpus,
+    source_before: &[u8],
+    bytes: &[u8],
+    policy: &str,
+) -> Result<(bool, bool, bool), Box<dyn Error>> {
+    let reference = &corpus.corpus.target_payload;
+    let matches_reference = bytes == reference
+        && sha256_hex(bytes) == corpus.evidence.published_sha256
+        && bytes.len() == usize::try_from(corpus.evidence.published_bytes)?;
+    if !matches_reference {
+        return Err(format!(
+            "{} ordinary-save {policy} artifact differs from the corpus reference",
+            corpus.format.as_str()
+        )
+        .into());
+    }
+    let matches_source = bytes == source_before;
+    if !corpus.evidence.edit_admitted && corpus.format == Format::Docx && !matches_source {
+        return Err(format!(
+            "refused DOCX ordinary-save {policy} artifact is not byte-identical to its source"
+        )
+        .into());
+    }
+    let source_unchanged = check_source_unchanged(corpus, source_before)?;
+    Ok((matches_reference, matches_source, source_unchanged))
+}
+
+fn export_filesystem_policy(
+    output_directory: &Path,
+    corpus: &SaveCorpus,
+    source_before: &[u8],
+    case_directory: &Path,
+    policy: &'static str,
+    durability: Option<litchi_core::Durability>,
+) -> Result<ArtifactPolicyOutput, Box<dyn Error>> {
+    let path = case_directory.join(format!("{policy}.{}", corpus.format.extension()));
+    let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+    let outcome = owner.edit(corpus)?;
+    if outcome.as_str() != corpus.evidence.edit_outcome {
+        return Err(format!(
+            "{} ordinary-save {policy} edit outcome changed from {} to {}",
+            corpus.format.as_str(),
+            corpus.evidence.edit_outcome,
+            outcome.as_str()
+        )
+        .into());
+    }
+    owner.save_at(&path, durability)?;
+    drop(owner);
+    let bytes = fs::read(&path)?;
+    let (matches_reference, matches_source, source_unchanged) =
+        validate_export_bytes(corpus, source_before, &bytes, policy)?;
+    let reopen_admitted = check_reopen(corpus.format, &path)?;
+    Ok(ArtifactPolicyOutput {
+        policy,
+        publication: if durability.is_some() {
+            "save_with_durability"
+        } else {
+            "save"
+        },
+        output: artifact_file(output_directory, &path, &bytes),
+        bytes: bytes.len(),
+        sha256: sha256_hex(&bytes),
+        matches_reference,
+        matches_source,
+        source_unchanged,
+        reopen_admitted,
+    })
+}
+
+fn export_stream_policy(
+    output_directory: &Path,
+    corpus: &SaveCorpus,
+    source_before: &[u8],
+    case_directory: &Path,
+) -> Result<ArtifactPolicyOutput, Box<dyn Error>> {
+    let path = case_directory.join(format!("stream.{}", corpus.format.extension()));
+    let budget = usize::try_from(corpus.evidence.published_bytes)?
+        .saturating_mul(4)
+        .max(64 * 1024);
+    let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+    let outcome = owner.edit(corpus)?;
+    if outcome.as_str() != corpus.evidence.edit_outcome {
+        return Err(format!(
+            "{} ordinary-save stream edit outcome changed from {} to {}",
+            corpus.format.as_str(),
+            corpus.evidence.edit_outcome,
+            outcome.as_str()
+        )
+        .into());
+    }
+    let mut sink = BoundedSink::bounded(budget);
+    sink.reserve_budget()?;
+    owner.write_to(&mut sink)?;
+    drop(owner);
+    let bytes = sink.bytes;
+    fs::write(&path, &bytes)?;
+    let (matches_reference, matches_source, source_unchanged) =
+        validate_export_bytes(corpus, source_before, &bytes, "stream")?;
+    let reopen_admitted = check_reopen(corpus.format, &path)?;
+    Ok(ArtifactPolicyOutput {
+        policy: "stream",
+        publication: "sequential_sink",
+        output: artifact_file(output_directory, &path, &bytes),
+        bytes: bytes.len(),
+        sha256: sha256_hex(&bytes),
+        matches_reference,
+        matches_source,
+        source_unchanged,
+        reopen_admitted,
+    })
+}
+
+fn export_one_artifact_case(
+    output_directory: &Path,
+    case_id: String,
+    format: Format,
+    origin: Origin,
+    input_path: Option<&Path>,
+    filesystem_root: Option<&Path>,
+) -> Result<OrdinarySaveArtifactCase, Box<dyn Error>> {
+    let corpus = build_corpus(format, origin, input_path, filesystem_root)?;
+    let case_directory = output_directory.join(&case_id);
+    fs::create_dir(&case_directory)?;
+    let source_before = fs::read(corpus.workspace.source())?;
+    if source_before != corpus.corpus.archive
+        || sha256_hex(&source_before) != corpus.evidence.source_archive_sha256
+    {
+        return Err(format!(
+            "{} ordinary-save source staging differs from the corpus archive",
+            format.as_str()
+        )
+        .into());
+    }
+    let source_path = case_directory.join(format!("source.{}", format.extension()));
+    fs::write(&source_path, &source_before)?;
+    let source_output = fs::read(&source_path)?;
+    if source_output != source_before {
+        return Err(format!(
+            "{} ordinary-save source artifact changed while being exported",
+            format.as_str()
+        )
+        .into());
+    }
+
+    let reference = &corpus.corpus.target_payload;
+    if sha256_hex(reference) != corpus.evidence.published_sha256
+        || reference.len() != usize::try_from(corpus.evidence.published_bytes)?
+    {
+        return Err(format!(
+            "{} ordinary-save corpus reference metadata is inconsistent",
+            format.as_str()
+        )
+        .into());
+    }
+    let mut policy_outputs = Vec::with_capacity(4);
+    for (policy, durability) in [
+        ("default", None),
+        ("full", Some(litchi_core::Durability::Full)),
+        ("file-only", Some(litchi_core::Durability::FileOnly)),
+        ("no-sync", Some(litchi_core::Durability::NoSync)),
+    ] {
+        policy_outputs.push(export_filesystem_policy(
+            output_directory,
+            &corpus,
+            &source_before,
+            &case_directory,
+            policy,
+            durability,
+        )?);
+    }
+    let stream_output =
+        export_stream_policy(output_directory, &corpus, &source_before, &case_directory)?;
+    let refused_output_source_exact = policy_outputs
+        .iter()
+        .chain(std::iter::once(&stream_output))
+        .all(|output| output.matches_source);
+    if !corpus.evidence.edit_admitted
+        && corpus.format == Format::Docx
+        && !refused_output_source_exact
+    {
+        return Err("refused DOCX ordinary-save export did not preserve source bytes".into());
+    }
+    Ok(OrdinarySaveArtifactCase {
+        case_id,
+        format: format.as_str(),
+        origin: origin.as_str(),
+        input_path: input_path.map(|path| path.display().to_string()),
+        corpus: corpus.corpus.manifest.clone(),
+        source_archive: artifact_file(output_directory, &source_path, &source_output),
+        source_archive_bytes: source_before.len(),
+        source_archive_sha256: sha256_hex(&source_before),
+        published_bytes: reference.len(),
+        published_sha256: sha256_hex(reference),
+        edit_description: corpus.evidence.edit_description.clone(),
+        edit_target: edit_target(&corpus),
+        edit_admitted: corpus.evidence.edit_admitted,
+        edit_outcome: corpus.evidence.edit_outcome.clone(),
+        refused_output_source_exact,
+        policy_outputs,
+        stream_output,
+    })
+}
+
+/// Export the three fixed medium generated corpora and each caller-named
+/// OOXML file into a new directory.
+///
+/// Every real file is classified independently, so multiple files of one
+/// format are accepted. The timed ordinary-save selectors continue to use
+/// [`classify_inputs`] and retain their one-file-per-format rule.
+///
+/// The export writes the original source archive plus separately opened and
+/// edited `default`, `full`, `file-only`, `no-sync`, and sequential `stream`
+/// artifacts. It refuses an existing output directory and leaves each
+/// corpus's private workspace to [`Workspace::drop`] before moving on.
+pub(crate) fn export_artifacts(
+    output_directory: &Path,
+    filesystem_root: Option<&Path>,
+    ooxml_files: &[PathBuf],
+) -> Result<(), Box<dyn Error>> {
+    if output_directory.exists() {
+        return Err(format!(
+            "ordinary-save artifact output directory {} already exists",
+            output_directory.display()
+        )
+        .into());
+    }
+    fs::create_dir(output_directory)?;
+
+    let mut cases = Vec::with_capacity(3 + ooxml_files.len());
+    for format in Format::ALL {
+        cases.push(export_one_artifact_case(
+            output_directory,
+            format!("generated-{}-medium", format.extension()),
+            format,
+            Origin::Generated,
+            None,
+            filesystem_root,
+        )?);
+    }
+    for (index, path) in ooxml_files.iter().enumerate() {
+        let format = classify(path)?;
+        cases.push(export_one_artifact_case(
+            output_directory,
+            format!("real-{index:03}-{}", format.extension()),
+            format,
+            Origin::RealFile,
+            Some(path),
+            filesystem_root,
+        )?);
+    }
+    let manifest = OrdinarySaveArtifactManifest {
+        schema_version: 1,
+        kind: "ordinary-save-artifact-export",
+        generator: "litchi-perf-ordinary-save-artifacts-v1",
+        output_directory: output_directory.display().to_string(),
+        filesystem_root: filesystem_root.map(|path| path.display().to_string()),
+        cases,
+    };
+    fs::write(
+        output_directory.join("manifest.json"),
+        serde_json::to_vec_pretty(&manifest)?,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -1998,5 +2402,76 @@ mod tests {
         let error = checked_uncompressed_member_bytes(&members)
             .expect_err("member total must use checked addition");
         assert!(error.to_string().contains("overflows u64"));
+    }
+
+    #[test]
+    fn artifact_export_generated_matrix_matches_reference_and_refuses_reuse() {
+        let parent = crate::filesystem::scratch_root(None, "ordinary-save-artifact-test")
+            .expect("artifact test parent");
+        let _directory = TestDirectory(parent.clone());
+        let output = parent.join("artifacts");
+        let filesystem_root = parent.join("filesystem");
+        let (docx_archive, _) = generated_archive(Format::Docx).expect("generated DOCX archive");
+        let first_docx = parent.join("first-input.docx");
+        let second_docx = parent.join("second-input.docx");
+        fs::write(&first_docx, &docx_archive).expect("first DOCX input");
+        fs::write(&second_docx, &docx_archive).expect("second DOCX input");
+        export_artifacts(
+            &output,
+            Some(&filesystem_root),
+            &[first_docx.clone(), second_docx.clone()],
+        )
+        .expect("generated ordinary-save artifacts");
+
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join("manifest.json")).expect("manifest"))
+                .expect("manifest JSON");
+        let cases = manifest["cases"].as_array().expect("case array");
+        assert_eq!(cases.len(), 5);
+        assert_eq!(
+            cases
+                .iter()
+                .take(3)
+                .map(|case| case["format"].as_str().expect("format"))
+                .collect::<Vec<_>>(),
+            vec!["DOCX", "XLSX", "PPTX"]
+        );
+        assert_eq!(
+            cases
+                .iter()
+                .skip(3)
+                .map(|case| case["origin"].as_str().expect("origin"))
+                .collect::<Vec<_>>(),
+            vec!["caller-named-real-file", "caller-named-real-file"]
+        );
+        for case in cases {
+            assert!(case["edit_description"].as_str().is_some());
+            assert!(case["edit_target"]["main_part"].as_str().is_some());
+            let outputs = case["policy_outputs"].as_array().expect("policy outputs");
+            assert_eq!(outputs.len(), 4);
+            for policy in outputs {
+                assert!(policy["matches_reference"].as_bool().unwrap());
+                assert!(policy["source_unchanged"].as_bool().unwrap());
+                assert!(policy["reopen_admitted"].as_bool().unwrap());
+                let relative = policy["output"]["path"].as_str().expect("output path");
+                let bytes = fs::read(output.join(relative)).expect("policy artifact");
+                assert_eq!(
+                    sha256_hex(&bytes),
+                    case["published_sha256"].as_str().expect("published digest")
+                );
+                assert_eq!(
+                    bytes.len(),
+                    case["published_bytes"].as_u64().unwrap() as usize
+                );
+            }
+            let stream = &case["stream_output"];
+            assert_eq!(stream["policy"], "stream");
+            assert!(stream["matches_reference"].as_bool().unwrap());
+            assert!(stream["source_unchanged"].as_bool().unwrap());
+            assert!(stream["reopen_admitted"].as_bool().unwrap());
+        }
+        let error = export_artifacts(&output, Some(&filesystem_root), &[])
+            .expect_err("existing output directory must be refused");
+        assert!(error.to_string().contains("already exists"));
     }
 }

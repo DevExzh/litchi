@@ -41,6 +41,10 @@ name = "attribute_checks_equivalence"
 path = "src/bin/attribute_checks_equivalence.rs"
 
 [[bin]]
+name = "ordinary_save_artifacts"
+path = "src/bin/ordinary_save_artifacts.rs"
+
+[[bin]]
 name = "xlsb_crud"
 path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]
