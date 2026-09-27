@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0796 — direct helper boundary controls
+
+[0796](0796-xml-attribute-boundary-diagnostic.md) One binary compares exact baseline and rejected 0794 OPC helpers over 31 inputs and two modes. All 992 reports/22,568 samples validate; no production baseline changes.
+
 ## 0795 — exact-source rejected-candidate instruction comparison
 
 [0795](0795-xml-duplicate-key-instruction-profile.md) Twelve owner-scoped Callgrind captures and four separate native profiles preserve all 412 output/readback oracles. Large guest instruction totals fall only 0.387–0.393%; no fresh native latency comparison or optimized baseline follows.

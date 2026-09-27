@@ -1,0 +1,346 @@
+{
+  "schema": "litchi.attribute-boundary-probe.v1",
+  "tool": "attribute-boundary-probe-0796",
+  "binary": "attribute-boundary-probe",
+  "leg": "after",
+  "case": "distinct-1",
+  "category": "distinct",
+  "attribute_count": 1,
+  "mode": "consume",
+  "iterations": 4096,
+  "warmup": 3,
+  "samples_requested": 30,
+  "timing_scope": "selected named consumption owner call, including its common call dispatch",
+  "source": {
+    "bytes": 8,
+    "encoding": "utf8",
+    "value": "e n0=\"0\""
+  },
+  "semantic_oracle": {
+    "quick_xml": {
+      "accepted": 1,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 5042292673190138136,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        }
+      ]
+    },
+    "baseline": {
+      "accepted": 1,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 5042292673190138136,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        }
+      ]
+    },
+    "candidate": {
+      "accepted": 1,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 5042292673190138136,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        }
+      ]
+    },
+    "baseline_matches_quick_xml": true,
+    "candidate_matches_quick_xml": true,
+    "clone_checks": [
+      {
+        "advance": 0,
+        "quick_xml_sequence_hash": 5042292673190138136,
+        "baseline_sequence_hash": 5042292673190138136,
+        "candidate_sequence_hash": 5042292673190138136,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 1,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 4,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 5,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 32,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 33,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      }
+    ],
+    "all_checks_passed": true
+  },
+  "iterator_sizes": {
+    "baseline_checked_attributes": 120,
+    "candidate_checked_attributes": 192
+  },
+  "expected_result": {
+    "checksum": 6424165714711548169,
+    "accepted": 4096,
+    "error_marker": 0
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 116120,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 127021,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 115060,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 115041,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 115090,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 115131,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 115141,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 115100,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 114971,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 115130,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 127751,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 115090,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 115231,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 115121,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 115130,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 115231,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 115230,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 115211,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 122860,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 114941,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 115031,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 115010,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 114921,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 114940,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 114971,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 114960,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 114961,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 121691,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 114910,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 114941,
+      "checksum": 6424165714711548169,
+      "accepted": 4096,
+      "error_marker": 0
+    }
+  ]
+}

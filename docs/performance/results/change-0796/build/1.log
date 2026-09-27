@@ -1,0 +1,14 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling syn v3.0.6
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling serde_derive v1.0.229
+   Compiling itoa v1.0.18
+   Compiling quick-xml v0.41.0
+   Compiling attribute-boundary-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0796/probe-src)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.75s

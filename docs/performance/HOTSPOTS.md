@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0796 — construction and early duplicate work isolated
+
+[0796](0796-xml-attribute-boundary-diagnostic.md) Opaque construction costs rise; long quoted and unterminated duplicate tails after one attribute are about 24× slower in the rejected candidate. Larger valid inputs often improve. Preserve early duplicate detection and reduce short-tag state work before fresh workflow gates.
+
 ## 0795 — iterator bookkeeping remains a bounded target
 
 [0795](0795-xml-duplicate-key-instruction-profile.md) Large-capture inspector and checked-iterator self costs rise by 609,567 and 276,822 guest instructions in both repeats. Simulated indirect misses rise about 35%; these are not native predictor counts or a causal explanation. Short-tag construction and bookkeeping merit isolated controls before another workflow-gated candidate.
