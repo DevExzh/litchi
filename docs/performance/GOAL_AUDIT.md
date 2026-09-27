@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0791 — PPTX production opportunity narrowed
+
+[0791](0791-pptx-current-capture-profile.md) Current profiles support testing removal of empty attribute-iterator work while retaining validation order and the independent scanner oracle. This is measured prioritization, not a retained optimization. OLE2/OOXML remain active, ODF deferred, iWork excluded, and comprehensive goal completion remains open.
+
 ## 0790 — direct counter evidence advances measurement work
 
 [0790](0790-fork-launcher-calibration.md) Ordinary-fork controls eliminate inherited startup high water while preserving counter/residency differences. Three trace qualification failures remain visible; the 0787 candidate stays rejected. OLE2/OOXML active, ODF deferred, iWork excluded; broad completion remains unproven.

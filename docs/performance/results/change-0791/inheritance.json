@@ -1,0 +1,40 @@
+{
+  "probe_source": "0784 exact source reused on current production; marker/wrapper names intentionally unchanged",
+  "production_reference": {
+    "bytes": 1182921,
+    "path": "../change-0789/production-source.json",
+    "sha256": "b8c0c30107df14c2e45453790258fd18e65dbdbadd4508b86318e35f7a2942cc"
+  },
+  "references": {
+    "native_analysis.py": {
+      "bytes": 5285,
+      "path": "../change-0784/native_analysis.py",
+      "sha256": "7b38d91c082b8d60a6829bdbae203bdd750c6bf5e307c8927463a2d46a2490cd"
+    },
+    "perf_analysis.py": {
+      "bytes": 6145,
+      "path": "../change-0784/perf_analysis.py",
+      "sha256": "9e21daf25eb64ed52dd4644e48761bd38a7590ba2f9bba7e768aa66a6058f2de"
+    },
+    "probe-src/Cargo.lock": {
+      "bytes": 30241,
+      "path": "../change-0784/probe-src/Cargo.lock",
+      "sha256": "41a6bc5edd9bd648754239cd99bfdb4ea4b23fc04b05ddf33968f71464775139"
+    },
+    "probe-src/src/allocation_metrics.rs": {
+      "bytes": 62273,
+      "path": "../change-0784/probe-src/src/allocation_metrics.rs",
+      "sha256": "a3f985831592ec8d1b547aed829fe00fe893a7c16020fd6e1b7ffd75a13a34a9"
+    },
+    "probe-src/src/main.rs": {
+      "bytes": 25079,
+      "path": "../change-0784/probe-src/src/main.rs",
+      "sha256": "9252c5f3d76582a73991326e733706dd7924a794868a3325cf4d70f46c7875d8"
+    },
+    "profile_analysis.py": {
+      "bytes": 42781,
+      "path": "../change-0784/profile_analysis.py",
+      "sha256": "70b0bb3fc665860a9aa586725d72ced75e41de06f95e3b1c5408c70998e926b6"
+    }
+  }
+}

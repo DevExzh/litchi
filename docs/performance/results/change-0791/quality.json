@@ -1,0 +1,19 @@
+{
+  "format": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "docs/performance/results/change-0791/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "scope": "Unchanged evidence probe source; fresh control/profile and frame-pointer release builds plus exact measured output checks. Inherited16unusedhelper warnings retained. No production-code change or fresh production test-suite claim."
+}

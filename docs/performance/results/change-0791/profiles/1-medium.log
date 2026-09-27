@@ -1,0 +1,11 @@
+==589811== Callgrind, a call-graph generating cache profiler
+==589811== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==589811== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==589811== Command: /home/zhuhe/code/litchi-target-0791/profile --mode capture --shape medium --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0791/profiles/1-medium.json
+==589811== 
+==589811== For interactive control, run 'callgrind_control -h'.
+==589811== 
+==589811== Events    : Ir
+==589811== Collected : 13949381
+==589811== 
+==589811== I   refs:      13,949,381
