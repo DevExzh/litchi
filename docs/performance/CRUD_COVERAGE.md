@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0779 — ingress candidate checked, no production promotion
+
+[0779](0779-opc-bounded-input-growth.md) checks source/output identity, growth/limit/short-read/error behavior, ordinary workbook phases and two small-open controls. Six candidate gates pass, but measured memory costs cause rejection. The production source census is restored exactly; no candidate test or coverage-index status is promoted.
+
 ## 0778 — named ordinary-save edits and refusal checked
 
 [0778](0778-ordinary-save-durability.md) checks paragraph append, one decoded cell replacement, shape-text replacement and exact altChunk refusal across four policies plus stream output. DOCX note edges and payloads are preserved after unrelated edits. Fourteen quality gates pass; edited-part style/lexical semantics and native Office interoperability remain outside the oracle. No registry row is promoted.

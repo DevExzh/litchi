@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0779 — allocation-growth candidate rejected
+
+[0779](0779-opc-bounded-input-growth.md) attributes the 0778 XLSX allocation-request total to exact per-chunk OPC reservations. The bounded-growth candidate passes six gates (3,079 tests) and reduces request volume, but generated save/lifecycle RSS rises about 20% for less than 1% lifecycle p50 improvement. The candidate is rejected, all 120 native/40 allocation processes retained, and production source restored.
+
 ## 0778 — note preservation fixed; durability costs measured
 
 [0778](0778-ordinary-save-durability.md) fixes DOCX note relationships lost during paragraph edits. Fourteen gates pass (2,492 tests), and 35 exported outputs pass independent preservation checks. The current-source matrix retains 280 native and 140 allocation processes, 50 spread flags and 28 policy-correct traces. Weaker durability lowers observed latency without changing default Full; no default-contract speedup is claimed.

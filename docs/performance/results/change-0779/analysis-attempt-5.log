@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 1190, in <module>
+    require(not output.exists(), "refusing to overwrite analysis.json")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 57, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 52, in fail
+    raise ReplayError(message)
+ReplayError: refusing to overwrite analysis.json

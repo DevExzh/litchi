@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0779 — cumulative realloc requests are not a latency ranking
+
+[0779](0779-opc-bounded-input-growth.md) locates 1.093 GB of generated-XLSX allocation requests in 8 KiB exact ingress growth, but direct open takes about 0.4 ms and the growth candidate improves lifecycle p50 less than 1% while costing roughly 20% peak process RSS in save/lifecycle children. The candidate is rejected. Use current profiles and retained-memory evidence to prioritize further work; ZIP-2 is already closed.
+
 ## 0778 — synchronization costs and XLSX allocation follow-up
 
 [0778](0778-ordinary-save-durability.md) measures policy-dependent lifecycle and publication latency while user instructions and operation allocation remain effectively unchanged across policies. Generated XLSX lifecycle requests 1.10 GB cumulative allocation with much smaller live memory; attribution remains a follow-up, not a proven copy-removal opportunity. All 50 native spread flags are retained.

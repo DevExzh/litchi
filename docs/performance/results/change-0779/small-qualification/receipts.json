@@ -1,0 +1,74 @@
+[
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/test-data/poi/test-data/spreadsheet/47889.xlsx",
+      "--sheet",
+      "Sheet1",
+      "--phase",
+      "open",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/small-xlsx.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/small-xlsx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 825,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/small-xlsx.json",
+      "sha256": "071833365dbc0e49d0715fdfa2d3dc1d8980f891c4f95256a7d701c382fe0b9e"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 36102384,
+      "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+      "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0779/before-native",
+      "--source",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx",
+      "--sheet",
+      "Sheet1",
+      "--phase",
+      "open",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/boundary-xlsx.json"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/boundary-xlsx.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report": {
+      "bytes": 855,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/small-qualification/boundary-xlsx.json",
+      "sha256": "9fb0a70469fe06c89b205189cf370755524f3283f0bb836dfebbd376b2466732"
+    }
+  }
+]

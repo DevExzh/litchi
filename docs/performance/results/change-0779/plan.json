@@ -1,0 +1,65 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "base": "345b81ce8a",
+  "corpora": [
+    {
+      "bytes": 4226429,
+      "id": "generated-xlsx",
+      "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "sheet": "Sheet1",
+      "source": "docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx"
+    },
+    {
+      "bytes": 654688,
+      "id": "conditional-formatting",
+      "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074",
+      "sheet": "Home",
+      "source": "docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "phases": [
+    "open",
+    "edit",
+    "save",
+    "lifecycle"
+  ],
+  "review_percent": 5,
+  "schema": "litchi-0779-plan-v1",
+  "scope": "Warm source; absent destination; NoSync save only for attribution; current owned Workbook API; process RSS includes setup and verification; no phase peak arithmetic or physical-copy inference"
+}

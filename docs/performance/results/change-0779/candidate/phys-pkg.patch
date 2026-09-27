@@ -1,0 +1,243 @@
+diff --git a/crates/litchi-opc/src/phys_pkg.rs b/crates/litchi-opc/src/phys_pkg.rs
+index 582e2ffb7d..d7b41e39b2 100644
+--- a/crates/litchi-opc/src/phys_pkg.rs
++++ b/crates/litchi-opc/src/phys_pkg.rs
+@@ -1772,6 +1772,8 @@ impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
+     }
+ }
+ 
++const READ_CHUNK_BYTES: usize = 8 * 1024;
++
+ pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
+     let Ok(maximum) = usize::try_from(limits.max_input_bytes()) else {
+         return Err(OpcError::InvalidReadLimit {
+@@ -1780,13 +1782,13 @@ pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result
+         });
+     };
+     let mut data = Vec::new();
+-    data.try_reserve_exact(maximum.min(8 * 1024))
++    data.try_reserve_exact(maximum.min(READ_CHUNK_BYTES))
+         .map_err(|source| OpcError::Allocation {
+             resource: "OPC package input",
+             source,
+         })?;
+ 
+-    let mut buffer = [0u8; 8 * 1024];
++    let mut buffer = [0u8; READ_CHUNK_BYTES];
+     loop {
+         let remaining = maximum.saturating_sub(data.len());
+         if remaining == 0 {
+@@ -1826,15 +1828,41 @@ pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result
+         if read == 0 {
+             return Ok(data);
+         }
+-        data.try_reserve_exact(read)
+-            .map_err(|source| OpcError::Allocation {
+-                resource: "OPC package input",
+-                source,
++        let required = data.len().checked_add(read).ok_or_else(|| {
++            std::io::Error::new(
++                std::io::ErrorKind::InvalidData,
++                "OPC package input length overflow",
++            )
++        })?;
++        if required > data.capacity() {
++            let target = bounded_reservation_target(data.capacity(), required, maximum);
++            let additional = target.checked_sub(data.len()).ok_or_else(|| {
++                std::io::Error::new(
++                    std::io::ErrorKind::InvalidData,
++                    "OPC package input capacity overflow",
++                )
+             })?;
++            data.try_reserve_exact(additional)
++                .map_err(|source| OpcError::Allocation {
++                    resource: "OPC package input",
++                    source,
++                })?;
++        }
+         data.extend_from_slice(&buffer[..read]);
+     }
+ }
+ 
++fn bounded_reservation_target(current_capacity: usize, required: usize, maximum: usize) -> usize {
++    debug_assert!(current_capacity < required);
++    debug_assert!(required <= maximum);
++    let growth = (current_capacity / 8).max(READ_CHUNK_BYTES);
++    current_capacity
++        .checked_add(growth)
++        .unwrap_or(maximum)
++        .max(required)
++        .min(maximum)
++}
++
+ /// Read an owned package source from a filesystem path under the bounded
+ /// ingress policy. ZIP validation remains the caller's responsibility so an
+ /// owning package constructor can build its one physical reader directly.
+@@ -2824,6 +2852,167 @@ mod tests {
+         }
+     }
+ 
++    struct RecordingReader {
++        bytes: Vec<u8>,
++        offset: usize,
++        calls: Vec<usize>,
++        max_return: usize,
++        interrupted: usize,
++        fail_on_call: Option<usize>,
++        overreport: bool,
++    }
++
++    impl RecordingReader {
++        fn new(bytes: Vec<u8>) -> Self {
++            Self {
++                bytes,
++                offset: 0,
++                calls: Vec::new(),
++                max_return: usize::MAX,
++                interrupted: 0,
++                fail_on_call: None,
++                overreport: false,
++            }
++        }
++
++        fn limits(maximum: usize) -> ReadLimits {
++            ReadLimits::builder()
++                .max_input_bytes(maximum as u64)
++                .unwrap()
++                .build()
++                .unwrap()
++        }
++    }
++
++    impl Read for RecordingReader {
++        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
++            self.calls.push(output.len());
++            if self.interrupted != 0 {
++                self.interrupted -= 1;
++                return Err(std::io::Error::from(std::io::ErrorKind::Interrupted));
++            }
++            if self.fail_on_call == Some(self.calls.len()) {
++                return Err(std::io::Error::new(
++                    std::io::ErrorKind::Other,
++                    "late input failure",
++                ));
++            }
++            if self.overreport {
++                return Ok(output.len().saturating_add(1));
++            }
++            let available = self.bytes.len().saturating_sub(self.offset);
++            let amount = available.min(output.len()).min(self.max_return);
++            output[..amount].copy_from_slice(&self.bytes[self.offset..self.offset + amount]);
++            self.offset += amount;
++            Ok(amount)
++        }
++    }
++
++    #[test]
++    fn read_limited_uses_bounded_growth_and_keeps_eight_kibibyte_reads() {
++        let maximum = 10 * READ_CHUNK_BYTES;
++        let mut reader = RecordingReader::new(vec![b'x'; maximum]);
++        let data = read_limited(&mut reader, RecordingReader::limits(maximum)).unwrap();
++
++        assert_eq!(data, vec![b'x'; maximum]);
++        assert_eq!(reader.calls.len(), 11);
++        assert!(reader.calls[..10]
++            .iter()
++            .all(|&length| length == READ_CHUNK_BYTES));
++        assert_eq!(reader.calls[10], 1);
++        assert_eq!(reader.offset, maximum);
++    }
++
++    #[test]
++    fn read_limited_preserves_short_reads_and_retries_interrupted_reads() {
++        let mut reader = RecordingReader::new(b"short input".to_vec());
++        reader.max_return = 3;
++        reader.interrupted = 1;
++        let data = read_limited(&mut reader, RecordingReader::limits(READ_CHUNK_BYTES)).unwrap();
++
++        assert_eq!(data, b"short input");
++        assert_eq!(reader.calls, vec![
++            READ_CHUNK_BYTES,
++            READ_CHUNK_BYTES,
++            READ_CHUNK_BYTES - 3,
++            READ_CHUNK_BYTES - 6,
++            READ_CHUNK_BYTES - 9,
++            READ_CHUNK_BYTES - 11,
++        ]);
++    }
++
++    #[test]
++    fn read_limited_keeps_late_io_errors_and_rejects_overreported_counts() {
++        let mut late_error = RecordingReader::new(vec![b'x'; 2 * READ_CHUNK_BYTES]);
++        late_error.fail_on_call = Some(2);
++        let error = read_limited(
++            &mut late_error,
++            RecordingReader::limits(2 * READ_CHUNK_BYTES),
++        )
++        .unwrap_err();
++        assert!(matches!(
++            error,
++            OpcError::IoError(error)
++                if error.kind() == std::io::ErrorKind::Other
++                    && error.to_string() == "late input failure"
++        ));
++        assert_eq!(late_error.calls, vec![READ_CHUNK_BYTES, READ_CHUNK_BYTES]);
++
++        let mut overreport = RecordingReader::new(vec![b'x'; READ_CHUNK_BYTES]);
++        overreport.overreport = true;
++        let error = read_limited(&mut overreport, RecordingReader::limits(READ_CHUNK_BYTES))
++            .unwrap_err();
++        assert!(matches!(
++            error,
++            OpcError::IoError(error) if error.kind() == std::io::ErrorKind::InvalidData
++        ));
++        assert_eq!(overreport.calls, vec![READ_CHUNK_BYTES]);
++    }
++
++    #[test]
++    fn read_limited_keeps_exact_limit_and_one_byte_sentinel() {
++        let mut exact = RecordingReader::new(vec![b'x'; READ_CHUNK_BYTES]);
++        let data = read_limited(&mut exact, RecordingReader::limits(READ_CHUNK_BYTES)).unwrap();
++        assert_eq!(data.len(), READ_CHUNK_BYTES);
++        assert_eq!(exact.calls, vec![READ_CHUNK_BYTES, 1]);
++
++        let mut over = RecordingReader::new(vec![b'x'; READ_CHUNK_BYTES + 1]);
++        let error = read_limited(&mut over, RecordingReader::limits(READ_CHUNK_BYTES))
++            .unwrap_err();
++        assert!(matches!(
++            error,
++            OpcError::ReadLimit {
++                resource: ReadResource::InputBytes,
++                actual,
++                maximum,
++            } if actual == (READ_CHUNK_BYTES + 1) as u64 && maximum == READ_CHUNK_BYTES as u64
++        ));
++        assert_eq!(over.calls, vec![READ_CHUNK_BYTES, 1]);
++    }
++
++    #[test]
++    fn bounded_growth_target_caps_requested_capacity_and_retained_slack() {
++        let cases = [
++            (READ_CHUNK_BYTES, READ_CHUNK_BYTES + 1, 64 * 1024, 2 * READ_CHUNK_BYTES),
++            (8 * READ_CHUNK_BYTES, 8 * READ_CHUNK_BYTES + 1, 256 * 1024, 9 * READ_CHUNK_BYTES),
++            (16 * READ_CHUNK_BYTES, 16 * READ_CHUNK_BYTES + 1, 512 * 1024, 18 * READ_CHUNK_BYTES),
++            (200_000, 200_001, 200_500, 200_500),
++        ];
++        for (capacity, required, maximum, expected) in cases {
++            let target = bounded_reservation_target(capacity, required, maximum);
++            assert_eq!(target, expected);
++            assert!(target >= required);
++            assert!(target <= maximum);
++            assert!(target - required <= READ_CHUNK_BYTES.max(capacity / 8));
++        }
++
++        let maximum = usize::MAX - 1;
++        assert_eq!(
++            bounded_reservation_target(maximum - 1, maximum, maximum),
++            maximum
++        );
++    }
++
+     #[test]
+     fn bounded_ingress_rejects_before_zip_parsing() {
+         let limits = ReadLimits::builder()

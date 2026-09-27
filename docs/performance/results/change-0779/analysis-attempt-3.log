@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 1215, in <module>
+    result = analyze()
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 1103, in analyze
+    heaptrack = load_heaptrack()
+  File "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/analyze.py", line 1009, in load_heaptrack
+    role: module.verify_role(PACKET.resolve(), role)
+          ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: verify_role() missing 4 required keyword-only arguments: 'owned_worktree', 'current_repo', 'cleanup', and 'cleanup_verified'

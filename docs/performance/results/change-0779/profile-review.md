@@ -8,6 +8,12 @@ binary receipt, and exact command flags are checked before either trace is
 accepted.  No native binary, Cargo command, Heaptrack capture, or
 `heaptrack_print` invocation is performed by the replay.
 
+The module exposes a pure `analyze(root)` API for the final validator.  After
+relocation it maps only the original `origin.json` owned-worktree prefix for
+file checks and keeps the captured absolute strings in the returned result.
+If a captured binary has been removed, replay accepts it only with an exact
+size/SHA/path witness in a verified `cleanup.json`.
+
 The probe ran one open sample.  Its `run_one` performs the timed
 `Workbook::open` and then a second `Workbook::open` for post-clock
 verification.  The table therefore reports two open calls inside one sample;

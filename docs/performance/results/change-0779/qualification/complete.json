@@ -1,0 +1,13 @@
+{
+  "children": 8,
+  "receipts": {
+    "bytes": 17149,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/qualification/receipts.json",
+    "sha256": "2ec8bde7e861b1e711af4a77c7cc8fe2e918ccfe0f01f472eb3e528e2bffbd64"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/qualification/source.json",
+    "sha256": "778067a6add24f995779eec509584024860cb843ad1f9d4921e6cb3b504df894"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "binary": {
+    "bytes": 36102384,
+    "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+    "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "12",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/open",
+    "/home/zhuhe/code/litchi-target-0779/before-native",
+    "--source",
+    "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+    "--sheet",
+    "Sheet1",
+    "--phase",
+    "open",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/report.json"
+  ],
+  "exit_code": 0,
+  "log": {
+    "bytes": 733,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/capture.log",
+    "sha256": "8c1d5799d3ca95696de51b43311fb4a78be10f31cc7775f6661de22afd190cf0"
+  }
+}

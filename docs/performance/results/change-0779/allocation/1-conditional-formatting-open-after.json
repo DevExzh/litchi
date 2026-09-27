@@ -1,0 +1,82 @@
+{
+  "schema": "litchi.xlsx.allocation-probe.v1",
+  "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+  "source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/real-002-xlsx/source.xlsx",
+    "bytes": 654688,
+    "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+  },
+  "sheet": "Home",
+  "address": "A1",
+  "marker": "litchi-perf-0638-ordinary-save",
+  "phase": "open",
+  "timing_scope": "Workbook::open(source) only",
+  "durability": null,
+  "warmup": 0,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1729788,
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 9141,
+        "deallocation_calls": 4716,
+        "reallocation_calls": 962,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 12403384,
+        "deallocated_bytes": 11102358,
+        "live_bytes_before": 2037,
+        "live_bytes_after": 1303063,
+        "peak_live_bytes_before": 655608,
+        "peak_live_bytes_after": 1380504,
+        "region_peak_live_bytes": 1380504
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1281855,
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 9141,
+        "deallocation_calls": 4716,
+        "reallocation_calls": 962,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 12403384,
+        "deallocated_bytes": 11102358,
+        "live_bytes_before": 2037,
+        "live_bytes_after": 1303063,
+        "peak_live_bytes_before": 2681530,
+        "peak_live_bytes_after": 2681530,
+        "region_peak_live_bytes": 1380504
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1282805,
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 9141,
+        "deallocation_calls": 4716,
+        "reallocation_calls": 962,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 12403384,
+        "deallocated_bytes": 11102358,
+        "live_bytes_before": 2037,
+        "live_bytes_after": 1303063,
+        "peak_live_bytes_before": 2681530,
+        "peak_live_bytes_after": 2681530,
+        "region_peak_live_bytes": 1380504
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "litchi-xlsx-allocation-probe-0779-alloc",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

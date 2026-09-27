@@ -1,0 +1,6 @@
+{
+  "probe-src/Cargo.toml.template": "19bc8a328d0acdb447678e408d66aadb994c8403c8fd0295620544a02aa32e9d",
+  "probe-src/src/allocation_metrics.rs": "68b1c02c3a576cd6e0dde23c7c8442f1ff9a034d586cae3e960fec5cbec320d1",
+  "probe-src/src/counting_allocator.rs": "bd89fa4d5bdd1ac9d02921dbdf373dd7b484f358e5ac3c34455259a4cd7cfe10",
+  "probe-src/src/main.rs": "c601ce2b369b51f3921ac24b972b0fa573c02dec356289a5c5ccbd4995d35695"
+}

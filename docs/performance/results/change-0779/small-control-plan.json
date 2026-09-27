@@ -1,0 +1,61 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "corpora": [
+    {
+      "bytes": 3555,
+      "id": "small-xlsx",
+      "sha256": "a6d7f8a056622201862c354bd508820f7e57a84c5e2531e4e4da20180615f312",
+      "sheet": "Sheet1",
+      "source": "test-data/poi/test-data/spreadsheet/47889.xlsx"
+    },
+    {
+      "bytes": 8224,
+      "id": "boundary-xlsx",
+      "sha256": "9d57919aa4f6036fb922daba5d1dc913a8847581fd9a3dd3c4d79bca7d28bdb8",
+      "sheet": "Sheet1",
+      "source": "test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "phases": [
+    "open"
+  ],
+  "reason": "Benign open and retained slack across initial8KiBcapacity boundary; supplementalfixedmatrix beforepairedcaptures",
+  "review_percent": 5,
+  "schema": "litchi-0779-small-controls-v1"
+}

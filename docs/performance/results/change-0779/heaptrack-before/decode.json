@@ -1,0 +1,29 @@
+{
+  "command": [
+    "heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/open.zst",
+    "-H",
+    "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/histogram",
+    "-n",
+    "15",
+    "-s",
+    "3"
+  ],
+  "exit_code": 0,
+  "histogram": {
+    "bytes": 5775,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/histogram",
+    "sha256": "9f7619257adea819d3e7baee1df9c556dbe427e78bbcb67781790cda2a305ed9"
+  },
+  "log": {
+    "bytes": 397662,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/print.log",
+    "sha256": "a77edadf4b7d22466127adec109c0ef8af5f8c5255b6e2946e94a9c18c0fdd39"
+  },
+  "trace": {
+    "bytes": 45923,
+    "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/open.zst",
+    "sha256": "bdc11ba981c07a571fce6f1a281cfd906d4a2516bf0c742b994787f4f61595d9"
+  }
+}

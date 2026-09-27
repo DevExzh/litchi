@@ -1,0 +1,41 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/probe-src/Cargo.toml"
+    ],
+    "ended": 1790490267.9901412,
+    "exit_code": 0,
+    "log": {
+      "bytes": 9193,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/build-before/native.log",
+      "sha256": "19222cd242fe80ae7a21896af669c245a4c8e4d6cd50a8c3f0e9b7d175a53e00"
+    },
+    "started": 1790490122.2932043
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/probe-src/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--locked"
+    ],
+    "ended": 1790490291.9083874,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1898,
+      "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/build-before/allocation.log",
+      "sha256": "861f82a21d4f1158608a31a3a414b667b60592fb857bcb6e3c03ebd79425dc1f"
+    },
+    "started": 1790490268.8943117
+  }
+]
