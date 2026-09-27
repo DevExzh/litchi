@@ -1,0 +1,14 @@
+{
+  "before": {
+    "path": "/home/zhuhe/code/litchi-target-0775-release-before/release/mce-stream-probe",
+    "bytes": 1381176,
+    "sha256": "70dce3ad8de1cdd4ce9564796524d85ebd692b9f06a7de7d4fa191d461599f65",
+    "lock_sha256": "813f34fc59a6f9b4cda78cc2205b7e4b5ae339e18b361cb2c598aa1b894d1b59"
+  },
+  "after": {
+    "path": "/home/zhuhe/code/litchi-target-0775-release-after/release/mce-stream-probe",
+    "bytes": 1387584,
+    "sha256": "a294db9f7fce6f5370252534b7e941ac0683751155ab5f5ebd6f08aed5b40c79",
+    "lock_sha256": "813f34fc59a6f9b4cda78cc2205b7e4b5ae339e18b361cb2c598aa1b894d1b59"
+  }
+}

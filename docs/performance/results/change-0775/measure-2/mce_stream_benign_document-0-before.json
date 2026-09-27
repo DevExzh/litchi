@@ -1,0 +1,22 @@
+{
+  "case": "mce_stream_benign_document",
+  "elapsed_ns": [
+    9597821,
+    9647321,
+    9503901,
+    9588400,
+    9497841,
+    9562271,
+    9397780,
+    9552011,
+    9503580
+  ],
+  "input_bytes": 288070,
+  "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+  "outcomes": [
+    "ok:4427c8fbfa9879e16d5b5624fa27582c806d491c51d7978b09d235179e21dba6:fca8371d3f630f1f5796175f1d2b600a0564a6cacc4150afb05d40dd36cc9b5d:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+  ],
+  "p50_ns": 9552011,
+  "samples": 9,
+  "warmup": 2
+}

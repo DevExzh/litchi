@@ -1,0 +1,7 @@
+# Probe corrections
+
+Before compilation root corrected a default-namespace pair: an explicitly prefixed inner element had been compared with an unprefixed element under an empty default namespace. Both now expand to urn:a.
+
+`measure-0` built both release legs but stopped at the baseline differential. The invalid duplicate controls omitted the MCE namespace marker, so the tree processor used its existing no-MCE passthrough and did not validate attributes; the stream rejected them. The raw report and source are preserved. This was a probe-scope error, not evidence of a candidate regression. `measure-1` adds the MCE namespace marker to both controls so they enter the MCE parser under test. No production code changed. No native timing measurements were collected in measure-0.
+
+`measure-1` then exposed a distinct existing tree-processor gap: with MCE processing active it rejects the lexical duplicate but accepts the duplicate expanded name expressed through two prefixes; the stream rejects both. Static inspection of the unchanged tree `start` path confirms raw quick-xml checks enforce lexical duplication, without the stream's general expanded-name check. The correction in measure-2 records both rejection booleans, requires stream rejection for both and tree rejection for the lexical control, and retains the expanded-name tree acceptance as an explicit pre-existing limitation. It is not labeled a valid input or silently treated as successful validation. Production is unchanged; measure-1 contains no native timing observations.

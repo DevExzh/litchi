@@ -1,0 +1,27 @@
+{
+  "time": 1790476005.0207682,
+  "executables_verified_before_removal": true,
+  "fixtures_unchanged": true,
+  "targets": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0775-quality",
+      "bytes": 5548698594,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0775-release-before",
+      "bytes": 363746284,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0775-release-after",
+      "bytes": 364199052,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0775-preid",
+      "bytes": 363534818,
+      "removed": true
+    }
+  ]
+}

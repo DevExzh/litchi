@@ -1,0 +1,15 @@
+    Checking num-traits v0.2.19
+    Checking rand v0.10.2
+    Checking chrono v0.4.45
+    Checking zerocopy v0.8.56
+    Checking getrandom v0.3.4
+    Checking tempfile v3.27.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-crypto)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0775-mce-stream-integration/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized] target(s) in 5.79s
+   Generated /home/zhuhe/code/litchi-target-0775-quality/doc/litchi_ooxml_common/index.html

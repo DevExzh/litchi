@@ -1,0 +1,22 @@
+{
+  "case": "mce_aliases_high",
+  "elapsed_ns": [
+    668413,
+    638312,
+    621743,
+    623073,
+    621762,
+    612883,
+    617083,
+    608632,
+    617953
+  ],
+  "input_bytes": 31865,
+  "input_sha256": "1e0f5aef70d8bafa466b95dbc180862144b53c4f2d214674e7ec25275773e33c",
+  "outcomes": [
+    "ok:9496b73d45cd610049775b93662ab3f5e8060a5feabf761bb3f7d8416b4f431e"
+  ],
+  "p50_ns": 621743,
+  "samples": 9,
+  "warmup": 2
+}

@@ -1,0 +1,22 @@
+{
+  "case": "mce_stream_benign_worksheet",
+  "elapsed_ns": [
+    71633066,
+    72629400,
+    71534495,
+    71515516,
+    70665392,
+    72072337,
+    73680085,
+    71305505,
+    72472089
+  ],
+  "input_bytes": 1558391,
+  "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+  "outcomes": [
+    "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+  ],
+  "p50_ns": 71633066,
+  "samples": 9,
+  "warmup": 2
+}
