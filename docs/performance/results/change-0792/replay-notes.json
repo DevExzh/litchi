@@ -1,0 +1,14 @@
+{
+  "corrections": [
+    "Initial candidate rustfmt check failed; formatting-only correction before quality and builds, original patch/log retained.",
+    "Quality attempt 0 failed known-namespace const-address equality; baseline isolated test passed. Explicit test-only correction and installed Rust reference retained before native measurements.",
+    "Supplemental node/count/byte tests added; byte-array branch given explicit slice type before final quality.",
+    "Root quality-summary generation found existing identical output; --check passed without overwrite.",
+    "Initial analyzer summary omitted computed decision_guards serialization; added and checked against final disposition before sealing.",
+    "Root initial in-memory summary requested missing decision_guards key; analyzer itself had completed custody checks; no raw change.",
+    "Cleanup witness uses the analyzer exact four-field schema; removed an extra schema label after first post-cleanup check refused it. Binary witnesses unchanged."
+  ],
+  "primary_capture_retries": 0,
+  "raw_captures_changed": false,
+  "scope": "All failures and preparation corrections retained. Final analysis, independent raw audit, quality summary and final seal replay after cleanup."
+}

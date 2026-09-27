@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0792 — known-empty attribute iteration removed
+
+[0792](0792-pptx-empty-attribute-tail.md) The notes scanner now skips checked-iterator setup/advancement for exactly empty raw tails after element validation. Large generated capture improves 5.211%; event parsing, namespace checks, and attribute-bearing work remain. No new instruction-share claim.
+
 ## 0791 — attribute iteration remains a current capture cost
 
 [0791](0791-pptx-current-capture-profile.md) Current native stacks include notes scanning 935/929 times and checked attribute iteration 186/148 times under 1,066/1,068 exact capture-owner stacks. Namespace-helper counts are 5/4. Test an exact-empty-attribute-tail shortcut after element validation before broader scanner changes; no benefit is yet claimed.

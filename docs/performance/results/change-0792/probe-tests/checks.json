@@ -1,0 +1,47 @@
+[
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+      "--",
+      "--test-threads=1"
+    ],
+    "ended": 1790538582.625226,
+    "exit_code": 0,
+    "log": {
+      "bytes": 4492,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-tests/00.log",
+      "sha256": "4b3cfdbda137233ef252e2d5a9ce0d63cbfe223ad67bb2532ac56016967374df"
+    },
+    "started": 1790538576.4304736
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+      "--all-features",
+      "--",
+      "--test-threads=1",
+      "--skip",
+      "allocation_metrics::tests::"
+    ],
+    "ended": 1790538588.878908,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1447,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-tests/01.log",
+      "sha256": "caf755dd6951c88570e7343a2afd1186049c85070d340c070bd12de64ea5b1a9"
+    },
+    "started": 1790538582.6255002
+  }
+]

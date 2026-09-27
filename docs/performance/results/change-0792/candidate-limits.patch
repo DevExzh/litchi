@@ -1,0 +1,120 @@
+diff --git a/crates/litchi-pptx/src/notes/codec.rs b/crates/litchi-pptx/src/notes/codec.rs
+--- a/crates/litchi-pptx/src/notes/codec.rs
++++ b/crates/litchi-pptx/src/notes/codec.rs
+@@ -719,3 +719,116 @@ mod tests {
+     const STRICT_NS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
+ 
++    fn inspect_child_with_counters(
++        xml: &[u8],
++        attributes: usize,
++        attribute_bytes: usize,
++    ) -> (Result<()>, usize, usize) {
++        let mut reader = NsReader::from_reader(xml);
++        reader.config_mut().trim_text(false);
++        assert!(matches!(
++            reader.read_event().expect("test XML root must parse"),
++            Event::Start(_)
++        ));
++        let event = reader.read_event().expect("test XML child must parse");
++        let element = match event {
++            Event::Start(element) | Event::Empty(element) => element,
++            _ => panic!("test XML child must be a start or empty element"),
++        };
++        let mut attributes_seen = attributes;
++        let mut attribute_bytes_seen = attribute_bytes;
++        let mut scan = XmlScan::default();
++        let result = inspect_element(
++            &reader,
++            &element,
++            Conformance::Transitional,
++            "sld",
++            false,
++            &mut attributes_seen,
++            &mut attribute_bytes_seen,
++            &mut scan,
++        );
++        (result, attributes_seen, attribute_bytes_seen)
++    }
++
++    #[test]
++    fn empty_attribute_tail_preserves_direct_attribute_limits() {
++        let empty_tags = [
++            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x></p:x></p:sld>"#).into_bytes(),
++            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x/></p:sld>"#).into_bytes(),
++        ];
++        for xml in empty_tags {
++            let (result, attributes, attribute_bytes) =
++                inspect_child_with_counters(&xml, MAX_ATTRIBUTES, MAX_ATTRIBUTE_BYTES);
++            assert!(result.is_ok());
++            assert_eq!(attributes, MAX_ATTRIBUTES);
++            assert_eq!(attribute_bytes, MAX_ATTRIBUTE_BYTES);
++        }
++
++        let attribute_tags = [
++            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1"></p:x></p:sld>"#).into_bytes(),
++            format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1"/></p:sld>"#).into_bytes(),
++        ];
++        for xml in attribute_tags {
++            let (result, attributes, attribute_bytes) =
++                inspect_child_with_counters(&xml, MAX_ATTRIBUTES, 0);
++            assert!(matches!(
++                result,
++                Err(Error::Limit {
++                    resource: "notes XML attributes",
++                    limit: MAX_ATTRIBUTES,
++                })
++            ));
++            assert_eq!(attributes, MAX_ATTRIBUTES + 1);
++            assert_eq!(attribute_bytes, 0);
++
++            let (result, attributes, attribute_bytes) =
++                inspect_child_with_counters(&xml, 0, MAX_ATTRIBUTE_BYTES);
++            assert!(matches!(
++                result,
++                Err(Error::Limit {
++                    resource: "notes XML attribute bytes",
++                    limit: MAX_ATTRIBUTE_BYTES,
++                })
++            ));
++            assert_eq!(attributes, 1);
++            assert!(attribute_bytes > MAX_ATTRIBUTE_BYTES);
++        }
++    }
++
++    #[test]
++    fn empty_attribute_tail_preserves_node_ceiling_for_start_and_empty_children() {
++        for empty in [false, true] {
++            let mut xml = format!(r#"<p:sld xmlns:p="{P_NS}">"#).into_bytes();
++            let child: &[u8] = if empty { b"<p:x/>" } else { b"<p:x></p:x>" };
++            for _ in 0..MAX_NODES {
++                xml.extend_from_slice(child);
++            }
++            xml.extend_from_slice(b"</p:sld>");
++
++            let expected = outcome(buffered_scan_oracle(
++                &xml,
++                xml.len(),
++                crate::notes::MAX_SLIDE_XML,
++                Conformance::Transitional,
++                "sld",
++            ));
++            let actual = outcome(scan_processed_xml(
++                &xml,
++                xml.len(),
++                crate::notes::MAX_SLIDE_XML,
++                Conformance::Transitional,
++                "sld",
++            ));
++            assert_eq!(
++                actual, expected,
++                "node ceiling diverged for {} children",
++                if empty { "empty" } else { "start" }
++            );
++            match &expected {
++                Err(error) => assert!(error.contains("notes XML nodes")),
++                Ok(_) => panic!("node ceiling must refuse 100001 nodes"),
++            }
++        }
++    }
++
+     /// The scanner as it stood before change 0743, verbatim: buffered reads

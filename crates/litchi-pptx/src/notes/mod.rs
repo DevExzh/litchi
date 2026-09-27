@@ -158,13 +158,15 @@ mod known_uri_tests {
     }
 
     #[test]
-    fn exact_known_namespaces_return_the_static_constants() {
+    fn exact_known_namespaces_do_not_borrow_the_input() {
         for &(namespace, expected) in &KNOWN {
             let input = namespace.as_bytes().to_vec();
             let actual = resolved(ResolveResult::Bound(Namespace(&input)))
                 .expect("known namespace should be valid UTF-8");
             assert_eq!(actual, expected);
-            assert_eq!(actual.as_ptr(), expected.as_ptr());
+            // Equal string constants need not have the same address. The known
+            // path must return static bytes instead of borrowing this live Vec.
+            assert_ne!(actual.as_ptr(), input.as_ptr());
             assert_bound_parity(&input);
         }
     }

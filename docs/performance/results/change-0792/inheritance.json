@@ -1,0 +1,31 @@
+{
+  "prior_profile": "../change-0791/seal.json",
+  "prior_profile_sha256": "47d175b3a08fc36534b6f16639b26175c3ce2087d6731b7d5aa82a5c5a81d12d",
+  "probe_references": {
+    "probe-src/Cargo.lock": {
+      "bytes": 30217,
+      "path": "../change-0785/probe-src/Cargo.lock",
+      "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+    },
+    "probe-src/Cargo.toml.template": {
+      "bytes": 603,
+      "path": "../change-0785/probe-src/Cargo.toml.template",
+      "sha256": "b10720785e30f36fb88eba8bec657aec50b9e88e8dd5c4c4d48df1c37d2c8c7e"
+    },
+    "probe-src/src/allocation_metrics.rs": {
+      "bytes": 62279,
+      "path": "../change-0785/probe-src/src/allocation_metrics.rs",
+      "sha256": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728"
+    },
+    "probe-src/src/counting_allocator.rs": {
+      "bytes": 10444,
+      "path": "../change-0785/probe-src/src/counting_allocator.rs",
+      "sha256": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa"
+    },
+    "probe-src/src/main.rs": {
+      "bytes": 33800,
+      "path": "../change-0785/probe-src/src/main.rs",
+      "sha256": "99bbf7e2e0e5c41c7f9b81d69bcc96631f9ef1981f076ac947853202d57edfe5"
+    }
+  }
+}

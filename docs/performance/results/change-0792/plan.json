@@ -1,0 +1,106 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "cases": [
+    {
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0792.v1",
+  "scope": "Warm generated borrowed-input capture, staged commit and full lifecycle; tiny/medium/large and ASCII/Unicode vendor attribute controls. Fresh paired baseline; no historical timing pool.",
+  "source_allowlist": [
+    "crates/litchi-pptx/src/notes/codec.rs"
+  ]
+}

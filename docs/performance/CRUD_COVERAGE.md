@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0792 — existing PPTX workloads improved
+
+[0792](0792-pptx-empty-attribute-tail.md) The existing generated capture, staged-commit, and lifecycle matrix gains a retained scanner optimization, with ASCII/Unicode vendor controls. This adds no native-producer, cold/range, concurrent, or CRUD capability coverage.
+
 ## 0791 — existing capture shapes profiled again
 
 [0791](0791-pptx-current-capture-profile.md) The three generated borrowed-input PPTX capture shapes have current owner-scoped instruction and native ancestry evidence. This promotes no CRUD registry row and adds no native producer, cold/range, concurrency, or lifecycle timing coverage.

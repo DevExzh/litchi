@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0792 — measured scanner work removal retained
+
+[0792](0792-pptx-empty-attribute-tail.md) The empty-attribute-tail branch passes the frozen native benefit and resource guards while retaining XML checks and independent oracle tests. This advances existing PPTX performance work; comprehensive completion remains open. OLE2/OOXML active, ODF deferred, iWork excluded.
+
 ## 0791 — PPTX production opportunity narrowed
 
 [0791](0791-pptx-current-capture-profile.md) Current profiles support testing removal of empty attribute-iterator work while retaining validation order and the independent scanner oracle. This is measured prioritization, not a retained optimization. OLE2/OOXML remain active, ODF deferred, iWork excluded, and comprehensive goal completion remains open.

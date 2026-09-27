@@ -1,0 +1,27 @@
+{
+  "baseline_diagnostic": {
+    "bytes": 999,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/baseline-test-diagnostic/receipt.json",
+    "sha256": "ba58ae67cfc0c48bb79e1d90b2393f68c8dadd74597c440cabee92c1708cb0a4"
+  },
+  "baseline_test_passed": true,
+  "candidate_initial_quality_failed": true,
+  "native_paired_captures_started": false,
+  "original_installed_reference": {
+    "bytes": 34146,
+    "path": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/share/doc/rust/html/reference/items/constant-items.html",
+    "sha256": "e2b4dd139c8102ea0bba4196555fbc6991e5b6f85587c1bbb6e42cb6070aace9"
+  },
+  "policy_thresholds_changed": false,
+  "reason": "Equal string constants are not guaranteed to share an address; the original equality check failed after unrelated scanner/test code layout changed. Preserve value equality and verify known result does not borrow live input Vec.",
+  "reference": {
+    "bytes": 34146,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/reference/constant-items.html",
+    "sha256": "e2b4dd139c8102ea0bba4196555fbc6991e5b6f85587c1bbb6e42cb6070aace9"
+  },
+  "reference_excerpt": "References to the same constant are not necessarily guaranteed to refer to the same memory address.",
+  "source_allowlist": [
+    "crates/litchi-pptx/src/notes/codec.rs",
+    "crates/litchi-pptx/src/notes/mod.rs"
+  ]
+}

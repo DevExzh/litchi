@@ -1,0 +1,875 @@
+{
+  "adoption_eligible": true,
+  "benefits": [
+    {
+      "after_p50_ns": 19091318.0,
+      "before_p50_ns": 20128215.0,
+      "ci95": [
+        0.9192496864184769,
+        0.9531054964262482
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.9422501071209952,
+        0.9522058471200442,
+        0.9526874967731593,
+        0.9435837720529795,
+        0.953523496079337,
+        0.8962492657159588
+      ],
+      "ratio": 0.9478948095865118,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 28629126.5,
+      "before_p50_ns": 30768311.0,
+      "ci95": [
+        0.925159831067738,
+        0.9332382343143297
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9328273796790331,
+        0.9247761668016797,
+        0.9309588775876171,
+        0.9302920265546571,
+        0.9336490889496264,
+        0.9255434953337964
+      ],
+      "ratio": 0.9306254520711371,
+      "shape": "large"
+    }
+  ],
+  "latency_violations": [],
+  "memory": [
+    {
+      "after": {
+        "bytes": 117635,
+        "calls": 1338,
+        "net": 43477,
+        "peak": 62463
+      },
+      "before": {
+        "bytes": 117635,
+        "calls": 1338,
+        "net": 43477,
+        "peak": 62463
+      },
+      "block": 0,
+      "mode": "capture",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 117635,
+        "calls": 1338,
+        "net": 43477,
+        "peak": 62463
+      },
+      "before": {
+        "bytes": 117635,
+        "calls": 1338,
+        "net": 43477,
+        "peak": 62463
+      },
+      "block": 1,
+      "mode": "capture",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 148164,
+        "calls": 1863,
+        "net": 5947,
+        "peak": 67676
+      },
+      "before": {
+        "bytes": 148164,
+        "calls": 1863,
+        "net": 5947,
+        "peak": 67676
+      },
+      "block": 0,
+      "mode": "commit",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 148164,
+        "calls": 1863,
+        "net": 5947,
+        "peak": 67676
+      },
+      "before": {
+        "bytes": 148164,
+        "calls": 1863,
+        "net": 5947,
+        "peak": 67676
+      },
+      "block": 1,
+      "mode": "commit",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1023938,
+        "calls": 5670,
+        "net": 106060,
+        "peak": 552012
+      },
+      "before": {
+        "bytes": 1023938,
+        "calls": 5670,
+        "net": 106060,
+        "peak": 552012
+      },
+      "block": 0,
+      "mode": "lifecycle",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1023938,
+        "calls": 5670,
+        "net": 106060,
+        "peak": 552012
+      },
+      "before": {
+        "bytes": 1023938,
+        "calls": 5670,
+        "net": 106060,
+        "peak": 552012
+      },
+      "block": 1,
+      "mode": "lifecycle",
+      "shape": "tiny",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 228631,
+        "calls": 2869,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 228631,
+        "calls": 2869,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 0,
+      "mode": "capture",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 228631,
+        "calls": 2869,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 228631,
+        "calls": 2869,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 1,
+      "mode": "capture",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 233162,
+        "calls": 3061,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 233162,
+        "calls": 3061,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 0,
+      "mode": "commit",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 233162,
+        "calls": 3061,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 233162,
+        "calls": 3061,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 1,
+      "mode": "commit",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1331862,
+        "calls": 9568,
+        "net": 135196,
+        "peak": 592974
+      },
+      "before": {
+        "bytes": 1331862,
+        "calls": 9568,
+        "net": 135196,
+        "peak": 592974
+      },
+      "block": 0,
+      "mode": "lifecycle",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1331862,
+        "calls": 9568,
+        "net": 135196,
+        "peak": 592974
+      },
+      "before": {
+        "bytes": 1331862,
+        "calls": 9568,
+        "net": 135196,
+        "peak": 592974
+      },
+      "block": 1,
+      "mode": "lifecycle",
+      "shape": "medium",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 4767939,
+        "calls": 72106,
+        "net": 278201,
+        "peak": 338955
+      },
+      "before": {
+        "bytes": 4767939,
+        "calls": 72106,
+        "net": 278201,
+        "peak": 338955
+      },
+      "block": 0,
+      "mode": "capture",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 4767939,
+        "calls": 72106,
+        "net": 278201,
+        "peak": 338955
+      },
+      "before": {
+        "bytes": 4767939,
+        "calls": 72106,
+        "net": 278201,
+        "peak": 338955
+      },
+      "block": 1,
+      "mode": "capture",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1111996,
+        "calls": 15498,
+        "net": 17709,
+        "peak": 367392
+      },
+      "before": {
+        "bytes": 1111996,
+        "calls": 15498,
+        "net": 17709,
+        "peak": 367392
+      },
+      "block": 0,
+      "mode": "commit",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1111996,
+        "calls": 15498,
+        "net": 17709,
+        "peak": 367392
+      },
+      "before": {
+        "bytes": 1111996,
+        "calls": 15498,
+        "net": 17709,
+        "peak": 367392
+      },
+      "block": 1,
+      "mode": "commit",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 8542943,
+        "calls": 104331,
+        "net": 706864,
+        "peak": 1290863
+      },
+      "before": {
+        "bytes": 8542943,
+        "calls": 104331,
+        "net": 706864,
+        "peak": 1290863
+      },
+      "block": 0,
+      "mode": "lifecycle",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 8542943,
+        "calls": 104331,
+        "net": 706864,
+        "peak": 1290863
+      },
+      "before": {
+        "bytes": 8542943,
+        "calls": 104331,
+        "net": 706864,
+        "peak": 1290863
+      },
+      "block": 1,
+      "mode": "lifecycle",
+      "shape": "large",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 0,
+      "mode": "capture",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 1,
+      "mode": "capture",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 0,
+      "mode": "commit",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 1,
+      "mode": "commit",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "before": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "block": 0,
+      "mode": "lifecycle",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "before": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "block": 1,
+      "mode": "lifecycle",
+      "shape": "vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 0,
+      "mode": "capture",
+      "shape": "unicode-vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "before": {
+        "bytes": 292567,
+        "calls": 3157,
+        "net": 68221,
+        "peak": 90400
+      },
+      "block": 1,
+      "mode": "capture",
+      "shape": "unicode-vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 0,
+      "mode": "commit",
+      "shape": "unicode-vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "before": {
+        "bytes": 269277,
+        "calls": 3165,
+        "net": 7666,
+        "peak": 98477
+      },
+      "block": 1,
+      "mode": "commit",
+      "shape": "unicode-vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "before": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "block": 0,
+      "mode": "lifecycle",
+      "shape": "unicode-vendor",
+      "violations": []
+    },
+    {
+      "after": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "before": {
+        "bytes": 1445364,
+        "calls": 9998,
+        "net": 137151,
+        "peak": 596387
+      },
+      "block": 1,
+      "mode": "lifecycle",
+      "shape": "unicode-vendor",
+      "violations": []
+    }
+  ],
+  "memory_guard": true,
+  "native": [
+    {
+      "after_p50_ns": 235631.0,
+      "before_p50_ns": 237761.0,
+      "ci95": [
+        0.9889651205735376,
+        0.9920983096704047
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.9902380164319741,
+        0.9930886548583806,
+        0.9892966999899696,
+        0.9886335411571056,
+        0.9900412217782092,
+        0.9911079644824288
+      ],
+      "ratio": 0.9901396191050916,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 211546.0,
+      "before_p50_ns": 212841.0,
+      "ci95": [
+        0.992419850842144,
+        0.9987989895069088
+      ],
+      "mode": "commit",
+      "paired_ratios": [
+        0.9936545539151402,
+        1.0000943169331906,
+        0.992157083750135,
+        0.9926826179341529,
+        0.9929098327941362,
+        0.997503662080627
+      ],
+      "ratio": 0.9932821933546383,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 1408676.5,
+      "before_p50_ns": 1429181.5,
+      "ci95": [
+        0.9832370894379836,
+        0.98890717280209
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9820206848351937,
+        0.9892699565106489,
+        0.9844534940407734,
+        0.988544389093531,
+        0.9867132984621588,
+        0.9860564747875649
+      ],
+      "ratio": 0.9863848866248619,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 459647.0,
+      "before_p50_ns": 469287.0,
+      "ci95": [
+        0.969914975201206,
+        0.9970752053557079
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.979569455383078,
+        0.9882992472873576,
+        0.9825944353574885,
+        1.0058511634240583,
+        0.9741774118510741,
+        0.9656525385513378
+      ],
+      "ratio": 0.9810819453702833,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 295661.5,
+      "before_p50_ns": 297221.5,
+      "ci95": [
+        0.9894676313474473,
+        1.0009223889280898
+      ],
+      "mode": "commit",
+      "paired_ratios": [
+        0.997807513909956,
+        0.9893656635054396,
+        0.9957908832752379,
+        1.0040372639462236,
+        0.9895695991894549,
+        0.9967692105767969
+      ],
+      "ratio": 0.9962800469260173,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 2012949.0,
+      "before_p50_ns": 2053304.0,
+      "ci95": [
+        0.9786125689912285,
+        0.9817918081409436
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9790749816406599,
+        0.978321913961586,
+        0.9794796618108189,
+        0.9841039544710681,
+        0.9793430968513798,
+        0.978903224020871
+      ],
+      "ratio": 0.9792090392460198,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 19091318.0,
+      "before_p50_ns": 20128215.0,
+      "ci95": [
+        0.9192496864184769,
+        0.9531054964262482
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.9422501071209952,
+        0.9522058471200442,
+        0.9526874967731593,
+        0.9435837720529795,
+        0.953523496079337,
+        0.8962492657159588
+      ],
+      "ratio": 0.9478948095865118,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 1294546.0,
+      "before_p50_ns": 1308701.0,
+      "ci95": [
+        0.9810302208239057,
+        0.9973158403226354
+      ],
+      "mode": "commit",
+      "paired_ratios": [
+        0.9815482150846575,
+        0.9915639284584454,
+        0.9885315661183138,
+        0.980512226563154,
+        0.9910447943664726,
+        1.0030677521868254
+      ],
+      "ratio": 0.9897881802423932,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 28629126.5,
+      "before_p50_ns": 30768311.0,
+      "ci95": [
+        0.925159831067738,
+        0.9332382343143297
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9328273796790331,
+        0.9247761668016797,
+        0.9309588775876171,
+        0.9302920265546571,
+        0.9336490889496264,
+        0.9255434953337964
+      ],
+      "ratio": 0.9306254520711371,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 539892.0,
+      "before_p50_ns": 550223.0,
+      "ci95": [
+        0.977599692728229,
+        0.9862825870192378
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.9815730189628399,
+        0.975238954960638,
+        0.9889674795411669,
+        0.9822315541900394,
+        0.97996043049582,
+        0.9835976944973086
+      ],
+      "ratio": 0.9819022865764396,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 324596.5,
+      "before_p50_ns": 326057.0,
+      "ci95": [
+        0.9931946901671098,
+        0.9971142685375928
+      ],
+      "mode": "commit",
+      "paired_ratios": [
+        0.9979115467779688,
+        0.9925741207648564,
+        0.9963169902972168,
+        0.9938152595693633,
+        0.9959273230959699,
+        0.9938482549037098
+      ],
+      "ratio": 0.9948877889998398,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 2163440.0,
+      "before_p50_ns": 2196005.0,
+      "ci95": [
+        0.9820570614711998,
+        0.9867090642473382
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9859502926642476,
+        0.9832634367142878,
+        0.9874678358304286,
+        0.9849866806311331,
+        0.9808506862281117,
+        0.9854505546549117
+      ],
+      "ratio": 0.9852186176430224,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 542337.0,
+      "before_p50_ns": 553533.0,
+      "ci95": [
+        0.9730811043640872,
+        0.9837403711045227
+      ],
+      "mode": "capture",
+      "paired_ratios": [
+        0.9714443652182682,
+        0.984391193232687,
+        0.9809778825622454,
+        0.9747178435099063,
+        0.9760597503536567,
+        0.9830895489763586
+      ],
+      "ratio": 0.978518816457951,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 323376.5,
+      "before_p50_ns": 326497.0,
+      "ci95": [
+        0.9813767113201424,
+        0.9937909294893679
+      ],
+      "mode": "commit",
+      "paired_ratios": [
+        0.9926737794228495,
+        0.9888835141688506,
+        0.986396096749737,
+        0.9763573258905477,
+        0.9933661341146554,
+        0.9942157248640803
+      ],
+      "ratio": 0.99077864679585,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 2165075.0,
+      "before_p50_ns": 2206865.0,
+      "ci95": [
+        0.9608138474886425,
+        0.9824232056986326
+      ],
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9807383554809742,
+        0.9824892715544224,
+        0.9723604972500023,
+        0.9492671977272827,
+        0.9823571398428428,
+        0.981700719385376
+      ],
+      "ratio": 0.9812195374331751,
+      "shape": "unicode-vendor"
+    }
+  ],
+  "scope": "Independent raw numerical audit only; main validator checks custody and identities."
+}

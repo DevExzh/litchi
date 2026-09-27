@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0792 — PPTX scanner improvement retained
+
+[0792](0792-pptx-empty-attribute-tail.md) Large generated capture and lifecycle improve 5.211% and 6.937% by paired p50 with confidence intervals below one. No frozen latency or allocation-resource guard fails; six quality gates and 1,238 tests pass (three ignored). A layout-dependent constant-address test was corrected with its failure retained.
+
 ## 0791 — current profiles rank the next candidate
 
 [0791](0791-pptx-current-capture-profile.md) The post-known-URI profile supports a narrow attribute-iteration experiment. Native wrapper perturbation and unresolved frames prevent precise phase-share or speedup claims. Production source remains unchanged, all outputs validate, and the cached-Part rejection remains authoritative.

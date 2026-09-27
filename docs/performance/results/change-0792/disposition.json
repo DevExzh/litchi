@@ -1,0 +1,21 @@
+{
+  "application": {
+    "bytes": 1795,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/final-application.json",
+    "sha256": "54cd4a3c0c693c186a7c53488ea1511df8b3603c95ebf0a6978fd69b707c21b5"
+  },
+  "independent_raw_audit": {
+    "bytes": 18143,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/root-audit.json",
+    "sha256": "8400521b27d2a80402ca4927ad291c7675901d9dff993fae05b1a88d4f09ba40"
+  },
+  "policy": {
+    "bytes": 821,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/adoption-policy.json",
+    "sha256": "7374be9474ec7aa54e8cc1033ce2c62976e7bd5c423752adfd09800fd2790a43"
+  },
+  "production_change_retained": true,
+  "reason": "Large capture and lifecycle satisfy the frozen >=3% paired-p50 benefit criterion with CI high below one; no latency or allocation-resource guard violations. All six quality gates and raw identity custody pass.",
+  "scope": "Named generated warm borrowed-input public workflows only. No guest instruction reduction, physical RSS reduction, historical aggregate speedup, or coverage promotion claim.",
+  "status": "retained"
+}

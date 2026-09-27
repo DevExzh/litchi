@@ -1,0 +1,165 @@
+diff --git a/crates/litchi-pptx/src/notes/codec.rs b/crates/litchi-pptx/src/notes/codec.rs
+--- a/crates/litchi-pptx/src/notes/codec.rs
++++ b/crates/litchi-pptx/src/notes/codec.rs
+@@ -471,6 +471,9 @@ fn inspect_element(
+             "invalid {expected_root} root or namespace"
+         )));
+     }
++    if element.attributes_raw().is_empty() {
++        return Ok(());
++    }
+     for item in element.checked_attributes() {
+         let item = item.map_err(xml_error)?;
+         let raw = item.key.as_ref();
+@@ -579,10 +579,151 @@ mod tests {
+         assert!(matches!(
+             processed_limit,
+             Error::Limit {
+                 resource: "processed notes XML bytes",
+                 limit: 1,
+             }
+         ));
+     }
+ 
++    fn assert_empty_attribute_tail_candidate_matches_oracle(
++        label: &str,
++        processed: &[u8],
++        conformance: Conformance,
++        expected_refusal: bool,
++    ) {
++        let expected = outcome(buffered_scan_oracle(
++            processed,
++            processed.len(),
++            crate::notes::MAX_SLIDE_XML,
++            conformance,
++            "sld",
++        ));
++        let actual = outcome(scan_processed_xml(
++            processed,
++            processed.len(),
++            crate::notes::MAX_SLIDE_XML,
++            conformance,
++            "sld",
++        ));
++        assert_eq!(
++            actual, expected,
++            "{label}: candidate scanner diverged from the independent buffered oracle"
++        );
++        assert_eq!(
++            expected.is_err(),
++            expected_refusal,
++            "{label}: boundary case did not have the expected refusal outcome"
++        );
++    }
++
++    #[test]
++    fn empty_attribute_tail_candidate_matches_buffered_oracle_boundaries() {
++        let mut invalid_utf8_name = format!(r#"<p:sld xmlns:p="{P_NS}"><p:"#).into_bytes();
++        invalid_utf8_name.extend_from_slice(b"\xff/></p:sld>");
++        let cases = vec![
++            (
++                "Start with an exact empty attribute tail",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x></p:x></p:sld>"#).into_bytes(),
++                false,
++            ),
++            (
++                "Empty with an exact empty attribute tail",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x/></p:sld>"#).into_bytes(),
++                false,
++            ),
++            (
++                "space before an empty-element close",
++                format!("<p:sld xmlns:p=\"{P_NS}\"><p:x /></p:sld>").into_bytes(),
++                false,
++            ),
++            (
++                "tab before an empty-element close",
++                format!("<p:sld xmlns:p=\"{P_NS}\"><p:x\t/></p:sld>").into_bytes(),
++                false,
++            ),
++            (
++                "newline before an empty-element close",
++                format!("<p:sld xmlns:p=\"{P_NS}\"><p:x\n/></p:sld>").into_bytes(),
++                false,
++            ),
++            (
++                "namespace declaration remains on the checked path",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x xmlns:q="urn:vendor"/></p:sld>"#)
++                    .into_bytes(),
++                false,
++            ),
++            (
++                "malformed attribute syntax",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a/></p:sld>"#).into_bytes(),
++                true,
++            ),
++            (
++                "malformed attribute name",
++                {
++                    let mut value = format!(r#"<p:sld xmlns:p="{P_NS}"><p:x "#).into_bytes();
++                    value.extend_from_slice(b"\xff=\"v\"/></p:sld>");
++                    value
++                },
++                true,
++            ),
++            (
++                "malformed attribute value entity",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="&bad;"/></p:sld>"#)
++                    .into_bytes(),
++                true,
++            ),
++            (
++                "duplicate attribute",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1" a="2"/></p:sld>"#)
++                    .into_bytes(),
++                true,
++            ),
++            (
++                "undeclared element prefix with no attributes",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><q:x/></p:sld>"#).into_bytes(),
++                true,
++            ),
++            (
++                "undeclared attribute prefix",
++                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x q:y="1"/></p:sld>"#)
++                    .into_bytes(),
++                true,
++            ),
++            (
++                "invalid UTF-8 element name with no attributes",
++                invalid_utf8_name,
++                true,
++            ),
++            (
++                "invalid root with no attributes",
++                b"<sld/>".to_vec(),
++                true,
++            ),
++            (
++                "invalid root namespace",
++                INVALID_ROOT.to_vec(),
++                true,
++            ),
++        ];
++
++        for (label, xml, expected_refusal) in cases {
++            assert_empty_attribute_tail_candidate_matches_oracle(
++                label,
++                &xml,
++                Conformance::Transitional,
++                expected_refusal,
++            );
++        }
++
++        let strict = format!(r#"<p:sld xmlns:p="{STRICT_NS}"><p:x/></p:sld>"#).into_bytes();
++        assert_empty_attribute_tail_candidate_matches_oracle(
++            "Strict empty-element path",
++            &strict,
++            Conformance::Strict,
++            false,
++        );
++    }
++
++    const STRICT_NS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
++
+     /// The scanner as it stood before change 0743, verbatim: buffered reads
