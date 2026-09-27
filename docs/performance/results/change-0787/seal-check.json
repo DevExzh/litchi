@@ -1,0 +1,9 @@
+{
+  "valid_payload_passed": true,
+  "invalid_payloads_rejected": [
+    "changed_bytes",
+    "added_file",
+    "symlink"
+  ],
+  "isolated_temporary_inputs": true
+}

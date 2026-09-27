@@ -1,0 +1,119 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-opc",
+      "--",
+      "--check"
+    ],
+    "ended": 1790530474.4629464,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790530473.9336052
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790530477.9883811,
+    "exit_code": 0,
+    "log": {
+      "bytes": 173,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/01.log",
+      "sha256": "e768c19fba40d4814d091f1a9d6866c3e79874a4a79015d66ef3a1750d2db1e3"
+    },
+    "started": 1790530474.6520417
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790530524.6158464,
+    "exit_code": 0,
+    "log": {
+      "bytes": 100879,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/02.log",
+      "sha256": "65c8560f352a56c38a507fc003dc0f29219288facea1b612ac793318be748a1c"
+    },
+    "started": 1790530478.18055
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790530529.2859707,
+    "exit_code": 0,
+    "log": {
+      "bytes": 883,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/03.log",
+      "sha256": "86ad8df35337d149a83360c7d9368e0288acd1a3702f751b3eed5ec7aebc48af"
+    },
+    "started": 1790530524.8114855
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "--all-features",
+      "--no-deps"
+    ],
+    "ended": 1790530530.7348416,
+    "exit_code": 0,
+    "log": {
+      "bytes": 256,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/04.log",
+      "sha256": "bd0ff46713472773da9f2784bcd01f18b1b81cf6c98e6dc59a17891526974196"
+    },
+    "started": 1790530529.483403
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "ended": 1790530807.2058065,
+    "exit_code": 0,
+    "log": {
+      "bytes": 565,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/quality-0/05.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "started": 1790530530.9270763
+  }
+]

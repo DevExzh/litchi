@@ -1,0 +1,31 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--all-targets"
+  ],
+  "ended": 1790529852.7843282,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0787/quality"
+  },
+  "exit_code": 101,
+  "log": {
+    "bytes": 4945,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/compile-preflight-0/log",
+    "sha256": "2f1afb0bbf9105edb19bd31d4a20891ab5cdec86c76dd0e6c62605e19990e3f2"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/compile-preflight-0/source.json",
+    "sha256": "4525d99a3d449d8602eb72f91fa063bd0fc54abec3f4c29812c2e50652729259"
+  },
+  "started": 1790529838.6517937
+}

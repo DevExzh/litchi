@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/tools/perf-execution/Cargo.toml"
+    ],
+    "ended": 1790530848.6685495,
+    "exit_code": 0,
+    "log": {
+      "bytes": 315,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/build-after/native.log",
+      "sha256": "1e7a46d29815f4a39fdfa8bbec47e8200e99c668473edaa3dc09b0ace42b4d38"
+    },
+    "started": 1790530825.7367945
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/tools/perf-execution/Cargo.toml",
+      "--features",
+      "source-metrics"
+    ],
+    "ended": 1790530857.0686011,
+    "exit_code": 0,
+    "log": {
+      "bytes": 201,
+      "path": "/home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/build-after/observer.log",
+      "sha256": "90e903bfe93c50f05d6c5103d62d7a3f907c116f1ab017dc3881e49d530725ab"
+    },
+    "started": 1790530848.873719
+  }
+]

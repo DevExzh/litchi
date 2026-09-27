@@ -1,0 +1,9 @@
+{
+  "schema": "litchi.cached-part-policy-interpretation.0787.v1",
+  "recorded_at": 1790529314.7204406,
+  "before_after_build_and_paired_capture": true,
+  "frozen_policy_sha256": "aa7d1cdf29e955f29a45f67241a8044169dac54d9fee49a26b075a352e9c33bc",
+  "rejection": "A latency or RSS case rejects only when both median paired after/before ratio > 1.05 and CI95 lower endpoint > 1.0.",
+  "benefit": "At least one eligible primed width 2/4/8/32 case has median paired after/before ratio <= 0.97 and CI95 upper endpoint < 1.0.",
+  "reason": "Make the pre-build conjunctive decision rule explicit; correct in-progress offline analyzer before candidate build or paired observations. Frozen policy and capture inputs unchanged."
+}

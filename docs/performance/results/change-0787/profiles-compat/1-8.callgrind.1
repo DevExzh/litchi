@@ -1,0 +1,4145 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 193134
+cmd:  /home/zhuhe/code/litchi-target-0787/baseline-profile-compat --route parts --shape large --workers 8 --task-floor 0 --state primed --samples 1 --warmup 0 --output /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles-compat/1-8.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 130417105
+desc: Trigger: --dump-after=cached_part_profile::cached_part_region_0787
+
+positions: line
+events: Ir
+summary: 57924
+
+
+ob=(6) /home/zhuhe/code/litchi-target-0787/baseline-profile-compat
+fl=(435) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/thread.rs
+fn=(4132) <std::thread::thread::Thread>::new
+93 64
+fi=(265) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs
+1164 16
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+14 16
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(650) malloc
+calls=16 3283 
+* 933
+fi=(244) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+1620 16
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+1917 48
+fe=(435)
+111 48
+
+fl=(369) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-core/src/execution.rs
+fn=(2564) litchi_core::execution::ExecutionContext::reserve
+331 28
+fi=(180) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+444 7
+fi=(173) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs
+3891 14
+729 7
+fi=(244)
+2173 7
+fi=(180)
+444 7
+fi=(348) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs
+2422 42
+fi=(376) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-core/src/budget.rs
+303 70
+162 7
+fi=(173)
+3891 7
+0 7
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+769 14
+fi=(173)
+3386 21
+4061 7
+3387 7
+fi=(174)
+2301 14
+fi=(265)
+745 21
+fi=(376)
+301 7
+fi=(173)
+3923 14
+fi=(244)
+967 42
+0 28
+fe=(369)
+334 42
+
+fn=(4066) litchi_core::execution::ExecutionContext::consume
+365 4
+fi=(180)
++79 1
+fi=(173)
+3891 2
+729 1
+fi=(244)
+2173 1
+fi=(180)
+444 1
+fi=(348)
+2422 6
+fi=(376)
+303 10
+162 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+769 2
+fi=(173)
+3386 3
+4061 1
+3387 1
+fi=(174)
+2301 2
+fi=(265)
+745 4
+fi=(376)
+301 2
+fe=(369)
+0 1
+368 6
+
+fl=(475) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/array.rs
+fn=(4334) std::sync::mpmc::array::Channel<T>::recv::{{closure}}
+390 36
++2 4
++1 24
+cfi=(477) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/waker.rs
+cfn=(4336) <std::sync::mpmc::waker::SyncWaker>::register
+calls=76 152 
+* 632
+fi=(173)
+3892 8
+fe=(475)
+555 16
+396 4
+fi=(173)
+3892 4
+fe=(475)
+396 8
++6 16
+0 20
+fi=(173)
+3891 4
+fi=(484) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/select.rs
+52 8
+fi=(173)
+3891 5
+fi=(484)
+52 10
+fi=(180)
+444 5
+fi=(173)
+3941 5
+fi=(479) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/sync/thread_parking/futex.rs
+50 5
+-50 8
+fi=(173)
+3978 8
+fi=(479)
+57 4
+fi=(265)
+-57 8
+fi=(173)
+3890 4
+fi=(483) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/pal/unix/futex.rs
+44 8
+fi=(265)
+745 12
+fi=(483)
+73 32
+cob=(2)
+cfi=(480) ./misc/../sysdeps/unix/sysv/linux/x86_64/syscall.S
+cfn=(4354) syscall
+calls=76 -44 
+* 48
++16 4
+fi=(351) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs
+-23 4
+fi=(484)
+-14 12
+fe=(475)
+413 32
+
+fl=(481) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/mod.rs
+fn=(4360) std::sync::mpmc::Sender<T>::send
+393 400
++1 120
+fi=(474) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/list.rs
+0 40
+fi=(484)
+5 160
+fi=(173)
+3890 40
+fi=(475)
+130 120
+fi=(233)
+0 200
+fi=(475)
+137 80
++1 80
++4 40
+fi=(290) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+253 80
+fi=(173)
+3891 40
+fi=(475)
+146 80
++1 120
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+0 40
+fi=(174)
+2457 40
+fi=(173)
+4067 80
+fi=(475)
+158 40
+0 40
+166 40
++1 80
+fi=(233)
+1917 240
+fi=(173)
+3876 40
+fi=(475)
+210 120
+cfi=(477)
+cfn=(4370) <std::sync::mpmc::waker::SyncWaker>::notify
+calls=80 -39 
+* 4720
+* 40
+fi=(244)
+966 120
++1 80
+fe=(481)
+403 320
+
+fl=(164) ???
+fn=(596) main
+cfi=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+cfn=(598) std::rt::lang_start_internal
+calls=0 152 
+0 57924
+
+fn=(564) (below main)
+cob=(2)
+cfi=(165) ./csu/../csu/libc-start.c
+cfn=(566) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 57924
+
+fl=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+fn=(1092) alloc::raw_vec::RawVecInner<A>::finish_grow
+542 90
+fi=(174)
+3051 80
+fi=(281) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+457 30
+0 10
+fe=(252)
+632 20
+fi=(291) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs
+186 20
+-91 10
+fi=(243)
+-82 10
+fe=(252)
+563 40
+fi=(243)
+14 20
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=148 3283 
+* 300
+fe=(252)
+562 20
+0 20
+566 80
+
+fn=(1742) alloc::raw_vec::RawVec<T,A>::grow_one
+186 16
+491 4
++30 4
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1037 12
+fe=(252)
+527 24
+cfn=(1092)
+calls=24 +15 
+* 300
+fi=(244)
+2173 8
++1 4
+fe=(252)
+774 4
++1 4
+189 16
+
+fl=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(473) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(250) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profile-src/src/main.rs
+cfn=(864) cached_part_profile::main
+calls=0 1050 
+250 57924
+fe=(249)
+
+fl=(334) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/sip.rs
+fn=(1516) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+256 64
++2 64
++4 192
+0 32
+263 32
+fi=(236)
+1076 96
+fe=(334)
+126 64
+0 128
+132 128
++5 64
++2 160
+265 128
++1 64
++1 32
+0 32
+300 64
+-22 32
++1 96
++3 64
+0 160
+fi=(233)
+547 32
+fe=(334)
+288 32
+fi=(174)
+2457 32
+fi=(281)
+2029 32
+fi=(174)
+2457 32
+fe=(334)
+78 32
+fi=(281)
+2029 32
+fe=(334)
+79 32
+fi=(281)
+2029 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fe=(334)
+79 32
+fi=(281)
+2029 64
+fe=(334)
+78 32
+290 32
++2 32
+-10 64
+fi=(233)
+547 32
+fe=(334)
+288 32
+fi=(174)
+2457 32
+fi=(281)
+2029 32
+fi=(174)
+2457 32
+fe=(334)
+78 32
+fi=(281)
+2029 32
+fe=(334)
+79 32
+fi=(281)
+2029 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fe=(334)
+79 32
+fi=(281)
+2029 64
+fe=(334)
+78 32
+290 32
++2 32
+-10 64
+0 128
+126 64
+fi=(233)
+547 64
+fe=(334)
+132 160
++5 64
+298 32
+0 32
+300 64
+
+fl=(444) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread/unix.rs
+fn=(4168) <std::sys::thread::unix::Thread>::new
+46 80
++3 8
+cob=(2)
+cfi=(193) ./nptl/./nptl/pthread_attr_init.c
+cfn=(642) pthread_attr_init@@GLIBC_2.2.5
+calls=16 -17 
+* 184
+* 24
+fi=(173)
+3891 16
+fi=(445) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/pal/unix/weak/dlsym.rs
+70 32
+-70 8
+fe=(444)
+1009 8
+cob=(2)
+cfi=(450) ./nptl/./nptl/nptl-stack.c
+cfn=(4184) __pthread_get_minstack
+calls=16 162 
+* 96
+* 8
+fi=(236)
++28 24
+fe=(444)
+71 16
+cob=(2)
+cfi=(451) ./nptl/./nptl/pthread_attr_setstacksize.c
+cfn=(4186) pthread_attr_setstacksize@@GLIBC_2.34
+calls=16 -41 
+* 56
+* 16
+fi=(233)
+1717 8
+fe=(444)
+98 40
+cob=(2)
+cfi=(452) ./nptl/./nptl/pthread_create.c
+cfn=(4190) pthread_create@@GLIBC_2.34
+calls=16 651 
+* 8337
++1 16
++1 16
+0 8
+51 8
+cob=(2)
+cfi=(232) ./nptl/./nptl/pthread_attr_destroy.c
+cfn=(818) pthread_attr_destroy
+calls=16 -25 
+* 48
+* 24
++71 72
+
+fl=(426) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-opc/src/source_backed/batch.rs
+fn=(4028) litchi_opc::source_backed::batch::read_parts_ordered
+140 11
+fi=(265)
+745 2
+1164 1
+fi=(173)
+3923 1
+fi=(348)
+2405 1
+fi=(180)
+444 1
+fi=(173)
+3923 1
+fi=(348)
+2405 1
+fi=(265)
+2262 3
+fi=(369)
+257 6
+fi=(265)
+1165 4
+fi=(180)
+444 2
+fi=(348)
+2422 6
+fi=(371) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-opc/src/source_backed.rs
+3841 1
+cfi=(250)
+cfn=(2310) <cached_part_profile::InMemoryReadAt as litchi_core::source::ReadAt>::version
+calls=2 497 
+* 5
+0 1
+fi=(244)
+2173 2
++1 2
+fi=(373) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-core/src/source.rs
+20 8
+fi=(265)
+745 2
+fi=(180)
+444 1
+fi=(173)
+3891 2
+729 1
+fi=(244)
+2173 1
+fe=(426)
+147 2
++4 1
+1102 2
+fi=(233)
+805 2
+0 1
+805 1
+cfn=(4850) core::ptr::drop_in_place<litchi_core::execution::ExecutionContext>
+calls=2 * 
+* 17
+fe=(426)
+350 8
+fi=(265)
+745 2
+fe=(426)
+1178 1
+fi=(180)
+444 1
+fi=(173)
+3891 1
+729 1
+fi=(244)
+2173 1
+0 4
+fi=(180)
+444 1
+fi=(348)
+2422 4
+fi=(376)
+303 2
+fi=(173)
+3891 1
+0 1
+fi=(174)
+769 2
+fi=(173)
+3386 3
+4061 1
+3387 1
+fi=(174)
+2301 2
+fi=(265)
+745 3
+fi=(376)
+301 1
+fi=(173)
+3923 2
+0 2
+fe=(426)
+1188 3
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+* 2
+fi=(244)
+2174 8
+fe=(426)
+363 17
+fi=(253) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs
+464 4
+fi=(252)
+798 6
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
++1 2
+fi=(252)
+774 1
++1 1
+fi=(265)
+1229 2
+fi=(239) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs
+961 10
+fi=(252)
+0 96
+fi=(239)
+961 96
+fi=(233)
+1917 192
+fi=(253)
+1034 128
+fi=(180)
+1720 32
+fi=(286) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 32
+fi=(180)
+444 64
+fi=(348)
+2422 160
+fi=(371)
+3841 64
+cfi=(250)
+cfn=(2310)
+calls=64 497 
+* 160
+fi=(244)
+2173 64
++1 64
+fi=(373)
+20 224
+fi=(265)
+745 64
+fi=(180)
+444 32
+fi=(173)
+3891 32
+729 32
+fi=(244)
+2173 32
+fi=(306) /rust/deps/hashbrown-0.16.1/src/map.rs
+1309 64
+258 256
+cfi=(333) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/mod.rs
+cfn=(1514) core::hash::BuildHasher::hash_one
+calls=64 694 
+* 6720
+fi=(338) /rust/deps/hashbrown-0.16.1/src/control/tag.rs
+48 96
+fi=(307) /rust/deps/hashbrown-0.16.1/src/raw/mod.rs
+2492 192
+0 32
+fi=(233)
+547 32
+fi=(336) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs
+1563 96
+fi=(344) /rust/deps/hashbrown-0.16.1/src/control/bitmask.rs
+50 64
+-50 192
+fi=(337) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/nonzero.rs
+641 32
+fi=(307)
+2073 64
+fi=(239)
+1072 96
+fi=(264) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs
+20 64
+fi=(307)
+1236 64
+fi=(264)
+154 32
+cob=(2)
+cfi=(341) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(1578) __memcmp_avx2_movbe
+calls=64 -81 
+* 632
+* 32
+fi=(281)
+434 32
+fi=(265)
+2126 32
+fi=(290)
+219 64
+0 32
+221 64
+fi=(252)
+612 32
+fe=(426)
+385 64
+fi=(265)
+745 32
+fe=(426)
+390 32
+fi=(180)
++54 64
+fi=(348)
+2422 160
+fi=(371)
+3841 64
+cfi=(250)
+cfn=(2310)
+calls=64 497 
+* 160
+fi=(244)
+2173 64
++1 64
+fi=(373)
+20 352
+fi=(265)
+745 64
+fi=(180)
+444 32
+fi=(173)
+3891 32
+729 32
+fi=(244)
+2173 32
+0 64
+fi=(290)
+219 64
+fi=(252)
+612 32
+fi=(290)
+221 32
+fi=(295) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/soapberry-zip/src/office.rs
+4402 32
+fi=(244)
+967 128
+fi=(180)
+444 64
+fi=(348)
+2422 160
+fi=(371)
+3841 64
+cfi=(250)
+cfn=(2310)
+calls=64 497 
+* 160
+fi=(244)
+2173 64
++1 64
+fi=(373)
+20 288
+fi=(265)
+745 64
+fi=(180)
+444 32
+fi=(173)
+3891 32
+729 32
+fi=(244)
+2173 32
+fe=(426)
+1150 416
+fi=(244)
+2173 96
+fe=(426)
+395 64
+fi=(370) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-opc/src/limits.rs
+291 64
+fi=(174)
+769 32
+fi=(281)
+457 32
+0 32
+fe=(426)
+400 128
+0 32
+fi=(253)
+1028 64
+fi=(180)
+444 2
+fi=(348)
+2422 6
+fi=(371)
+3841 1
+cfi=(250)
+cfn=(2310)
+calls=2 497 
+* 5
+fi=(244)
+2173 2
++1 2
+fi=(373)
+20 11
+fi=(265)
+745 2
+fi=(180)
+444 1
+fi=(173)
+3891 2
+729 1
+fi=(244)
+2173 1
+fe=(426)
+413 2
++3 3
++1 8
+155 3
+1189 13
+156 19
+fi=(265)
+745 1
+fe=(426)
+426 1
+0 5
+434 3
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+fi=(244)
+966 5
++1 6
+fe=(426)
+440 3
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+* 2
++1 11
+fi=(253)
+2997 3
+fe=(426)
+161 17
+fi=(252)
+765 1
+-42 1
+0 1
+fe=(426)
+168 3
+fi=(265)
+745 1
+1229 1
+fe=(426)
+0 2
+176 1
+fi=(265)
+1230 2
+fi=(236)
+1076 4
+fe=(426)
+176 2
++8 5
+fi=(265)
+664 4
+cfi=(426)
+cfn=(4062) litchi_opc::source_backed::batch::read_parts_ordered::{{closure}}
+calls=2 186 
+* 15
+fe=(426)
+198 2
+fi=(265)
+745 2
+fe=(426)
+203 2
+fi=(310) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/range.rs
+563 1
+fe=(426)
+0 4
+341 14
+fi=(175) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/mod.rs
+975 1
+cfi=(233)
+cfn=(4830) core::ptr::drop_in_place<litchi_opc::source_backed::batch::PreparedBatch>
+calls=2 805 
+* 91
+fe=(426)
+342 3
+0 1
+343 4
+473 10
+343 3
+cfn=(4838) litchi_opc::source_backed::batch::finish
+calls=2 1205 
+* 56
+* 1
+0 5
+fi=(236)
+1916 1
+fi=(254)
+1214 2
+fi=(253)
+1815 1
+fe=(426)
+1075 2
+fi=(265)
+1367 3
+fe=(426)
+0 2
+fi=(265)
+1367 2
+0 3
+fe=(426)
+1085 1
+fi=(265)
+0 1
+fe=(426)
+1075 2
+fi=(265)
+745 1
+fe=(426)
+484 1
+fi=(265)
+1367 15
+fe=(426)
+0 7
+fi=(174)
+769 7
+fi=(281)
+457 7
+0 7
+fe=(426)
+1082 7
++3 14
++4 7
+-14 21
+0 2
+fi=(174)
+3051 2
+fi=(281)
+457 1
+fi=(174)
+3051 4
+769 3
+fi=(281)
+457 1
+fi=(174)
+769 1
+fi=(281)
+457 1
+fe=(426)
+568 5
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+fi=(244)
+966 3
++1 2
+fe=(426)
+567 2
++3 5
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+* 2
++1 4
++6 5
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+* 2
++5 5
++7 3
+fi=(174)
+769 3
+fi=(281)
+457 1
+fe=(426)
+603 4
+cfi=(369)
+cfn=(2564)
+calls=2 331 
+* 60
+* 2
++1 5
++13 4
++1 4
++1 4
+-7 6
+213 2
+-2 1
+497 1
+fi=(174)
+3051 2
+fi=(281)
+457 1
+fi=(174)
+769 4
+fi=(281)
+457 1
+0 1
+457 2
+0 5
+fe=(426)
+0 1
+fi=(252)
+798 6
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
++1 1
+fi=(265)
+636 1
+fe=(426)
+462 1
+0 3
+462 2
+214 16
+fi=(233)
+805 2
+fe=(426)
+215 17
++19 18
+fi=(180)
+444 1
+fi=(173)
+3891 1
+729 1
+fe=(426)
+235 1
+fi=(253)
+2997 3
+fe=(426)
+242 2
+cfi=(369)
+cfn=(4066)
+calls=2 365 
+* 51
+* 2
+fi=(252)
+612 1
+fi=(253)
+1815 5
+fe=(426)
+250 5
+cfn=(4076) litchi_opc::source_backed::batch::read_parallel
+calls=2 655 
+* 42107
+* 1
+0 1
+fi=(175)
+975 1
+cfi=(233)
+cfn=(4824) core::ptr::drop_in_place<litchi_opc::source_backed::batch::SchedulerAdmission>
+calls=2 805 
+* 92
+fe=(426)
+0 5
+
+fn=(4062)
+186 3
++1 1
+fi=(253)
+2997 1
+fe=(426)
+187 2
++1 3
++1 2
++6 2
++1 1
+
+fn=(4076)
+655 16
+fi=(369)
+309 2
+fi=(180)
+444 2
+fi=(348)
+2422 6
+fi=(371)
+3841 1
+cfi=(250)
+cfn=(2310)
+calls=2 497 
+* 5
+fi=(244)
+2173 2
++1 2
+fi=(373)
+20 8
+fi=(265)
+745 2
+fi=(180)
+444 1
+fi=(173)
+3891 1
+729 1
+fi=(244)
+2173 1
+fi=(265)
+745 4
+fe=(426)
+1075 7
+fi=(265)
+1367 7
+0 3
+fe=(426)
+1085 1
+673 8
+1075 2
+fi=(265)
+1367 18
+fe=(426)
+0 7
+fi=(174)
+769 7
+fi=(281)
+457 7
+0 7
+fe=(426)
+1082 7
++3 14
++4 7
+-14 21
+0 2
+fi=(372) /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/crates/litchi-opc/src/lib.rs
+0 2
+fe=(426)
+669 3
+fi=(427) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/scoped.rs
+150 1
+cfi=(242) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/current.rs
+cfn=(4090) std::thread::current::current_or_unnamed
+calls=2 +91 
+* 15
+* 1
+fi=(348)
+422 5
+fi=(243)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=2 3283 
+* 30
+fi=(245) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs
+248 2
+0 1
+289 6
+fi=(427)
+147 1
+fi=(253)
+464 13
+fi=(252)
+798 7
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
+fe=(426)
+0 1
+918 1
+cfi=(233)
+cfn=(4786) core::ptr::drop_in_place<alloc::vec::Vec<std::sync::mpsc::Receiver<core::result::Result<litchi_opc::source_backed::PartData,litchi_opc::error::OpcError>>>>
+calls=2 805 
+* 1583
+0 1
+918 1
+cfi=(233)
+cfn=(4808) core::ptr::drop_in_place<alloc::vec::Vec<std::sync::mpsc::SyncSender<litchi_opc::source_backed::batch::WorkerCommand>>>
+calls=2 805 
+* 3222
+fi=(248) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs
+545 8
+fi=(180)
+444 1
+fi=(173)
+3891 1
+fi=(427)
+161 4
++6 4
+fi=(180)
+444 1
+fi=(173)
+3890 1
+fi=(427)
+169 2
++3 8
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+0 1
+2854 1
+cfn=(1726) alloc::sync::Arc<T,A>::drop_slow
+calls=2 2109 
+* 45
+* 1
+fi=(244)
+2174 1
+fi=(252)
+774 1
++1 2
++23 6
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
++1 1
+fi=(252)
+774 2
++1 2
++23 5
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
++1 1
+fi=(252)
+774 2
++1 2
++23 5
+cfn=(1092)
+calls=2 542 
+* 75
+fi=(244)
+2173 2
++1 1
+fi=(252)
+774 2
++1 1
+fi=(174)
+3051 3
+fi=(281)
+457 1
+fi=(427)
+0 1
+fi=(174)
+3051 1
+fe=(426)
+1167 4
+0 1
+fi=(174)
+3051 1
+fi=(281)
+457 1
+0 1
+fi=(174)
+3051 1
+fe=(426)
+1167 4
+0 3
+fi=(253)
+1028 16
+0 8
+fi=(233)
+1917 8
+fi=(253)
+1034 8
+fi=(236)
+1916 16
+fi=(254)
+772 8
+0 1
+fe=(426)
+867 4
+fi=(243)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=2 3283 
+* 30
+* 14
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=14 3283 
+* 210
+fi=(252)
+468 16
+fi=(233)
+1917 24
+fi=(475)
+111 16
+fi=(504) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/counter.rs
+-90 192
+fi=(230) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/metadata.rs
+133 8
+fi=(243)
+-50 32
+cob=(2)
+cfi=(155)
+cfn=(1222) posix_memalign
+calls=16 5366 
+* 736
++1 8
+fi=(245)
+248 40
++41 32
+cob=(2)
+cfi=(211) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(728) __memcpy_avx_unaligned_erms
+calls=16 -34 
+* 712
+fi=(243)
+14 16
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=16 3283 
+* 240
+fi=(252)
+468 16
+fi=(233)
+1917 24
+fi=(475)
+111 16
+fi=(504)
+-90 192
+fi=(230)
+133 8
+fi=(243)
+-50 32
+cob=(2)
+cfi=(155)
+cfn=(1222)
+calls=16 5366 
+* 736
++1 8
+fi=(245)
+248 40
++41 40
+cob=(2)
+cfi=(211)
+cfn=(728)
+calls=16 -34 
+* 712
+* 8
+fe=(426)
+873 56
+fi=(427)
+265 8
+fi=(173)
+3923 8
+fi=(348)
+2405 8
+0 16
+fi=(173)
+3890 8
+fi=(174)
+769 8
+fi=(281)
+457 8
+fi=(174)
+769 8
+fi=(173)
+4031 8
+fi=(505) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/id.rs
+53 8
+fi=(434) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/lifecycle.rs
+-5 16
+cfi=(435)
+cfn=(4132)
+calls=16 +45 
+* 1141
+* 16
++5 24
+cfi=(436) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/spawnhook.rs
+cfn=(4140) std::thread::spawnhook::run_spawn_hooks
+calls=16 +60 
+* 544
+fi=(348)
+422 32
+fi=(243)
+14 16
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=16 3283 
+* 397
+fi=(245)
+248 16
++41 48
+fi=(348)
++21 8
+fi=(173)
+3923 8
+fi=(348)
+2405 8
+fi=(434)
+87 96
++19 24
+fi=(173)
+3923 8
+fi=(427)
+51 8
+fi=(434)
++62 96
+fi=(243)
+-99 16
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=16 3283 
+* 240
+fi=(245)
+248 16
++41 80
+fi=(173)
+3923 8
+fi=(348)
+2405 8
+fi=(434)
+121 32
+fi=(243)
+14 16
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=16 3283 
+* 553
+fi=(245)
+248 16
++41 32
+fi=(434)
+137 24
+cfi=(444)
+cfn=(4168)
+calls=16 -91 
+* 9153
+* 8
+fi=(244)
+2173 16
+fi=(434)
+139 8
+fe=(426)
+876 24
+fi=(253)
+1025 16
++3 16
+fi=(252)
+612 16
+fi=(239)
+961 16
+fi=(233)
+1917 32
+fi=(253)
+1034 24
+-9 8
++3 16
+fi=(252)
+612 8
+fi=(239)
+961 16
+fi=(233)
+1917 24
+fi=(253)
+1034 16
+fe=(426)
+879 48
+fi=(253)
+1025 8
++3 16
+fi=(252)
+612 8
+fi=(239)
+961 16
+fi=(233)
+1917 32
+fi=(253)
+1034 24
+fi=(236)
+1916 8
+fi=(254)
+772 9
+fe=(426)
+887 3
+fi=(252)
+612 2
+fi=(253)
+1851 4
+0 15
+fi=(371)
+3841 20
+0 1
+fi=(180)
+444 2
+fi=(348)
+2422 5
+fi=(371)
+3841 2
+cfi=(250)
+cfn=(2310)
+calls=2 497 
+* 5
+0 3
+fi=(180)
+444 6
+fi=(348)
+2422 15
+fi=(371)
+3841 6
+cfi=(250)
+cfn=(2310)
+calls=6 497 
+* 15
+fi=(244)
+2173 8
++1 12
+fi=(373)
+20 32
+-20 4
+fi=(265)
+745 8
+0 4
+fi=(180)
+444 4
+fi=(173)
+3891 4
+729 4
+fi=(244)
+2173 4
+0 4
+fi=(265)
+1367 92
+fe=(426)
+0 32
+fi=(174)
+769 32
+fi=(281)
+457 32
+0 32
+fe=(426)
+1082 120
++3 64
+0 32
+1089 64
+-14 188
+0 4
+1091 12
+0 4
+fi=(286)
+180 4
+0 8
+180 4
+0 4
+180 4
+fe=(426)
+937 32
+fi=(180)
+659 4
+1720 4
+fi=(286)
+180 4
+fe=(426)
+941 8
++3 8
+fi=(236)
+1916 12
+0 4
+fe=(426)
+944 8
+fi=(236)
+0 28
+fe=(426)
+944 56
+0 64
+944 160
++1 64
+0 32
+948 224
+-2 64
+fi=(485) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpsc.rs
+674 160
+cfi=(481)
+cfn=(4360)
+calls=64 393 
+* 5881
+fi=(244)
+-80 32
+fe=(426)
+945 32
+0 64
+fi=(236)
+1916 128
+fi=(254)
+772 32
+0 20
+fe=(426)
+965 8
+fi=(254)
+0 28
+fe=(426)
+965 56
+0 32
+965 64
+fi=(485)
+849 128
+fi=(481)
+983 64
+fi=(348)
+0 64
+fi=(484)
+5 96
+-5 96
+fi=(173)
+3890 32
+fi=(475)
+221 32
++5 32
+-5 96
++1 64
+fi=(290)
++31 32
+fi=(173)
+3891 32
+fi=(475)
+230 96
+fi=(484)
+0 12
+fi=(173)
+3890 4
+fi=(475)
+221 4
++5 4
+-5 12
++1 8
+fi=(290)
++31 4
+fi=(173)
+3891 4
+fi=(475)
+230 12
++1 128
+0 64
+fi=(174)
+2457 64
+fi=(173)
+4067 96
+fi=(475)
+242 32
++17 8
+fi=(173)
+4376 8
+3890 4
+fi=(475)
+264 24
++2 8
+384 12
+fi=(476) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/mpmc/context.rs
+46 24
+fi=(299) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread_local/native/lazy.rs
++13 16
+fi=(175)
+901 4
++1 4
+fi=(476)
+53 8
++2 4
+fi=(173)
+3876 8
+fi=(175)
+902 4
+fi=(265)
+1015 24
+fi=(476)
+49 12
+cfi=(475)
+cfn=(4334)
+calls=11 390 
+* 998
+fi=(175)
+901 8
++1 4
+fi=(233)
+-97 8
+fi=(475)
+0 32
+250 64
+fi=(174)
+2457 32
+fi=(475)
+251 32
+fi=(233)
+1717 256
+fi=(173)
+3876 32
+fi=(475)
+300 256
++4 64
+cfi=(477)
+cfn=(4370)
+calls=64 171 
+* 576
++1 320
+fi=(244)
+966 128
++1 224
+fi=(481)
+0 96
+984 32
+fi=(244)
+-18 128
+fe=(426)
+0 32
+fi=(244)
+967 288
+fe=(426)
+-1 64
++1 64
+0 64
+967 32
++1 96
+0 32
+969 160
+fi=(253)
++56 32
++3 64
+0 32
+fi=(252)
+612 32
+fi=(239)
+961 32
+fi=(233)
+1917 128
+fi=(253)
+1034 96
+fe=(426)
+0 96
+fi=(236)
+1916 68
+fe=(426)
+984 12
+0 4
+987 8
+0 8
+932 8
++65 2
++1 1
+fi=(244)
+0 1
+fi=(286)
+180 1
+0 5
+fe=(426)
+1033 2
+fi=(485)
+674 5
+cfi=(481)
+cfn=(4360)
+calls=2 393 
+* 214
+fe=(426)
+1033 14
+fi=(485)
+674 35
+cfi=(481)
+cfn=(4360)
+calls=14 393 
+* 1545
+0 8
+fi=(180)
+659 16
+1720 8
+fi=(286)
+180 8
+fe=(426)
+907 1
+fi=(244)
+741 3
+0 7
+fe=(426)
+911 1
+cfn=(4734) litchi_opc::source_backed::batch::join_workers
+calls=2 1037 
+* 2697
++6 1
+fi=(265)
+1229 4
+fi=(252)
+632 2
+0 1
+fi=(243)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(762) free
+calls=2 3319 
+* 33
+* 1
+fe=(426)
+
+fn=(4734)
+1037 11
++6 3
+fi=(239)
+-82 3
+fe=(426)
++82 4
+fi=(180)
+1720 1
+fi=(263) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/into_iter.rs
+223 1
+0 3
+223 4
+fi=(180)
+1720 16
+fi=(263)
+223 8
++4 8
+fi=(233)
+1717 8
+fe=(426)
+1043 56
+fi=(434)
+241 8
+fi=(444)
+126 16
+cob=(2)
+cfi=(495) ./nptl/./nptl/pthread_join.c
+cfn=(4738) pthread_join@@GLIBC_2.34
+calls=16 23 
+* 969
++1 16
+fi=(180)
+444 8
+fi=(173)
+3975 24
+fi=(348)
+2762 8
+fi=(173)
+3891 8
+-15 8
+fi=(348)
+2766 8
+2617 8
++77 8
+fi=(175)
+901 16
+fi=(265)
+1014 8
+fi=(175)
+902 8
+fi=(265)
+1014 8
+fi=(180)
+444 8
+fi=(173)
+3942 8
+fi=(348)
+2811 8
++43 16
+cfn=(4756) <alloc::sync::Arc<std::thread::thread::Inner, std::alloc::System>>::drop_slow
+calls=16 2109 
+* 400
+fi=(180)
+444 8
+fi=(173)
+3942 8
+fi=(348)
+2811 8
++43 16
+cfn=(1726)
+calls=16 2109 
+* 880
+fi=(244)
+594 8
+fe=(426)
+1044 8
+fi=(233)
+0 1
+fe=(426)
+1055 1
+cfi=(233)
+cfn=(4780) core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<(usize,std::thread::scoped::ScopedJoinHandle<()>)>>
+calls=2 805 
+* 56
++1 8
+
+fn=(4838)
+1205 7
+fi=(180)
+444 2
+fi=(348)
+2422 6
+fi=(371)
+3841 1
+cfi=(250)
+cfn=(2310)
+calls=2 497 
+* 5
+0 1
+fi=(244)
+2173 2
++1 2
+fi=(373)
+20 8
+fi=(265)
+745 2
+fi=(180)
+444 1
+fi=(173)
+3891 1
+729 1
+fi=(244)
+2173 1
+fe=(426)
+1214 5
+-1 11
+
+fl=(250)
+fn=(864)
+cfn=(2264) cached_part_profile::run_sample
+calls=0 916 
+1027 57924
+
+fn=(4922) cached_part_profile::cached_part_region_0787
+761 2
+fi=(371)
+7083 1
+cfi=(426)
+cfn=(4028)
+calls=1 140 
+* 57919
+fe=(250)
+768 2
+
+fn=(2310)
+497 104
++1 312
++1 104
+
+fn=(2264)
+cfn=(4922)
+calls=1 761 
+889 57924
+
+fl=(348)
+fn=(4756)
+2109 32
++6 8
++5 8
+fi=(233)
+805 16
+fe=(348)
+3327 16
+fi=(173)
+3942 8
+fe=(348)
+3479 8
+fi=(243)
+48 40
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=16 3319 
+* 264
+fe=(348)
+
+fn=(1726)
+2109 1
++6 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fe=(348)
+2811 1
+3327 2
+fi=(173)
+3942 1
+fe=(348)
+3479 1
+fi=(243)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=16 3319 
+* 33
+fe=(348)
+2109 24
++6 8
++5 16
+cfi=(233)
+cfn=(4762) core::ptr::drop_in_place<std::thread::lifecycle::Packet<()>>
+calls=16 805 
+* 285
+3327 16
+fi=(173)
+3942 8
+fe=(348)
+3479 8
+fi=(243)
+48 40
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=16 3319 
+* 475
+fe=(348)
+2109 1
++6 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fe=(348)
+2811 1
+3327 2
+fi=(173)
+3942 1
+fe=(348)
+3479 1
+fi=(243)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=2 3319 
+* 33
+fe=(348)
+
+fl=(233)
+fn=(4786)
+805 12
+0 1
+805 58
+cfn=(4788) core::ptr::drop_in_place<std::sync::mpsc::Receiver<core::result::Result<litchi_opc::source_backed::PartData,litchi_opc::error::OpcError>>>
+calls=16 * 
+* 1460
+* 8
+fi=(252)
+632 2
+fi=(243)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=2 3319 
+* 33
+fe=(233)
+
+fn=(4810) core::ptr::drop_in_place<std::sync::mpsc::SyncSender<litchi_opc::source_backed::batch::WorkerCommand>>
+805 24
+fi=(481)
+632 16
+fi=(173)
+3943 8
+fi=(504)
+61 8
+fi=(173)
+4121 8
+fi=(475)
+452 8
+0 8
+fi=(173)
+4121 32
+fi=(475)
+454 16
+0 8
+fi=(173)
+3909 8
+fi=(504)
+64 16
+fe=(233)
+805 16
+cfn=(4796) core::ptr::drop_in_place<std::sync::mpmc::counter::Counter<std::sync::mpmc::array::Channel<litchi_opc::source_backed::batch::WorkerCommand>>>
+calls=16 * 
+* 2627
+fi=(481)
+0 32
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=16 3319 
+0 264
+fe=(233)
+
+fn=(4830)
+805 4
+fi=(252)
+632 2
+fe=(233)
+805 1
+fi=(243)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=2 3319 
+* 33
+fe=(233)
+805 4
+fi=(376)
+463 3
+fi=(180)
+-19 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 3
+fi=(376)
+463 1
+fe=(233)
+805 1
+fi=(376)
+463 2
+fi=(180)
+-19 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 4
+
+fn=(4850)
+805 4
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 7
+
+fn=(4808)
+805 12
+0 1
+805 58
+cfn=(4810)
+calls=16 * 
+* 3099
+* 8
+fi=(252)
+632 2
+fi=(243)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=2 3319 
+* 33
+fe=(233)
+
+fn=(4780)
+805 8
+fi=(263)
+514 2
+fe=(233)
+805 2
+fi=(252)
+632 2
+fi=(263)
+506 1
+fi=(243)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=2 3319 
+* 33
+fe=(233)
+
+fn=(4824)
+805 5
+fi=(376)
+463 3
+fi=(180)
+-19 1
+fi=(376)
++20 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 1
+fi=(376)
+463 3
+fi=(180)
+-19 1
+fi=(376)
++20 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 1
+fi=(376)
+463 3
+fi=(180)
+-19 1
+fi=(376)
++20 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 1
+fi=(376)
+463 3
+fi=(180)
+-19 1
+fi=(376)
++20 2
+0 1
+fi=(173)
+3891 1
+0 1
+fi=(174)
+2345 3
+fi=(173)
+4061 1
+3387 1
+fi=(265)
+745 2
+fi=(376)
+-73 1
+fi=(180)
+444 1
+fi=(173)
+3942 1
+fi=(348)
+2811 1
+fe=(233)
+805 4
+
+fn=(4762)
+805 64
+fi=(434)
+197 40
+fe=(233)
+805 16
+fi=(434)
+209 8
++5 24
+0 8
+fi=(427)
+64 8
+fi=(173)
+3942 8
+fi=(427)
+67 8
+fi=(180)
+444 2
+fi=(173)
+3908 1
+fi=(479)
+96 2
+fi=(173)
+3942 8
+fi=(348)
+2811 8
+fe=(233)
+805 80
+
+fn=(4788)
+805 64
+fi=(481)
+1358 16
+fi=(173)
+3943 8
+fi=(504)
+114 8
+fi=(173)
+4121 8
+fi=(475)
+471 8
+0 8
+fi=(173)
+4121 48
+fi=(475)
+472 24
+0 8
+fi=(173)
+3890 8
+fi=(475)
+502 40
++5 24
++1 16
++4 8
+fi=(290)
+253 8
+fi=(173)
+3891 8
+fi=(475)
+516 24
++15 16
+fi=(243)
+0 8
+fi=(173)
+3909 8
+fi=(504)
+117 16
+fe=(233)
+805 16
+cfn=(4796)
+calls=16 * 
+* 724
+fi=(481)
+0 72
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=16 3319 
+0 264
+fe=(233)
+
+fn=(4796)
+805 96
+fi=(245)
+1920 32
+fe=(233)
+805 16
+fi=(243)
+48 16
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=32 3319 
+* 1614
+fe=(233)
+805 64
+fi=(252)
+632 32
+fe=(233)
+805 64
+fi=(252)
+632 32
+fe=(233)
+805 64
+fi=(252)
+632 32
+fi=(243)
+48 24
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=24 3319 
+* 1073
+fe=(233)
+805 64
+fi=(252)
+632 32
+fe=(233)
+805 96
+
+fl=(477)
+fn=(4336)
+152 36
+fi=(173)
+3975 8
+fi=(247) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/sync/mutex/futex.rs
+32 4
+fi=(173)
+3890 8
+fi=(248)
+464 12
+0 4
+fi=(173)
+3890 4
+fi=(478) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/poison.rs
+123 4
+fi=(244)
+1231 4
+fi=(173)
+3923 4
+fi=(348)
+2405 4
+fe=(477)
+49 12
+fi=(253)
+1025 4
++3 8
+fe=(477)
+154 4
+fi=(253)
+1029 4
+cfi=(252)
+cfn=(1742)
+calls=24 186 
+* 396
+fi=(252)
+612 4
+fi=(239)
+961 4
+fi=(233)
+1917 16
+fi=(253)
+1034 8
+fe=(477)
+156 4
+fi=(478)
+0 4
+fi=(173)
+3877 4
+fi=(478)
+129 8
+0 4
+fi=(173)
+3890 4
+fi=(248)
+464 8
+0 4
+fi=(173)
+3908 4
+fi=(247)
+90 8
+fe=(477)
++67 28
+
+fn=(4370)
+171 504
+fi=(173)
+3892 72
+fe=(477)
+172 144
+0 64
+fi=(173)
+3975 64
+fi=(247)
+32 32
+fi=(173)
+3890 64
+fi=(248)
+464 96
+0 32
+fi=(173)
+3890 32
+fi=(478)
+123 32
+fi=(244)
+1231 32
+fi=(173)
+3892 32
+fe=(477)
+174 64
+fi=(253)
+2997 32
+fe=(477)
+68 64
+fi=(384) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread_local/native/mod.rs
++7 64
+fi=(252)
+612 32
+fi=(239)
+961 160
+fi=(180)
+444 32
+fe=(477)
+77 64
++3 32
+fi=(173)
+3996 64
+fe=(477)
+78 32
++6 32
+fi=(476)
++23 64
+fe=(477)
+0 32
+fi=(180)
+444 64
+fi=(173)
+3908 32
+fi=(479)
+96 64
+-96 32
+fi=(483)
+107 160
+cob=(2)
+cfi=(480)
+cfn=(4354)
+calls=76 -78 
+* 384
+fi=(253)
+2997 64
+2379 64
+fi=(252)
+612 32
+fi=(233)
+1717 128
+fi=(253)
+2393 64
+fi=(233)
+638 160
+cob=(2)
+cfi=(211)
+cfn=(728)
+calls=76 255 
+* 416
+fi=(253)
+2395 32
+2168 32
+2350 64
++1 64
+fi=(265)
+1165 32
+fi=(173)
+3942 32
+fi=(348)
+2811 32
+0 1
+2854 1
+cfn=(1726)
+calls=2 2109 
+* 45
+0 32
+fi=(252)
+612 32
+fi=(253)
+2997 32
+2168 32
+fi=(180)
+1720 32
+fi=(286)
+180 32
+fe=(477)
+-2 64
+fi=(253)
+3022 64
+0 64
+fi=(173)
+3877 32
+fi=(478)
+129 64
+0 32
+fi=(173)
+3890 32
+fi=(248)
+464 64
+0 32
+fi=(173)
+3908 32
+fi=(247)
+90 64
+fe=(477)
++93 568
+fi=(483)
+-76 13
+cob=(2)
+cfi=(480)
+cfn=(4354)
+calls=5 -78 
+* 12
+fe=(477)
+
+fl=(172)
+fn=(860) std::rt::lang_start::{{closure}}
+cfi=(249)
+cfn=(862)
+calls=0 162 
+206 57924
+
+fn=(598)
+fi=(473)
+cfn=(860)
+calls=0 206 
+287 57924
+fe=(172)
+
+fl=(242)
+fn=(4090)
+241 4
++1 1
+fi=(350) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cell.rs
+555 1
+fe=(242)
+243 2
+fi=(173)
+3923 1
+fi=(348)
+2405 1
+fe=(242)
+0 1
+253 4
+
+fl=(436)
+fn=(4160) <std::thread::spawnhook::SpawnHooks as core::ops::drop::Drop>::drop
+22 64
+fi=(175)
+901 8
++1 8
+fi=(265)
+1545 16
+fe=(436)
+28 56
+
+fn=(4140)
+113 80
+fi=(384)
+-45 8
+fi=(350)
+555 16
+fi=(437) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread_local/native/eager.rs
+35 8
+fi=(175)
+901 16
++1 8
+fi=(265)
+2262 16
+fi=(175)
+0 8
+901 8
++1 16
+fi=(233)
+-97 8
+cfi=(436)
+cfn=(4160)
+calls=16 22 
+* 152
+* 24
+fe=(436)
+119 8
+-3 16
+fi=(265)
+745 8
+2766 8
+fi=(252)
+0 24
+fi=(265)
+2766 8
+fe=(436)
+127 32
++6 72
+
+fl=(333)
+fn=(1514)
+694 96
+fi=(334)
+203 64
++1 64
++1 64
++1 32
+fi=(297) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/hash/random.rs
+84 320
+fi=(334)
+306 128
+cfn=(1516)
+calls=540 -50 
+* 2464
+fe=(333)
++57 160
+cfi=(334)
+cfn=(1516)
+calls=540 256 
+* 1120
+fi=(334)
+-49 96
+-2 64
++4 64
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fi=(174)
+2457 32
+fi=(334)
+78 32
+fi=(281)
+2029 32
+fi=(334)
+79 32
+fi=(281)
+2029 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fi=(334)
+79 32
+fi=(281)
+2029 64
+fi=(334)
+78 32
+318 32
++2 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fi=(334)
+78 32
+fi=(281)
+2029 64
+fi=(334)
+79 32
+fi=(174)
+2457 32
+fi=(281)
+2029 32
+fi=(174)
+2457 32
+fi=(334)
+79 32
+fi=(281)
+2029 32
+fi=(334)
+78 32
+fi=(281)
+2029 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fi=(334)
+78 32
+fi=(281)
+2029 64
+fi=(334)
+79 32
+fi=(174)
+2457 32
+fi=(281)
+2029 32
+fi=(174)
+2457 32
+fi=(334)
+79 32
+fi=(281)
+2029 32
+fi=(334)
+78 32
+fi=(281)
+2029 32
+fi=(174)
+2457 64
+fi=(281)
+2029 32
+fi=(334)
+78 32
+fi=(281)
+2029 32
+fi=(334)
+79 32
+fi=(174)
+2457 32
+fi=(281)
+2029 128
+fi=(334)
+323 96
+fe=(333)
+702 96
+
+ob=(2)
+fl=(197) ./misc/./misc/sbrk.c
+fn=(658) sbrk
+37 5
++6 2
++35 3
+-38 2
++18 2
++4 2
+
+fl=(341)
+fn=(1578)
+73 32
++7 32
++1 32
+401 32
++1 32
++5 32
++1 32
++1 32
++1 32
++1 32
++3 28
++1 28
++1 28
++1 28
++3 28
++1 28
++1 28
++1 56
++6 4
++1 4
++82 4
++1 4
++1 4
++1 4
++1 4
++4 4
++1 4
++1 4
++1 4
++1 4
++1 4
++2 4
++2 4
+
+fl=(499) ./nptl/./nptl/futex-internal.c
+fn=(4770) __futex_abstimed_wait_cancelable64
+138 1
+-61 2
++3 2
++58 1
+-55 1
+-26 2
++26 1
+-26 1
++26 1
++55 1
+-81 1
++27 1
+-27 1
++27 1
+-27 3
+cfi=(177) ./nptl/./nptl/cancellation.c
+cfn=(4772) __internal_syscall_cancel
+calls=2 -27 
+* 48
++46 10
++38 1
+-28 1
++28 1
+
+fl=(193)
+fn=(642)
+32 16
+fi=(194) ./nptl/../string/bits/string_fortified.h
++27 8
+fe=(193)
+-27 32
+fi=(194)
++27 16
+fe=(193)
+-13 16
+cfi=(190) ./misc/../sysdeps/unix/sysv/linux/getpagesize.c
+cfn=(636) getpagesize
+calls=33 -19 
+* 48
+* 16
++3 32
+
+fl=(441) ./nptl/./nptl/pthread_mutex_lock.c
+fn=(4150) pthread_mutex_lock@@GLIBC_2.2.5
+71 8
++3 8
++2 8
++2 24
+-7 24
++10 8
++2 16
++75 8
++2 8
++3 8
+-59 8
++62 16
+-76 16
++5 16
+-51 8
++1 32
++65 24
++1 16
+-63 32
+
+fl=(211)
+fn=(728)
+255 48
++1 48
++6 48
++1 48
++2 16
++1 16
++1 16
++38 32
++1 32
++2 32
++1 32
++2 32
++4 32
++1 32
++1 32
++8 32
++61 16
++1 16
++5 16
++1 16
++24 16
++1 16
++4 16
++2 16
++4 16
++1 16
++11 16
++3 16
++2 16
++2 16
++4 16
++1 16
++9 16
++1 16
++2 16
++2 16
++1 16
++1 16
++3 16
++2 16
++2 16
++2 32
++6 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 16
+-11 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++1 48
++2 16
++1 16
++1 16
++1 16
++2 16
++4 32
+
+fl=(498) ./nptl/./nptl/nptl_free_tcb.c
+fn=(4744) __nptl_free_tcb
+25 8
++2 24
++4 24
++11 16
+cfi=(450)
+cfn=(4746) __nptl_deallocate_stack
+calls=16 +81 
+* 360
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(588) (below main)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 57924
+
+fl=(451)
+fn=(4186)
+30 8
++8 8
+fi=(506) ./nptl/../sysdeps/nptl/pthreadP.h
+707 16
+fe=(451)
+40 8
++2 8
++1 8
+
+fl=(495)
+fn=(4738)
+23 8
++1 32
+cfi=(496) ./nptl/./nptl/pthread_join_common.c
+cfn=(4740) __pthread_clockjoin_ex
+calls=16 +6 
+* 929
+
+fl=(480)
+fn=(4354)
+29 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
++1 37
+
+fl=(500) ./nptl/../sysdeps/unix/sysv/linux/x86_64/syscall_cancel.S
+fn=(4774) __syscall_cancel_arch
+31 1
++6 1
++1 1
++1 1
++4 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++4 1
+
+fl=(456) ./misc/../sysdeps/unix/sysv/linux/clone-internal.c
+fn=(4210) __clone_internal
+97 16
++2 8
+-2 56
++2 8
+-2 8
+-17 24
++26 8
+-42 24
++42 8
+-53 8
++11 8
+-2 8
+-9 8
++9 8
++2 32
+cfi=(458) ./misc/../sysdeps/unix/sysv/linux/x86_64/clone.S
+cfn=(4214) clone
+calls=15 -12 
+* 152
++45 16
++1 56
+
+fl=(452)
+fn=(4208) create_thread
+237 88
++4 8
+-4 24
++4 16
++4 16
++3 16
++1 16
++39 8
++3 8
++2 8
+-5 16
++10 16
+-10 16
++5 8
++5 8
+-10 32
++10 16
+cfi=(456)
+cfn=(4210)
+calls=16 97 
+* 456
++1 16
++5 8
++6 16
++12 16
++11 8
++1 88
+
+fn=(4190)
+651 128
++6 16
++13 32
+925 16
++4 96
+668 8
+-2 8
+fi=(453) ./nptl/./nptl/allocatestack.c
+362 8
+cfi=(190)
+cfn=(636)
+calls=16 27 
+* 48
+* 16
++4 24
+fi=(454) ./nptl/./nptl-stack.h
+61 64
+fi=(453)
+371 8
+fi=(454)
+61 8
+fi=(453)
+371 16
+479 32
++10 8
+362 8
+489 40
++4 64
++5 24
++1 8
+-2 16
+66 40
++8 16
+-11 8
++11 16
+fi=(454)
+-37 8
+fi=(453)
++42 40
+-1 8
++3 16
++15 24
++9 8
++3 16
+cfi=(450)
+cfn=(4926) __nptl_stack_list_del
+calls=8 -80 
+* 72
++3 24
+cfi=(450)
+cfn=(4202) __nptl_stack_list_add
+calls=8 -68 
+* 96
++3 24
++3 32
++2 40
++5 8
++18 8
+fi=(194)
+-83 8
+fi=(453)
++69 8
++1 8
+-5 8
++1 8
++5 8
+-5 8
++8 8
++2 8
++1 8
++3 8
+fi=(194)
+-80 8
+fi=(453)
++84 32
++1 40
+cob=(3) ???
+cfi=(152) ???
+cfn=(760) 0x0000000004a773c0
+calls=8 0 
+* 48
+* 640
+cob=(3)
+cfi=(152)
+cfn=(760)
+calls=128 0 
+* 768
+-1 408
++2 16
+fi=(194)
+-86 24
+cob=(3)
+cfi=(152)
+cfn=(798) 0x0000000004a77710
+calls=8 -59 
+* 304
+fi=(453)
++89 24
+cob=(3)
+cfi=(152)
+cfn=(4928) 0x0000000004a77750
+calls=8 0 
+* 2920
+257 24
++35 24
+620 8
+fe=(452)
+782 8
+fi=(453)
+620 8
++19 8
++16 8
+fe=(452)
++44 8
+fi=(453)
+-60 8
++11 16
+-21 8
++21 8
+-11 8
+fe=(452)
++69 8
+-6 8
+fi=(453)
+-47 8
+fe=(452)
++14 8
+fi=(453)
+-35 8
+fe=(452)
++74 8
++1 8
++1 8
+-1 8
++5 8
+fi=(453)
+-77 8
++2 8
+fe=(452)
++75 8
+-1 8
++2 24
++4 8
+-5 8
++5 32
++6 16
++2 16
++3 32
++5 16
++1 16
++4 16
++5 16
+fi=(507) ./nptl/../sysdeps/x86/nptl/tls-setup.h
+22 16
+fe=(452)
+757 24
++21 16
++4 16
++2 8
++10 8
+fi=(459) ./nptl/../sysdeps/unix/sysv/linux/internal-signals.h
+81 40
+fe=(452)
+799 16
+fi=(459)
+81 16
+fe=(452)
+807 24
+fi=(455) ./nptl/../sysdeps/unix/sysv/linux/internal-sigset.h
+34 8
+fe=(452)
+634 16
+863 48
+cfn=(4208)
+calls=16 237 
+* 928
+fi=(459)
+89 24
+fe=(452)
+863 8
+fi=(459)
+89 24
+fe=(452)
+870 16
++41 16
++10 16
+fi=(453)
+381 16
+fe=(452)
+818 16
+fi=(455)
+102 8
++1 8
+fe=(452)
+688 1
++91 1
+cfi=(199) ./libio/./libio/genops.c
+cfn=(4204) _IO_enable_locks
+calls=2 544 
+* 5
+* 2
+fi=(453)
+83 16
+fe=(452)
+
+fn=(4218) start_thread
+fe=(452)
+
+fl=(190)
+fn=(636)
+27 16
++1 64
++2 16
+
+fl=(155)
+fn=(762)
+3319 203
++3 406
++15 134
+-4 201
++8 201
++6 201
++6 67
+-3 134
++3 67
+-3 67
++1 134
++2 201
+3007 54
++8 54
+-12 54
++4 162
++1 54
++7 54
+3354 54
++10 39
+-34 13
++40 26
+fi=(154) ./malloc/./malloc/arena.c
+151 39
+-6 10
++6 5
+fe=(155)
+3374 15
+cfn=(730) _int_free_chunk
+calls=102 4351 
+* 800
+* 24
+cfn=(730)
+calls=454 4351 
+* 1120
+-36 136
+
+fn=(794) unlink_chunk.isra.0
+1592 12
++2 36
+-2 12
++2 24
++3 12
++3 24
+-2 12
++2 24
++3 12
++1 12
++1 42
++2 2
++1 3
++3 2
++14 1
++1 1
++3 24
+
+fn=(1650) systrim.constprop.0
+2743 3
++2 1
++1 2
++4 1
++1 1
+-1 2
++3 4
++2 2
+-21 1
++28 1
+-28 2
++28 3
+cfi=(196) ./malloc/./malloc/morecore.c
+cfn=(656) __glibc_morecore
+calls=32 25 
+* 26
+* 1
++1 4
++32 1
+-48 1
++48 1
+
+fn=(732) _int_free_merge_chunk
+4407 104
++7 65
+-6 13
++9 39
++5 39
++4 26
+-1 26
++1 26
+1895 39
+4433 26
++2 4
++2 4
++1 16
++2 4
+-4 4
++4 4
+cfn=(794)
+calls=287 1592 
+* 79
++18 26
++6 26
++4 6
++4 26
++9 5
+-1 5
++2 10
++2 15
++7 16
++1 32
++1 8
++2 16
++3 48
++4 8
+-1 8
++2 8
++1 8
++2 24
++1 8
+-61 8
+-1 16
++1 48
+-1 8
+cfn=(734) _int_free_maybe_trim
+calls=574 +83 
+* 192
++57 5
+-1 5
++2 5
++1 5
++2 15
++1 5
+-61 5
+-1 10
++1 30
+-1 5
+cfn=(734)
+calls=357 +83 
+* 187
++20 7
++1 7
+-1 7
+cfn=(794)
+calls=159 1592 
+* 145
++1 7
+
+fn=(650)
+3283 59
+1269 118
++19 59
+3287 59
+1288 177
+3287 118
++2 177
++2 118
++2 354
+3030 108
++4 216
++4 54
++1 54
+3294 54
++12 5
+cfn=(652) __libc_malloc2
+calls=1340 -59 
+* 1203
+
+fn=(652)
+3247 30
++4 10
++8 40
++2 15
+cfn=(654) _int_malloc
+calls=309 3790 
+* 1013
++3 10
++8 20
++4 15
+fi=(154)
+151 15
+fe=(155)
+3276 10
++3 25
+
+fn=(734)
+4528 143
++3 26
++2 4
++3 5
++14 132
+-13 4
++13 7
+-13 1
+cfn=(1650)
+calls=32 2743 
+* 57
+
+fn=(654)
+3790 45
++32 10
+1288 30
+3831 10
++16 10
++72 3
+-1 3
++12 6
+-11 6
+-1 9
++12 6
+-6 3
++5 3
+-7 3
++2 6
++9 6
++3 6
++1 9
+-3 3
++5 3
++1 12
++2 12
+-10 3
++12 6
++1 6
++2 6
++11 12
++29 1
++1 1
++4 2
++31 2
++8 4
++1 1
++1 1
+-1 1
++4 2
++50 2
++9 1
+-9 4
++1 1
++1 1
++1 1
++1 1
++6 2
+3850 5
++2 5
+-2 5
++2 10
++2 2
++1 4
++2 2
++1 2
++1 2
++2 8
++6 6
++1 4
+2919 4
+3872 6
++4 37
++1 18
++2 14
++2 7
++1 7
++1 14
++2 7
+2999 7
++16 7
+3886 7
+3003 14
++4 28
++1 7
++7 7
++32 11
+1888 2
+3893 2
+1888 4
+4340 45
+3901 5
+-52 30
+4105 3
+3930 3
+4111 4
++13 1
+-2 2
+4277 2
++3 8
++2 3
++1 1
+1888 1
+4286 1
+1888 2
+4031 8
++52 1
+-51 1
++51 3
+3959 6
++2 2
+-1 4
++71 14
+4195 1
++1 1
++1 1
+-1 1
++1 1
++1 2
++1 3
++5 4
++16 30
++2 60
+-4 62
++8 1
++3 2
+-21 3
++3 4
+-3 3
++3 4
+-3 3
++3 4
+-3 1
++5 4
++1 2
++24 2
++3 2
++2 1
++3 2
+-3 4
++3 1
+cfn=(794)
+calls=364 1592 
+* 31
++3 6
++15 1
++1 2
++3 1
+-9 1
++9 2
++1 1
++1 1
++3 2
++1 1
++1 3
+3965 2
++3 2
+-4 4
++3 2
+-1 2
++1 4
++1 4
++1 4
++2 4
++4 2
++6 2
+-6 14
++2 6
++5 2
+-4 2
++4 4
+cfn=(662) alloc_perturb
+calls=461 1887 
+* 10
++1 2
+
+fn=(662)
+1887 2
++1 6
++2 2
+
+fn=(730)
+4351 52
++8 13
+-3 13
++3 13
+-3 26
++6 26
++11 26
++27 39
+-35 26
++1 52
++2 26
+cfn=(732)
+calls=151 +39 
+* 1543
+* 13
++3 52
+
+fn=(1222)
+5366 32
++6 16
+-1 16
++1 16
+-1 16
++1 16
++1 64
+-7 32
++11 16
+-11 64
++11 16
+cfn=(1224) _mid_memalign
+calls=67 3558 
+* 1024
+* 16
++8 16
+-6 32
++2 16
++1 16
++4 48
+
+fn=(1224)
+3558 16
++5 32
++4 32
+-9 80
+1269 32
++19 64
+3104 32
++2 48
++1 48
++4 32
++1 16
++5 32
+-6 16
++2 16
++6 32
+-2 64
++1 16
++1 32
+3572 48
++8 32
+3026 16
+-1 32
++9 16
++4 16
++1 16
+3618 80
+3030 32
++4 64
+3618 32
+
+fl=(450)
+fn=(4746)
+123 24
++1 16
+-1 16
++1 24
++4 8
+-99 8
+fi=(508) ./nptl/../include/list.h
++26 24
++1 8
+fe=(450)
+-19 8
++69 16
++28 16
+-28 16
+-62 32
+fi=(508)
+-1 8
++1 8
+-1 8
++2 8
++2 8
+fe=(450)
++5 8
++64 8
+-1 24
++1 16
++32 32
++1 16
+
+fn=(4184)
+162 8
+fi=(454)
+61 56
+fe=(450)
+164 8
+fi=(454)
+61 8
+fe=(450)
+164 8
++1 8
+
+fn=(4926)
+28 8
++1 16
+fi=(508)
++26 24
++1 8
+fe=(450)
+-19 8
++1 8
+
+fn=(4202)
+43 8
++1 32
+fi=(508)
+-1 8
++1 8
+-1 8
++2 8
++2 8
+fe=(450)
++5 8
++1 8
+
+fl=(199)
+fn=(4204)
+544 1
++3 3
++5 1
+
+fl=(227) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+fn=(800) __memset_avx2_unaligned_erms
+198 8
++1 16
++5 8
++1 8
++1 8
++1 8
++1 8
++21 8
++1 8
++6 8
++1 8
++12 8
++3 8
++1 8
++12 8
++1 8
++13 8
++1 8
++2 8
++3 8
++3 8
++3 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 16
++3 8
++1 8
++1 8
++1 8
++3 16
+
+fl=(443) ./nptl/./nptl/pthread_mutex_unlock.c
+fn=(4156) pthread_mutex_unlock@@GLIBC_2.2.5
+357 8
+51 8
++1 16
+357 24
+55 16
++8 8
+-3 8
+-21 8
++1 32
++28 8
++2 8
+359 16
+43 32
++29 16
++3 24
++3 16
+
+fl=(458)
+fn=(4214)
+52 8
++2 8
++1 8
++1 8
++3 8
++1 8
++3 8
++2 8
++4 8
++3 8
++1 8
++1 8
++1 8
++1 8
++5 8
++4 8
++2 8
+-4 8
++1 8
+
+fl=(497) ./nptl/./nptl/pthread_testcancel.c
+fn=(4742) pthread_testcancel@@GLIBC_2.34
+24 8
++2 16
++1 32
+
+fl=(196)
+fn=(656)
+25 1
++1 2
+-1 2
++4 1
+cfi=(197)
+cfn=(658)
+calls=68 +8 
+* 16
++1 2
++4 2
+
+fl=(496)
+fn=(4740)
+30 104
++1 16
++6 16
++5 8
++4 24
++32 8
++3 16
++4 16
+cfi=(498)
+cfn=(4744)
+calls=16 -60 
+* 432
+* 8
++3 8
++3 64
+-34 2
++10 5
+cfi=(499)
+cfn=(4770)
+calls=2 +71 
+* 81
++4 4
+-25 9
++1 18
++3 10
+-18 8
+cfi=(497)
+cfn=(4742)
+calls=16 -8 
+* 56
+* 16
+
+fl=(232)
+fn=(818)
+26 8
++10 24
++8 16
+
+fl=(165)
+fn=(566)
+cfi=(168)
+cfn=(588)
+calls=0 30 
+360 57924
+
+fl=(177)
+fn=(4772)
+30 5
++7 2
++1 6
++11 12
+cfi=(500)
+cfn=(4774)
+calls=2 -18 
+* 15
++5 2
++6 4
++4 2
+
+ob=(3)
+fl=(152)
+fn=(798)
+0 16
+cob=(2)
+cfi=(227)
+cfn=(800)
+calls=85 198 
+0 288
+
+fn=(760)
+0 272
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=254 3319 
+0 544
+
+fn=(4928)
+0 16
+cob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+cfi=(48) ./elf/../elf/dl-tls.c
+cfn=(462) _dl_allocate_tls_init
+calls=8 612 
+0 2904
+
+ob=(1)
+fl=(29) ./string/../sysdeps/x86_64/multiarch/../multiarch/memmove-vec-unaligned-erms.S
+fn=(124) mempcpy
+197 24
++1 24
++1 24
++1 24
++17 24
++1 24
++2 16
++1 16
++1 16
++2 16
++1 16
++1 16
++2 32
++77 8
++1 8
++2 8
++1 8
++2 8
++4 8
++1 8
++1 8
++8 8
+
+fl=(48)
+fn=(462)
+612 80
++1 16
++4 8
++9 16
+-3 16
+cob=(2)
+cfi=(441)
+cfn=(4150)
+calls=8 71 
+* 288
++3 24
++12 24
+-19 8
++43 24
+-19 72
++9 72
++1 48
++6 72
++3 24
+-2 24
++6 24
+-6 24
++2 48
++4 24
+-4 72
++3 48
++4 48
++1 96
++2 48
++1 24
++21 48
+-21 24
++21 24
+-12 24
++12 48
+cfi=(29)
+cfn=(124)
+calls=24 197 
+* 344
+* 120
+cfi=(45) ./string/../sysdeps/x86_64/multiarch/../multiarch/memset-vec-unaligned-erms.S
+cfn=(128) memset
+calls=24 137 
+* 432
+-51 24
++59 24
+-59 96
++6 80
++59 16
+cob=(2)
+cfi=(443)
+cfn=(4156)
+calls=8 357 
+* 248
++3 8
++3 72
+
+fl=(45)
+fn=(128)
+137 24
++1 48
++5 24
++1 24
++1 16
++2 16
++1 16
++73 8
++1 8
++2 16
++12 16
++1 16
++12 16
++3 16
++1 16
++12 8
++1 8
++13 8
++1 8
++2 8
++18 8
++1 8
++1 8
++1 8
++3 16
++35 8
++9 8
++1 8
++5 8
++1 8
++36 8
++1 8
++5 8
+
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 57924
+
+totals: 57924

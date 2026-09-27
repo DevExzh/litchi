@@ -1,0 +1,32 @@
+==191483== Callgrind, a call-graph generating cache profiler
+==191483== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==191483== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==191483== Command: /home/zhuhe/code/litchi-target-0787/baseline-profile --route parts --shape large --workers 1 --task-floor 0 --state primed --samples 1 --warmup 0 --output /home/zhuhe/code/litchi-worktrees/0787-cached-part-scheduling/docs/performance/results/change-0787/profiles/0-1.json
+==191483== 
+==191483== For interactive control, run 'callgrind_control -h'.
+==191483== brk segment overflow in thread #1: can't grow to 0x4a4f000
+==191483== (see section Limitations in user manual)
+==191483== NOTE: further instances of this message will not be shown
+==191483== 
+==191483== Process terminating with default action of signal 11 (SIGSEGV)
+==191483==  Access not within mapped region at address 0x7C167E9A6000
+==191483==    at 0x417AF6A: rustix::backend::param::auxv::check_elf_base (library/core/src/array/equality.rs:157)
+==191483==    by 0x417B1A3: rustix::backend::param::auxv::init_from_aux_iter (auxv.rs:407)
+==191483==    by 0x417B106: rustix::backend::param::auxv::init_auxv_impl (auxv.rs:301)
+==191483==    by 0x417ABD3: rustix::backend::vdso_wrappers::init_clock_gettime (auxv.rs:276)
+==191483==    by 0x4078506: cached_part_profile::run_sample (src/backend/linux_raw/vdso_wrappers.rs:70)
+==191483==    by 0x407E64D: cached_part_profile::main (main.rs:1035)
+==191483==    by 0x4083452: std::sys::backtrace::__rust_begin_short_backtrace (library/core/src/ops/function.rs:250)
+==191483==    by 0x4083448: std::rt::lang_start::{{closure}} (library/std/src/rt.rs:206)
+==191483==    by 0x41CAC3D: std::rt::lang_start_internal (function.rs:287)
+==191483==    by 0x4097F8B: main (in /home/zhuhe/code/litchi-target-0787/baseline-profile)
+==191483==  If you believe this happened as a result of a stack
+==191483==  overflow in your program's main thread (unlikely but
+==191483==  possible), you can try to increase the size of the
+==191483==  main thread stack using the --main-stacksize= flag.
+==191483==  The main thread stack size used in this run was 8388608.
+==191483== 
+==191483== Events    : Ir
+==191483== Collected : 0
+==191483== 
+==191483== I   refs:      0
