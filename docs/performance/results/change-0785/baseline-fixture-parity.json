@@ -1,0 +1,194 @@
+{
+  "rows": [
+    {
+      "case": "0-tiny-capture-before",
+      "current": {
+        "bytes": 2530,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-tiny-capture-before.json",
+        "sha256": "a5541bd78062c11bd0b8762b0e86ed6d1923400680fc962fe5341b2cf4daf500"
+      },
+      "output": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      },
+      "previous": {
+        "bytes": 2242,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-tiny-capture-before.json",
+        "sha256": "b298cbf86d9a87b7ba82ff15ac80fc5ab9167c34e7c313ad819da2b9805bc229"
+      },
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "0-tiny-commit-before",
+      "current": {
+        "bytes": 2498,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-tiny-commit-before.json",
+        "sha256": "a8523269da741e03c28ccae7eb1330e9f741cba5108c6f5c4ea653b55e0df2e3"
+      },
+      "output": {
+        "bytes": 31549,
+        "sha256": "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      },
+      "previous": {
+        "bytes": 2210,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-tiny-commit-before.json",
+        "sha256": "c0bd53a64c479f86cb1397e5940b086a60043249a2983842f21ae016bcaea0c6"
+      },
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "0-tiny-lifecycle-before",
+      "current": {
+        "bytes": 2525,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-tiny-lifecycle-before.json",
+        "sha256": "006d95f659151b76af7954a725947bc447a4612b9d9ddf4c9cee158bd1e038e3"
+      },
+      "output": {
+        "bytes": 31549,
+        "sha256": "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      },
+      "previous": {
+        "bytes": 2237,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-tiny-lifecycle-before.json",
+        "sha256": "751b7fea9b78944d8232296c774a837f402a8ae7b3ef0778b82a1ad254ddb512"
+      },
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "0-medium-capture-before",
+      "current": {
+        "bytes": 2538,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-medium-capture-before.json",
+        "sha256": "8b3298a80e4723485e230144dbe53e19e7f88aee9ca4babda7ad876439eed380"
+      },
+      "output": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      },
+      "previous": {
+        "bytes": 2250,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-medium-capture-before.json",
+        "sha256": "9d7c90e4266d4174d2280b5faf8bc1db6283e0b98a08a5e0d3bfc3e01fe76546"
+      },
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "0-medium-commit-before",
+      "current": {
+        "bytes": 2503,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-medium-commit-before.json",
+        "sha256": "95cd479ecdd836613fda0ff1e0d95ec5293620a67933ef5fad28638f5f154d73"
+      },
+      "output": {
+        "bytes": 40806,
+        "sha256": "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      },
+      "previous": {
+        "bytes": 2215,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-medium-commit-before.json",
+        "sha256": "09e85526a895557b29f15f7d5f8ef51d63dc43fe7774f1c8f266d17172660a0b"
+      },
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "0-medium-lifecycle-before",
+      "current": {
+        "bytes": 2531,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-medium-lifecycle-before.json",
+        "sha256": "7aaaad2b51eba69470ca63e4ae26caa7008a15128b42c57db4f54ed796d53f6e"
+      },
+      "output": {
+        "bytes": 40806,
+        "sha256": "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      },
+      "previous": {
+        "bytes": 2244,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-medium-lifecycle-before.json",
+        "sha256": "f61b5e584380e180945ed353779f3459602bd1104b2cc1afec64336db747d9aa"
+      },
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "0-large-capture-before",
+      "current": {
+        "bytes": 2567,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-large-capture-before.json",
+        "sha256": "a9e9e6a16fe320c3d928102adebfde032d18c5be65c5ccb9180ff9ba8c953f94"
+      },
+      "output": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      },
+      "previous": {
+        "bytes": 2279,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-large-capture-before.json",
+        "sha256": "a28db45b4c5323e3e3aa8ebe89a2c033587855a417e212e4b7fb8c38432c21c9"
+      },
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    },
+    {
+      "case": "0-large-commit-before",
+      "current": {
+        "bytes": 2527,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-large-commit-before.json",
+        "sha256": "ef531321d2213473d6851d02af6420657d23925847b85a5667abf32905ecac55"
+      },
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "previous": {
+        "bytes": 2239,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-large-commit-before.json",
+        "sha256": "94e522b5b5b7d308b77921fb68164793a1369ec572a1f4a53228e6414a75ab0d"
+      },
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    },
+    {
+      "case": "0-large-lifecycle-before",
+      "current": {
+        "bytes": 2554,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/qualification/0-large-lifecycle-before.json",
+        "sha256": "8cf63fb3127a188417ff623c95e2d229d52248505e52f7954bc9d663f9607b81"
+      },
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "previous": {
+        "bytes": 2267,
+        "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0780/qualification/0-large-lifecycle-before.json",
+        "sha256": "c2f6591b2aef3e6df7cc51758b7617818330ea7fd6d649f2fadb93ef9ff98a3e"
+      },
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    }
+  ],
+  "scope": "Exact source/output parity with sealed0780ordinary qualification; not a timing comparison."
+}

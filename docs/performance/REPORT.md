@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0785 — known namespace URI fast path retained
+
+[0785](0785-pptx-known-namespace-uris.md) Large generated PPTX initial capture is 8.489% faster and full lifecycle 6.844% faster by median paired process p50. Memory and allocation counts are unchanged; all 15 cases pass frozen adoption guards. Tail outliers remain disclosed, and no universal speedup or tail-latency improvement is claimed.
+
 ## 0784 — qualified capture profiles guide a narrow optimization
 
 [0784](0784-pptx-initial-capture-profile.md) Recovered capture-owner stacks contain notes XML scanning far more often than fingerprinting on the large shape-heavy fixture; an unresolved frame prevents native phase-fraction claims. Namespace resolution is a nested candidate cost; fingerprinting is smaller than software-SHA Callgrind shares suggest. All 1,486 measured outputs match the inherited source/output/semantic identities. Production code remains unchanged.

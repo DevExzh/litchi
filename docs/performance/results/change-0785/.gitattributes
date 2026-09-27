@@ -1,0 +1,7 @@
+* -text
+**/* -text
+*.log -whitespace
+**/*.log -whitespace
+*.asm.txt -whitespace
+**/*.asm.txt -whitespace
+*.patch -whitespace

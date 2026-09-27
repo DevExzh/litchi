@@ -1,0 +1,13 @@
+{
+  "children": 60,
+  "receipts": {
+    "bytes": 110150,
+    "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/allocation/receipts.json",
+    "sha256": "b395726e4f6e1c14d78b8c69c16e3c7b0567137fde9462bb2bb7140d6f2a990b"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/allocation/source.json",
+    "sha256": "3f71a1af16a673492bfa03a5304e8a6605462bd5ef9eef16a9a849ed13e55af4"
+  }
+}

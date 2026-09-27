@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0785 — paired known-namespace URI results
+
+[0785](0785-pptx-known-namespace-uris.md) Six alternating native blocks across 15 PPTX cases retain the exact-byte known-URI path: large capture p50 improves 8.489% and large lifecycle 6.844%. All 5,595 measured outputs verify; operation allocation and memory remain unchanged. Two p99 flag families and all RSS/tail spreads are disclosed. No historical timing is pooled.
+
 ## 0784 — scoped initial-capture attribution
 
 [0784](0784-pptx-initial-capture-profile.md) Six exact-boundary Callgrind captures and two qualified native frame-pointer profiles locate the large PPTX capture cost. Notes XML validation appears in 1,031/1,029 capture-owner stacks and fingerprinting in 97/93. One unresolved interior frame prevents native phase-fraction claims. Ordinary DWARF traces have zero qualified owner stacks and remain retained. No production change or speedup is claimed.

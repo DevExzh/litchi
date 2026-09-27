@@ -1,0 +1,188 @@
+
+/home/zhuhe/code/litchi-target-0785/after-native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000138750 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E>:
+  138750:	push   %r15
+  138752:	push   %r14
+  138754:	push   %r12
+  138756:	push   %rbx
+  138757:	sub    $0x88,%rsp
+  13875e:	mov    %rdi,%rbx
+  138761:	mov    (%rsi),%r12
+  138764:	movabs $0x8000000000000000,%rcx
+  13876e:	xor    %r12,%rcx
+  138771:	test   %r12,%r12
+  138774:	mov    $0x2,%eax
+  138779:	cmovs  %rcx,%rax
+  13877d:	test   %rax,%rax
+  138780:	je     1387bf <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x6f>
+  138782:	cmp    $0x1,%rax
+  138786:	jne    1387d4 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x84>
+  138788:	mov    0x8(%rsi),%r15
+  13878c:	mov    0x10(%rsi),%r14
+  138790:	lea    -0x29(%r14),%rax
+  138794:	cmp    $0x1a,%rax
+  138798:	ja     1388cc <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x17c>
+  13879e:	lea    -0x1140e5(%rip),%rcx        # 246c0 <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x3f78>
+  1387a5:	movslq (%rcx,%rax,4),%rax
+  1387a9:	add    %rcx,%rax
+  1387ac:	jmp    *%rax
+  1387ae:	lea    -0x1135eb(%rip),%r12        # 251ca <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4a82>
+  1387b5:	mov    $0x29,%edx
+  1387ba:	jmp    1388b8 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x168>
+  1387bf:	movq   $0x1,0x8(%rbx)
+  1387c7:	movq   $0x0,0x10(%rbx)
+  1387cf:	jmp    13897f <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x22f>
+  1387d4:	mov    0x8(%rsi),%r14
+  1387d8:	mov    0x10(%rsi),%rdx
+  1387dc:	lea    0x8(%rsp),%r15
+  1387e1:	mov    %r15,%rdi
+  1387e4:	mov    %r14,%rsi
+  1387e7:	call   *0x10a15b(%rip)        # 242948 <_DYNAMIC+0x268>
+  1387ed:	mov    %r15,0x28(%rsp)
+  1387f2:	lea    0x4b037(%rip),%rax        # 183830 <_ZN66_$LT$alloc..borrow..Cow$LT$B$GT$$u20$as$u20$core..fmt..Display$GT$3fmt17h771b964d13c43a02E>
+  1387f9:	mov    %rax,0x30(%rsp)
+  1387fe:	lea    -0x127878(%rip),%rsi        # 10f8d <anon.eb89d4395b0ead844ef0b45b8b54da85.185.llvm.3643936799275306673+0x9b>
+  138805:	lea    0x70(%rsp),%rdi
+  13880a:	lea    0x28(%rsp),%rdx
+  13880f:	call   *0x10a193(%rip)        # 2429a8 <_DYNAMIC+0x2c8>
+  138815:	cmpq   $0x0,0x8(%rsp)
+  13881b:	jle    138828 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0xd8>
+  13881d:	mov    0x10(%rsp),%rdi
+  138822:	call   *0x10a0b0(%rip)        # 2428d8 <free@GLIBC_2.2.5>
+  138828:	movups 0x70(%rsp),%xmm0
+  13882d:	movups %xmm0,0xf(%rsp)
+  138832:	mov    0x80(%rsp),%rax
+  13883a:	mov    %rax,0x1f(%rsp)
+  13883f:	movb   $0x8,(%rbx)
+  138842:	movups 0x8(%rsp),%xmm0
+  138847:	mov    0x17(%rsp),%rax
+  13884c:	mov    0x1f(%rsp),%rcx
+  138851:	movups %xmm0,0x1(%rbx)
+  138855:	mov    %rax,0x10(%rbx)
+  138859:	mov    %rcx,0x18(%rbx)
+  13885d:	test   %r12,%r12
+  138860:	je     138982 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x232>
+  138866:	mov    %r14,%rdi
+  138869:	call   *0x10a069(%rip)        # 2428d8 <free@GLIBC_2.2.5>
+  13886f:	jmp    138982 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x232>
+  138874:	lea    -0x1136e6(%rip),%r12        # 25195 <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4a4d>
+  13887b:	mov    $0x35,%edx
+  138880:	jmp    1388b8 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x168>
+  138882:	lea    -0x11350a(%rip),%r12        # 2537f <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4c37>
+  138889:	mov    $0x43,%edx
+  13888e:	jmp    1388b8 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x168>
+  138890:	lea    -0x11366a(%rip),%r12        # 2522d <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4ae5>
+  138897:	mov    $0x2e,%edx
+  13889c:	jmp    1388b8 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x168>
+  13889e:	lea    -0x1134e3(%rip),%r12        # 253c2 <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4c7a>
+  1388a5:	mov    $0x37,%edx
+  1388aa:	jmp    1388b8 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x168>
+  1388ac:	lea    -0x1136c0(%rip),%r12        # 251f3 <anon.e56b651126400e1886280b3951aafcb8.284.llvm.17542450157981850571+0x4aab>
+  1388b3:	mov    $0x3a,%edx
+  1388b8:	mov    %r15,%rdi
+  1388bb:	mov    %r12,%rsi
+  1388be:	call   *0x10a20c(%rip)        # 242ad0 <bcmp@GLIBC_2.2.5>
+  1388c4:	test   %eax,%eax
+  1388c6:	je     138977 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x227>
+  1388cc:	lea    0x58(%rsp),%rdi
+  1388d1:	mov    %r15,%rsi
+  1388d4:	mov    %r14,%rdx
+  1388d7:	call   *0x10a19b(%rip)        # 242a78 <_DYNAMIC+0x398>
+  1388dd:	cmpl   $0x1,0x58(%rsp)
+  1388e2:	jne    13896c <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x21c>
+  1388e8:	lea    0x60(%rsp),%rax
+  1388ed:	movups (%rax),%xmm0
+  1388f0:	movaps %xmm0,0x40(%rsp)
+  1388f5:	movq   $0x0,0x28(%rsp)
+  1388fe:	movq   $0x1,0x30(%rsp)
+  138907:	movq   $0x0,0x38(%rsp)
+  138910:	cmpb   $0x1,0x48(%rsp)
+  138915:	jne    138991 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x241>
+  138917:	movzbl 0x49(%rsp),%eax
+  13891c:	mov    %al,0x6(%rsp)
+  138920:	lea    0x6(%rsp),%rax
+  138925:	mov    %rax,0x8(%rsp)
+  13892a:	mov    0x10a087(%rip),%rax        # 2429b8 <_DYNAMIC+0x2d8>
+  138931:	mov    %rax,0x10(%rsp)
+  138936:	lea    0x40(%rsp),%rax
+  13893b:	mov    %rax,0x18(%rsp)
+  138940:	mov    0x10a059(%rip),%rax        # 2429a0 <_DYNAMIC+0x2c0>
+  138947:	mov    %rax,0x20(%rsp)
+  13894c:	lea    0x1032ed(%rip),%rsi        # 23bc40 <anon.d52f46b15fdcd5698bc8ad444313a502.63.llvm.7539205927777768153+0x38>
+  138953:	lea    -0x1258ea(%rip),%rdx        # 13070 <anon.58baeeae7d5fe476157d296c9f08f803.369.llvm.5844774155465566772>
+  13895a:	lea    0x28(%rsp),%rdi
+  13895f:	lea    0x8(%rsp),%rcx
+  138964:	call   *0x10a046(%rip)        # 2429b0 <_DYNAMIC+0x2d0>
+  13896a:	jmp    1389c5 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x275>
+  13896c:	movups 0x60(%rsp),%xmm0
+  138971:	movups %xmm0,0x8(%rbx)
+  138975:	jmp    13897f <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x22f>
+  138977:	mov    %r12,0x8(%rbx)
+  13897b:	mov    %r14,0x10(%rbx)
+  13897f:	movb   $0x27,(%rbx)
+  138982:	add    $0x88,%rsp
+  138989:	pop    %rbx
+  13898a:	pop    %r12
+  13898c:	pop    %r14
+  13898e:	pop    %r15
+  138990:	ret
+  138991:	lea    0x40(%rsp),%rax
+  138996:	mov    %rax,0x8(%rsp)
+  13899b:	mov    0x109ffe(%rip),%rax        # 2429a0 <_DYNAMIC+0x2c0>
+  1389a2:	mov    %rax,0x10(%rsp)
+  1389a7:	lea    0x103292(%rip),%rsi        # 23bc40 <anon.d52f46b15fdcd5698bc8ad444313a502.63.llvm.7539205927777768153+0x38>
+  1389ae:	lea    -0x126f1e(%rip),%rdx        # 11a97 <anon.58baeeae7d5fe476157d296c9f08f803.370.llvm.5844774155465566772>
+  1389b5:	lea    0x28(%rsp),%rdi
+  1389ba:	lea    0x8(%rsp),%rcx
+  1389bf:	call   *0x109feb(%rip)        # 2429b0 <_DYNAMIC+0x2d0>
+  1389c5:	test   %al,%al
+  1389c7:	jne    1389fd <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x2ad>
+  1389c9:	mov    0x38(%rsp),%rax
+  1389ce:	mov    %rax,0x1f(%rsp)
+  1389d3:	movups 0x28(%rsp),%xmm0
+  1389d8:	movups %xmm0,0xf(%rsp)
+  1389dd:	movb   $0x7,(%rbx)
+  1389e0:	movups 0x8(%rsp),%xmm0
+  1389e5:	mov    0x17(%rsp),%rax
+  1389ea:	mov    0x1f(%rsp),%rcx
+  1389ef:	movups %xmm0,0x1(%rbx)
+  1389f3:	mov    %rax,0x10(%rbx)
+  1389f7:	mov    %rcx,0x18(%rbx)
+  1389fb:	jmp    138982 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x232>
+  1389fd:	lea    -0xfbc3a(%rip),%rdi        # 3cdca <anon.d52f46b15fdcd5698bc8ad444313a502.8109.llvm.7539205927777768153+0x263>
+  138a04:	lea    0x103575(%rip),%rcx        # 23bf80 <anon.d52f46b15fdcd5698bc8ad444313a502.63.llvm.7539205927777768153+0x378>
+  138a0b:	lea    0x10350e(%rip),%r8        # 23bf20 <anon.d52f46b15fdcd5698bc8ad444313a502.63.llvm.7539205927777768153+0x318>
+  138a12:	lea    0x7(%rsp),%rdx
+  138a17:	mov    $0x37,%esi
+  138a1c:	call   *0x109f4e(%rip)        # 242970 <_DYNAMIC+0x290>
+  138a22:	ud2
+  138a24:	mov    %rax,%rbx
+  138a27:	cmpq   $0x0,0x8(%rsp)
+  138a2d:	jle    138a3f <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x2ef>
+  138a2f:	mov    0x10(%rsp),%rdi
+  138a34:	call   *0x109e9e(%rip)        # 2428d8 <free@GLIBC_2.2.5>
+  138a3a:	jmp    138a3f <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x2ef>
+  138a3c:	mov    %rax,%rbx
+  138a3f:	test   %r12,%r12
+  138a42:	je     138a51 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x301>
+  138a44:	jmp    138a5e <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x30e>
+  138a46:	mov    %rax,%rbx
+  138a49:	cmpq   $0x0,0x28(%rsp)
+  138a4f:	jne    138a59 <_ZN11litchi_pptx5notes8resolved17h52e58dcd856b6bc6E+0x309>
+  138a51:	mov    %rbx,%rdi
+  138a54:	call   238080 <_Unwind_Resume@plt>
+  138a59:	mov    0x30(%rsp),%r14
+  138a5e:	mov    %r14,%rdi
+  138a61:	call   *0x109e71(%rip)        # 2428d8 <free@GLIBC_2.2.5>
+  138a67:	mov    %rbx,%rdi
+  138a6a:	call   238080 <_Unwind_Resume@plt>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

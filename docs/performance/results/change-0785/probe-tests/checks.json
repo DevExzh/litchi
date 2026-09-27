@@ -1,0 +1,47 @@
+[
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/probe-src/Cargo.toml",
+      "--",
+      "--test-threads=1"
+    ],
+    "ended": 1790523788.9157484,
+    "exit_code": 0,
+    "log": {
+      "bytes": 4523,
+      "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/probe-tests/00.log",
+      "sha256": "14e2e4f09948de0cb088bf60fe9bb27b557360c47b15ae99d243acd35af3f452"
+    },
+    "started": 1790523782.682021
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/probe-src/Cargo.toml",
+      "--all-features",
+      "--",
+      "--test-threads=1",
+      "--skip",
+      "allocation_metrics::tests::"
+    ],
+    "ended": 1790523788.970492,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1331,
+      "path": "/home/zhuhe/code/litchi-worktrees/0785-pptx-known-uris/docs/performance/results/change-0785/probe-tests/01.log",
+      "sha256": "5c1144f8e814491ea9dca9bb4f552f00f3d5ef28080ba096a0ac58a2a3cd5e5d"
+    },
+    "started": 1790523788.9160125
+  }
+]

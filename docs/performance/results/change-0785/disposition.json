@@ -1,0 +1,6 @@
+{
+  "status": "retained",
+  "production_change_retained": true,
+  "source_file": "crates/litchi-pptx/src/notes/mod.rs",
+  "reason": "Retain exact known-URI matching: five capture/lifecycle cases satisfy the frozen practical/statistical benefit threshold, including large capture -8.489% and lifecycle -6.844%. All 15 latency and memory guards pass; allocation count/bytes and net-live/peak-above-entry are unchanged. Three individual p99 regressions in two families remain disclosed; no blanket tail-latency claim. Six production quality gates pass."
+}

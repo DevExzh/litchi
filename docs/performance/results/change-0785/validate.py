@@ -25,6 +25,7 @@ def validate(*, require_final_seal: bool = False) -> dict[str, Any]:
     seal_present = any(path.is_file() and not path.is_symlink() for path in seal_paths)
     if require_final_seal:
         require(seal_present, "final seal is missing")
+        require((PACKET / "disposition.json").is_file(), "final disposition is missing")
     retained_path = PACKET / "analysis.json"
     require(retained_path.is_file(), "analysis.json is missing; run analyze.py after capture")
     retained = analyze.read_json(retained_path)
@@ -33,6 +34,13 @@ def validate(*, require_final_seal: bool = False) -> dict[str, Any]:
     require(result["allocation"]["children"] == 60, "allocation child cardinality changed")
     require(result["qualification"]["children"] == 15,
             "qualification child cardinality changed")
+    require(result["counts"] == {
+        "reports": 255,
+        "samples": 5595,
+        "native_reports": 180,
+        "allocation_reports": 60,
+        "qualification_reports": 15,
+    }, "aggregate report/sample cardinality changed")
     require(result["quality"]["gates"] == 6, "quality gate cardinality changed")
     require(result["test_summary"]["passed"] >= 0
             and result["test_summary"]["failed"] == 0
@@ -41,6 +49,40 @@ def validate(*, require_final_seal: bool = False) -> dict[str, Any]:
             "quality test summary changed")
     require(result["verification"]["probe_contract_checked"] is True,
             "probe contract was not checked")
+    require(result["verification"]["frozen_inputs_checked"] is True,
+            "frozen build inputs were not checked")
+    require(result["verification"]["revision_transition_checked"] is True,
+            "revision transition was not checked")
+    transition = result["revision_transition"]
+    require(transition["base"] == analyze.origin()["base"]
+            and transition["build_revision"] == result["source"]["before"]["revision"]
+            and transition["ancestor_checked"] is True
+            and transition["production_diff_empty"] is True
+            and transition["base_file_census_matches"] is True
+            and transition["base_blob_hashes_checked"] == len(result["source"]["before"]["files"]),
+            "revision transition custody changed")
+    require(result["verification"]["architecture_inputs_checked"] is True,
+            "architecture inputs were not checked")
+    architecture = result["architecture_inputs"]
+    require(architecture["count"] == 35
+            and architecture["revision"] == analyze.origin()["base"]
+            and architecture["live_files_match"] is True
+            and architecture["origin_blob_hashes_match"] is True
+            and len(architecture["files"]) == 35,
+            "architecture input custody changed")
+    require(result["verification"]["historical_qualification_git_checked"] is True,
+            "historical qualification Git anchor was not checked")
+    historical = result["historical_qualification"]
+    require(historical["git_revision"] == analyze.origin()["base"]
+            and historical["plan_cases"] == 10
+            and historical["ordinary_cases"] == 9
+            and historical["diagnostic_cases"] == 1
+            and historical["qualification_reports"] == 10
+            and historical["sealed_git_comparison"] is True
+            and len(historical["sealed_reports"]) == 10,
+            "historical qualification custody changed")
+    require(result["verification"]["aggregate_counts_checked"] is True,
+            "aggregate counts were not checked")
     require(result["verification"]["fixture_output_parity_checked"] is True,
             "fixture/output parity was not checked")
     require(set(result["fixture_parity"]["source_by_shape"]) == set(analyze.SHAPES),
@@ -103,6 +145,9 @@ def validate(*, require_final_seal: bool = False) -> dict[str, Any]:
 
     require(result["disposition"]["status"] in {"retained", "rejected"},
             "candidate disposition is not recorded")
+    if result["disposition"]["status"] == "retained":
+        require(guards["latency_guard_passed"] and guards["resource_guard_passed"]
+                and guards["benefit_satisfied"], "retained candidate violates frozen adoption policy")
     require(result["verification"]["cleanup_binary_witness_required_when_missing"] is True,
             "cleanup binary custody contract is unstable")
     require(result["verification"]["optional_file_inventory_seal_checked"] is True,

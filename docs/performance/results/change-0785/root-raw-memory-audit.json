@@ -1,0 +1,10 @@
+{
+  "paired_samples": 90,
+  "fields": [
+    "net_live",
+    "peak_above_entry",
+    "allocation_calls",
+    "allocated_bytes"
+  ],
+  "differences": []
+}

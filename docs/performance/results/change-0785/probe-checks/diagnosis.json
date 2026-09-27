@@ -1,0 +1,5 @@
+{
+  "reason": "Root first invoked synthetic counter tests with the real process-global allocator enabled. Their counter injections cannot be isolated from live test-harness allocations. Reusing established0781 protocol: default-feature synthetic suite, then all-feature wrapper/fixture tests excluding synthetic counter tests, bothserial.",
+  "production_or_probe_source_changes": false,
+  "failed_attempt_retained": true
+}

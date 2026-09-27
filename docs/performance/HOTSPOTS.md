@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0785 — repeated known-URI validation removed
+
+[0785](0785-pptx-known-namespace-uris.md) Exact byte matches now reuse the six namespace constants while unknown values keep the UTF-8 decoder. Release assembly shows length dispatch plus one byte comparison. Large public capture/lifecycle p50 improves 8.489%/6.844% without added operation memory. Further scanner changes need fresh attribution; this does not assign a new phase fraction.
+
 ## 0784 — repeated namespace validation is the next candidate
 
 [0784](0784-pptx-initial-capture-profile.md) Recovered capture-owner stacks include notes XML scanning 1,031/1,029 times and nested notes::resolved 146/150 times. An unresolved interior frame prevents native phase-fraction claims. Exact known-URI byte matches could remove repeated UTF-8 validation while all unknown values retain existing checks. Review and fresh public paired measurements must precede adoption; guest SHA percentages are not native CPU fractions.
