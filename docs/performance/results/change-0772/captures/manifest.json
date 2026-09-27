@@ -1,0 +1,86 @@
+[
+  {
+    "repeat": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0772/release/litchi-perf-baseline",
+      "--warmup",
+      "2",
+      "--samples",
+      "9",
+      "--case",
+      "opc_mutated_save,opc_noop_save",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0772/captures/00.json"
+    ],
+    "started": 1790469196.380058,
+    "monotonic_start": 1360853526138737,
+    "build_sha256": "49cf639bb796a61b8732ba9400be0239bd1483f44924e235edabc6890d30e0c0",
+    "exit": 0,
+    "ended": 1790469198.4534314,
+    "monotonic_end": 1360855599506072,
+    "files": {
+      "captures/00.json": "a5ef131f857dd3b28e64ab95f3a491a0f28ad1440c953452f3dd7379c0c20533",
+      "captures/00.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "captures/00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "repeat": 1,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0772/release/litchi-perf-baseline",
+      "--warmup",
+      "2",
+      "--samples",
+      "9",
+      "--case",
+      "opc_mutated_save,opc_noop_save",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0772/captures/01.json"
+    ],
+    "started": 1790469198.637407,
+    "monotonic_start": 1360855783481707,
+    "build_sha256": "49cf639bb796a61b8732ba9400be0239bd1483f44924e235edabc6890d30e0c0",
+    "exit": 0,
+    "ended": 1790469200.6976476,
+    "monotonic_end": 1360857843722756,
+    "files": {
+      "captures/01.json": "6ae0cadf6f9001ca99adfd139e328d3cc876c673e39d340671966a3922e68efe",
+      "captures/01.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "captures/01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "repeat": 2,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0772/release/litchi-perf-baseline",
+      "--warmup",
+      "2",
+      "--samples",
+      "9",
+      "--case",
+      "opc_mutated_save,opc_noop_save",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0772/captures/02.json"
+    ],
+    "started": 1790469200.882626,
+    "monotonic_start": 1360858028700836,
+    "build_sha256": "49cf639bb796a61b8732ba9400be0239bd1483f44924e235edabc6890d30e0c0",
+    "exit": 0,
+    "ended": 1790469202.9546647,
+    "monotonic_end": 1360860100739605,
+    "files": {
+      "captures/02.json": "90fb12bf4c24712e5f4c21fa86fcef053c4cf54083939737957bc52b9f10bf78",
+      "captures/02.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "captures/02.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

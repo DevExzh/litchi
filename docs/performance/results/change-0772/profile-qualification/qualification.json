@@ -1,0 +1,24 @@
+{
+  "qualification": "rejected",
+  "buckets": {
+    "exact_timed_caller": {
+      "samples": 0,
+      "period": 0
+    },
+    "other_root_offset": {
+      "samples": 2,
+      "period": 44355497
+    },
+    "no_recognized_root": {
+      "samples": 582,
+      "period": 10522952226
+    }
+  },
+  "root_offsets": {
+    "0x94e": 2
+  },
+  "samples": 584,
+  "period": 10567307723,
+  "decoded_sha256": "83f34ae053a80bc140166d8f4a6b7d66158bed5edf0f671a18c4154196749b39",
+  "limitation": "No recognized root does not mean outside the timed region. Missing/truncated unwind context remains unclassified. No Deflate fraction or removable-cost inference is supported."
+}

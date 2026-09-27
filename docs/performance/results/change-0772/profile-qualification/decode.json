@@ -1,0 +1,18 @@
+{
+  "command": [
+    "perf",
+    "script",
+    "--show-lost-events",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0772/profile-qualification/perf.data",
+    "-F",
+    "comm,pid,tid,time,event,period,ip,sym,symoff,dso"
+  ],
+  "exit": 0,
+  "perf_data_sha256": "6009428d0052735aacbdcf9ea7688dd6b5dc9534dbe1f36fc51cca099f2d9f32",
+  "output": "profile-qualification/decoded-stacks.txt.gz",
+  "encoded_sha256": "0037c381f2875085ad1bd01a9dc23b19c22bdf354a33f4951aefc66067150cca",
+  "decoded_sha256": "83f34ae053a80bc140166d8f4a6b7d66158bed5edf0f671a18c4154196749b39",
+  "decoded_bytes": 179954,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

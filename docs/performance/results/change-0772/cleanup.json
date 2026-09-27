@@ -1,0 +1,18 @@
+{
+  "utc": "2026-09-27T00:49:58.222304+00:00",
+  "target": "/home/zhuhe/code/litchi-target-0772",
+  "file_bytes_before": 1244751311,
+  "removed": true,
+  "binary_sha256_verified": "6309c7915f8333a3b6d1fba52b4c75b222210e1fd26ca1911b5c79d3127aff10",
+  "binary_bytes_verified": 68733352,
+  "perf_record_no_buildid_cache": true,
+  "raw_profile_archived": {
+    "raw_path": "profile-qualification/perf.data",
+    "decoded_sha256": "6009428d0052735aacbdcf9ea7688dd6b5dc9534dbe1f36fc51cca099f2d9f32",
+    "decoded_bytes": 19347568,
+    "archive": "profile-qualification/perf.data.gz",
+    "encoded_sha256": "4f0bd79b1f7d54d52366b70780b3363f592ec4c654d6ac3d475aeb477700ad84",
+    "encoded_bytes": 11848991
+  },
+  "scope": "Only0772 target and raw perf.data after verified lossless archival. Integration0773 targets and unrelated worktrees untouched."
+}

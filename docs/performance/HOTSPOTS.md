@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0772 — mutated OPC publication remains an unqualified attribution opportunity
+
+[0772](0772-opc-mutated-save-current-baseline.md) measures the four-4-MiB incompressible corpus at 59.403 ms median process p50. Its one ordinary-binary profile has zero samples with the exact timed caller, so no sampled Deflate fraction or removable-cost estimate is admitted. Source inspection excludes repeated old-target decoding from the timed loop.
+
 ## 0756 — the OLE2/OOXML wave of 2026-09-22/23 integrated; the next hotspots
 
 [0756](0756-ole2-ooxml-wave-integration.md) integrates records 0742–0755 and
