@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0776 — measured cost of missing validation
+
+[0776](0776-mce-expanded-attribute-duplicates.md) first found 24–38% overhead on multi-attribute synthetic cases. Resolving namespaces only for colliding local names reduces those observed regressions to 6–20%, while ordinary worksheet latency is +5.77%. Bounded inline checks and larger-list sorting remain reviewable follow-up costs; correctness is retained. No universal speedup or allocation reduction is claimed.
+
 ## 0775 — repeated stream URI copies removed
 
 [0775](0775-mce-stream-integration.md) reduces the named long-URI attribute probe from 2,253.992 to 1.739 ms median process p50 and about 1.96 GiB to 11 MiB peak process RSS. Real-document controls stay below 5% regressions; short-extension microcases and low-alias RSS have disclosed flags. Registered-extension checks still copy URI text and remain separate work.

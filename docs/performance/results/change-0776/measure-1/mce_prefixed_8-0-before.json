@@ -1,0 +1,22 @@
+{
+  "case": "mce_prefixed_8",
+  "elapsed_ns": [
+    3945107,
+    3908038,
+    3901637,
+    3907547,
+    3948637,
+    3997248,
+    4046307,
+    3895647,
+    3917407
+  ],
+  "input_bytes": 304120,
+  "input_sha256": "4e540bf1cc96c6295137db6fe6fdef2c0c5552d605f4e9a027cc831a7a26cfe3",
+  "outcomes": [
+    "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+  ],
+  "p50_ns": 3917407,
+  "samples": 9,
+  "warmup": 2
+}

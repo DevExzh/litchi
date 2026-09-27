@@ -1,0 +1,7 @@
+{
+  "status": "failed",
+  "reason": "Classifier expected err:duplicate attribute, but Error Display prefixes it with non-conformant markup compatibility XML",
+  "binary_sha256": "44b20746f4b9da0e7686f708713966a197f00af646a73c80386189fed075f43e",
+  "source_sha256": "571db3aab3144b6cb9913175fc3411e4299472cd4c482e18fd37e545192058c6",
+  "build_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

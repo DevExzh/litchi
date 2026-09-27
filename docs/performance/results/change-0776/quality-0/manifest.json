@@ -1,0 +1,59 @@
+{
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "started": 1790476615.9551697,
+      "ended": 1790476620.28045,
+      "log": "quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-ooxml-common",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "started": 1790476620.5248504,
+      "ended": 1790476682.1692164,
+      "log": "quality-0/01.log",
+      "sha256": "9ff4b6309a5d1ee4bb41a0821931472d5c6a1f0dcf4b1fe4a0e72a29dd2abb00"
+    }
+  ],
+  "source_file": "quality-0/source.json",
+  "source_sha256": "57a02585c65abeed5c0d806f600464c40a73e608d64b2481a02f7f7f00b5d996",
+  "target": "/home/zhuhe/code/litchi-target-0776-quality",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "case": "mce_benign_document",
+  "elapsed_ns": [
+    1760697,
+    1770408,
+    1756658,
+    1749997,
+    1754368,
+    1745308,
+    1740267,
+    1719678,
+    1715537
+  ],
+  "input_bytes": 288070,
+  "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+  "outcomes": [
+    "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+  ],
+  "p50_ns": 1749997,
+  "samples": 9,
+  "warmup": 2
+}

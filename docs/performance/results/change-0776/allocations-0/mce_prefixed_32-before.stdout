@@ -1,0 +1,5 @@
+heaptrack output will be written to "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/allocations-0/mce_prefixed_32-before.zst"
+starting application, this might take some time...
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/allocations-0/mce_prefixed_32-before.zst"

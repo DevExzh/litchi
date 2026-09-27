@@ -1,0 +1,16 @@
+{
+  "case": "mce_long_uri_plain",
+  "elapsed_ns": [
+    6557739,
+    6111376,
+    6091747
+  ],
+  "input_bytes": 4204287,
+  "input_sha256": "5ef07b70b8d92f706f10e67088cd1103ec7058c1056d6cb72f07716bf348908b",
+  "outcomes": [
+    "ok:28c1727c33d30da5af68b0e25d332579c3af57edd4beb3c84f9f272450718f6d"
+  ],
+  "p50_ns": 6111376,
+  "samples": 3,
+  "warmup": 1
+}

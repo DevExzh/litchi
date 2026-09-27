@@ -1,0 +1,23 @@
+{
+  "time": 1790478870.2614963,
+  "executables_verified_before_removal": true,
+  "source_unchanged": true,
+  "fixtures_unchanged": true,
+  "targets": [
+    {
+      "path": "/home/zhuhe/code/litchi-target-0776-quality",
+      "bytes": 6086523073,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0776-release-before",
+      "bytes": 376774987,
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-target-0776-release-after",
+      "bytes": 377136605,
+      "removed": true
+    }
+  ]
+}

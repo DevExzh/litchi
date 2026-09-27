@@ -1,0 +1,11 @@
+{
+  "base": "22f62ee328",
+  "prior_production": "fbb579914c",
+  "production_unchanged_since_prior_capture": true,
+  "evidence": "docs/performance/results/change-0775/measure-2/differential-after.json",
+  "evidence_sha256": "4aa001d7c4ff454180cc64a30a6ec3bba2f2c93cf47daab07feb82a3c23d8949",
+  "cases": {
+    "alias_pair::invalid-expanded-duplicate::aliased": "invalid-control:codec_rejected=false:stream_rejected=true",
+    "alias_pair::invalid-expanded-duplicate::direct": "invalid-control:codec_rejected=true:stream_rejected=true"
+  }
+}

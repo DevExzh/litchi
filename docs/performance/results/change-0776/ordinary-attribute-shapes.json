@@ -1,0 +1,14 @@
+{
+  "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx::xl/worksheets/sheet3.xml": {
+    "0": 57007,
+    "1": 3802
+  },
+  "test-data/ooxml/docx/drawing.docx::word/document.xml": {
+    "0": 3486,
+    "1": 3178,
+    "2": 281,
+    "3": 246,
+    "4": 90,
+    "7": 1
+  }
+}

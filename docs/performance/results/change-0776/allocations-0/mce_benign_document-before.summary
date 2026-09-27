@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/allocations-0/mce_benign_document-before.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0776-release-before/release/mce-stream-probe adversarial --case mce_benign_document --samples 1 --warmup 0 --json /home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/allocations-0/mce_benign_document-before.json
+finished reading file, now analyzing data:
+
+total runtime: 0.068000s.
+calls to allocation functions: 16056 (236117/s)
+temporary memory allocations: 4013 (59014/s)
+peak heap memory consumption: 951.22K
+peak RSS (including heaptrack overhead): 6.23M
+total memory leaked: 544B

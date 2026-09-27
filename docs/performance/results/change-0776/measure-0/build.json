@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/measure-0/before/Cargo.toml"
+    ],
+    "exit": 0,
+    "started": 1790477434.9928231,
+    "ended": 1790477498.9624994,
+    "log": "build-before.log",
+    "sha256": "cefb3f417d8941f91105a087dfc1597e02736a8dc231316ea5a5dd0f0cdc3402"
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0776-mce-expanded-duplicates/docs/performance/results/change-0776/measure-0/after/Cargo.toml"
+    ],
+    "exit": 0,
+    "started": 1790477498.9637663,
+    "ended": 1790477562.988241,
+    "log": "build-after.log",
+    "sha256": "5190c001edd13737082685875841810f36020f85ccf62bf5ebd2608f8b7f1a7e"
+  }
+]

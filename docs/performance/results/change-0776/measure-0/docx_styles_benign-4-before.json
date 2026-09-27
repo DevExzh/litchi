@@ -1,0 +1,22 @@
+{
+  "case": "docx_styles_benign",
+  "elapsed_ns": [
+    1626268,
+    1610307,
+    1601557,
+    1613067,
+    1608327,
+    1610007,
+    1605247,
+    1602697,
+    1599187
+  ],
+  "input_bytes": 173620,
+  "input_sha256": "abaa5f800e916cfcb11b0dae7f27c7a27df7e3f980d9439c8d309c6d6062e862",
+  "outcomes": [
+    "err:invalid DOCX format: style numPr is missing numId"
+  ],
+  "p50_ns": 1608327,
+  "samples": 9,
+  "warmup": 2
+}
