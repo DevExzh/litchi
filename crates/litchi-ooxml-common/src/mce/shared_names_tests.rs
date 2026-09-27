@@ -1,7 +1,7 @@
 //! Record 0771: the MCE stream's names share their namespace URI, so its
-//! work per element, attribute and directive token does not depend on the
-//! length of that URI, and every check it makes of a name through namespace
-//! identities decides what the same check through URI text decided.
+//! event-name sharing and directive checks avoid per-name URI copies and
+//! hashing. Registered-extension checks and observer work are outside this
+//! property. Checks through namespace identities preserve URI-text equality.
 //!
 //! Work is bounded by counting, not timing: the namespace-URI bytes the scope
 //! hashes, compares or examines for facts, the bytes the stream copies

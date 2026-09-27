@@ -262,6 +262,11 @@ whitespace makes the checked iterator report names from inside that value
 
 ### Namespace identities in the MCE processor (after the review)
 
+Current-source clarification: [0775](0775-mce-stream-integration.md) extends
+identity-based directive checks and shared event names to the stream. Matching
+registered-extension checks still copy URI text in both processors. The
+measurements and stream description below remain historical to 0764.
+
 The review found that every element or attribute in a namespace with a long
 URI cost time proportional to the URI in both MCE processors, on the base and
 on this branch's first build alike (*After the review* under Result has the
