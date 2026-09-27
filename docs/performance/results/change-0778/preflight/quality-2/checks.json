@@ -1,0 +1,160 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790484261.0251873,
+    "exit_code": 0,
+    "log": "quality-2/00.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "started": 1790484260.120916
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--all-targets"
+    ],
+    "ended": 1790484271.9402523,
+    "exit_code": 0,
+    "log": "quality-2/01.log",
+    "log_sha256": "ff03397b4adb6c2515fda6a9ee364407a3b7584cf0c32924be6dc741bc6ea0c6",
+    "started": 1790484261.2169409
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--bins",
+      "--",
+      "--test-threads=1"
+    ],
+    "ended": 1790484294.7088244,
+    "exit_code": 0,
+    "log": "quality-2/02.log",
+    "log_sha256": "d3180b1efa0f406450f9cb5e3211b42e4299564178274906d76907613a59789a",
+    "started": 1790484272.1339371
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--lib",
+      "--bin",
+      "ordinary_save_artifacts",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790484307.127733,
+    "exit_code": 0,
+    "log": "quality-2/03.log",
+    "log_sha256": "d39791677d78aa0ba339b2276282de9171fddfbac3ddcade0233b8ef0912a59f",
+    "started": 1790484294.904232
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--features",
+      "allocator-metrics",
+      "--no-deps"
+    ],
+    "ended": 1790484321.0080717,
+    "exit_code": 0,
+    "log": "quality-2/04.log",
+    "log_sha256": "1395e6225b18aa12558224ee7e8016c5de1c0d4e2ed42bd3e019ede4370780cc",
+    "started": 1790484307.3253007
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/test_perf_baseline_source_policy.py"
+    ],
+    "ended": 1790484321.2534811,
+    "exit_code": 0,
+    "log": "quality-2/05.log",
+    "log_sha256": "0df7eb82e98db3aa16102e6e85bc8e796bf5e847674be78ae04b8fb10d6ee4db",
+    "started": 1790484321.2049186
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "ended": 1790484321.787481,
+    "exit_code": 0,
+    "log": "quality-2/06.log",
+    "log_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+    "started": 1790484321.4464183
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--release",
+      "--bin",
+      "litchi-perf-baseline",
+      "--bin",
+      "ordinary_save_artifacts"
+    ],
+    "ended": 1790484848.8606908,
+    "exit_code": 0,
+    "log": "quality-2/07.log",
+    "log_sha256": "3c9b77872c98ebe4f95680ecec00faca5e9cd252a5da8517d962c0b5aeca9160",
+    "started": 1790484321.9817812
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--offline",
+      "--locked",
+      "--release",
+      "--features",
+      "allocator-metrics",
+      "--bin",
+      "litchi-perf-baseline-alloc"
+    ],
+    "ended": 1790484937.9946582,
+    "exit_code": 0,
+    "log": "quality-2/08.log",
+    "log_sha256": "624ee51221e2fef3a6552a06034b7e5c4c26372a7355c51da17354976c7029d3",
+    "started": 1790484849.1032622
+  }
+]

@@ -1,0 +1,7 @@
+generated-docx: PASS changed=['word/document.xml']
+generated-xlsx: PASS changed=['xl/workbook.xml', 'xl/worksheets/sheet1.xml']
+generated-pptx: PASS changed=['ppt/slides/slide1.xml']
+numbered-list: FAIL: cases[3].default authorized relationship rewrite changed graph semantics in 'word/_rels/document.xml.rels'
+alt-chunk-header: PASS changed=[]
+conditional-formatting: FAIL: cases[5].default content-type table changed outside exact calcChain override removal
+slide-section: PASS changed=['ppt/slides/slide2.xml']

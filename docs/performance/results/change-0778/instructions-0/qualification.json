@@ -1,0 +1,36 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-x",
+    ";",
+    "--no-big-num",
+    "-e",
+    "instructions:u",
+    "-o",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/instructions-0/qualification.csv",
+    "--",
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/true"
+  ],
+  "csv": {
+    "bytes": 80,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/instructions-0/qualification.csv",
+    "sha256": "d98b2480cfd4082227017d96b625c6df1ca2bb9407b6c08169952d918a60203a"
+  },
+  "ended": 1790488422.9921722,
+  "exit_code": 0,
+  "started": 1790488422.935963,
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/instructions-0/qualification.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/instructions-0/qualification.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "control": "internal-and-external-distinguished",
+    "rejected": true
+  },
+  {
+    "control": "invalid-target-mode",
+    "rejected": true
+  },
+  {
+    "control": "missing-stream-control",
+    "rejected": true
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-docx",
+      "--",
+      "--check"
+    ],
+    "ended": 1790486316.0943909,
+    "exit_code": 0,
+    "log": "docx-quality-1/00.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "started": 1790486314.711357
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790486327.0681853,
+    "exit_code": 0,
+    "log": "docx-quality-1/01.log",
+    "log_sha256": "844016b6f82eb119b24882d8d55842a84e30939f85c526332ae5501323f1feab",
+    "started": 1790486316.2881606
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790486373.9511268,
+    "exit_code": 101,
+    "log": "docx-quality-1/02.log",
+    "log_sha256": "be1f540127067f701c063fd7aee4dfbeae191cae243f9f931b68a3671b3c5251",
+    "started": 1790486327.262466
+  }
+]

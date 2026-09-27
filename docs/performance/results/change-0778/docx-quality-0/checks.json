@@ -1,0 +1,89 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-docx",
+      "--",
+      "--check"
+    ],
+    "ended": 1790485957.832764,
+    "exit_code": 0,
+    "log": "docx-quality-0/00.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "started": 1790485956.4584043
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790485986.262966,
+    "exit_code": 0,
+    "log": "docx-quality-0/01.log",
+    "log_sha256": "53d55dbbf3c34286f6e07e745ca92bfa19a53744f3a8b7ec58143edf31c6e980",
+    "started": 1790485958.027971
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790486073.1034396,
+    "exit_code": 0,
+    "log": "docx-quality-0/02.log",
+    "log_sha256": "5d46641789c91a5a08cb1ce94ca53f85f618ab00b7640f329046fcf7a78d4e8a",
+    "started": 1790485986.4596543
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790486094.3040078,
+    "exit_code": 0,
+    "log": "docx-quality-0/03.log",
+    "log_sha256": "59674d5eeb3a4f1876251a1ed2958180f6ac3050e9cfce322f91d18696c59467",
+    "started": 1790486073.3009446
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "-p",
+      "litchi-docx",
+      "--offline",
+      "--locked",
+      "--all-features",
+      "--no-deps"
+    ],
+    "ended": 1790486098.6691418,
+    "exit_code": 0,
+    "log": "docx-quality-0/04.log",
+    "log_sha256": "49f4064e389673b732d8d652dcf8d3905469f7ed5ac112186df499cad7059a4e",
+    "started": 1790486094.501252
+  }
+]

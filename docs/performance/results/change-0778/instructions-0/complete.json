@@ -1,0 +1,10 @@
+{
+  "binary_unchanged": true,
+  "fixtures_unchanged": true,
+  "plan_sha256": "86a3e27a1ff7dbb70427e6f7dc1819d532cf6435868e447847923fbc09cbf3a2",
+  "runner_sha256": "7041fd5263196f2f9690f7536cb52dfed5199aa68779d5ff6b0d15795ed78002",
+  "runs": 32,
+  "source_sha256": "8ce041173da709112a32cc4d0dbb43af32d2a33dd5753ba3394bb58fd9845f3a",
+  "source_unchanged": true,
+  "supported": true
+}

@@ -1,0 +1,12 @@
+{
+  "binaries_unchanged": true,
+  "expected_rows": 28,
+  "fixtures_unchanged": true,
+  "lane": "qualification",
+  "qualification_identities_sha256": "c34d823321ba1379088d1af682cda33a0ce46e80a5ba0f2a6979d5c87cd7fc7c",
+  "rows": 28,
+  "runner_unchanged": true,
+  "schema": "litchi-0778-durability-lane-v1",
+  "serial": true,
+  "source_unchanged": true
+}

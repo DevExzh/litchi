@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0778 — ordinary-save evidence extended; goal remains active
+
+[0778](0778-ordinary-save-durability.md) adds independently checked ordinary-save artifacts and current-source policy measurements, repairing a preflight-discovered DOCX note graph defect. Default Full remains unchanged. Full CRUD, cold/range/concurrency/scaling and broader memory-budget work remain open; no coverage row or complete-program claim is promoted.
+
 ## 0777 — attribute integration has fresh evidence; goal remains active
 
 [0777](0777-xml-attribute-integration.md) integrates the preserved 0770 snapshot into current MCE and reader owners with fresh source-bound quality, semantic, native, instruction and allocation evidence. The deterministic comparison bound is retained with disclosed latency/RSS costs, not presented as a speedup. The original dirty worktree remains untouched. Full CRUD, cold/range/scaling coverage and broader memory-budget work remain open.

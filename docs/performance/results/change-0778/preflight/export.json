@@ -1,0 +1,62 @@
+{
+  "binary": {
+    "bytes": 16947536,
+    "path": "/home/zhuhe/code/litchi-target-0778/release/ordinary_save_artifacts",
+    "sha256": "74baad2c53fe8da539d11e948fe6659634d97953c120bb181bd06ceecd22391f"
+  },
+  "build_sha256": "14cf748146391db53cc957f0fd9ed0dfaede2f4ef88f6c2b0b94074be889706f",
+  "command": [
+    "/home/zhuhe/code/litchi-target-0778/release/ordinary_save_artifacts",
+    "--output",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/artifacts-0",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-0778-fs",
+    "--ooxml-file",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+    "--ooxml-file",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+    "--ooxml-file",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
+    "--ooxml-file",
+    "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx"
+  ],
+  "ended": 1790484982.7429936,
+  "exit_code": 0,
+  "fixtures": {
+    "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx": {
+      "bytes": 108164,
+      "sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+    },
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx": {
+      "bytes": 55519,
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    },
+    "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx": {
+      "bytes": 77621,
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8"
+    },
+    "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx": {
+      "bytes": 654688,
+      "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+    }
+  },
+  "manifest": {
+    "bytes": 32809,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/artifacts-0/manifest.json",
+    "sha256": "a30ae4f3274a7079a24c053e75f1d32d88ddb24d656c4ca801f731e37f01f6e9"
+  },
+  "plan_sha256": "86a3e27a1ff7dbb70427e6f7dc1819d532cf6435868e447847923fbc09cbf3a2",
+  "runner_sha256": "db5ce81b1609c7a26d1a55e17fe7cd0ac9aacee27373429468aa343a78c08a58",
+  "source_sha256": "352b4b536a4ae8b96e1579824ab642c5852562f07f6a3ef7d7ef6f298ae1537b",
+  "started": 1790484981.686288,
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/export.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/export.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

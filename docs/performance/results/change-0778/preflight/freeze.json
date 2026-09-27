@@ -1,0 +1,67 @@
+{
+  "binaries": {
+    "allocation": {
+      "bytes": 68739680,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/litchi-perf-baseline-alloc",
+      "sha256": "143500a64ceca81b804b38a50890b19a9f06b1016704b3ce34ebd39b59f8ee51"
+    },
+    "export": {
+      "bytes": 16947536,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/ordinary_save_artifacts",
+      "sha256": "74baad2c53fe8da539d11e948fe6659634d97953c120bb181bd06ceecd22391f"
+    },
+    "native": {
+      "bytes": 68865144,
+      "path": "/home/zhuhe/code/litchi-target-0778/release/litchi-perf-baseline",
+      "sha256": "971d6b624d031860e5a43bdb7cce911f2f47493b217bf5f7abd9e3302278d7a4"
+    }
+  },
+  "build": {
+    "bytes": 5157,
+    "path": "build.json",
+    "sha256": "14cf748146391db53cc957f0fd9ed0dfaede2f4ef88f6c2b0b94074be889706f"
+  },
+  "build_source_sha256": "352b4b536a4ae8b96e1579824ab642c5852562f07f6a3ef7d7ef6f298ae1537b",
+  "fixtures": {
+    "alt-chunk-header": {
+      "bytes": 77621,
+      "path": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+      "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8"
+    },
+    "conditional-formatting": {
+      "bytes": 654688,
+      "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
+      "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074"
+    },
+    "generated-docx": null,
+    "generated-pptx": null,
+    "generated-xlsx": null,
+    "numbered-list": {
+      "bytes": 55519,
+      "path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
+      "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+    },
+    "slide-section": {
+      "bytes": 108164,
+      "path": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+      "sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0"
+    }
+  },
+  "plan": {
+    "bytes": 4019,
+    "path": "plan.json",
+    "sha256": "86a3e27a1ff7dbb70427e6f7dc1819d532cf6435868e447847923fbc09cbf3a2"
+  },
+  "runner": {
+    "bytes": 54362,
+    "path": "/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/docs/performance/results/change-0778/capture.py",
+    "sha256": "40d5d487931b7ad8668b033ba066f096ffb84271a1a0a491ae55c68345b7b66e"
+  },
+  "schema": "litchi-0778-durability-freeze-v1",
+  "source": {
+    "bytes": 1193902,
+    "path": "source.json",
+    "sha256": "352b4b536a4ae8b96e1579824ab642c5852562f07f6a3ef7d7ef6f298ae1537b"
+  },
+  "source_revision": "3cd8e197b025f3f925515410afa32ea01dd43a45"
+}

@@ -1,0 +1,34 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/tools/perf-baseline)
+error: unnecessary closure used with `bool::then`
+    --> src/ordinary_save.rs:1708:21
+     |
+1708 |           pptx_slide: (corpus.format == Format::Pptx)
+     |  _____________________^
+1709 | |             .then(|| corpus.pptx_target)
+     | |________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unnecessary_lazy_evaluations
+     = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `then_some` instead
+     |
+1709 -             .then(|| corpus.pptx_target)
+1709 +             .then_some(corpus.pptx_target)
+     |
+
+error: unnecessary closure used with `bool::then`
+    --> src/ordinary_save.rs:1711:21
+     |
+1711 |           pptx_shape: (corpus.format == Format::Pptx)
+     |  _____________________^
+1712 | |             .then(|| corpus.pptx_target)
+     | |________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unnecessary_lazy_evaluations
+help: use `then_some` instead
+     |
+1712 -             .then(|| corpus.pptx_target)
+1712 +             .then_some(corpus.pptx_target)
+     |
+
+error: could not compile `litchi-perf-baseline` (lib) due to 2 previous errors

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0778 — synchronization costs and XLSX allocation follow-up
+
+[0778](0778-ordinary-save-durability.md) measures policy-dependent lifecycle and publication latency while user instructions and operation allocation remain effectively unchanged across policies. Generated XLSX lifecycle requests 1.10 GB cumulative allocation with much smaller live memory; attribution remains a follow-up, not a proven copy-removal opportunity. All 50 native spread flags are retained.
+
 ## 0777 — ordered attribute checking has measured transition costs
 
 [0777](0777-xml-attribute-integration.md) replaces the unkeyed duplicate-check pre-filter after 32 names with an ordered comparison bound. The accepted 256-declaration OPC control costs +54.10% latency; marginal user instructions rise about 32.82%, and whole-process allocation calls rise by 34. Ordinary document controls remain below 5%. These are explicit hardening costs; no practical hash-collision family or general large-tag speedup is demonstrated.

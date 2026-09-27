@@ -1,0 +1,4 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/crates/litchi-docx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0778-ordinary-save-durability/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 2m 17s

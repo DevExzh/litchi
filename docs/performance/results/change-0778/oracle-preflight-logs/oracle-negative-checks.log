@@ -1,0 +1,5 @@
+workbook-attribute: REJECTED: negative.workbook-attribute workbook structure or attributes changed outside calcPr
+workbook-sheet-name: REJECTED: negative.workbook-sheet-name workbook structure or attributes changed outside calcPr
+unrelated-workbook-relationship: REJECTED: negative.unrelated-workbook-relationship authorized relationship rewrite changed graph semantics in 'xl/_rels/workbook.xml.rels'
+unrelated-content-type: REJECTED: negative.unrelated-content-type content-type table changed without a source calcChain
+calcPr-flag: REJECTED: negative.calcPr-flag output calcPr does not match the exact dirty-calculation contract
