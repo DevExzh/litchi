@@ -1,0 +1,33 @@
+{
+  "corrections": [
+    {
+      "items": [
+        "Corrected two missing percent markers before PRIu64 in C format string.",
+        "Made mapped_bytes zero at startup/unmapped/final and requested bytes while mapping exists.",
+        "Unexpected pthread_join failure terminates before releasing possibly live worker storage."
+      ],
+      "stage": "before build and all captures"
+    },
+    {
+      "items": [
+        "Load the actual matrix/receipts.json and traces/receipts.json artifact lists.",
+        "Bind probe source through frozen-inputs.json rather than a nonexistent build.source field.",
+        "Parse GNU-time raw text through artifact receipt and keep checksum fields numeric, including zero-payload cases.",
+        "Use smaps header group 7 for pathname; group 6 is inode and incorrectly classified anonymous maps. Recomputed derived anonymous fields; raw captures unchanged.",
+        "Use exact cleanup witness schema for stable replay after binary removal."
+      ],
+      "stage": "offline analyzer integration"
+    },
+    {
+      "items": [
+        "Original four traces abbreviate rusage and support call-path claims only.",
+        "Retained originals; added -v for four separately planned detailed traces to validate exact 48 self samples and four wait4 triples.",
+        "Supplement excluded from original 276-child analyzer and included in independent 280-child summary."
+      ],
+      "stage": "separate trace supplement"
+    }
+  ],
+  "production_unchanged": true,
+  "raw_captures_unchanged": true,
+  "schema": "litchi.rss-accounting-corrections.0789.v1"
+}

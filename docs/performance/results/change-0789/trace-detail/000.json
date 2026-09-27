@@ -1,0 +1,86 @@
+{
+  "affinity": "single",
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe",
+    "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+  },
+  "case": {
+    "mib": 0,
+    "touch": "main",
+    "workers": 0
+  },
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "0",
+    "/usr/bin/strace",
+    "-v",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=execve,getrusage,wait4",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/trace-detail/000.strace.log",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/trace-detail/000.time.txt",
+    "/home/zhuhe/code/litchi-target-0789/probe",
+    "--mib",
+    "0",
+    "--workers",
+    "0",
+    "--touch",
+    "main"
+  ],
+  "ended": 1790535683.8186343,
+  "error": null,
+  "gnu_time": {
+    "bytes": 10,
+    "path": "trace-detail/000.time.txt",
+    "sha256": "0338a3241947507e5307b2fdb2b4055928dd3501997532cd75d3b284d61b815d"
+  },
+  "index": 0,
+  "launcher": "time",
+  "observer": "full",
+  "points": {
+    "bytes": 3397,
+    "path": "trace-detail/000.points.json.gz",
+    "sha256": "a86eec4a3286ef325997e5df13968385b61033d16fe3ecccb7ba222705e09e74"
+  },
+  "repeat": 0,
+  "schema": "litchi.rss-accounting-child.0789.v1",
+  "spawn_method": "os.posix_spawn taskset exec",
+  "started": 1790535683.812771,
+  "stderr": {
+    "bytes": 0,
+    "path": "trace-detail/000.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "strace": {
+    "bytes": 6956,
+    "path": "trace-detail/000.strace.log",
+    "sha256": "f5e51e7338e443a80e4591dc113acbbfb5bc6778a1ef402e207d8a470c3485e2"
+  },
+  "trace": true,
+  "transcript": {
+    "bytes": 430,
+    "path": "trace-detail/000.transcript.txt",
+    "sha256": "c28dbd2bab5ea27a2a9690ff7c4dd63621e235c6e887c2c28a3e56eedf38ce9f"
+  },
+  "wait4": {
+    "exit_code": 0,
+    "pid": 562392,
+    "rusage": {
+      "major_faults": 0,
+      "maxrss_kib": 17712,
+      "minor_faults": 561,
+      "system_seconds": 0.0009989999999999999,
+      "user_seconds": 0.0019329999999999998
+    },
+    "status": 0
+  },
+  "wrapper_pid": 562392
+}

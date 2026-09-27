@@ -1,0 +1,63 @@
+{
+  "affinity": "single",
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe",
+    "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+  },
+  "case": {
+    "mib": 64,
+    "touch": "workers",
+    "workers": 4
+  },
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "0",
+    "/home/zhuhe/code/litchi-target-0789/probe",
+    "--mib",
+    "64",
+    "--workers",
+    "4",
+    "--touch",
+    "workers"
+  ],
+  "ended": 1790535636.1931806,
+  "error": null,
+  "index": 116,
+  "launcher": "direct",
+  "observer": "identity",
+  "points": {
+    "bytes": 527,
+    "path": "matrix/116.points.json.gz",
+    "sha256": "9f8e487c4901fcf7448c5a865e16a296888d287a47b0997a85242c420badce0d"
+  },
+  "repeat": 0,
+  "schema": "litchi.rss-accounting-child.0789.v1",
+  "spawn_method": "os.posix_spawn taskset exec",
+  "started": 1790535636.1800075,
+  "stderr": {
+    "bytes": 0,
+    "path": "matrix/116.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "trace": false,
+  "transcript": {
+    "bytes": 515,
+    "path": "matrix/116.transcript.txt",
+    "sha256": "5b7cc574c2108bebf65c87378589c69e88d35ece96aa7395d3443a7ff3e6889d"
+  },
+  "wait4": {
+    "exit_code": 0,
+    "pid": 560122,
+    "rusage": {
+      "major_faults": 0,
+      "maxrss_kib": 67316,
+      "minor_faults": 16543,
+      "system_seconds": 0.012589999999999999,
+      "user_seconds": 0.0
+    },
+    "status": 0
+  },
+  "wrapper_pid": 560122
+}

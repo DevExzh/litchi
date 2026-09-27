@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0789 — measurement calibration only
+
+[0789](0789-rss-accounting-calibration.md) The standalone known-page probe supplies supporting category-15 measurement evidence. It performs no Office CRUD operation, promotes no registry row, and adds no native producer/provider/scaling coverage.
+
 ## 0788 — category 15 residency and allocation diagnostics
 
 [0788](0788-cached-part-memory-attribution.md) Adds first/last-sample residency snapshots, source/resource checks, and whole-child allocation profiles for bounded ordered Part reads. No native-format CRUD, physical-cold/range, or cross-session coverage promotion is claimed.

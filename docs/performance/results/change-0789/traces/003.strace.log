@@ -1,0 +1,17 @@
+561911 execve("/usr/bin/time", ["/usr/bin/time", "-f", "%M %R %F", "-o", "/home/zhuhe/code/litchi/docs/per"..., "/home/zhuhe/code/litchi-target-0"..., "--mib", "64", "--workers", "0", "--touch", "main"], 0x7ffd474a1cc8 /* 48 vars */) = 0
+561911 wait4(-1 <unfinished ...>
+561912 execve("/home/zhuhe/code/litchi-target-0789/probe", ["/home/zhuhe/code/litchi-target-0"..., "--mib", "64", "--workers", "0", "--touch", "main"], 0x7ffef508c490 /* 48 vars */) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=374}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=392}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=400}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=409}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2045}, ru_stime={tv_sec=0, tv_usec=10226}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2048}, ru_stime={tv_sec=0, tv_usec=10244}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2050}, ru_stime={tv_sec=0, tv_usec=10254}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2053}, ru_stime={tv_sec=0, tv_usec=10267}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2097}, ru_stime={tv_sec=0, tv_usec=11533}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2098}, ru_stime={tv_sec=0, tv_usec=11544}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2099}, ru_stime={tv_sec=0, tv_usec=11547}, ...}) = 0
+561912 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=2101}, ru_stime={tv_sec=0, tv_usec=11555}, ...}) = 0
+561911 <... wait4 resumed>, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, {ru_utime={tv_sec=0, tv_usec=2101}, ru_stime={tv_sec=0, tv_usec=11660}, ...}) = 561912
+561911 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=561912, si_uid=1001, si_status=0, si_utime=0, si_stime=1 /* 0.01 s */} ---

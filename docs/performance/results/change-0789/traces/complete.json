@@ -1,0 +1,8 @@
+{
+  "children": 4,
+  "receipts": {
+    "bytes": 563,
+    "path": "traces/receipts.json",
+    "sha256": "01325857e97df9d9dd3ae3b2660ba498bc72aabd2b588bfef333ca37e67f2f22"
+  }
+}

@@ -1,0 +1,17 @@
+561899 execve("/usr/bin/time", ["/usr/bin/time", "-f", "%M %R %F", "-o", "/home/zhuhe/code/litchi/docs/per"..., "/home/zhuhe/code/litchi-target-0"..., "--mib", "0", "--workers", "0", "--touch", "main"], 0x7fffb244ff18 /* 48 vars */) = 0
+561899 wait4(-1 <unfinished ...>
+561900 execve("/home/zhuhe/code/litchi-target-0789/probe", ["/home/zhuhe/code/litchi-target-0"..., "--mib", "0", "--workers", "0", "--touch", "main"], 0x7ffda9177050 /* 48 vars */) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=288}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=306}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=312}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=320}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=326}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=335}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=342}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=349}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=355}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=364}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=370}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561900 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=378}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561899 <... wait4 resumed>, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, {ru_utime={tv_sec=0, tv_usec=429}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 561900
+561899 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=561900, si_uid=1001, si_status=0, si_utime=0, si_stime=0} ---

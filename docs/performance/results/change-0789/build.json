@@ -1,0 +1,63 @@
+{
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe",
+    "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+  },
+  "commands": [
+    {
+      "command": [
+        "/usr/bin/cc",
+        "-std=c11",
+        "-O2",
+        "-g",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0789/probe.c",
+        "-o",
+        "/home/zhuhe/code/litchi-target-0789/probe"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "build-probe.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/cc",
+        "-std=c11",
+        "-O2",
+        "-g",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0789/probe.c",
+        "-o",
+        "/home/zhuhe/code/litchi-target-0789/probe-sanitized"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "build-probe-sanitized.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "inputs": {
+    "bytes": 778,
+    "path": "frozen-inputs.json",
+    "sha256": "1cd09ba0f9d0d0f81b378e777dc95baa5fbb893520dc40fb314203dc5c0b8a30"
+  },
+  "sanitized_binary": {
+    "bytes": 105800,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+    "sha256": "3eaa8e6c6886a56c588210b874761f24e98fc5018cb95b28d13aebf60e2c59fe"
+  }
+}

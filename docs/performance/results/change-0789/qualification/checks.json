@@ -1,0 +1,272 @@
+[
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "65",
+      "--workers",
+      "0",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "mib_over_limit",
+    "stderr": {
+      "bytes": 75,
+      "path": "qualification/mib_over_limit.stderr.log",
+      "sha256": "406b953f920e3df7497a65f19e913b430badc4292010111e4af980608acaf443"
+    },
+    "stdin_hex": "",
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/mib_over_limit.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "0",
+      "--workers",
+      "33",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "workers_over_limit",
+    "stderr": {
+      "bytes": 75,
+      "path": "qualification/workers_over_limit.stderr.log",
+      "sha256": "406b953f920e3df7497a65f19e913b430badc4292010111e4af980608acaf443"
+    },
+    "stdin_hex": "",
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/workers_over_limit.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "invalid"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "unknown_touch",
+    "stderr": {
+      "bytes": 75,
+      "path": "qualification/unknown_touch.stderr.log",
+      "sha256": "406b953f920e3df7497a65f19e913b430badc4292010111e4af980608acaf443"
+    },
+    "stdin_hex": "",
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/unknown_touch.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "workers"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "workers_touch_without_workers",
+    "stderr": {
+      "bytes": 75,
+      "path": "qualification/workers_touch_without_workers.stderr.log",
+      "sha256": "406b953f920e3df7497a65f19e913b430badc4292010111e4af980608acaf443"
+    },
+    "stdin_hex": "",
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/workers_touch_without_workers.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "eof_ack",
+    "stderr": {
+      "bytes": 26,
+      "path": "qualification/eof_ack.stderr.log",
+      "sha256": "4de7ae2ed43986d078290a436edf2726c3d6f14f509df467c973d98d907ed001"
+    },
+    "stdin_hex": "",
+    "stdout": {
+      "bytes": 38,
+      "path": "qualification/eof_ack.stdout.txt",
+      "sha256": "035436635d147ade0a7d05ee04f54f7041896c1b18191d0a8cd4ad4b2081ffa9"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 1,
+    "expected_success": false,
+    "name": "wrong_ack",
+    "stderr": {
+      "bytes": 26,
+      "path": "qualification/wrong_ack.stderr.log",
+      "sha256": "4de7ae2ed43986d078290a436edf2726c3d6f14f509df467c973d98d907ed001"
+    },
+    "stdin_hex": "2d0a",
+    "stdout": {
+      "bytes": 38,
+      "path": "qualification/wrong_ack.stdout.txt",
+      "sha256": "8a02ba1c851ff136c2e91ca95738a5b79d5f3072e77c1449261adfe7210c35e3"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 105800,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "sha256": "3eaa8e6c6886a56c588210b874761f24e98fc5018cb95b28d13aebf60e2c59fe"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 0,
+    "expected_success": true,
+    "name": "sanitized-0-0-main",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/sanitized-0-0-main.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdin_hex": "2b0a2b0a2b0a2b0a2b0a2b0a",
+    "stdout": {
+      "bytes": 466,
+      "path": "qualification/sanitized-0-0-main.stdout.txt",
+      "sha256": "099edcd7885cfa924bfc337f40d60f532c94cc981565c1993735018cb200b9b0"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 105800,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "sha256": "3eaa8e6c6886a56c588210b874761f24e98fc5018cb95b28d13aebf60e2c59fe"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "--mib",
+      "64",
+      "--workers",
+      "4",
+      "--touch",
+      "workers"
+    ],
+    "exit_code": 0,
+    "expected_success": true,
+    "name": "sanitized-64-4-workers",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/sanitized-64-4-workers.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdin_hex": "2b0a2b0a2b0a2b0a2b0a2b0a",
+    "stdout": {
+      "bytes": 515,
+      "path": "qualification/sanitized-64-4-workers.stdout.txt",
+      "sha256": "428f2036fea28e02c8fc91124a94a3049fe1baeeda5ece6bfa93e5bd307a07a6"
+    }
+  },
+  {
+    "binary": {
+      "bytes": 105800,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "sha256": "3eaa8e6c6886a56c588210b874761f24e98fc5018cb95b28d13aebf60e2c59fe"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "--mib",
+      "4",
+      "--workers",
+      "32",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 0,
+    "expected_success": true,
+    "name": "sanitized-4-32-main",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/sanitized-4-32-main.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdin_hex": "2b0a2b0a2b0a2b0a2b0a2b0a",
+    "stdout": {
+      "bytes": 500,
+      "path": "qualification/sanitized-4-32-main.stdout.txt",
+      "sha256": "4ade332924309a7ca6fd65950b1e598d8496d2a5717332ebc90b5f0490bbe26c"
+    }
+  }
+]

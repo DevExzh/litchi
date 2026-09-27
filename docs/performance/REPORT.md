@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0789 — accounting interfaces qualified
+
+[0789](0789-rss-accounting-calibration.md) Known-page checks and detailed traces support the kernel counter explanation for RSS disagreement. Direct launch also exposes pre-exec high-water contamination. Production source is unchanged and the 0787 rejection remains authoritative; all raw results and limitations are retained.
+
 ## 0788 — memory attribution remains bounded
 
 [0788](0788-cached-part-memory-attribution.md) Native target RSS ratio is 0.974631 with interval [0.949270, 1.006135]; this separate experiment does not overturn 0787. All 220 children complete, exact production source is restored, and phase/heap diagnostics remain separate from native measurements.

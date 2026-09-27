@@ -1,0 +1,4 @@
+trace-detail 0 {'mib': 0, 'workers': 0, 'touch': 'main'} single time full PASS
+trace-detail 1 {'mib': 0, 'workers': 0, 'touch': 'main'} all time full PASS
+trace-detail 2 {'mib': 64, 'workers': 0, 'touch': 'main'} single time full PASS
+trace-detail 3 {'mib': 64, 'workers': 0, 'touch': 'main'} all time full PASS

@@ -1,0 +1,18 @@
+561907 execve("/usr/bin/time", ["/usr/bin/time", "-f", "%M %R %F", "-o", "/home/zhuhe/code/litchi/docs/per"..., "/home/zhuhe/code/litchi-target-0"..., "--mib", "64", "--workers", "0", "--touch", "main"], 0x7ffc8c2d0758 /* 48 vars */) = 0
+561908 execve("/home/zhuhe/code/litchi-target-0789/probe", ["/home/zhuhe/code/litchi-target-0"..., "--mib", "64", "--workers", "0", "--touch", "main"], 0x7ffca080c670 /* 48 vars */ <unfinished ...>
+561907 wait4(-1 <unfinished ...>
+561908 <... execve resumed>)            = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=263}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=280}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=290}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=300}, ru_stime={tv_sec=0, tv_usec=0}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=977}, ru_stime={tv_sec=0, tv_usec=11724}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=978}, ru_stime={tv_sec=0, tv_usec=11736}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=978}, ru_stime={tv_sec=0, tv_usec=11742}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=11750}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=12970}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=12981}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=12987}, ...}) = 0
+561908 getrusage(RUSAGE_SELF, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=12996}, ...}) = 0
+561907 <... wait4 resumed>, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, {ru_utime={tv_sec=0, tv_usec=979}, ru_stime={tv_sec=0, tv_usec=13071}, ...}) = 561908
+561907 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=561908, si_uid=1001, si_status=0, si_utime=0, si_stime=1 /* 0.01 s */} ---
