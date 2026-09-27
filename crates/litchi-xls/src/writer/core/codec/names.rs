@@ -156,6 +156,11 @@ impl Writer {
         if let Some(comment) = &name.comment {
             ensure_utf16_len_within(comment, NAME_COMMENT_UNITS, "defined-name comment")?;
         }
+        let future_internal_count =
+            usize::from(!self.worksheets.is_empty()) * self.worksheets.len();
+        let additional_internal_references =
+            future_internal_count.saturating_sub(self.internal_external_reference_count());
+        self.check_external_reference_capacity(additional_internal_references, 0, 0, 0)?;
         self.defined_names.push(name);
         Ok(())
     }
@@ -187,6 +192,10 @@ impl Writer {
                 limit: usize::from(u16::MAX),
             });
         }
+        let future_internal_count = usize::from(!self.worksheets.is_empty());
+        let additional_internal_references =
+            future_internal_count.saturating_sub(self.internal_external_reference_count());
+        self.check_external_reference_capacity(additional_internal_references, 0, 0, 0)?;
         let index = self.defined_name_records.len();
         self.defined_name_records
             .push((options, Default::default()));
@@ -210,6 +219,10 @@ impl Writer {
                 limit: usize::from(u16::MAX),
             });
         }
+        let future_internal_count = usize::from(!self.worksheets.is_empty());
+        let additional_internal_references =
+            future_internal_count.saturating_sub(self.internal_external_reference_count());
+        self.check_external_reference_capacity(additional_internal_references, 0, 0, 0)?;
         let index = self.defined_name_records.len();
         self.defined_name_records.push((options, future));
         Ok(index)

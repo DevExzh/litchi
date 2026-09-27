@@ -182,6 +182,21 @@ impl Writer {
             )));
         }
 
+        let future_internal_count = if self.defined_names.is_empty() {
+            usize::from(
+                !self.defined_name_records.is_empty()
+                    || self
+                        .worksheets
+                        .iter()
+                        .any(|worksheet| !worksheet.pivot_tables.is_empty()),
+            )
+        } else {
+            self.worksheets.len().saturating_add(1)
+        };
+        let additional_internal_references =
+            future_internal_count.saturating_sub(self.internal_external_reference_count());
+        self.check_external_reference_capacity(additional_internal_references, 0, 0, 0)?;
+
         let index = self.worksheets.len();
         self.worksheets
             .push(WritableWorksheet::new(name.to_string()));
