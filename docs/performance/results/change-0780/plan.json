@@ -1,0 +1,83 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "cases": [
+    {
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "mode": "capabilities",
+      "shape": "tiny"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0780.v1",
+  "scope": "Warm in-memory public PPTX operations; constructor diagnostic separate; no filesystem durability/cold/concurrency claim."
+}

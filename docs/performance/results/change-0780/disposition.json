@@ -1,0 +1,6 @@
+{
+  "production_change_retained": true,
+  "reason": "Retain for paired public staged-commit improvements of 5.012%, 6.592% and 9.167% plus consistently fewer allocation requests without added retained or peak-above-entry live bytes. Accept and disclose the consistent 2.398% large-lifecycle regression; no overall lifecycle speedup is claimed. Constructor-only results are diagnostic.",
+  "source_file": "crates/litchi-ooxml-common/src/mce/model.rs",
+  "status": "retained"
+}

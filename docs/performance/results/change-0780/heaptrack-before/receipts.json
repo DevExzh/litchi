@@ -1,0 +1,52 @@
+[
+  {
+    "binary": {
+      "bytes": 13743928,
+      "path": "/home/zhuhe/code/litchi-target-0780/before-native",
+      "sha256": "33a3fa5a813482874b15d3d42990d8806085318bef0d56feed88cb0be83a878c"
+    },
+    "block": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "heaptrack",
+      "-o",
+      "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/heaptrack-before/trace",
+      "/home/zhuhe/code/litchi-target-0780/before-native",
+      "--mode",
+      "capabilities",
+      "--shape",
+      "tiny",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/heaptrack-before/0-tiny-capabilities-before.json"
+    ],
+    "ended": 1790493162.7366133,
+    "exit_code": 0,
+    "leg": "before",
+    "log": {
+      "bytes": 728,
+      "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/heaptrack-before/0-tiny-capabilities-before.log",
+      "sha256": "e73e0cb47d6c348b515d451f181aa7a5ee0fd2f1213356345a211b8256bf3748"
+    },
+    "mode": "capabilities",
+    "report": {
+      "bytes": 1366,
+      "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/heaptrack-before/0-tiny-capabilities-before.json",
+      "sha256": "a56c26eee430be8aa91ac6fb8186e0daa73a1611cdf5147fd8aaa2b3c59b3588"
+    },
+    "shape": "tiny",
+    "started": 1790493162.5861194,
+    "traces": [
+      {
+        "bytes": 56658,
+        "path": "/home/zhuhe/code/litchi-worktrees/0780-static-mce-capabilities/docs/performance/results/change-0780/heaptrack-before/trace.zst",
+        "sha256": "8b6130ecdddcba5fe6e869d9dc296c23a08d9e6534f2722100cf4376a2b6d23b"
+      }
+    ]
+  }
+]

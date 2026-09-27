@@ -1,0 +1,714 @@
+{
+  "schema": "litchi.pptx.static-mce-capabilities-probe.v1",
+  "tool": "mce-capabilities-probe-0780",
+  "mode": "capabilities",
+  "shape": "tiny",
+  "slides": 3,
+  "shapes_per_slide": 4,
+  "timing_scope": "1000 Capabilities::ooxml_baseline constructions and membership checks; constructor diagnostic only",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 31530,
+    "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+  },
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1370486,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1370486,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1356695,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1356695,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1367466,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1367466,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 1357396,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1357396,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 1357976,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1357976,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 1363566,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1363566,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 1365456,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1365456,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 1357806,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1357806,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 1356946,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1356946,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 1355376,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1355376,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 1360906,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1360906,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 1355096,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1355096,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 1356466,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1356466,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 1360956,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1360956,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 1356815,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1356815,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 1355976,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1355976,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 1361156,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1361156,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 1355266,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1355266,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 1354576,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1354576,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 1362216,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1362216,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 1356886,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1356886,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 1361616,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1361616,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 1354696,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1354696,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 1353926,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1353926,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 1365066,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1365066,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 1353275,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1353275,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 1352586,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1352586,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 1360426,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1360426,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 1351186,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1351186,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 1355346,
+      "metrics": {
+        "constructor_repetitions": 1000,
+        "elapsed_ns": 1355346,
+        "recognized_memberships": 17000,
+        "shapes_per_slide": 4,
+        "slides": 3
+      },
+      "source_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "verification": {
+        "semantic_check": true,
+        "reopened": false,
+        "expected_text": null,
+        "actual_text": null,
+        "semantic_text_bytes": null,
+        "semantic_text_sha256": null,
+        "readback_bytes": null,
+        "readback_sha256": null,
+        "marker_matches": null
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-native",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}
