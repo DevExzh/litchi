@@ -1,0 +1,465 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 866402
+cmd:  /home/zhuhe/code/litchi-target-0797/attribute-boundary-probe --leg before --case duplicate-valid-after-1 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0797/profiles/0-duplicate-valid-after-1-consume-before.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 193434
+desc: Trigger: --dump-after=attribute_boundary_probe::before_consume
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 754 95 11 10 2
+
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(588) (below main)
+cob=(6) /home/zhuhe/code/litchi-target-0797/attribute-boundary-probe
+cfi=(164) ???
+cfn=(596) main
+calls=0 0 
+59 754 95 11 10 2
+
+fl=(165) ./csu/../csu/libc-start.c
+fn=(566) __libc_start_main@@GLIBC_2.34
+cfi=(168)
+cfn=(588)
+calls=0 30 
+360 754 95 11 10 2
+
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(650) malloc
+3283 1
+1269 2 1
++19 1
+3287 1
+1288 3 1
+3287 2 1
++2 3
++2 2 1
++2 6 1
+3030 2 1
++4 4
++4 1
++1 1
+3294 1
+
+fn=(762) free
+3319 1
++3 2 1
++15 2 1
+-4 3
++8 3 1
++6 3 1
++6 1
+-3 2
++3 1
+-3 1
++1 2 1
++2 3 1
+3007 1
++8 1
+-12 1
++4 3
++1 1
++7 1
+3354 1
+
+fl=(294) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+fn=(1126) __memcmp_avx2_movbe
+73 1
++7 1
++1 1 1
+401 1
++1 1 1
++5 1
++1 1
++1 1
++1 1
++1 1 1
++3 1
++1 1
++1 1
++1 1
++3 1
++1 1 1
++1 1
++1 2
+
+ob=(6)
+fl=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+fn=(1056) alloc::raw_vec::RawVecInner<A>::finish_grow
+542 4
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+3051 7
+fi=(284) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+457 3 1
+fe=(252)
+632 2 1
+-69 4
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+14 2 0 0 1
+cob=(2)
+cfi=(155)
+cfn=(650)
+calls=22 3283 
+* 30 6
+fe=(252)
+562 2 1
+0 2
+566 4
+
+fn=(1054) alloc::raw_vec::RawVec<T,A>::grow_one
+186 4
+491 1
++30 1
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1037 3
+fe=(252)
+527 4
+cfn=(1056)
+calls=22 +15 
+* 60 9 0 1
+fi=(244) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+2173 2 1
++1 1
+fe=(252)
+774 1
++1 1
+189 4
+
+fl=(164)
+fn=(596)
+cfi=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+cfn=(598) std::rt::lang_start_internal
+calls=0 152 
+0 754 95 11 10 2
+
+fn=(564) (below main)
+cob=(2)
+cfi=(165)
+cfn=(566)
+calls=0 242 
+0 754 95 11 10 2
+
+fl=(297) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs
+fn=(1160) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+697 12
++1 8 0 0 2
+cfn=(1162) quick_xml::events::attributes::IterState::next
+calls=51 1222 
+* 455 66 2 5
+* 8 3
++3 6
+0 2
+700 6
+fi=(174)
+923 7
+fe=(297)
+-50 3 0 0 1
+fi=(174)
++50 7 3
+fi=(276) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+89 4
+fe=(297)
+700 5
++3 10
+
+fn=(1172) quick_xml::events::attributes::IterState::check_for_duplicates
+1135 14
++5 4 2
+0 4
+fi=(253) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs
+2997 2
+fe=(297)
+1141 4 2
+0 8
+fi=(252)
+612 4
+fi=(239) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs
+961 8
+fi=(180) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+1720 2
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 2 2 1
+0 13 2
+fe=(297)
+1147 2
+fi=(174)
+923 5 2
+fi=(264) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs
+20 2 1
+fi=(276)
++69 2
+fi=(264)
++65 2 0 0 1
+cob=(2)
+cfi=(294)
+cfn=(1126)
+calls=22 -81 
+* 19 4
+* 1
+fi=(277)
+349 1 1
+0 1
+fe=(297)
+1149 5
+0 2
+fi=(253)
+1028 2 1
+0 3
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+1917 3
+fi=(253)
+1034 3
+fe=(297)
+1153 3
++1 16
+fi=(253)
+1029 2 0 0 1
+cfi=(252)
+cfn=(1054)
+calls=22 186 
+* 82 10 0 1
+fi=(252)
+612 3
+fe=(297)
+
+fn=(1162)
+1222 14
++1 6
+1055 6 0 0 2
+0 2
+1055 2
+fi=(276)
+568 4 2
+fi=(180)
+1720 4
+fi=(277)
+180 2 2
+fe=(297)
+1224 2
+fi=(276)
+89 8
+-89 2
+fe=(297)
+1229 4
+fi=(298) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/utils.rs
+322 2 2
+fe=(297)
+1229 4
+fi=(298)
+322 2 2
+0 4 2 1
+fi=(180)
+1720 6
+fi=(277)
+180 2 2
+fe=(297)
+1360 18
+fi=(277)
+180 16
+0 2
+fi=(180)
+1720 2
+fi=(277)
+180 2 2
+fi=(180)
+1720 2
+fi=(277)
+180 2 2
+fe=(297)
+1242 16 4
+0 18 8
+1287 24
+cfn=(1172)
+calls=51 1135 
+* 224 27 1 3
+* 4 2
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+0 2
+fe=(297)
+1298 2
+fi=(298)
+322 1 1
+0 2 1
+fe=(297)
+1288 5
++1 3
++1 1
+fi=(306) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/lib.rs
+0 1
+fe=(297)
+0 3 1
+fi=(277)
+180 2
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(259) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs
+2469 2
+fe=(297)
+1342 2
+fi=(180)
+659 2
+fi=(259)
+2469 2 2
+fe=(297)
+0 3
+1342 2 1
+1212 2
+0 5
+
+fl=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(307) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0797/probe-src/src/main.rs
+cfn=(864) attribute_boundary_probe::main
+calls=0 382 
+250 754 95 11 10 2
+fe=(249)
+
+fl=(172)
+fn=(598)
+fi=(307)
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 754 95 11 10 2
+fe=(172)
+
+fn=(860)
+cfi=(249)
+cfn=(862)
+calls=0 162 
+206 754 95 11 10 2
+
+fl=(250)
+fn=(1316) attribute_boundary_probe::before_consume
+880 10
+fi=(236)
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 17
+fi=(174)
+2533 2
+fe=(250)
+838 2
+fi=(174)
+2457 6
+fi=(236)
+1916 2
+fi=(254)
+772 1 1 1
+0 3
+fi=(174)
+844 2
+fi=(299) /home/zhuhe/code/litchi/docs/performance/results/change-0797/probe-src/src/baseline.rs
+114 21
+0 2
+fi=(174)
+2533 1
+fe=(250)
+815 1
+fi=(174)
+2533 2
+fe=(250)
+815 3
+fi=(299)
+228 3
+0 2
+228 2 1
+0 2
+228 6 3 1
++3 6
+cfi=(297)
+cfn=(1160)
+calls=2 697 
+* 533 72 2 8
++1 4 2 2
+fi=(233)
+805 2 1 1
+fi=(299)
+233 2
++2 1
++2 6
+fe=(250)
+811 4 1
+fi=(299)
+237 6
+fe=(250)
+811 10 3 1
++1 6
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 3
+fi=(308) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs
+350 1
+fi=(309) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs
+207 1
+fi=(233)
+805 2 1 1
+fi=(299)
+0 1
+fe=(250)
+818 4
+fi=(283)
+491 3
+fe=(250)
+785 5 0 0 1 1
++6 2
++1 1
+0 1
+fi=(284)
+2029 2
+fe=(250)
+794 2
+fi=(252)
+632 2 1
+fi=(233)
+805 1
+fi=(243)
+48 1 0 0 1 1
+cob=(2)
+cfi=(155)
+cfn=(762)
+calls=1 3319 
+* 33 6
+fi=(233)
+805 5 2 2
+fi=(243)
+0 1
+fi=(283)
+491 3
+fe=(250)
+892 8
+
+fn=(864)
+cfn=(1316)
+calls=1 880 
+1024 754 95 11 10 2
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 754 95 11 10 2
+
+totals: 754 95 11 10 2

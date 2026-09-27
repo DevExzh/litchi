@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0797 — first-attribute candidate stopped at preflight
+
+[0797](0797-xml-first-attribute-preflight.md) The candidate passes helper semantics and 1,056 captures, but 20 consumption regressions prevent advancement to workflow trials. Both iterator sizes remain 120 bytes; production is unchanged.
+
 ## 0796 — attribute boundary diagnostics retain rejection
 
 [0796](0796-xml-attribute-boundary-diagnostic.md) All 992 reports/22,568 samples validate. Thirty-one construction and eight consumption rows trigger diagnostic regression flags; these micro-input results do not establish workflow speed or adoption. Production is unchanged.

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0797 — helper preflight, no coverage promotion
+
+[0797](0797-xml-first-attribute-preflight.md) Exact helper copies pass isolated differential and boundary tests, but this does not establish full production-crate or public-workflow behavior. No CRUD or producer coverage is promoted.
+
 ## 0796 — direct helper diagnostics, no coverage promotion
 
 [0796](0796-xml-attribute-boundary-diagnostic.md) Hot repeated XML attribute inputs isolate construction and error/growth boundaries. This adds no document producer, CRUD, cold/range, or concurrency coverage. Production is unchanged.

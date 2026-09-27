@@ -1,0 +1,9 @@
+{
+  "failure": "E0631 test-only Iterator::any(Result::is_err) reference/value mismatch",
+  "fix": "any(|item| item.is_err())",
+  "production_changed": false,
+  "quality_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0797/quality-failed-0",
+  "quality_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0797/quality",
+  "source_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0797/test-src-failed-0",
+  "source_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0797/test-src"
+}

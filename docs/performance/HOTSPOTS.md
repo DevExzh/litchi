@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0797 — first-attribute replay adds multi-attribute cost
+
+[0797](0797-xml-first-attribute-preflight.md) Same-size iterator state preserves early duplicate refusal and helps one-attribute inputs, but two/three attributes regress 42.987%/33.387%. Quantify actual workload attribute distributions before another specialization.
+
 ## 0796 — construction and early duplicate work isolated
 
 [0796](0796-xml-attribute-boundary-diagnostic.md) Opaque construction costs rise; long quoted and unterminated duplicate tails after one attribute are about 24× slower in the rejected candidate. Larger valid inputs often improve. Preserve early duplicate detection and reduce short-tag state work before fresh workflow gates.

@@ -1,0 +1,535 @@
+{
+  "production_adoption": false,
+  "reports": 1056,
+  "rows": [
+    {
+      "case": "distinct-0",
+      "ci_high": 1.0749158249158248,
+      "ci_low": 0.9224283305227656,
+      "mode": "construct",
+      "ratio": 0.923207408504626,
+      "regression": false
+    },
+    {
+      "case": "distinct-0",
+      "ci_high": 1.348676917243031,
+      "ci_low": 1.0503507111371384,
+      "mode": "consume",
+      "ratio": 1.0506327752819336,
+      "regression": true
+    },
+    {
+      "case": "distinct-1",
+      "ci_high": 0.9249578414839797,
+      "ci_low": 0.9232727045227045,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "distinct-1",
+      "ci_high": 0.6436624346249913,
+      "ci_low": 0.621102215035672,
+      "mode": "consume",
+      "ratio": 0.6423168072788805,
+      "regression": false
+    },
+    {
+      "case": "distinct-2",
+      "ci_high": 1.0008431703204046,
+      "ci_low": 0.920959595959596,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "distinct-2",
+      "ci_high": 1.4538848363414572,
+      "ci_low": 1.4265083429836363,
+      "mode": "consume",
+      "ratio": 1.4298712526504387,
+      "regression": true
+    },
+    {
+      "case": "distinct-3",
+      "ci_high": 0.9249578414839797,
+      "ci_low": 0.9224283305227656,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "distinct-3",
+      "ci_high": 1.3539618281436914,
+      "ci_low": 1.3104750175018955,
+      "mode": "consume",
+      "ratio": 1.3338724463919231,
+      "regression": true
+    },
+    {
+      "case": "distinct-4",
+      "ci_high": 1.0767284991568298,
+      "ci_low": 0.9240505788250308,
+      "mode": "construct",
+      "ratio": 0.9248951734196253,
+      "regression": false
+    },
+    {
+      "case": "distinct-4",
+      "ci_high": 1.2917437718748979,
+      "ci_low": 1.2495687824010808,
+      "mode": "consume",
+      "ratio": 1.2703277546674088,
+      "regression": true
+    },
+    {
+      "case": "distinct-5",
+      "ci_high": 1.0007805022560503,
+      "ci_low": 0.9194630872483222,
+      "mode": "construct",
+      "ratio": 0.9232715008431703,
+      "regression": false
+    },
+    {
+      "case": "distinct-5",
+      "ci_high": 1.1824709230905202,
+      "ci_low": 1.1542222286080923,
+      "mode": "consume",
+      "ratio": 1.1653494254790626,
+      "regression": true
+    },
+    {
+      "case": "distinct-8",
+      "ci_high": 0.9999361234605754,
+      "ci_low": 0.921718366942055,
+      "mode": "construct",
+      "ratio": 0.923207408504626,
+      "regression": false
+    },
+    {
+      "case": "distinct-8",
+      "ci_high": 1.1067436372068906,
+      "ci_low": 1.08659488979675,
+      "mode": "consume",
+      "ratio": 1.095853291501105,
+      "regression": true
+    },
+    {
+      "case": "distinct-9",
+      "ci_high": 0.924114671163575,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.9240367656947532,
+      "regression": false
+    },
+    {
+      "case": "distinct-9",
+      "ci_high": 1.0789213680462861,
+      "ci_low": 1.063559908623518,
+      "mode": "consume",
+      "ratio": 1.0725186290313604,
+      "regression": true
+    },
+    {
+      "case": "distinct-16",
+      "ci_high": 0.9248937491454354,
+      "ci_low": 0.9216518756990932,
+      "mode": "construct",
+      "ratio": 0.9224283305227656,
+      "regression": false
+    },
+    {
+      "case": "distinct-16",
+      "ci_high": 1.0714221442374585,
+      "ci_low": 1.0477766720103991,
+      "mode": "consume",
+      "ratio": 1.0556083687953484,
+      "regression": true
+    },
+    {
+      "case": "distinct-17",
+      "ci_high": 0.9257383437400301,
+      "ci_low": 0.9232715008431703,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "distinct-17",
+      "ci_high": 1.0965484328071624,
+      "ci_low": 1.0634248993254416,
+      "mode": "consume",
+      "ratio": 1.0649656392988456,
+      "regression": true
+    },
+    {
+      "case": "distinct-32",
+      "ci_high": 0.9256756756756757,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.9248951734196253,
+      "regression": false
+    },
+    {
+      "case": "distinct-32",
+      "ci_high": 1.0453075363889512,
+      "ci_low": 1.029105434570985,
+      "mode": "consume",
+      "ratio": 1.0377291341437558,
+      "regression": false
+    },
+    {
+      "case": "distinct-33",
+      "ci_high": 0.9999375429392293,
+      "ci_low": 0.9216518756990932,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "distinct-33",
+      "ci_high": 1.0421402009427438,
+      "ci_low": 1.0161919652912013,
+      "mode": "consume",
+      "ratio": 1.0184235683452885,
+      "regression": false
+    },
+    {
+      "case": "distinct-64",
+      "ci_high": 1.0741379506134987,
+      "ci_low": 0.9225589225589226,
+      "mode": "construct",
+      "ratio": 0.9249578414839797,
+      "regression": false
+    },
+    {
+      "case": "distinct-64",
+      "ci_high": 1.0196823788585152,
+      "ci_low": 0.9983858283609266,
+      "mode": "consume",
+      "ratio": 1.0073915959462458,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-1",
+      "ci_high": 0.924114671163575,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-1",
+      "ci_high": 1.4129748303843108,
+      "ci_low": 1.3567501350049809,
+      "mode": "consume",
+      "ratio": 1.389820133050775,
+      "regression": true
+    },
+    {
+      "case": "duplicate-valid-after-4",
+      "ci_high": 0.9249642388308721,
+      "ci_low": 0.9232715008431703,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-4",
+      "ci_high": 1.3060022264882152,
+      "ci_low": 1.2446759199786535,
+      "mode": "consume",
+      "ratio": 1.2515653112375382,
+      "regression": true
+    },
+    {
+      "case": "duplicate-valid-after-5",
+      "ci_high": 0.924114671163575,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-5",
+      "ci_high": 1.229297548969872,
+      "ci_low": 1.187322780782155,
+      "mode": "consume",
+      "ratio": 1.2126223183039984,
+      "regression": true
+    },
+    {
+      "case": "duplicate-valid-after-32",
+      "ci_high": 0.9992862180362181,
+      "ci_low": 0.9201015759839288,
+      "mode": "construct",
+      "ratio": 0.9224283305227656,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-32",
+      "ci_high": 1.0248053519712268,
+      "ci_low": 1.0132869094557007,
+      "mode": "consume",
+      "ratio": 1.0225755648419255,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-33",
+      "ci_high": 0.924114671163575,
+      "ci_low": 0.9224283305227656,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-valid-after-33",
+      "ci_high": 1.0408481188849137,
+      "ci_low": 1.0203703121562018,
+      "mode": "consume",
+      "ratio": 1.0257085806621906,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-quoted-after-1",
+      "ci_high": 1.0,
+      "ci_low": 0.9217836629601335,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-quoted-after-1",
+      "ci_high": 1.391793557618135,
+      "ci_low": 1.3556197071953977,
+      "mode": "consume",
+      "ratio": 1.366083016207106,
+      "regression": true
+    },
+    {
+      "case": "duplicate-long-quoted-after-33",
+      "ci_high": 0.9248951734196253,
+      "ci_low": 0.921718366942055,
+      "mode": "construct",
+      "ratio": 0.9225589225589226,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-quoted-after-33",
+      "ci_high": 1.0269011442529132,
+      "ci_low": 1.008507542896998,
+      "mode": "consume",
+      "ratio": 1.0141982405414398,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-unterminated-after-1",
+      "ci_high": 0.9998724616322077,
+      "ci_low": 0.9208754208754208,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-unterminated-after-1",
+      "ci_high": 1.400956091958162,
+      "ci_low": 1.3561111483443717,
+      "mode": "consume",
+      "ratio": 1.3675656611813398,
+      "regression": true
+    },
+    {
+      "case": "duplicate-long-unterminated-after-33",
+      "ci_high": 0.924114671163575,
+      "ci_low": 0.9224283305227656,
+      "mode": "construct",
+      "ratio": 0.9225589225589226,
+      "regression": false
+    },
+    {
+      "case": "duplicate-long-unterminated-after-33",
+      "ci_high": 1.0313133848285987,
+      "ci_low": 1.0096318531337032,
+      "mode": "consume",
+      "ratio": 1.0151515150121486,
+      "regression": false
+    },
+    {
+      "case": "duplicate-unquoted-after-1",
+      "ci_high": 0.9241785477029996,
+      "ci_low": 0.9232715008431703,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "duplicate-unquoted-after-1",
+      "ci_high": 1.423886147172194,
+      "ci_low": 1.3534605394421602,
+      "mode": "consume",
+      "ratio": 1.3681219783697716,
+      "regression": true
+    },
+    {
+      "case": "duplicate-unquoted-after-33",
+      "ci_high": 1.001622464101385,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.9256756756756757,
+      "regression": false
+    },
+    {
+      "case": "duplicate-unquoted-after-33",
+      "ci_high": 1.0317309620554562,
+      "ci_low": 1.0144728235695362,
+      "mode": "consume",
+      "ratio": 1.0173771587494491,
+      "regression": false
+    },
+    {
+      "case": "syntax-flag-after-0",
+      "ci_high": 0.9232715008431703,
+      "ci_low": 0.9217060195564507,
+      "mode": "construct",
+      "ratio": 0.9224283305227656,
+      "regression": false
+    },
+    {
+      "case": "syntax-flag-after-0",
+      "ci_high": 1.075628129763422,
+      "ci_low": 1.0238700995316115,
+      "mode": "consume",
+      "ratio": 1.0518478323983356,
+      "regression": true
+    },
+    {
+      "case": "syntax-flag-after-4",
+      "ci_high": 0.9248951734196253,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "syntax-flag-after-4",
+      "ci_high": 1.264327123822682,
+      "ci_low": 1.2342220390136356,
+      "mode": "consume",
+      "ratio": 1.2521980742346188,
+      "regression": true
+    },
+    {
+      "case": "syntax-flag-after-33",
+      "ci_high": 0.9992411467116358,
+      "ci_low": 0.921718366942055,
+      "mode": "construct",
+      "ratio": 0.9232727045227045,
+      "regression": false
+    },
+    {
+      "case": "syntax-flag-after-33",
+      "ci_high": 1.0378435942998383,
+      "ci_low": 1.018654334940834,
+      "mode": "consume",
+      "ratio": 1.0212827469292023,
+      "regression": false
+    },
+    {
+      "case": "syntax-unique-tail-after-0",
+      "ci_high": 1.0015455037134524,
+      "ci_low": 0.9216518756990932,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "syntax-unique-tail-after-0",
+      "ci_high": 0.8243810123730742,
+      "ci_low": 0.7951354067129353,
+      "mode": "consume",
+      "ratio": 0.8000466075168389,
+      "regression": false
+    },
+    {
+      "case": "syntax-unique-tail-after-4",
+      "ci_high": 1.0,
+      "ci_low": 0.9216518756990932,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "syntax-unique-tail-after-4",
+      "ci_high": 1.2105341507115384,
+      "ci_low": 1.171539690224269,
+      "mode": "consume",
+      "ratio": 1.1961462476114622,
+      "regression": true
+    },
+    {
+      "case": "syntax-unique-tail-after-33",
+      "ci_high": 0.9990943726188246,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.9233367968612488,
+      "regression": false
+    },
+    {
+      "case": "syntax-unique-tail-after-33",
+      "ci_high": 1.0194033498021517,
+      "ci_low": 0.9991811867186393,
+      "mode": "consume",
+      "ratio": 1.0132212945654242,
+      "regression": false
+    },
+    {
+      "case": "syntax-equals-value-after-0",
+      "ci_high": 0.9249578414839797,
+      "ci_low": 0.9224936265408441,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "syntax-equals-value-after-0",
+      "ci_high": 1.0698788290022485,
+      "ci_low": 1.0200144684886006,
+      "mode": "consume",
+      "ratio": 1.0513225495355418,
+      "regression": true
+    },
+    {
+      "case": "syntax-equals-value-after-4",
+      "ci_high": 0.9257383437400301,
+      "ci_low": 0.9232715008431703,
+      "mode": "construct",
+      "ratio": 0.924114671163575,
+      "regression": false
+    },
+    {
+      "case": "syntax-equals-value-after-4",
+      "ci_high": 1.2615185499339225,
+      "ci_low": 1.2272857876014853,
+      "mode": "consume",
+      "ratio": 1.240536785783102,
+      "regression": true
+    },
+    {
+      "case": "syntax-equals-value-after-33",
+      "ci_high": 1.0008431703204046,
+      "ci_low": 0.9216518756990932,
+      "mode": "construct",
+      "ratio": 0.9232715008431703,
+      "regression": false
+    },
+    {
+      "case": "syntax-equals-value-after-33",
+      "ci_high": 1.0274041928372806,
+      "ci_low": 1.0095579591438124,
+      "mode": "consume",
+      "ratio": 1.0187263802074504,
+      "regression": false
+    }
+  ],
+  "samples": 24024
+}
