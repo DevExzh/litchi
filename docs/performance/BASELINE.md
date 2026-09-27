@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0775 — MCE stream current-source pair
+
+[0775](0775-mce-stream-integration.md) records 18 cases/108 serial process captures, nine passing gates and a complete text-based semantic reference. Long-URI event-name sharing removes repeated copies; ordinary document controls and three regression flags are explicit. This is an in-memory parser pair, not a CRUD or cold-cache baseline.
+
 ## 0774 — paired XLS formula and numeric authoring probes
 
 [0774](0774-xls-writer-integration.md) compares source `25c3b27ba4` with `836120efe7`: four processes per leg/case, nine samples after two warmups, 20,000 cells and identical output hashes. Formula median process p50 is 20.071 → 14.131 ms; the numeric control is 5.819 → 5.786 ms. Separate whole-process heaptrack observations and every RSS/spread flag are retained. These observations cover synthetic registration plus memory serialization only.
