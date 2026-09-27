@@ -1,0 +1,70 @@
+{
+  "executables": [
+    {
+      "bytes": 9864136,
+      "path": "/home/zhuhe/code/litchi-target-0781/before-allocation",
+      "sha256": "f0dbd511a68c8b67ee531df667ba3e8d5b6ab9c9985770c8b2ff81d5778cc66a"
+    },
+    {
+      "bytes": 9660184,
+      "path": "/home/zhuhe/code/litchi-target-0781/before-native",
+      "sha256": "dce861e09e69630a37187175357431f4d6d4c42da306d9cb55d651287fc3e99f"
+    },
+    {
+      "bytes": 9862528,
+      "path": "/home/zhuhe/code/litchi-target-0781/after-allocation",
+      "sha256": "d09d939dd9fe39e8ebe3a9419cd86d103f9cbaa119d473a3c24ee62b3ac23d85"
+    },
+    {
+      "bytes": 9658488,
+      "path": "/home/zhuhe/code/litchi-target-0781/after-native",
+      "sha256": "220bc489aa05ae812a64132ee877592544cd91ddf8d3df962f9b2c3c513690f3"
+    },
+    {
+      "bytes": 9423024,
+      "path": "/home/zhuhe/code/litchi-target-0781/initial-before-allocation",
+      "sha256": "877672f6883f87827847082ea4b810cda90b7d6c68d129e3e955f751d9c9874b"
+    },
+    {
+      "bytes": 9222472,
+      "path": "/home/zhuhe/code/litchi-target-0781/initial-before-native",
+      "sha256": "9cfe2c7f486351eeda0457682df76bdafd0e3f3a1d23c6da24b1edee5def8cd2"
+    },
+    {
+      "bytes": 68838400,
+      "path": "/home/zhuhe/code/litchi-target-0781/harness/release/litchi-perf-baseline",
+      "sha256": "55533cb8345e13bdbb034af48ec00f4e10fcf193e2e7357e9cdcfec641d44d5d"
+    }
+  ],
+  "executables_verified_before_removal": true,
+  "initial_binary_relocations": [
+    {
+      "archived": {
+        "bytes": 9423024,
+        "path": "/home/zhuhe/code/litchi-target-0781/initial-before-allocation",
+        "sha256": "877672f6883f87827847082ea4b810cda90b7d6c68d129e3e955f751d9c9874b"
+      },
+      "original": {
+        "bytes": 9423024,
+        "path": "/home/zhuhe/code/litchi-target-0781/before-allocation",
+        "sha256": "877672f6883f87827847082ea4b810cda90b7d6c68d129e3e955f751d9c9874b"
+      }
+    },
+    {
+      "archived": {
+        "bytes": 9222472,
+        "path": "/home/zhuhe/code/litchi-target-0781/initial-before-native",
+        "sha256": "9cfe2c7f486351eeda0457682df76bdafd0e3f3a1d23c6da24b1edee5def8cd2"
+      },
+      "original": {
+        "bytes": 9222472,
+        "path": "/home/zhuhe/code/litchi-target-0781/before-native",
+        "sha256": "9cfe2c7f486351eeda0457682df76bdafd0e3f3a1d23c6da24b1edee5def8cd2"
+      }
+    }
+  ],
+  "removed_target": "/home/zhuhe/code/litchi-target-0781",
+  "removed_target_file_bytes": 3248857328,
+  "verified": true,
+  "worktree_cleanup": "Recorded after integration in the report outside this sealed packet."
+}

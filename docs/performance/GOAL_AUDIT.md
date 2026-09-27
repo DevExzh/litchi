@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0781 — CI evidence flow repaired; general optimization rejected
+
+[0781](0781-ppt-text-ownership-and-ci-matrix.md) closes stale default-matrix and coverage-artifact wiring in performance CI with actual local report validation. A measured PPT copy-removal candidate is rejected after consistent short-text regressions despite large-text gains. Complete replay binds qualification corrections, 120 native/40 allocator processes, separate profilers, and source restoration. Full CRUD metrics, cold/range/concurrency/scaling and broader budget work remain open. OLE2/OOXML remain active, ODF deferred, and iWork excluded.
+
 ## 0780 — Narrow shared-MCE progress; goal remains active
 
 [0780](0780-static-mce-capabilities.md) The retained static profile preserves the public membership contract, custom-registration fallback and checked DOCX owner layout. Paired staged-commit benefits come with a disclosed large-lifecycle regression. Six final gates and complete offline replay pass; no CRUD row, scaling, cold/range, concurrency or completed-program claim is promoted.

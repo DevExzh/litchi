@@ -1,0 +1,9 @@
+# 0781 fresh PPT text ownership
+
+Hypothesis: fresh PPT conversion clones source text into short-lived UserShapeData immediately before serialization. 0753 attributed 15% of its payload-heavy timed workload to this conversion; current source still clones the plain string and rich paragraphs. Fresh measurements and allocation attribution are required before adoption. The current target is borrowed text during synchronous fresh serialization, preserving owned fallback for mutation, exact output and public API behavior. No existing-document preservation policy changes.
+
+ADRs 0001/0002/0024 keep correctness and owner boundaries; 0003/0004 keep public snapshots/APIs unchanged; 0005 removes transient copying without global caches or ambient execution; 0006 binds output bytes, refusals and validation; 0008 requires final gates. All 35 previously read architecture inputs remain hash-identical to 0780. OLE2/OOXML priority and ODF deferral follow 0758; iWork excluded.
+
+Freeze six alternating native blocks (30 samples, 3 warmups), two independent allocation blocks (3 samples, no warmup), ten cases (five corpora × write/lifecycle), CPU 12. Validate exact deterministic source/output and reopened semantic content outside every timing/allocation region. Keep output and writer alive through endpoints. Preserve every sample/flag; do not resample based on results. Qualify the baseline before candidate application; build both legs with the same probe/lock/profile. All hardware-dependent workloads run serially under coordinator control.
+
+Quality: PPT fmt, all-feature/all-target check, all-feature tests, warning-denied library Clippy/rustdoc, repository boundary check. Candidate tests must cover borrow ownership, rich mutations and ordinary/Unicode/record-boundary byte equivalence. Existing complete PPT suite supplies wider format checks. No coverage registry row promotion or full goal claim follows.

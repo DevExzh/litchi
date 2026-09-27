@@ -1,0 +1,179 @@
+{
+  "schema": "litchi.ppt.borrowed-text-probe.v1",
+  "tool": "ppt-borrowed-text-probe-0781",
+  "mode": "lifecycle",
+  "shape": "tiny",
+  "slides": 2,
+  "boxes_per_slide": 3,
+  "text_boxes": 6,
+  "timing_scope": "Writer::new, add_slide, add_textbox/add_rich_textbox, and Writer::write_to",
+  "source": {
+    "bytes": 310,
+    "sha256": "1784e50e879fc359e4f71b9baa42aa9b046708e1896169b900c7462336cbe0f5"
+  },
+  "expected_semantic_text_bytes": 210,
+  "expected_raw_text_bytes": 210,
+  "warmup": 0,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 76500,
+      "metrics": {
+        "boxes_per_slide": 3,
+        "elapsed_ns": 76500,
+        "slides": 2
+      },
+      "source_sha256": "1784e50e879fc359e4f71b9baa42aa9b046708e1896169b900c7462336cbe0f5",
+      "output": {
+        "bytes": 8704,
+        "sha256": "8c649694207012a7b6b23e29baeed18467326f389f380d1bbbbf5a964bcb44e4"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 496,
+        "deallocation_calls": 305,
+        "reallocation_calls": 179,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 83423,
+        "deallocated_bytes": 63726,
+        "live_bytes_before": 3000,
+        "live_bytes_after": 22697,
+        "peak_live_bytes_before": 3000,
+        "peak_live_bytes_after": 42609,
+        "region_peak_live_bytes": 42609
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 2,
+        "expected_slide_count": 2,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 210,
+        "expected_semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "semantic_text_bytes": 210,
+        "semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 210,
+        "expected_raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_bytes": 210,
+        "raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_box_count": 6,
+        "expected_raw_text_box_count": 6,
+        "raw_text_atom_count": 6,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 26690,
+      "metrics": {
+        "boxes_per_slide": 3,
+        "elapsed_ns": 26690,
+        "slides": 2
+      },
+      "source_sha256": "1784e50e879fc359e4f71b9baa42aa9b046708e1896169b900c7462336cbe0f5",
+      "output": {
+        "bytes": 8704,
+        "sha256": "8c649694207012a7b6b23e29baeed18467326f389f380d1bbbbf5a964bcb44e4"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 496,
+        "deallocation_calls": 305,
+        "reallocation_calls": 179,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 83423,
+        "deallocated_bytes": 63726,
+        "live_bytes_before": 3847,
+        "live_bytes_after": 23544,
+        "peak_live_bytes_before": 59852,
+        "peak_live_bytes_after": 59852,
+        "region_peak_live_bytes": 43456
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 2,
+        "expected_slide_count": 2,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 210,
+        "expected_semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "semantic_text_bytes": 210,
+        "semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 210,
+        "expected_raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_bytes": 210,
+        "raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_box_count": 6,
+        "expected_raw_text_box_count": 6,
+        "raw_text_atom_count": 6,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 20850,
+      "metrics": {
+        "boxes_per_slide": 3,
+        "elapsed_ns": 20850,
+        "slides": 2
+      },
+      "source_sha256": "1784e50e879fc359e4f71b9baa42aa9b046708e1896169b900c7462336cbe0f5",
+      "output": {
+        "bytes": 8704,
+        "sha256": "8c649694207012a7b6b23e29baeed18467326f389f380d1bbbbf5a964bcb44e4"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 496,
+        "deallocation_calls": 305,
+        "reallocation_calls": 179,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 83423,
+        "deallocated_bytes": 63726,
+        "live_bytes_before": 4630,
+        "live_bytes_after": 24327,
+        "peak_live_bytes_before": 60699,
+        "peak_live_bytes_after": 60699,
+        "region_peak_live_bytes": 44239
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 2,
+        "expected_slide_count": 2,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 210,
+        "expected_semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "semantic_text_bytes": 210,
+        "semantic_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 210,
+        "expected_raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_bytes": 210,
+        "raw_text_sha256": "45b0919e4a8281b458bd9ec6669821357f1acf56eac5790852bff1dc025cfab9",
+        "raw_text_box_count": 6,
+        "expected_raw_text_box_count": 6,
+        "raw_text_atom_count": 6,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "after-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

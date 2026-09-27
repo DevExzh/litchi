@@ -1,0 +1,31 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "ended": 1790496012.2723713,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0781/harness"
+  },
+  "exit_code": 0,
+  "log": {
+    "bytes": 9021,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-baseline-build/build.log",
+    "sha256": "d86bb73696683f8840b4f43c3fc649cffaac32d776041aef9bd90c56e13c3f04"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-baseline-build/source.json",
+    "sha256": "e15ff3e531570299847944382c03a3b38a155756ba8be0a2b3ddd3984bbc37a6"
+  },
+  "started": 1790495481.6958904
+}

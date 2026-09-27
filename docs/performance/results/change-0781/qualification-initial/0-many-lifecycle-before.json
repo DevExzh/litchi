@@ -1,0 +1,66 @@
+{
+  "schema": "litchi.ppt.borrowed-text-probe.v1",
+  "tool": "ppt-borrowed-text-probe-0781",
+  "mode": "lifecycle",
+  "shape": "many",
+  "slides": 100,
+  "boxes_per_slide": 10,
+  "text_boxes": 1000,
+  "timing_scope": "Writer::new, add_slide, add_textbox/add_rich_textbox, and Writer::write_to",
+  "source": {
+    "bytes": 49836,
+    "sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e"
+  },
+  "expected_semantic_text_bytes": 41098,
+  "warmup": 0,
+  "samples_requested": 1,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 821903,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 821903,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 18157,
+        "deallocation_calls": 12400,
+        "reallocation_calls": 4653,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 4227653,
+        "deallocated_bytes": 2811392,
+        "live_bytes_before": 152614,
+        "live_bytes_after": 1568875,
+        "peak_live_bytes_before": 250850,
+        "peak_live_bytes_after": 2015009,
+        "region_peak_live_bytes": 2015009
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

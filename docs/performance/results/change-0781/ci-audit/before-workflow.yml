@@ -1,0 +1,2731 @@
+name: Performance baseline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/litchi-biff/**'
+      - 'crates/litchi-cfb/**'
+      - 'crates/litchi-codepage/**'
+      - 'crates/litchi-core/**'
+      - 'crates/litchi-crypto/**'
+      - 'crates/litchi-doc/**'
+      - 'crates/litchi-docx/**'
+      - 'crates/litchi-drawingml/**'
+      - 'crates/litchi-fonts/**'
+      - 'crates/litchi-formula/**'
+      - 'crates/litchi/**'
+      - 'crates/litchi-odf-common/**'
+      - 'crates/litchi-odp/**'
+      - 'crates/litchi-odraw/**'
+      - 'crates/litchi-ods/**'
+      - 'crates/litchi-odt/**'
+      - 'crates/litchi-ograph/**'
+      - 'crates/litchi-ole-common/**'
+      - 'crates/litchi-ooxml-common/**'
+      - 'crates/litchi-opc/**'
+      - 'crates/litchi-ppt/**'
+      - 'crates/litchi-pptx/**'
+      - 'crates/litchi-rtf/**'
+      - 'crates/litchi-sheet/**'
+      - 'crates/litchi-sign/**'
+      - 'crates/litchi-spreadsheet-drawing/**'
+      - 'crates/litchi-vba/**'
+      - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsb/**'
+      - 'crates/litchi-xlsx/**'
+      - 'crates/soapberry-zip/**'
+      - 'crates/xml-minifier-macros/**'
+      - 'crates/xml-minifier/**'
+      - 'tools/perf-baseline/**'
+      - 'tools/perf_compare.py'
+      - 'tools/test_perf_compare.py'
+      - 'tools/perf_smoke_baseline.py'
+      - 'tools/test_perf_smoke_baseline.py'
+      - 'tools/perf_abba_package.py'
+      - 'tools/test_perf_abba_package.py'
+      - 'tools/perf_abba_summary.py'
+      - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_resource_profile.py'
+      - 'tools/validate_perf_corpus_binding.py'
+      - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/test_validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/validate_crud_coverage_index.py'
+      - 'tools/test_crud_coverage_index.py'
+      - 'tools/test_perf_resource_profile.py'
+      - 'tools/test_perf_baseline_source_policy.py'
+      - 'tools/test_perf_workflow_policy.py'
+      - 'tools/check_perf_claims.py'
+      - 'tools/test_perf_claims.py'
+      - 'tools/check_report_claim_classification.py'
+      - 'tools/test_report_claim_classification.py'
+      - 'docs/performance/claim-registry-v1.json'
+      - 'docs/performance/report-claim-classification-v1.json'
+      - 'docs/performance/REPORT.md'
+      - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/perf-smoke-baseline-policy-v1.json'
+      - 'docs/performance/results/perf-regression-default-manifest-v1.json'
+      - 'docs/performance/perf-regression-policy-allocator-v1.json'
+      - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
+      - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/CRUD_COVERAGE.md'
+      - 'docs/CRUD_Scenario_Checklist.md'
+      - 'docs/performance/results/**'
+      - 'docs/performance/changes/**'
+      - 'docs/performance/REGRESSION_COMPARATOR.md'
+      - '.github/workflows/perf-baseline.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/litchi-biff/**'
+      - 'crates/litchi-cfb/**'
+      - 'crates/litchi-codepage/**'
+      - 'crates/litchi-core/**'
+      - 'crates/litchi-crypto/**'
+      - 'crates/litchi-doc/**'
+      - 'crates/litchi-docx/**'
+      - 'crates/litchi-drawingml/**'
+      - 'crates/litchi-fonts/**'
+      - 'crates/litchi-formula/**'
+      - 'crates/litchi/**'
+      - 'crates/litchi-odf-common/**'
+      - 'crates/litchi-odp/**'
+      - 'crates/litchi-odraw/**'
+      - 'crates/litchi-ods/**'
+      - 'crates/litchi-odt/**'
+      - 'crates/litchi-ograph/**'
+      - 'crates/litchi-ole-common/**'
+      - 'crates/litchi-ooxml-common/**'
+      - 'crates/litchi-opc/**'
+      - 'crates/litchi-ppt/**'
+      - 'crates/litchi-pptx/**'
+      - 'crates/litchi-rtf/**'
+      - 'crates/litchi-sheet/**'
+      - 'crates/litchi-sign/**'
+      - 'crates/litchi-spreadsheet-drawing/**'
+      - 'crates/litchi-vba/**'
+      - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsb/**'
+      - 'crates/litchi-xlsx/**'
+      - 'crates/soapberry-zip/**'
+      - 'crates/xml-minifier-macros/**'
+      - 'crates/xml-minifier/**'
+      - 'tools/perf-baseline/**'
+      - 'tools/perf_compare.py'
+      - 'tools/test_perf_compare.py'
+      - 'tools/perf_smoke_baseline.py'
+      - 'tools/test_perf_smoke_baseline.py'
+      - 'tools/perf_abba_package.py'
+      - 'tools/test_perf_abba_package.py'
+      - 'tools/perf_abba_summary.py'
+      - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_resource_profile.py'
+      - 'tools/validate_perf_corpus_binding.py'
+      - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/test_validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/validate_crud_coverage_index.py'
+      - 'tools/test_crud_coverage_index.py'
+      - 'tools/test_perf_resource_profile.py'
+      - 'tools/test_perf_baseline_source_policy.py'
+      - 'tools/test_perf_workflow_policy.py'
+      - 'tools/check_perf_claims.py'
+      - 'tools/test_perf_claims.py'
+      - 'tools/check_report_claim_classification.py'
+      - 'tools/test_report_claim_classification.py'
+      - 'docs/performance/claim-registry-v1.json'
+      - 'docs/performance/report-claim-classification-v1.json'
+      - 'docs/performance/REPORT.md'
+      - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/perf-smoke-baseline-policy-v1.json'
+      - 'docs/performance/results/perf-regression-default-manifest-v1.json'
+      - 'docs/performance/perf-regression-policy-allocator-v1.json'
+      - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
+      - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/CRUD_COVERAGE.md'
+      - 'docs/CRUD_Scenario_Checklist.md'
+      - 'docs/performance/results/**'
+      - 'docs/performance/changes/**'
+      - 'docs/performance/REGRESSION_COMPARATOR.md'
+      - '.github/workflows/perf-baseline.yml'
+  workflow_dispatch:
+    inputs:
+      reference_run_id:
+        description: Prior reference run ID; leave empty to record only
+        required: false
+        type: string
+  schedule:
+    - cron: '17 3 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "1"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUST_BACKTRACE: 1
+  PERF_MANIFEST: tools/perf-baseline/Cargo.toml
+  RUSTFLAGS: "-D warnings -D deprecated"
+
+jobs:
+  smoke:
+    name: deterministic container smoke
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+      LITCHI_RUNNER_LABELS: ubuntu-latest
+      LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
+      LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
+      LITCHI_SMOKE_DIR: target/perf/allocator-smoke
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Capture runner diagnostics before build
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/before-build.txt"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
+          cache-target: false
+
+      - name: Check standalone harness
+        run: |
+          cargo fmt --manifest-path "$PERF_MANIFEST" -- --check
+          cargo check --locked --manifest-path "$PERF_MANIFEST"
+          cargo test --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Run real-producer security correctness corpus
+        run: cargo test --locked --manifest-path "$PERF_MANIFEST" --lib security_corpus -- --ignored
+
+      - name: Check release fresh-child XLSX contract
+        run: cargo test --release --locked --manifest-path "$PERF_MANIFEST" --test xlsx_filesystem
+
+      - name: Check allocator-only benchmark target
+        run: |
+          cargo check --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc
+          cargo test --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc
+
+      - name: Run bounded allocator evidence
+        run: |
+          mkdir -p "$LITCHI_SMOKE_DIR"
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc -- \
+            --warmup 3 \
+            --samples 15 \
+            --case opc_file_eager_open \
+            --filesystem-cache warm,cold-requested \
+            --json "$LITCHI_SMOKE_DIR/current.json"
+
+      - name: Fetch the last successful full-run allocator reference
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p "$LITCHI_SMOKE_DIR/reference"
+          status_file="$LITCHI_SMOKE_DIR/fetch-status.json"
+          python3 tools/perf_smoke_baseline.py fetch-status \
+            --out "$status_file" \
+            --reason "the reference fetch did not complete"
+          if ! command -v gh > /dev/null 2>&1; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "the gh CLI is not available on this runner"
+            exit 0
+          fi
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow perf-baseline.yml \
+            --branch main \
+            --status success \
+            --limit 40 \
+            --json databaseId,event,conclusion,headSha,createdAt \
+            > "$LITCHI_SMOKE_DIR/runs.json"
+          if [ $? -ne 0 ]; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "gh run list did not return a run listing"
+            exit 0
+          fi
+          python3 tools/perf_smoke_baseline.py choose-runs \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --runs "$LITCHI_SMOKE_DIR/runs.json" \
+            --current-sha "$GITHUB_SHA" \
+            --out "$LITCHI_SMOKE_DIR/candidates.txt"
+          if [ $? -ne 0 ]; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "no candidate reference run could be read from the listing"
+            exit 0
+          fi
+          python3 tools/perf_smoke_baseline.py fetch-status \
+            --out "$status_file" \
+            --reason "no successful full run has published a reference artifact"
+          while read -r candidate_run_id; do
+            [ -n "$candidate_run_id" ] || continue
+            gh run download "$candidate_run_id" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "container-performance-baseline-$candidate_run_id" \
+              --dir "$LITCHI_SMOKE_DIR/reference"
+            if [ $? -eq 0 ]; then
+              python3 tools/perf_smoke_baseline.py fetch-status \
+                --out "$status_file" \
+                --fetched \
+                --run-id "$candidate_run_id" \
+                --reason "downloaded the baseline artifact of run $candidate_run_id"
+              break
+            fi
+          done < "$LITCHI_SMOKE_DIR/candidates.txt"
+          exit 0
+
+      - name: Select the smoke comparison baseline
+        run: |
+          python3 tools/perf_smoke_baseline.py select \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --comparator-policy "$LITCHI_ALLOCATOR_POLICY" \
+            --current "$LITCHI_SMOKE_DIR/current.json" \
+            --reference-dir "$LITCHI_SMOKE_DIR/reference" \
+            --fetch-status "$LITCHI_SMOKE_DIR/fetch-status.json" \
+            --runner-labels "$LITCHI_RUNNER_LABELS" \
+            --current-run-id "$GITHUB_RUN_ID" \
+            --baseline-out "$LITCHI_SMOKE_DIR/baseline.json" \
+            --selection-out "$LITCHI_SMOKE_DIR/selection.json"
+
+      - name: Compare the smoke report against the selected baseline
+        run: |
+          set +e
+          python3 tools/perf_compare.py \
+            --policy "$LITCHI_ALLOCATOR_POLICY" \
+            --baseline "$LITCHI_SMOKE_DIR/baseline.json" \
+            --current "$LITCHI_SMOKE_DIR/current.json" \
+            --json-out "$LITCHI_SMOKE_DIR/comparison.json" \
+            --summary-out "$LITCHI_SMOKE_DIR/comparison.txt"
+          comparator_status=$?
+          set -e
+          printf '%s\n' "$comparator_status" \
+            > "$LITCHI_SMOKE_DIR/comparator-exit-status.txt"
+          echo "comparator exit status: $comparator_status"
+
+      - name: Report the smoke comparison outcome
+        run: |
+          python3 tools/perf_smoke_baseline.py report \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --selection "$LITCHI_SMOKE_DIR/selection.json" \
+            --comparison "$LITCHI_SMOKE_DIR/comparison.json" \
+            --comparator-exit-status \
+              "$(cat "$LITCHI_SMOKE_DIR/comparator-exit-status.txt")" \
+            --classification-out "$LITCHI_SMOKE_DIR/classification.json" \
+            --summary-out "$LITCHI_SMOKE_DIR/outcome.md" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Ensure zstd is available for strict claim checking
+        run: |
+          if ! command -v zstd >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zstd
+          fi
+          zstd --version
+
+      - name: Test fail-closed performance Python tooling
+        run: |
+          python3 -m unittest \
+            tools.test_perf_compare \
+            tools.test_perf_smoke_baseline \
+            tools.test_perf_abba_summary \
+            tools.test_perf_abba_package \
+            tools.test_perf_resource_profile \
+            tools.test_perf_corpus_binding \
+            tools.test_validate_opc_serial_eager_allocator_abba \
+            tools.test_crud_coverage_index \
+            tools.test_perf_workflow_policy
+
+      - name: Test benchmark source policy
+        run: python3 -m unittest tools.test_perf_baseline_source_policy
+
+      - name: Check performance claim registry (strict evidence)
+        run: |
+          python3 tools/check_perf_claims.py \
+            --registry docs/performance/claim-registry-v1.json \
+            --repo-root . \
+            --evidence-root . \
+            --mode strict
+          python3 -m unittest tools.test_perf_claims
+
+      - name: Validate non-iWork CRUD coverage index
+        run: |
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog docs/performance/results/perf-corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root .
+
+      - name: Check historical REPORT claim classification
+        run: |
+          python3 tools/check_report_claim_classification.py \
+            --registry docs/performance/report-claim-classification-v1.json \
+            --repo-root .
+          python3 -m unittest tools.test_report_claim_classification
+
+      - name: Run deterministic smoke baseline
+        run: |
+          mkdir -p target/perf
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 2 \
+            --shape tiny \
+            --payload compressible \
+            --writer-shape tiny \
+            --xlsx-shape tiny \
+            --semantic-shape tiny \
+            --json target/perf/opc-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/opc-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 37
+          assert len({item["case"] for item in report["results"]}) == 37
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 2
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run XLSX commit/read attribution smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_one_cell_commit_first_read \
+            --xlsx-shape tiny \
+            --json target/perf/xlsx-commit-read-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-commit-read-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          assert report["results"][0]["case"] == "xlsx_one_cell_commit_first_read"
+          assert len(report["results"][0]["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run DOCX/PPTX semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+            --semantic-shape tiny \
+            --json target/perf/semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 16
+          assert len({item["case"] for item in report["results"]}) == 16
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run common OLE2 publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case ole_common_open,ole_common_put_stream_publish,ole_common_finish_render,ole_common_one_edit_save \
+            --shape few-large \
+            --payload incompressible \
+            --json target/perf/ole-common-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/ole-common-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 4
+          assert {result["case"] for result in report["results"]} == {
+              "ole_common_open",
+              "ole_common_put_stream_publish",
+              "ole_common_finish_render",
+              "ole_common_one_edit_save",
+          }
+          for result in report["results"]:
+              assert result["corpus"]["entry_count"] == 5
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
+              assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+              assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run source-backed OPC one-Part publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case opc_source_overlay_one_part_save \
+            --json target/perf/opc-source-overlay-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/opc-source-overlay-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "opc_source_overlay_one_part_save"
+          assert result["corpus"]["archive_sha256"] == "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6"
+          assert result["corpus"]["archive_member_count"] == 6
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_216
+          assert result["output_sha256"] == "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+          assert result["source"]["ordinary_payload_materializations"] == [1]
+          assert result["sink"]["accepted_bytes"] == 16_783_632
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run source-backed DOCX semantic publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case docx_source_backed_one_edit_save \
+            --json target/perf/docx-source-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/docx-source-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "docx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+          assert result["corpus"]["entry_count"] == 17
+          assert result["corpus"]["archive_member_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_833_643
+          assert result["output_sha256"] == "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795"
+          assert result["source"]["ordinary_payload_materializations"] == [1]
+          assert result["sink"]["accepted_bytes"] == 16_793_048
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run source-backed PPTX semantic publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case pptx_source_backed_one_edit_save \
+            --json target/perf/pptx-source-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-source-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "pptx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+          assert result["corpus"]["entry_count"] == 229
+          assert result["corpus"]["archive_member_count"] == 445
+          assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+          assert result["output_sha256"] == "bcfd05dc7590051137db64810db2d822ac814417c03c50d8a7fc33f429e50d61"
+          assert result["source"]["ordinary_payload_materializations"] == [2]
+          assert result["sink"]["accepted_bytes"] == 17_017_144
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run atomic PPTX batch publication controls smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case pptx_eager_batch_edit_save,pptx_source_backed_batch_edit_save \
+            --json target/perf/pptx-source-batch-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-source-batch-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["pptx_eager_batch_edit_save"]
+          source = results["pptx_source_backed_batch_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+              assert result["corpus"]["entry_count"] == 229
+              assert result["corpus"]["archive_member_count"] == 445
+              assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+              assert result["output_sha256"] == "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755"
+              assert result["sink"]["accepted_bytes"] == 17_017_138
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [229]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run multi-slide PPTX batch publication controls smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case pptx_eager_multi_slide_batch_edit_save,pptx_source_backed_multi_slide_batch_edit_save \
+            --json target/perf/pptx-multi-slide-batch-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-multi-slide-batch-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["pptx_eager_multi_slide_batch_edit_save"]
+          source = results["pptx_source_backed_multi_slide_batch_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+              assert result["corpus"]["entry_count"] == 229
+              assert result["corpus"]["archive_member_count"] == 445
+              assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+              assert result["output_sha256"] == "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+              assert result["sink"]["accepted_bytes"] == 17_017_145
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [229]
+          assert source["source"]["ordinary_payload_materializations"] == [9]
+          PY
+
+      - name: Run XLSX calculation-metadata publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_calculation_metadata_edit_save,xlsx_source_backed_calculation_metadata_edit_save \
+            --json target/perf/xlsx-calculation-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-calculation-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_calculation_metadata_edit_save"]
+          source = results["xlsx_source_backed_calculation_metadata_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "96f60a09a8e87204a533e178bdda115b0202e8aa8ac4fe5673a881f981d3e98d"
+              assert result["sink"]["accepted_bytes"] == 16_786_830
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [1]
+          PY
+
+      - name: Run XLSX page-break publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_page_break_edit_save,xlsx_source_backed_page_break_edit_save \
+            --json target/perf/xlsx-page-break-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-break-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_break_edit_save"]
+          source = results["xlsx_source_backed_page_break_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "1e3b7a9f763feaed4ad4888aa8aa0cd3773cdb9fd9f12e16f3c05b7fd0cd95b3"
+              assert result["sink"]["accepted_bytes"] == 16_786_878
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX page-margin publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_page_margin_edit_save,xlsx_source_backed_page_margin_edit_save \
+            --json target/perf/xlsx-page-margin-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-margin-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_margin_edit_save"]
+          source = results["xlsx_source_backed_page_margin_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "2b50a470f5066dd078c0566ca9e203f26843026b58b6a7a6eca14ac8435429a7"
+              assert result["sink"]["accepted_bytes"] == 16_786_883
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX page-setup publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_page_setup_edit_save,xlsx_source_backed_page_setup_edit_save \
+            --json target/perf/xlsx-page-setup-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-setup-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_setup_edit_save"]
+          source = results["xlsx_source_backed_page_setup_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "fd866304c7aab42bcd5195e38bef5dd76f6192b05bcb551786a2096ad898fcb1"
+              assert result["sink"]["accepted_bytes"] == 16_786_902
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX defined-name publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_defined_names_edit_save,xlsx_source_backed_defined_names_edit_save \
+            --json target/perf/xlsx-defined-names-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-defined-names-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_defined_names_edit_save"]
+          source = results["xlsx_source_backed_defined_names_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615"
+              assert result["sink"]["accepted_bytes"] == 16_786_946
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [1]
+          PY
+
+      - name: Run XLSX print-options publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_print_options_edit_save,xlsx_source_backed_print_options_edit_save \
+            --json target/perf/xlsx-print-options-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-print-options-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_print_options_edit_save"]
+          source = results["xlsx_source_backed_print_options_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "6eee37e1c0e4e9cdf1f364fdf1cbc90d58a6c25acc6fce222670f937abd5a74c"
+              assert result["sink"]["accepted_bytes"] == 16_786_886
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX sheet-protection publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_sheet_protection_edit_save,xlsx_source_backed_sheet_protection_edit_save \
+            --json target/perf/xlsx-sheet-protection-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-sheet-protection-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_sheet_protection_edit_save"]
+          source = results["xlsx_source_backed_sheet_protection_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3"
+              assert result["sink"]["accepted_bytes"] == 16_787_247
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX data-validation publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_data_validation_edit_save,xlsx_source_backed_data_validation_edit_save \
+            --json target/perf/xlsx-data-validation-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-data-validation-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_data_validation_edit_save"]
+          source = results["xlsx_source_backed_data_validation_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "55be448c6a1ec7d2aae2a93bcbc9dd714061778be336675dd69f9edf842321b6"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_783_570
+              assert result["output_sha256"] == "5109c16e75ea6b6f85b8e3b4b8cdde0ba1994d37e5c94e7a45d6ac46fc9eb264"
+              assert result["sink"]["accepted_bytes"] == 16_787_229
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [2]
+          PY
+
+      - name: Run XLSX auto-filter publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_auto_filter_edit_save,xlsx_source_backed_auto_filter_edit_save \
+            --json target/perf/xlsx-auto-filter-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-auto-filter-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_auto_filter_edit_save"]
+          source = results["xlsx_source_backed_auto_filter_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "57678991c8cabfceda63b278f4e50fee87fd7f540f0c2f0eff8cb048f457d421"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_720
+              assert result["output_sha256"] == "34893a3eaf685f20569a6ea383de022825b0fcb434ff49039eaa27bb262b8561"
+              assert result["sink"]["accepted_bytes"] == 16_786_968
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [3]
+          PY
+
+      - name: Run XLSX conditional-formatting publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case xlsx_eager_conditional_formatting_edit_save,xlsx_source_backed_conditional_formatting_edit_save \
+            --json target/perf/xlsx-conditional-formatting-edit-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-conditional-formatting-edit-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_conditional_formatting_edit_save"]
+          source = results["xlsx_source_backed_conditional_formatting_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "843ec3a9fdf759f3ed79064050125975150b16b8230aab52e6074dc000efedfa"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_783_105
+              assert result["output_sha256"] == "5a44bffa0f3b4ea554e3eaa6588eec770d72528a9c854019c7abc6ee419b9b70"
+              assert result["sink"]["accepted_bytes"] == 16_786_983
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 1
+              assert result["source"]["read_bytes"][0] <= result["corpus"]["archive_bytes"] + 65_536
+              assert result["source"]["ordinary_payload_read_calls"][0] > 0
+              assert result["source"]["ordinary_payload_read_bytes"][0] > 0
+          assert eager["output_sha256"] == source["output_sha256"]
+          assert eager["source"]["ordinary_payload_materializations"] == [12]
+          assert source["source"]["ordinary_payload_materializations"] == [3]
+          PY
+
+      - name: Run ODP media publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odp_media_textbox_edit_save,odp_media_textbox_scalar_replace_save,odp_media_textbox_batch_replace_save \
+            --json target/perf/odp-media-textbox-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odp-media-textbox-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 3
+          results = {result["case"]: result for result in report["results"]}
+          result = results["odp_media_textbox_edit_save"]
+          assert result["case"] == "odp_media_textbox_edit_save"
+          assert result["corpus"]["entry_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
+          assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          scalar = results["odp_media_textbox_scalar_replace_save"]
+          batch = results["odp_media_textbox_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 28
+          assert scalar["corpus"]["archive_member_count"] == 13
+          assert scalar["corpus"]["uncompressed_payload_bytes"] == 16_778_604
+          assert scalar["corpus"]["archive_bytes"] == 16_786_244
+          assert scalar["corpus"]["archive_sha256"] == "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+          assert scalar["output_sha256"] == "ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b"
+          assert batch["output_sha256"] == "fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf"
+          for measured, expected_bytes in [(scalar, 16_786_370), (batch, 16_786_368)]:
+              assert len(measured["elapsed_ns"]["samples"]) == 1
+              assert measured["sink"] == {
+                  "accepted_bytes": expected_bytes,
+                  "write_calls": 1,
+                  "largest_write": expected_bytes,
+                  "write_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_1_to_512": 0,
+                      "bytes_513_to_4096": 0,
+                      "bytes_4097_to_16384": 0,
+                      "bytes_16385_to_65536": 0,
+                      "bytes_over_65536": 1,
+                  },
+              }
+              assert "source" not in measured
+          PY
+
+      - name: Run ODT media paragraph publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_media_paragraph_edit_save \
+            --json target/perf/odt-media-paragraph-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-paragraph-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_paragraph_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run ODT embedded-resource publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_embedded_resource_scalar_replace_save,odt_embedded_resource_batch_replace_save \
+            --json target/perf/odt-embedded-resource-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-embedded-resource-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          scalar = results["odt_embedded_resource_scalar_replace_save"]
+          batch = results["odt_embedded_resource_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 272
+          assert scalar["corpus"]["archive_member_count"] == 77
+          assert scalar["corpus"]["archive_bytes"] == 17061898
+          assert scalar["corpus"]["archive_sha256"] == "7b0ddd1c00ef91d24e60f30bf4a0ca0045807d537329e213f2f03020dfb0750b"
+          assert scalar["corpus"]["generator"] == "litchi-odt-embedded-resource-batch-publication-v1"
+          assert scalar["corpus"]["shape"] == "media-rich-64-image-owners"
+          assert scalar["output_sha256"] == "2da19ec3aff1f8cf76a2690a498bb9582b604c0aab25cd40c3b688efa5888a1d"
+          assert batch["output_sha256"] == "fa71c846111de90d5cfed8e6a95493126baad291f4ef4d9f4905bf65fc54e896"
+          for measured, expected_bytes in ((scalar, 17336931), (batch, 17336924)):
+              assert len(measured["elapsed_ns"]["samples"]) == 1
+              assert measured["sink"]["write_calls"] == 1
+              assert measured["sink"]["accepted_bytes"] == expected_bytes
+              assert measured["sink"]["largest_write"] == expected_bytes
+              assert "source" not in measured
+          PY
+
+      - name: Run ODT media line-break publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_media_line_break_edit_save \
+            --json target/perf/odt-media-line-break-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-line-break-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_line_break_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "c38d45741cdad624da8ac0d22e268f4074e8073c16a7586af13620a1e20e2c20"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run ODT media append-run publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_media_append_run_edit_save \
+            --json target/perf/odt-media-append-run-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-append-run-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_append_run_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "8b63becd2100f11255baff345e71cf66ae85aa7812313deaf54b782ce3d8f5db"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run ODT media append-hyperlink publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_media_append_hyperlink_edit_save \
+            --json target/perf/odt-media-append-hyperlink-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-append-hyperlink-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_append_hyperlink_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "5c55c1e220a434868fd7d57d967b9bc0b84ad31711aebb16da05074bd3608f8d"
+          assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run ODT media structural paragraph publication smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_media_insert_paragraph_edit_save,odt_media_remove_paragraph_edit_save \
+            --json target/perf/odt-media-structural-paragraph-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-structural-paragraph-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          assert set(results) == {
+              "odt_media_insert_paragraph_edit_save",
+              "odt_media_remove_paragraph_edit_save",
+          }
+          assert results["odt_media_insert_paragraph_edit_save"]["output_sha256"] == "ddbeb156c053d84e816017fc323386938974b904ecaae62eef1d38dd831ceeec"
+          assert results["odt_media_remove_paragraph_edit_save"]["output_sha256"] == "f4040afaf4092fee50609e21d4dedd1e2affd4a69587c71f9f8ca6a69d1b15e5"
+          for result in results.values():
+              assert result["corpus"]["entry_count"] == 208
+              assert result["corpus"]["archive_member_count"] == 13
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+              assert result["corpus"]["archive_bytes"] == 16_786_287
+              assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+              assert len(result["elapsed_ns"]["samples"]) == 1
+          PY
+
+      - name: Run native OLE2 semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+            --writer-shape tiny \
+            --json target/perf/ole2-semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/ole2-semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 20
+          assert len({item["case"] for item in report["results"]}) == 20
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run ODF semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_cell_sweep,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,ods_semantic_one_percent_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+            --semantic-shape tiny \
+            --json target/perf/odf-semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/odf-semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 24
+          assert len({item["case"] for item in report["results"]}) == 24
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run RTF semantic smoke
+        run: |
+          cargo run --locked --manifest-path "$PERF_MANIFEST" -- \
+            --warmup 0 \
+            --samples 1 \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
+            --semantic-shape tiny \
+            --rtf-variant plain,byte1252,lzfu,watermark \
+            --json target/perf/rtf-semantic-smoke.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/rtf-semantic-smoke.json").read_text())
+          assert report["schema_version"] == 1
+          assert report["configuration"]["rtf_variants"] == [
+              "plain", "byte1252", "lzfu", "watermark"
+          ]
+          assert len(report["results"]) == 39
+          assert len({item["case"] for item in report["results"]}) == 13
+          assert len({
+              (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
+              for item in report["results"]
+          }) == 39
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 1
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          lifecycle = [
+              item for item in report["results"]
+              if item["case"] in {
+                  "rtf_semantic_remove_paragraph_save",
+                  "rtf_semantic_move_paragraph_save",
+              }
+          ]
+          assert len(lifecycle) == 2
+          assert {item["corpus"]["rtf_variant"] for item in lifecycle} == {"plain"}
+          expected = {
+              "rtf_semantic_remove_paragraph_save": (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "49ef949a6ee85cc3a1bce19026e10a3b953136c73997eec6f719940e2c0b37a2",
+                  1250,
+              ),
+              "rtf_semantic_move_paragraph_save": (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "9c7e42060e71be8cedf54fed9907d6a189efa45f1fec0f57d483e02af756f1fd",
+                  1304,
+              ),
+          }
+          for item in lifecycle:
+              source_sha256, output_sha256, output_bytes = expected[item["case"]]
+              assert item["corpus"]["archive_sha256"] == source_sha256
+              assert item["output_sha256"] == output_sha256
+              assert item["sink"]["accepted_bytes"] == output_bytes
+              assert item["sink"]["write_calls"] > 0
+              assert item["sink"]["largest_write"] <= item["sink"]["accepted_bytes"]
+              assert "source" not in item
+          PY
+
+      - name: Capture runner diagnostics after workload
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "cargo_target_size"
+            du -sh "$CARGO_TARGET_DIR" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/after-workload.txt"
+
+      - name: Upload smoke comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-smoke-comparison-${{ github.run_id }}
+          path: |
+            target/perf/allocator-smoke/selection.json
+            target/perf/allocator-smoke/classification.json
+            target/perf/allocator-smoke/comparison.json
+            target/perf/allocator-smoke/comparison.txt
+            target/perf/allocator-smoke/outcome.md
+            target/perf/allocator-smoke/fetch-status.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-diagnostics-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/litchi-perf-diagnostics/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Clean temporary Cargo target
+        if: always()
+        run: |
+          if [ -n "${CARGO_TARGET_DIR:-}" ] &&
+             [ -n "${RUNNER_TEMP:-}" ] &&
+             [ "$CARGO_TARGET_DIR" = "$RUNNER_TEMP/litchi-perf-target" ] &&
+             [ "$CARGO_TARGET_DIR" != "/" ] &&
+             [ -d "$CARGO_TARGET_DIR" ] &&
+             [ ! -L "$CARGO_TARGET_DIR" ]; then
+            find "$CARGO_TARGET_DIR" -xdev -depth -delete
+          else
+            echo "Refusing to clean unexpected Cargo target: ${CARGO_TARGET_DIR:-<unset>}" >&2
+            exit 1
+          fi
+
+  full:
+    name: release container matrix
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+      LITCHI_RUNNER_LABELS: ubuntu-latest
+      LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
+      LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Capture runner diagnostics before build
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/before-build.txt"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
+          cache-target: false
+
+      - name: Check historical REPORT claim classification
+        run: |
+          python3 tools/check_report_claim_classification.py \
+            --registry docs/performance/report-claim-classification-v1.json \
+            --repo-root .
+          python3 -m unittest tools.test_report_claim_classification
+
+      - name: Ensure zstd is available for strict claim checking
+        run: |
+          if ! command -v zstd >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zstd
+          fi
+          zstd --version
+
+      - name: Check performance claim registry (strict evidence)
+        run: |
+          python3 tools/check_perf_claims.py \
+            --registry docs/performance/claim-registry-v1.json \
+            --repo-root . \
+            --evidence-root . \
+            --mode strict
+          python3 -m unittest tools.test_perf_claims
+
+      - name: Validate non-iWork CRUD coverage index
+        run: |
+          mkdir -p target/perf
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog docs/performance/results/perf-corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root .
+
+      - name: Build release harness
+        run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Publish the bounded allocator reference for the smoke comparison
+        run: |
+          mkdir -p target/perf
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc -- \
+            --warmup 3 \
+            --samples 15 \
+            --case opc_file_eager_open \
+            --filesystem-cache warm,cold-requested \
+            --json target/perf/allocator-baseline.json
+          python3 tools/perf_smoke_baseline.py descriptor \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --comparator-policy "$LITCHI_ALLOCATOR_POLICY" \
+            --report target/perf/allocator-baseline.json \
+            --runner-labels "$LITCHI_RUNNER_LABELS" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --event "$GITHUB_EVENT_NAME" \
+            --out target/perf/allocator-baseline-descriptor.json
+
+      - name: Run current-HEAD resource profile
+        run: |
+          mkdir -p target/perf
+          python3 tools/perf_resource_profile.py run \
+            --binary "$CARGO_TARGET_DIR/release/litchi-perf-baseline" \
+            --output target/perf/resource-profile.json \
+            --only opc-source-one-part,xlsx-managed-batch,rtf-streaming,cfb-selective,cfb-save,opc-scaling,cfb-scaling \
+            --warmup 1 \
+            --samples 3 \
+            --timeout 600
+
+      - name: Validate current-HEAD resource profile report
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected_workloads = [
+              "opc-source-one-part",
+              "xlsx-managed-batch",
+              "rtf-streaming",
+              "cfb-selective",
+              "cfb-save",
+              "opc-scaling",
+              "cfb-scaling",
+          ]
+          expected_tools = {
+              "time",
+              "heaptrack",
+              "heaptrack_print",
+              "perf",
+              "strace",
+              "taskset",
+          }
+
+          report = json.loads(Path("target/perf/resource-profile.json").read_text())
+          assert report["schema_version"] == 1
+          tool = report["tool"]
+          assert tool["name"] == "litchi-resource-profile"
+          assert isinstance(tool["version"], str) and tool["version"]
+          scope = report["scope"]
+          assert scope["excluded_formats"] == ["iWork"]
+
+          configuration = report["configuration"]
+          assert configuration["workloads"] == expected_workloads
+          assert configuration["warmup_iterations"] == 1
+          assert configuration["samples"] == 3
+          assert configuration["timeout_seconds"] == 600.0
+
+          tools = report["tools"]
+          assert set(tools) == expected_tools
+          for name in expected_tools:
+              descriptor = tools[name]
+              # ``available`` is an explicit boolean status.  False is valid
+              # for an unavailable or permission-denied optional profiler.
+              assert isinstance(descriptor.get("available"), bool), name
+              assert "returncode" in descriptor, name
+
+          def status_values(value):
+              if isinstance(value, dict):
+                  values = []
+                  if "status" in value:
+                      values.append(value["status"])
+                  for nested in value.values():
+                      values.extend(status_values(nested))
+                  return values
+              if isinstance(value, list):
+                  values = []
+                  for nested in value:
+                      values.extend(status_values(nested))
+                  return values
+              return []
+
+          workloads = report["workloads"]
+          assert len(workloads) == len(expected_workloads)
+          assert [item["id"] for item in workloads] == expected_workloads
+          for item in workloads:
+              assert item["harness"]["returncode"] == 0
+              assert item["harness"]["report"]["present"] is True
+              assert item["harness"]["logical_measurements"]
+              for profile_name, profile in item["external_profiles"].items():
+                  assert isinstance(profile, dict), (item["id"], profile_name)
+                  statuses = status_values(profile)
+                  assert any(
+                      isinstance(status, str) and status for status in statuses
+                  ), (item["id"], profile_name)
+                  if "command" in profile:
+                      assert isinstance(profile["command"], list)
+                      assert profile["command"]
+                      assert "returncode" in profile
+                  else:
+                      # Unsupported tools may have no attempted command, but
+                      # must retain a human-readable explicit reason/status.
+                      assert isinstance(profile.get("status"), str)
+                      assert isinstance(profile.get("reason"), str)
+                      assert profile["reason"]
+                  if profile_name == "heaptrack" and "print" in profile:
+                      printed = profile["print"]
+                      assert isinstance(printed, dict)
+                      assert isinstance(printed.get("parsed"), dict)
+                      assert isinstance(printed["parsed"].get("status"), str)
+          PY
+
+      - name: Run full release baseline matrix
+        run: |
+          mkdir -p target/perf
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --json target/perf/container-baseline.json \
+            --corpus-manifest target/perf/container-baseline.corpus-manifest-v2.json
+
+      - name: Validate full corpus catalog binding
+        run: |
+          python3 tools/validate_perf_corpus_binding.py \
+            --report target/perf/container-baseline.json \
+            --catalog target/perf/container-baseline.corpus-manifest-v2.json
+
+      - name: Validate full CRUD coverage timing contract
+        run: |
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog target/perf/container-baseline.corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root . \
+            --report target/perf/container-baseline.json
+          cp docs/performance/crud-coverage-index-v1.json \
+            target/perf/crud-coverage-index-v1.json
+
+      - name: Validate full baseline report shape
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/container-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 201
+          assert len({item["case"] for item in report["results"]}) == 37
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run release XLSX commit/read attribution matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_one_cell_commit_first_read \
+            --xlsx-shape tiny,medium,dense-wide \
+            --json target/perf/xlsx-commit-read-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-commit-read-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 3
+          assert {item["corpus"]["shape"] for item in report["results"]} == {"tiny", "medium", "dense-wide"}
+          for item in report["results"]:
+              assert item["case"] == "xlsx_one_cell_commit_first_read"
+              assert len(item["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release DOCX/PPTX semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+            --semantic-shape tiny,large \
+            --json target/perf/semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 30
+          assert len({item["case"] for item in report["results"]}) == 16
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run release common OLE2 publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case ole_common_open,ole_common_put_stream_publish,ole_common_finish_render,ole_common_one_edit_save \
+            --shape few-large \
+            --payload incompressible \
+            --json target/perf/ole-common-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/ole-common-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 4
+          assert {result["case"] for result in report["results"]} == {
+              "ole_common_open",
+              "ole_common_put_stream_publish",
+              "ole_common_finish_render",
+              "ole_common_one_edit_save",
+          }
+          for result in report["results"]:
+              assert result["corpus"]["entry_count"] == 5
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_252
+              assert result["corpus"]["archive_sha256"] == "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d"
+              assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release source-backed OPC one-Part publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case opc_source_overlay_one_part_save \
+            --json target/perf/opc-source-overlay-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/opc-source-overlay-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "opc_source_overlay_one_part_save"
+          assert result["corpus"]["archive_sha256"] == "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6"
+          assert result["corpus"]["archive_member_count"] == 6
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_777_216
+          assert result["output_sha256"] == "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+          assert result["source"]["ordinary_payload_materializations"] == [1] * 15
+          assert result["sink"]["accepted_bytes"] == 16_783_632
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release source-backed DOCX semantic publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case docx_source_backed_one_edit_save \
+            --json target/perf/docx-source-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/docx-source-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "docx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+          assert result["corpus"]["entry_count"] == 17
+          assert result["corpus"]["archive_member_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_833_643
+          assert result["output_sha256"] == "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795"
+          assert result["source"]["ordinary_payload_materializations"] == [1] * 15
+          assert result["sink"]["accepted_bytes"] == 16_793_048
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release source-backed PPTX semantic publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case pptx_source_backed_one_edit_save \
+            --json target/perf/pptx-source-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-source-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "pptx_source_backed_one_edit_save"
+          assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+          assert result["corpus"]["entry_count"] == 229
+          assert result["corpus"]["archive_member_count"] == 445
+          assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+          assert result["output_sha256"] == "bcfd05dc7590051137db64810db2d822ac814417c03c50d8a7fc33f429e50d61"
+          assert result["source"]["ordinary_payload_materializations"] == [2] * 15
+          assert result["sink"]["accepted_bytes"] == 17_017_144
+          assert result["sink"]["largest_write"] <= 65_536
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release atomic PPTX batch publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case pptx_eager_batch_edit_save,pptx_source_backed_batch_edit_save \
+            --json target/perf/pptx-source-batch-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-source-batch-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["pptx_eager_batch_edit_save"]
+          source = results["pptx_source_backed_batch_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+              assert result["corpus"]["entry_count"] == 229
+              assert result["corpus"]["archive_member_count"] == 445
+              assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+              assert result["output_sha256"] == "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755"
+              assert result["sink"]["accepted_bytes"] == 17_017_138
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [229] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release multi-slide PPTX batch publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case pptx_eager_multi_slide_batch_edit_save,pptx_source_backed_multi_slide_batch_edit_save \
+            --json target/perf/pptx-multi-slide-batch-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/pptx-multi-slide-batch-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["pptx_eager_multi_slide_batch_edit_save"]
+          source = results["pptx_source_backed_multi_slide_batch_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757"
+              assert result["corpus"]["entry_count"] == 229
+              assert result["corpus"]["archive_member_count"] == 445
+              assert result["corpus"]["uncompressed_payload_bytes"] == 17_568_429
+              assert result["output_sha256"] == "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9"
+              assert result["sink"]["accepted_bytes"] == 17_017_145
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [229] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [9] * 15
+          PY
+
+      - name: Run release XLSX calculation-metadata publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_calculation_metadata_edit_save,xlsx_source_backed_calculation_metadata_edit_save \
+            --json target/perf/xlsx-calculation-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-calculation-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_calculation_metadata_edit_save"]
+          source = results["xlsx_source_backed_calculation_metadata_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "96f60a09a8e87204a533e178bdda115b0202e8aa8ac4fe5673a881f981d3e98d"
+              assert result["sink"]["accepted_bytes"] == 16_786_830
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [1] * 15
+          PY
+
+      - name: Run release XLSX page-break publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_page_break_edit_save,xlsx_source_backed_page_break_edit_save \
+            --json target/perf/xlsx-page-break-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-break-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_break_edit_save"]
+          source = results["xlsx_source_backed_page_break_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "1e3b7a9f763feaed4ad4888aa8aa0cd3773cdb9fd9f12e16f3c05b7fd0cd95b3"
+              assert result["sink"]["accepted_bytes"] == 16_786_878
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX page-margin publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_page_margin_edit_save,xlsx_source_backed_page_margin_edit_save \
+            --json target/perf/xlsx-page-margin-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-margin-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_margin_edit_save"]
+          source = results["xlsx_source_backed_page_margin_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "2b50a470f5066dd078c0566ca9e203f26843026b58b6a7a6eca14ac8435429a7"
+              assert result["sink"]["accepted_bytes"] == 16_786_883
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX page-setup publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_page_setup_edit_save,xlsx_source_backed_page_setup_edit_save \
+            --json target/perf/xlsx-page-setup-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-page-setup-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_page_setup_edit_save"]
+          source = results["xlsx_source_backed_page_setup_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "fd866304c7aab42bcd5195e38bef5dd76f6192b05bcb551786a2096ad898fcb1"
+              assert result["sink"]["accepted_bytes"] == 16_786_902
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX defined-name publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_defined_names_edit_save,xlsx_source_backed_defined_names_edit_save \
+            --json target/perf/xlsx-defined-names-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-defined-names-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_defined_names_edit_save"]
+          source = results["xlsx_source_backed_defined_names_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "f59c85a4003018c58732db832aff9ac3577cff7e7af37d9372ddc4ca5679a615"
+              assert result["sink"]["accepted_bytes"] == 16_786_946
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [1] * 15
+          PY
+
+      - name: Run release XLSX print-options publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_print_options_edit_save,xlsx_source_backed_print_options_edit_save \
+            --json target/perf/xlsx-print-options-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-print-options-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_print_options_edit_save"]
+          source = results["xlsx_source_backed_print_options_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "6eee37e1c0e4e9cdf1f364fdf1cbc90d58a6c25acc6fce222670f937abd5a74c"
+              assert result["sink"]["accepted_bytes"] == 16_786_886
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX sheet-protection publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_sheet_protection_edit_save,xlsx_source_backed_sheet_protection_edit_save \
+            --json target/perf/xlsx-sheet-protection-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-sheet-protection-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_sheet_protection_edit_save"]
+          source = results["xlsx_source_backed_sheet_protection_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "c11a9424accfc6ce56e4deb6ecb18a2142d2f0076395018ef00ba93897049f7c"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_412
+              assert result["output_sha256"] == "76b3a48e9682479a7dc75b047e37f221c52dc6953c10168e20995adbf992b8f3"
+              assert result["sink"]["accepted_bytes"] == 16_787_247
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX data-validation publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_data_validation_edit_save,xlsx_source_backed_data_validation_edit_save \
+            --json target/perf/xlsx-data-validation-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-data-validation-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_data_validation_edit_save"]
+          source = results["xlsx_source_backed_data_validation_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "55be448c6a1ec7d2aae2a93bcbc9dd714061778be336675dd69f9edf842321b6"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_783_570
+              assert result["output_sha256"] == "5109c16e75ea6b6f85b8e3b4b8cdde0ba1994d37e5c94e7a45d6ac46fc9eb264"
+              assert result["sink"]["accepted_bytes"] == 16_787_229
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [2] * 15
+          PY
+
+      - name: Run release XLSX auto-filter publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_auto_filter_edit_save,xlsx_source_backed_auto_filter_edit_save \
+            --json target/perf/xlsx-auto-filter-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-auto-filter-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_auto_filter_edit_save"]
+          source = results["xlsx_source_backed_auto_filter_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "57678991c8cabfceda63b278f4e50fee87fd7f540f0c2f0eff8cb048f457d421"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_782_720
+              assert result["output_sha256"] == "34893a3eaf685f20569a6ea383de022825b0fcb434ff49039eaa27bb262b8561"
+              assert result["sink"]["accepted_bytes"] == 16_786_968
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [3] * 15
+          PY
+
+      - name: Run release XLSX conditional-formatting publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case xlsx_eager_conditional_formatting_edit_save,xlsx_source_backed_conditional_formatting_edit_save \
+            --json target/perf/xlsx-conditional-formatting-edit-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/xlsx-conditional-formatting-edit-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          eager = results["xlsx_eager_conditional_formatting_edit_save"]
+          source = results["xlsx_source_backed_conditional_formatting_edit_save"]
+          for result in results.values():
+              assert result["corpus"]["archive_sha256"] == "843ec3a9fdf759f3ed79064050125975150b16b8230aab52e6074dc000efedfa"
+              assert result["corpus"]["entry_count"] == 12
+              assert result["corpus"]["archive_member_count"] == 17
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_783_105
+              assert result["output_sha256"] == "5a44bffa0f3b4ea554e3eaa6588eec770d72528a9c854019c7abc6ee419b9b70"
+              assert result["sink"]["accepted_bytes"] == 16_786_983
+              assert result["sink"]["largest_write"] <= 65_536
+              assert len(result["elapsed_ns"]["samples"]) == 15
+              assert all(
+                  value <= result["corpus"]["archive_bytes"] + 65_536
+                  for value in result["source"]["read_bytes"]
+              )
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_calls"])
+              assert all(value > 0 for value in result["source"]["ordinary_payload_read_bytes"])
+          assert eager["output_sha256"] == source["output_sha256"]
+          assert eager["source"]["ordinary_payload_materializations"] == [12] * 15
+          assert source["source"]["ordinary_payload_materializations"] == [3] * 15
+          PY
+
+      - name: Run release ODP media publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odp_media_textbox_edit_save,odp_media_textbox_scalar_replace_save,odp_media_textbox_batch_replace_save \
+            --json target/perf/odp-media-textbox-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odp-media-textbox-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 3
+          results = {result["case"]: result for result in report["results"]}
+          result = results["odp_media_textbox_edit_save"]
+          assert result["case"] == "odp_media_textbox_edit_save"
+          assert result["corpus"]["entry_count"] == 20
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_778_260
+          assert result["corpus"]["archive_sha256"] == "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          scalar = results["odp_media_textbox_scalar_replace_save"]
+          batch = results["odp_media_textbox_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 28
+          assert scalar["corpus"]["archive_member_count"] == 13
+          assert scalar["corpus"]["uncompressed_payload_bytes"] == 16_778_604
+          assert scalar["corpus"]["archive_bytes"] == 16_786_244
+          assert scalar["corpus"]["archive_sha256"] == "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+          assert scalar["output_sha256"] == "ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b"
+          assert batch["output_sha256"] == "fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf"
+          for measured, expected_bytes in [(scalar, 16_786_370), (batch, 16_786_368)]:
+              assert len(measured["elapsed_ns"]["samples"]) == 15
+              assert measured["sink"] == {
+                  "accepted_bytes": expected_bytes,
+                  "write_calls": 1,
+                  "largest_write": expected_bytes,
+                  "write_size_buckets": {
+                      "bytes_0": 0,
+                      "bytes_1_to_512": 0,
+                      "bytes_513_to_4096": 0,
+                      "bytes_4097_to_16384": 0,
+                      "bytes_16385_to_65536": 0,
+                      "bytes_over_65536": 1,
+                  },
+              }
+              assert "source" not in measured
+          PY
+
+      - name: Run release ODT media paragraph publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_media_paragraph_edit_save \
+            --json target/perf/odt-media-paragraph-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-paragraph-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_paragraph_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release ODT embedded-resource publication controls
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_embedded_resource_scalar_replace_save,odt_embedded_resource_batch_replace_save \
+            --json target/perf/odt-embedded-resource-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-embedded-resource-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          scalar = results["odt_embedded_resource_scalar_replace_save"]
+          batch = results["odt_embedded_resource_batch_replace_save"]
+          assert scalar["corpus"] == batch["corpus"]
+          assert scalar["corpus"]["entry_count"] == 272
+          assert scalar["corpus"]["archive_member_count"] == 77
+          assert scalar["corpus"]["archive_bytes"] == 17061898
+          assert scalar["corpus"]["archive_sha256"] == "7b0ddd1c00ef91d24e60f30bf4a0ca0045807d537329e213f2f03020dfb0750b"
+          assert scalar["corpus"]["generator"] == "litchi-odt-embedded-resource-batch-publication-v1"
+          assert scalar["corpus"]["shape"] == "media-rich-64-image-owners"
+          assert scalar["output_sha256"] == "2da19ec3aff1f8cf76a2690a498bb9582b604c0aab25cd40c3b688efa5888a1d"
+          assert batch["output_sha256"] == "fa71c846111de90d5cfed8e6a95493126baad291f4ef4d9f4905bf65fc54e896"
+          for measured, expected_bytes in ((scalar, 17336931), (batch, 17336924)):
+              assert len(measured["elapsed_ns"]["samples"]) == 15
+              assert measured["sink"]["write_calls"] == 1
+              assert measured["sink"]["accepted_bytes"] == expected_bytes
+              assert measured["sink"]["largest_write"] == expected_bytes
+              assert "source" not in measured
+          PY
+
+      - name: Run release ODT media line-break publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_media_line_break_edit_save \
+            --json target/perf/odt-media-line-break-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-line-break-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_line_break_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "c38d45741cdad624da8ac0d22e268f4074e8073c16a7586af13620a1e20e2c20"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release ODT media append-run publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_media_append_run_edit_save \
+            --json target/perf/odt-media-append-run-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-append-run-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_append_run_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "8b63becd2100f11255baff345e71cf66ae85aa7812313deaf54b782ce3d8f5db"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release ODT media append-hyperlink publication case
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_media_append_hyperlink_edit_save \
+            --json target/perf/odt-media-append-hyperlink-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-append-hyperlink-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 1
+          result = report["results"][0]
+          assert result["case"] == "odt_media_append_hyperlink_edit_save"
+          assert result["corpus"]["entry_count"] == 208
+          assert result["corpus"]["archive_member_count"] == 13
+          assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+          assert result["corpus"]["archive_bytes"] == 16_786_287
+          assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+          assert result["output_sha256"] == "5c55c1e220a434868fd7d57d967b9bc0b84ad31711aebb16da05074bd3608f8d"
+          assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release ODT media structural paragraph publication cases
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_media_insert_paragraph_edit_save,odt_media_remove_paragraph_edit_save \
+            --json target/perf/odt-media-structural-paragraph-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/perf/odt-media-structural-paragraph-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 2
+          results = {result["case"]: result for result in report["results"]}
+          assert set(results) == {
+              "odt_media_insert_paragraph_edit_save",
+              "odt_media_remove_paragraph_edit_save",
+          }
+          assert results["odt_media_insert_paragraph_edit_save"]["output_sha256"] == "ddbeb156c053d84e816017fc323386938974b904ecaae62eef1d38dd831ceeec"
+          assert results["odt_media_remove_paragraph_edit_save"]["output_sha256"] == "f4040afaf4092fee50609e21d4dedd1e2affd4a69587c71f9f8ca6a69d1b15e5"
+          for result in results.values():
+              assert result["corpus"]["entry_count"] == 208
+              assert result["corpus"]["archive_member_count"] == 13
+              assert result["corpus"]["uncompressed_payload_bytes"] == 16_787_016
+              assert result["corpus"]["archive_bytes"] == 16_786_287
+              assert result["corpus"]["archive_sha256"] == "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed"
+              assert len(result["elapsed_ns"]["samples"]) == 15
+          PY
+
+      - name: Run release native OLE2 semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+            --writer-shape tiny,large \
+            --json target/perf/ole2-semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/ole2-semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 40
+          assert len({item["case"] for item in report["results"]}) == 20
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run release ODF semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case odt_semantic_open,odt_semantic_list_paragraphs,odt_semantic_one_paragraph,odt_semantic_full_text,odt_semantic_create_small,odt_semantic_noop_edit_save,odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,ods_semantic_open,ods_semantic_list_sheets,ods_semantic_one_cell,ods_semantic_cell_sweep,ods_semantic_full_cell_text,ods_semantic_create_small,ods_semantic_noop_edit_save,ods_semantic_one_edit_save,ods_semantic_one_percent_edit_save,odp_semantic_open,odp_semantic_list_slides,odp_semantic_one_slide,odp_semantic_full_text,odp_semantic_create_small,odp_semantic_noop_edit_save,odp_semantic_one_edit_save \
+            --semantic-shape tiny,large \
+            --json target/perf/odf-semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/odf-semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert len(report["results"]) == 45
+          assert len({item["case"] for item in report["results"]}) == 24
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          PY
+
+      - name: Run release RTF semantic matrix
+        run: |
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
+            --samples 15 \
+            --case rtf_semantic_open,rtf_semantic_paragraph_count,rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,rtf_semantic_one_paragraph,rtf_semantic_full_text,rtf_semantic_text_to_sink,rtf_semantic_stream_save,rtf_semantic_noop_edit_save,rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save \
+            --semantic-shape tiny,large \
+            --rtf-variant plain,byte1252,lzfu,watermark \
+            --json target/perf/rtf-semantic-baseline.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          SINK_BUCKET_KEYS = {
+              "bytes_0",
+              "bytes_1_to_512",
+              "bytes_513_to_4096",
+              "bytes_4097_to_16384",
+              "bytes_16385_to_65536",
+              "bytes_over_65536",
+          }
+
+          def assert_sink_invariant(item):
+              sink = item.get("sink")
+              if sink is None:
+                  return
+              buckets = sink["write_size_buckets"]
+              assert set(buckets) == SINK_BUCKET_KEYS
+              assert sum(buckets.values()) == sink["write_calls"]
+
+          report = json.loads(Path("target/perf/rtf-semantic-baseline.json").read_text())
+          assert report["schema_version"] == 1
+          assert report["configuration"]["rtf_variants"] == [
+              "plain", "byte1252", "lzfu", "watermark"
+          ]
+          assert len(report["results"]) == 70
+          assert len({item["case"] for item in report["results"]}) == 13
+          assert len({
+              (item["case"], item["corpus"]["rtf_variant"], item["corpus"]["shape"])
+              for item in report["results"]
+          }) == 70
+          for item in report["results"]:
+              assert len(item["elapsed_ns"]["samples"]) == 15
+              assert item["corpus"]["archive_sha256"]
+              assert_sink_invariant(item)
+          lifecycle = [
+              item for item in report["results"]
+              if item["case"] in {
+                  "rtf_semantic_remove_paragraph_save",
+                  "rtf_semantic_move_paragraph_save",
+              }
+          ]
+          assert len(lifecycle) == 4
+          assert {item["corpus"]["rtf_variant"] for item in lifecycle} == {"plain"}
+          assert {item["corpus"]["shape"] for item in lifecycle} == {"tiny", "large"}
+          expected = {
+              ("rtf_semantic_remove_paragraph_save", "tiny"): (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "49ef949a6ee85cc3a1bce19026e10a3b953136c73997eec6f719940e2c0b37a2",
+                  1250,
+              ),
+              ("rtf_semantic_move_paragraph_save", "tiny"): (
+                  "73641cf09b630632deabce8585c67f395a6bd3ac01eedcca6a8b7224ef00d252",
+                  "9c7e42060e71be8cedf54fed9907d6a189efa45f1fec0f57d483e02af756f1fd",
+                  1304,
+              ),
+              ("rtf_semantic_remove_paragraph_save", "large"): (
+                  "5feae6e5bd27751d75c936a5ae9f57e00d391d7759557e07c535227c72f3cf7c",
+                  "946eda640eaa0b1df36e38264aa3ef8dd08d95986de0517baa186fae4da8f95d",
+                  539954,
+              ),
+              ("rtf_semantic_move_paragraph_save", "large"): (
+                  "5feae6e5bd27751d75c936a5ae9f57e00d391d7759557e07c535227c72f3cf7c",
+                  "6f6a12a8f44580bd2a3b243306e49e185931079d3abe369b780fe82d4d111f27",
+                  540008,
+              ),
+          }
+          for item in lifecycle:
+              key = (item["case"], item["corpus"]["shape"])
+              source_sha256, output_sha256, output_bytes = expected[key]
+              assert item["corpus"]["archive_sha256"] == source_sha256
+              assert item["output_sha256"] == output_sha256
+              assert item["sink"]["accepted_bytes"] == output_bytes
+              assert item["sink"]["write_calls"] > 0
+              assert item["sink"]["largest_write"] <= item["sink"]["accepted_bytes"]
+              assert "source" not in item
+          PY
+
+      - name: Upload performance baseline JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-baseline-${{ github.run_id }}
+          path: |
+            target/perf/container-baseline.json
+            target/perf/container-baseline.corpus-manifest-v2.json
+            target/perf/allocator-baseline.json
+            target/perf/allocator-baseline-descriptor.json
+            target/perf/crud-coverage-index-v1.json
+            target/perf/resource-profile.json
+            target/perf/xlsx-commit-read-baseline.json
+            target/perf/opc-source-overlay-baseline.json
+            target/perf/docx-source-edit-baseline.json
+            target/perf/pptx-source-edit-baseline.json
+            target/perf/pptx-source-batch-baseline.json
+            target/perf/pptx-multi-slide-batch-baseline.json
+            target/perf/xlsx-calculation-edit-baseline.json
+            target/perf/xlsx-page-break-edit-baseline.json
+            target/perf/xlsx-page-margin-edit-baseline.json
+            target/perf/xlsx-page-setup-edit-baseline.json
+            target/perf/xlsx-defined-names-edit-baseline.json
+            target/perf/xlsx-print-options-edit-baseline.json
+            target/perf/xlsx-sheet-protection-edit-baseline.json
+            target/perf/xlsx-data-validation-edit-baseline.json
+            target/perf/xlsx-auto-filter-edit-baseline.json
+            target/perf/xlsx-conditional-formatting-edit-baseline.json
+            target/perf/ole-common-baseline.json
+            target/perf/odp-media-textbox-baseline.json
+            target/perf/odt-media-paragraph-baseline.json
+            target/perf/odt-embedded-resource-baseline.json
+            target/perf/odt-media-line-break-baseline.json
+            target/perf/odt-media-append-run-baseline.json
+            target/perf/odt-media-append-hyperlink-baseline.json
+            target/perf/odt-media-structural-paragraph-baseline.json
+            target/perf/ole2-semantic-baseline.json
+            target/perf/semantic-baseline.json
+            target/perf/odf-semantic-baseline.json
+            target/perf/rtf-semantic-baseline.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Capture runner diagnostics after workload
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "cargo_target_size"
+            du -sh "$CARGO_TARGET_DIR" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/after-workload.txt"
+
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-diagnostics-full-${{ github.run_id }}
+          path: ${{ runner.temp }}/litchi-perf-diagnostics/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Clean temporary Cargo target
+        if: always()
+        run: |
+          if [ -n "${CARGO_TARGET_DIR:-}" ] &&
+             [ -n "${RUNNER_TEMP:-}" ] &&
+             [ "$CARGO_TARGET_DIR" = "$RUNNER_TEMP/litchi-perf-target" ] &&
+             [ "$CARGO_TARGET_DIR" != "/" ] &&
+             [ -d "$CARGO_TARGET_DIR" ] &&
+             [ ! -L "$CARGO_TARGET_DIR" ]; then
+            find "$CARGO_TARGET_DIR" -xdev -depth -delete
+          else
+            echo "Refusing to clean unexpected Cargo target: ${CARGO_TARGET_DIR:-<unset>}" >&2
+            exit 1
+          fi
+
+  reference-regression:
+    name: reference-gated hosted comparison
+    if: github.event_name == 'workflow_dispatch' && inputs.reference_run_id != ''
+    needs: full
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download current hosted report
+        uses: actions/download-artifact@v4
+        with:
+          name: container-performance-baseline-${{ github.run_id }}
+          path: target/perf/current
+
+      - name: Download explicit reference report
+        uses: actions/download-artifact@v4
+        with:
+          name: container-performance-baseline-${{ inputs.reference_run_id }}
+          path: target/perf/reference
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.reference_run_id }}
+
+      - name: Apply versioned performance regression policy
+        run: |
+          python3 tools/perf_compare.py \
+            --policy docs/performance/perf-regression-policy-v1.json \
+            --baseline target/perf/reference/container-baseline.json \
+            --current target/perf/current/container-baseline.json \
+            --json-out target/perf/comparison/perf-regression.json \
+            --summary-out target/perf/comparison/perf-regression.txt
+
+      - name: Upload comparison summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-regression-comparison-${{ github.run_id }}
+          path: target/perf/comparison/
+          if-no-files-found: warn
+          retention-days: 30

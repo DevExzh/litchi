@@ -72,7 +72,9 @@ on:
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
-      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/crud-coverage-index-v2.json'
+      - 'tools/validate_perf_default_matrix.py'
+      - 'tools/test_validate_perf_default_matrix.py'
       - 'docs/performance/CRUD_COVERAGE.md'
       - 'docs/CRUD_Scenario_Checklist.md'
       - 'docs/performance/results/**'
@@ -150,7 +152,9 @@ on:
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
-      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/crud-coverage-index-v2.json'
+      - 'tools/validate_perf_default_matrix.py'
+      - 'tools/test_validate_perf_default_matrix.py'
       - 'docs/performance/CRUD_COVERAGE.md'
       - 'docs/CRUD_Scenario_Checklist.md'
       - 'docs/performance/results/**'
@@ -383,6 +387,7 @@ jobs:
             tools.test_perf_corpus_binding \
             tools.test_validate_opc_serial_eager_allocator_abba \
             tools.test_crud_coverage_index \
+            tools.test_validate_perf_default_matrix \
             tools.test_perf_workflow_policy
 
       - name: Test benchmark source policy
@@ -400,7 +405,7 @@ jobs:
       - name: Validate non-iWork CRUD coverage index
         run: |
           python3 tools/validate_crud_coverage_index.py \
-            --index docs/performance/crud-coverage-index-v1.json \
+            --index docs/performance/crud-coverage-index-v2.json \
             --catalog docs/performance/results/perf-corpus-manifest-v2.json \
             --selector-source tools/perf-baseline/src/lib.rs \
             --checklist docs/CRUD_Scenario_Checklist.md \
@@ -424,36 +429,13 @@ jobs:
             --xlsx-shape tiny \
             --semantic-shape tiny \
             --json target/perf/opc-smoke.json
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          SINK_BUCKET_KEYS = {
-              "bytes_0",
-              "bytes_1_to_512",
-              "bytes_513_to_4096",
-              "bytes_4097_to_16384",
-              "bytes_16385_to_65536",
-              "bytes_over_65536",
-          }
-
-          def assert_sink_invariant(item):
-              sink = item.get("sink")
-              if sink is None:
-                  return
-              buckets = sink["write_size_buckets"]
-              assert set(buckets) == SINK_BUCKET_KEYS
-              assert sum(buckets.values()) == sink["write_calls"]
-
-          report = json.loads(Path("target/perf/opc-smoke.json").read_text())
-          assert report["schema_version"] == 1
-          assert len(report["results"]) == 37
-          assert len({item["case"] for item in report["results"]}) == 37
-          for item in report["results"]:
-              assert len(item["elapsed_ns"]["samples"]) == 2
-              assert item["corpus"]["archive_sha256"]
-              assert_sink_invariant(item)
-          PY
+          python3 tools/validate_perf_default_matrix.py \
+            --manifest docs/performance/results/perf-regression-default-manifest-v1.json \
+            --report target/perf/opc-smoke.json \
+            --mode smoke \
+            --samples 2 \
+            --shape tiny \
+            --payload compressible
 
       - name: Run XLSX commit/read attribution smoke
         run: |
@@ -1502,7 +1484,7 @@ jobs:
         run: |
           mkdir -p target/perf
           python3 tools/validate_crud_coverage_index.py \
-            --index docs/performance/crud-coverage-index-v1.json \
+            --index docs/performance/crud-coverage-index-v2.json \
             --catalog docs/performance/results/perf-corpus-manifest-v2.json \
             --selector-source tools/perf-baseline/src/lib.rs \
             --checklist docs/CRUD_Scenario_Checklist.md \
@@ -1652,47 +1634,22 @@ jobs:
       - name: Validate full CRUD coverage timing contract
         run: |
           python3 tools/validate_crud_coverage_index.py \
-            --index docs/performance/crud-coverage-index-v1.json \
+            --index docs/performance/crud-coverage-index-v2.json \
             --catalog target/perf/container-baseline.corpus-manifest-v2.json \
             --selector-source tools/perf-baseline/src/lib.rs \
             --checklist docs/CRUD_Scenario_Checklist.md \
             --repo-root . \
             --report target/perf/container-baseline.json
-          cp docs/performance/crud-coverage-index-v1.json \
-            target/perf/crud-coverage-index-v1.json
+          cp docs/performance/crud-coverage-index-v2.json \
+            target/perf/crud-coverage-index-v2.json
 
       - name: Validate full baseline report shape
         run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          SINK_BUCKET_KEYS = {
-              "bytes_0",
-              "bytes_1_to_512",
-              "bytes_513_to_4096",
-              "bytes_4097_to_16384",
-              "bytes_16385_to_65536",
-              "bytes_over_65536",
-          }
-
-          def assert_sink_invariant(item):
-              sink = item.get("sink")
-              if sink is None:
-                  return
-              buckets = sink["write_size_buckets"]
-              assert set(buckets) == SINK_BUCKET_KEYS
-              assert sum(buckets.values()) == sink["write_calls"]
-
-          report = json.loads(Path("target/perf/container-baseline.json").read_text())
-          assert report["schema_version"] == 1
-          assert len(report["results"]) == 201
-          assert len({item["case"] for item in report["results"]}) == 37
-          for item in report["results"]:
-              assert len(item["elapsed_ns"]["samples"]) == 15
-              assert item["corpus"]["archive_sha256"]
-              assert_sink_invariant(item)
-          PY
+          python3 tools/validate_perf_default_matrix.py \
+            --manifest docs/performance/results/perf-regression-default-manifest-v1.json \
+            --report target/perf/container-baseline.json \
+            --mode full \
+            --samples 15
 
       - name: Run release XLSX commit/read attribution matrix
         run: |
@@ -2608,7 +2565,7 @@ jobs:
             target/perf/container-baseline.corpus-manifest-v2.json
             target/perf/allocator-baseline.json
             target/perf/allocator-baseline-descriptor.json
-            target/perf/crud-coverage-index-v1.json
+            target/perf/crud-coverage-index-v2.json
             target/perf/resource-profile.json
             target/perf/xlsx-commit-read-baseline.json
             target/perf/opc-source-overlay-baseline.json

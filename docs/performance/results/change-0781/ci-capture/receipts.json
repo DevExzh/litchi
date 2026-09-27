@@ -1,0 +1,75 @@
+[
+  {
+    "binary": {
+      "bytes": 68838400,
+      "path": "/home/zhuhe/code/litchi-target-0781/harness/release/litchi-perf-baseline",
+      "sha256": "55533cb8345e13bdbb034af48ec00f4e10fcf193e2e7357e9cdcfec641d44d5d"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0781/harness/release/litchi-perf-baseline",
+      "--samples",
+      "2",
+      "--shape",
+      "tiny",
+      "--payload",
+      "compressible",
+      "--writer-shape",
+      "tiny",
+      "--xlsx-shape",
+      "tiny",
+      "--semantic-shape",
+      "tiny",
+      "--json",
+      "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/smoke.json"
+    ],
+    "ended": 1790496051.0417345,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/smoke.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "mode": "smoke",
+    "report": {
+      "bytes": 270272,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/smoke.json",
+      "sha256": "6b72e045c1421172c9bdd42612073a4e9ee2d1a8818d64af30ace5ba31df6bff"
+    },
+    "started": 1790496050.5550582
+  },
+  {
+    "binary": {
+      "bytes": 68838400,
+      "path": "/home/zhuhe/code/litchi-target-0781/harness/release/litchi-perf-baseline",
+      "sha256": "55533cb8345e13bdbb034af48ec00f4e10fcf193e2e7357e9cdcfec641d44d5d"
+    },
+    "catalog": {
+      "bytes": 282169,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/full.corpus-manifest-v2.json",
+      "sha256": "ca06e5e555f40047282db222a4ada6441d9650e58e078f2c545e6bb3a1b12400"
+    },
+    "command": [
+      "/home/zhuhe/code/litchi-target-0781/harness/release/litchi-perf-baseline",
+      "--samples",
+      "15",
+      "--corpus-manifest",
+      "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/full.corpus-manifest-v2.json",
+      "--json",
+      "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/full.json"
+    ],
+    "ended": 1790496082.5005,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/full.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "mode": "full",
+    "report": {
+      "bytes": 1504451,
+      "path": "/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text/docs/performance/results/change-0781/ci-capture/full.json",
+      "sha256": "8e674f1bc38ec13ab0fce96fc490e03108396ed36d8e739e1328d446dd4a033a"
+    },
+    "started": 1790496051.238199
+  }
+]

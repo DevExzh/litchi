@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0781 — Paired fresh-PPT text ownership experiment
+
+[0781](0781-ppt-text-ownership-and-ci-matrix.md) retains 120 native and 40 allocation processes across five generated decks and two public writer scopes. The rejected candidate improves payload write/lifecycle paired p50 by 25.555%/19.186%, but regresses many-short-text write/lifecycle by 12.121%/10.551% in every block. Exact source/output and raw text preservation pass; baseline production source is restored. Separate CI captures validate 41 smoke and 213 full rows.
+
 ## 0780 — Paired PPTX profile-construction costs
 
 [0780](0780-static-mce-capabilities.md) Six alternating blocks measure public capture, staged commit and lifecycle on three generated decks. Large staged commit p50 is 1.465 → 1.332 ms (paired −9.167%); large lifecycle is 31.993 → 32.663 ms (+2.398%). Separate allocator and profiler lanes verify fewer requests, not equivalent RSS savings. All distributions and flags remain available.

@@ -1,0 +1,14 @@
+{
+  "authored_fixture_functions_unchanged": {
+    "append_len_prefixed": "f78ff1d32bc246411ddb4fd17c4f37a66dc2f7f8262c7c0caeb37ce2a500b80d",
+    "ascii_payload": "55e33da2a831fe2770f26ec08a0d088a4e76ff42e021605699097bdcc03c8322",
+    "expected_slide_text": "f3f718f154fb5c834c6c5275af1782223b68cb4c73582e0301e66477d96773d8",
+    "repeat_to_bytes": "95e66bb55b78f7210914b093bab690d7279d98e97c4a38210bd1418360571a98",
+    "repeat_to_utf16_units": "fdb54421e32d45205d8023459159e87827d9932c916b95a41f4c79072bc30697",
+    "rich_text": "d06b82fec056981471ab6d708d2e1a3769877b050f1ac1558ef2436a0607033e",
+    "short_text": "c2baf77e76f38b245c6383ac25964f9e39cdbf403a5878b0621385324bf96b30",
+    "unicode_payload": "7763e06d6d645c372c48840c13c83d4427f2ba728b12a6f428a3ea2d2b63cef4"
+  },
+  "initial_probe_sha256": "0898052c3c157b84a355144ff34691d9930919cb92e6ca833611d774d248c681",
+  "scope": "Source-level authored fixture functions; runtime source/output digest equivalence still requires corrected baseline qualification."
+}
