@@ -1,0 +1,31 @@
+    Checking litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution)
+error: method `as_str` is never used
+  --> src/main.rs:48:14
+   |
+47 | impl Route {
+   | ---------- method in this implementation
+48 |     const fn as_str(self) -> &'static str {
+   |              ^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: method `as_str` is never used
+  --> src/main.rs:79:14
+   |
+78 | impl Shape {
+   | ---------- method in this implementation
+79 |     const fn as_str(self) -> &'static str {
+   |              ^^^^^^
+
+error: method `as_str` is never used
+   --> src/main.rs:122:14
+    |
+121 | impl State {
+    | ---------- method in this implementation
+122 |     const fn as_str(self) -> &'static str {
+    |              ^^^^^^
+
+error: could not compile `litchi-perf-execution` (bin "litchi-perf-execution") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-perf-execution` (bin "litchi-perf-execution" test) due to 3 previous errors

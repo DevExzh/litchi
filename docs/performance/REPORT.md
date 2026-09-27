@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0786 — current low-level execution baseline
+
+[0786](0786-finite-execution-budget-scaling.md) The current-source read-session matrix closes a timing-evidence gap after 0676. It adds a reusable benchmark with deterministic payloads and bounded execution; production source is unchanged. Measured scaling, negative results and descriptive Amdahl fits are reported individually.
+
 ## 0785 — known namespace URI fast path retained
 
 [0785](0785-pptx-known-namespace-uris.md) Large generated PPTX initial capture is 8.489% faster and full lifecycle 6.844% faster by median paired process p50. Memory and allocation counts are unchanged; all 15 cases pass frozen adoption guards. Tail outliers remain disclosed, and no universal speedup or tail-latency improvement is claimed.

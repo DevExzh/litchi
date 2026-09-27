@@ -1,0 +1,11 @@
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution)
+    Finished `test` profile [unoptimized] target(s) in 0.32s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0786/quality/debug/deps/litchi_perf_execution-2c84609654d78bf5)
+
+running 3 tests
+test tests::public_routes_verify_order_and_release_resources ... ok
+test tests::zero_io_budget_refuses_before_first_payload_read ... ok
+test tests::generator_identity_and_argument_bounds ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+

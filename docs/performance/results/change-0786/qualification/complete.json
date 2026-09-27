@@ -1,0 +1,13 @@
+{
+  "children": 120,
+  "receipts": {
+    "bytes": 249994,
+    "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/qualification/receipts.json",
+    "sha256": "7a5001b7b6972be336681a4a1695dfbc40000f9771c02c665026198b39543624"
+  },
+  "source": {
+    "bytes": 1201785,
+    "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/qualification/source.json",
+    "sha256": "4862751ed3111fe88ef02db6b10f77d6ac2078e46c1fb5be79375999a60d4882"
+  }
+}

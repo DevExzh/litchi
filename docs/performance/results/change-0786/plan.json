@@ -1,0 +1,928 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "bootstrap": {
+    "confidence": 0.95,
+    "resamples": 10000,
+    "seed": 786078
+  },
+  "cases": [
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "opc",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    }
+  ],
+  "metrics": {
+    "native": "nearest-rank per-process p50/p95/p99, process CPU clock interval, logical throughput, whole-child peak RSS",
+    "observer": "separate source-metrics executable; source read counts and concurrency, resource snapshots, exact output parity; its timings never pooled with native",
+    "scaling": "paired within-block width-one reference; speedup and efficiency use requested width, not inferred active workers; Amdahl apparent serial fractions and model residuals not causal decompositions"
+  },
+  "native": {
+    "blocks": 6,
+    "orders": [
+      "forward",
+      "reverse",
+      "forward",
+      "reverse",
+      "reverse",
+      "forward"
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "orders": [
+      "forward",
+      "reverse"
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "qualification": {
+    "blocks": 1,
+    "orders": [
+      "forward"
+    ],
+    "samples": 1,
+    "warmup": 0
+  },
+  "schema": "litchi.execution-scaling.0786.v1",
+  "scope": "Current-source finite-budget public low-level read-session scaling; warm in-memory source bytes; fresh versus primed session/part-cache states. No physical-cold, native-format CRUD, before/after production speedup or whole-program completion claim.",
+  "source_policy": "Production source must remain byte-identical to origin throughout this evidence batch. Tool source frozen before successful builds and all captures.",
+  "widths": [
+    1,
+    2,
+    4,
+    8,
+    32
+  ]
+}

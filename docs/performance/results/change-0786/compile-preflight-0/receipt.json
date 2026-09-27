@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-execution/Cargo.toml",
+    "--all-features",
+    "--all-targets"
+  ],
+  "exit_code": 101,
+  "started": 1790526731.5395553,
+  "ended": 1790526741.6339996
+}

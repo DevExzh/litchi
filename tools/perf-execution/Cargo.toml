@@ -1,0 +1,30 @@
+[package]
+name = "litchi-perf-execution"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+# Adds a separate observer source with atomics.  The normal benchmark binary
+# has no source counters in its ReadAt implementation.
+source-metrics = []
+
+[dependencies]
+litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-opc = { path = "../../crates/litchi-opc" }
+rustix = { version = "1.1.4", default-features = false, features = ["time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../crates/soapberry-zip" }
+
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+incremental = false

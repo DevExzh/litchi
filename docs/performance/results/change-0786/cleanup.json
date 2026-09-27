@@ -1,0 +1,22 @@
+{
+  "binaries": {
+    "native": {
+      "bytes": 12907024,
+      "path": "/home/zhuhe/code/litchi-target-0786/attempt-0-native",
+      "sha256": "ed90974e2e1e5ff7cb2475feb78bbb8f4eb8965e8ef0c13e3d6e3d4f7839ecb2"
+    },
+    "observer": {
+      "bytes": 12918720,
+      "path": "/home/zhuhe/code/litchi-target-0786/attempt-0-observer",
+      "sha256": "99b39c6ed893ba179525d6254f8afd8d2f79d3b857f47a503b3bf6a7125a6288"
+    }
+  },
+  "ended": 1790527832.460026,
+  "executables_verified_before_removal": true,
+  "file_bytes": 808040280,
+  "file_count": 2104,
+  "started": 1790527832.3898985,
+  "target": "/home/zhuhe/code/litchi-target-0786",
+  "target_absent_after_removal": true,
+  "verified": true
+}

@@ -1,0 +1,73 @@
+{
+  "binaries": {
+    "native": {
+      "bytes": 12907024,
+      "path": "/home/zhuhe/code/litchi-target-0786/attempt-0-native",
+      "sha256": "ed90974e2e1e5ff7cb2475feb78bbb8f4eb8965e8ef0c13e3d6e3d4f7839ecb2"
+    },
+    "observer": {
+      "bytes": 12918720,
+      "path": "/home/zhuhe/code/litchi-target-0786/attempt-0-observer",
+      "sha256": "99b39c6ed893ba179525d6254f8afd8d2f79d3b857f47a503b3bf6a7125a6288"
+    }
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0786",
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "frozen_inputs": {
+    "bytes": 778,
+    "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/build-0/frozen-inputs.json",
+    "sha256": "31b5cef7386463302e07632ee17140f6ece7382713271a71652449484c160e7b"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml"
+      ],
+      "ended": 1790527140.390207,
+      "exit_code": 0,
+      "log": {
+        "bytes": 2875,
+        "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/build-0/native.log",
+        "sha256": "fd54950f6046fc9d134d11cc3b21d31208495290ddd2a6263db1727ec03e9bc6"
+      },
+      "started": 1790527102.3473113
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml",
+        "--features",
+        "source-metrics"
+      ],
+      "ended": 1790527148.807483,
+      "exit_code": 0,
+      "log": {
+        "bytes": 196,
+        "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/build-0/observer.log",
+        "sha256": "9f084d8e8e7c8a7dee5ff1098cf2e97795c1fe554fc0ce9804751ab86d3199da"
+      },
+      "started": 1790527140.6012337
+    }
+  ],
+  "source": {
+    "bytes": 1201785,
+    "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/build-0/source.json",
+    "sha256": "4862751ed3111fe88ef02db6b10f77d6ac2078e46c1fb5be79375999a60d4882"
+  }
+}

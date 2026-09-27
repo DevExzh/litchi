@@ -1,0 +1,84 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790526799.5087864,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790526799.4658923
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790526799.8904157,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1077,
+      "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/quality-0/01.log",
+      "sha256": "760678eb978d190c375c8c4a9bc45b5023fdcc873f93f960d1e391a4ded8e452"
+    },
+    "started": 1790526799.7041597
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790526811.6554043,
+    "exit_code": 0,
+    "log": {
+      "bytes": 3563,
+      "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/quality-0/02.log",
+      "sha256": "76f7452e954b83cc9102e729189136fe3f9f72213a3a4f06f0cedc587f028981"
+    },
+    "started": 1790526800.0853798
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/tools/perf-execution/Cargo.toml",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790526812.0988963,
+    "exit_code": 101,
+    "log": {
+      "bytes": 1161,
+      "path": "/home/zhuhe/code/litchi-worktrees/0786-execution-scaling/docs/performance/results/change-0786/quality-0/03.log",
+      "sha256": "1701bd828c21cd107c5be6ed3cfeec8bca0456d3f8a219493a0c55df7b9fccc7"
+    },
+    "started": 1790526811.8497703
+  }
+]

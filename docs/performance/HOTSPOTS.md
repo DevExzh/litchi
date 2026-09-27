@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0786 — finite-budget scheduling evidence
+
+[0786](0786-finite-execution-budget-scaling.md) The 120-case matrix separates small, large and mixed payload eligibility from requested width. The 64 KiB per-task floor serializes the one-batch small/mixed fixtures; primed ordered Parts provide a no-source-read cache-hit control. See the report for measured follow-up priorities.
+
 ## 0785 — repeated known-URI validation removed
 
 [0785](0785-pptx-known-namespace-uris.md) Exact byte matches now reuse the six namespace constants while unknown values keep the UTF-8 decoder. Release assembly shows length dispatch plus one byte comparison. Large public capture/lifecycle p50 improves 8.489%/6.844% without added operation memory. Further scanner changes need fresh attribution; this does not assign a new phase fraction.
