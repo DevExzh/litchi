@@ -1,0 +1,70 @@
+{
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0792"
+  },
+  "lock": {
+    "bytes": 30217,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.lock",
+    "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+  },
+  "probe": {
+    "probe-src/Cargo.toml.template": "b10720785e30f36fb88eba8bec657aec50b9e88e8dd5c4c4d48df1c37d2c8c7e",
+    "probe-src/src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "probe-src/src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "probe-src/src/main.rs": "99bbf7e2e0e5c41c7f9b81d69bcc96631f9ef1981f076ac947853202d57edfe5"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+        "--",
+        "--test-threads=1"
+      ],
+      "ended": 1790538582.625226,
+      "exit_code": 0,
+      "log": {
+        "bytes": 4492,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-tests/00.log",
+        "sha256": "4b3cfdbda137233ef252e2d5a9ce0d63cbfe223ad67bb2532ac56016967374df"
+      },
+      "started": 1790538576.4304736
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+        "--all-features",
+        "--",
+        "--test-threads=1",
+        "--skip",
+        "allocation_metrics::tests::"
+      ],
+      "ended": 1790538588.878908,
+      "exit_code": 0,
+      "log": {
+        "bytes": 1447,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-tests/01.log",
+        "sha256": "caf755dd6951c88570e7343a2afd1186049c85070d340c070bd12de64ea5b1a9"
+      },
+      "started": 1790538582.6255002
+    }
+  ],
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/build-before/source.json",
+    "sha256": "dbff561a888aaeb0fee866a83caf4d035ef56f4877c1bca8c4078f72d872a78c"
+  }
+}

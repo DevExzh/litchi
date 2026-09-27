@@ -1,0 +1,47 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:671:
+             ),
+             (
+                 "malformed attribute value entity",
+[31m-                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="&bad;"/></p:sld>"#)
+[m[31m-                    .into_bytes(),
+[m[32m+                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="&bad;"/></p:sld>"#).into_bytes(),
+[m                 true,
+             ),
+             (
+Diff in /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:679:
+                 "duplicate attribute",
+[31m-                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1" a="2"/></p:sld>"#)
+[m[31m-                    .into_bytes(),
+[m[32m+                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x a="1" a="2"/></p:sld>"#).into_bytes(),
+[m                 true,
+             ),
+             (
+Diff in /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:688:
+             ),
+             (
+                 "undeclared attribute prefix",
+[31m-                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x q:y="1"/></p:sld>"#)
+[m[31m-                    .into_bytes(),
+[m[32m+                format!(r#"<p:sld xmlns:p="{P_NS}"><p:x q:y="1"/></p:sld>"#).into_bytes(),
+[m                 true,
+             ),
+             (
+Diff in /home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:697:
+                 invalid_utf8_name,
+                 true,
+             ),
+[31m-            (
+[m[31m-                "invalid root with no attributes",
+[m[31m-                b"<sld/>".to_vec(),
+[m[31m-                true,
+[m[31m-            ),
+[m[31m-            (
+[m[31m-                "invalid root namespace",
+[m[31m-                INVALID_ROOT.to_vec(),
+[m[31m-                true,
+[m[31m-            ),
+[m[32m+            ("invalid root with no attributes", b"<sld/>".to_vec(), true),
+[m[32m+            ("invalid root namespace", INVALID_ROOT.to_vec(), true),
+[m         ];
+ 
+         for (label, xml, expected_refusal) in cases {

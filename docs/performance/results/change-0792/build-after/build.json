@@ -1,0 +1,79 @@
+{
+  "binaries": {
+    "allocation": {
+      "bytes": 13953360,
+      "path": "/home/zhuhe/code/litchi-target-0792/after-allocation",
+      "sha256": "3919a3035c4007f3736eb21733835cc2074f7a757a4c6b70ed2a5f18fc98c96e"
+    },
+    "native": {
+      "bytes": 14040336,
+      "path": "/home/zhuhe/code/litchi-target-0792/after-native",
+      "sha256": "07b77ffa22cd20890fdf83247ecd6d1d83d6537c89d2b0bd654ada89749eb206"
+    }
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0792",
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null
+  },
+  "lock": {
+    "bytes": 30217,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.lock",
+    "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+  },
+  "probe": {
+    "probe-src/Cargo.toml.template": "b10720785e30f36fb88eba8bec657aec50b9e88e8dd5c4c4d48df1c37d2c8c7e",
+    "probe-src/src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "probe-src/src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "probe-src/src/main.rs": "99bbf7e2e0e5c41c7f9b81d69bcc96631f9ef1981f076ac947853202d57edfe5"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+        "--locked"
+      ],
+      "ended": 1790539515.1454914,
+      "exit_code": 0,
+      "log": {
+        "bytes": 4784,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/build-after/native.log",
+        "sha256": "ba2572c65affcbb6fcd8bfa792d6776aff4646cf4cab5f597a1d0ecf228160ad"
+      },
+      "started": 1790539455.824922
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0792/probe-src/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--locked"
+      ],
+      "ended": 1790539525.5676665,
+      "exit_code": 0,
+      "log": {
+        "bytes": 1841,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/build-after/allocation.log",
+        "sha256": "273011b0e06b0bc5a6970c5dd6e7ab89c5658f938b50dc66cf39d644c5d66ad8"
+      },
+      "started": 1790539515.3483117
+    }
+  ],
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/build-after/source.json",
+    "sha256": "2cafad53432f42f3a39c938b7433f9b7f18e8c569554acc2a738342b2866e899"
+  }
+}

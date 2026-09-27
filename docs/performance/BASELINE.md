@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0792 — empty attribute-tail optimization retained
+
+[0792](0792-pptx-empty-attribute-tail.md) Fresh six-block pairs show large PPTX capture −5.211% and lifecycle −6.937% p50; 255 reports/5,595 measured samples pass identity checks. All 90 allocation sample pairs retain equal calls, bytes, net live, and peak above entry.
+
 ## 0791 — current PPTX capture attribution
 
 [0791](0791-pptx-current-capture-profile.md) Current-source native controls, six exact-region guest profiles, and two frame-pointer native profiles retain 44 reports/1,286 measured outputs. The large wrapper is 3.512% slower; all ten spread flags and unresolved-frame limitations are explicit.

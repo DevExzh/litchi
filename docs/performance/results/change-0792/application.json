@@ -1,0 +1,27 @@
+{
+  "after": {
+    "bytes": 43233,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/candidate/after-initial.rs",
+    "sha256": "3914a3dee5bb181aa0f66bc490c476bebc01e534765ce2b64d47ae6f729424eb"
+  },
+  "applied_patch": {
+    "bytes": 5557,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/candidate/applied-initial.patch",
+    "sha256": "b7a20bddc7c0e4c4db1f9693befd291e1f59b47330a35614b0527734e1b2471a"
+  },
+  "archive_relocation": "Initial formatted files renamed after supplemental tests; bytes unchanged.",
+  "before": {
+    "bytes": 38554,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/candidate/before.rs",
+    "sha256": "4dfdceef01af78426a4cdfd6da1915bcc10fea33e161cf11b8afcb8047acd09e"
+  },
+  "changed_files": [
+    "crates/litchi-pptx/src/notes/codec.rs"
+  ],
+  "correction": "Initial candidate fmt check failed; only rustfmt layout corrected before quality/build. Original patch and fmt log retained.",
+  "original_patch": {
+    "bytes": 5759,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0792/candidate.patch",
+    "sha256": "5ce648ac1d269e63abec2eabafd7236b69825fc12d2e9f11b419d09e4f866e1a"
+  }
+}
