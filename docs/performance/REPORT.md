@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0774 — checked XLS fields with fresh performance evidence
+
+[0774](0774-xls-writer-integration.md) rejects selected unrepresentable fields before registration and preflights cumulative external/internal references. Review removed a retained formula cache while keeping the static tokenizer function table. The 20,000-formula probe measures 20.071 → 14.131 ms and 48,078,704 → 33,140,823 whole-process allocated bytes; the numeric control is stable. Final gates pass, failed setup evidence is retained, and owned targets are cleaned. API changes and measurement limits are documented.
+
 ## 0773 — explicit save durability integrated and verified
 
 [0773](0773-save-durability-integration.md) integrates the owner-authorized Full/FileOnly/NoSync API while retaining Full for ordinary saves. Fresh paired traces verify 2/1/0 syncs, one replacement and equal output bytes across twelve routes and both destination states. Current regression gates pass; the initial verifier failure and its offline correction are retained. Owned build targets were removed after identity checks. No speedup or memory claim is made.

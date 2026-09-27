@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0774 — paired XLS formula and numeric authoring probes
+
+[0774](0774-xls-writer-integration.md) compares source `25c3b27ba4` with `836120efe7`: four processes per leg/case, nine samples after two warmups, 20,000 cells and identical output hashes. Formula median process p50 is 20.071 → 14.131 ms; the numeric control is 5.819 → 5.786 ms. Separate whole-process heaptrack observations and every RSS/spread flag are retained. These observations cover synthetic registration plus memory serialization only.
+
 ## 0773 — current durability syscall comparison
 
 [0773](0773-save-durability-integration.md) captures 24 baseline and 96 integrated save windows across twelve routes and existing/absent destinations. Default and Full retain two syncs; FileOnly performs one and NoSync none, with one replacement and identical output bytes throughout. These are paired debug-build syscall observations, with no latency, allocation or RSS claim.

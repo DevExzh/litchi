@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0774 — XLS field checks integrated; repeated tokenizer map removed
+
+[0774](0774-xls-writer-integration.md) closes the pending XLS integration with aggregate external-reference preflight. A static fourteen-entry function table avoids repeated map construction. Review removed the unbudgeted retained token cache; formula validation and serialization both encode, yet the paired formula probe improves with lower total allocation calls/bytes. Broader writer budgets and representative workbook distributions remain open.
+
 ## 0773 — explicit synchronization policy integrated
 
 [0773](0773-save-durability-integration.md) completes the owner-authorized durability integration: Full remains the default, while explicit FileOnly/NoSync calls omit requested synchronization work. Fresh traces and current-source regression gates pass. The XLS writer length-field branch remains separate integration work; this change does not establish a wall-clock speedup.

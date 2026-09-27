@@ -121,3 +121,8 @@ This closes the reviewed XLS integration batch, not the non-iWork program.
 Legacy writer-wide resource budgets, broader corpus measurements, individual
 near-limit activation tests, cold/range/scaling evidence and the full goal audit
 remain separate work.
+
+After integration, the owned worktree, copied root lock and reference-corpus
+symlinks were removed. Final production bytes and every sealed committed packet
+file were verified against the tested source and inventory; unrelated files and
+original worktrees were preserved.
