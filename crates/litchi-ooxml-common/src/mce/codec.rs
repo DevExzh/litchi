@@ -1410,27 +1410,36 @@ fn validate_alternate_attributes(
 /// use a fallibly reserved vector and in-place sorting, never URI copies or
 /// URI-length-dependent hashing. Scratch is dropped before processing children.
 fn validate_expanded_attribute_duplicates(raw: &[Attr<'_>], ns: Resolver<'_>) -> R<()> {
-    let mut prefixed = raw
-        .iter()
-        .filter(|a| a.key.contains(':') && !a.key.starts_with("xmlns:"));
+    let mut prefixed = raw.iter().filter_map(|attribute| {
+        let (prefix, local) = attribute.key.split_once(':')?;
+        (prefix != "xmlns").then_some((local, attribute.key, 0usize))
+    });
     let Some(first) = prefixed.next() else {
         return Ok(());
     };
     let Some(second) = prefixed.next() else {
         return Ok(());
     };
-    let mut inline = [(0, ""); 8];
+    let mut inline = [("", "", 0usize); 8];
     let mut used = 0;
     let mut overflow = Vec::new();
-    for attribute in std::iter::once(first)
+    for name in std::iter::once(first)
         .chain(std::iter::once(second))
         .chain(prefixed)
     {
-        let (namespace, local) = expand_parts(attribute.key, ns, false)?;
-        let name = (namespace.id, local);
         if used < inline.len() {
-            if inline[..used].contains(&name) {
-                return Err(bad("duplicate attribute"));
+            // Different local parts cannot collide, regardless of prefix.
+            // Resolve only possible collisions, avoiding a repeated QName
+            // validation and scope lookup for every ordinary attribute.
+            for previous in inline[..used]
+                .iter()
+                .filter(|previous| previous.0 == name.0)
+            {
+                let (left, _) = expand_parts(previous.1, ns, false)?;
+                let (right, _) = expand_parts(name.1, ns, false)?;
+                if left.id == right.id {
+                    return Err(bad("duplicate attribute"));
+                }
             }
             inline[used] = name;
             used += 1;
@@ -1442,9 +1451,24 @@ fn validate_expanded_attribute_duplicates(raw: &[Attr<'_>], ns: Resolver<'_>) ->
             overflow.push(name);
         }
     }
-    overflow.sort_unstable();
-    if overflow.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(bad("duplicate attribute"));
+    overflow.sort_unstable_by(|left, right| left.0.cmp(right.0));
+    let mut start = 0;
+    while start < overflow.len() {
+        let mut end = start + 1;
+        while end < overflow.len() && overflow[end].0 == overflow[start].0 {
+            end += 1;
+        }
+        if end - start > 1 {
+            let group = &mut overflow[start..end];
+            for name in &mut *group {
+                name.2 = expand_parts(name.1, ns, false)?.0.id;
+            }
+            group.sort_unstable_by_key(|name| name.2);
+            if group.windows(2).any(|pair| pair[0].2 == pair[1].2) {
+                return Err(bad("duplicate attribute"));
+            }
+        }
+        start = end;
     }
     Ok(())
 }
