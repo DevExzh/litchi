@@ -1,0 +1,28 @@
+{
+  "baseline_helper": {
+    "bytes": 11417,
+    "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs",
+    "sha256": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821"
+  },
+  "candidate_helper": {
+    "bytes": 14143,
+    "path": "docs/performance/results/change-0797/candidate/after/litchi-opc-xml_attributes.rs",
+    "sha256": "fc8cc4e934ab8282a0bb11c42cf0be962c0fe5ea6de82bc4a62fd2eabd145dc6"
+  },
+  "candidate_manifest": {
+    "bytes": 2409,
+    "path": "docs/performance/results/change-0797/candidate/manifest.json",
+    "sha256": "d3b597e1c4bb0c84a26432c7d0bbefd2b3993d3dc68d38a3f8dc52a28cbb35d1"
+  },
+  "parser": {
+    "bytes": 18529,
+    "path": "docs/performance/results/change-0796/callgrind_parser.py",
+    "sha256": "4a32c35c5e90aa290b4b983091ba4ed86569b4322c7ea4d0292e8d4ae4e6ad2e"
+  },
+  "previous_seal": {
+    "bytes": 322090,
+    "path": "docs/performance/results/change-0796/seal.json",
+    "sha256": "a173d142e2498b1998ea21eb4ff9cc2b3994eacfc08bdab539bbe8730520444a"
+  },
+  "quality": "Fresh minimal mirror workspace helper tests; no full production-crate claim"
+}

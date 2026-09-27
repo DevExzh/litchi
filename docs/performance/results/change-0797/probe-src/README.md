@@ -1,0 +1,1 @@
+Standalone direct preflight for0797. Exact baseline and candidate helpers compile as local modules in one binary; no production adoption is implied. Same timing and semantic protocol as0796, with distinct2/3 cases added. External cfg(test) modules are excluded from this probe build; separate helper tests provide coverage.

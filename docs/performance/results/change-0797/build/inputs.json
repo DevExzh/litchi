@@ -1,0 +1,30 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "86310ab19474945a28f52e1a3d595bd7a1a687f3fc51810fbc6600d01b0d4500",
+    "candidate.patch": "3fe1a61c2575ee32b0b3f4faf0d512c2728194880cbde1554ff407f33d462a7f",
+    "capture.py": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d",
+    "custody.py": "371a85a08d3e71ffaa39daf4f4815225d5ddd2135e1a1f68ee0e3d5e3c0a874c",
+    "decision.py": "3f65f6d293dbc7ecd5b7c463762382a8c86203ddd98eae6f0f8bad4472a59643",
+    "fixture_check.py": "c06ab6a1f198ea6319f54eca7afe6b0c148da1fc10e1c25b6580e4aa560c27d1",
+    "fixtures.json": "46bd546138ff0046651a8e59ecd93b36020f50c69a66005eb392d9534f4028af",
+    "host.json": "cbcf89b1406cdd8a0562ba7d8baf862625540ec18052ae46d4b3fdd193a3f262",
+    "inheritance.json": "84b20272fe356ca57dda322ab0b6b71ece385c1c9e8bc4c3bcc2dd1a9101ba6c",
+    "lock-generation.json": "49cd5727966400d3612e11ac28a7b74011616d2287818d7f9c83d726e3f5e099",
+    "lock-generation.log": "80c79ba0b92c0c7696dbee779e03f63558db41c667090bd908f83dbb224990e2",
+    "origin.json": "1d12bcf1af3363c259adfcab4aabdd1b1e0a5071641dacb75066e26edceaf1da",
+    "plan.json": "02a0bb1260b1f5820c65855da4b585bb8b94a738b86648f7213c063118f0daa3",
+    "quality.py": "2724e9c70753e56b6d2c28232b1bbbe676b17e1943ced7381b68a89bedb57415",
+    "quality/archive-inputs.json": "76226cfa2f0307b389d57f62c6a7d8aa8f884a89be6b3acd4a64daae4e505ba8",
+    "quality/complete.json": "935fff8f3bc88174e8e4519815e0a44cbf2f242c6e47ee23b877121dfe2c8642"
+  },
+  "probe": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "README.md": "468982427ad274d9ccbafed8caef432b2db541889d10312ea435c6dbf4fdd067",
+    "src/baseline.rs": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "src/candidate.rs": "fc8cc4e934ab8282a0bb11c42cf0be962c0fe5ea6de82bc4a62fd2eabd145dc6",
+    "src/main.rs": "271aee1cbf958bbdcd5adce2aa07ce5462824db24e85cfd96e78ca43d2c4163f"
+  }
+}

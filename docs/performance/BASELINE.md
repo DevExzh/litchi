@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0797 — first-attribute replay fails preflight
+
+[0797](0797-xml-first-attribute-preflight.md) The new prototype improves one-attribute consumption by 35.768% but regresses two-attribute consumption by 42.987%. All 1,056 reports/24,024 samples validate. Production baseline remains unchanged.
+
 ## 0796 — direct helper boundary controls
 
 [0796](0796-xml-attribute-boundary-diagnostic.md) One binary compares exact baseline and rejected 0794 OPC helpers over 31 inputs and two modes. All 992 reports/22,568 samples validate; no production baseline changes.

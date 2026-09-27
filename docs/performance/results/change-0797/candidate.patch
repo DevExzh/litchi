@@ -1,0 +1,677 @@
+--- a/crates/litchi-opc/src/xml_attributes.rs
++++ b/crates/litchi-opc/src/xml_attributes.rs
+@@ -1,5 +1,12 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
++//!
++//! The first valid attribute is read with duplicate checking disabled. A tag
++//! with only that attribute has no possible duplicate, so the iterator can
++//! finish after checking that the remaining bytes are whitespace without
++//! allocating quick-xml's name list. If any non-whitespace byte follows, the
++//! next call rebuilds quick-xml's checked iterator, consumes the first
++//! attribute as a replay seed, and resumes the ordinary bounded handoff below.
+ //!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+ //! default. It compares each name with the names before it while it has seen
+@@ -88,6 +95,10 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
++    /// The first attribute has not been requested yet.
++    First,
++    /// The first attribute was yielded unchecked and another item may follow.
++    ReplayFirst,
+     /// quick-xml checks the names; this many have been yielded.
+     QuickXml(usize),
+     /// quick-xml's check is off; this iterator checks the names.
+@@ -107,15 +118,50 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The first item is initially read without duplicate checking. If the
++    // tag continues, `replay_first` installs a checked iterator before the
++    // second item is requested.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
+-        }
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item and avoid constructing quick-xml's duplicate-name
++    /// list when its value is followed only by tag whitespace. A lexical error
++    /// in the first item is unchanged because no earlier name exists.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ReplayFirst;
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Replace the unchecked iterator with a fresh checked one and consume its
++    /// first item. The item was already yielded by `next_first`; replaying it
++    /// seeds quick-xml's duplicate state without exposing it twice.
++    #[cold]
++    #[inline(never)]
++    #[allow(clippy::disallowed_methods)]
++    fn replay_first(&mut self) {
++        let mut attributes = self.tag.attributes();
++        let first = attributes.next();
++        debug_assert!(matches!(first, Some(Ok(_))));
++        self.attributes = attributes;
++        self.phase = Phase::QuickXml(1);
+     }
+ 
+     /// Everything after quick-xml's 32 names: the switch to this iterator's
+@@ -127,7 +173,12 @@
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
++            Phase::ReplayFirst => {
++                self.replay_first();
++                return self.next();
++            },
+             Phase::Own(_) => {},
++            Phase::First => unreachable!("first item is handled by next_first"),
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+@@ -225,6 +276,9 @@
+     /// The first 32 names are quick-xml's checked iterator plus a counter.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
+         if let Phase::QuickXml(yielded) = &mut self.phase
+             && *yielded < QUICK_XML_LINEAR_NAMES
+         {
+@@ -255,6 +309,14 @@
+     offset_in(base, value)
+         .saturating_add(value.len())
+         .saturating_add(1)
++}
++
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately takes the replay path,
++/// including a malformed second attribute or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+--- a/crates/litchi-ole-common/src/xml_attributes.rs
++++ b/crates/litchi-ole-common/src/xml_attributes.rs
+@@ -1,5 +1,10 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
++//!
++//! The first valid attribute is read without duplicate checking. If its
++//! remainder is only tag whitespace, the iterator is fused without building a
++//! name list. A non-whitespace remainder takes a cold replay path that rebuilds
++//! quick-xml's checked iterator and consumes the first item before continuing.
+ //!
+ //! This is a copy of `litchi_opc::xml_attributes` (record 0770) for the OLE2 crates,
+ //! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+@@ -74,6 +79,10 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
++    /// The first attribute has not been requested yet.
++    First,
++    /// The first attribute was yielded unchecked and another item may follow.
++    ReplayFirst,
+     /// quick-xml checks the names; this many have been yielded.
+     QuickXml(usize),
+     /// quick-xml's check is off; this iterator checks the names.
+@@ -93,15 +102,50 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The first item is initially read without duplicate checking. If the
++    // tag continues, `replay_first` installs a checked iterator before the
++    // second item is requested.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
+-        }
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item and avoid constructing quick-xml's duplicate-name
++    /// list when its value is followed only by tag whitespace. A lexical error
++    /// in the first item is unchanged because no earlier name exists.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ReplayFirst;
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Replace the unchecked iterator with a fresh checked one and consume its
++    /// first item. The item was already yielded by `next_first`; replaying it
++    /// seeds quick-xml's duplicate state without exposing it twice.
++    #[cold]
++    #[inline(never)]
++    #[allow(clippy::disallowed_methods)]
++    fn replay_first(&mut self) {
++        let mut attributes = self.tag.attributes();
++        let first = attributes.next();
++        debug_assert!(matches!(first, Some(Ok(_))));
++        self.attributes = attributes;
++        self.phase = Phase::QuickXml(1);
+     }
+ 
+     /// Everything after quick-xml's 32 names: the switch to this iterator's
+@@ -113,7 +157,12 @@
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
++            Phase::ReplayFirst => {
++                self.replay_first();
++                return self.next();
++            },
+             Phase::Own(_) => {},
++            Phase::First => unreachable!("first item is handled by next_first"),
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+@@ -211,6 +260,9 @@
+     /// The first 32 names are quick-xml's checked iterator plus a counter.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
+         if let Phase::QuickXml(yielded) = &mut self.phase
+             && *yielded < QUICK_XML_LINEAR_NAMES
+         {
+@@ -241,6 +293,14 @@
+     offset_in(base, value)
+         .saturating_add(value.len())
+         .saturating_add(1)
++}
++
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately takes the replay path,
++/// including a malformed second attribute or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+--- a/crates/litchi-sign/src/xml_attributes.rs
++++ b/crates/litchi-sign/src/xml_attributes.rs
+@@ -1,5 +1,10 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
++//!
++//! The first valid attribute is read without duplicate checking. If its
++//! remainder is only tag whitespace, the iterator is fused without building a
++//! name list. A non-whitespace remainder takes a cold replay path that rebuilds
++//! quick-xml's checked iterator and consumes the first item before continuing.
+ //!
+ //! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+ //! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+@@ -74,6 +79,10 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
++    /// The first attribute has not been requested yet.
++    First,
++    /// The first attribute was yielded unchecked and another item may follow.
++    ReplayFirst,
+     /// quick-xml checks the names; this many have been yielded.
+     QuickXml(usize),
+     /// quick-xml's check is off; this iterator checks the names.
+@@ -93,15 +102,50 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The first item is initially read without duplicate checking. If the
++    // tag continues, `replay_first` installs a checked iterator before the
++    // second item is requested.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
+-        }
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item and avoid constructing quick-xml's duplicate-name
++    /// list when its value is followed only by tag whitespace. A lexical error
++    /// in the first item is unchanged because no earlier name exists.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ReplayFirst;
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Replace the unchecked iterator with a fresh checked one and consume its
++    /// first item. The item was already yielded by `next_first`; replaying it
++    /// seeds quick-xml's duplicate state without exposing it twice.
++    #[cold]
++    #[inline(never)]
++    #[allow(clippy::disallowed_methods)]
++    fn replay_first(&mut self) {
++        let mut attributes = self.tag.attributes();
++        let first = attributes.next();
++        debug_assert!(matches!(first, Some(Ok(_))));
++        self.attributes = attributes;
++        self.phase = Phase::QuickXml(1);
+     }
+ 
+     /// Everything after quick-xml's 32 names: the switch to this iterator's
+@@ -113,7 +157,12 @@
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
++            Phase::ReplayFirst => {
++                self.replay_first();
++                return self.next();
++            },
+             Phase::Own(_) => {},
++            Phase::First => unreachable!("first item is handled by next_first"),
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+@@ -211,6 +260,9 @@
+     /// The first 32 names are quick-xml's checked iterator plus a counter.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
+         if let Phase::QuickXml(yielded) = &mut self.phase
+             && *yielded < QUICK_XML_LINEAR_NAMES
+         {
+@@ -241,6 +293,14 @@
+     offset_in(base, value)
+         .saturating_add(value.len())
+         .saturating_add(1)
++}
++
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately takes the replay path,
++/// including a malformed second attribute or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+--- a/crates/litchi-xldm/src/xml_attributes.rs
++++ b/crates/litchi-xldm/src/xml_attributes.rs
+@@ -1,5 +1,10 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
++//!
++//! The first valid attribute is read without duplicate checking. If its
++//! remainder is only tag whitespace, the iterator is fused without building a
++//! name list. A non-whitespace remainder takes a cold replay path that rebuilds
++//! quick-xml's checked iterator and consumes the first item before continuing.
+ //!
+ //! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+ //! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+@@ -74,6 +79,10 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
++    /// The first attribute has not been requested yet.
++    First,
++    /// The first attribute was yielded unchecked and another item may follow.
++    ReplayFirst,
+     /// quick-xml checks the names; this many have been yielded.
+     QuickXml(usize),
+     /// quick-xml's check is off; this iterator checks the names.
+@@ -93,15 +102,50 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The first item is initially read without duplicate checking. If the
++    // tag continues, `replay_first` installs a checked iterator before the
++    // second item is requested.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
+-        }
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item and avoid constructing quick-xml's duplicate-name
++    /// list when its value is followed only by tag whitespace. A lexical error
++    /// in the first item is unchanged because no earlier name exists.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ReplayFirst;
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Replace the unchecked iterator with a fresh checked one and consume its
++    /// first item. The item was already yielded by `next_first`; replaying it
++    /// seeds quick-xml's duplicate state without exposing it twice.
++    #[cold]
++    #[inline(never)]
++    #[allow(clippy::disallowed_methods)]
++    fn replay_first(&mut self) {
++        let mut attributes = self.tag.attributes();
++        let first = attributes.next();
++        debug_assert!(matches!(first, Some(Ok(_))));
++        self.attributes = attributes;
++        self.phase = Phase::QuickXml(1);
+     }
+ 
+     /// Everything after quick-xml's 32 names: the switch to this iterator's
+@@ -113,7 +157,12 @@
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
++            Phase::ReplayFirst => {
++                self.replay_first();
++                return self.next();
++            },
+             Phase::Own(_) => {},
++            Phase::First => unreachable!("first item is handled by next_first"),
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+@@ -211,6 +260,9 @@
+     /// The first 32 names are quick-xml's checked iterator plus a counter.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
+         if let Phase::QuickXml(yielded) = &mut self.phase
+             && *yielded < QUICK_XML_LINEAR_NAMES
+         {
+@@ -241,6 +293,14 @@
+     offset_in(base, value)
+         .saturating_add(value.len())
+         .saturating_add(1)
++}
++
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately takes the replay path,
++/// including a malformed second attribute or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+--- a/crates/xml-minifier/src/xml_attributes.rs
++++ b/crates/xml-minifier/src/xml_attributes.rs
+@@ -1,5 +1,10 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
++//!
++//! The first valid attribute is read without duplicate checking. If its
++//! remainder is only tag whitespace, the iterator is fused without building a
++//! name list. A non-whitespace remainder takes a cold replay path that rebuilds
++//! quick-xml's checked iterator and consumes the first item before continuing.
+ //!
+ //! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+ //! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+@@ -74,6 +79,10 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
++    /// The first attribute has not been requested yet.
++    First,
++    /// The first attribute was yielded unchecked and another item may follow.
++    ReplayFirst,
+     /// quick-xml checks the names; this many have been yielded.
+     QuickXml(usize),
+     /// quick-xml's check is off; this iterator checks the names.
+@@ -93,15 +102,50 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The first item is initially read without duplicate checking. If the
++    // tag continues, `replay_first` installs a checked iterator before the
++    // second item is requested.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
+-        }
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item and avoid constructing quick-xml's duplicate-name
++    /// list when its value is followed only by tag whitespace. A lexical error
++    /// in the first item is unchanged because no earlier name exists.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ReplayFirst;
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Replace the unchecked iterator with a fresh checked one and consume its
++    /// first item. The item was already yielded by `next_first`; replaying it
++    /// seeds quick-xml's duplicate state without exposing it twice.
++    #[cold]
++    #[inline(never)]
++    #[allow(clippy::disallowed_methods)]
++    fn replay_first(&mut self) {
++        let mut attributes = self.tag.attributes();
++        let first = attributes.next();
++        debug_assert!(matches!(first, Some(Ok(_))));
++        self.attributes = attributes;
++        self.phase = Phase::QuickXml(1);
+     }
+ 
+     /// Everything after quick-xml's 32 names: the switch to this iterator's
+@@ -113,7 +157,12 @@
+             Phase::Done => return None,
+             // quick-xml would hash the next name: turn its check off first.
+             Phase::QuickXml(_) => self.take_over(),
++            Phase::ReplayFirst => {
++                self.replay_first();
++                return self.next();
++            },
+             Phase::Own(_) => {},
++            Phase::First => unreachable!("first item is handled by next_first"),
+         }
+         let Some(item) = self.attributes.next() else {
+             self.phase = Phase::Done;
+@@ -211,6 +260,9 @@
+     /// The first 32 names are quick-xml's checked iterator plus a counter.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
+         if let Phase::QuickXml(yielded) = &mut self.phase
+             && *yielded < QUICK_XML_LINEAR_NAMES
+         {
+@@ -241,6 +293,14 @@
+     offset_in(base, value)
+         .saturating_add(value.len())
+         .saturating_add(1)
++}
++
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately takes the replay path,
++/// including a malformed second attribute or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+--- a/crates/litchi-opc/src/xml_attributes/tests.rs
++++ b/crates/litchi-opc/src/xml_attributes/tests.rs
+@@ -274,6 +274,87 @@
+     assert_eq!(items.len(), 41);
+     assert!(matches!(items[40], Err(AttrError::Duplicated(..))));
+     assert!(tag.checked_attributes().nth(41).is_none());
++}
++
++#[test]
++fn a_single_attribute_checks_the_tail_and_then_stays_fused() {
++    for content in ["e a=\"1\"", "e a='1' ", "e a = \"1\"\t\r\n"] {
++        let tag = tag(content);
++        let mut attributes = tag.checked_attributes();
++        assert!(attributes.next().is_some(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++    }
++    for content in ["e", "e ", "e\t\r\n"] {
++        let tag = tag(content);
++        let mut attributes = tag.checked_attributes();
++        assert!(attributes.next().is_none(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++    }
++}
++
++#[test]
++fn a_second_attribute_replays_the_first_before_checking_it() {
++    for content in [
++        "e a=\"1\" b=\"2\"",
++        "e a=\"1\" a=\"2\"",
++        "e a=\"1\" a=unquoted tail=\"ok\"",
++        "e a=\"1\" b=",
++    ] {
++        assert_same(content);
++        let tag = tag(content);
++        let mut attributes = tag.checked_attributes();
++        assert!(attributes.next().is_some(), "{content}");
++        assert!(attributes.next().is_some(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++    }
++}
++
++#[test]
++fn clone_matches_from_before_and_after_the_replay_boundary() {
++    for content in [
++        "e",
++        "e a=\"1\" ",
++        "e a=\"1\" b=\"2\" c=\"3\"",
++        "e a=\"1\" a=unquoted tail=\"ok\"",
++    ] {
++        for advance in [0, 1] {
++            let tag = tag(content);
++            let mut left = tag.checked_attributes();
++            for _ in 0..advance {
++                let _ = left.next();
++            }
++            let mut right = left.clone();
++            loop {
++                let left_item = left.next().map(owned);
++                let right_item = right.next().map(owned);
++                assert_eq!(left_item, right_item, "{content}, advance={advance}");
++                if left_item.is_none() {
++                    break;
++                }
++            }
++            assert!(left.next().is_none(), "{content}, advance={advance}");
++            assert!(right.next().is_none(), "{content}, advance={advance}");
++        }
++    }
++}
++
++#[test]
++fn an_error_with_a_valid_recovery_tail_remains_the_terminal_item() {
++    let content = "e a=\"1\" a=unquoted tail=\"ok\"";
++    let tag = tag(content);
++    let expected = quick_xml_until_error(&tag);
++    assert!(matches!(
++        expected.last(),
++        Some(Err(AttrError::Duplicated(..)))
++    ));
++    let actual = checked(&tag);
++    assert_eq!(actual, expected);
++    let mut attributes = tag.checked_attributes();
++    assert!(attributes.by_ref().any(|item| item.is_err()));
++    assert!(attributes.next().is_none());
++    assert!(attributes.next().is_none());
+ }
+ 
+ #[test]

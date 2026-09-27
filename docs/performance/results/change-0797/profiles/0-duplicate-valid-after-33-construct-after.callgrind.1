@@ -1,0 +1,120 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 866436
+cmd:  /home/zhuhe/code/litchi-target-0797/attribute-boundary-probe --leg after --case duplicate-valid-after-33 --mode construct --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0797/profiles/0-duplicate-valid-after-33-construct-after.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 499630
+desc: Trigger: --dump-after=attribute_boundary_probe::after_construct
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 69 5 3
+
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(165) ./csu/../csu/libc-start.c
+fn=(566) __libc_start_main@@GLIBC_2.34
+cfi=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(588) (below main)
+calls=0 30 
+360 69 5 3
+
+fl=(168)
+fn=(588)
+cob=(6) /home/zhuhe/code/litchi-target-0797/attribute-boundary-probe
+cfi=(164) ???
+cfn=(596) main
+calls=0 0 
+59 69 5 3
+
+ob=(6)
+fl=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(324) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0797/probe-src/src/main.rs
+cfn=(864) attribute_boundary_probe::main
+calls=0 382 
+250 69 5 3
+fe=(249)
+
+fl=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+fn=(598) std::rt::lang_start_internal
+fi=(324)
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 69 5 3
+fe=(172)
+
+fn=(860)
+cfi=(249)
+cfn=(862)
+calls=0 162 
+206 69 5 3
+
+fl=(250)
+fn=(1518) attribute_boundary_probe::after_construct
+862 9
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 11
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2457 1
+fi=(236)
+1916 3
+fi=(254)
+772 1 1 1
+fi=(318) /home/zhuhe/code/litchi/docs/performance/results/change-0797/probe-src/src/candidate.rs
+129 15
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 3
+fe=(250)
+871 5
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+632 2 1 1
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+805 5 2 1
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+0 1
+fi=(283)
+491 3
+fe=(250)
+877 8
+
+fn=(864)
+cfn=(1518)
+calls=1 862 
+1024 69 5 3
+
+fl=(164)
+fn=(564) (below main)
+cob=(2)
+cfi=(165)
+cfn=(566)
+calls=0 242 
+0 69 5 3
+
+fn=(596)
+cfi=(172)
+cfn=(598)
+calls=0 152 
+0 69 5 3
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 69 5 3
+
+totals: 69 5 3

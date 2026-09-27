@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0797 — archive replay prototype without workflow advancement
+
+[0797](0797-xml-first-attribute-preflight.md) Single-attribute benefit qualifies, but 20 consumption cases trigger the frozen preflight regression rule. All 264 counter owners qualify and 66 paired rows match independent audits. No production edit or adoption follows.
+
 ## 0796 — early duplicate rejection remains necessary
 
 [0796](0796-xml-attribute-boundary-diagnostic.md) Locked probe gates, 248 qualified counter owners, 496 independently conserved dumps, and independent sample/checksum/native audits pass. Long duplicate values expose extra lexical work; 0794 remains rejected.
