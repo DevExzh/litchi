@@ -171,6 +171,14 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
 
     let raw_attributes = string_capacity(token, attributes.checked_mul(2)?)?
         .checked_add(vec_capacity(attributes, pair_bytes)?)?;
+    // Expanded duplicate checks keep eight (namespace identity, local-name)
+    // pairs on the stack, then reserve at most one pair per source attribute.
+    // Charge both and the temporary vector owner conservatively even for the
+    // common path that never spills. No URI text is retained by this scratch.
+    let expanded_name_pair = u64::try_from(size_of::<(usize, &str)>()).ok()?;
+    let expanded_attribute_names = vec_capacity(attributes, expanded_name_pair)?
+        .checked_add(expanded_name_pair.checked_mul(8)?)?
+        .checked_add(u64::try_from(size_of::<Vec<(usize, &str)>>()).ok()?)?;
     let quickxml_attributes = vec_capacity(attributes, range_bytes)?
         .checked_add(hash_capacity(attributes, size_of::<u64>() as u64)?)?;
 
@@ -278,6 +286,7 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
         mce_frames,
         raw_attributes,
         quickxml_attributes,
+        expanded_attribute_names,
         namespace_storage,
         namespace_index,
         hoisted_lists,

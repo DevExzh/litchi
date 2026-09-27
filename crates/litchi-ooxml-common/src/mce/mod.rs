@@ -12,6 +12,8 @@ mod scope;
 #[cfg(test)]
 mod bounds_tests;
 #[cfg(test)]
+mod expanded_duplicates_tests;
+#[cfg(test)]
 mod shared_names_tests;
 #[cfg(test)]
 mod tests;
