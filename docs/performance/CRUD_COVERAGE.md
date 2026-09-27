@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0774 — XLS registration refusal and aggregate reference bounds
+
+[0774](0774-xls-writer-integration.md) adds current-source evidence for checked string/count/index registration, deterministic accepted-input round trips, formula replacement, and aggregate ExternSheet refusal at 1,371 references. Final XLS tests pass 1,655 cases with one ignored; a separate 1,024-workbook property run passes. Dedicated near-limit tests for every internal-reference activation transition remain an explicit coverage opportunity.
+
 ## 0773 — filesystem publication policy and failure coverage
 
 [0773](0773-save-durability-integration.md) validates the explicit policy across OPC/CFB and seven Office format owners. Twelve traced routes cover both existing and absent destinations; full owner, dependency, facade and harness suites pass, including typed publication failures and preservation checks. Encrypted saves and DOCX tail append remain Full-only; ODF/iWork policy expansion is outside scope.

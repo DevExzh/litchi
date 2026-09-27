@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0774 — reviewed XLS integration complete; broader goal remains open
+
+[0774](0774-xls-writer-integration.md) integrates the pending 0766 work, fixes a review-found aggregate reference gap, removes unbudgeted formula-token retention, and validates final source with owner/facade/harness build gates and paired native/allocation evidence. No historical probe claim is adopted. Writer-wide resource budgets, broader corpora, cold/range/scaling evidence and full CRUD completion remain unproved; the non-iWork goal stays active.
+
 ## 0773 — durability integration closed; program remains active
 
 [0773](0773-save-durability-integration.md) integrates the existing 0761 policy with fresh source-bound gates and paired syscall evidence, superseding incomplete old scratch claims. The full harness passes 555 tests with one ignored. Default behavior and output bytes are preserved. XLS writer integration, physical cold-cache, remote/range, scaling and complete CRUD coverage remain open; the non-iWork goal is not complete.
