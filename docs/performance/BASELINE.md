@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0795 — exact-source rejected-candidate instruction comparison
+
+[0795](0795-xml-duplicate-key-instruction-profile.md) Twelve owner-scoped Callgrind captures and four separate native profiles preserve all 412 output/readback oracles. Large guest instruction totals fall only 0.387–0.393%; no fresh native latency comparison or optimized baseline follows.
+
 ## 0794 — current paired XML attribute experiment rejected
 
 [0794](0794-xml-inline-duplicate-keys.md) All 255 primary reports/5,595 samples and thirteen cross-format reports/2,888 case samples preserve their exact source and output contracts. No PPTX timing benefit qualifies; tiny XLSX full-cell scanning regresses 5.511%. Production is restored; no new optimized baseline is adopted.

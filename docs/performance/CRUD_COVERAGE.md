@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0795 — diagnostic capture profiles, no coverage promotion
+
+[0795](0795-xml-duplicate-key-instruction-profile.md) Exact baseline/rejected-candidate PPTX capture profiles retain generated tiny/medium/large identity. The OPC helper is exercised; no native-producer, cold/range, concurrency, or CRUD support row is promoted. Production remains the baseline.
+
 ## 0794 — shared XML iterator evidence, no coverage promotion
 
 [0794](0794-xml-inline-duplicate-keys.md) Generated PPTX capture/commit/lifecycle and DOCX/XLSX read controls validate, but the candidate fails timing adoption and is restored. The experiment adds no native-producer, cold/range, concurrency, or CRUD coverage promotion.

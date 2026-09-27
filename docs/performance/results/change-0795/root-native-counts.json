@@ -1,0 +1,33 @@
+{
+  "phase_fraction_claim": false,
+  "rows": [
+    {
+      "leg": "before",
+      "owner": 1016,
+      "repeat": 0,
+      "total": 3128,
+      "unresolved_owner": 1
+    },
+    {
+      "leg": "after",
+      "owner": 1023,
+      "repeat": 0,
+      "total": 3369,
+      "unresolved_owner": 0
+    },
+    {
+      "leg": "after",
+      "owner": 1032,
+      "repeat": 1,
+      "total": 3386,
+      "unresolved_owner": 0
+    },
+    {
+      "leg": "before",
+      "owner": 1026,
+      "repeat": 1,
+      "total": 3128,
+      "unresolved_owner": 1
+    }
+  ]
+}

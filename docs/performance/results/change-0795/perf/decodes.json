@@ -1,0 +1,122 @@
+[
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-before.data"
+    ],
+    "ended": 1790547082.5642228,
+    "exit_code": 0,
+    "frames": {
+      "bytes": 221551,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-before.frames.gz",
+      "sha256": "dfc04339877ad700434fc26ff67b4e26052df175932bb2b09b2ba0e37001abbc"
+    },
+    "leg": "before",
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-before.decode.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 585376,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-before.data",
+      "sha256": "bc502bd0b02266c2018416ea88cfbbb5ccc65fd6322af1e2650c4676942ddda0"
+    },
+    "repeat": 0,
+    "started": 1790547082.5247815
+  },
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-after.data"
+    ],
+    "ended": 1790547082.6580582,
+    "exit_code": 0,
+    "frames": {
+      "bytes": 223482,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-after.frames.gz",
+      "sha256": "b04ecb0712db8a8d99c954e465bc53f637e94caf0ce0e358d306f14569b54c85"
+    },
+    "leg": "after",
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-after.decode.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 621192,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/0-after.data",
+      "sha256": "24ba9fd466de957fac067547394d8180712f362c555e4ab78deeca3ffb48edd6"
+    },
+    "repeat": 0,
+    "started": 1790547082.6191192
+  },
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-after.data"
+    ],
+    "ended": 1790547082.751829,
+    "exit_code": 0,
+    "frames": {
+      "bytes": 220444,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-after.frames.gz",
+      "sha256": "624231d45cc5cf838b760e744cc6cb5e9fcdd623229324160b52ad5f7e5cb881"
+    },
+    "leg": "after",
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-after.decode.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 624488,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-after.data",
+      "sha256": "115e974c1b57b28ba6b72bfe1048edfb916c69c6902ede086b7dd0059086a3c6"
+    },
+    "repeat": 1,
+    "started": 1790547082.7146742
+  },
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-before.data"
+    ],
+    "ended": 1790547082.8460588,
+    "exit_code": 0,
+    "frames": {
+      "bytes": 216198,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-before.frames.gz",
+      "sha256": "93ed937a22b1215a78c292d8b99f98b92a5a0f867fb4009b5e6956793f1ea932"
+    },
+    "leg": "before",
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-before.decode.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 583568,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/perf/1-before.data",
+      "sha256": "8afcf17e201da3b00ba3b94d7c91f8b65aec3846e2321446947eb7fcdb342623"
+    },
+    "repeat": 1,
+    "started": 1790547082.8131454
+  }
+]

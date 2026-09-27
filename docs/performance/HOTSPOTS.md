@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0795 — iterator bookkeeping remains a bounded target
+
+[0795](0795-xml-duplicate-key-instruction-profile.md) Large-capture inspector and checked-iterator self costs rise by 609,567 and 276,822 guest instructions in both repeats. Simulated indirect misses rise about 35%; these are not native predictor counts or a causal explanation. Short-tag construction and bookkeeping merit isolated controls before another workflow-gated candidate.
+
 ## 0794 — fewer allocations do not establish faster iteration
 
 [0794](0794-xml-inline-duplicate-keys.md) Four qualified heap traces confirm large-capture owner calls fall from 72,106 to 10,781, while primary paired p50 medians all worsen. Iterator size grows 120→192 bytes. These costs motivate instruction/branch attribution before another layout experiment; no production optimization is retained.

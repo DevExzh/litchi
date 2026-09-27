@@ -1,0 +1,58 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/probe-src/Cargo.toml",
+      "--features",
+      "capture-profile"
+    ],
+    "ended": 1790546790.4704263,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0795",
+      "RUSTFLAGS": ""
+    },
+    "exit_code": 0,
+    "kind": "profile",
+    "log": {
+      "bytes": 4590,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/build-after/profile.log",
+      "sha256": "9a57c83be35dec5142a391cc37f65801583992ded4e3bbe1873375fd1e4e46b8"
+    },
+    "started": 1790546790.414898
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0795/probe-src/Cargo.toml",
+      "--features",
+      "capture-profile"
+    ],
+    "ended": 1790546790.7285244,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0795",
+      "RUSTFLAGS": "-C force-frame-pointers=yes"
+    },
+    "exit_code": 0,
+    "kind": "fp",
+    "log": {
+      "bytes": 4590,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/build-after/fp.log",
+      "sha256": "9a57c83be35dec5142a391cc37f65801583992ded4e3bbe1873375fd1e4e46b8"
+    },
+    "started": 1790546790.673775
+  }
+]

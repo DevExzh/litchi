@@ -1,0 +1,58 @@
+{
+  "candidate": "Exact rejected0794 candidate, temporary build only; must restore baseline before profiles",
+  "previous": {
+    "analysis.json": {
+      "bytes": 6595426,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/analysis.json",
+      "sha256": "251774eae2971166f3a89d48fe5da47c97aee60a08ed1acd17ff995b7b70f905"
+    },
+    "candidate/candidate.patch": {
+      "bytes": 94547,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/candidate/candidate.patch",
+      "sha256": "a234f9c0f13c81a9acc9bb1087d212e1fdba5a1b40d6331367c9112ee289e62d"
+    },
+    "candidate/manifest.json": {
+      "bytes": 3063,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/candidate/manifest.json",
+      "sha256": "19ac0ac98aada6dcccd04c82e29333e669c0d25d0dee6d30d1f56340b52ba4d5"
+    },
+    "cross-analysis.json": {
+      "bytes": 41321,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-analysis.json",
+      "sha256": "0a95b6cee35afc9bc42d4eca0d5fa29d9121935a73de734d33d16a41d5807a54"
+    },
+    "disposition.json": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/disposition.json",
+      "sha256": "2869475d084aa01ec7ec037bb2ddf37ade96beca3c5bfe1cf94b6b67573c91a8"
+    },
+    "probe-src/Cargo.lock": {
+      "bytes": 30217,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/probe-src/Cargo.lock",
+      "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+    },
+    "quality-before.json": {
+      "bytes": 5990,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality-before.json",
+      "sha256": "e34347b4fce484edfdf1ae99ad0d87418398d974207728651bb0038628f23376"
+    },
+    "quality.json": {
+      "bytes": 5988,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality.json",
+      "sha256": "a0855d0d8f35f2bd8e36bcf1db0f71fb64d99d1f86296f2e5fdf0056182f8458"
+    },
+    "seal.json": {
+      "bytes": 116356,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/seal.json",
+      "sha256": "69584f97d1e63cd072b3e3d7297ce8b0dab615cce0838c74a3c129b5a1f8af8c"
+    }
+  },
+  "probe": {
+    "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+    "src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "src/main.rs": "1bc0c66d13982f942c3ec889d498e30623a16b1faba78d8ae81c8dadc7425d28"
+  },
+  "quality": "Inherited exact-source baseline and candidate gates0794; no fresh production tests claimed"
+}

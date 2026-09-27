@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0795/test_callgrind_parser.py"
+  ],
+  "exit_code": 0,
+  "log": {
+    "bytes": 101,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/parser-tests.log",
+    "sha256": "921b60a7fd52e978fbb551cacd29df2d6708879400278e1fcc70fceeb0c6f8e0"
+  },
+  "parser": {
+    "bytes": 18529,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/callgrind_parser.py",
+    "sha256": "4a32c35c5e90aa290b4b983091ba4ed86569b4322c7ea4d0292e8d4ae4e6ad2e"
+  },
+  "scope": "Fresh synthetic evidence-parser tests; no production test count",
+  "test_source": {
+    "bytes": 3045,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/test_callgrind_parser.py",
+    "sha256": "6dd736240eeac9564bc2eefdf3148c68431480c2e775763040225fd827323e4b"
+  },
+  "tests": 3
+}

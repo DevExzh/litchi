@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0795 — instruction evidence narrows the next experiment
+
+[0795](0795-xml-duplicate-key-instruction-profile.md) All twelve multi-counter owner profiles qualify, but two unresolved native owner frames block phase fractions. Guest total instruction savings are small despite 0794 allocation reductions. Stale candidate build artifacts were detected and rebuilt before capture. Exact production restoration, three parser tests, raw audits, and cleanup preserve the rejected disposition.
+
 ## 0794 — allocation reduction rejected by workflow gates
 
 [0794](0794-xml-inline-duplicate-keys.md) Large capture allocation calls fall 85.048% and allocated bytes 82.316%, yet no primary latency benefit qualifies. Tiny XLSX scan triggers the significant 5% veto. All six quality gates pass (12,865 tests, 89 ignored); exact production restoration and retained failure evidence preserve the existing baseline. OLE2/OOXML remain active, ODF deferred, iWork excluded.

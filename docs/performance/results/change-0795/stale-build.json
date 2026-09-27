@@ -1,0 +1,44 @@
+{
+  "failed_build": {
+    "bytes": 3572,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0795/build-after-stale/build.json",
+    "sha256": "0cd64659a79cde6ab36a7a1bd10b98b66f448074356b22558c1027092ea1e0c9"
+  },
+  "reason": "copy2 retained pre-baseline-build mtimes, causing Cargo freshness to reuse source-incompatible baseline executables; detected equal hashes before any profile",
+  "removed_binary_copies": [
+    {
+      "bytes": 13992480,
+      "path": "/home/zhuhe/code/litchi-target-0795/after-fp",
+      "sha256": "aaae01a0b56e417e4b03165923cd0195064c792f125560843a2d87231ecd8f15"
+    },
+    {
+      "bytes": 14041192,
+      "path": "/home/zhuhe/code/litchi-target-0795/after-profile",
+      "sha256": "a0ab0321e12a94168181ef423db5f50103225532c75084c674bef82fe4b9b39c"
+    }
+  ],
+  "source_bytes_unchanged": true,
+  "source_mtimes_before_refresh": {
+    "crates/litchi-ole-common/src/xml_attributes.rs": {
+      "mtime_ns": 1790544423284742896,
+      "sha256": "1306cb95c9a913c44199e16b744073078165e330d6b42f078c096d240878eaa8"
+    },
+    "crates/litchi-opc/src/xml_attributes.rs": {
+      "mtime_ns": 1790544423677744616,
+      "sha256": "692eae80ee27c4fcd2137625b5f07c576114b6d50a1c7af3c15cbe4f1a271f2e"
+    },
+    "crates/litchi-sign/src/xml_attributes.rs": {
+      "mtime_ns": 1790544423815745220,
+      "sha256": "c2a57eac31f344ce12b3ed4fafd101cf2341ec48cf7217a44b177de52c249e1b"
+    },
+    "crates/litchi-xldm/src/xml_attributes.rs": {
+      "mtime_ns": 1790544423938745758,
+      "sha256": "c2a57eac31f344ce12b3ed4fafd101cf2341ec48cf7217a44b177de52c249e1b"
+    },
+    "crates/xml-minifier/src/xml_attributes.rs": {
+      "mtime_ns": 1790544423961745858,
+      "sha256": "c2a57eac31f344ce12b3ed4fafd101cf2341ec48cf7217a44b177de52c249e1b"
+    }
+  },
+  "timestamp_refresh_completed": 1790546822.6256752
+}

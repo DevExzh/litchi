@@ -1,0 +1,80 @@
+{
+  "callgrind": {
+    "branch_sim": true,
+    "events": [
+      "Ir",
+      "Bc",
+      "Bcm",
+      "Bi",
+      "Bim"
+    ],
+    "leg_orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "positive_dumps": 1,
+    "samples": 1,
+    "shape_orders": [
+      [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      [
+        "large",
+        "medium",
+        "tiny"
+      ]
+    ],
+    "shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "termination_empty": true,
+    "warmup": 0
+  },
+  "claims": {
+    "guest_counts_are_cpu_cycles": false,
+    "native_latency": false,
+    "nested_costs_overlap": true,
+    "phase_fraction_requires_all_owner_frames_resolved": true,
+    "production_adoption": false
+  },
+  "cpu": 12,
+  "execution": "Root serial builds and captures; restore exact baseline before capture; no automatic retries",
+  "owner": "namespace_uri_probe::capture_region_0793",
+  "perf": {
+    "call_graph": "fp",
+    "decode_no_inline": true,
+    "event": "cycles:u",
+    "frequency": 499,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 100,
+    "shape": "large",
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0795.v1",
+  "source_allowlist": [
+    "crates/litchi-opc/src/xml_attributes.rs",
+    "crates/litchi-ole-common/src/xml_attributes.rs",
+    "crates/litchi-sign/src/xml_attributes.rs",
+    "crates/litchi-xldm/src/xml_attributes.rs",
+    "crates/xml-minifier/src/xml_attributes.rs"
+  ]
+}
