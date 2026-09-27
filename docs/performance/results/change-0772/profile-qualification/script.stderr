@@ -1,0 +1,152 @@
+  Error: unknown option `sym-offset'
+
+ Usage: perf script [<options>]
+    or: perf script [<options>] record <script> [<record-options>] <command>
+    or: perf script [<options>] report <script> [script-args]
+    or: perf script [<options>] <script> [<record-options>] <command>
+    or: perf script [<options>] <top-script> [script-args]
+
+    -a, --all-cpus        system-wide collection from all CPUs
+    -c, --comms <comm[,comm...]>
+                          only display events for these comms
+    -C, --cpu <cpu>       list of cpus to profile
+    -d, --debug-mode      do various checks like samples ordering and lost events
+    -D, --dump-raw-trace  dump raw trace in ASCII
+    -F, --fields <str>    comma separated output fields prepend with 'type:'. +field to add and -field to remove.Valid types: hw,sw,trace,raw,synth. Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,dsoff,addr,symoff,srcline,period,iregs,uregs,brstack,brstacksym,flags,data_src,weight,bpf-output,brstackinsn,brstackinsnlen,brstackdisasm,brstackoff,callindent,insn,disasm,insnlen,synth,phys_addr,metric,misc,srccode,ipc,tod,data_page_size,code_page_size,ins_lat,machine_pid,vcpu,cgroup,retire_lat,brcntr
+    -f, --force           don't complain, do it
+    -g, --gen-script <lang>
+                          generate perf-script.xx script in specified language
+    -G, --hide-call-graph
+                          When printing symbols do not display call chain
+    -i, --input <file>    input file name
+    -I, --show-info       display extended information from perf.data file
+    -k, --vmlinux <file>  vmlinux pathname
+    -L, --Latency         show latency attributes (irqs/preemption disabled, etc)
+    -l, --list            list available scripts
+    -s, --script <name>   script file name (lang:script name, script name, or *)
+    -S, --symbols <symbol[,symbol...]>
+                          only consider these symbols
+    -v, --verbose         be more verbose (show symbol address, etc)
+        --addr-range <n>  Use with -S to list traced records within address range
+        --addr2line <path>
+                          addr2line binary to use for line numbers
+        --call-ret-trace[=...]
+                          Decode calls and returns from itrace
+        --call-trace[=...]
+                          Decode calls from itrace
+        --deltatime       Show time stamps relative to previous event
+        --demangle        Enable symbol demangling
+        --demangle-kernel
+                          Enable kernel symbol demangling
+        --dlarg <argument>
+                          filter argument
+        --dlfilter <file>
+                          filter .so file name
+        --dsos <dso[,dso...]>
+                          only consider symbols in these DSOs
+        --dump-unsorted-raw-trace
+                          dump unsorted raw trace in ASCII
+        --full-source-path
+                          Show full source file name path for source lines
+        --graph-function <symbol[,symbol...]>
+                          Only print symbols and callees with --call-trace/--call-ret-trace
+        --guest-code      Guest code can be found in hypervisor process
+        --guestkallsyms <file>
+                          file saving guest os /proc/kallsyms
+        --guestmodules <file>
+                          file saving guest os /proc/modules
+        --guestmount <directory>
+                          guest mount directory under which every guest os instance has a subdir
+        --guestvmlinux <file>
+                          file saving guest os vmlinux
+        --header          Show data header.
+        --header-only     Show only data header.
+        --inline          Show inline function
+        --insn-trace[=<raw|disasm>]
+                          Decode instructions from itrace
+        --itrace[=<opts>]
+                          Instruction Tracing options
+				i[period]:    		synthesize instructions events
+				y[period]:    		synthesize cycles events (same period as i)
+				b:	    		synthesize branches events
+				c:	    		synthesize branches events (calls only)
+				r:	    		synthesize branches events (returns only)
+				x:	    		synthesize transactions events
+				w:	    		synthesize ptwrite events
+				p:	    		synthesize power events
+				o:			synthesize other events recorded due to the use
+							of aux-output (refer to perf record)
+				I:			synthesize interrupt or similar (asynchronous) events
+							(e.g. Intel PT Event Trace)
+				e[flags]:		synthesize error events
+							each flag must be preceded by + or -
+							error flags are: o (overflow)
+									 l (data lost)
+				d[flags]:		create a debug log
+							each flag must be preceded by + or -
+							log flags are: a (all perf events)
+							               o (output to stdout)
+				f:	    		synthesize first level cache events
+				m:	    		synthesize last level cache events
+				t:	    		synthesize TLB events
+				a:	    		synthesize remote access events
+				g[len]:     		synthesize a call chain (use with i or x)
+				G[len]:			synthesize a call chain on existing event records
+				l[len]:     		synthesize last branch entries (use with i or x)
+				L[len]:			synthesize last branch entries on existing event records
+				sNUMBER:    		skip initial number of events
+				q:			quicker (less detailed) decoding
+				A:			approximate IPC
+				Z:			prefer to ignore timestamps (so-called "timeless" decoding)
+				T:			use the timestamp trace as kernel time
+				PERIOD[ns|us|ms|i|t]:   specify period to sample stream
+				concatenate multiple options. Default is iybxwpe or cewp
+
+        --kallsyms <file>
+                          kallsyms pathname
+        --list-dlfilters  list available dlfilters
+        --max-blocks <n>  Maximum number of code blocks to dump with brstackinsn
+        --max-stack <n>   Set the maximum stack depth when parsing the callchain, anything beyond the specified depth will be ignored. Default: kernel.perf_event_max_stack or 127
+        --merge-callchains
+                          Enable merge deferred user callchains
+        --ns              Use 9 decimal places when displaying time
+        --per-event-dump  Dump trace output to files named by the monitored events
+        --pid <pid[,pid...]>
+                          only consider symbols in these pids
+        --reltime         Show time stamps relative to start
+        --show-bpf-events
+                          Show bpf related events (if recorded)
+        --show-cgroup-events
+                          Show cgroup events (if recorded)
+        --show-kernel-path
+                          Show the path of [kernel.kallsyms]
+        --show-lost-events
+                          Show lost events (if recorded)
+        --show-mmap-events
+                          Show the mmap events
+        --show-namespace-events
+                          Show namespace events (if recorded)
+        --show-on-off-events
+                          Show the on/off switch events, used with --switch-on and --switch-off
+        --show-round-events
+                          Show round events (if recorded)
+        --show-switch-events
+                          Show context switch events (if recorded)
+        --show-task-events
+                          Show the fork/comm/exit events
+        --show-text-poke-events
+                          Show text poke related events (if recorded)
+        --stitch-lbr      Enable LBR callgraph stitching approach
+        --stop-bt <symbol[,symbol...]>
+                          Stop display of callgraph at these symbols
+        --switch-off <event>
+                          Stop considering events after the occurrence of this event
+        --switch-on <event>
+                          Consider events after the occurrence of this event
+        --symfs <directory>
+                          Look for files with symbols relative to this directory
+        --tid <tid[,tid...]>
+                          only consider symbols in these tids
+        --time <str>      Time span of interest (start,stop)
+        --xed[=...]       Run xed disassembler on output
+

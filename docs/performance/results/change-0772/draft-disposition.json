@@ -1,0 +1,7 @@
+{
+  "path": "/tmp/opc_mutated_save_oracle_draft.rs",
+  "sha256": "ccf215fbc32c695a2574ced914060078f77a4286d0b49ee56ceda7eb3c0b62f3",
+  "bytes": 10548,
+  "disposition": "not integrated; removed owned temporary draft",
+  "reason": "Integration sketch removed the existing deterministic expected-output check and changed sink admission; the requested future oracle must supplement existing checks. No candidate comparison is being accepted with the current oracle."
+}

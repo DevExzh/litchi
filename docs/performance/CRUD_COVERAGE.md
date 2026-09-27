@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0772 — existing OPC publication selectors recaptured
+
+[0772](0772-opc-mutated-save-current-baseline.md) recaptures `opc_noop_save` and `opc_mutated_save` across their existing generated matrix. It does not promote any coverage-index row: independent raw-member proofs and reported output digests remain prerequisites for accepting a preservation optimization. No filesystem, cold-cache, allocator, or concurrent lane is established.
+
 ## 0756 — wave integration, no coverage promotion
 
 [0756](0756-ole2-ooxml-wave-integration.md) changes no coverage-index row and

@@ -1,0 +1,22 @@
+{
+  "binary_sha256": "6309c7915f8333a3b6d1fba52b4c75b222210e1fd26ca1911b5c79d3127aff10",
+  "command": [
+    "objdump",
+    "-d",
+    "-C",
+    "--start-address=0xd9f680",
+    "--stop-address=0xda0721",
+    "/home/zhuhe/code/litchi-target-0772/release/litchi-perf-baseline"
+  ],
+  "objdump_sha256": "7fbcf800cdf4f700a951193b5469b1107f87a08f998abf9f518ac450532b34ae",
+  "root_symbol": "litchi_perf_baseline::run_opc_mutated_save",
+  "root_start": "0xd9f680",
+  "root_size": "0x10a1",
+  "timed_writer_call": "0xd9fe4d",
+  "timed_writer_return": "0xd9fe52",
+  "timed_root_return_offset": "0x7d2",
+  "writer_target": "0x16546c0",
+  "qualification": "Static only. Perf call-chain qualification has not run. Accept exact call-site return offset (or perf IP-minus-one representation) only; do not admit all samples containing the root.",
+  "archive_file": "timed-boundary.objdump.gz",
+  "archive_sha256": "48bd981f13bc8f7b87ecc6db35ff35514f4616ec84de8fc37770ada32ef058e5"
+}

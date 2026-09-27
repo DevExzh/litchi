@@ -1,0 +1,2 @@
+# Preserve the tool's raw usage output, including its final blank line.
+profile-qualification/script.stderr -diff

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0772 — source-grounded OPC investigation; attribution not established
+
+[0772](0772-opc-mutated-save-current-baseline.md) confirms the current publication cost but rejects an ordinary-stack profile that never recovers the exact timed caller. Old-target decoding occurs outside this selector’s clock, so skipping it is not a supported optimization of these timings. The non-iWork goal remains active. Owner decisions from 0756 were resolved by [0758](0758-owner-decisions-2026-09-24.md); integration of the existing durability and XLS-writer branches remains separate work.
+
 ## 0756 — wave integration: measured gains, reviewed correctness, open owner decisions
 
 [0756](0756-ole2-ooxml-wave-integration.md) closes a coordinated wave.

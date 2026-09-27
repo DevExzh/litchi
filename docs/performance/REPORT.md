@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0772 — current OPC publication baseline and rejected profile
+
+[0772](0772-opc-mutated-save-current-baseline.md) retains source/binary custody, three serial captures, replayed statistics, all spread flags, and an explicitly rejected caller qualification. No production or harness source changed and no candidate was accepted. The owned build target was removed after identity checks; raw profile data remains losslessly archived.
+
 ## 0756 — fifteen records, each changed by an independent review
 
 [0756](0756-ole2-ooxml-wave-integration.md) summarizes the wave:
