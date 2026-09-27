@@ -10171,6 +10171,26 @@ pub fn write_opc_part_add_fixtures(directory: &std::path::Path) -> Result<(), Bo
     opc_part_add::export(directory)
 }
 
+/// Export untimed ordinary-save source and policy artifacts to a new directory.
+///
+/// This helper accepts each real OOXML input independently, so callers may
+/// provide multiple files of one format. The generated medium DOCX, XLSX,
+/// and PPTX corpora are always included.
+///
+/// This is a standalone benchmark helper, not a production library API.
+///
+/// # Errors
+///
+/// Returns corpus, publication, reader-reopen, validation, or filesystem
+/// errors. An existing output directory is refused.
+pub fn write_ordinary_save_artifacts(
+    directory: &std::path::Path,
+    filesystem_root: Option<&std::path::Path>,
+    ooxml_files: &[std::path::PathBuf],
+) -> Result<(), Box<dyn Error>> {
+    ordinary_save::export_artifacts(directory, filesystem_root, ooxml_files)
+}
+
 /// Export source/candidate ODP tail-append fixtures to a new caller-selected directory.
 ///
 /// This is a standalone benchmark helper, not a production library API.
