@@ -1706,10 +1706,10 @@ fn edit_target(corpus: &SaveCorpus) -> EditTarget {
         xlsx_sheet: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_sheet.clone()),
         xlsx_address: (corpus.format == Format::Xlsx).then(|| corpus.xlsx_address.clone()),
         pptx_slide: (corpus.format == Format::Pptx)
-            .then(|| corpus.pptx_target)
+            .then_some(corpus.pptx_target)
             .and_then(|target| target.map(|(slide, _)| slide)),
         pptx_shape: (corpus.format == Format::Pptx)
-            .then(|| corpus.pptx_target)
+            .then_some(corpus.pptx_target)
             .and_then(|target| target.map(|(_, shape)| shape)),
     }
 }
