@@ -1,0 +1,591 @@
+{
+  "schema": "litchi.xlsx.heaptrack-analysis.v1",
+  "status": "pass",
+  "scope": {
+    "experiment": "0779",
+    "phase": "open",
+    "source_scope": "whole process, including post-clock workbook verification",
+    "attribution_basis": "Heaptrack allocation request size multiplied by live '+' events whose interpreted ancestry contains read_limited",
+    "does_not_claim": [
+      "physical bytes copied by realloc",
+      "resident memory or RSS improvement",
+      "latency improvement"
+    ]
+  },
+  "roles": {
+    "before": {
+      "role": "before",
+      "artifacts": {
+        "capture": {
+          "path": "heaptrack-before/capture.json",
+          "bytes": 1179,
+          "sha256": "883d660daa8456b6b19257c48c65a4e26972f84bdd60b107572e1b831c6d7c7e"
+        },
+        "decode": {
+          "path": "heaptrack-before/decode.json",
+          "bytes": 1193,
+          "sha256": "193dfb6a53c926de16a0c46057cceba3569eacc2ea84edcc0abb037b65319354"
+        },
+        "report": {
+          "path": "heaptrack-before/report.json",
+          "bytes": 866,
+          "sha256": "d392d656c6a099e6b6245374d47207df1e21269345b24a4c7e2bede19d86c9ad"
+        },
+        "histogram": {
+          "path": "heaptrack-before/histogram",
+          "bytes": 5775,
+          "sha256": "9f7619257adea819d3e7baee1df9c556dbe427e78bbcb67781790cda2a305ed9"
+        },
+        "print_log": {
+          "path": "heaptrack-before/print.log",
+          "bytes": 397662,
+          "sha256": "a77edadf4b7d22466127adec109c0ef8af5f8c5255b6e2946e94a9c18c0fdd39"
+        },
+        "trace": {
+          "path": "heaptrack-before/open.zst",
+          "bytes": 45923,
+          "sha256": "bdc11ba981c07a571fce6f1a281cfd906d4a2516bf0c742b994787f4f61595d9"
+        }
+      },
+      "capture": {
+        "command": [
+          "taskset",
+          "-c",
+          "12",
+          "heaptrack",
+          "-o",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/open",
+          "/home/zhuhe/code/litchi-target-0779/before-native",
+          "--source",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "--sheet",
+          "Sheet1",
+          "--phase",
+          "open",
+          "--samples",
+          "1",
+          "--warmup",
+          "0",
+          "--output",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-before/report.json"
+        ],
+        "binary": {
+          "path": "/home/zhuhe/code/litchi-target-0779/before-native",
+          "bytes": 36102384,
+          "sha256": "022031bc489700894de61b72d63347dfd349a0af88f0c10eb783e473ba7e48cd"
+        },
+        "exit_code": 0
+      },
+      "verification": {
+        "capture_log": {
+          "path": "heaptrack-before/capture.log",
+          "bytes": 733,
+          "sha256": "8c1d5799d3ca95696de51b43311fb4a78be10f31cc7775f6661de22afd190cf0"
+        },
+        "decode_trace": {
+          "path": "heaptrack-before/open.zst",
+          "bytes": 45923,
+          "sha256": "bdc11ba981c07a571fce6f1a281cfd906d4a2516bf0c742b994787f4f61595d9"
+        },
+        "decode_histogram": {
+          "path": "heaptrack-before/histogram",
+          "bytes": 5775,
+          "sha256": "9f7619257adea819d3e7baee1df9c556dbe427e78bbcb67781790cda2a305ed9"
+        },
+        "decode_log": {
+          "path": "heaptrack-before/print.log",
+          "bytes": 397662,
+          "sha256": "a77edadf4b7d22466127adec109c0ef8af5f8c5255b6e2946e94a9c18c0fdd39"
+        },
+        "capture_command_shape": "exact",
+        "decode_command_shape": "exact",
+        "source_identity": {
+          "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "bytes": 4226429,
+          "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+        },
+        "report_identity": {
+          "path": "heaptrack-before/report.json",
+          "bytes": 866,
+          "sha256": "d392d656c6a099e6b6245374d47207df1e21269345b24a4c7e2bede19d86c9ad"
+        }
+      },
+      "report": {
+        "schema": "litchi.xlsx.allocation-probe.v1",
+        "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+        "phase": "open",
+        "samples": [
+          {
+            "index": 0,
+            "elapsed_ns": 10814519
+          }
+        ],
+        "source": {
+          "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "bytes": 4226429,
+          "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+        }
+      },
+      "histogram": {
+        "rows": 639,
+        "allocation_events": 3300,
+        "requested_bytes": 2191954137
+      },
+      "print_summary": {
+        "allocation_events": 3300,
+        "temporary_allocations": 1352,
+        "total_memory_leaked": 544
+      },
+      "trace": {
+        "format": "interpreted_heaptrack_v3",
+        "trace_records": 1618,
+        "instruction_records": 397,
+        "allocation_info_records": 1995,
+        "trace_records_read": 11526,
+        "all_allocation_events": 3300,
+        "all_requested_bytes": 2191954137,
+        "all_deallocation_events": 3299,
+        "all_deallocated_bytes": 2191953593,
+        "target": "litchi_opc::phys_pkg::read_limited",
+        "target_allocation_info_records": 1032,
+        "target_allocation_events": 1032,
+        "target_requested_bytes": 2185394938,
+        "target_deallocation_events": 1032,
+        "target_deallocated_bytes": 2185394938,
+        "open_calls": [
+          {
+            "open_call_group": "run_one_call_trace_72",
+            "first_allocation_info_index": 33,
+            "allocation_info_records": 516,
+            "allocation_events": 516,
+            "deallocation_events": 516,
+            "requested_bytes": 1092697469,
+            "deallocated_bytes": 1092697469,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 515,
+                "allocation_events": 515,
+                "requested_bytes": 1092689277,
+                "deallocation_events": 515,
+                "deallocated_bytes": 1092689277
+              }
+            },
+            "open_call": "timed_open",
+            "arithmetic_delta_requested_bytes": 0,
+            "arithmetic_delta_growth_realloc_events": 0
+          },
+          {
+            "open_call_group": "run_one_call_trace_835",
+            "first_allocation_info_index": 1011,
+            "allocation_info_records": 516,
+            "allocation_events": 516,
+            "deallocation_events": 516,
+            "requested_bytes": 1092697469,
+            "deallocated_bytes": 1092697469,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 515,
+                "allocation_events": 515,
+                "requested_bytes": 1092689277,
+                "deallocation_events": 515,
+                "deallocated_bytes": 1092689277
+              }
+            },
+            "open_call": "post_clock_verification_open",
+            "arithmetic_delta_requested_bytes": 0,
+            "arithmetic_delta_growth_realloc_events": 0
+          }
+        ]
+      },
+      "read_limited": {
+        "run_one_samples": 1,
+        "open_call_count": 2,
+        "whole_process": {
+          "allocation_info_records": 1032,
+          "allocation_events": 1032,
+          "requested_bytes": 2185394938,
+          "initial_alloc_events": 2,
+          "growth_realloc_events": 1030,
+          "deallocation_events": 1032,
+          "deallocated_bytes": 2185394938
+        },
+        "per_open_call": [
+          {
+            "open_call_group": "run_one_call_trace_72",
+            "first_allocation_info_index": 33,
+            "allocation_info_records": 516,
+            "allocation_events": 516,
+            "deallocation_events": 516,
+            "requested_bytes": 1092697469,
+            "deallocated_bytes": 1092697469,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 515,
+                "allocation_events": 515,
+                "requested_bytes": 1092689277,
+                "deallocation_events": 515,
+                "deallocated_bytes": 1092689277
+              }
+            },
+            "open_call": "timed_open",
+            "arithmetic_delta_requested_bytes": 0,
+            "arithmetic_delta_growth_realloc_events": 0
+          },
+          {
+            "open_call_group": "run_one_call_trace_835",
+            "first_allocation_info_index": 1011,
+            "allocation_info_records": 516,
+            "allocation_events": 516,
+            "deallocation_events": 516,
+            "requested_bytes": 1092697469,
+            "deallocated_bytes": 1092697469,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 515,
+                "allocation_events": 515,
+                "requested_bytes": 1092689277,
+                "deallocation_events": 515,
+                "deallocated_bytes": 1092689277
+              }
+            },
+            "open_call": "post_clock_verification_open",
+            "arithmetic_delta_requested_bytes": 0,
+            "arithmetic_delta_growth_realloc_events": 0
+          }
+        ],
+        "arithmetic_model_for_one_call": {
+          "source_bytes": 4226429,
+          "chunk_bytes": 8192,
+          "initial_allocation_bytes": 8192,
+          "growth_reallocation_count": 515,
+          "growth_requested_bytes": 1092689277,
+          "requested_bytes": 1092697469,
+          "total_allocation_events": 516,
+          "last_capacity": 4226429
+        }
+      }
+    },
+    "after": {
+      "role": "after",
+      "artifacts": {
+        "capture": {
+          "path": "heaptrack-after/capture.json",
+          "bytes": 1174,
+          "sha256": "4db84c6635d22910659a44e7f824a1e6a592826620ca11edb28a13596edaa8ff"
+        },
+        "decode": {
+          "path": "heaptrack-after/decode.json",
+          "bytes": 1188,
+          "sha256": "f6584ed29849557ec0cdafb47b440d1476a3da611788ddf584858bd8cc888003"
+        },
+        "report": {
+          "path": "heaptrack-after/report.json",
+          "bytes": 865,
+          "sha256": "85dbad87b47bf9007f745f9d945b8ec0b18b1d5e62654177d0c8a25d8281a192"
+        },
+        "histogram": {
+          "path": "heaptrack-after/histogram",
+          "bytes": 1152,
+          "sha256": "9f62a0f980b7add51eb82e5cf0fe4d35be405865d2cdf1b2225ddc38a0d3b3f7"
+        },
+        "print_log": {
+          "path": "heaptrack-after/print.log",
+          "bytes": 397019,
+          "sha256": "63cff33361a0af72a50a33da4ac123104e39e5a24a71f4bb50eef6efb73cb61d"
+        },
+        "trace": {
+          "path": "heaptrack-after/open.zst",
+          "bytes": 41501,
+          "sha256": "30d87fb54845a4c485848ca623a32a9e7b971ff0795e67d884a4a70530234a61"
+        }
+      },
+      "capture": {
+        "command": [
+          "taskset",
+          "-c",
+          "12",
+          "heaptrack",
+          "-o",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-after/open",
+          "/home/zhuhe/code/litchi-target-0779/after-native",
+          "--source",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "--sheet",
+          "Sheet1",
+          "--phase",
+          "open",
+          "--samples",
+          "1",
+          "--warmup",
+          "0",
+          "--output",
+          "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0779/heaptrack-after/report.json"
+        ],
+        "binary": {
+          "path": "/home/zhuhe/code/litchi-target-0779/after-native",
+          "bytes": 36104384,
+          "sha256": "140773be5783e8cb691eac6cab813451d366bb3acfca8dc1584d37264a58946f"
+        },
+        "exit_code": 0
+      },
+      "verification": {
+        "capture_log": {
+          "path": "heaptrack-after/capture.log",
+          "bytes": 730,
+          "sha256": "c861ee54cd62054e250f9d5b90144121dc280ce1ccac9552fe9ae4149608dcc7"
+        },
+        "decode_trace": {
+          "path": "heaptrack-after/open.zst",
+          "bytes": 41501,
+          "sha256": "30d87fb54845a4c485848ca623a32a9e7b971ff0795e67d884a4a70530234a61"
+        },
+        "decode_histogram": {
+          "path": "heaptrack-after/histogram",
+          "bytes": 1152,
+          "sha256": "9f62a0f980b7add51eb82e5cf0fe4d35be405865d2cdf1b2225ddc38a0d3b3f7"
+        },
+        "decode_log": {
+          "path": "heaptrack-after/print.log",
+          "bytes": 397019,
+          "sha256": "63cff33361a0af72a50a33da4ac123104e39e5a24a71f4bb50eef6efb73cb61d"
+        },
+        "capture_command_shape": "exact",
+        "decode_command_shape": "exact",
+        "source_identity": {
+          "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "bytes": 4226429,
+          "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+        },
+        "report_identity": {
+          "path": "heaptrack-after/report.json",
+          "bytes": 865,
+          "sha256": "85dbad87b47bf9007f745f9d945b8ec0b18b1d5e62654177d0c8a25d8281a192"
+        }
+      },
+      "report": {
+        "schema": "litchi.xlsx.allocation-probe.v1",
+        "tool": "litchi-xlsx-allocation-attribution-probe-0779",
+        "phase": "open",
+        "samples": [
+          {
+            "index": 0,
+            "elapsed_ns": 4302119
+          }
+        ],
+        "source": {
+          "path": "/home/zhuhe/code/litchi-worktrees/0779-xlsx-allocation-attribution/docs/performance/results/change-0778/artifacts-0/generated-xlsx-medium/source.xlsx",
+          "bytes": 4226429,
+          "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+        }
+      },
+      "histogram": {
+        "rows": 167,
+        "allocation_events": 2356,
+        "requested_bytes": 87859389
+      },
+      "print_summary": {
+        "allocation_events": 2356,
+        "temporary_allocations": 408,
+        "total_memory_leaked": 544
+      },
+      "trace": {
+        "format": "interpreted_heaptrack_v3",
+        "trace_records": 1618,
+        "instruction_records": 397,
+        "allocation_info_records": 1051,
+        "trace_records_read": 8694,
+        "all_allocation_events": 2356,
+        "all_requested_bytes": 87859389,
+        "all_deallocation_events": 2355,
+        "all_deallocated_bytes": 87858845,
+        "target": "litchi_opc::phys_pkg::read_limited",
+        "target_allocation_info_records": 88,
+        "target_allocation_events": 88,
+        "target_requested_bytes": 81300192,
+        "target_deallocation_events": 88,
+        "target_deallocated_bytes": 81300192,
+        "open_calls": [
+          {
+            "open_call_group": "run_one_call_trace_72",
+            "first_allocation_info_index": 33,
+            "allocation_info_records": 44,
+            "allocation_events": 44,
+            "deallocation_events": 44,
+            "requested_bytes": 40650096,
+            "deallocated_bytes": 40650096,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 43,
+                "allocation_events": 43,
+                "requested_bytes": 40641904,
+                "deallocation_events": 43,
+                "deallocated_bytes": 40641904
+              }
+            },
+            "open_call": "timed_open",
+            "arithmetic_delta_requested_bytes": -1052047373,
+            "arithmetic_delta_growth_realloc_events": -472
+          },
+          {
+            "open_call_group": "run_one_call_trace_835",
+            "first_allocation_info_index": 539,
+            "allocation_info_records": 44,
+            "allocation_events": 44,
+            "deallocation_events": 44,
+            "requested_bytes": 40650096,
+            "deallocated_bytes": 40650096,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 43,
+                "allocation_events": 43,
+                "requested_bytes": 40641904,
+                "deallocation_events": 43,
+                "deallocated_bytes": 40641904
+              }
+            },
+            "open_call": "post_clock_verification_open",
+            "arithmetic_delta_requested_bytes": -1052047373,
+            "arithmetic_delta_growth_realloc_events": -472
+          }
+        ]
+      },
+      "read_limited": {
+        "run_one_samples": 1,
+        "open_call_count": 2,
+        "whole_process": {
+          "allocation_info_records": 88,
+          "allocation_events": 88,
+          "requested_bytes": 81300192,
+          "initial_alloc_events": 2,
+          "growth_realloc_events": 86,
+          "deallocation_events": 88,
+          "deallocated_bytes": 81300192
+        },
+        "per_open_call": [
+          {
+            "open_call_group": "run_one_call_trace_72",
+            "first_allocation_info_index": 33,
+            "allocation_info_records": 44,
+            "allocation_events": 44,
+            "deallocation_events": 44,
+            "requested_bytes": 40650096,
+            "deallocated_bytes": 40650096,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 43,
+                "allocation_events": 43,
+                "requested_bytes": 40641904,
+                "deallocation_events": 43,
+                "deallocated_bytes": 40641904
+              }
+            },
+            "open_call": "timed_open",
+            "arithmetic_delta_requested_bytes": -1052047373,
+            "arithmetic_delta_growth_realloc_events": -472
+          },
+          {
+            "open_call_group": "run_one_call_trace_835",
+            "first_allocation_info_index": 539,
+            "allocation_info_records": 44,
+            "allocation_events": 44,
+            "deallocation_events": 44,
+            "requested_bytes": 40650096,
+            "deallocated_bytes": 40650096,
+            "allocator_kinds": {
+              "alloc": {
+                "allocation_info_records": 1,
+                "allocation_events": 1,
+                "requested_bytes": 8192,
+                "deallocation_events": 1,
+                "deallocated_bytes": 8192
+              },
+              "realloc": {
+                "allocation_info_records": 43,
+                "allocation_events": 43,
+                "requested_bytes": 40641904,
+                "deallocation_events": 43,
+                "deallocated_bytes": 40641904
+              }
+            },
+            "open_call": "post_clock_verification_open",
+            "arithmetic_delta_requested_bytes": -1052047373,
+            "arithmetic_delta_growth_realloc_events": -472
+          }
+        ],
+        "arithmetic_model_for_one_call": {
+          "source_bytes": 4226429,
+          "chunk_bytes": 8192,
+          "initial_allocation_bytes": 8192,
+          "growth_reallocation_count": 515,
+          "growth_requested_bytes": 1092689277,
+          "requested_bytes": 1092697469,
+          "total_allocation_events": 516,
+          "last_capacity": 4226429
+        }
+      }
+    }
+  },
+  "comparison": {
+    "before_role": "before",
+    "after_role": "after",
+    "whole_process_delta": {
+      "allocation_events": -944,
+      "growth_realloc_events": -944,
+      "requested_bytes": -2104094746
+    },
+    "whole_process_after_to_before_ratio": {
+      "allocation_events": 0.08527131782945736,
+      "growth_realloc_events": 0.08349514563106795,
+      "requested_bytes": 0.037201601681389085
+    }
+  }
+}
