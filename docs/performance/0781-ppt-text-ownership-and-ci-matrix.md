@@ -255,7 +255,15 @@ the historical receipts must not be relabeled as evidence from a new run.
 All seven executable identities were checked before removing the owned target
 (3,248,857,328 file bytes). Offline replay and all five table checks pass with
 cleanup witnesses after removal. The final seal covers 766 payload files;
-sealed replay and all five table checks pass. The owned worktree and branch
-will be removed after Git integration; the closure record is maintained in
-this report outside the sealed packet. The broader non-iWork goal remains
-active.
+all 766 files plus the seal were checked against staged Git blobs before
+commit `6b817fc663`, which was fast-forwarded into
+`feat/office-format-completeness`. Sealed replay and all five table checks
+pass from the main checkout both before and after removal of the original
+worktree and executables.
+
+The owned worktree `/home/zhuhe/code/litchi-worktrees/0781-ppt-borrowed-text`
+and branch `perf/0781-ppt-borrowed-text` were removed after verifying and
+removing the copied workspace lockfile and three exact reference symlinks.
+All pre-existing worktree records and the three unrelated main-worktree file
+hashes remain unchanged. No production crate diff is retained. The broader
+non-iWork goal remains active.
