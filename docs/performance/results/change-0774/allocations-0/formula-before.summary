@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/allocations-0/formula-before.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0774-release-before/release/xls-formula-probe --case formula --samples 1 --warmup 0
+finished reading file, now analyzing data:
+
+total runtime: 0.243000s.
+calls to allocation functions: 642449 (2643823/s)
+temporary memory allocations: 119639 (492341/s)
+peak heap memory consumption: 10.18M
+peak RSS (including heaptrack overhead): 15.79M
+total memory leaked: 544B

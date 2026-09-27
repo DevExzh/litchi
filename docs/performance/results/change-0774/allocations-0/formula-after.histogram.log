@@ -1,0 +1,10 @@
+reading file "docs/performance/results/change-0774/allocations-0/formula-after.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0774-release-after/release/xls-formula-probe --case formula --samples 1 --warmup 0
+finished reading file, now analyzing data:
+
+total runtime: 0.193000s.
+calls to allocation functions: 502471 (2603476/s)
+temporary memory allocations: 219630 (1137979/s)
+peak heap memory consumption: 10.18M
+peak RSS (including heaptrack overhead): 14.99M
+total memory leaked: 544B

@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/measure-1/before/Cargo.toml"
+    ],
+    "exit": 0,
+    "started": 1790473588.4762993,
+    "ended": 1790473597.572905,
+    "log": "build-before.log",
+    "sha256": "45b0b17ed657d6ac7a345b23fb59cfdb7c8625ff061ee811975718ba7c782a8a"
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/measure-1/after/Cargo.toml"
+    ],
+    "exit": 0,
+    "started": 1790473597.5743136,
+    "ended": 1790473646.4038343,
+    "log": "build-after.log",
+    "sha256": "8aea00f789232c5f03d21e3ffb5b685175c710948fd0df2e7c0ef619d6829c1b"
+  }
+]

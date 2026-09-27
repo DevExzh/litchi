@@ -1,0 +1,22 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "litchi-xls",
+    "--offline",
+    "--locked",
+    "--test",
+    "xls_writer_round_trip_property",
+    "--",
+    "--nocapture"
+  ],
+  "exit": 0,
+  "started": 1790472538.7509186,
+  "ended": 1790472542.6540093,
+  "cases": 1024,
+  "seed": "0x07745eed00000000",
+  "log": "property-1024.log",
+  "sha256": "76c4d30d690b038db5c26ff1131994a0b4abc5107e2a89318b0135aeb3a8a8ff",
+  "source_unchanged": true
+}

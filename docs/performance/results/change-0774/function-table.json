@@ -1,0 +1,22 @@
+{
+  "before_source": "25c3b27ba4:crates/litchi-xls/src/writer/formula.rs",
+  "after_source_sha256": "489a407127d07b755d1e87b99d96ce5457b3ef2b3141f65ad1e19359da335edc",
+  "identical_indices": {
+    "SUM": "4",
+    "IF": "1",
+    "COUNT": "0",
+    "AVERAGE": "5",
+    "MAX": "7",
+    "MIN": "6",
+    "VLOOKUP": "102",
+    "CONCATENATE": "336",
+    "LEFT": "115",
+    "RIGHT": "116",
+    "MID": "31",
+    "LEN": "32",
+    "ROUND": "27",
+    "ABS": "24"
+  },
+  "entries": 14,
+  "scope": "Static table equality; not runtime performance evidence."
+}

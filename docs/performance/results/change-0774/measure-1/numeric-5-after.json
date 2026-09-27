@@ -1,0 +1,1 @@
+{"schema":"xls-formula-probe-v1","case":"numeric","cells":20000,"warmup":2,"samples":9,"samples_ns":[5796935,5761724,5761965,5757674,5878905,5738124,5784875,5700144,5710974],"output_bytes":817152,"output_sha256":"cdf2ac87fc21a9e6666e730aed3d1565d687d45133df0a7c7722767723d41b1f"}

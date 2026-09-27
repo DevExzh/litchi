@@ -1,0 +1,148 @@
+{
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-xls",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "started": 1790472084.2150583,
+      "ended": 1790472085.1603093,
+      "log": "quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-xls",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 0,
+      "started": 1790472085.401424,
+      "ended": 1790472103.7492673,
+      "log": "quality-0/01.log",
+      "sha256": "b4a470f2ab8e89402dc6a721e42c56f6f1074a917395769e2f578a7a70e78f1e"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-xls",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "started": 1790472104.0006595,
+      "ended": 1790472173.3036473,
+      "log": "quality-0/02.log",
+      "sha256": "f5ecc4010fa62c6a0fcc16c2fde4b58a29a16b8490b99af80e65e2b37e977b4c"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-xls",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "started": 1790472173.5493975,
+      "ended": 1790472184.860244,
+      "log": "quality-0/03.log",
+      "sha256": "7674412ff0f132be284ba5231724e6fa4e0e9da6bd2e002fda7eb4584dd34c8a"
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-xls",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit": 0,
+      "started": 1790472185.1126592,
+      "ended": 1790472188.0648537,
+      "log": "quality-0/04.log",
+      "sha256": "4f521de82a37e2d2f044c50c9e37305b27d7c4e8512c7f535491182c050a315d"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi",
+        "--offline",
+        "--locked",
+        "--features",
+        "xls",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "started": 1790472188.3192573,
+      "ended": 1790472198.6267846,
+      "log": "quality-0/05.log",
+      "sha256": "41d80992900d9b3031eb0b101936401a4f3a8fe6eb31ea73610a77752fd6aef6"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--offline",
+        "--locked",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "started": 1790472198.874769,
+      "ended": 1790472254.668011,
+      "log": "quality-0/06.log",
+      "sha256": "03aa6556b78f687b6624bf5bd3bc92eabc43adf5b9b50a4e0663ecf0047c98ac"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit": 0,
+      "started": 1790472254.914942,
+      "ended": 1790472521.1769416,
+      "log": "quality-0/07.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    }
+  ],
+  "source_file": "quality-0/source.json",
+  "source_sha256": "8319bffbcca478a8d3166908bf0467bbada6b42ae2c0bcd757102319de3d3119",
+  "target": "/home/zhuhe/code/litchi-target-0774-quality",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": null,
+    "RUSTUP_TOOLCHAIN": null
+  }
+}

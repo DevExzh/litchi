@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running tests/xls_writer_round_trip_property.rs (/home/zhuhe/code/litchi-target-0774-quality/debug/deps/xls_writer_round_trip_property-00364b002e00477d)
+
+running 2 tests
+test surrogate_pairs_at_each_limit_round_trip_or_are_refused ... ok
+1024 random workbooks from seed 0x7745eed00000000; calls accepted / refused:
+  AutoFilter condition: 1583 / 2075
+  AutoFilter range: 1408 / 0
+  boolean cell: 5977 / 0
+  cell style (font, format): 1231 / 4254
+  defined name: 2174 / 663
+  formula: 6299 / 1902
+  hyperlink: 4666 / 862
+  number cell: 5518 / 0
+  number format: 2257 / 529
+  string cell: 11075 / 0
+  worksheet name: 1505 / 1355
+test random_workbooks_round_trip_through_the_reader ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.77s
+
