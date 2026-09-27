@@ -1,0 +1,27 @@
+{
+  "files": {
+    "Cargo.toml": {
+      "bytes": 1695,
+      "sha256": "bc9b167ec41e06439dfa591bbdc1a7160384a923dfe0baa479391ad4d559ef9b",
+      "source": "Cargo.toml.template"
+    },
+    "src/bin/attribute_checks.rs": {
+      "bytes": 17338,
+      "sha256": "81550fd8741212957df412b6072af42a57bfd26520140be3631107887116bc44",
+      "source": "attribute_checks.rs"
+    },
+    "src/bin/attribute_checks_equivalence.rs": {
+      "bytes": 14297,
+      "sha256": "84f372cdabf6ef8d971c9ec37031d85455b200542bb3abb3e378d1c9064a18cb",
+      "source": "attribute_checks_equivalence.rs"
+    },
+    "src/bin/mce-stream-probe.rs": {
+      "bytes": 61480,
+      "sha256": "87dc3b82c9c1fa0c923ea711f7871191dd9174340052f2c7c291a16fbfe71c71",
+      "source": "main.rs"
+    }
+  },
+  "leg": "after",
+  "root": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration",
+  "template_sha256": "fc6f7e06cec3a379829640e4901ba5b1c9781cae64c3096b4efda02c5f4038b2"
+}

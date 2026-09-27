@@ -1,0 +1,12 @@
+{
+  "absolute_roots": [
+    "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/test-data",
+    "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results"
+  ],
+  "collector": "regular files with PK\\x03\\x04 prefix; symlinks skipped",
+  "mutate_limit": 1048576,
+  "roots": [
+    "test-data",
+    "docs/performance/results"
+  ]
+}

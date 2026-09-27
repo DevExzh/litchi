@@ -1,0 +1,13 @@
+{
+  "after": {
+    "bytes": 33696,
+    "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/probe-after/Cargo.lock",
+    "sha256": "eb03bb922df4ca466f820d82e893d5705440af177c1f1fba0277a31dac842c78"
+  },
+  "before": {
+    "bytes": 33696,
+    "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/probe-before/Cargo.lock",
+    "sha256": "eb03bb922df4ca466f820d82e893d5705440af177c1f1fba0277a31dac842c78"
+  },
+  "copied_before_to_after": true
+}

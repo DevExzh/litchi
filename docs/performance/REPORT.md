@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0777 — bounded fail-fast XML attribute checks integrated
+
+[0777](0777-xml-attribute-integration.md) supplies deterministic ordered duplicate checks above 32 names, preserves first-error reader behavior, and charges DOCX MCE scratch. Nine gates pass (10,519 tests); 228,716 reader outcomes are unchanged, with zero attribute-equivalence mismatches. All four native latency flags and two RSS flags are disclosed alongside separate instruction/allocation observations. Full non-iWork program completion remains open.
+
 ## 0776 — expanded-attribute duplicates fail closed
 
 [0776](0776-mce-expanded-attribute-duplicates.md) repairs tree MCE acceptance of aliased duplicate attributes, including inactive/opaque content, with bounded fallible scratch and DOCX accounting. Nine gates pass (5,676 tests); 64,292 of 64,541 differential outcomes are unchanged and all 249 changes have duplicate witnesses or the explicit invalid control. Both native attempts, seven final latency flags and separate allocation evidence are retained. This does not complete the non-iWork performance program.

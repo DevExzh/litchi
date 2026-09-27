@@ -1,0 +1,30 @@
+{
+  "Cargo.toml.template": {
+    "bytes": 1223,
+    "origin": "docs/performance/results/change-0777/probe-src/Cargo.toml.template",
+    "origin_sha256": "fc6f7e06cec3a379829640e4901ba5b1c9781cae64c3096b4efda02c5f4038b2",
+    "path": "probe-src/Cargo.toml.template",
+    "sha256": "fc6f7e06cec3a379829640e4901ba5b1c9781cae64c3096b4efda02c5f4038b2"
+  },
+  "attribute_checks.rs": {
+    "bytes": 17338,
+    "origin": "tools/perf-baseline/src/bin/attribute_checks.rs",
+    "origin_sha256": "81550fd8741212957df412b6072af42a57bfd26520140be3631107887116bc44",
+    "path": "probe-src/attribute_checks.rs",
+    "sha256": "81550fd8741212957df412b6072af42a57bfd26520140be3631107887116bc44"
+  },
+  "attribute_checks_equivalence.rs": {
+    "bytes": 14297,
+    "origin": "tools/perf-baseline/src/bin/attribute_checks_equivalence.rs",
+    "origin_sha256": "84f372cdabf6ef8d971c9ec37031d85455b200542bb3abb3e378d1c9064a18cb",
+    "path": "probe-src/attribute_checks_equivalence.rs",
+    "sha256": "84f372cdabf6ef8d971c9ec37031d85455b200542bb3abb3e378d1c9064a18cb"
+  },
+  "main.rs": {
+    "bytes": 61480,
+    "origin": "docs/performance/results/change-0776/probe-src/main.rs",
+    "origin_sha256": "87dc3b82c9c1fa0c923ea711f7871191dd9174340052f2c7c291a16fbfe71c71",
+    "path": "probe-src/main.rs",
+    "sha256": "87dc3b82c9c1fa0c923ea711f7871191dd9174340052f2c7c291a16fbfe71c71"
+  }
+}

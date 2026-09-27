@@ -1,0 +1,5 @@
+heaptrack output will be written to "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/allocations-0/mce_benign_document-None-after.zst"
+starting application, this might take some time...
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/allocations-0/mce_benign_document-None-after.zst"

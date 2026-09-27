@@ -1,0 +1,31 @@
+{
+  "after": {
+    "attribute_checks": {
+      "bytes": 2436352,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-after/release/attribute_checks",
+      "sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf"
+    },
+    "attribute_checks_equivalence": {
+      "bytes": 736224,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-after/release/attribute_checks_equivalence",
+      "sha256": "2b2d9bcb24bd2d1b363c0497d7a153f4c8fcdbe731d75813055aaef11fb8443f"
+    },
+    "mce-stream-probe": {
+      "bytes": 1421472,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-after/release/mce-stream-probe",
+      "sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c"
+    }
+  },
+  "before": {
+    "attribute_checks": {
+      "bytes": 2427784,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-before/release/attribute_checks",
+      "sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791"
+    },
+    "mce-stream-probe": {
+      "bytes": 1404960,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-before/release/mce-stream-probe",
+      "sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf"
+    }
+  }
+}

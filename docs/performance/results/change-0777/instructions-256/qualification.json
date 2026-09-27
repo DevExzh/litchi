@@ -1,0 +1,25 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-x",
+    ";",
+    "--no-big-num",
+    "-e",
+    "instructions:u",
+    "-o",
+    "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/instructions-256/qualification.csv",
+    "--",
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/true"
+  ],
+  "csv": "qualification.csv",
+  "csv_sha256": "a66cb8f2f36659e0cf3c718019c95b0ee700067ab0547abcd01bfd4a0be3a938",
+  "ended": 1790481135.6926098,
+  "exit": 0,
+  "log": "qualification.log",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started": 1790481135.6379895
+}

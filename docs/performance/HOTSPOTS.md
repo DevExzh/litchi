@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0777 — ordered attribute checking has measured transition costs
+
+[0777](0777-xml-attribute-integration.md) replaces the unkeyed duplicate-check pre-filter after 32 names with an ordered comparison bound. The accepted 256-declaration OPC control costs +54.10% latency; marginal user instructions rise about 32.82%, and whole-process allocation calls rise by 34. Ordinary document controls remain below 5%. These are explicit hardening costs; no practical hash-collision family or general large-tag speedup is demonstrated.
+
 ## 0776 — measured cost of missing validation
 
 [0776](0776-mce-expanded-attribute-duplicates.md) first found 24–38% overhead on multi-attribute synthetic cases. Resolving namespaces only for colliding local names reduces those observed regressions to 6–20%, while ordinary worksheet latency is +5.77%. Bounded inline checks and larger-list sorting remain reviewable follow-up costs; correctness is retained. No universal speedup or allocation reduction is claimed.

@@ -1,0 +1,26 @@
+{
+  "executables_verified_before_removal": true,
+  "fixtures_unchanged": true,
+  "main_unrelated_files_unchanged": true,
+  "origin_review_edits_unchanged": true,
+  "package_inventory_unchanged": true,
+  "scope": "Only three owned build targets. Worktree, copied root lock and reference symlinks are removed after integration and recorded in the report.",
+  "source_unchanged": true,
+  "targets": [
+    {
+      "bytes": 7730032836,
+      "path": "/home/zhuhe/code/litchi-target-0777-quality",
+      "removed": true
+    },
+    {
+      "bytes": 567787069,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-before",
+      "removed": true
+    },
+    {
+      "bytes": 570656118,
+      "path": "/home/zhuhe/code/litchi-target-0777-release-after",
+      "removed": true
+    }
+  ]
+}

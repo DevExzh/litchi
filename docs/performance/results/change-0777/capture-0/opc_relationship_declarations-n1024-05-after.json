@@ -1,0 +1,1 @@
+{"case":"opc_relationship_declarations","durations_ns":[18070,15950,15810,15510,15480,15240,15280,15600,16300],"input_bytes":16119,"n":1024,"outcomes":["err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"],"samples":9,"warmup":2}

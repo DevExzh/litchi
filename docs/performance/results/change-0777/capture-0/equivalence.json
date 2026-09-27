@@ -1,0 +1,27 @@
+{
+  "members": 13764,
+  "mismatch_examples": [],
+  "mismatches": 0,
+  "mutated_tags": 2332430,
+  "mutated_tags_over_32_names": 1015360,
+  "outcomes": {
+    "mutated / accepted / after 32": 101410,
+    "mutated / duplicate / after 32": 507890,
+    "mutated / duplicate / within 32": 911850,
+    "mutated / no closing quote / after 32": 101515,
+    "mutated / no closing quote / within 32": 101305,
+    "mutated / no equals sign / after 32": 101515,
+    "mutated / no equals sign / within 32": 101305,
+    "mutated / no value / after 32": 101515,
+    "mutated / no value / within 32": 101305,
+    "mutated / unquoted value / after 32": 101515,
+    "mutated / unquoted value / within 32": 101305,
+    "real / accepted / after 32": 105,
+    "real / accepted / within 32": 7598291,
+    "real / unquoted value / within 32": 18
+  },
+  "packages": 2088,
+  "tags": 7598414,
+  "tags_over_32_names": 105,
+  "tags_with_an_error": 18
+}

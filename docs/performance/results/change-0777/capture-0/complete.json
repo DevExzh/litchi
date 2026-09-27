@@ -1,0 +1,33 @@
+{
+  "base": "87e926fcc6e71360073a8bf97ad572ad9d187a67",
+  "binaries_unchanged": true,
+  "candidate": "1e334ffba9efb89e5badb8aa7a3e33052e96635c",
+  "complete": true,
+  "cpu": 12,
+  "differential_legs": [
+    "before",
+    "after"
+  ],
+  "equivalence": "candidate",
+  "fixtures_unchanged": true,
+  "known_styles_refusal_included": false,
+  "mutate_limit": 1048576,
+  "native_cases": 19,
+  "native_processes": 114,
+  "order": [
+    "before",
+    "after",
+    "after",
+    "before",
+    "before",
+    "after"
+  ],
+  "package_inventory_unchanged": true,
+  "probe_inputs_unchanged": true,
+  "samples": 9,
+  "schema": "litchi-0777-xml-attribute-capture-v1",
+  "serial": true,
+  "source_unchanged": true,
+  "standalone_lock_shared": true,
+  "warmup": 2
+}

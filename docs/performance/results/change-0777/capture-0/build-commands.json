@@ -1,0 +1,34 @@
+{
+  "after": [
+    "cargo",
+    "build",
+    "--release",
+    "--offline",
+    "--locked",
+    "--no-default-features",
+    "--features",
+    "candidate-equivalence",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/probe-after/Cargo.toml",
+    "--bin",
+    "attribute_checks",
+    "--bin",
+    "attribute_checks_equivalence",
+    "--bin",
+    "mce-stream-probe"
+  ],
+  "before": [
+    "cargo",
+    "build",
+    "--release",
+    "--offline",
+    "--locked",
+    "--no-default-features",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/probe-before/Cargo.toml",
+    "--bin",
+    "attribute_checks",
+    "--bin",
+    "mce-stream-probe"
+  ]
+}

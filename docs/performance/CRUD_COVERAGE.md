@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0777 — explicit XML attribute policies validated
+
+[0777](0777-xml-attribute-integration.md) validates 545 fail-fast migrations, explicit lenient/counting exceptions, and synchronized low-level adapters. Nine quality gates pass with 10,519 tests; 228,716 reader outcomes are unchanged and real/mutated attribute equivalence finds zero mismatches. No CRUD row is promoted; allocator recovery and full malformed-input parity remain outside the claim.
+
 ## 0776 — malformed MCE duplicate refusal
 
 [0776](0776-mce-expanded-attribute-duplicates.md) closes the tree expanded-attribute duplicate gap recorded in 0775, including opaque/skipped branches and active-offset processing. Seven new tests and nine final quality gates pass. No CRUD row is promoted; no-MCE passthrough and broader malformed-QName parity remain outside this validation scope.

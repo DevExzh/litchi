@@ -1,0 +1,27 @@
+site	parser_reason	verdict	evidence
+crates/litchi-docx/src/document/transaction.rs:7698	iterator followed by '.' (adaptor or not a for header)	stops at the first error	size_hint() only; (0, None) for both iterators
+crates/litchi-docx/src/revision.rs:701	iterator followed by '.' (adaptor or not a for header)	stops at the first error	enumerate(); count check then `attr.map_err(..)?`
+crates/litchi-docx/src/revision/authoring.rs:2506	iterator followed by ';' (adaptor or not a for header)	stops at the first error	one `attributes.next()` per raw attribute, `.map_err(..)?`
+crates/litchi-docx/src/source_backed/story_text.rs:2715	pattern shadows VAR but RHS does not start with VAR: match attribute { Ok ( attribute )	stops at the first error	`match` returns `Some(Err(..))` on Err
+crates/litchi-docx/src/validation.rs:1099	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`all(is_ok_and)`: an Err ends `all` with false
+crates/litchi-opc/src/xml_splice.rs:1181	let without =	stops at the first error	count check, then `let attribute: Attribute = attribute_result.map_err(..)?`
+crates/litchi-ppt/src/slide_round_trip.rs:759	first mention statement is not `let ... = VAR...`: attribute . map_err ( | error | error . to_string ( )	stops at the first error	`attribute.map_err(..)?.decoded_and_normalized_value(..)`
+crates/litchi-pptx/src/animations/codec/validation.rs:297	first mention statement is not `let ... = VAR...`: attribute . map_err ( | error | Error : : Xml (	stops at the first error	`attribute.map_err(..)?;` then count
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1254	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`.next().is_some()`: the first item only
+crates/litchi-xlsx/src/connections/codec.rs:3682	first mention statement is not `let ... = VAR...`: if attribute . map_err ( xml_error ) ? . key . as_ref	stops at the first error	`attribute.map_err(xml_error)?.key`
+crates/litchi-xlsx/src/form_control/codec.rs:3012	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/codec.rs:3167	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/codec.rs:3301	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/codec.rs:3322	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/codec.rs:3345	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/codec.rs:3428	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding, then `attribute.map_err(..)?` first in the loop
+crates/litchi-xlsx/src/form_control/model.rs:2403	iterator followed by ';' (adaptor or not a for header)	stops at the first error	binding; count check, then `attribute.map_err(..)?`
+crates/litchi-xlsx/src/outline_properties.rs:369	first mention statement is not `let ... = VAR...`: attribute . map_err ( xml_error ) ? ;	stops at the first error	`attribute.map_err(xml_error)?;`
+crates/litchi-xlsx/src/raw/compact.rs:352	first mention is nested (inside (), [] or {})	stops at the first error	`push_attribute(attribute.map_err(xml_error)?)`
+crates/litchi-xlsx/src/raw/worksheet/mod.rs:208	first mention is nested (inside (), [] or {})	stops at the first error	`let Ok(attribute) = attribute else { return false; }`
+crates/litchi-xlsx/src/survey.rs:2057	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`map(.. raw.map_err(xml_error)? ..).collect::<Result<_>>()`
+crates/litchi-xlsx/src/survey.rs:2071	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`map(.. raw.map_err(xml_error)? ..).collect::<Result<_>>()`
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5215	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`.next().is_some()`: the first item only
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5232	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`.next().is_some()`: the first item only
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5298	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`.next().is_some()`: the first item only
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5312	iterator followed by '.' (adaptor or not a for header)	stops at the first error	`.next().is_some()`: the first item only
