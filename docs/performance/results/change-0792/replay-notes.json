@@ -6,7 +6,8 @@
     "Root quality-summary generation found existing identical output; --check passed without overwrite.",
     "Initial analyzer summary omitted computed decision_guards serialization; added and checked against final disposition before sealing.",
     "Root initial in-memory summary requested missing decision_guards key; analyzer itself had completed custody checks; no raw change.",
-    "Cleanup witness uses the analyzer exact four-field schema; removed an extra schema label after first post-cleanup check refused it. Binary witnesses unchanged."
+    "Cleanup witness uses the analyzer exact four-field schema; removed an extra schema label after first post-cleanup check refused it. Binary witnesses unchanged.",
+    "Initial staged inventory audit found workspace-Cargo.lock ignored by Git; shell continued to initial commit9ddf08c27c. Corrective commit force-adds the already sealed exact lock, updates this note/seal, then verifies every final HEAD blob. No source, measurement, or lock bytes changed."
   ],
   "primary_capture_retries": 0,
   "raw_captures_changed": false,
