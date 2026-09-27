@@ -1,5 +1,6 @@
 //! Workbook-level BIFF8 record writers.
 
+use crate::external_link::MAX_EXTERNAL_REFERENCES;
 use crate::writer::string_limits::{
     NUMBER_FORMAT_UNITS, WORKSHEET_NAME_UNITS, checked_utf16_len, record_len, u8_len, u16_len,
 };
@@ -997,13 +998,32 @@ pub(super) fn write_external_link_table<W: Write>(
     add_in_functions: &[crate::writer::core::AddInFunctionOptions],
     dde_or_ole_links: &[crate::writer::core::DdeOrOleLinkOptions],
 ) -> Result<()> {
-    if let Some((sheet_count, _)) = internal {
-        write_supbook_internal(writer, sheet_count)?;
-    }
     if external.len() != external_names.len() {
         return Err(Error::InvalidData(
             "external workbook/name table cardinality mismatch".to_string(),
         ));
+    }
+    let internal_count = internal.map_or(0usize, |(sheet_count, mode)| match mode {
+        ExternSheetMode::PerSheet => usize::from(sheet_count),
+        ExternSheetMode::WorkbookWide => 1,
+    });
+    let external_count = external
+        .iter()
+        .try_fold(0usize, |count, book| count.checked_add(book.sheets.len()));
+    let add_in_count = usize::from(!add_in_functions.is_empty());
+    let count = external_count
+        .and_then(|count| count.checked_add(internal_count))
+        .and_then(|count| count.checked_add(add_in_count))
+        .and_then(|count| count.checked_add(dde_or_ole_links.len()));
+    let count = count
+        .filter(|count| *count <= MAX_EXTERNAL_REFERENCES)
+        .ok_or(Error::TooMany {
+            collection: "ExternSheet references",
+            limit: MAX_EXTERNAL_REFERENCES,
+        })?;
+
+    if let Some((sheet_count, _)) = internal {
+        write_supbook_internal(writer, sheet_count)?;
     }
     for (book, names) in external.iter().zip(external_names) {
         write_external_supbook(writer, book, names)?;
@@ -1015,18 +1035,6 @@ pub(super) fn write_external_link_table<W: Write>(
         write_dde_or_ole_supbook(writer, link)?;
     }
 
-    let internal_count = internal.map_or(0usize, |(sheet_count, mode)| match mode {
-        ExternSheetMode::PerSheet => usize::from(sheet_count),
-        ExternSheetMode::WorkbookWide => 1,
-    });
-    let external_count = external.iter().map(|book| book.sheets.len()).sum::<usize>();
-    let add_in_count = usize::from(!add_in_functions.is_empty());
-    let count = internal_count + external_count + add_in_count + dde_or_ole_links.len();
-    if count > 1370 {
-        return Err(Error::InvalidData(
-            "ExternSheet reference count exceeds BIFF8 record bound".to_string(),
-        ));
-    }
     write_record_header(
         writer,
         0x0017,

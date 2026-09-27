@@ -863,6 +863,57 @@ fn external_link(values: Vec<CachedValue>) -> ExternalWorkbookOptions {
     }
 }
 
+fn external_workbook_with_sheets(start: usize, count: usize) -> ExternalWorkbookOptions {
+    ExternalWorkbookOptions {
+        encoded_virtual_path: "\u{1}book.xls".to_string(),
+        sheets: (start..start + count)
+            .map(|index| ExternalSheetOptions {
+                name: format!("S{index}"),
+                cache_rows: Vec::new(),
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn external_sheet_reference_count_is_checked_at_registration() {
+    let mut writer = Writer::new();
+    writer.add_worksheet("Links").unwrap();
+
+    // Five full SupBooks and one partial one produce N - 1 references.
+    for (start, count) in [
+        (0, 256),
+        (256, 256),
+        (512, 256),
+        (768, 256),
+        (1024, 256),
+        (1280, 89),
+    ] {
+        writer
+            .add_external_workbook_link(external_workbook_with_sheets(start, count))
+            .unwrap();
+    }
+    let before_limit = written(&mut writer);
+
+    // The BIFF8 ExternSheet record accepts exactly 1,370 references.
+    writer
+        .add_external_workbook_link(external_workbook_with_sheets(1369, 1))
+        .unwrap();
+    let at_limit = written(&mut writer);
+    assert_ne!(at_limit, before_limit);
+
+    // N + 1 is refused before the workbook state changes, and the accepted
+    // N-byte workbook remains writable byte-for-byte.
+    assert!(matches!(
+        writer.add_external_workbook_link(external_workbook_with_sheets(1370, 1)),
+        Err(Error::TooMany {
+            collection: "ExternSheet references",
+            limit: 1370,
+        })
+    ));
+    assert_eq!(written(&mut writer), at_limit);
+}
+
 /// Fifteen 255-unit UTF-16 strings (514 bytes of `SerAr` each) and one of
 /// `last` code units fill `4 + 7,710 + 4 + 2 * last` bytes of one `CRN`.
 fn crn_values(last: &str) -> Vec<CachedValue> {

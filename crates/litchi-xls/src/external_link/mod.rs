@@ -22,7 +22,7 @@ pub(crate) const CONTINUE_RECORD_TYPE: u16 = 0x003c;
 
 pub(super) const MAX_SUPPORTING_BOOKS: usize = 1024;
 pub(super) const MAX_EXTERNAL_SHEETS: usize = 256;
-pub(super) const MAX_EXTERNAL_REFERENCES: usize = 1370;
+pub(crate) const MAX_EXTERNAL_REFERENCES: usize = 1370;
 pub(super) const MAX_CACHED_CELLS: usize = 65_536;
 pub(super) const MAX_EXTERNAL_NAMES: usize = 4096;
 pub(super) const MAX_EXTERNAL_NAME_BYTES: usize = 1_048_576;

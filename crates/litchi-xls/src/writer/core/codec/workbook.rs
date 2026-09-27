@@ -4,6 +4,7 @@ use super::super::{
     WorkbookWindowOptions, Writer,
 };
 use crate::error::{Error, Result};
+use crate::external_link::MAX_EXTERNAL_REFERENCES;
 use crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC;
 use crate::writer::string_limits::record_len;
 
@@ -16,6 +17,58 @@ pub(super) const fn xfcrc_capacity_error() -> Error {
 }
 
 impl Writer {
+    /// Return the internal `ExternSheet` contribution that the workbook
+    /// stream writer emits for the current workbook state.
+    pub(super) fn internal_external_reference_count(&self) -> usize {
+        let has_pivot_tables = self
+            .worksheets
+            .iter()
+            .any(|worksheet| !worksheet.pivot_tables.is_empty());
+        if self.worksheets.is_empty()
+            || (self.defined_names.is_empty()
+                && self.defined_name_records.is_empty()
+                && !has_pivot_tables)
+        {
+            0
+        } else if self.defined_names.is_empty() {
+            1
+        } else {
+            self.worksheets.len()
+        }
+    }
+
+    /// Check the cumulative `ExternSheet` reference count that the workbook
+    /// stream writer emits. The internal contribution is derived from the
+    /// same workbook state that selects its `ExternSheetMode`; the additional
+    /// arguments correspond one-for-one to the writer's BIFF count.
+    pub(super) fn check_external_reference_capacity(
+        &self,
+        additional_internal_references: usize,
+        additional_external_sheets: usize,
+        additional_add_in_markers: usize,
+        additional_dde_links: usize,
+    ) -> Result<()> {
+        let external_count = self
+            .external_workbooks
+            .iter()
+            .try_fold(0usize, |count, book| count.checked_add(book.sheets.len()));
+        let count = external_count
+            .and_then(|count| count.checked_add(self.internal_external_reference_count()))
+            .and_then(|count| count.checked_add(usize::from(!self.add_in_functions.is_empty())))
+            .and_then(|count| count.checked_add(self.dde_or_ole_links.len()))
+            .and_then(|count| count.checked_add(additional_internal_references))
+            .and_then(|count| count.checked_add(additional_external_sheets))
+            .and_then(|count| count.checked_add(additional_add_in_markers))
+            .and_then(|count| count.checked_add(additional_dde_links));
+        if count.is_none_or(|count| count > MAX_EXTERNAL_REFERENCES) {
+            return Err(Error::TooMany {
+                collection: "ExternSheet references",
+                limit: MAX_EXTERNAL_REFERENCES,
+            });
+        }
+        Ok(())
+    }
+
     /// Set the date system (1900 vs 1904)
     ///
     /// # Arguments
@@ -255,6 +308,7 @@ impl Writer {
         options: ExternalWorkbookOptions,
     ) -> Result<usize> {
         options.validate()?;
+        self.check_external_reference_capacity(0, options.sheets.len(), 0, 0)?;
         if self.external_workbooks.len()
             + self.dde_or_ole_links.len()
             + usize::from(!self.add_in_functions.is_empty())
@@ -311,6 +365,12 @@ impl Writer {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_add_in_function(&mut self, options: AddInFunctionOptions) -> Result<usize> {
         options.validate()?;
+        self.check_external_reference_capacity(
+            0,
+            0,
+            usize::from(self.add_in_functions.is_empty()),
+            0,
+        )?;
         if self.add_in_functions.is_empty()
             && self.external_workbooks.len() + self.dde_or_ole_links.len() >= 1024
         {
@@ -333,6 +393,7 @@ impl Writer {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn add_dde_or_ole_link(&mut self, options: DdeOrOleLinkOptions) -> Result<usize> {
         options.validate()?;
+        self.check_external_reference_capacity(0, 0, 0, 1)?;
         if self.external_workbooks.len()
             + self.dde_or_ole_links.len()
             + usize::from(!self.add_in_functions.is_empty())

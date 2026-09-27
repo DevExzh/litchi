@@ -103,15 +103,26 @@ impl Writer {
     /// ([`Error::TooMany`]).
     pub fn add_pivot_table(&mut self, sheet: usize, config: PivotTableConfig) -> Result<()> {
         validate_pivot_table_config(&config)?;
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let has_pivot_tables = self
+            .worksheets
+            .iter()
+            .any(|worksheet| !worksheet.pivot_tables.is_empty());
+        let additional_internal_references = usize::from(
+            !self.worksheets.is_empty()
+                && self.defined_names.is_empty()
+                && self.defined_name_records.is_empty()
+                && !has_pivot_tables,
+        );
+        self.check_external_reference_capacity(additional_internal_references, 0, 0, 0)?;
         // A pivot table writes an XFCRC record, which counts at most 4050 XF
         // records, including the three pivot XFs this adds.
         if self.fmt.xf_record_count_with(0, true) > MAX_XF_RECORDS_WITH_XFCRC {
             return Err(super::workbook::xfcrc_capacity_error());
         }
-        let worksheet = self
-            .worksheets
-            .get(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
         check_reader_bounds(worksheet, &config)?;
 
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
