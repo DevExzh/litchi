@@ -1,0 +1,6 @@
+*.log -diff
+*.patch -diff
+*.stdout -diff
+*.stderr -diff
+*.summary -diff
+capture-0/differential-*.json -diff

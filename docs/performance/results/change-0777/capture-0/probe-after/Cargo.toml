@@ -1,0 +1,45 @@
+[package]
+name = "xml-attribute-capture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# The checked-attribute equivalence binary imports the 0770 extension API.
+# Keep that binary out of the base build while using the same manifest and
+# source copy for both legs.
+candidate-equivalence = []
+
+[[bin]]
+name = "attribute_checks"
+path = "src/bin/attribute_checks.rs"
+
+[[bin]]
+name = "attribute_checks_equivalence"
+path = "src/bin/attribute_checks_equivalence.rs"
+required-features = ["candidate-equivalence"]
+
+[[bin]]
+name = "mce-stream-probe"
+path = "src/bin/mce-stream-probe.rs"
+
+[dependencies]
+litchi-docx = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-docx" }
+litchi-ole-common = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ole-common" }
+litchi-ooxml-common = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ooxml-common" }
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-opc", default-features = false }
+litchi-pptx = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-pptx" }
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-xlsx" }
+quick-xml = "0.41"
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/soapberry-zip" }
+xml-minifier = { path = "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/xml-minifier" }
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = true
+panic = "abort"
+
+[workspace]

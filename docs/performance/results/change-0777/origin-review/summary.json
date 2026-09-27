@@ -1,0 +1,10 @@
+{
+ "checked_sites": 545,
+ "parser_verdicts": {
+  "AUTO": 519,
+  "HAND": 26
+ },
+ "hand_checked": 26,
+ "parser": "review/verify.py tokenizes each file (comments, strings, chars and lifetimes aware) and accepts a site automatically only in the shape `for VAR in <receiver>.checked_attributes() { <statements that neither mention VAR nor contain continue> let PAT = VAR? | VAR.map_err(..)? | VAR.ok()? ... }`, with that first mention of VAR at depth 0 of the loop body; every other site is listed for hand review (hand-checked.tsv)",
+ "reviewer": "independent Opus review agent, read-only; its run ended at the automatic pass (API session limit), and the implementer read the 26 listed sites"
+}

@@ -1,0 +1,3 @@
+     Locking 146 packages to latest Rust 1.95.0 compatible versions
+      Adding generic-array v0.14.7 (available: v0.14.9)
+      Adding zerocopy v0.8.57 (available: v0.8.58)

@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -418,6 +419,9 @@ def main() -> int:
         raise RuntimeError("root must write final-source.json before capture")
 
     CAPTURE.mkdir()
+    runner = artifact_receipt(Path(__file__).resolve())
+    json_write(CAPTURE / "runner.json", runner)
+
     final_source = json_read(final_source_path)
     candidate_ref = git(AFTER, "rev-parse", "HEAD")
     if final_source.get("candidate") != candidate_ref:
@@ -493,6 +497,9 @@ def main() -> int:
     before_lock = manifests["before"].parent / "Cargo.lock"
     after_lock = manifests["after"].parent / "Cargo.lock"
     shutil.copy2(before_lock, after_lock)
+    resolved = tomllib.loads(before_lock.read_text())["package"]
+    assert [x["version"] for x in resolved if x["name"] == "quick-xml"] == ["0.41.0"], "reviewed quick-xml version changed"
+
     lock_receipt = {
         "before": artifact_receipt(before_lock),
         "after": artifact_receipt(after_lock),
@@ -752,6 +759,8 @@ def main() -> int:
             current = artifact_receipt(Path(receipt["path"]))
             if current != receipt:
                 raise RuntimeError(f"binary changed during capture: {leg}/{name}")
+
+    assert artifact_receipt(Path(__file__).resolve()) == runner, "capture runner changed"
 
     complete = {
         "schema": "litchi-0777-xml-attribute-capture-v1",

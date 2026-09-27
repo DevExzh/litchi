@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/validate_crud_coverage_index.py"
+  ],
+  "exit": 0,
+  "inputs": {
+    "docs/CRUD_Scenario_Checklist.md": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+    "docs/performance/crud-coverage-index-v2.json": "0ef21929c2cc91f2671e67bc8efd57e34b02bde8b98ea0f4eac6a3bb09775c0b",
+    "docs/performance/results/perf-corpus-manifest-v2.json": "9ba0af2852e84c971d0e5a0cef471fd4eb9e8c6c3519cf015db36ed761ae7ac1",
+    "tools/perf-baseline/src/lib.rs": "ed223a98ab3adf5bcabb3bf22337048cb5c8950779c8486aff3c39429848da7e",
+    "tools/validate_crud_coverage_index.py": "b3f808bccb38a60b0d2d772db8cbdf695dc6859009407e6d273e92840a01bd19"
+  },
+  "scope": "Contract-only validation; no scenario promotion or full-run timing report.",
+  "stderr": "",
+  "stdout": "validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)\n"
+}

@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/allocations-0/opc_relationship_declarations-30-before.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0777-release-before/release/attribute_checks probe --case opc_relationship_declarations --samples 1 --warmup 0 --json /home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/allocations-0/opc_relationship_declarations-30-before.json --n 30
+finished reading file, now analyzing data:
+
+total runtime: 0.001000s.
+calls to allocation functions: 237 (237000/s)
+temporary memory allocations: 58 (58000/s)
+peak heap memory consumption: 85.48K
+peak RSS (including heaptrack overhead): 6.33M
+total memory leaked: 544B

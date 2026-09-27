@@ -1,0 +1,22 @@
+{
+  "case": "mce_stream_count_document",
+  "elapsed_ns": [
+    5255873,
+    5244423,
+    5228723,
+    5267333,
+    5250293,
+    5233253,
+    5254783,
+    5240293,
+    5231203
+  ],
+  "input_bytes": 288070,
+  "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+  "outcomes": [
+    "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+  ],
+  "p50_ns": 5244423,
+  "samples": 9,
+  "warmup": 2
+}

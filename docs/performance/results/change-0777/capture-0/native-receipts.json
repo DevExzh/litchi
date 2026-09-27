@@ -1,0 +1,2396 @@
+[
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-00-before.json",
+      "sha256": "e05413df026fc115ec2896cff5b356f9b92573973a8708b0d372526c72da226a"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-00-before.rss",
+      "sha256": "337272adaaec693715758645e05bdce6da090486fbbb988ffb2e3be355091919"
+    },
+    "rss_kib": 7168,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-01-after.json",
+      "sha256": "c0800c3bd20c88550954465b6543cb8701519cb4ea7e73a5418e486b8bc83f40"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-01-after.rss",
+      "sha256": "86e9588ea1c2e54aabed3021f9de03ecadec71bba6593f7be2ab27a7aa85653c"
+    },
+    "rss_kib": 6996,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-02-after.json",
+      "sha256": "5a0388fe4d636f2a72861a03853d51e672a7513b3dbca08e4d6fbd3948a0e2ad"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-02-after.rss",
+      "sha256": "0175bcbe7393068941e9b3804460a20e97da03420def6cfb1f5c7d0f270b2120"
+    },
+    "rss_kib": 7188,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-03-before.json",
+      "sha256": "26cc5925174861db30bb257efabefb59351b5073b42ce977593e80a759281383"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-03-before.rss",
+      "sha256": "16de4b8fec4c80b4f6896efc9a9b4415b6d8581e2be734c53c72dc6a0984d844"
+    },
+    "rss_kib": 7180,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-04-before.json",
+      "sha256": "57bb40a9afadbfd29784dcb627e209d54c3ec0b6330c3f8d312743ed6ae24805"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-04-before.rss",
+      "sha256": "5931a5498991d828f9e26015032af3849b757e01c28d940b306673a6b8f56abb"
+    },
+    "rss_kib": 7104,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+    ],
+    "report": {
+      "bytes": 444,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-05-after.json",
+      "sha256": "5448e5ab73947f8303f843043e98f69b1b090b0f78199ea891dd39d07cf5515e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_worksheet-05-after.rss",
+      "sha256": "9e4c26e07528688600961f7645b5bd109f7b2bf5db5fd1e5aebee1358e0d425f"
+    },
+    "rss_kib": 7056,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-00-before.json",
+      "sha256": "ce11161bcb5c20873cd5baa471e6e840f6c32d9c66fd3b2fc84102cf665de7ff"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-00-before.rss",
+      "sha256": "a35a5e69d88d7a6780c200af2a370834cf58149be217857a7c783ebb1e1ea8b6"
+    },
+    "rss_kib": 3624,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-01-after.json",
+      "sha256": "1860640a32736fc4a56816929d072732e481adc8a957d1fef03030fd1752279c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-01-after.rss",
+      "sha256": "cb52300d1b100ff50d6cd99c8d42f6ea7ad0f454422f1d58f796a4048fef89d4"
+    },
+    "rss_kib": 3644,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-02-after.json",
+      "sha256": "3cc0c6158c5c6d7e366e319533d03436b9171639c16d07952c92153a785753c2"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-02-after.rss",
+      "sha256": "97b194f79ffb6bac68b7bb8a70687fb6fca6491ff93aea19b7e89ea5d8b8acf8"
+    },
+    "rss_kib": 3488,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-03-before.json",
+      "sha256": "3e9bc08af83474ef6ab2f843129be74d143a10deb02d524ab08eef22c8a11358"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-03-before.rss",
+      "sha256": "260d4afb8b4437b739d3864c951f44b9f7f45d74a5adf1c0047ac28c175ab9ae"
+    },
+    "rss_kib": 3544,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-04-before.json",
+      "sha256": "a6c59ccfbcc3e619f0ebc46a6e65c81b90fa43e4d51d86fdd0f835f9ce080238"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-04-before.rss",
+      "sha256": "997f68b79ee040275f049d01fe8f81d19b4934fc6f616a277a56e0c5e1e4ee4d"
+    },
+    "rss_kib": 3600,
+    "samples": 9
+  },
+  {
+    "case": "mce_benign_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+    ],
+    "report": {
+      "bytes": 432,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-05-after.json",
+      "sha256": "f324bfd38fe68ecf24490868116b8cfa94ab31d84e9f6ebfc44dd025e5b3a9e1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_benign_document-05-after.rss",
+      "sha256": "2d1acc2d25ab7ebe64d444eadc338d962f78e6fe98402c2ea56c0aed83607a9b"
+    },
+    "rss_kib": 3528,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-00-before.json",
+      "sha256": "f5388d40de3d2a48d1938c71df27ebc7d8d059ecec9bdcd4947257dca85643a9"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-00-before.rss",
+      "sha256": "49271bfb7a82c00cba311ed56c737f92aca605cfba09542867ebeef66da1e720"
+    },
+    "rss_kib": 4564,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-01-after.json",
+      "sha256": "90daa4f15b2d8e8f87e50b003d687958607a244f9f718bfd04894288f28f36be"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-01-after.rss",
+      "sha256": "39c56ae246e34fc133e796d8492dc2ac43af5ba1b714fd28cdd4703444b73b62"
+    },
+    "rss_kib": 4524,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-02-after.json",
+      "sha256": "ce70311a4cd300b948cd812a48ee99fda9ecf9f0c49d0ebaf091a049e99880bf"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-02-after.rss",
+      "sha256": "7c994cfab7a231b25c62c432dd4f0f2f156466b835fbc47881e3c6e29d7b8adc"
+    },
+    "rss_kib": 4592,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-03-before.json",
+      "sha256": "e3e4f905e2eff47e833cd0ca083795d8ec326024e815ab6003b68fe8ef3c8730"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-03-before.rss",
+      "sha256": "921e2c7ad7feb0bb0975d5deb6f2dc25a28610b089cd317c5d9d7f84f099db1a"
+    },
+    "rss_kib": 4552,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-04-before.json",
+      "sha256": "7332cb7e0785eaf1848d645cc925e1e7ae56d83f91dba462cf4c251213c9edc6"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-04-before.rss",
+      "sha256": "9473911dba07097b139bd24f6f8c5bbe38cf6c18f8a433b1f0d1aa730d386ccb"
+    },
+    "rss_kib": 4596,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_worksheet",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+    ],
+    "report": {
+      "bytes": 638,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-05-after.json",
+      "sha256": "a06752961d3dbf456d28187851f359eeeaf7360521603a20c002b548eb084bf7"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_worksheet-05-after.rss",
+      "sha256": "4e6d195390e49d5378bce83e800a6459c52e755acb1070ac3c2a0a61363f10da"
+    },
+    "rss_kib": 4512,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-00-before.json",
+      "sha256": "417ebcc6c7430b87016738904c48895cff75554af8da3295137e760311778352"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-00-before.rss",
+      "sha256": "655028e35414b900d465d4f6bf3055b0301d73914312a897d59275adde809bca"
+    },
+    "rss_kib": 3284,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-01-after.json",
+      "sha256": "99b22aec6adb15d426b7dc78524494ef69a9f4e5898df06bbbbbe2fce9faf893"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-01-after.rss",
+      "sha256": "276c197f5d18f0fb072b8bd49734b81211eebf92b263177025e69b3d4add189a"
+    },
+    "rss_kib": 3368,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-02-after.json",
+      "sha256": "95e0a08e961778b07e107f2105c2d4cd633a60d38822a73cb6f1794901658623"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-02-after.rss",
+      "sha256": "1c576857eb850cad5a86062dcebfa5d6d96eeb3f2cae9ec9436076e6240bab94"
+    },
+    "rss_kib": 3232,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-03-before.json",
+      "sha256": "246a6f3bdccd17fa3f98b4ae31d57e483a09800f2e31c4ab4fe1ed7ce8e95bcc"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-03-before.rss",
+      "sha256": "56cc2e26049d4b0362ec5f90e0d579de932c8787858d83241fbda56fc74847c5"
+    },
+    "rss_kib": 3344,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-04-before.json",
+      "sha256": "6280e6fcc1d19a09da9271a8d71b431603f8f28097e2ab96d72b61f18a06e883"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-04-before.rss",
+      "sha256": "db0feb4082b627f43d50851f83ca1d99f37f520d82cd0a87eae02fcbad586f4e"
+    },
+    "rss_kib": 3352,
+    "samples": 9
+  },
+  {
+    "case": "mce_stream_count_document",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+    ],
+    "report": {
+      "bytes": 618,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-05-after.json",
+      "sha256": "b9f578580c7b47026df05936dadfba54a4e25ebdbae5d4c65507749575a76c81"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_stream_count_document-05-after.rss",
+      "sha256": "79630c34fc641236f14e681ffc4896d8cbe57e88aabb1c7351927a6ff8635349"
+    },
+    "rss_kib": 3392,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-00-before.json",
+      "sha256": "93fcf20af49108237ca3d4bf3c85d3447e42570f4571740b7aafe65dd4a37f71"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-00-before.rss",
+      "sha256": "bec32c21e48ae215ddf050bc4271a7f0e8b90644d1d78cb54791391385ccef0a"
+    },
+    "rss_kib": 3076,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-01-after.json",
+      "sha256": "47525aeb1c893519c68405a074ece08a200925104cdb01c8ed1c93a9cda844d7"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-01-after.rss",
+      "sha256": "7920c64416d3e048b51e05904a3e15762fa9d4dd391d9889b7b35d8f3097ab23"
+    },
+    "rss_kib": 3120,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-02-after.json",
+      "sha256": "c1781d5bd6e821203959dc05f8f7298cc1939ed91b8a16f0808492f4ae6544da"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-02-after.rss",
+      "sha256": "3224d5369273a4550b7186c8389e927cf86027e5912a7da00141f0ebbfc99ea4"
+    },
+    "rss_kib": 3040,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-03-before.json",
+      "sha256": "f1ab2773a621cdc301d6427b268531cda81e8557e684cd61c6288334f09a4ac3"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-03-before.rss",
+      "sha256": "f9467579c59a9df50e55de6cb63ab8970b95d04e5589f4d0679f96595d16f2bf"
+    },
+    "rss_kib": 2944,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-04-before.json",
+      "sha256": "b600f6ab5aac09400e11771c528f87dfbf514e18013911f510b54d2d358fd2c7"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-04-before.rss",
+      "sha256": "628edfb9c1808f339fd28e1dba10564b4159da8645b28327bf31c20014c779dc"
+    },
+    "rss_kib": 3012,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_1",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+    ],
+    "report": {
+      "bytes": 416,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-05-after.json",
+      "sha256": "b1127fbe42f4198e38e4070a2b22689c460dcc39986bd7546479a791373f22eb"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_1-05-after.rss",
+      "sha256": "b6e90453f1237e1b301e131e38e0dcb5e1223aad3c9dfddb68af5e51d6b9892b"
+    },
+    "rss_kib": 3104,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-00-before.json",
+      "sha256": "4b4fa0b62ced039f8c5cd508acdc09096dc33bc3e3300f62f2298c28ebf7ddb5"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-00-before.rss",
+      "sha256": "5ad8a942488afda24964b039e277e16637f8dd17ae5a8b9a666c2b73947964da"
+    },
+    "rss_kib": 3204,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-01-after.json",
+      "sha256": "c5f9dae4f83c295258dc001d881d6fc7584c5138fba1a486705edf34f8ec5e02"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-01-after.rss",
+      "sha256": "14ce149bca09c0db22a77a93fef07f84f38ab8a620dbc1ffcbd8afcdcf00d8f1"
+    },
+    "rss_kib": 3336,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-02-after.json",
+      "sha256": "61075a42fc40e78c65dfa7672193028efd2f3d08ea8493a427a66daa7770a441"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-02-after.rss",
+      "sha256": "4d47c4fec69705d6455040b4ee69c2724807530f91a725566b77aedc845b0cff"
+    },
+    "rss_kib": 3296,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-03-before.json",
+      "sha256": "995b0d4f0d7b325ff3d33946a4d9d5e45aef9a7d8edd4e352af5a1836152ab96"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-03-before.rss",
+      "sha256": "399875feddbc0cfc1becb48a7783d73d3c3794cea5dd5fafbf7b42285ebe16d7"
+    },
+    "rss_kib": 3268,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-04-before.json",
+      "sha256": "c5fcb33cad7e03099dbe78ec774947d894dfaeaa117c0fc65085a91e25fa77e1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-04-before.rss",
+      "sha256": "68701503249744219753aea0c5924c8b274aa00de917f8a04144aae8c8972b47"
+    },
+    "rss_kib": 3308,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_2",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+    ],
+    "report": {
+      "bytes": 426,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-05-after.json",
+      "sha256": "0e48e7f8eb07a87b29d9109f67714d6f6597fd488ebdb5ddf88775f7a4f40183"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_2-05-after.rss",
+      "sha256": "14ce149bca09c0db22a77a93fef07f84f38ab8a620dbc1ffcbd8afcdcf00d8f1"
+    },
+    "rss_kib": 3336,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-00-before.json",
+      "sha256": "6a7ca82e2f66df53c28dc05e0764557ca83a2ff4556011cbc103e0ca928e3dd4"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-00-before.rss",
+      "sha256": "50d9ec6a5b236972ffa715634278859c1b310fb8d33fc589e78444d863809543"
+    },
+    "rss_kib": 3692,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-01-after.json",
+      "sha256": "32462720f3feab626b2b1cbfe13f43280b1064cb2b94fe28f8dec7583ebf8371"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-01-after.rss",
+      "sha256": "3740f003790a46771c2a0f20da81e9a94e1d5be462124f2f9729b04ea6331f0f"
+    },
+    "rss_kib": 3880,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-02-after.json",
+      "sha256": "3718c43e7c07041db633276e38fd15de041e7c6e1f2eea92b93733f73680acdc"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-02-after.rss",
+      "sha256": "9c7a7d2427821e58f4c6bb9211cdae5afe2d5fdc9bcc839ed7feebcfa5a3a0ca"
+    },
+    "rss_kib": 3864,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-03-before.json",
+      "sha256": "52330c399aa1775015721790766aef477ebb322098f7fbad2c914460ba06af30"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-03-before.rss",
+      "sha256": "19fca465cb5b428ac5e8cd87219d744aecb3727d2e5149d46037d0507ba6c613"
+    },
+    "rss_kib": 3812,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-04-before.json",
+      "sha256": "83c1fe37df585f1110efd168f686c6a4f8e21e20e52f041f15cd3ded1c3fde95"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-04-before.rss",
+      "sha256": "ec2d80c616562e885e5b4176deeb07275574083c3e837a8f0b69ea5606aa8e28"
+    },
+    "rss_kib": 3816,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_8",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-05-after.json",
+      "sha256": "7aa4925ab1c142f6cc2497b3d97f92f5532ae5b683643798b34aeeb5e01d3fa7"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_8-05-after.rss",
+      "sha256": "6adfba97aff2c9b91739cb610a718166101597417fcc4d877a9fb4378eb84496"
+    },
+    "rss_kib": 3836,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-00-before.json",
+      "sha256": "ffd8808ea7bed3952a306280ef80a3283f6f12d2ca6f7d69cb41a8cf5427885b"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-00-before.rss",
+      "sha256": "2cfe595f33bed38cc33d47c92802cc11512fc4a0bcea450f3242b700bd6289d2"
+    },
+    "rss_kib": 3948,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-01-after.json",
+      "sha256": "f29efa29e43c8c52275eadb3ee10e7487413204c002f4d6586a9e1e0e05c804e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-01-after.rss",
+      "sha256": "d5b56e3909284567638764dc44b6b76a1c10088011986d1b9226607a89c54dab"
+    },
+    "rss_kib": 3772,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-02-after.json",
+      "sha256": "2f46efe5f561ccf66ea5cffde08d3ddd3fc2225a240d33f85c6b9d673c723495"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-02-after.rss",
+      "sha256": "007b73e443567d7fe53b18bdb75ec2933794ea34ef1c24893e9698d2e10235ba"
+    },
+    "rss_kib": 3856,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-03-before.json",
+      "sha256": "b20daffb9cafe8505cf01315f7bbfae32c703de6993d23f6796724dd26940bc5"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-03-before.rss",
+      "sha256": "bde1791b1f68bf5f2c356582e5362177353fc224a50b6ea810c31fd51cfbd308"
+    },
+    "rss_kib": 3596,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-04-before.json",
+      "sha256": "3b2d6254530a63a8ce5d317930e8ea5603c0999a309ee661876896f5a920a2ff"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-04-before.rss",
+      "sha256": "9c7a7d2427821e58f4c6bb9211cdae5afe2d5fdc9bcc839ed7feebcfa5a3a0ca"
+    },
+    "rss_kib": 3864,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_9",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+    ],
+    "report": {
+      "bytes": 427,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-05-after.json",
+      "sha256": "0b2945f30b069a31ecde6ebaa7f01ce73d61a7fac0bf0a662430bc98550517fa"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_9-05-after.rss",
+      "sha256": "dccc0106a7c1001aa46ee82a39e72c9ac2a844c9c5db9ec3a87a1dfbf286342a"
+    },
+    "rss_kib": 3752,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "before",
+    "n": null,
+    "order_index": 0,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-00-before.json",
+      "sha256": "3bdd0d113107da82309b69485336dcc55c784887f3971a494f54f9f8ea7ced5c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-00-before.rss",
+      "sha256": "c6f89cae5e1b747272d60937b46a5609618c46b97d4f13896c161bd44ab1fab8"
+    },
+    "rss_kib": 6276,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "after",
+    "n": null,
+    "order_index": 1,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-01-after.json",
+      "sha256": "68eaa74322918c188314e4122d163c9d101cf20c31839fdae4a83b9205a513b5"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-01-after.rss",
+      "sha256": "3ed819c6a1dcf8f9307a26908e5224a14883b96d002b01919a883c4a607f7080"
+    },
+    "rss_kib": 6520,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "after",
+    "n": null,
+    "order_index": 2,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-02-after.json",
+      "sha256": "9bb5ac6c0b4f1fa9fcb5ebbf2a4d8e1239d12998d858a7eb8c0c80efa65a82cb"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-02-after.rss",
+      "sha256": "76ca82f3619529c3e7c72b9756bb53ee516511678b191322b1deed1caa3878cd"
+    },
+    "rss_kib": 6404,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "before",
+    "n": null,
+    "order_index": 3,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-03-before.json",
+      "sha256": "b875f2b5171d6948976c29c85da19ae7e0e92d5f96e3b504a7dd51f627734411"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-03-before.rss",
+      "sha256": "281859aa7f4081e6b3bcc91338ce53c9f22aba3c63ab523529778323da80d93a"
+    },
+    "rss_kib": 6332,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "before",
+    "n": null,
+    "order_index": 4,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-04-before.json",
+      "sha256": "181eda78a3af8816a9bfcf0982589527ed8b0543df77adf2b2b9916f1db0e7ff"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-04-before.rss",
+      "sha256": "376e40f3f7a4c7fdfa3cd15854615fd6c0531fe02976d5420aefaecfa45e48e7"
+    },
+    "rss_kib": 6440,
+    "samples": 9
+  },
+  {
+    "case": "mce_prefixed_32",
+    "leg": "after",
+    "n": null,
+    "order_index": 5,
+    "outcomes": [
+      "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+    ],
+    "report": {
+      "bytes": 439,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-05-after.json",
+      "sha256": "e73406ba92c876185ffed111302aa26e0ebe4e1fed5cdbb4773b4c9913a989e1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/mce_prefixed_32-05-after.rss",
+      "sha256": "01cdfd71654f85556ca64b35c4f6a236dcd2e338b868d06c5a9b17ddd7157b30"
+    },
+    "rss_kib": 6496,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 0,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-00-before.json",
+      "sha256": "d4d5ea9d9278cd0a47782be2f2ea0af62cf349e63af1f545244cb57e664f2652"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-00-before.rss",
+      "sha256": "1c576857eb850cad5a86062dcebfa5d6d96eeb3f2cae9ec9436076e6240bab94"
+    },
+    "rss_kib": 3232,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 0,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-01-after.json",
+      "sha256": "e2ad66214a836d4120b70a33744e817fa105504504699d156b24c84b9174fd5d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-01-after.rss",
+      "sha256": "569873a1f010b21daafc03ed90405dc2d9a1707647b6a2f3d251ecb409435b04"
+    },
+    "rss_kib": 3200,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 0,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-02-after.json",
+      "sha256": "fde1998b9adb15d94ef0b64edee0f97c0a86165ace225646368b49665de97d3d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-02-after.rss",
+      "sha256": "341b039f8bc901a783fb65169f665e8cf612927f0c861343ca1fc22640b71c01"
+    },
+    "rss_kib": 3068,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 0,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-03-before.json",
+      "sha256": "98f7ff819212de43862ac86f352205065f529db87aaf21866a0f2c2505f820b1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-03-before.rss",
+      "sha256": "68701503249744219753aea0c5924c8b274aa00de917f8a04144aae8c8972b47"
+    },
+    "rss_kib": 3308,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 0,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-04-before.json",
+      "sha256": "d039defafa0c32d8b6039778a52a10568f492aede56b32afc170f7f588e1e166"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-04-before.rss",
+      "sha256": "f9467579c59a9df50e55de6cb63ab8970b95d04e5589f4d0679f96595d16f2bf"
+    },
+    "rss_kib": 2944,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 0,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-05-after.json",
+      "sha256": "1b72223c4fa3c97d22c7b1629c1ee518dd0eb06518dce0f96688460f0e27cc23"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n0-05-after.rss",
+      "sha256": "3224d5369273a4550b7186c8389e927cf86027e5912a7da00141f0ebbfc99ea4"
+    },
+    "rss_kib": 3040,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 8,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-00-before.json",
+      "sha256": "255e1db903074fe4d270972ffc8bb039d132235a023f7664863a42d11a2e98fe"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-00-before.rss",
+      "sha256": "fa6bfe5050c224a5b156192a2532c7bacc66984ed18ae7eb78dcce0aa889b553"
+    },
+    "rss_kib": 3244,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 8,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-01-after.json",
+      "sha256": "96832453c09373e72d92cf54393bade6e7ca31c6f3e8954a59e2c8e1208c341e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-01-after.rss",
+      "sha256": "729fbc1164159847df1856837d233c53e1fba03f309ee908f9b2ed7434491358"
+    },
+    "rss_kib": 2992,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 8,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-02-after.json",
+      "sha256": "8aaccfd7f4319ac732d6ec5ff6819860bfe7ccb7047986c096b9b3eb8122a6f6"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-02-after.rss",
+      "sha256": "6da9223860f40d5df9f17ca3d1dcad1c3b64b6d3bc1eafcc3305e6871b7f3f53"
+    },
+    "rss_kib": 3252,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 8,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-03-before.json",
+      "sha256": "469842975b97a0db2b687e585a728299eeb73243835a1047464fb4ff099e3471"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-03-before.rss",
+      "sha256": "68701503249744219753aea0c5924c8b274aa00de917f8a04144aae8c8972b47"
+    },
+    "rss_kib": 3308,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 8,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-04-before.json",
+      "sha256": "c5840cab4e375e4f8a7aec6eccb41e4124baaf1d6cb720b4a0cc03068c4ec0e9"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-04-before.rss",
+      "sha256": "628edfb9c1808f339fd28e1dba10564b4159da8645b28327bf31c20014c779dc"
+    },
+    "rss_kib": 3012,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 8,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 232,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-05-after.json",
+      "sha256": "05ad3541c89cd00b64f45034989a69162e6050a842703459df93076b33b72be1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n8-05-after.rss",
+      "sha256": "7d568f8faf70251b4370995b32c89b5f46e7b95035bf6de259030be2edbdc20a"
+    },
+    "rss_kib": 3092,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 29,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 235,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-00-before.json",
+      "sha256": "eb875d9f2783428d3354533548d0dfd34526d7ada9db2e7bf3dbb9d910cc4e1d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-00-before.rss",
+      "sha256": "74c1935a1dcbf8968609132ed00c34afcd29b713ee02aca0d0b55676f3cb8070"
+    },
+    "rss_kib": 3028,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 29,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-01-after.json",
+      "sha256": "b061d3e7ac2580253801149a7ba8fab9ce33331a52bb1823914ddbb5778b307d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-01-after.rss",
+      "sha256": "dc792935a13aa314dfe53fca3d073af074856524436cd2bb6b0dafcaf62c5df1"
+    },
+    "rss_kib": 3144,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 29,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-02-after.json",
+      "sha256": "86e4d43dd500e37d307b80d91bf812769f80577a75bed6fc0e3f5bb80b7527b4"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-02-after.rss",
+      "sha256": "05c0d5d9ef36ef2e717ed50a5d86ceab057c2249c0e8dd4385b3f2cf09a98e80"
+    },
+    "rss_kib": 3132,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 29,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 235,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-03-before.json",
+      "sha256": "df74ddbf1824630cc1313390a6673771ef4975b78e27b2a3c0263bfadbffe7ef"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-03-before.rss",
+      "sha256": "628edfb9c1808f339fd28e1dba10564b4159da8645b28327bf31c20014c779dc"
+    },
+    "rss_kib": 3012,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 29,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 235,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-04-before.json",
+      "sha256": "923908ae55f0787186ff4e8836039900343c515d10a3952f1822b1ae007992c2"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-04-before.rss",
+      "sha256": "09ebd0ce5dc2dfb2728e93d69ef19cacabfcc47c697ca5c9a15a6dcd882385f7"
+    },
+    "rss_kib": 3224,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 29,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-05-after.json",
+      "sha256": "cb70a0a9b11597e75f6533c27f561b793ea55cbeba4119bfe544e9a2cca96f37"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n29-05-after.rss",
+      "sha256": "4eacdc7db8e67d204c38e3795c14fae4f34d077b061f1731db30ab8fda87acb5"
+    },
+    "rss_kib": 3108,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 30,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-00-before.json",
+      "sha256": "61154d2be6f1abd4bab8016fffd12bd9765d6262068dc4ff9b2b19036432f23e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-00-before.rss",
+      "sha256": "f0b6ce1ccb7d6400753a21690eee63c09b8ed6821e350fb90b895afad3a37197"
+    },
+    "rss_kib": 3044,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 30,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 238,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-01-after.json",
+      "sha256": "9e5939e327ec048264c2b92377134670d7c9056c47455ab3fa7365f8be5f74a1"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-01-after.rss",
+      "sha256": "8a535f1e24c8dc136593b395afac52a2e64446bb85890816985b8dd93292a0e2"
+    },
+    "rss_kib": 3264,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 30,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 237,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-02-after.json",
+      "sha256": "7392201cde26003cff37dfa2fd95c8a4c28959b36745e2a2af986519622c225c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-02-after.rss",
+      "sha256": "220b964202b0c29333677fbd8e39268f56e30dfc3dcc0e459fa276087e1124a0"
+    },
+    "rss_kib": 3100,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 30,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 237,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-03-before.json",
+      "sha256": "bd976b3991a2ed085f6917496822c60133fb447d2f06e40178c6b141683f04dd"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-03-before.rss",
+      "sha256": "68701503249744219753aea0c5924c8b274aa00de917f8a04144aae8c8972b47"
+    },
+    "rss_kib": 3308,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 30,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-04-before.json",
+      "sha256": "9c2db56f48827f876fb8ff56174eeb574be512aaab2cd17fffff89bfd862eb3d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-04-before.rss",
+      "sha256": "77aeb56a60f0d0836a1a19bb1b0c8bb21432999a47045808253ae69dcce20fed"
+    },
+    "rss_kib": 3032,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 30,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 238,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-05-after.json",
+      "sha256": "49402eebd22bcbf8346d5aab7bb024430eb20f474047801fd36d325193e68c01"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n30-05-after.rss",
+      "sha256": "4eacdc7db8e67d204c38e3795c14fae4f34d077b061f1731db30ab8fda87acb5"
+    },
+    "rss_kib": 3108,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 32,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 237,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-00-before.json",
+      "sha256": "bbdc823f6c29dcc05584703140fd57fbb2a78cffb4f89bf5ee91e436682cd29d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-00-before.rss",
+      "sha256": "f0b6ce1ccb7d6400753a21690eee63c09b8ed6821e350fb90b895afad3a37197"
+    },
+    "rss_kib": 3044,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 32,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 240,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-01-after.json",
+      "sha256": "4ecc863bf44f9cd0262e60c5d757e834384e477b0d4ebf44bb9d07f318b9ec3e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-01-after.rss",
+      "sha256": "0e36f128ce9080e9fdd32c91a06816f56793abd186eb983415c44b8799cc773c"
+    },
+    "rss_kib": 3292,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 32,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 238,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-02-after.json",
+      "sha256": "4702a25462cc3c2aea5ac19afb2cdc33e6a10b3903c88ac6aa128f4a6f4e4aee"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-02-after.rss",
+      "sha256": "0e36f128ce9080e9fdd32c91a06816f56793abd186eb983415c44b8799cc773c"
+    },
+    "rss_kib": 3292,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 32,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 237,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-03-before.json",
+      "sha256": "9d03fb64d58aca7b81177fd9917d156666dde86530e9b3ebf085ff00a9c0b642"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-03-before.rss",
+      "sha256": "4bc99bf86dff54e3c69680361d23dbdc192a5266d4beaa5806705a17de768d86"
+    },
+    "rss_kib": 2972,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 32,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-04-before.json",
+      "sha256": "6f860c4011b59289b5b5ecb7738917557690623e5a7152bc12848691a3c4b7cc"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-04-before.rss",
+      "sha256": "ab5fbf75df1e82afda821958f4d3ebb0432af78cbba4b4aaa5f3f01c83d15eec"
+    },
+    "rss_kib": 3024,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 32,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 238,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-05-after.json",
+      "sha256": "bbd8ddfd8e75e6f6f7cd0d732ccd227815b34b09bb5366f9fa948853cffd9f4c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n32-05-after.rss",
+      "sha256": "09c337e9b4575fb0a07b807d760513cc2984a716606183c53f8469d337274bb5"
+    },
+    "rss_kib": 3168,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 33,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-00-before.json",
+      "sha256": "39e7f4a971b48b784e22d69b0821ad22d92defaf3102135d3ffa30a23086124d"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-00-before.rss",
+      "sha256": "d363438eed0f822193bd4c84e63596b2fa55431a24a27bc4eeff1496d4e0b0e6"
+    },
+    "rss_kib": 3236,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 33,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 240,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-01-after.json",
+      "sha256": "0855f9b1a7829245bb36a8a3280ef70b411d459c3cf38daf08b1a73ac62aaf9e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-01-after.rss",
+      "sha256": "7d568f8faf70251b4370995b32c89b5f46e7b95035bf6de259030be2edbdc20a"
+    },
+    "rss_kib": 3092,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 33,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 238,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-02-after.json",
+      "sha256": "50aafa37bd3ba02c3ab3d7160a3277b916a4029152c24f8621e54013bc714b63"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-02-after.rss",
+      "sha256": "c043e6f83183fdaa14d5018f366e425a797af1b096dea7bab68610c227da9027"
+    },
+    "rss_kib": 3260,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 33,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 236,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-03-before.json",
+      "sha256": "59425ddd1a7192ae59182f9c0f94bc2c01c93b619f03ff042fe48d2c8eacbad7"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-03-before.rss",
+      "sha256": "f0b6ce1ccb7d6400753a21690eee63c09b8ed6821e350fb90b895afad3a37197"
+    },
+    "rss_kib": 3044,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 33,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 237,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-04-before.json",
+      "sha256": "d6e6ebf783f0ebc0cb25e1a51d3803b9490dafa9001f06005d8539f1743e31e8"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-04-before.rss",
+      "sha256": "609f5c64953ef9243791c120965f60263a98ad172971042c863ae69f34618ec0"
+    },
+    "rss_kib": 3188,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 33,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 239,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-05-after.json",
+      "sha256": "68b54223ca25ae642e42d5a2994c636f38b8247fb4202cc1637e0a7039980e93"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n33-05-after.rss",
+      "sha256": "0e36f128ce9080e9fdd32c91a06816f56793abd186eb983415c44b8799cc773c"
+    },
+    "rss_kib": 3292,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 256,
+    "order_index": 0,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-00-before.json",
+      "sha256": "baa3840253ae61f9d616ab4b74716412c2f7eacf4e05411b8ffe7676a98d3ef6"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-00-before.rss",
+      "sha256": "79b7bbc84b5fb58e057d6417bc1279b34f4ff4e51bdff5ebbc0c7344e766efae"
+    },
+    "rss_kib": 3056,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 256,
+    "order_index": 1,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-01-after.json",
+      "sha256": "10c2793ba9608c4a1f2beb5bd7b7c002d25332409278e05de8ae65d904699ca3"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-01-after.rss",
+      "sha256": "a6ad9a9b10912b030a4e03a06e2da1fd5f203971e0d532f09d5e7765dbaf9bbe"
+    },
+    "rss_kib": 2980,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 256,
+    "order_index": 2,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-02-after.json",
+      "sha256": "e3585e5dca007f61fc81f01c53a18bd623421fd3d5f05ae554844dd9c4813f60"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-02-after.rss",
+      "sha256": "75c65cb9a4b40d8b9f0773718e62a9067b93baba81c77eee0e566bebbc7d69e2"
+    },
+    "rss_kib": 3312,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 256,
+    "order_index": 3,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-03-before.json",
+      "sha256": "00aa2765fb19f3a13d20ba8a8dfe3e48b879efac2f9e9400cc3e6ef3e7bd7641"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-03-before.rss",
+      "sha256": "8a535f1e24c8dc136593b395afac52a2e64446bb85890816985b8dd93292a0e2"
+    },
+    "rss_kib": 3264,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 256,
+    "order_index": 4,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-04-before.json",
+      "sha256": "a4fa75db2d98e131cce0483a520000003a732cbdcdda25d04f5695ed876223e8"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-04-before.rss",
+      "sha256": "399875feddbc0cfc1becb48a7783d73d3c3794cea5dd5fafbf7b42285ebe16d7"
+    },
+    "rss_kib": 3268,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 256,
+    "order_index": 5,
+    "outcomes": [
+      "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+    ],
+    "report": {
+      "bytes": 244,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-05-after.json",
+      "sha256": "eff7b5d936a0f914e1c28d626968f4050fda6c250a653d7245ecdb0bf1dc753b"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n256-05-after.rss",
+      "sha256": "5ad8a942488afda24964b039e277e16637f8dd17ae5a8b9a666c2b73947964da"
+    },
+    "rss_kib": 3204,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 1024,
+    "order_index": 0,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-00-before.json",
+      "sha256": "08653ba8b0489569d6769b76ae8d54e35b74952bcb0b55167ac88e7792fc3a39"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-00-before.rss",
+      "sha256": "8473d094d8842d5e98f7f29a84b8e13ef0b16e514f7330af15986bd97b31fdc5"
+    },
+    "rss_kib": 3300,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 1024,
+    "order_index": 1,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-01-after.json",
+      "sha256": "c1f6ac1889291e157654304ac239ac7023d9a21efcfccec8da5cf9c4d5cedc02"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-01-after.rss",
+      "sha256": "71c6701cfe4d019476d48cd99326f39f53273981d1194f8ee99221c6da8b3387"
+    },
+    "rss_kib": 3316,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 1024,
+    "order_index": 2,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-02-after.json",
+      "sha256": "34726c4236e9091392299ed645180dc7f8857b90d8e2bb54a989fdf9b536bdb9"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-02-after.rss",
+      "sha256": "321b7c50756d8b35b341ca967e0206f34800399defde87a0200d2f42045c63b6"
+    },
+    "rss_kib": 3276,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 1024,
+    "order_index": 3,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-03-before.json",
+      "sha256": "53d99a0ba9c94238670154ff67b2b2cca4626523ba40e3b53ae17065850c2bd3"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-03-before.rss",
+      "sha256": "79b7bbc84b5fb58e057d6417bc1279b34f4ff4e51bdff5ebbc0c7344e766efae"
+    },
+    "rss_kib": 3056,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 1024,
+    "order_index": 4,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-04-before.json",
+      "sha256": "8136dbd43641a5ef0484e6a182d2b448607d3299ec99c314cd4979a76a698254"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-04-before.rss",
+      "sha256": "7d568f8faf70251b4370995b32c89b5f46e7b95035bf6de259030be2edbdc20a"
+    },
+    "rss_kib": 3092,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 1024,
+    "order_index": 5,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-05-after.json",
+      "sha256": "28822c37baab88a0c1e9fa61d2d010b160fa1734180e9ea16507fd07bf724211"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n1024-05-after.rss",
+      "sha256": "09b7e43edf7ae56b74194e3e17cdfa8fab35d150632d39ff9e065b8533f49cf2"
+    },
+    "rss_kib": 3148,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 4096,
+    "order_index": 0,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-00-before.json",
+      "sha256": "af1360a87d125f7bcd905c94da7dfaa7fdc1ba728767c2f4d447ba421877d996"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-00-before.rss",
+      "sha256": "7cbdb044742e54eea41c54369b39f7b185f1d2a0df4b1c1c8a1682ea59d1dc32"
+    },
+    "rss_kib": 3348,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 4096,
+    "order_index": 1,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-01-after.json",
+      "sha256": "4e32f50749341bba3ff40e8a518ea91d28531f0577b5d3d53b466f92df412b9e"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-01-after.rss",
+      "sha256": "6abf6f12209299604d54d3bf151695e644ab2441e18d60758500e21f1ced257a"
+    },
+    "rss_kib": 3356,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 4096,
+    "order_index": 2,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-02-after.json",
+      "sha256": "f5245b5c0511950fd32a60386ca09a682558e137292c435164086d910d8417e6"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-02-after.rss",
+      "sha256": "5acd08dfd161af4e72509ef4e3e4d299bbe1ba32115e665b12caa60667acce8f"
+    },
+    "rss_kib": 3548,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 4096,
+    "order_index": 3,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-03-before.json",
+      "sha256": "e983710ce06baa9d6e8830e2c63bbef9cc8f792dae30d67a519532bb1dea6b75"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-03-before.rss",
+      "sha256": "90a94bd54238f5f3dfcc37ffea5be5f9c79a93ae011d88dbc886990c0f1d2865"
+    },
+    "rss_kib": 3552,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 4096,
+    "order_index": 4,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-04-before.json",
+      "sha256": "3724034fddb7cecd012e600f26fabf79ed62871a5caf8d01e7cbd12bb19936b4"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-04-before.rss",
+      "sha256": "22bbc1fcaacf5a095bfa82e2b011ff5cdadb36eede57bc310a261d4418aac638"
+    },
+    "rss_kib": 3540,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 4096,
+    "order_index": 5,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 325,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-05-after.json",
+      "sha256": "a6442263eab80b569ca894edaeec4d8c28daff2d4504cba5b333c1204b6acb4c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n4096-05-after.rss",
+      "sha256": "13d4fea7d1f4c22cb69162a94c32ed0c0a8ad3d5c40112e32e6e4ca9103f54df"
+    },
+    "rss_kib": 3520,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 16384,
+    "order_index": 0,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-00-before.json",
+      "sha256": "3de4f6be29de1e2b90cf2234bbf6e4cdae5433b85cae3d997290b35518e64d43"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-00-before.rss",
+      "sha256": "f419208d19ab363a1bc50113d6884109d6f5a20dd5b27fa1428a80dfe961f07c"
+    },
+    "rss_kib": 3604,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 16384,
+    "order_index": 1,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-01-after.json",
+      "sha256": "d55c49a1cdd5ceedd32b3b9ee31729d1e0dfeef9a2070dd123590323c0aaad66"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-01-after.rss",
+      "sha256": "3efaae0b4d0b6b9b11def577d7da48c13467c97119a5fa0b4466319b0707c5f1"
+    },
+    "rss_kib": 3504,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 16384,
+    "order_index": 2,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-02-after.json",
+      "sha256": "36c9f27995858f4bcc9af05002416ab1aad93a993d7111d377ef380463ea0142"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-02-after.rss",
+      "sha256": "f655d72a1efa3d9a73ac0feec07b3e1f826ede8418cc46746728e69e30a54d7b"
+    },
+    "rss_kib": 3776,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 16384,
+    "order_index": 3,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-03-before.json",
+      "sha256": "b13b7f9afa208a7173137769a5151d6964e6827a6c7ad4099573d50a9d6e0a2c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-03-before.rss",
+      "sha256": "67b7f191b147e73b9ffd41e7d51f8b9ae7984241dbfe27b1ca0dd0af9ba64adb"
+    },
+    "rss_kib": 3780,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "before",
+    "n": 16384,
+    "order_index": 4,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-04-before.json",
+      "sha256": "c46b9d2703d2c83ab548c41d59f415489989e08b86a1b1a888a0266ce11a0378"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-04-before.rss",
+      "sha256": "3327bd2e8cac101a69186a54926587147f24f635619fab98509103c5f6e1821c"
+    },
+    "rss_kib": 4080,
+    "samples": 9
+  },
+  {
+    "case": "opc_relationship_declarations",
+    "leg": "after",
+    "n": 16384,
+    "order_index": 5,
+    "outcomes": [
+      "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+    ],
+    "report": {
+      "bytes": 336,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-05-after.json",
+      "sha256": "ed4b3ba64b56200a9f8079e49b38d7a42d460782b0ed4f960a544713664d988c"
+    },
+    "rss": {
+      "bytes": 5,
+      "path": "/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/docs/performance/results/change-0777/capture-0/opc_relationship_declarations-n16384-05-after.rss",
+      "sha256": "ae394d0817b49214a54587a46be0dac2f3a7cc5084c400fd05e71b476cf7f965"
+    },
+    "rss_kib": 3716,
+    "samples": 9
+  }
+]

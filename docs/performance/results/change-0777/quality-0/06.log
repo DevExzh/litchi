@@ -1,0 +1,105 @@
+   Compiling serde_core v1.0.229
+   Compiling zerocopy v0.8.56
+   Compiling num-traits v0.2.19
+    Checking digest v0.11.3
+   Compiling serde v1.0.229
+    Checking serde_json v1.0.149
+    Checking chrono v0.4.45
+    Checking sha2 v0.11.0
+    Checking either v1.18.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-core)
+    Checking rayon v1.12.0
+   Compiling getrandom v0.3.4
+    Checking bitflags v2.13.1
+    Checking rustix v1.1.4
+    Checking zlib-rs v0.6.7
+    Checking flate2 v1.1.10
+    Checking tempfile v3.27.0
+    Checking tinyvec v1.12.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/soapberry-zip)
+    Checking ppv-lite86 v0.2.21
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-opc)
+    Checking unicode-normalization v0.1.25
+    Checking caseless v0.2.2
+    Checking rand_chacha v0.3.1
+    Checking num-integer v0.1.47
+    Checking num-iter v0.1.46
+    Checking rand v0.8.8
+    Checking inout v0.2.2
+    Checking cipher v0.5.2
+    Checking num-bigint-dig v0.8.6
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ole-common)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ooxml-common)
+    Checking rsa v0.9.10
+    Checking rc4 v0.2.0
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-odraw)
+    Checking rand_core v0.9.5
+    Checking sha1 v0.11.0
+    Checking md-5 v0.11.0
+   Compiling lock_api v0.4.13
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-drawingml)
+   Compiling parking_lot_core v0.9.11
+    Checking utf8parse v0.2.2
+    Checking anstyle-parse v0.2.7
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-crypto)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-vba)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-sheet)
+    Checking anstyle-query v1.1.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking scopeguard v1.2.0
+    Checking anstyle v1.0.14
+    Checking colorchoice v1.0.5
+    Checking anstream v0.6.21
+    Checking wait-timeout v0.2.1
+    Checking errno v0.3.14
+    Checking strsim v0.10.0
+    Checking bit-vec v0.8.0
+    Checking clap_lex v0.6.0
+    Checking quick-error v1.2.3
+    Checking simd-adler32 v0.3.10
+    Checking log v0.4.29
+    Checking fnv v1.0.7
+    Checking rusty-fork v0.3.1
+    Checking zopfli v0.8.3
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-pptx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-xlsb)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-docx)
+   Compiling clap_derive v4.4.7
+    Checking clap_builder v4.4.18
+    Checking bit-set v0.8.0
+    Checking signal-hook-registry v1.4.8
+    Checking parking_lot v0.12.4
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-xls)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-doc)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi-ppt)
+    Checking rand_chacha v0.9.0
+    Checking rand_xorshift v0.4.0
+    Checking rand v0.9.5
+    Checking socket2 v0.6.5
+    Checking mio v1.0.4
+   Compiling tokio-macros v2.5.0
+    Checking unarray v0.1.4
+    Checking bytes v1.12.1
+    Checking pin-project-lite v0.2.17
+    Checking regex-syntax v0.8.11
+    Checking tokio v1.47.5
+    Checking proptest v1.7.0
+    Checking zip v8.6.0
+    Checking clap v4.4.18
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0777-xml-attribute-integration/crates/litchi)
+warning: function `missing_ooxml_catalog_part_error` is never used
+   --> crates/litchi/src/detection_smart/detected.rs:612:4
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+warning: `litchi` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized] target(s) in 34.07s

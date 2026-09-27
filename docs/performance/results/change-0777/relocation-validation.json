@@ -1,0 +1,24 @@
+{
+  "exit": 0,
+  "initial_setup": "Hard links into /tmp failed with EXDEV; temporary directory automatically removed. Retried on source filesystem.",
+  "method": "Independent packet path on same filesystem, hard-linked immutable artifacts, Python -B; no native binaries or source checkout required.",
+  "replay": {
+    "binary_live_files_not_required": true,
+    "cases": 19,
+    "differential_changes": 0,
+    "equivalence_mismatches": 0,
+    "native_processes": 114,
+    "observations": {
+      "allocation_processes": 12,
+      "instruction_processes": 72
+    },
+    "quality_gates": 9,
+    "quality_tests": {
+      "ignored": 80,
+      "passed": 10519,
+      "suites": 407
+    },
+    "source_files": 305
+  },
+  "temporary_copy_removed": true
+}

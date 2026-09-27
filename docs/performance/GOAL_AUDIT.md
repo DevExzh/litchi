@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0777 — attribute integration has fresh evidence; goal remains active
+
+[0777](0777-xml-attribute-integration.md) integrates the preserved 0770 snapshot into current MCE and reader owners with fresh source-bound quality, semantic, native, instruction and allocation evidence. The deterministic comparison bound is retained with disclosed latency/RSS costs, not presented as a speedup. The original dirty worktree remains untouched. Full CRUD, cold/range/scaling coverage and broader memory-budget work remain open.
+
 ## 0776 — duplicate gap closed; broader goal active
 
 [0776](0776-mce-expanded-attribute-duplicates.md) adds bounded expanded-attribute validation with caller memory accounting. Final gates pass; all 249 differential changes are explained by independently witnessed malformed duplicates. Seven latency regressions are disclosed and retained as correctness costs. The original dirty 0770 worktree remains untouched; its snapshot integration needs fresh evidence. Full CRUD, cold/range/scaling coverage and broader QName validation remain open.

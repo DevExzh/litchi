@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0777 — paired XML attribute hardening costs
+
+[0777](0777-xml-attribute-integration.md) records 19 cases and 114 timed processes. Ordinary worksheet/document p50 changes are +0.36%/+1.34%; accepted OPC controls have four latency flags, including 22.811 → 35.151 µs (+54.10%) at 256 extra namespace declarations. Two RSS flags and separate instruction/allocation observations are disclosed. Three larger OPC controls measure existing namespace-limit refusals, not accepted-input scaling. This is parser evidence, not a complete CRUD baseline.
+
 ## 0776 — cost of expanded-attribute refusal
 
 [0776](0776-mce-expanded-attribute-duplicates.md) retains both paired captures: the final 18-case/108-process run reports seven latency flags, including worksheet +5.77% and synthetic 32-prefixed-attribute +19.70%, with no peak-RSS regression above 5%. Separate whole-process allocation observations show unchanged ordinary allocation counts and 4,000 additional spill allocations on the 32-attribute control. This is a measured correctness repair, not a speedup or CRUD baseline.

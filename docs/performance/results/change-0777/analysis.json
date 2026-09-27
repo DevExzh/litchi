@@ -1,0 +1,2176 @@
+{
+  "base": "87e926fcc6e71360073a8bf97ad572ad9d187a67",
+  "candidate": "1e334ffba9efb89e5badb8aa7a3e33052e96635c",
+  "cases": {
+    "mce_benign_document": {
+      "after": {
+        "p50_ns": {
+          "max": 1808257,
+          "median": 1791998,
+          "min": 1786667,
+          "spread_percent": 1.2048004517862185
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_benign_document-01-after.log",
+            "order_index": 1,
+            "p50_ns": 1808257,
+            "report": "capture-0/mce_benign_document-01-after.json",
+            "rss": "capture-0/mce_benign_document-01-after.rss",
+            "rss_kib": 3644,
+            "sample_max_ns": 1833168
+          },
+          {
+            "log": "capture-0/mce_benign_document-02-after.log",
+            "order_index": 2,
+            "p50_ns": 1786667,
+            "report": "capture-0/mce_benign_document-02-after.json",
+            "rss": "capture-0/mce_benign_document-02-after.rss",
+            "rss_kib": 3488,
+            "sample_max_ns": 1827298
+          },
+          {
+            "log": "capture-0/mce_benign_document-05-after.log",
+            "order_index": 5,
+            "p50_ns": 1791998,
+            "report": "capture-0/mce_benign_document-05-after.json",
+            "rss": "capture-0/mce_benign_document-05-after.rss",
+            "rss_kib": 3528,
+            "sample_max_ns": 1814838
+          }
+        ],
+        "rss_kib": {
+          "max": 3644,
+          "median": 3528,
+          "min": 3488,
+          "spread_percent": 4.421768707482993
+        },
+        "sample_max_ns": {
+          "max": 1833168,
+          "median": 1827298,
+          "min": 1814838,
+          "spread_percent": 1.003120454353915
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 1778268,
+          "median": 1768387,
+          "min": 1766157,
+          "spread_percent": 0.6848614019442577
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_benign_document-00-before.log",
+            "order_index": 0,
+            "p50_ns": 1778268,
+            "report": "capture-0/mce_benign_document-00-before.json",
+            "rss": "capture-0/mce_benign_document-00-before.rss",
+            "rss_kib": 3624,
+            "sample_max_ns": 1789348
+          },
+          {
+            "log": "capture-0/mce_benign_document-03-before.log",
+            "order_index": 3,
+            "p50_ns": 1766157,
+            "report": "capture-0/mce_benign_document-03-before.json",
+            "rss": "capture-0/mce_benign_document-03-before.rss",
+            "rss_kib": 3544,
+            "sample_max_ns": 1792778
+          },
+          {
+            "log": "capture-0/mce_benign_document-04-before.log",
+            "order_index": 4,
+            "p50_ns": 1768387,
+            "report": "capture-0/mce_benign_document-04-before.json",
+            "rss": "capture-0/mce_benign_document-04-before.rss",
+            "rss_kib": 3600,
+            "sample_max_ns": 1782388
+          }
+        ],
+        "rss_kib": {
+          "max": 3624,
+          "median": 3600,
+          "min": 3544,
+          "spread_percent": 2.2222222222222223
+        },
+        "sample_max_ns": {
+          "max": 1792778,
+          "median": 1789348,
+          "min": 1782388,
+          "spread_percent": 0.5806584297744206
+        }
+      },
+      "case": "mce_benign_document",
+      "input_bytes": 288070,
+      "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+      "n": null,
+      "outcomes": [
+        "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+      ],
+      "p50_change_percent": 1.3351715433330025,
+      "p50_regression_flag": false,
+      "rss_change_percent": -2.0000000000000018,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_benign_worksheet": {
+      "after": {
+        "p50_ns": {
+          "max": 13074828,
+          "median": 13048457,
+          "min": 13043097,
+          "spread_percent": 0.24317817807883338
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_benign_worksheet-01-after.log",
+            "order_index": 1,
+            "p50_ns": 13043097,
+            "report": "capture-0/mce_benign_worksheet-01-after.json",
+            "rss": "capture-0/mce_benign_worksheet-01-after.rss",
+            "rss_kib": 6996,
+            "sample_max_ns": 13275558
+          },
+          {
+            "log": "capture-0/mce_benign_worksheet-02-after.log",
+            "order_index": 2,
+            "p50_ns": 13074828,
+            "report": "capture-0/mce_benign_worksheet-02-after.json",
+            "rss": "capture-0/mce_benign_worksheet-02-after.rss",
+            "rss_kib": 7188,
+            "sample_max_ns": 13319999
+          },
+          {
+            "log": "capture-0/mce_benign_worksheet-05-after.log",
+            "order_index": 5,
+            "p50_ns": 13048457,
+            "report": "capture-0/mce_benign_worksheet-05-after.json",
+            "rss": "capture-0/mce_benign_worksheet-05-after.rss",
+            "rss_kib": 7056,
+            "sample_max_ns": 13268439
+          }
+        ],
+        "rss_kib": {
+          "max": 7188,
+          "median": 7056,
+          "min": 6996,
+          "spread_percent": 2.7210884353741496
+        },
+        "sample_max_ns": {
+          "max": 13319999,
+          "median": 13275558,
+          "min": 13268439,
+          "spread_percent": 0.38838292145610753
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 13011227,
+          "median": 13001607,
+          "min": 12958487,
+          "spread_percent": 0.4056421640801787
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_benign_worksheet-00-before.log",
+            "order_index": 0,
+            "p50_ns": 13001607,
+            "report": "capture-0/mce_benign_worksheet-00-before.json",
+            "rss": "capture-0/mce_benign_worksheet-00-before.rss",
+            "rss_kib": 7168,
+            "sample_max_ns": 13299409
+          },
+          {
+            "log": "capture-0/mce_benign_worksheet-03-before.log",
+            "order_index": 3,
+            "p50_ns": 13011227,
+            "report": "capture-0/mce_benign_worksheet-03-before.json",
+            "rss": "capture-0/mce_benign_worksheet-03-before.rss",
+            "rss_kib": 7180,
+            "sample_max_ns": 13256618
+          },
+          {
+            "log": "capture-0/mce_benign_worksheet-04-before.log",
+            "order_index": 4,
+            "p50_ns": 12958487,
+            "report": "capture-0/mce_benign_worksheet-04-before.json",
+            "rss": "capture-0/mce_benign_worksheet-04-before.rss",
+            "rss_kib": 7104,
+            "sample_max_ns": 13153308
+          }
+        ],
+        "rss_kib": {
+          "max": 7180,
+          "median": 7168,
+          "min": 7104,
+          "spread_percent": 1.0602678571428572
+        },
+        "sample_max_ns": {
+          "max": 13299409,
+          "median": 13256618,
+          "min": 13153308,
+          "spread_percent": 1.102098589549763
+        }
+      },
+      "case": "mce_benign_worksheet",
+      "input_bytes": 1558391,
+      "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+      "n": null,
+      "outcomes": [
+        "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+      ],
+      "p50_change_percent": 0.36034007180805183,
+      "p50_regression_flag": false,
+      "rss_change_percent": -1.5625,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_prefixed_1": {
+      "after": {
+        "p50_ns": {
+          "max": 817303,
+          "median": 816294,
+          "min": 811184,
+          "spread_percent": 0.7496073718537684
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_1-01-after.log",
+            "order_index": 1,
+            "p50_ns": 816294,
+            "report": "capture-0/mce_prefixed_1-01-after.json",
+            "rss": "capture-0/mce_prefixed_1-01-after.rss",
+            "rss_kib": 3120,
+            "sample_max_ns": 822053
+          },
+          {
+            "log": "capture-0/mce_prefixed_1-02-after.log",
+            "order_index": 2,
+            "p50_ns": 817303,
+            "report": "capture-0/mce_prefixed_1-02-after.json",
+            "rss": "capture-0/mce_prefixed_1-02-after.rss",
+            "rss_kib": 3040,
+            "sample_max_ns": 821723
+          },
+          {
+            "log": "capture-0/mce_prefixed_1-05-after.log",
+            "order_index": 5,
+            "p50_ns": 811184,
+            "report": "capture-0/mce_prefixed_1-05-after.json",
+            "rss": "capture-0/mce_prefixed_1-05-after.rss",
+            "rss_kib": 3104,
+            "sample_max_ns": 829544
+          }
+        ],
+        "rss_kib": {
+          "max": 3120,
+          "median": 3104,
+          "min": 3040,
+          "spread_percent": 2.577319587628866
+        },
+        "sample_max_ns": {
+          "max": 829544,
+          "median": 822053,
+          "min": 821723,
+          "spread_percent": 0.951398510801615
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 795333,
+          "median": 795234,
+          "min": 794574,
+          "spread_percent": 0.09544360527844635
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_1-00-before.log",
+            "order_index": 0,
+            "p50_ns": 795234,
+            "report": "capture-0/mce_prefixed_1-00-before.json",
+            "rss": "capture-0/mce_prefixed_1-00-before.rss",
+            "rss_kib": 3076,
+            "sample_max_ns": 808044
+          },
+          {
+            "log": "capture-0/mce_prefixed_1-03-before.log",
+            "order_index": 3,
+            "p50_ns": 794574,
+            "report": "capture-0/mce_prefixed_1-03-before.json",
+            "rss": "capture-0/mce_prefixed_1-03-before.rss",
+            "rss_kib": 2944,
+            "sample_max_ns": 805064
+          },
+          {
+            "log": "capture-0/mce_prefixed_1-04-before.log",
+            "order_index": 4,
+            "p50_ns": 795333,
+            "report": "capture-0/mce_prefixed_1-04-before.json",
+            "rss": "capture-0/mce_prefixed_1-04-before.rss",
+            "rss_kib": 3012,
+            "sample_max_ns": 801704
+          }
+        ],
+        "rss_kib": {
+          "max": 3076,
+          "median": 3012,
+          "min": 2944,
+          "spread_percent": 4.382470119521912
+        },
+        "sample_max_ns": {
+          "max": 808044,
+          "median": 805064,
+          "min": 801704,
+          "spread_percent": 0.78751502986098
+        }
+      },
+      "case": "mce_prefixed_1",
+      "input_bytes": 52120,
+      "input_sha256": "1fc8c79babe5fc55d0ce168125204c1388cca8685d0d9d6a5cd992163de0cb23",
+      "n": null,
+      "outcomes": [
+        "ok:31a245089be85df4847ef5067c1935143481f764568911e1efca80d939370708"
+      ],
+      "p50_change_percent": 2.6482771108881087,
+      "p50_regression_flag": false,
+      "rss_change_percent": 3.054448871181936,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_prefixed_2": {
+      "after": {
+        "p50_ns": {
+          "max": 1289676,
+          "median": 1277395,
+          "min": 1274796,
+          "spread_percent": 1.1648706938730777
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_2-01-after.log",
+            "order_index": 1,
+            "p50_ns": 1274796,
+            "report": "capture-0/mce_prefixed_2-01-after.json",
+            "rss": "capture-0/mce_prefixed_2-01-after.rss",
+            "rss_kib": 3336,
+            "sample_max_ns": 1319726
+          },
+          {
+            "log": "capture-0/mce_prefixed_2-02-after.log",
+            "order_index": 2,
+            "p50_ns": 1289676,
+            "report": "capture-0/mce_prefixed_2-02-after.json",
+            "rss": "capture-0/mce_prefixed_2-02-after.rss",
+            "rss_kib": 3296,
+            "sample_max_ns": 1309085
+          },
+          {
+            "log": "capture-0/mce_prefixed_2-05-after.log",
+            "order_index": 5,
+            "p50_ns": 1277395,
+            "report": "capture-0/mce_prefixed_2-05-after.json",
+            "rss": "capture-0/mce_prefixed_2-05-after.rss",
+            "rss_kib": 3336,
+            "sample_max_ns": 1302456
+          }
+        ],
+        "rss_kib": {
+          "max": 3336,
+          "median": 3336,
+          "min": 3296,
+          "spread_percent": 1.1990407673860912
+        },
+        "sample_max_ns": {
+          "max": 1319726,
+          "median": 1309085,
+          "min": 1302456,
+          "spread_percent": 1.3192420660232147
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 1244535,
+          "median": 1243686,
+          "min": 1234105,
+          "spread_percent": 0.8386361187630962
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_2-00-before.log",
+            "order_index": 0,
+            "p50_ns": 1234105,
+            "report": "capture-0/mce_prefixed_2-00-before.json",
+            "rss": "capture-0/mce_prefixed_2-00-before.rss",
+            "rss_kib": 3204,
+            "sample_max_ns": 1270746
+          },
+          {
+            "log": "capture-0/mce_prefixed_2-03-before.log",
+            "order_index": 3,
+            "p50_ns": 1243686,
+            "report": "capture-0/mce_prefixed_2-03-before.json",
+            "rss": "capture-0/mce_prefixed_2-03-before.rss",
+            "rss_kib": 3268,
+            "sample_max_ns": 1273326
+          },
+          {
+            "log": "capture-0/mce_prefixed_2-04-before.log",
+            "order_index": 4,
+            "p50_ns": 1244535,
+            "report": "capture-0/mce_prefixed_2-04-before.json",
+            "rss": "capture-0/mce_prefixed_2-04-before.rss",
+            "rss_kib": 3308,
+            "sample_max_ns": 1268706
+          }
+        ],
+        "rss_kib": {
+          "max": 3308,
+          "median": 3268,
+          "min": 3204,
+          "spread_percent": 3.182374541003672
+        },
+        "sample_max_ns": {
+          "max": 1273326,
+          "median": 1270746,
+          "min": 1268706,
+          "spread_percent": 0.3635659683367093
+        }
+      },
+      "case": "mce_prefixed_2",
+      "input_bytes": 88120,
+      "input_sha256": "c38028f8435ae8161603aaeff52939385ab787ac6edc769b8955964f5e7a3224",
+      "n": null,
+      "outcomes": [
+        "ok:58b8a05cb19c972deea117ba0ae5b58535e84311583c4804309a45282a183d07"
+      ],
+      "p50_change_percent": 2.7104108271702065,
+      "p50_regression_flag": false,
+      "rss_change_percent": 2.080783353733162,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_prefixed_32": {
+      "after": {
+        "p50_ns": {
+          "max": 19492745,
+          "median": 19371936,
+          "min": 19338675,
+          "spread_percent": 0.7953257743572971
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_32-01-after.log",
+            "order_index": 1,
+            "p50_ns": 19371936,
+            "report": "capture-0/mce_prefixed_32-01-after.json",
+            "rss": "capture-0/mce_prefixed_32-01-after.rss",
+            "rss_kib": 6520,
+            "sample_max_ns": 19473825
+          },
+          {
+            "log": "capture-0/mce_prefixed_32-02-after.log",
+            "order_index": 2,
+            "p50_ns": 19492745,
+            "report": "capture-0/mce_prefixed_32-02-after.json",
+            "rss": "capture-0/mce_prefixed_32-02-after.rss",
+            "rss_kib": 6404,
+            "sample_max_ns": 19567916
+          },
+          {
+            "log": "capture-0/mce_prefixed_32-05-after.log",
+            "order_index": 5,
+            "p50_ns": 19338675,
+            "report": "capture-0/mce_prefixed_32-05-after.json",
+            "rss": "capture-0/mce_prefixed_32-05-after.rss",
+            "rss_kib": 6496,
+            "sample_max_ns": 19560895
+          }
+        ],
+        "rss_kib": {
+          "max": 6520,
+          "median": 6496,
+          "min": 6404,
+          "spread_percent": 1.7857142857142858
+        },
+        "sample_max_ns": {
+          "max": 19567916,
+          "median": 19560895,
+          "min": 19473825,
+          "spread_percent": 0.48101582264001724
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 19030394,
+          "median": 18777112,
+          "min": 18600131,
+          "spread_percent": 2.291422663932558
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_32-00-before.log",
+            "order_index": 0,
+            "p50_ns": 18600131,
+            "report": "capture-0/mce_prefixed_32-00-before.json",
+            "rss": "capture-0/mce_prefixed_32-00-before.rss",
+            "rss_kib": 6276,
+            "sample_max_ns": 18687522
+          },
+          {
+            "log": "capture-0/mce_prefixed_32-03-before.log",
+            "order_index": 3,
+            "p50_ns": 18777112,
+            "report": "capture-0/mce_prefixed_32-03-before.json",
+            "rss": "capture-0/mce_prefixed_32-03-before.rss",
+            "rss_kib": 6332,
+            "sample_max_ns": 19019193
+          },
+          {
+            "log": "capture-0/mce_prefixed_32-04-before.log",
+            "order_index": 4,
+            "p50_ns": 19030394,
+            "report": "capture-0/mce_prefixed_32-04-before.json",
+            "rss": "capture-0/mce_prefixed_32-04-before.rss",
+            "rss_kib": 6440,
+            "sample_max_ns": 19340155
+          }
+        ],
+        "rss_kib": {
+          "max": 6440,
+          "median": 6332,
+          "min": 6276,
+          "spread_percent": 2.590018951358181
+        },
+        "sample_max_ns": {
+          "max": 19340155,
+          "median": 19019193,
+          "min": 18687522,
+          "spread_percent": 3.4314442258407074
+        }
+      },
+      "case": "mce_prefixed_32",
+      "input_bytes": 1256120,
+      "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+      "n": null,
+      "outcomes": [
+        "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+      ],
+      "p50_change_percent": 3.167814091964738,
+      "p50_regression_flag": false,
+      "rss_change_percent": 2.590018951358175,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_prefixed_8": {
+      "after": {
+        "p50_ns": {
+          "max": 4576350,
+          "median": 4544980,
+          "min": 4543070,
+          "spread_percent": 0.7322364454849086
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_8-01-after.log",
+            "order_index": 1,
+            "p50_ns": 4576350,
+            "report": "capture-0/mce_prefixed_8-01-after.json",
+            "rss": "capture-0/mce_prefixed_8-01-after.rss",
+            "rss_kib": 3880,
+            "sample_max_ns": 4748821
+          },
+          {
+            "log": "capture-0/mce_prefixed_8-02-after.log",
+            "order_index": 2,
+            "p50_ns": 4543070,
+            "report": "capture-0/mce_prefixed_8-02-after.json",
+            "rss": "capture-0/mce_prefixed_8-02-after.rss",
+            "rss_kib": 3864,
+            "sample_max_ns": 4726181
+          },
+          {
+            "log": "capture-0/mce_prefixed_8-05-after.log",
+            "order_index": 5,
+            "p50_ns": 4544980,
+            "report": "capture-0/mce_prefixed_8-05-after.json",
+            "rss": "capture-0/mce_prefixed_8-05-after.rss",
+            "rss_kib": 3836,
+            "sample_max_ns": 4702581
+          }
+        ],
+        "rss_kib": {
+          "max": 3880,
+          "median": 3864,
+          "min": 3836,
+          "spread_percent": 1.1387163561076605
+        },
+        "sample_max_ns": {
+          "max": 4748821,
+          "median": 4726181,
+          "min": 4702581,
+          "spread_percent": 0.9783797954416049
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 4361559,
+          "median": 4343419,
+          "min": 4310898,
+          "spread_percent": 1.1663852831145234
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_8-00-before.log",
+            "order_index": 0,
+            "p50_ns": 4361559,
+            "report": "capture-0/mce_prefixed_8-00-before.json",
+            "rss": "capture-0/mce_prefixed_8-00-before.rss",
+            "rss_kib": 3692,
+            "sample_max_ns": 4517800
+          },
+          {
+            "log": "capture-0/mce_prefixed_8-03-before.log",
+            "order_index": 3,
+            "p50_ns": 4343419,
+            "report": "capture-0/mce_prefixed_8-03-before.json",
+            "rss": "capture-0/mce_prefixed_8-03-before.rss",
+            "rss_kib": 3812,
+            "sample_max_ns": 4492490
+          },
+          {
+            "log": "capture-0/mce_prefixed_8-04-before.log",
+            "order_index": 4,
+            "p50_ns": 4310898,
+            "report": "capture-0/mce_prefixed_8-04-before.json",
+            "rss": "capture-0/mce_prefixed_8-04-before.rss",
+            "rss_kib": 3816,
+            "sample_max_ns": 4429860
+          }
+        ],
+        "rss_kib": {
+          "max": 3816,
+          "median": 3812,
+          "min": 3692,
+          "spread_percent": 3.2528856243441764
+        },
+        "sample_max_ns": {
+          "max": 4517800,
+          "median": 4492490,
+          "min": 4429860,
+          "spread_percent": 1.9574890539544885
+        }
+      },
+      "case": "mce_prefixed_8",
+      "input_bytes": 304120,
+      "input_sha256": "4e540bf1cc96c6295137db6fe6fdef2c0c5552d605f4e9a027cc831a7a26cfe3",
+      "n": null,
+      "outcomes": [
+        "ok:e3c61c20d6e250ad526f601b9b1e26b48c03cc5e934f769149de7dbe8ab4b917"
+      ],
+      "p50_change_percent": 4.64060685832981,
+      "p50_regression_flag": false,
+      "rss_change_percent": 1.364113326337879,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_prefixed_9": {
+      "after": {
+        "p50_ns": {
+          "max": 5424494,
+          "median": 5377454,
+          "min": 5315383,
+          "spread_percent": 2.0290457156862707
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_9-01-after.log",
+            "order_index": 1,
+            "p50_ns": 5424494,
+            "report": "capture-0/mce_prefixed_9-01-after.json",
+            "rss": "capture-0/mce_prefixed_9-01-after.rss",
+            "rss_kib": 3772,
+            "sample_max_ns": 5581965
+          },
+          {
+            "log": "capture-0/mce_prefixed_9-02-after.log",
+            "order_index": 2,
+            "p50_ns": 5377454,
+            "report": "capture-0/mce_prefixed_9-02-after.json",
+            "rss": "capture-0/mce_prefixed_9-02-after.rss",
+            "rss_kib": 3856,
+            "sample_max_ns": 5491464
+          },
+          {
+            "log": "capture-0/mce_prefixed_9-05-after.log",
+            "order_index": 5,
+            "p50_ns": 5315383,
+            "report": "capture-0/mce_prefixed_9-05-after.json",
+            "rss": "capture-0/mce_prefixed_9-05-after.rss",
+            "rss_kib": 3752,
+            "sample_max_ns": 5448394
+          }
+        ],
+        "rss_kib": {
+          "max": 3856,
+          "median": 3772,
+          "min": 3752,
+          "spread_percent": 2.757158006362672
+        },
+        "sample_max_ns": {
+          "max": 5581965,
+          "median": 5491464,
+          "min": 5448394,
+          "spread_percent": 2.43233862591105
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 5273003,
+          "median": 5154542,
+          "min": 5151612,
+          "spread_percent": 2.3550297970217335
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_prefixed_9-00-before.log",
+            "order_index": 0,
+            "p50_ns": 5154542,
+            "report": "capture-0/mce_prefixed_9-00-before.json",
+            "rss": "capture-0/mce_prefixed_9-00-before.rss",
+            "rss_kib": 3948,
+            "sample_max_ns": 5252093
+          },
+          {
+            "log": "capture-0/mce_prefixed_9-03-before.log",
+            "order_index": 3,
+            "p50_ns": 5151612,
+            "report": "capture-0/mce_prefixed_9-03-before.json",
+            "rss": "capture-0/mce_prefixed_9-03-before.rss",
+            "rss_kib": 3596,
+            "sample_max_ns": 5250263
+          },
+          {
+            "log": "capture-0/mce_prefixed_9-04-before.log",
+            "order_index": 4,
+            "p50_ns": 5273003,
+            "report": "capture-0/mce_prefixed_9-04-before.json",
+            "rss": "capture-0/mce_prefixed_9-04-before.rss",
+            "rss_kib": 3864,
+            "sample_max_ns": 5338713
+          }
+        ],
+        "rss_kib": {
+          "max": 3948,
+          "median": 3864,
+          "min": 3596,
+          "spread_percent": 9.109730848861284
+        },
+        "sample_max_ns": {
+          "max": 5338713,
+          "median": 5252093,
+          "min": 5250263,
+          "spread_percent": 1.6840905140103193
+        }
+      },
+      "case": "mce_prefixed_9",
+      "input_bytes": 340120,
+      "input_sha256": "9e1c09483f404f3a9c7c7784061e11acc3dff0e3f0dd3df50090acccb69795ba",
+      "n": null,
+      "outcomes": [
+        "ok:4005886a7091ca602fefbfd85e4969f410911fbd6cf82cee3e17c98b5a65a785"
+      ],
+      "p50_change_percent": 4.324574326875208,
+      "p50_regression_flag": false,
+      "rss_change_percent": -2.3809523809523836,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_stream_count_document": {
+      "after": {
+        "p50_ns": {
+          "max": 5282813,
+          "median": 5251613,
+          "min": 5244423,
+          "spread_percent": 0.7310135000427488
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_stream_count_document-01-after.log",
+            "order_index": 1,
+            "p50_ns": 5251613,
+            "report": "capture-0/mce_stream_count_document-01-after.json",
+            "rss": "capture-0/mce_stream_count_document-01-after.rss",
+            "rss_kib": 3368,
+            "sample_max_ns": 5276093
+          },
+          {
+            "log": "capture-0/mce_stream_count_document-02-after.log",
+            "order_index": 2,
+            "p50_ns": 5282813,
+            "report": "capture-0/mce_stream_count_document-02-after.json",
+            "rss": "capture-0/mce_stream_count_document-02-after.rss",
+            "rss_kib": 3232,
+            "sample_max_ns": 5310713
+          },
+          {
+            "log": "capture-0/mce_stream_count_document-05-after.log",
+            "order_index": 5,
+            "p50_ns": 5244423,
+            "report": "capture-0/mce_stream_count_document-05-after.json",
+            "rss": "capture-0/mce_stream_count_document-05-after.rss",
+            "rss_kib": 3392,
+            "sample_max_ns": 5267333
+          }
+        ],
+        "rss_kib": {
+          "max": 3392,
+          "median": 3368,
+          "min": 3232,
+          "spread_percent": 4.750593824228028
+        },
+        "sample_max_ns": {
+          "max": 5310713,
+          "median": 5276093,
+          "min": 5267333,
+          "spread_percent": 0.8221993054330164
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 5248503,
+          "median": 5167763,
+          "min": 5153953,
+          "spread_percent": 1.8296117681867377
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_stream_count_document-00-before.log",
+            "order_index": 0,
+            "p50_ns": 5167763,
+            "report": "capture-0/mce_stream_count_document-00-before.json",
+            "rss": "capture-0/mce_stream_count_document-00-before.rss",
+            "rss_kib": 3284,
+            "sample_max_ns": 5182093
+          },
+          {
+            "log": "capture-0/mce_stream_count_document-03-before.log",
+            "order_index": 3,
+            "p50_ns": 5248503,
+            "report": "capture-0/mce_stream_count_document-03-before.json",
+            "rss": "capture-0/mce_stream_count_document-03-before.rss",
+            "rss_kib": 3344,
+            "sample_max_ns": 5305093
+          },
+          {
+            "log": "capture-0/mce_stream_count_document-04-before.log",
+            "order_index": 4,
+            "p50_ns": 5153953,
+            "report": "capture-0/mce_stream_count_document-04-before.json",
+            "rss": "capture-0/mce_stream_count_document-04-before.rss",
+            "rss_kib": 3352,
+            "sample_max_ns": 5167343
+          }
+        ],
+        "rss_kib": {
+          "max": 3352,
+          "median": 3344,
+          "min": 3284,
+          "spread_percent": 2.0334928229665072
+        },
+        "sample_max_ns": {
+          "max": 5305093,
+          "median": 5182093,
+          "min": 5167343,
+          "spread_percent": 2.658192355868565
+        }
+      },
+      "case": "mce_stream_count_document",
+      "input_bytes": 288070,
+      "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+      "n": null,
+      "outcomes": [
+        "ok:(7282, 5379):(12492, 5322):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 12493 }"
+      ],
+      "p50_change_percent": 1.6225589292697906,
+      "p50_regression_flag": false,
+      "rss_change_percent": 0.7177033492822948,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "mce_stream_count_worksheet": {
+      "after": {
+        "p50_ns": {
+          "max": 40965450,
+          "median": 40735599,
+          "min": 40499878,
+          "spread_percent": 1.1429118791158563
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_stream_count_worksheet-01-after.log",
+            "order_index": 1,
+            "p50_ns": 40735599,
+            "report": "capture-0/mce_stream_count_worksheet-01-after.json",
+            "rss": "capture-0/mce_stream_count_worksheet-01-after.rss",
+            "rss_kib": 4524,
+            "sample_max_ns": 40771679
+          },
+          {
+            "log": "capture-0/mce_stream_count_worksheet-02-after.log",
+            "order_index": 2,
+            "p50_ns": 40965450,
+            "report": "capture-0/mce_stream_count_worksheet-02-after.json",
+            "rss": "capture-0/mce_stream_count_worksheet-02-after.rss",
+            "rss_kib": 4592,
+            "sample_max_ns": 41568072
+          },
+          {
+            "log": "capture-0/mce_stream_count_worksheet-05-after.log",
+            "order_index": 5,
+            "p50_ns": 40499878,
+            "report": "capture-0/mce_stream_count_worksheet-05-after.json",
+            "rss": "capture-0/mce_stream_count_worksheet-05-after.rss",
+            "rss_kib": 4512,
+            "sample_max_ns": 40670749
+          }
+        ],
+        "rss_kib": {
+          "max": 4592,
+          "median": 4524,
+          "min": 4512,
+          "spread_percent": 1.7683465959328029
+        },
+        "sample_max_ns": {
+          "max": 41568072,
+          "median": 40771679,
+          "min": 40670749,
+          "spread_percent": 2.200848780350694
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 40312257,
+          "median": 40218956,
+          "min": 39999946,
+          "spread_percent": 0.7765268695686681
+        },
+        "processes": [
+          {
+            "log": "capture-0/mce_stream_count_worksheet-00-before.log",
+            "order_index": 0,
+            "p50_ns": 39999946,
+            "report": "capture-0/mce_stream_count_worksheet-00-before.json",
+            "rss": "capture-0/mce_stream_count_worksheet-00-before.rss",
+            "rss_kib": 4564,
+            "sample_max_ns": 40542998
+          },
+          {
+            "log": "capture-0/mce_stream_count_worksheet-03-before.log",
+            "order_index": 3,
+            "p50_ns": 40312257,
+            "report": "capture-0/mce_stream_count_worksheet-03-before.json",
+            "rss": "capture-0/mce_stream_count_worksheet-03-before.rss",
+            "rss_kib": 4552,
+            "sample_max_ns": 40420617
+          },
+          {
+            "log": "capture-0/mce_stream_count_worksheet-04-before.log",
+            "order_index": 4,
+            "p50_ns": 40218956,
+            "report": "capture-0/mce_stream_count_worksheet-04-before.json",
+            "rss": "capture-0/mce_stream_count_worksheet-04-before.rss",
+            "rss_kib": 4596,
+            "sample_max_ns": 40429957
+          }
+        ],
+        "rss_kib": {
+          "max": 4596,
+          "median": 4564,
+          "min": 4552,
+          "spread_percent": 0.9640666082383874
+        },
+        "sample_max_ns": {
+          "max": 40542998,
+          "median": 40429957,
+          "min": 40420617,
+          "spread_percent": 0.3026988131597568
+        }
+      },
+      "case": "mce_stream_count_worksheet",
+      "input_bytes": 1558391,
+      "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+      "n": null,
+      "outcomes": [
+        "ok:(60809, 53265):(159586, 49460):StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+      ],
+      "p50_change_percent": 1.2845758601988555,
+      "p50_regression_flag": false,
+      "rss_change_percent": -0.876424189307623,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n0": {
+      "after": {
+        "p50_ns": {
+          "max": 6800,
+          "median": 6690,
+          "min": 6570,
+          "spread_percent": 3.43796711509716
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-01-after.log",
+            "order_index": 1,
+            "p50_ns": 6800,
+            "report": "capture-0/opc_relationship_declarations-n0-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-01-after.rss",
+            "rss_kib": 3200,
+            "sample_max_ns": 8280
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-02-after.log",
+            "order_index": 2,
+            "p50_ns": 6570,
+            "report": "capture-0/opc_relationship_declarations-n0-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-02-after.rss",
+            "rss_kib": 3068,
+            "sample_max_ns": 8110
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-05-after.log",
+            "order_index": 5,
+            "p50_ns": 6690,
+            "report": "capture-0/opc_relationship_declarations-n0-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-05-after.rss",
+            "rss_kib": 3040,
+            "sample_max_ns": 7970
+          }
+        ],
+        "rss_kib": {
+          "max": 3200,
+          "median": 3068,
+          "min": 3040,
+          "spread_percent": 5.215123859191656
+        },
+        "sample_max_ns": {
+          "max": 8280,
+          "median": 8110,
+          "min": 7970,
+          "spread_percent": 3.822441430332922
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 6620,
+          "median": 6510,
+          "min": 6340,
+          "spread_percent": 4.301075268817204
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-00-before.log",
+            "order_index": 0,
+            "p50_ns": 6340,
+            "report": "capture-0/opc_relationship_declarations-n0-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-00-before.rss",
+            "rss_kib": 3232,
+            "sample_max_ns": 7971
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-03-before.log",
+            "order_index": 3,
+            "p50_ns": 6620,
+            "report": "capture-0/opc_relationship_declarations-n0-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-03-before.rss",
+            "rss_kib": 3308,
+            "sample_max_ns": 7860
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n0-04-before.log",
+            "order_index": 4,
+            "p50_ns": 6510,
+            "report": "capture-0/opc_relationship_declarations-n0-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n0-04-before.rss",
+            "rss_kib": 2944,
+            "sample_max_ns": 8000
+          }
+        ],
+        "rss_kib": {
+          "max": 3308,
+          "median": 3232,
+          "min": 2944,
+          "spread_percent": 11.262376237623762
+        },
+        "sample_max_ns": {
+          "max": 8000,
+          "median": 7971,
+          "min": 7860,
+          "spread_percent": 1.7563668297578723
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 845,
+      "input_sha256": null,
+      "n": 0,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 2.764976958525356,
+      "p50_regression_flag": false,
+      "rss_change_percent": -5.074257425742578,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n1024": {
+      "after": {
+        "p50_ns": {
+          "max": 15680,
+          "median": 15600,
+          "min": 15590,
+          "spread_percent": 0.5769230769230769
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-01-after.log",
+            "order_index": 1,
+            "p50_ns": 15590,
+            "report": "capture-0/opc_relationship_declarations-n1024-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-01-after.rss",
+            "rss_kib": 3316,
+            "sample_max_ns": 19821
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-02-after.log",
+            "order_index": 2,
+            "p50_ns": 15680,
+            "report": "capture-0/opc_relationship_declarations-n1024-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-02-after.rss",
+            "rss_kib": 3276,
+            "sample_max_ns": 17900
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-05-after.log",
+            "order_index": 5,
+            "p50_ns": 15600,
+            "report": "capture-0/opc_relationship_declarations-n1024-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-05-after.rss",
+            "rss_kib": 3148,
+            "sample_max_ns": 18070
+          }
+        ],
+        "rss_kib": {
+          "max": 3316,
+          "median": 3276,
+          "min": 3148,
+          "spread_percent": 5.128205128205129
+        },
+        "sample_max_ns": {
+          "max": 19821,
+          "median": 18070,
+          "min": 17900,
+          "spread_percent": 10.630879911455452
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 15310,
+          "median": 15240,
+          "min": 15240,
+          "spread_percent": 0.45931758530183725
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-00-before.log",
+            "order_index": 0,
+            "p50_ns": 15240,
+            "report": "capture-0/opc_relationship_declarations-n1024-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-00-before.rss",
+            "rss_kib": 3300,
+            "sample_max_ns": 17610
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-03-before.log",
+            "order_index": 3,
+            "p50_ns": 15310,
+            "report": "capture-0/opc_relationship_declarations-n1024-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-03-before.rss",
+            "rss_kib": 3056,
+            "sample_max_ns": 26080
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n1024-04-before.log",
+            "order_index": 4,
+            "p50_ns": 15240,
+            "report": "capture-0/opc_relationship_declarations-n1024-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n1024-04-before.rss",
+            "rss_kib": 3092,
+            "sample_max_ns": 17810
+          }
+        ],
+        "rss_kib": {
+          "max": 3300,
+          "median": 3092,
+          "min": 3056,
+          "spread_percent": 7.8913324708926265
+        },
+        "sample_max_ns": {
+          "max": 26080,
+          "median": 17810,
+          "min": 17610,
+          "spread_percent": 47.55755193711398
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 16119,
+      "input_sha256": null,
+      "n": 1024,
+      "outcomes": [
+        "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+      ],
+      "p50_change_percent": 2.3622047244094446,
+      "p50_regression_flag": false,
+      "rss_change_percent": 5.950840879689512,
+      "rss_regression_flag": true,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n16384": {
+      "after": {
+        "p50_ns": {
+          "max": 158720,
+          "median": 154491,
+          "min": 154041,
+          "spread_percent": 3.0286553909289213
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-01-after.log",
+            "order_index": 1,
+            "p50_ns": 154491,
+            "report": "capture-0/opc_relationship_declarations-n16384-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-01-after.rss",
+            "rss_kib": 3504,
+            "sample_max_ns": 174110
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-02-after.log",
+            "order_index": 2,
+            "p50_ns": 154041,
+            "report": "capture-0/opc_relationship_declarations-n16384-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-02-after.rss",
+            "rss_kib": 3776,
+            "sample_max_ns": 163951
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-05-after.log",
+            "order_index": 5,
+            "p50_ns": 158720,
+            "report": "capture-0/opc_relationship_declarations-n16384-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-05-after.rss",
+            "rss_kib": 3716,
+            "sample_max_ns": 180031
+          }
+        ],
+        "rss_kib": {
+          "max": 3776,
+          "median": 3716,
+          "min": 3504,
+          "spread_percent": 7.3196986006458555
+        },
+        "sample_max_ns": {
+          "max": 180031,
+          "median": 174110,
+          "min": 163951,
+          "spread_percent": 9.235540750100512
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 153391,
+          "median": 153091,
+          "min": 152720,
+          "spread_percent": 0.4383014024338465
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-00-before.log",
+            "order_index": 0,
+            "p50_ns": 153091,
+            "report": "capture-0/opc_relationship_declarations-n16384-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-00-before.rss",
+            "rss_kib": 3604,
+            "sample_max_ns": 167531
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-03-before.log",
+            "order_index": 3,
+            "p50_ns": 153391,
+            "report": "capture-0/opc_relationship_declarations-n16384-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-03-before.rss",
+            "rss_kib": 3780,
+            "sample_max_ns": 167411
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n16384-04-before.log",
+            "order_index": 4,
+            "p50_ns": 152720,
+            "report": "capture-0/opc_relationship_declarations-n16384-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n16384-04-before.rss",
+            "rss_kib": 4080,
+            "sample_max_ns": 170190
+          }
+        ],
+        "rss_kib": {
+          "max": 4080,
+          "median": 3780,
+          "min": 3604,
+          "spread_percent": 12.592592592592593
+        },
+        "sample_max_ns": {
+          "max": 170190,
+          "median": 167531,
+          "min": 167411,
+          "spread_percent": 1.6587974762879705
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 268263,
+      "input_sha256": null,
+      "n": 16384,
+      "outcomes": [
+        "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+      ],
+      "p50_change_percent": 0.9144887681183045,
+      "p50_regression_flag": false,
+      "rss_change_percent": -1.6931216931216908,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n256": {
+      "after": {
+        "p50_ns": {
+          "max": 35690,
+          "median": 35151,
+          "min": 33760,
+          "spread_percent": 5.490597707035362
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-01-after.log",
+            "order_index": 1,
+            "p50_ns": 35690,
+            "report": "capture-0/opc_relationship_declarations-n256-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-01-after.rss",
+            "rss_kib": 2980,
+            "sample_max_ns": 49620
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-02-after.log",
+            "order_index": 2,
+            "p50_ns": 35151,
+            "report": "capture-0/opc_relationship_declarations-n256-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-02-after.rss",
+            "rss_kib": 3312,
+            "sample_max_ns": 39300
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-05-after.log",
+            "order_index": 5,
+            "p50_ns": 33760,
+            "report": "capture-0/opc_relationship_declarations-n256-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-05-after.rss",
+            "rss_kib": 3204,
+            "sample_max_ns": 54470
+          }
+        ],
+        "rss_kib": {
+          "max": 3312,
+          "median": 3204,
+          "min": 2980,
+          "spread_percent": 10.362047440699126
+        },
+        "sample_max_ns": {
+          "max": 54470,
+          "median": 49620,
+          "min": 39300,
+          "spread_percent": 30.57234985892785
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 23171,
+          "median": 22811,
+          "min": 22660,
+          "spread_percent": 2.2401472973565384
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-00-before.log",
+            "order_index": 0,
+            "p50_ns": 22811,
+            "report": "capture-0/opc_relationship_declarations-n256-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-00-before.rss",
+            "rss_kib": 3056,
+            "sample_max_ns": 35850
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-03-before.log",
+            "order_index": 3,
+            "p50_ns": 22660,
+            "report": "capture-0/opc_relationship_declarations-n256-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-03-before.rss",
+            "rss_kib": 3264,
+            "sample_max_ns": 24030
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n256-04-before.log",
+            "order_index": 4,
+            "p50_ns": 23171,
+            "report": "capture-0/opc_relationship_declarations-n256-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n256-04-before.rss",
+            "rss_kib": 3268,
+            "sample_max_ns": 35560
+          }
+        ],
+        "rss_kib": {
+          "max": 3268,
+          "median": 3264,
+          "min": 3056,
+          "spread_percent": 6.495098039215686
+        },
+        "sample_max_ns": {
+          "max": 35850,
+          "median": 35560,
+          "min": 24030,
+          "spread_percent": 33.239595050618675
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 4575,
+      "input_sha256": null,
+      "n": 256,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 54.09670772872737,
+      "p50_regression_flag": true,
+      "rss_change_percent": -1.8382352941176516,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n29": {
+      "after": {
+        "p50_ns": {
+          "max": 9130,
+          "median": 8860,
+          "min": 8840,
+          "spread_percent": 3.27313769751693
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-01-after.log",
+            "order_index": 1,
+            "p50_ns": 9130,
+            "report": "capture-0/opc_relationship_declarations-n29-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-01-after.rss",
+            "rss_kib": 3144,
+            "sample_max_ns": 29700
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-02-after.log",
+            "order_index": 2,
+            "p50_ns": 8860,
+            "report": "capture-0/opc_relationship_declarations-n29-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-02-after.rss",
+            "rss_kib": 3132,
+            "sample_max_ns": 11110
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-05-after.log",
+            "order_index": 5,
+            "p50_ns": 8840,
+            "report": "capture-0/opc_relationship_declarations-n29-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-05-after.rss",
+            "rss_kib": 3108,
+            "sample_max_ns": 11000
+          }
+        ],
+        "rss_kib": {
+          "max": 3144,
+          "median": 3132,
+          "min": 3108,
+          "spread_percent": 1.1494252873563218
+        },
+        "sample_max_ns": {
+          "max": 29700,
+          "median": 11110,
+          "min": 11000,
+          "spread_percent": 168.31683168316832
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 8750,
+          "median": 8730,
+          "min": 8480,
+          "spread_percent": 3.0927835051546393
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-00-before.log",
+            "order_index": 0,
+            "p50_ns": 8730,
+            "report": "capture-0/opc_relationship_declarations-n29-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-00-before.rss",
+            "rss_kib": 3028,
+            "sample_max_ns": 10660
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-03-before.log",
+            "order_index": 3,
+            "p50_ns": 8480,
+            "report": "capture-0/opc_relationship_declarations-n29-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-03-before.rss",
+            "rss_kib": 3012,
+            "sample_max_ns": 10530
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n29-04-before.log",
+            "order_index": 4,
+            "p50_ns": 8750,
+            "report": "capture-0/opc_relationship_declarations-n29-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n29-04-before.rss",
+            "rss_kib": 3224,
+            "sample_max_ns": 10920
+          }
+        ],
+        "rss_kib": {
+          "max": 3224,
+          "median": 3028,
+          "min": 3012,
+          "spread_percent": 7.001321003963012
+        },
+        "sample_max_ns": {
+          "max": 10920,
+          "median": 10660,
+          "min": 10530,
+          "spread_percent": 3.658536585365854
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 1241,
+      "input_sha256": null,
+      "n": 29,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 1.4891179839633395,
+      "p50_regression_flag": false,
+      "rss_change_percent": 3.4346103038309206,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n30": {
+      "after": {
+        "p50_ns": {
+          "max": 9860,
+          "median": 9750,
+          "min": 9740,
+          "spread_percent": 1.2307692307692308
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-01-after.log",
+            "order_index": 1,
+            "p50_ns": 9740,
+            "report": "capture-0/opc_relationship_declarations-n30-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-01-after.rss",
+            "rss_kib": 3264,
+            "sample_max_ns": 13060
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-02-after.log",
+            "order_index": 2,
+            "p50_ns": 9750,
+            "report": "capture-0/opc_relationship_declarations-n30-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-02-after.rss",
+            "rss_kib": 3100,
+            "sample_max_ns": 12740
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-05-after.log",
+            "order_index": 5,
+            "p50_ns": 9860,
+            "report": "capture-0/opc_relationship_declarations-n30-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-05-after.rss",
+            "rss_kib": 3108,
+            "sample_max_ns": 12710
+          }
+        ],
+        "rss_kib": {
+          "max": 3264,
+          "median": 3108,
+          "min": 3100,
+          "spread_percent": 5.276705276705277
+        },
+        "sample_max_ns": {
+          "max": 13060,
+          "median": 12740,
+          "min": 12710,
+          "spread_percent": 2.7472527472527473
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 9400,
+          "median": 9190,
+          "min": 9091,
+          "spread_percent": 3.3623503808487487
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-00-before.log",
+            "order_index": 0,
+            "p50_ns": 9190,
+            "report": "capture-0/opc_relationship_declarations-n30-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-00-before.rss",
+            "rss_kib": 3044,
+            "sample_max_ns": 10870
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-03-before.log",
+            "order_index": 3,
+            "p50_ns": 9400,
+            "report": "capture-0/opc_relationship_declarations-n30-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-03-before.rss",
+            "rss_kib": 3308,
+            "sample_max_ns": 21340
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n30-04-before.log",
+            "order_index": 4,
+            "p50_ns": 9091,
+            "report": "capture-0/opc_relationship_declarations-n30-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n30-04-before.rss",
+            "rss_kib": 3032,
+            "sample_max_ns": 10870
+          }
+        ],
+        "rss_kib": {
+          "max": 3308,
+          "median": 3044,
+          "min": 3032,
+          "spread_percent": 9.067017082785808
+        },
+        "sample_max_ns": {
+          "max": 21340,
+          "median": 10870,
+          "min": 10870,
+          "spread_percent": 96.32014719411224
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 1255,
+      "input_sha256": null,
+      "n": 30,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 6.093579978237207,
+      "p50_regression_flag": true,
+      "rss_change_percent": 2.1024967148488782,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n32": {
+      "after": {
+        "p50_ns": {
+          "max": 10270,
+          "median": 9950,
+          "min": 9940,
+          "spread_percent": 3.3165829145728645
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-01-after.log",
+            "order_index": 1,
+            "p50_ns": 10270,
+            "report": "capture-0/opc_relationship_declarations-n32-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-01-after.rss",
+            "rss_kib": 3292,
+            "sample_max_ns": 13180
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-02-after.log",
+            "order_index": 2,
+            "p50_ns": 9940,
+            "report": "capture-0/opc_relationship_declarations-n32-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-02-after.rss",
+            "rss_kib": 3292,
+            "sample_max_ns": 13710
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-05-after.log",
+            "order_index": 5,
+            "p50_ns": 9950,
+            "report": "capture-0/opc_relationship_declarations-n32-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-05-after.rss",
+            "rss_kib": 3168,
+            "sample_max_ns": 12900
+          }
+        ],
+        "rss_kib": {
+          "max": 3292,
+          "median": 3292,
+          "min": 3168,
+          "spread_percent": 3.766707168894289
+        },
+        "sample_max_ns": {
+          "max": 13710,
+          "median": 13180,
+          "min": 12900,
+          "spread_percent": 6.145675265553869
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 9730,
+          "median": 9480,
+          "min": 9450,
+          "spread_percent": 2.9535864978902953
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-00-before.log",
+            "order_index": 0,
+            "p50_ns": 9480,
+            "report": "capture-0/opc_relationship_declarations-n32-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-00-before.rss",
+            "rss_kib": 3044,
+            "sample_max_ns": 11221
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-03-before.log",
+            "order_index": 3,
+            "p50_ns": 9730,
+            "report": "capture-0/opc_relationship_declarations-n32-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-03-before.rss",
+            "rss_kib": 2972,
+            "sample_max_ns": 11240
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n32-04-before.log",
+            "order_index": 4,
+            "p50_ns": 9450,
+            "report": "capture-0/opc_relationship_declarations-n32-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n32-04-before.rss",
+            "rss_kib": 3024,
+            "sample_max_ns": 11400
+          }
+        ],
+        "rss_kib": {
+          "max": 3044,
+          "median": 3024,
+          "min": 2972,
+          "spread_percent": 2.380952380952381
+        },
+        "sample_max_ns": {
+          "max": 11400,
+          "median": 11240,
+          "min": 11221,
+          "spread_percent": 1.592526690391459
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 1283,
+      "input_sha256": null,
+      "n": 32,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 4.957805907172985,
+      "p50_regression_flag": false,
+      "rss_change_percent": 8.86243386243386,
+      "rss_regression_flag": true,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n33": {
+      "after": {
+        "p50_ns": {
+          "max": 10180,
+          "median": 10120,
+          "min": 9980,
+          "spread_percent": 1.976284584980237
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-01-after.log",
+            "order_index": 1,
+            "p50_ns": 10180,
+            "report": "capture-0/opc_relationship_declarations-n33-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-01-after.rss",
+            "rss_kib": 3092,
+            "sample_max_ns": 12390
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-02-after.log",
+            "order_index": 2,
+            "p50_ns": 9980,
+            "report": "capture-0/opc_relationship_declarations-n33-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-02-after.rss",
+            "rss_kib": 3260,
+            "sample_max_ns": 12580
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-05-after.log",
+            "order_index": 5,
+            "p50_ns": 10120,
+            "report": "capture-0/opc_relationship_declarations-n33-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-05-after.rss",
+            "rss_kib": 3292,
+            "sample_max_ns": 12750
+          }
+        ],
+        "rss_kib": {
+          "max": 3292,
+          "median": 3260,
+          "min": 3092,
+          "spread_percent": 6.134969325153374
+        },
+        "sample_max_ns": {
+          "max": 12750,
+          "median": 12580,
+          "min": 12390,
+          "spread_percent": 2.861685214626391
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 9520,
+          "median": 9520,
+          "min": 9270,
+          "spread_percent": 2.6260504201680672
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-00-before.log",
+            "order_index": 0,
+            "p50_ns": 9270,
+            "report": "capture-0/opc_relationship_declarations-n33-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-00-before.rss",
+            "rss_kib": 3236,
+            "sample_max_ns": 11091
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-03-before.log",
+            "order_index": 3,
+            "p50_ns": 9520,
+            "report": "capture-0/opc_relationship_declarations-n33-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-03-before.rss",
+            "rss_kib": 3044,
+            "sample_max_ns": 11840
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n33-04-before.log",
+            "order_index": 4,
+            "p50_ns": 9520,
+            "report": "capture-0/opc_relationship_declarations-n33-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n33-04-before.rss",
+            "rss_kib": 3188,
+            "sample_max_ns": 11120
+          }
+        ],
+        "rss_kib": {
+          "max": 3236,
+          "median": 3188,
+          "min": 3044,
+          "spread_percent": 6.022584692597239
+        },
+        "sample_max_ns": {
+          "max": 11840,
+          "median": 11120,
+          "min": 11091,
+          "spread_percent": 6.735611510791367
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 1297,
+      "input_sha256": null,
+      "n": 33,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 6.302521008403361,
+      "p50_regression_flag": true,
+      "rss_change_percent": 2.258469259723972,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n4096": {
+      "after": {
+        "p50_ns": {
+          "max": 43530,
+          "median": 43480,
+          "min": 43331,
+          "spread_percent": 0.4576816927322907
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-01-after.log",
+            "order_index": 1,
+            "p50_ns": 43530,
+            "report": "capture-0/opc_relationship_declarations-n4096-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-01-after.rss",
+            "rss_kib": 3356,
+            "sample_max_ns": 44181
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-02-after.log",
+            "order_index": 2,
+            "p50_ns": 43480,
+            "report": "capture-0/opc_relationship_declarations-n4096-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-02-after.rss",
+            "rss_kib": 3548,
+            "sample_max_ns": 51021
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-05-after.log",
+            "order_index": 5,
+            "p50_ns": 43331,
+            "report": "capture-0/opc_relationship_declarations-n4096-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-05-after.rss",
+            "rss_kib": 3520,
+            "sample_max_ns": 44060
+          }
+        ],
+        "rss_kib": {
+          "max": 3548,
+          "median": 3520,
+          "min": 3356,
+          "spread_percent": 5.454545454545454
+        },
+        "sample_max_ns": {
+          "max": 51021,
+          "median": 44181,
+          "min": 44060,
+          "spread_percent": 15.755641565378783
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 44040,
+          "median": 43030,
+          "min": 42960,
+          "spread_percent": 2.509876830118522
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-00-before.log",
+            "order_index": 0,
+            "p50_ns": 44040,
+            "report": "capture-0/opc_relationship_declarations-n4096-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-00-before.rss",
+            "rss_kib": 3348,
+            "sample_max_ns": 55040
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-03-before.log",
+            "order_index": 3,
+            "p50_ns": 42960,
+            "report": "capture-0/opc_relationship_declarations-n4096-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-03-before.rss",
+            "rss_kib": 3552,
+            "sample_max_ns": 58471
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n4096-04-before.log",
+            "order_index": 4,
+            "p50_ns": 43030,
+            "report": "capture-0/opc_relationship_declarations-n4096-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n4096-04-before.rss",
+            "rss_kib": 3540,
+            "sample_max_ns": 66640
+          }
+        ],
+        "rss_kib": {
+          "max": 3552,
+          "median": 3540,
+          "min": 3348,
+          "spread_percent": 5.762711864406779
+        },
+        "sample_max_ns": {
+          "max": 66640,
+          "median": 58471,
+          "min": 55040,
+          "spread_percent": 19.83889449470678
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 65271,
+      "input_sha256": null,
+      "n": 4096,
+      "outcomes": [
+        "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+      ],
+      "p50_change_percent": 1.04578201254939,
+      "p50_regression_flag": false,
+      "rss_change_percent": -0.5649717514124242,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    },
+    "opc_relationship_declarations::n8": {
+      "after": {
+        "p50_ns": {
+          "max": 7620,
+          "median": 7440,
+          "min": 7390,
+          "spread_percent": 3.0913978494623655
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-01-after.log",
+            "order_index": 1,
+            "p50_ns": 7390,
+            "report": "capture-0/opc_relationship_declarations-n8-01-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-01-after.rss",
+            "rss_kib": 2992,
+            "sample_max_ns": 9221
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-02-after.log",
+            "order_index": 2,
+            "p50_ns": 7620,
+            "report": "capture-0/opc_relationship_declarations-n8-02-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-02-after.rss",
+            "rss_kib": 3252,
+            "sample_max_ns": 9100
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-05-after.log",
+            "order_index": 5,
+            "p50_ns": 7440,
+            "report": "capture-0/opc_relationship_declarations-n8-05-after.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-05-after.rss",
+            "rss_kib": 3092,
+            "sample_max_ns": 9410
+          }
+        ],
+        "rss_kib": {
+          "max": 3252,
+          "median": 3092,
+          "min": 2992,
+          "spread_percent": 8.408796895213454
+        },
+        "sample_max_ns": {
+          "max": 9410,
+          "median": 9221,
+          "min": 9100,
+          "spread_percent": 3.3618913349962045
+        }
+      },
+      "before": {
+        "p50_ns": {
+          "max": 7270,
+          "median": 7070,
+          "min": 7070,
+          "spread_percent": 2.828854314002829
+        },
+        "processes": [
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-00-before.log",
+            "order_index": 0,
+            "p50_ns": 7070,
+            "report": "capture-0/opc_relationship_declarations-n8-00-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-00-before.rss",
+            "rss_kib": 3244,
+            "sample_max_ns": 9060
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-03-before.log",
+            "order_index": 3,
+            "p50_ns": 7070,
+            "report": "capture-0/opc_relationship_declarations-n8-03-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-03-before.rss",
+            "rss_kib": 3308,
+            "sample_max_ns": 9040
+          },
+          {
+            "log": "capture-0/opc_relationship_declarations-n8-04-before.log",
+            "order_index": 4,
+            "p50_ns": 7270,
+            "report": "capture-0/opc_relationship_declarations-n8-04-before.json",
+            "rss": "capture-0/opc_relationship_declarations-n8-04-before.rss",
+            "rss_kib": 3012,
+            "sample_max_ns": 8840
+          }
+        ],
+        "rss_kib": {
+          "max": 3308,
+          "median": 3244,
+          "min": 3012,
+          "spread_percent": 9.124537607891492
+        },
+        "sample_max_ns": {
+          "max": 9060,
+          "median": 9040,
+          "min": 8840,
+          "spread_percent": 2.433628318584071
+        }
+      },
+      "case": "opc_relationship_declarations",
+      "input_bytes": 949,
+      "input_sha256": null,
+      "n": 8,
+      "outcomes": [
+        "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+      ],
+      "p50_change_percent": 5.233380480905225,
+      "p50_regression_flag": true,
+      "rss_change_percent": -4.6855733662145465,
+      "rss_regression_flag": false,
+      "samples": 9,
+      "warmup": 2
+    }
+  },
+  "differential": {
+    "changes": {},
+    "comparisons": 228716,
+    "summary": {
+      "formats": {
+        "Docx": 1567,
+        "Other": 120,
+        "Pptx": 126,
+        "Xlsx": 275
+      },
+      "mutated_packages": 2037,
+      "mutations": 113830,
+      "outcomes": 228716,
+      "packages": 2088
+    },
+    "unchanged": 228716
+  },
+  "equivalence": {
+    "mismatches": 0,
+    "report": "capture-0/equivalence.json"
+  },
+  "limits": "Three serial processes per leg and nine measured samples per process. Sample maxima are descriptive, not stable p95/p99 estimates. RSS includes whole-process startup, input generation, parsing, and report overhead.",
+  "schema": "litchi-0777-xml-attribute-analysis-v1"
+}

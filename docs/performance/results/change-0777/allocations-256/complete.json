@@ -1,0 +1,6 @@
+{
+  "fixtures_unchanged": true,
+  "runs": 2,
+  "scope": "One whole-process instrumented sample per case/leg, including startup, input generation, parsing, observation and report serialization. Instrumented time is not native time.",
+  "source_unchanged": true
+}

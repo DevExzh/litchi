@@ -1,0 +1,584 @@
+# Every production call of quick_xml BytesStart::attributes in the in-scope crates at base 2be9758ff9
+# (clippy disallowed_methods survey, --all-features --lib), with its classification and replacement.
+crate	file	line	base_checks	class	replacement	evidence
+xml-minifier	crates/xml-minifier/src/audit.rs	2571	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-sign	crates/litchi-sign/src/xml.rs	1383	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ole-common	crates/litchi-ole-common/src/custom_xml/xml.rs	190	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ole-common	crates/litchi-ole-common/src/custom_xml/xml.rs	223	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/content_type.rs	362	default	fail-fast	checked_attributes	let x = item?
+litchi-opc	crates/litchi-opc/src/package/content_types.rs	406	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/package/relationships.rs	862	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/package/relationships.rs	968	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/package/relationships.rs	1593	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/part.rs	572	default	fail-fast	checked_attributes	let x = item?
+litchi-opc	crates/litchi-opc/src/pkgreader.rs	2147	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/source_backed/content_types_plan.rs	770	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/source_backed/content_types_plan.rs	791	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/source_backed.rs	739	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/source_backed.rs	860	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-crypto	crates/litchi-crypto/src/labels.rs	453	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-crypto	crates/litchi-crypto/src/labels.rs	629	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-crypto	crates/litchi-crypto/src/labels.rs	759	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-crypto	crates/litchi-crypto/src/labels.rs	775	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-crypto	crates/litchi-crypto/src/ooxml/agile.rs	1590	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/xml_splice/owned.rs	248	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/xml_splice/owned.rs	606	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/xml_splice/owned.rs	699	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/xml_splice.rs	1102	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-opc	crates/litchi-opc/src/xml_splice.rs	1180	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/binding_tracker.rs	295	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-ooxml-common	crates/litchi-ooxml-common/src/binding_tracker.rs	681	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom/codec.rs	399	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom/codec.rs	438	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom/codec.rs	505	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_data/codec.rs	368	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_data/codec.rs	602	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_data/codec.rs	1659	default	count	count_up_to	counted every checked item (reads on after a duplicate); the same count NamespaceState::enter already bounds
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_data/codec.rs	1671	default	count	count_up_to (reused)	reservation from a second full checked count
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_data/codec.rs	1673	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_xml/codec.rs	421	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_xml/codec.rs	461	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/custom_xml/codec.rs	723	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/mce/alternative/codec.rs	289	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/mce/alternative/codec.rs	350	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/mce/stream.rs	2688	false	unchecked	allowed (module attribute in mce/mod.rs)	with_checks(false); record 0771 owns the file
+litchi-ooxml-common	crates/litchi-ooxml-common/src/mce/codec.rs	876	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/mce/fragment.rs	366	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-ooxml-common	crates/litchi-ooxml-common/src/properties/read.rs	388	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/properties/read.rs	518	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/relationships/codec.rs	33	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/ribbon/codec.rs	192	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/ribbon/codec.rs	348	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/spreadsheet_xml_maps/codec.rs	706	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/spreadsheet_xml_maps/codec.rs	774	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/spreadsheet_xml_maps/codec.rs	791	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/web/codec/xml.rs	321	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/web/codec/xml.rs	570	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/web/model/custom_functions.rs	636	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/web/model/custom_functions.rs	651	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/web/model/custom_functions.rs	682	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xldm	crates/litchi-xldm/src/identity.rs	2031	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xldm	crates/litchi-xldm/src/metadata/codec.rs	267	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-formula	crates/litchi-formula/src/omml/xml_attributes.rs	40	default	helper	allowed	0764's private first_wins copy (checks off)
+litchi-xldm	crates/litchi-xldm/src/olap.rs	1112	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ooxml-common	crates/litchi-ooxml-common/src/xml/attributes.rs	56	default	helper	unchecked_attributes	0764's first_wins (checks off)
+litchi-ooxml-common	crates/litchi-ooxml-common/src/xml/attributes.rs	73	false	helper	unchecked_attributes	0764's count_up_to (checks off)
+litchi-ooxml-common	crates/litchi-ooxml-common/src/xml.rs	125	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xldm	crates/litchi-xldm/src/codec.rs	1328	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/blip.rs	52	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	418	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	527	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	680	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	1233	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	1275	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/extension/formatcode2.rs	1432	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/model.rs	37	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/reader/model.rs	68	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/reader/model.rs	208	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/chart/style/codec.rs	662	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/color/codec.rs	396	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/diagram/data/codec.rs	745	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/diagram/definition.rs	193	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/authoring.rs	860	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/authoring.rs	1295	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/codec.rs	908	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/codec.rs	1042	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/codec.rs	1252	default	lenient	first_wins	any() skipping errors
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	2084	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	2272	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	4509	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	5289	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	5468	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions_edit.rs	5596	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	1094	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	1724	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	1754	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	1887	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	2077	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/ink/actions.rs	2328	default	lenient	first_wins	any() skipping errors
+litchi-drawingml	crates/litchi-drawingml/src/model3d/codec/xml.rs	558	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/model3d/codec/xml.rs	617	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	1553	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	1675	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	1802	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	1857	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	2183	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	2421	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/svg_blip.rs	2457	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/codec.rs	1173	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/codec.rs	167	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/codec.rs	481	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/codec.rs	523	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/part.rs	565	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/part.rs	1528	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/part.rs	2258	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/part.rs	2310	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-drawingml	crates/litchi-drawingml/src/theme/family/part.rs	2385	default	lenient	first_wins	flatten()
+litchi-drawingml	crates/litchi-drawingml/src/transform/codec.rs	358	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-spreadsheet-drawing	crates/litchi-spreadsheet-drawing/src/chart/codec.rs	103	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-spreadsheet-drawing	crates/litchi-spreadsheet-drawing/src/chart/codec.rs	654	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-spreadsheet-drawing	crates/litchi-spreadsheet-drawing/src/shape/reader.rs	885	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-spreadsheet-drawing	crates/litchi-spreadsheet-drawing/src/shape/reader.rs	1335	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ppt	crates/litchi-ppt/src/slide_round_trip.rs	482	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-ppt	crates/litchi-ppt/src/slide_round_trip.rs	758	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-xlsb	crates/litchi-xlsb/src/cell_values/drawing_transfer.rs	1045	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/cell_values/drawing_transfer.rs	1066	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/cell_values/drawing_transfer.rs	1352	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/cell_values/drawing_transfer.rs	1669	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/comments/threaded/codec/mod.rs	718	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/package/../host/drawing.rs	772	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsb	crates/litchi-xlsb/src/timeline/codec.rs	68	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/animations/codec/validation.rs	296	default	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-pptx	crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs	371	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/animations/package.rs	676	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/change_tracking/codec.rs	572	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/chart/extension/codec/xml.rs	520	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/comments/codec.rs	438	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/comments/collaboration/codec.rs	1000	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/font/codec.rs	365	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/font/codec.rs	402	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/font/package.rs	565	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/media_parts/codec.rs	582	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs	580	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs	602	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs	613	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs	628	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec.rs	330	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec.rs	352	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec.rs	363	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/codec.rs	380	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/wire/xml.rs	234	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/modern_comments/wire/xml.rs	263	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/master_layout/codec.rs	705	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/master_layout/codec.rs	732	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/master_layout/package.rs	599	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/master_layout/package.rs	718	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/master_layout/placeholder.rs	1991	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/notes/codec.rs	473	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/copy_plan.rs	1006	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/copy_plan.rs	1109	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/remove_plan.rs	722	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/transaction.rs	1753	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/xml.rs	179	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/xml.rs	208	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/xml.rs	1156	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/xml.rs	1211	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/opened/xml.rs	1571	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/parts/presentation.rs	402	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/parts/slide.rs	251	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/parts/slide.rs	280	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/order.rs	835	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/order.rs	858	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	147	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	225	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	416	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/alt/codec.rs	325	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/alt/codec.rs	365	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	1141	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	1337	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs	1373	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/bibliography/mod.rs	461	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs	1253	true	fail-fast	checked_attributes	next() of the first item
+litchi-docx	crates/litchi-docx/src/chart/codec.rs	384	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs	1594	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/comment.rs	273	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source.rs	4026	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source.rs	4111	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source.rs	4194	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source.rs	4313	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source.rs	4539	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control/snapshot.rs	665	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/content_control/snapshot.rs	733	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/content_control/snapshot.rs	916	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source_cross_copy.rs	2667	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source_cross_copy.rs	2727	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source_cross_copy.rs	2885	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control.rs	1578	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control.rs	1613	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control.rs	1837	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control.rs	1887	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/content_control.rs	1963	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source_cross_copy.rs	5074	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/source_cross_copy.rs	5159	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/transition.rs	71	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/transition.rs	663	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/transition.rs	1758	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs	868	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs	999	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs	1026	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/controls/codec.rs	347	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/controls/slide/codec.rs	518	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/document/transaction.rs	6196	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/document/transaction.rs	7549	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/document/transaction.rs	7698	default	fail-fast	checked_attributes	size_hint() only
+litchi-docx	crates/litchi-docx/src/document/transaction.rs	7707	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs	680	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs	743	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs	826	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/codec.rs	327	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/codec.rs	389	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2109	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2527	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2568	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2608	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2637	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2664	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation/embedded/ole/codec.rs	116	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2799	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2848	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/source.rs	2889	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/drawing/validation.rs	44	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/field/codec.rs	86	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/field/codec.rs	1352	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/codec.rs	192	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/math/codec.rs	261	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/math/codec.rs	289	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/readonly_recommended/codec.rs	524	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/readonly_recommended/codec.rs	550	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/font/codec.rs	148	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs	872	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs	901	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs	939	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/font/open_type/codec.rs	607	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/font/open_type/codec.rs	676	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs	755	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/designer_tags/codec.rs	502	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/font/package.rs	852	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/footnote.rs	375	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/glossary/codec/xml.rs	333	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs	364	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs	617	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/protection/codec.rs	138	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs	480	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs	509	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs	548	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/sections/codec.rs	226	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/slide_sync/codec.rs	160	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs	733	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs	769	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/hyperlink.rs	190	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/presentation_properties/metadata/tracks/tracks_info.rs	525	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/codec.rs	699	default	fail-fast	checked_attributes	let x = item.ok()?
+litchi-docx	crates/litchi-docx/src/ink/codec.rs	836	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/codec.rs	1073	default	fail-fast	checked_attributes	let x = item.ok()?
+litchi-pptx	crates/litchi-pptx/src/shape/classification/codec.rs	587	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/codec.rs	594	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/p202.rs	353	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/p202.rs	384	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/p202.rs	421	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/properties.rs	946	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/designer/properties.rs	970	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/host.rs	988	default	fail-fast	checked_attributes	let x = item.ok()?
+litchi-docx	crates/litchi-docx/src/ink/host.rs	1396	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/host.rs	1462	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/zoom/codec.rs	415	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/zoom/codec.rs	969	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/package.rs	1112	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/package.rs	1138	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/package.rs	1212	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/package.rs	1232	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/placement.rs	1317	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/placement.rs	1455	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/reader.rs	1427	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/shape/reader.rs	1483	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/transaction/drawing_ids.rs	46	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/table/style/codec.rs	181	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/table/style/codec.rs	526	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/tag/codec.rs	241	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/transaction/durable.rs	2850	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/ink/xml.rs	118	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/tag/package/validation.rs	152	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/tag/package/validation.rs	198	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/mail_merge/codec.rs	789	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/tag/shape/codec.rs	1088	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/tag/shape/validation.rs	140	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/math.rs	438	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/math.rs	514	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/modern_comments/codec.rs	1035	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/transition/reader.rs	479	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/transition/reader.rs	875	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/transition/reader.rs	1038	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/namespace.rs	348	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/validation.rs	894	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/namespace.rs	811	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/numbering/codec.rs	752	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/numbering/codec.rs	837	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/numbering/codec.rs	864	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-pptx	crates/litchi-pptx/src/view_properties/codec.rs	196	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/numbering/codec.rs	1463	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/numbering/codec.rs	1606	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/package/package/transfer.rs	589	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/package/package/transfer.rs	640	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/package/package/transfer.rs	704	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/package/package/transfer.rs	824	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/editing.rs	336	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/run.rs	59	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/run_properties.rs	40	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/run_properties.rs	276	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/text.rs	565	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/text.rs	736	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/text.rs	761	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/codec/xml.rs	96	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/paragraph/codec/xml.rs	119	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/collapsed/codec.rs	355	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/extensions/codec.rs	166	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/paragraph/package.rs	116	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/redact.rs	552	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/authoring.rs	2313	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/authoring.rs	2411	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/authoring.rs	2461	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/authoring.rs	2505	default	fail-fast	checked_attributes	next()? per raw attribute
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	443	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	806	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	920	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	992	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	1230	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision/conflict/codec.rs	1266	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/revision.rs	700	default	fail-fast	checked_attributes	enumerate(), ? per item
+litchi-docx	crates/litchi-docx/src/run_effects/codec/mod.rs	332	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/run_symbols/codec.rs	345	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/sanitize.rs	719	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/sanitize.rs	774	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/codec.rs	675	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/codec.rs	1415	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/codec.rs	1529	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/codec.rs	1586	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/footnote_columns/codec.rs	528	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/footnote_columns/codec.rs	652	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/footnote_columns/package.rs	175	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/inventory.rs	1220	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/inventory.rs	1283	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/inventory.rs	1369	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/inventory.rs	1491	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/section/layout.rs	1046	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/settings/codec.rs	583	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/settings/document/codec.rs	655	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/settings/document/codec.rs	1428	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/settings/extensions/codec.rs	871	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/settings/extensions/codec.rs	980	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/smart_tag.rs	177	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/smartart.rs	518	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/smartart.rs	547	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/document_policy.rs	508	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/document_policy.rs	552	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/paragraph_copy.rs	1813	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/story_text.rs	2385	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/story_text.rs	2465	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/story_text.rs	2714	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-docx	crates/litchi-docx/src/source_backed/story_text.rs	4377	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	1714	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	1770	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	1806	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	3394	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	3528	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed/tail_append.rs	3578	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed.rs	2759	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/source_backed.rs	2790	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/story_hyperlinks.rs	1647	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/story_hyperlinks.rs	1679	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/story_hyperlinks.rs	1861	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/styles/effects.rs	2500	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/styles/effects.rs	3049	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/styles.rs	681	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/table.rs	130	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/validation.rs	1097	true	fail-fast	checked_attributes	all(is_ok_and): false at the first error
+litchi-docx	crates/litchi-docx/src/validation.rs	1109	true	lenient	first_wins	any(is_ok_and); called only after the tag passed the all() check
+litchi-docx	crates/litchi-docx/src/variables/codec.rs	926	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/web/codec/relationship.rs	69	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/web/codec/rewrite.rs	583	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/web/mod.rs	95	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/doc/codec.rs	191	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/doc/codec.rs	220	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/active_x/codec/xml.rs	385	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/active_x/codec/xml.rs	577	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/auto_filter/codec.rs	1226	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/auto_filter/codec.rs	1813	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/codec.rs	401	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/codec.rs	488	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/codec.rs	515	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/codec.rs	575	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/codec.rs	591	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/rewriter.rs	1165	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/rewriter.rs	1190	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/calculation_properties/rewriter.rs	1207	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-docx	crates/litchi-docx/src/writer/section/codec/xml.rs	1386	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/section/codec/xml.rs	2043	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/section/validation.rs	162	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/watermark.rs	511	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/cell_values/validation.rs	482	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-docx	crates/litchi-docx/src/writer/watermark.rs	931	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/cell_watches.rs	316	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/cell_watches.rs	365	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chain/codec.rs	241	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chain/codec.rs	284	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chain/codec.rs	330	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chain/package.rs	196	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chart_sheet/codec.rs	1168	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/chart_sheet/package/codec.rs	423	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/conditional_formatting/codec.rs	1305	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/conditional_formatting/package.rs	673	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/conditional_formatting/package.rs	776	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/connections/codec.rs	455	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/connections/codec.rs	831	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/connections/codec.rs	3681	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-xlsx	crates/litchi-xlsx/src/connections/codec.rs	4904	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/connections/embedded_data.rs	641	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/custom_data/package.rs	1947	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_consolidation/codec.rs	276	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_consolidation/codec.rs	321	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_consolidation/codec.rs	355	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_type_icons/codec.rs	313	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_validation/codec/wire.rs	525	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/data_validation/codec/wire.rs	555	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/codec.rs	1038	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/codec.rs	1145	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	2292	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	2769	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	2829	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3024	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3108	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3163	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3221	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3278	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3308	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/source.rs	3493	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/worksheet_source.rs	620	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/worksheet_source.rs	684	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/worksheet_source.rs	742	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/worksheet_source.rs	782	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/drawing/worksheet_source.rs	884	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/external_links/codec.rs	2799	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/external_links/codec.rs	2856	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3011	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3167	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3229	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3302	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3324	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3348	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3423	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/form_control/codec.rs	3432	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/scalar_edit.rs	1505	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/form_control/model.rs	2402	default	fail-fast	checked_attributes	binding + with_checks(true), ? per item
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	4820	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	5457	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	5588	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	6669	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	6721	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	6947	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	7245	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	7364	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	9110	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/form_control/owner.rs	9134	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/header_footer/codec.rs	232	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/header_footer/codec.rs	262	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/hyperlinks/codec.rs	373	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/hyperlinks/codec.rs	410	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/hyperlinks/codec.rs	654	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/hyperlinks/codec.rs	707	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/hyperlinks/codec.rs	1245	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ignored_errors/codec.rs	470	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ignored_errors/codec.rs	618	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ignored_errors/codec.rs	649	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/named_sheet_view/codec.rs	1773	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/named_sheet_view/codec.rs	1794	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ole_objects/codec.rs	712	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ole_objects/codec.rs	739	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/ole_objects/codec.rs	1235	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/outline_properties.rs	320	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/outline_properties.rs	368	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-xlsx	crates/litchi-xlsx/src/page_breaks/codec.rs	531	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/page_breaks/codec.rs	552	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/page_breaks/codec.rs	618	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/page_breaks/codec.rs	663	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/page_margins.rs	358	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/page_setup/codec.rs	397	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/phonetic_properties.rs	307	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs	68	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs	164	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs	206	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/mod.rs	5986	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/mod.rs	6057	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/pivot/server_formats/mod.rs	6219	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/print_options.rs	355	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/query_table/codec.rs	201	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/catalog_edit/codec.rs	714	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/compact.rs	211	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/compact.rs	351	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-xlsx	crates/litchi-xlsx/src/raw/properties_edit.rs	655	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/reference_edit.rs	365	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/reference_edit.rs	619	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/reference_scan.rs	218	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/sheet_view_edit.rs	633	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/web.rs	554	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/web.rs	572	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/web.rs	582	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/codec.rs	237	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs	618	default	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs	1732	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs	78	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs	112	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/selected.rs	824	default	fail-fast	allowed (function attribute)	with_checks(check_duplicates); returns by the second attribute
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/validation.rs	107	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/x14ac.rs	709	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/x14ac.rs	740	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/raw/worksheet/mod.rs	207	true	fail-fast	checked_attributes	first use exits on Err (hand-checked)
+litchi-xlsx	crates/litchi-xlsx/src/revisions/codec.rs	469	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/rich_values/codec/xml.rs	253	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs	869	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs	907	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs	947	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/row_visibility/rewrite.rs	284	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/scenarios/codec.rs	466	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/scenarios/codec.rs	504	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/scenarios/codec.rs	558	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/scenarios/codec.rs	698	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet/properties.rs	545	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet/properties.rs	627	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet/properties.rs	684	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet/sparklines.rs	1041	default	fail-fast	checked_attributes	let x = item?
+litchi-xlsx	crates/litchi-xlsx/src/sheet_calculation_properties.rs	265	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet_protection/codec.rs	428	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet_protection/codec.rs	491	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet_protection/codec.rs	1293	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/sheet_view/codec.rs	901	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache/crud.rs	1143	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache/package.rs	536	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache/views.rs	603	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache.rs	545	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache.rs	597	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache.rs	640	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/slicer_cache.rs	1022	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/smart_tags/codec.rs	470	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/smart_tags/codec.rs	501	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/smart_tags/codec.rs	548	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/smart_tags/codec.rs	582	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/style/stylesheet/parser.rs	953	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/survey.rs	2019	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/survey.rs	2056	true	fail-fast	checked_attributes	map(? per item).collect::<Result<_>>()
+litchi-xlsx	crates/litchi-xlsx/src/survey.rs	2071	true	fail-fast	checked_attributes	map(? per item).collect::<Result<_>>()
+litchi-xlsx	crates/litchi-xlsx/src/tab_state/source.rs	540	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/timelines/codec.rs	550	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/volatile_dependencies/codec.rs	651	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/volatile_dependencies/codec.rs	668	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/volatile_dependencies/codec.rs	686	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	1444	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	1555	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	1610	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	1898	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	1968	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/codec.rs	2388	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/removal.rs	316	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/data_model/removal.rs	544	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs	705	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs	991	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	4991	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5214	default	fail-fast	checked_attributes	next() of the first item
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5231	default	fail-fast	checked_attributes	next() of the first item
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5297	default	fail-fast	checked_attributes	next() of the first item
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5311	default	fail-fast	checked_attributes	next() of the first item
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5542	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs	5601	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/edit/transfer.rs	567	true	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook/source_merge.rs	1285	false	unchecked	unchecked_attributes	with_checks(false)
+litchi-xlsx	crates/litchi-xlsx/src/workbook_metadata/protection.rs	337	default	fail-fast	checked_attributes	let x = item.map_err(..)?
+litchi-xlsx	crates/litchi-xlsx/src/workbook_metadata/codec.rs	613	true	fail-fast	checked_attributes	let x = item.map_err(..)?

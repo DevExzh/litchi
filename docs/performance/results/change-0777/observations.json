@@ -1,0 +1,4483 @@
+{
+  "allocations": {
+    "n256": {
+      "claims": {
+        "cases": {
+          "opc_relationship_declarations::n256": {
+            "after": {
+              "allocated_bytes": 173331,
+              "allocation_calls": 512
+            },
+            "before": {
+              "allocated_bytes": 184997,
+              "allocation_calls": 478
+            },
+            "case": "opc_relationship_declarations",
+            "change": {
+              "allocated_bytes": -11666,
+              "allocated_bytes_percent": -6.306048206187132,
+              "allocation_calls": 34,
+              "allocation_calls_percent": 7.112970711297062
+            },
+            "input_bytes": 4575,
+            "input_sha256": null,
+            "n": 256,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ]
+          }
+        },
+        "rows": [
+          {
+            "allocated_bytes": 184997,
+            "allocation_calls": 478,
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "capture": "allocations-256/opc_relationship_declarations-256-before.zst",
+            "capture_sha256": "ddaacda1a6ccb31f31610600b08cdad44e562b0a4b69dabe41c8315f2a9ef147",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-256/opc_relationship_declarations-256-before.histogram",
+            "histogram_entries": 89,
+            "histogram_sha256": "8c41b70de0b5ae8d14e495d0de9b6d2d669f74495b5a48bcd414532d850d0e96",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": 256,
+            "report": "allocations-256/opc_relationship_declarations-256-before.json",
+            "report_sha256": "2ee0c284ffd144666387e2b73b72631dad45df069b11345874fe28f0db516ae2",
+            "stderr": "allocations-256/opc_relationship_declarations-256-before.stderr",
+            "stderr_sha256": "fe109679707a7759c764d02be4cf74644894af98fbfbe391419af52fa24e60a9",
+            "stdout": "allocations-256/opc_relationship_declarations-256-before.stdout",
+            "stdout_sha256": "15350159955da685647f345842430a0137cf2e4164a41465fbbf65b6483b879f",
+            "summary": "allocations-256/opc_relationship_declarations-256-before.summary",
+            "summary_sha256": "a954235c0e791785e7ab7b11fb0917a181e9dfc4e45728b28fc4875010fe54ff"
+          },
+          {
+            "allocated_bytes": 173331,
+            "allocation_calls": 512,
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "capture": "allocations-256/opc_relationship_declarations-256-after.zst",
+            "capture_sha256": "0bb502b4e0708a830e63cbe303bb2d1a767d821878778105a10824ab390d597c",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-256/opc_relationship_declarations-256-after.histogram",
+            "histogram_entries": 88,
+            "histogram_sha256": "bfb797ba62f0649bafa95ec37241849743ab90829fa94ed903960c3013f7f4fc",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": 256,
+            "report": "allocations-256/opc_relationship_declarations-256-after.json",
+            "report_sha256": "67ff72692551d8d1619e7e9c744e0601142af334a33e54dfbe25dae1ad571606",
+            "stderr": "allocations-256/opc_relationship_declarations-256-after.stderr",
+            "stderr_sha256": "6865e0d10df31ef8532e753b386f61870d039fec69956e1779295d1971db0755",
+            "stdout": "allocations-256/opc_relationship_declarations-256-after.stdout",
+            "stdout_sha256": "3db400ce2feb03c2d7b292466c87a3ff06da94a9d2f53de8069b863b3780b052",
+            "summary": "allocations-256/opc_relationship_declarations-256-after.summary",
+            "summary_sha256": "f7a3104075ed9b10aea789e017956803432dfdcbaee65633634539f1a723dd52"
+          }
+        ]
+      },
+      "rows": 2,
+      "scope": "One whole-process instrumented sample per case/leg, including startup, input generation, parsing, observation and report serialization. Instrumented time is not native time.",
+      "supported": true
+    },
+    "primary": {
+      "claims": {
+        "cases": {
+          "mce_benign_document": {
+            "after": {
+              "allocated_bytes": 2539500,
+              "allocation_calls": 16056
+            },
+            "before": {
+              "allocated_bytes": 2539502,
+              "allocation_calls": 16056
+            },
+            "case": "mce_benign_document",
+            "change": {
+              "allocated_bytes": -2,
+              "allocated_bytes_percent": -7.87555985426458e-05,
+              "allocation_calls": 0,
+              "allocation_calls_percent": 0.0
+            },
+            "input_bytes": 288070,
+            "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+            "n": null,
+            "outcomes": [
+              "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+            ]
+          },
+          "mce_benign_worksheet": {
+            "after": {
+              "allocated_bytes": 12455829,
+              "allocation_calls": 129512
+            },
+            "before": {
+              "allocated_bytes": 12455831,
+              "allocation_calls": 129512
+            },
+            "case": "mce_benign_worksheet",
+            "change": {
+              "allocated_bytes": -2,
+              "allocated_bytes_percent": -1.605673679572206e-05,
+              "allocation_calls": 0,
+              "allocation_calls_percent": 0.0
+            },
+            "input_bytes": 1558391,
+            "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+            "n": null,
+            "outcomes": [
+              "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+            ]
+          },
+          "opc_relationship_declarations::n29": {
+            "after": {
+              "allocated_bytes": 100163,
+              "allocation_calls": 233
+            },
+            "before": {
+              "allocated_bytes": 100165,
+              "allocation_calls": 233
+            },
+            "case": "opc_relationship_declarations",
+            "change": {
+              "allocated_bytes": -2,
+              "allocated_bytes_percent": -0.001996705436035917,
+              "allocation_calls": 0,
+              "allocation_calls_percent": 0.0
+            },
+            "input_bytes": 1241,
+            "input_sha256": null,
+            "n": 29,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ]
+          },
+          "opc_relationship_declarations::n30": {
+            "after": {
+              "allocated_bytes": 104034,
+              "allocation_calls": 242
+            },
+            "before": {
+              "allocated_bytes": 104420,
+              "allocation_calls": 237
+            },
+            "case": "opc_relationship_declarations",
+            "change": {
+              "allocated_bytes": -386,
+              "allocated_bytes_percent": -0.36966098448573126,
+              "allocation_calls": 5,
+              "allocation_calls_percent": 2.1097046413502074
+            },
+            "input_bytes": 1255,
+            "input_sha256": null,
+            "n": 30,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ]
+          },
+          "opc_relationship_declarations::n4096": {
+            "after": {
+              "allocated_bytes": 519449,
+              "allocation_calls": 136
+            },
+            "before": {
+              "allocated_bytes": 519451,
+              "allocation_calls": 136
+            },
+            "case": "opc_relationship_declarations",
+            "change": {
+              "allocated_bytes": -2,
+              "allocated_bytes_percent": -0.00038502187886813033,
+              "allocation_calls": 0,
+              "allocation_calls_percent": 0.0
+            },
+            "input_bytes": 65271,
+            "input_sha256": null,
+            "n": 4096,
+            "outcomes": [
+              "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+            ]
+          }
+        },
+        "rows": [
+          {
+            "allocated_bytes": 12455831,
+            "allocation_calls": 129512,
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "capture": "allocations-0/mce_benign_worksheet-None-before.zst",
+            "capture_sha256": "a1fa86296da31825585554e39e6984a338af8547f0ec8a718219c438240c7ba0",
+            "case": "mce_benign_worksheet",
+            "histogram": "allocations-0/mce_benign_worksheet-None-before.histogram",
+            "histogram_entries": 82,
+            "histogram_sha256": "48048a29a67611c1d84cc910856b752b1ef801260976d55541968f2e30be37fd",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": null,
+            "report": "allocations-0/mce_benign_worksheet-None-before.json",
+            "report_sha256": "7c866af04ede460fda3c8663fcc5bf38c378e4561b201b368d02c86bfa2df024",
+            "stderr": "allocations-0/mce_benign_worksheet-None-before.stderr",
+            "stderr_sha256": "eb583672576f4e89dc7fe992bbe42b7a116f2cfaa041691e94723c0755aafad9",
+            "stdout": "allocations-0/mce_benign_worksheet-None-before.stdout",
+            "stdout_sha256": "8e94c120463cb5234df72dcebee007d90f65ce9eb60140cbb33fae3ca89de2ce",
+            "summary": "allocations-0/mce_benign_worksheet-None-before.summary",
+            "summary_sha256": "2313ef4945a602db7334a46c3e533bdb567868c9206bb3fd32c123be0a2fed2d"
+          },
+          {
+            "allocated_bytes": 12455829,
+            "allocation_calls": 129512,
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "capture": "allocations-0/mce_benign_worksheet-None-after.zst",
+            "capture_sha256": "c6837d2a34779aaa7119ce13f11a3227a2032cb4bef67d0c3091dbfd59bc8bfb",
+            "case": "mce_benign_worksheet",
+            "histogram": "allocations-0/mce_benign_worksheet-None-after.histogram",
+            "histogram_entries": 81,
+            "histogram_sha256": "47a2a544a0100bd34fe19c4424822d62ae4c8852d82a1e4afe57fa5c4ce0f0b2",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": null,
+            "report": "allocations-0/mce_benign_worksheet-None-after.json",
+            "report_sha256": "04a84dffbfa70291038235db5793eb6161e5709fbb869c8db5a9dd57310be93e",
+            "stderr": "allocations-0/mce_benign_worksheet-None-after.stderr",
+            "stderr_sha256": "eb583672576f4e89dc7fe992bbe42b7a116f2cfaa041691e94723c0755aafad9",
+            "stdout": "allocations-0/mce_benign_worksheet-None-after.stdout",
+            "stdout_sha256": "d2730df02a7c32083a29e556dd498ba91edf61b0ebf0076de4d3eb58f9ed9a40",
+            "summary": "allocations-0/mce_benign_worksheet-None-after.summary",
+            "summary_sha256": "991c3fb75bf6151dc5d402dd3ed360d3e4750c02d95e0c14804d8480184e4792"
+          },
+          {
+            "allocated_bytes": 2539502,
+            "allocation_calls": 16056,
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "capture": "allocations-0/mce_benign_document-None-before.zst",
+            "capture_sha256": "8c9c1da3af1cf48577332b6798323891ed0c7242c468d297db97c4c7390aa2c1",
+            "case": "mce_benign_document",
+            "histogram": "allocations-0/mce_benign_document-None-before.histogram",
+            "histogram_entries": 97,
+            "histogram_sha256": "aa33d568ed92884b7b5ec167aeb49b6e1eaeddb42cf7d1a1c6dc2611432dd835",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": null,
+            "report": "allocations-0/mce_benign_document-None-before.json",
+            "report_sha256": "de41262ddeac377bd7a4e9bbbf54d435d4ed03fcdedfb5ef1d2aab81e94c0b8e",
+            "stderr": "allocations-0/mce_benign_document-None-before.stderr",
+            "stderr_sha256": "c3d89c699f2498b3f339451b11051016ffe1398bb4655960540ae51976732582",
+            "stdout": "allocations-0/mce_benign_document-None-before.stdout",
+            "stdout_sha256": "043ec4334bdd42cbf68e0b36b570f17f66b370f2b2df8f4c3fe0726ebaabd15d",
+            "summary": "allocations-0/mce_benign_document-None-before.summary",
+            "summary_sha256": "583cbe8138a80128497c0c9f6b663d00f2c229294b481ccde8f03e41104780d9"
+          },
+          {
+            "allocated_bytes": 2539500,
+            "allocation_calls": 16056,
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "capture": "allocations-0/mce_benign_document-None-after.zst",
+            "capture_sha256": "909abe6daea163bbd17e1fbc39867002e945dfdb4d34155032d3c77219c12a56",
+            "case": "mce_benign_document",
+            "histogram": "allocations-0/mce_benign_document-None-after.histogram",
+            "histogram_entries": 98,
+            "histogram_sha256": "d6e1efa751f663aa4b4116e4c7270199933fee8654b751ec6fb6502ee2d6d7bb",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": null,
+            "report": "allocations-0/mce_benign_document-None-after.json",
+            "report_sha256": "e6ab0432fb3ddd30ff2065dd2b1d267c0fa0fa316076eee3592661b1963082e2",
+            "stderr": "allocations-0/mce_benign_document-None-after.stderr",
+            "stderr_sha256": "c3d89c699f2498b3f339451b11051016ffe1398bb4655960540ae51976732582",
+            "stdout": "allocations-0/mce_benign_document-None-after.stdout",
+            "stdout_sha256": "d5fcf5634bc60397a964b0a65dfbeec56b7dd648d3a8b2bf0fc7166455c267f3",
+            "summary": "allocations-0/mce_benign_document-None-after.summary",
+            "summary_sha256": "32f9561ca17d8e156d75b1ad89dcb988f4515acb03eecb04f15b755d60ba8a83"
+          },
+          {
+            "allocated_bytes": 100165,
+            "allocation_calls": 233,
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "capture": "allocations-0/opc_relationship_declarations-29-before.zst",
+            "capture_sha256": "9208d295cf622ae066e1cf023719b0a0b71b4ad2be2167f5f8a675c343a58ff4",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-29-before.histogram",
+            "histogram_entries": 76,
+            "histogram_sha256": "588e07430141e5ba64eedff34acd83e1e7b546510a5839ee9421a4bab727645a",
+            "identity": {
+              "input_bytes": 1241,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": 29,
+            "report": "allocations-0/opc_relationship_declarations-29-before.json",
+            "report_sha256": "023e86123cbf710fabf52930c0b4c137d803c21984307e41105317721845d835",
+            "stderr": "allocations-0/opc_relationship_declarations-29-before.stderr",
+            "stderr_sha256": "4700649bddcc86829ad17d60cd5cd68a263712248dc9cbaf6fba9457a195bf2b",
+            "stdout": "allocations-0/opc_relationship_declarations-29-before.stdout",
+            "stdout_sha256": "23302ba879461f244591c3de3bd2875925204de3831e8d6968dabed67b5f7f61",
+            "summary": "allocations-0/opc_relationship_declarations-29-before.summary",
+            "summary_sha256": "8e5b603ba92340cb11965d6695461c37d6de9f947dbea1383f5c21904273d44c"
+          },
+          {
+            "allocated_bytes": 100163,
+            "allocation_calls": 233,
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "capture": "allocations-0/opc_relationship_declarations-29-after.zst",
+            "capture_sha256": "d12a7b859d2d16dec3295f86a1a37ca76878b992b61bfb1883d5dc7cbe0b555c",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-29-after.histogram",
+            "histogram_entries": 76,
+            "histogram_sha256": "2b7a708c50b098f67ce11873f26cd46b6bf09d6a673f53c51ffe32434e95f05d",
+            "identity": {
+              "input_bytes": 1241,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": 29,
+            "report": "allocations-0/opc_relationship_declarations-29-after.json",
+            "report_sha256": "229954cc60dc97fab6e6bb2b4d28fd3feb7e8bea23809970d04040b3bb554690",
+            "stderr": "allocations-0/opc_relationship_declarations-29-after.stderr",
+            "stderr_sha256": "4700649bddcc86829ad17d60cd5cd68a263712248dc9cbaf6fba9457a195bf2b",
+            "stdout": "allocations-0/opc_relationship_declarations-29-after.stdout",
+            "stdout_sha256": "97a51ad63b8e2cd94ede166546ab0e46bbda7ee218f92d6610662b8b0587d7b9",
+            "summary": "allocations-0/opc_relationship_declarations-29-after.summary",
+            "summary_sha256": "6a42d990e8e539dc5119d68c3244ed5106e79de7aac5d1015b178c6516a1b79f"
+          },
+          {
+            "allocated_bytes": 104420,
+            "allocation_calls": 237,
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "capture": "allocations-0/opc_relationship_declarations-30-before.zst",
+            "capture_sha256": "fa01c00ff8c5150fb5639279a1792a99c7e192491753399daf3bf0ffa424a005",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-30-before.histogram",
+            "histogram_entries": 78,
+            "histogram_sha256": "60e3aee1424fc78fcf5148541d09816135bbe11eac2d502c094847aa5687f5a7",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": 30,
+            "report": "allocations-0/opc_relationship_declarations-30-before.json",
+            "report_sha256": "23d2a369c730b9efabb9bef4eaf262194602fbca20989507b1de72f155032bfe",
+            "stderr": "allocations-0/opc_relationship_declarations-30-before.stderr",
+            "stderr_sha256": "3af7228b8c10f90f553d27e997d455f0bb8316cc39c83896024e50f2230499ec",
+            "stdout": "allocations-0/opc_relationship_declarations-30-before.stdout",
+            "stdout_sha256": "623fbbd25966f285f42c82a67e4ae38d36938515ae590a7cb4592f950d0fa525",
+            "summary": "allocations-0/opc_relationship_declarations-30-before.summary",
+            "summary_sha256": "c91353db75f4f570a85a0716d4a8c7dcf50c38c11c7bca307794f3eb4bb0a4d3"
+          },
+          {
+            "allocated_bytes": 104034,
+            "allocation_calls": 242,
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "capture": "allocations-0/opc_relationship_declarations-30-after.zst",
+            "capture_sha256": "83cba032149a6721ab1020f36b16781592d393e316f87136a154e5f0b773e973",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-30-after.histogram",
+            "histogram_entries": 79,
+            "histogram_sha256": "edf3a71b79c7c5b6683848c3507128a9891f74d5262d6973cac6b7d1b26c46d1",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": 30,
+            "report": "allocations-0/opc_relationship_declarations-30-after.json",
+            "report_sha256": "f00505ac92a74e0d4218aeb3dac88effdf53f7f7f3522ac57a385b146ce73d8a",
+            "stderr": "allocations-0/opc_relationship_declarations-30-after.stderr",
+            "stderr_sha256": "0fc69de6c273be9c062359db29d723d603e48a95b0752f443169e15595fd587a",
+            "stdout": "allocations-0/opc_relationship_declarations-30-after.stdout",
+            "stdout_sha256": "6752534891592ac98c4387ca7191a89a8f3a1c29f1e588d01dbaa6a9f042fea2",
+            "summary": "allocations-0/opc_relationship_declarations-30-after.summary",
+            "summary_sha256": "6532d14714790303560822f20bcf0f82f844862b9cb9a4d1457bc083a162e212"
+          },
+          {
+            "allocated_bytes": 519451,
+            "allocation_calls": 136,
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "capture": "allocations-0/opc_relationship_declarations-4096-before.zst",
+            "capture_sha256": "4e6cef08e758b4ba8bcebab81eadac919ac5a256dbed744a2aef3a43df1725d2",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-4096-before.histogram",
+            "histogram_entries": 77,
+            "histogram_sha256": "9ea55ceee97b386cef6c28516e602a523fe0bc14eeb598c7e81c8b0d0df321c8",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 1
+            },
+            "leg": "before",
+            "n": 4096,
+            "report": "allocations-0/opc_relationship_declarations-4096-before.json",
+            "report_sha256": "187b6aed804aeedf436fac8b3f4b36b1b4ac0df9cc593c99b60d78387c6469b4",
+            "stderr": "allocations-0/opc_relationship_declarations-4096-before.stderr",
+            "stderr_sha256": "eaa2f6491d1cfc959126c4142cc298c2f47057c83e658aae9331ab3cb81454e4",
+            "stdout": "allocations-0/opc_relationship_declarations-4096-before.stdout",
+            "stdout_sha256": "904ec64bbad606da75813b15ce0748037e2ce55ca58aca7de50effd368142dda",
+            "summary": "allocations-0/opc_relationship_declarations-4096-before.summary",
+            "summary_sha256": "8dca816c4771a56aadb287dae26b5b12b9582897d09b046ab6d7f3c7abf705a4"
+          },
+          {
+            "allocated_bytes": 519449,
+            "allocation_calls": 136,
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "capture": "allocations-0/opc_relationship_declarations-4096-after.zst",
+            "capture_sha256": "45d452db9b7330be404bedd25918d678bb02c1099cedc5198e82a7950bcf8453",
+            "case": "opc_relationship_declarations",
+            "histogram": "allocations-0/opc_relationship_declarations-4096-after.histogram",
+            "histogram_entries": 77,
+            "histogram_sha256": "b548599d785592fe29a5b267e99fd60ec1277c3b21dd13a1b74c962328e9f290",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 1
+            },
+            "leg": "after",
+            "n": 4096,
+            "report": "allocations-0/opc_relationship_declarations-4096-after.json",
+            "report_sha256": "4629e74a9b43cb79542d61776b75c3ac1159302fe130c54c453cd17901678380",
+            "stderr": "allocations-0/opc_relationship_declarations-4096-after.stderr",
+            "stderr_sha256": "eaa2f6491d1cfc959126c4142cc298c2f47057c83e658aae9331ab3cb81454e4",
+            "stdout": "allocations-0/opc_relationship_declarations-4096-after.stdout",
+            "stdout_sha256": "d1517af10f90922861bc9565637d6f8e43952b56d6364e6880c5f58dd4cda253",
+            "summary": "allocations-0/opc_relationship_declarations-4096-after.summary",
+            "summary_sha256": "1242182e689485ebb3575137fdb7a62e6797d01d6572412dbe5f28625aa5f31c"
+          }
+        ]
+      },
+      "rows": 10,
+      "scope": "One whole-process instrumented sample per case/leg, including startup, input generation, parsing, observation and report serialization. Instrumented time is not native time.",
+      "supported": true
+    }
+  },
+  "base": "87e926fcc6e71360073a8bf97ad572ad9d187a67",
+  "candidate": "1e334ffba9efb89e5badb8aa7a3e33052e96635c",
+  "capture": {
+    "cpu": 12,
+    "fixtures_unchanged": true,
+    "schema": "litchi-0777-xml-attribute-capture-v1",
+    "source_unchanged": true
+  },
+  "instructions": {
+    "n256": {
+      "claims": {
+        "cases": {
+          "opc_relationship_declarations::n256": {
+            "case": "opc_relationship_declarations",
+            "input_bytes": 4575,
+            "input_sha256": null,
+            "n": 256,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 60.43708822111522,
+                  "branches:u": 29.68847674979136,
+                  "cycles:u": 77.25917323399474,
+                  "instructions:u": 32.725616477313224
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 499.2,
+                    "before_per_operation": 311.15
+                  },
+                  "branches:u": {
+                    "after_per_operation": 125099.45,
+                    "before_per_operation": 96461.5
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 143322.55,
+                    "before_per_operation": 80854.8
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 619088.75,
+                    "before_per_operation": 466442.55
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 27652,
+                    "after_3": 17668,
+                    "before_23": 19958,
+                    "before_3": 13735
+                  },
+                  "branches:u": {
+                    "after_23": 3264306,
+                    "after_3": 762317,
+                    "before_23": 2544963,
+                    "before_3": 615733
+                  },
+                  "cycles:u": {
+                    "after_23": 4607115,
+                    "after_3": 1740664,
+                    "before_23": 3361768,
+                    "before_3": 1744672
+                  },
+                  "instructions:u": {
+                    "after_23": 16125480,
+                    "after_3": 3743705,
+                    "before_23": 12296847,
+                    "before_3": 2967996
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 87.84143904063957,
+                  "branches:u": 29.935642161507438,
+                  "cycles:u": 49.1618704154829,
+                  "instructions:u": 32.91123936818474
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 563.9,
+                    "before_per_operation": 300.2
+                  },
+                  "branches:u": {
+                    "after_per_operation": 125407.45,
+                    "before_per_operation": 96515.05
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 149187.75,
+                    "before_per_operation": 100017.35
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 620586.7,
+                    "before_per_operation": 466918.15
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 28681,
+                    "after_3": 17403,
+                    "before_23": 19836,
+                    "before_3": 13832
+                  },
+                  "branches:u": {
+                    "after_23": 3270560,
+                    "after_3": 762411,
+                    "before_23": 2546272,
+                    "before_3": 615971
+                  },
+                  "cycles:u": {
+                    "after_23": 4674984,
+                    "after_3": 1691229,
+                    "before_23": 3380563,
+                    "before_3": 1380216
+                  },
+                  "instructions:u": {
+                    "after_23": 16155764,
+                    "after_3": 3744030,
+                    "before_23": 12307423,
+                    "before_3": 2969060
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          }
+        },
+        "event_order": [
+          "instructions:u",
+          "cycles:u",
+          "branches:u",
+          "branch-misses:u"
+        ],
+        "iterator": null,
+        "rows": [
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-0-before-3.csv",
+            "csv_sha256": "dc42de50948a4807ef1955011f415613fdc01beb44e3a0720a4da3952cb921f4",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-256/opc_relationship_declarations-256-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 13735,
+                "running_percent": 100.0,
+                "time_running_ns": 1106300
+              },
+              "branches:u": {
+                "count": 615733,
+                "running_percent": 100.0,
+                "time_running_ns": 1106300
+              },
+              "cycles:u": {
+                "count": 1744672,
+                "running_percent": 100.0,
+                "time_running_ns": 1106300
+              },
+              "instructions:u": {
+                "count": 2967996,
+                "running_percent": 100.0,
+                "time_running_ns": 1106300
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-256/opc_relationship_declarations-256-0-before-3.json",
+            "report_sha256": "eb313942f8114b58986d6bb4ae264386ced842dd4c20d008b0ca3bb240997f21",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-0-after-3.csv",
+            "csv_sha256": "aee7f815f094b614b38d1ee1f0472490f777e9eadc4e969086ec1ecfcf4998e9",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-256/opc_relationship_declarations-256-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 17668,
+                "running_percent": 100.0,
+                "time_running_ns": 1061980
+              },
+              "branches:u": {
+                "count": 762317,
+                "running_percent": 100.0,
+                "time_running_ns": 1061980
+              },
+              "cycles:u": {
+                "count": 1740664,
+                "running_percent": 100.0,
+                "time_running_ns": 1061980
+              },
+              "instructions:u": {
+                "count": 3743705,
+                "running_percent": 100.0,
+                "time_running_ns": 1061980
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-256/opc_relationship_declarations-256-0-after-3.json",
+            "report_sha256": "567e2bb94ed90d263ef8ac4fe9c1fc456e1721869138701ba62f58a819eb45d4",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-0-after-23.csv",
+            "csv_sha256": "16f23827b31916429c7361381178233441c445291f119db4d14fb2fd0c02ad41",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-256/opc_relationship_declarations-256-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 27652,
+                "running_percent": 100.0,
+                "time_running_ns": 1668789
+              },
+              "branches:u": {
+                "count": 3264306,
+                "running_percent": 100.0,
+                "time_running_ns": 1668789
+              },
+              "cycles:u": {
+                "count": 4607115,
+                "running_percent": 100.0,
+                "time_running_ns": 1668789
+              },
+              "instructions:u": {
+                "count": 16125480,
+                "running_percent": 100.0,
+                "time_running_ns": 1668789
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-256/opc_relationship_declarations-256-0-after-23.json",
+            "report_sha256": "4e5b581b2b57eef0c36967256b5e07c31d1e892b9cb7e323cbe77df688ebb891",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-0-before-23.csv",
+            "csv_sha256": "d77e25fd36ac15ee2d82ffec22c1aa8925f3858ba1d16b9af4e61050befb741a",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-256/opc_relationship_declarations-256-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 19958,
+                "running_percent": 100.0,
+                "time_running_ns": 1405890
+              },
+              "branches:u": {
+                "count": 2544963,
+                "running_percent": 100.0,
+                "time_running_ns": 1405890
+              },
+              "cycles:u": {
+                "count": 3361768,
+                "running_percent": 100.0,
+                "time_running_ns": 1405890
+              },
+              "instructions:u": {
+                "count": 12296847,
+                "running_percent": 100.0,
+                "time_running_ns": 1405890
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-256/opc_relationship_declarations-256-0-before-23.json",
+            "report_sha256": "eb29e81de36c4df0e0c7ba11c7be1fdee85aa902a1a22cd00292eddcde801f0b",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-1-before-3.csv",
+            "csv_sha256": "1f2e0593cbad70c6ca37e91ac954f57b389e5e2efb0364d9eb3b515e9979400e",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-256/opc_relationship_declarations-256-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 13832,
+                "running_percent": 100.0,
+                "time_running_ns": 959779
+              },
+              "branches:u": {
+                "count": 615971,
+                "running_percent": 100.0,
+                "time_running_ns": 959779
+              },
+              "cycles:u": {
+                "count": 1380216,
+                "running_percent": 100.0,
+                "time_running_ns": 959779
+              },
+              "instructions:u": {
+                "count": 2969060,
+                "running_percent": 100.0,
+                "time_running_ns": 959779
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-256/opc_relationship_declarations-256-1-before-3.json",
+            "report_sha256": "aab1e5664fc8511b41ad000e38122dacbb7e7b47c38ed1b3e8c9e24dd6f48fb9",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-1-after-3.csv",
+            "csv_sha256": "559cd2812f1c9df61de5fc1858883ab95f73f98f68836498c0a51eca1623fdbc",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-256/opc_relationship_declarations-256-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 17403,
+                "running_percent": 100.0,
+                "time_running_ns": 1018140
+              },
+              "branches:u": {
+                "count": 762411,
+                "running_percent": 100.0,
+                "time_running_ns": 1018140
+              },
+              "cycles:u": {
+                "count": 1691229,
+                "running_percent": 100.0,
+                "time_running_ns": 1018140
+              },
+              "instructions:u": {
+                "count": 3744030,
+                "running_percent": 100.0,
+                "time_running_ns": 1018140
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-256/opc_relationship_declarations-256-1-after-3.json",
+            "report_sha256": "7c97765944ccbde64ddeb048e476f8a8fd82c2a345497934c5c005edada9ad7c",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-1-after-23.csv",
+            "csv_sha256": "86ef494dfab264c6829ea78a26203833a6f1acd8ec069f5c16faed577bb2c56a",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-256/opc_relationship_declarations-256-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 28681,
+                "running_percent": 100.0,
+                "time_running_ns": 1696129
+              },
+              "branches:u": {
+                "count": 3270560,
+                "running_percent": 100.0,
+                "time_running_ns": 1696129
+              },
+              "cycles:u": {
+                "count": 4674984,
+                "running_percent": 100.0,
+                "time_running_ns": 1696129
+              },
+              "instructions:u": {
+                "count": 16155764,
+                "running_percent": 100.0,
+                "time_running_ns": 1696129
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-256/opc_relationship_declarations-256-1-after-23.json",
+            "report_sha256": "fe2184a0da0a6f3da9ee1e5f79d054ef1678b6b11cb1786e870a65a4c9f7700f",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-256/opc_relationship_declarations-256-1-before-23.csv",
+            "csv_sha256": "3aa64e6c0deb5718b8425e7054b85c473bbe25e191480231b0395e583f87139b",
+            "identity": {
+              "input_bytes": 4575,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-256/opc_relationship_declarations-256-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 256,
+            "perf": {
+              "branch-misses:u": {
+                "count": 19836,
+                "running_percent": 100.0,
+                "time_running_ns": 1385040
+              },
+              "branches:u": {
+                "count": 2546272,
+                "running_percent": 100.0,
+                "time_running_ns": 1385040
+              },
+              "cycles:u": {
+                "count": 3380563,
+                "running_percent": 100.0,
+                "time_running_ns": 1385040
+              },
+              "instructions:u": {
+                "count": 12307423,
+                "running_percent": 100.0,
+                "time_running_ns": 1385040
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-256/opc_relationship_declarations-256-1-before-23.json",
+            "report_sha256": "8ab0377ef89ace73fe2dd991811d3d9bccd9daa5d950cc4a27f4c35c0cecf666",
+            "samples": 23,
+            "warmup": 2
+          }
+        ],
+        "scope": "Whole-process user counters; two repeats of 3 versus 23 measured operations, same two warmups. Difference/20 is a marginal estimate, not exact timed-region or function attribution. Instrumented elapsed times are excluded from native statistics."
+      },
+      "iterator_rows": 0,
+      "qualification": {
+        "csv": "instructions-256/qualification.csv",
+        "csv_sha256": "a66cb8f2f36659e0cf3c718019c95b0ee700067ab0547abcd01bfd4a0be3a938",
+        "exit": 0,
+        "log": "instructions-256/qualification.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "perf": {
+          "instructions:u": {
+            "count": 394896,
+            "running_percent": 100.0,
+            "time_running_ns": 30682058
+          }
+        },
+        "reason": null,
+        "supported": true
+      },
+      "rows": 8,
+      "supported": true
+    },
+    "primary": {
+      "claims": {
+        "cases": {
+          "mce_benign_document": {
+            "case": "mce_benign_document",
+            "input_bytes": 288070,
+            "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+            "n": null,
+            "outcomes": [
+              "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 0.019658856105531086,
+                  "branches:u": 0.7342073759868395,
+                  "cycles:u": 1.2983604423421946,
+                  "instructions:u": 0.76616018295661
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 11956.25,
+                    "before_per_operation": 11953.9
+                  },
+                  "branches:u": {
+                    "after_per_operation": 6752231.7,
+                    "before_per_operation": 6703017.65
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 8015387.25,
+                    "before_per_operation": 7912652.5
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 35633171.05,
+                    "before_per_operation": 35362239.65
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 367305,
+                    "after_3": 128180,
+                    "before_23": 350344,
+                    "before_3": 111266
+                  },
+                  "branches:u": {
+                    "after_23": 169448948,
+                    "after_3": 34404314,
+                    "before_23": 168206683,
+                    "before_3": 34146330
+                  },
+                  "cycles:u": {
+                    "after_23": 204022663,
+                    "after_3": 43714918,
+                    "before_23": 201178325,
+                    "before_3": 42925275
+                  },
+                  "instructions:u": {
+                    "after_23": 895615577,
+                    "after_3": 182952156,
+                    "before_23": 888782229,
+                    "before_3": 181537436
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 37.66353631842803,
+                  "branches:u": 0.7000196341307552,
+                  "cycles:u": 4.0692032796723066,
+                  "instructions:u": 0.732252175627246
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 13647.55,
+                    "before_per_operation": 9913.7
+                  },
+                  "branches:u": {
+                    "after_per_operation": 6754918.9,
+                    "before_per_operation": 6707961.85
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 8185232.4,
+                    "before_per_operation": 7865182.15
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 35646627.3,
+                    "before_per_operation": 35387501.55
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 386343,
+                    "after_3": 113392,
+                    "before_23": 356648,
+                    "before_3": 158374
+                  },
+                  "branches:u": {
+                    "after_23": 169501945,
+                    "after_3": 34403567,
+                    "before_23": 168305736,
+                    "before_3": 34146499
+                  },
+                  "cycles:u": {
+                    "after_23": 207068575,
+                    "after_3": 43363927,
+                    "before_23": 201438154,
+                    "before_3": 44134511
+                  },
+                  "instructions:u": {
+                    "after_23": 895881877,
+                    "after_3": 182949331,
+                    "before_23": 889288616,
+                    "before_3": 181538585
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "mce_benign_worksheet": {
+            "case": "mce_benign_worksheet",
+            "input_bytes": 1558391,
+            "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+            "n": null,
+            "outcomes": [
+              "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 0.347245471613733,
+                  "branches:u": 1.0028581261021685,
+                  "cycles:u": 0.3341148022823148,
+                  "instructions:u": 0.9804114868253277
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 37466.35,
+                    "before_per_operation": 37336.7
+                  },
+                  "branches:u": {
+                    "after_per_operation": 50327860.55,
+                    "before_per_operation": 49828154.85
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 58702796.65,
+                    "before_per_operation": 58507315.05
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 274909748.75,
+                    "before_per_operation": 272240669.95
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 968812,
+                    "after_3": 219485,
+                    "before_23": 965403,
+                    "before_3": 218669
+                  },
+                  "branches:u": {
+                    "after_23": 1259788032,
+                    "after_3": 253230821,
+                    "before_23": 1247264724,
+                    "before_3": 250701627
+                  },
+                  "cycles:u": {
+                    "after_23": 1474982931,
+                    "after_3": 300926998,
+                    "before_23": 1468437619,
+                    "before_3": 298291318
+                  },
+                  "instructions:u": {
+                    "after_23": 6887377678,
+                    "after_3": 1389182703,
+                    "before_23": 6820436047,
+                    "before_3": 1375622648
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 13.518833957221975,
+                  "branches:u": 0.7386419915627496,
+                  "cycles:u": 0.25841727585629304,
+                  "instructions:u": 0.7357755646834052
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 38953.25,
+                    "before_per_operation": 34314.35
+                  },
+                  "branches:u": {
+                    "after_per_operation": 50327874.6,
+                    "before_per_operation": 49958857.5
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 58823042.8,
+                    "before_per_operation": 58671425.7
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 274909887.15,
+                    "before_per_operation": 272901941.35
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 998164,
+                    "after_3": 219099,
+                    "before_23": 954196,
+                    "before_3": 267909
+                  },
+                  "branches:u": {
+                    "after_23": 1259788740,
+                    "after_3": 253231248,
+                    "before_23": 1249878811,
+                    "before_3": 250701661
+                  },
+                  "cycles:u": {
+                    "after_23": 1477578906,
+                    "after_3": 301118050,
+                    "before_23": 1473606295,
+                    "before_3": 300177781
+                  },
+                  "instructions:u": {
+                    "after_23": 6887381912,
+                    "after_3": 1389184169,
+                    "before_23": 6833661594,
+                    "before_3": 1375622767
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "mce_prefixed_32": {
+            "case": "mce_prefixed_32",
+            "input_bytes": 1256120,
+            "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+            "n": null,
+            "outcomes": [
+              "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 3.743916136278558,
+                  "branches:u": 0.7017754447079971,
+                  "cycles:u": 2.429632060457765,
+                  "instructions:u": 0.9323792862332647
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 85623.9,
+                    "before_per_operation": 82533.9
+                  },
+                  "branches:u": {
+                    "after_per_operation": 81507852.75,
+                    "before_per_operation": 80939836.85
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 87439891.9,
+                    "before_per_operation": 85365816.65
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 415268946.25,
+                    "before_per_operation": 411432831.75
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 2099084,
+                    "after_3": 386606,
+                    "before_23": 2027376,
+                    "before_3": 376698
+                  },
+                  "branches:u": {
+                    "after_23": 2034147651,
+                    "after_3": 403990596,
+                    "before_23": 2019946847,
+                    "before_3": 401150110
+                  },
+                  "cycles:u": {
+                    "after_23": 2183478923,
+                    "after_3": 434681085,
+                    "before_23": 2131337148,
+                    "before_3": 424020815
+                  },
+                  "instructions:u": {
+                    "after_23": 10373049181,
+                    "after_3": 2067670256,
+                    "before_23": 10277144357,
+                    "before_3": 2048487722
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 26.30042796211147,
+                  "branches:u": 0.7017859886010225,
+                  "cycles:u": 7.260790093796188,
+                  "instructions:u": 0.9323861849174664
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 78930.0,
+                    "before_per_operation": 62493.85
+                  },
+                  "branches:u": {
+                    "after_per_operation": 81507863.55,
+                    "before_per_operation": 80939839.1
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 88645821.45,
+                    "before_per_operation": 82645131.9
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 415268987.25,
+                    "before_per_operation": 411432844.25
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 1982825,
+                    "after_3": 404225,
+                    "before_23": 1656504,
+                    "before_3": 406627
+                  },
+                  "branches:u": {
+                    "after_23": 2034147825,
+                    "after_3": 403990554,
+                    "before_23": 2019947171,
+                    "before_3": 401150389
+                  },
+                  "cycles:u": {
+                    "after_23": 2213553903,
+                    "after_3": 440637474,
+                    "before_23": 2081255305,
+                    "before_3": 428352667
+                  },
+                  "instructions:u": {
+                    "after_23": 10373049831,
+                    "after_3": 2067670086,
+                    "before_23": 10277145700,
+                    "before_3": 2048488815
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "opc_relationship_declarations::n16384": {
+            "case": "opc_relationship_declarations",
+            "input_bytes": 268263,
+            "input_sha256": null,
+            "n": 16384,
+            "outcomes": [
+              "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": -21.65605095541402,
+                  "branches:u": -0.0065408938744404566,
+                  "cycles:u": 0.6473429776821416,
+                  "instructions:u": -0.0035448621556577464
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 36.9,
+                    "before_per_operation": 47.1
+                  },
+                  "branches:u": {
+                    "after_per_operation": 509835.8,
+                    "before_per_operation": 509869.15
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 695117.1,
+                    "before_per_operation": 690646.25
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 2947823.95,
+                    "before_per_operation": 2947928.45
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 11198,
+                    "after_3": 10460,
+                    "before_23": 11334,
+                    "before_3": 10392
+                  },
+                  "branches:u": {
+                    "after_23": 13998057,
+                    "after_3": 3801341,
+                    "before_23": 13998681,
+                    "before_3": 3801298
+                  },
+                  "cycles:u": {
+                    "after_23": 19320492,
+                    "after_3": 5418150,
+                    "before_23": 19115913,
+                    "before_3": 5302988
+                  },
+                  "instructions:u": {
+                    "after_23": 80206558,
+                    "after_3": 21250079,
+                    "before_23": 80208014,
+                    "before_3": 21249445
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": -0.651041666666663,
+                  "branches:u": -0.0025690551230916903,
+                  "cycles:u": 1.2384212435242459,
+                  "instructions:u": -0.0002883158345956538
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 38.15,
+                    "before_per_operation": 38.4
+                  },
+                  "branches:u": {
+                    "after_per_operation": 509902.0,
+                    "before_per_operation": 509915.1
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 701307.65,
+                    "before_per_operation": 692728.75
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 2948147.3,
+                    "before_per_operation": 2948155.8
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 11239,
+                    "after_3": 10476,
+                    "before_23": 11236,
+                    "before_3": 10468
+                  },
+                  "branches:u": {
+                    "after_23": 13999290,
+                    "after_3": 3801250,
+                    "before_23": 13999318,
+                    "before_3": 3801016
+                  },
+                  "cycles:u": {
+                    "after_23": 19365775,
+                    "after_3": 5339622,
+                    "before_23": 19192840,
+                    "before_3": 5338265
+                  },
+                  "instructions:u": {
+                    "after_23": 80212630,
+                    "after_3": 21249684,
+                    "before_23": 80211330,
+                    "before_3": 21248214
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "opc_relationship_declarations::n30": {
+            "case": "opc_relationship_declarations",
+            "input_bytes": 1255,
+            "input_sha256": null,
+            "n": 30,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 0.9489051094890621,
+                  "branches:u": 12.884181665413696,
+                  "cycles:u": 11.67383365690091,
+                  "instructions:u": 13.209442540530446
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 138.3,
+                    "before_per_operation": 137.0
+                  },
+                  "branches:u": {
+                    "after_per_operation": 35737.1,
+                    "before_per_operation": 31658.2
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 43745.6,
+                    "before_per_operation": 39172.65
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 172933.65,
+                    "before_per_operation": 152755.5
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 15783,
+                    "after_3": 13017,
+                    "before_23": 15478,
+                    "before_3": 12738
+                  },
+                  "branches:u": {
+                    "after_23": 1013458,
+                    "after_3": 298716,
+                    "before_23": 910431,
+                    "before_3": 277267
+                  },
+                  "cycles:u": {
+                    "after_23": 1950855,
+                    "after_3": 1075943,
+                    "before_23": 1855401,
+                    "before_3": 1071948
+                  },
+                  "instructions:u": {
+                    "after_23": 4886773,
+                    "after_3": 1428100,
+                    "before_23": 4379197,
+                    "before_3": 1324087
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": -16.318273769386394,
+                  "branches:u": 12.277151194889191,
+                  "cycles:u": 8.976192100240521,
+                  "instructions:u": 12.675329179297012
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 124.1,
+                    "before_per_operation": 148.3
+                  },
+                  "branches:u": {
+                    "after_per_operation": 35589.05,
+                    "before_per_operation": 31697.5
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 42337.85,
+                    "before_per_operation": 38850.55
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 172194.1,
+                    "before_per_operation": 152823.25
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 15537,
+                    "after_3": 13055,
+                    "before_23": 15546,
+                    "before_3": 12580
+                  },
+                  "branches:u": {
+                    "after_23": 1010980,
+                    "after_3": 299199,
+                    "before_23": 910701,
+                    "before_3": 276751
+                  },
+                  "cycles:u": {
+                    "after_23": 1935001,
+                    "after_3": 1088244,
+                    "before_23": 1833690,
+                    "before_3": 1056679
+                  },
+                  "instructions:u": {
+                    "after_23": 4873775,
+                    "after_3": 1429893,
+                    "before_23": 4378485,
+                    "before_3": 1322020
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "opc_relationship_declarations::n4096": {
+            "case": "opc_relationship_declarations",
+            "input_bytes": 65271,
+            "input_sha256": null,
+            "n": 4096,
+            "outcomes": [
+              "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 13.66313309776206,
+                  "branches:u": 0.015472695741003406,
+                  "cycles:u": 1.5522866678822966,
+                  "instructions:u": 0.03091749237242869
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 48.25,
+                    "before_per_operation": 42.45
+                  },
+                  "branches:u": {
+                    "after_per_operation": 153519.95,
+                    "before_per_operation": 153496.2
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 195203.45,
+                    "before_per_operation": 192219.65
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 847516.95,
+                    "before_per_operation": 847255.0
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 11239,
+                    "after_3": 10274,
+                    "before_23": 11150,
+                    "before_3": 10301
+                  },
+                  "branches:u": {
+                    "after_23": 4239769,
+                    "after_3": 1169370,
+                    "before_23": 4239275,
+                    "before_3": 1169351
+                  },
+                  "cycles:u": {
+                    "after_23": 5926323,
+                    "after_3": 2022254,
+                    "before_23": 5854165,
+                    "before_3": 2009772
+                  },
+                  "instructions:u": {
+                    "after_23": 23218997,
+                    "after_3": 6268658,
+                    "before_23": 23213131,
+                    "before_3": 6268031
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": -26.837060702875405,
+                  "branches:u": 0.019351433765324444,
+                  "cycles:u": 0.9780333158984078,
+                  "instructions:u": 0.023365602928748785
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 22.9,
+                    "before_per_operation": 31.3
+                  },
+                  "branches:u": {
+                    "after_per_operation": 153506.7,
+                    "before_per_operation": 153477.0
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 193539.8,
+                    "before_per_operation": 191665.25
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 847383.45,
+                    "before_per_operation": 847185.5
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 10751,
+                    "after_3": 10293,
+                    "before_23": 10961,
+                    "before_3": 10335
+                  },
+                  "branches:u": {
+                    "after_23": 4239534,
+                    "after_3": 1169400,
+                    "before_23": 4238596,
+                    "before_3": 1169056
+                  },
+                  "cycles:u": {
+                    "after_23": 5897055,
+                    "after_3": 2026259,
+                    "before_23": 5831755,
+                    "before_3": 1998450
+                  },
+                  "instructions:u": {
+                    "after_23": 23216380,
+                    "after_3": 6268711,
+                    "before_23": 23210583,
+                    "before_3": 6266873
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          },
+          "opc_relationship_declarations::n8": {
+            "case": "opc_relationship_declarations",
+            "input_bytes": 949,
+            "input_sha256": null,
+            "n": 8,
+            "outcomes": [
+              "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+            ],
+            "repeats": [
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 17.46116764863419,
+                  "branches:u": 1.348773137796444,
+                  "cycles:u": 4.4941260770333225,
+                  "instructions:u": 1.5164894490043102
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 109.65,
+                    "before_per_operation": 93.35
+                  },
+                  "branches:u": {
+                    "after_per_operation": 22549.95,
+                    "before_per_operation": 22249.85
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 23624.45,
+                    "before_per_operation": 22608.4
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 112261.35,
+                    "before_per_operation": 110584.35
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 14461,
+                    "after_3": 12268,
+                    "before_23": 14217,
+                    "before_3": 12350
+                  },
+                  "branches:u": {
+                    "after_23": 680575,
+                    "after_3": 229576,
+                    "before_23": 673815,
+                    "before_3": 228818
+                  },
+                  "cycles:u": {
+                    "after_23": 1721907,
+                    "after_3": 1249418,
+                    "before_23": 1761916,
+                    "before_3": 1309748
+                  },
+                  "instructions:u": {
+                    "after_23": 3355146,
+                    "after_3": 1109919,
+                    "before_23": 3316651,
+                    "before_3": 1104964
+                  }
+                },
+                "repeat": 0
+              },
+              {
+                "after_vs_before_percent": {
+                  "branch-misses:u": 15.589198036006536,
+                  "branches:u": 2.3508421866292872,
+                  "cycles:u": 4.345187446819154,
+                  "instructions:u": 2.6801784885304603
+                },
+                "marginal": {
+                  "branch-misses:u": {
+                    "after_per_operation": 141.25,
+                    "before_per_operation": 122.2
+                  },
+                  "branches:u": {
+                    "after_per_operation": 22774.7,
+                    "before_per_operation": 22251.6
+                  },
+                  "cycles:u": {
+                    "after_per_operation": 33355.4,
+                    "before_per_operation": 31966.4
+                  },
+                  "instructions:u": {
+                    "after_per_operation": 113467.45,
+                    "before_per_operation": 110505.7
+                  }
+                },
+                "raw_counts": {
+                  "branch-misses:u": {
+                    "after_23": 14833,
+                    "after_3": 12008,
+                    "before_23": 14707,
+                    "before_3": 12263
+                  },
+                  "branches:u": {
+                    "after_23": 684589,
+                    "after_3": 229095,
+                    "before_23": 673534,
+                    "before_3": 228502
+                  },
+                  "cycles:u": {
+                    "after_23": 1657788,
+                    "after_3": 990680,
+                    "before_23": 1644730,
+                    "before_3": 1005402
+                  },
+                  "instructions:u": {
+                    "after_23": 3377366,
+                    "after_3": 1108017,
+                    "before_23": 3313559,
+                    "before_3": 1103445
+                  }
+                },
+                "repeat": 1
+              }
+            ]
+          }
+        },
+        "event_order": [
+          "instructions:u",
+          "cycles:u",
+          "branches:u",
+          "branch-misses:u"
+        ],
+        "iterator": {
+          "identity_by_round": {
+            "23": {
+              "checksum": 48611006,
+              "rounds": 23,
+              "tags": 440371
+            },
+            "3": {
+              "checksum": 6340566,
+              "rounds": 3,
+              "tags": 440371
+            }
+          },
+          "repeats": [
+            {
+              "identity_by_round": {
+                "23": {
+                  "checksum": 48611006,
+                  "rounds": 23,
+                  "tags": 440371
+                },
+                "3": {
+                  "checksum": 6340566,
+                  "rounds": 3,
+                  "tags": 440371
+                }
+              },
+              "marginal_per_operation": {
+                "checked": {
+                  "branch-misses:u": 193378.65,
+                  "branches:u": 55831978.3,
+                  "cycles:u": 48322916.95,
+                  "instructions:u": 259474057.5
+                },
+                "quick-xml": {
+                  "branch-misses:u": 187845.0,
+                  "branches:u": 52196988.55,
+                  "cycles:u": 45460084.55,
+                  "instructions:u": 244257564.05
+                }
+              },
+              "repeat": 0
+            },
+            {
+              "identity_by_round": {
+                "23": {
+                  "checksum": 48611006,
+                  "rounds": 23,
+                  "tags": 440371
+                },
+                "3": {
+                  "checksum": 6340566,
+                  "rounds": 3,
+                  "tags": 440371
+                }
+              },
+              "marginal_per_operation": {
+                "checked": {
+                  "branch-misses:u": 190209.3,
+                  "branches:u": 55854999.85,
+                  "cycles:u": 48309166.45,
+                  "instructions:u": 259570557.45
+                },
+                "quick-xml": {
+                  "branch-misses:u": 192521.35,
+                  "branches:u": 52308092.05,
+                  "cycles:u": 46741666.1,
+                  "instructions:u": 244652690.65
+                }
+              },
+              "repeat": 1
+            }
+          ]
+        },
+        "rows": [
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-0-before-3.csv",
+            "csv_sha256": "b9244da45eb2ba1c218cfba9477e668b426c59c00b64664d39c2db3d90526958",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_worksheet-None-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 218669,
+                "running_percent": 100.0,
+                "time_running_ns": 68036044
+              },
+              "branches:u": {
+                "count": 250701627,
+                "running_percent": 100.0,
+                "time_running_ns": 68036044
+              },
+              "cycles:u": {
+                "count": 298291318,
+                "running_percent": 100.0,
+                "time_running_ns": 68036044
+              },
+              "instructions:u": {
+                "count": 1375622648,
+                "running_percent": 100.0,
+                "time_running_ns": 68036044
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_worksheet-None-0-before-3.json",
+            "report_sha256": "24558e143ec120ac48fa64309bd4d69c559bda9b4ff3826ca0dcf2fe59a52c44",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-0-after-3.csv",
+            "csv_sha256": "fd416abfb515b528d6942ec4152615213b0ef7821e6144859d72d3e8db807159",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_worksheet-None-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 219485,
+                "running_percent": 100.0,
+                "time_running_ns": 68353794
+              },
+              "branches:u": {
+                "count": 253230821,
+                "running_percent": 100.0,
+                "time_running_ns": 68353794
+              },
+              "cycles:u": {
+                "count": 300926998,
+                "running_percent": 100.0,
+                "time_running_ns": 68353794
+              },
+              "instructions:u": {
+                "count": 1389182703,
+                "running_percent": 100.0,
+                "time_running_ns": 68353794
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_worksheet-None-0-after-3.json",
+            "report_sha256": "5b37a34541d76a26ec1302dbed7214b445e620cf71c34cc06b3e08635b187041",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-0-after-23.csv",
+            "csv_sha256": "716bdfb33747a895ca0a165dcb9b239df822c65c9213dda80eef3e33cd5cc7ff",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_worksheet-None-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 968812,
+                "running_percent": 100.0,
+                "time_running_ns": 330588903
+              },
+              "branches:u": {
+                "count": 1259788032,
+                "running_percent": 100.0,
+                "time_running_ns": 330588903
+              },
+              "cycles:u": {
+                "count": 1474982931,
+                "running_percent": 100.0,
+                "time_running_ns": 330588903
+              },
+              "instructions:u": {
+                "count": 6887377678,
+                "running_percent": 100.0,
+                "time_running_ns": 330588903
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_worksheet-None-0-after-23.json",
+            "report_sha256": "9904ae0516256363b2b1674506297054ec6e5a05356d6c7fd2c8e98ca0c2f65d",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-0-before-23.csv",
+            "csv_sha256": "16eb90105b0cd47f5f6bc0df8843cdb8c941dc538296cb7a28aca3fef67d413f",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_worksheet-None-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 965403,
+                "running_percent": 100.0,
+                "time_running_ns": 329366663
+              },
+              "branches:u": {
+                "count": 1247264724,
+                "running_percent": 100.0,
+                "time_running_ns": 329366663
+              },
+              "cycles:u": {
+                "count": 1468437619,
+                "running_percent": 100.0,
+                "time_running_ns": 329366663
+              },
+              "instructions:u": {
+                "count": 6820436047,
+                "running_percent": 100.0,
+                "time_running_ns": 329366663
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_worksheet-None-0-before-23.json",
+            "report_sha256": "7a1dc10a7786af826bbca1a28baac2d50eadc3f23daab3961fef87d7120d3fd1",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-1-before-3.csv",
+            "csv_sha256": "88f5351493faf20477af7efdf06b13e983d36dacb2fa13535a7b44cc60817a2c",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_worksheet-None-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 267909,
+                "running_percent": 100.0,
+                "time_running_ns": 68218084
+              },
+              "branches:u": {
+                "count": 250701661,
+                "running_percent": 100.0,
+                "time_running_ns": 68218084
+              },
+              "cycles:u": {
+                "count": 300177781,
+                "running_percent": 100.0,
+                "time_running_ns": 68218084
+              },
+              "instructions:u": {
+                "count": 1375622767,
+                "running_percent": 100.0,
+                "time_running_ns": 68218084
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_worksheet-None-1-before-3.json",
+            "report_sha256": "36e5be49854ecce6c8ed52de9f49e20f5a2a1ebee8d0801ca5407ee0a52a03f0",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-1-after-3.csv",
+            "csv_sha256": "f6e8c6b0cc7f8b72c7b2b9faec42e8bb4de7d0b8a67718118604ae779fb7ab4e",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_worksheet-None-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 219099,
+                "running_percent": 100.0,
+                "time_running_ns": 68282664
+              },
+              "branches:u": {
+                "count": 253231248,
+                "running_percent": 100.0,
+                "time_running_ns": 68282664
+              },
+              "cycles:u": {
+                "count": 301118050,
+                "running_percent": 100.0,
+                "time_running_ns": 68282664
+              },
+              "instructions:u": {
+                "count": 1389184169,
+                "running_percent": 100.0,
+                "time_running_ns": 68282664
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_worksheet-None-1-after-3.json",
+            "report_sha256": "c3c9d64ae4196fd35a8ac1c8eb339f70f8bcba31c17079cb727cbba7698e994b",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-1-after-23.csv",
+            "csv_sha256": "66abbbc7938d602a68f8fc49118b53d46d871e6a7903703253839a741a480dfe",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_worksheet-None-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 998164,
+                "running_percent": 100.0,
+                "time_running_ns": 330943243
+              },
+              "branches:u": {
+                "count": 1259788740,
+                "running_percent": 100.0,
+                "time_running_ns": 330943243
+              },
+              "cycles:u": {
+                "count": 1477578906,
+                "running_percent": 100.0,
+                "time_running_ns": 330943243
+              },
+              "instructions:u": {
+                "count": 6887381912,
+                "running_percent": 100.0,
+                "time_running_ns": 330943243
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_worksheet-None-1-after-23.json",
+            "report_sha256": "767c3f6024124698938639eedb49417fafbc2d47411e2d103effdb6296f6c14a",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_worksheet",
+            "csv": "instructions-0/mce_benign_worksheet-None-1-before-23.csv",
+            "csv_sha256": "7ad7bf128d41b1fac5124802e37aea0e7d4f627563ac5a76381034cbc0322aba",
+            "identity": {
+              "input_bytes": 1558391,
+              "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+              "outcomes": [
+                "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_worksheet-None-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 954196,
+                "running_percent": 100.0,
+                "time_running_ns": 330525543
+              },
+              "branches:u": {
+                "count": 1249878811,
+                "running_percent": 100.0,
+                "time_running_ns": 330525543
+              },
+              "cycles:u": {
+                "count": 1473606295,
+                "running_percent": 100.0,
+                "time_running_ns": 330525543
+              },
+              "instructions:u": {
+                "count": 6833661594,
+                "running_percent": 100.0,
+                "time_running_ns": 330525543
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_worksheet-None-1-before-23.json",
+            "report_sha256": "c4f7a0c5ccbca52c240ff2d9888c9665231fa9621044f240770e040436e42563",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-0-before-3.csv",
+            "csv_sha256": "b449c5d0120a14dc2130c4c898e686c89d66ac9c6a72c76f84a2ebefbf3ac995",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_document-None-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 111266,
+                "running_percent": 100.0,
+                "time_running_ns": 10512936
+              },
+              "branches:u": {
+                "count": 34146330,
+                "running_percent": 100.0,
+                "time_running_ns": 10512936
+              },
+              "cycles:u": {
+                "count": 42925275,
+                "running_percent": 100.0,
+                "time_running_ns": 10512936
+              },
+              "instructions:u": {
+                "count": 181537436,
+                "running_percent": 100.0,
+                "time_running_ns": 10512936
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_document-None-0-before-3.json",
+            "report_sha256": "534f53dc5f533455b4c252f5727ab4b2d8d9f0bdba7b8fcee522a88e6688aad6",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-0-after-3.csv",
+            "csv_sha256": "680a89d5356b1546fd09078cdc1caadae1f54eb3fc43bdba1636ff416d320e78",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_document-None-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 128180,
+                "running_percent": 100.0,
+                "time_running_ns": 10573646
+              },
+              "branches:u": {
+                "count": 34404314,
+                "running_percent": 100.0,
+                "time_running_ns": 10573646
+              },
+              "cycles:u": {
+                "count": 43714918,
+                "running_percent": 100.0,
+                "time_running_ns": 10573646
+              },
+              "instructions:u": {
+                "count": 182952156,
+                "running_percent": 100.0,
+                "time_running_ns": 10573646
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_document-None-0-after-3.json",
+            "report_sha256": "20a6c8fe780a7a42a1c4c5d9c94f9a816242e276184c2c774175a71c21b4abc1",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-0-after-23.csv",
+            "csv_sha256": "70ecbb03b4147946687583f81c66bb466b230d06106c92c1a1ba6d9886bbabf2",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_document-None-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 367305,
+                "running_percent": 100.0,
+                "time_running_ns": 46320873
+              },
+              "branches:u": {
+                "count": 169448948,
+                "running_percent": 100.0,
+                "time_running_ns": 46320873
+              },
+              "cycles:u": {
+                "count": 204022663,
+                "running_percent": 100.0,
+                "time_running_ns": 46320873
+              },
+              "instructions:u": {
+                "count": 895615577,
+                "running_percent": 100.0,
+                "time_running_ns": 46320873
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_document-None-0-after-23.json",
+            "report_sha256": "45aff4342264b7c2dc85f03f098b407dd8acc0bb97f32d8529d37a0f7daf674c",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-0-before-23.csv",
+            "csv_sha256": "096f32caf84cd6d371baed01e6ec33010762931151d6f8487f56375ba22cd3cd",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_document-None-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 350344,
+                "running_percent": 100.0,
+                "time_running_ns": 45669263
+              },
+              "branches:u": {
+                "count": 168206683,
+                "running_percent": 100.0,
+                "time_running_ns": 45669263
+              },
+              "cycles:u": {
+                "count": 201178325,
+                "running_percent": 100.0,
+                "time_running_ns": 45669263
+              },
+              "instructions:u": {
+                "count": 888782229,
+                "running_percent": 100.0,
+                "time_running_ns": 45669263
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_benign_document-None-0-before-23.json",
+            "report_sha256": "458002ca323a0bd3340963a55264396d3c57f3533a733a29299e734d8c25d968",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-1-before-3.csv",
+            "csv_sha256": "50d0ee8f2ae834826f59f7081e6afd019a7729d482281fd3d407116cb3c10e12",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_document-None-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 158374,
+                "running_percent": 100.0,
+                "time_running_ns": 10679756
+              },
+              "branches:u": {
+                "count": 34146499,
+                "running_percent": 100.0,
+                "time_running_ns": 10679756
+              },
+              "cycles:u": {
+                "count": 44134511,
+                "running_percent": 100.0,
+                "time_running_ns": 10679756
+              },
+              "instructions:u": {
+                "count": 181538585,
+                "running_percent": 100.0,
+                "time_running_ns": 10679756
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_document-None-1-before-3.json",
+            "report_sha256": "0a873f668b6ec906bc5269432d371346bd92e464317d54ced51ca87250f56b9a",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-1-after-3.csv",
+            "csv_sha256": "371e9abaae48bf9cac0087d094d471ae0c8eca8c6b7def0feb67512b59bf3242",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_document-None-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 113392,
+                "running_percent": 100.0,
+                "time_running_ns": 10510156
+              },
+              "branches:u": {
+                "count": 34403567,
+                "running_percent": 100.0,
+                "time_running_ns": 10510156
+              },
+              "cycles:u": {
+                "count": 43363927,
+                "running_percent": 100.0,
+                "time_running_ns": 10510156
+              },
+              "instructions:u": {
+                "count": 182949331,
+                "running_percent": 100.0,
+                "time_running_ns": 10510156
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_document-None-1-after-3.json",
+            "report_sha256": "0ad9a662a4d95f894b79a5a4c7f5c75cee664802aabe653dc8bb8fe75fdee5f0",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-1-after-23.csv",
+            "csv_sha256": "65cd036f7ab5d17d6f6c102cd3a6074c91196a992b19166ff1a4687cbf324f37",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_benign_document-None-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 386343,
+                "running_percent": 100.0,
+                "time_running_ns": 47022302
+              },
+              "branches:u": {
+                "count": 169501945,
+                "running_percent": 100.0,
+                "time_running_ns": 47022302
+              },
+              "cycles:u": {
+                "count": 207068575,
+                "running_percent": 100.0,
+                "time_running_ns": 47022302
+              },
+              "instructions:u": {
+                "count": 895881877,
+                "running_percent": 100.0,
+                "time_running_ns": 47022302
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_document-None-1-after-23.json",
+            "report_sha256": "c7d9c2a69f11788e32b3a254b64665e33b352a50b2f30e0711dc8e6aa80650c6",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_benign_document",
+            "csv": "instructions-0/mce_benign_document-None-1-before-23.csv",
+            "csv_sha256": "bc28a36e8cd0779397a45b53c8d341b88c65cbd605ba148ea02165c1ac76647f",
+            "identity": {
+              "input_bytes": 288070,
+              "input_sha256": "985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee",
+              "outcomes": [
+                "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_benign_document-None-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 356648,
+                "running_percent": 100.0,
+                "time_running_ns": 45817453
+              },
+              "branches:u": {
+                "count": 168305736,
+                "running_percent": 100.0,
+                "time_running_ns": 45817453
+              },
+              "cycles:u": {
+                "count": 201438154,
+                "running_percent": 100.0,
+                "time_running_ns": 45817453
+              },
+              "instructions:u": {
+                "count": 889288616,
+                "running_percent": 100.0,
+                "time_running_ns": 45817453
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_benign_document-None-1-before-23.json",
+            "report_sha256": "109dc3aaa0f5c84963f0fc96e49ec0292d49b1f07cbf9fc790d519879f970d88",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-0-before-3.csv",
+            "csv_sha256": "ff24024c3ab9f841af7354cfb0051db3042de7244c208c594a132bf9c8177d3b",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_prefixed_32-None-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 376698,
+                "running_percent": 100.0,
+                "time_running_ns": 95965543
+              },
+              "branches:u": {
+                "count": 401150110,
+                "running_percent": 100.0,
+                "time_running_ns": 95965543
+              },
+              "cycles:u": {
+                "count": 424020815,
+                "running_percent": 100.0,
+                "time_running_ns": 95965543
+              },
+              "instructions:u": {
+                "count": 2048487722,
+                "running_percent": 100.0,
+                "time_running_ns": 95965543
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_prefixed_32-None-0-before-3.json",
+            "report_sha256": "5de113119d32f37989175a9e45e87375f74b670b1340b42d5ec34ec887caeefa",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-0-after-3.csv",
+            "csv_sha256": "889d86650bd5e452a4975da3b83eb4d4d79fc4054a53e262a186c996a867221b",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_prefixed_32-None-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 386606,
+                "running_percent": 100.0,
+                "time_running_ns": 98178252
+              },
+              "branches:u": {
+                "count": 403990596,
+                "running_percent": 100.0,
+                "time_running_ns": 98178252
+              },
+              "cycles:u": {
+                "count": 434681085,
+                "running_percent": 100.0,
+                "time_running_ns": 98178252
+              },
+              "instructions:u": {
+                "count": 2067670256,
+                "running_percent": 100.0,
+                "time_running_ns": 98178252
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_prefixed_32-None-0-after-3.json",
+            "report_sha256": "d4d02777b83053c735abecd75bd3305b15ca7b38f94e6c0ab0f54892295c35cb",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-0-after-23.csv",
+            "csv_sha256": "c57e44add7ff326ae3e5f855d2a1f8e097145b9352c93c33ed85093772377dce",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_prefixed_32-None-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 2099084,
+                "running_percent": 100.0,
+                "time_running_ns": 488549862
+              },
+              "branches:u": {
+                "count": 2034147651,
+                "running_percent": 100.0,
+                "time_running_ns": 488549862
+              },
+              "cycles:u": {
+                "count": 2183478923,
+                "running_percent": 100.0,
+                "time_running_ns": 488549862
+              },
+              "instructions:u": {
+                "count": 10373049181,
+                "running_percent": 100.0,
+                "time_running_ns": 488549862
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_prefixed_32-None-0-after-23.json",
+            "report_sha256": "0b3f56308895d301dd6db965927a69f23f24720ad5508317c49756cf151abe74",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-0-before-23.csv",
+            "csv_sha256": "eee33794196dc6fe2c630b0e8931e80734647c87a56a8886637c6d4268e68b06",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_prefixed_32-None-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 2027376,
+                "running_percent": 100.0,
+                "time_running_ns": 476852837
+              },
+              "branches:u": {
+                "count": 2019946847,
+                "running_percent": 100.0,
+                "time_running_ns": 476852837
+              },
+              "cycles:u": {
+                "count": 2131337148,
+                "running_percent": 100.0,
+                "time_running_ns": 476852837
+              },
+              "instructions:u": {
+                "count": 10277144357,
+                "running_percent": 100.0,
+                "time_running_ns": 476852837
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/mce_prefixed_32-None-0-before-23.json",
+            "report_sha256": "3f3fd34beb4cf6602c77de0f82f1656ec06cdd8a2b08612f181f6f2cefa21cc0",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-1-before-3.csv",
+            "csv_sha256": "235b10378755d7fd0e389d5fdaad5ba1870e9812146d5e95ef26cee38424feed",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_prefixed_32-None-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 406627,
+                "running_percent": 100.0,
+                "time_running_ns": 96916853
+              },
+              "branches:u": {
+                "count": 401150389,
+                "running_percent": 100.0,
+                "time_running_ns": 96916853
+              },
+              "cycles:u": {
+                "count": 428352667,
+                "running_percent": 100.0,
+                "time_running_ns": 96916853
+              },
+              "instructions:u": {
+                "count": 2048488815,
+                "running_percent": 100.0,
+                "time_running_ns": 96916853
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_prefixed_32-None-1-before-3.json",
+            "report_sha256": "5a9e88ae0fa99ac4e0ced3f19b0ad7a1de82321e0152826921a2b02d67ad3d6f",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-1-after-3.csv",
+            "csv_sha256": "e23ffe651f4eea82e8f355c09730156445c33c22cc645d14d2d1ec494d2002fa",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_prefixed_32-None-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 404225,
+                "running_percent": 100.0,
+                "time_running_ns": 99572111
+              },
+              "branches:u": {
+                "count": 403990554,
+                "running_percent": 100.0,
+                "time_running_ns": 99572111
+              },
+              "cycles:u": {
+                "count": 440637474,
+                "running_percent": 100.0,
+                "time_running_ns": 99572111
+              },
+              "instructions:u": {
+                "count": 2067670086,
+                "running_percent": 100.0,
+                "time_running_ns": 99572111
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_prefixed_32-None-1-after-3.json",
+            "report_sha256": "851731a4028e49524fe9402f752652e4d4d45851f4bd3e08556ecbefe2a4248b",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "24e26cb4e2580454f4999f401f6d5c03132fca5e7eaf012feac98c4f8893751c",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-1-after-23.csv",
+            "csv_sha256": "4314c8a45480a259be000cda69dc5f6b9356882921b484dda3377d78351d0209",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/mce_prefixed_32-None-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 1982825,
+                "running_percent": 100.0,
+                "time_running_ns": 495120410
+              },
+              "branches:u": {
+                "count": 2034147825,
+                "running_percent": 100.0,
+                "time_running_ns": 495120410
+              },
+              "cycles:u": {
+                "count": 2213553903,
+                "running_percent": 100.0,
+                "time_running_ns": 495120410
+              },
+              "instructions:u": {
+                "count": 10373049831,
+                "running_percent": 100.0,
+                "time_running_ns": 495120410
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_prefixed_32-None-1-after-23.json",
+            "report_sha256": "1fbca2998a8a2ba8537a01b93a949b8f95d9021e00d1b314012e27ed9e633fb0",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "5f34063e101f0f7152138270b0c44bcec323ee94e22a27af01ecfa785669a9cf",
+            "case": "mce_prefixed_32",
+            "csv": "instructions-0/mce_prefixed_32-None-1-before-23.csv",
+            "csv_sha256": "5b95d6cf916da9f07c98f20cd6670c25dd03830eff9bd780960dd27f6bae9f9e",
+            "identity": {
+              "input_bytes": 1256120,
+              "input_sha256": "f88cda674473cf1cb25520d72501ddf681911118ef4ab0bb74d760dda953d694",
+              "outcomes": [
+                "ok:38bcd56b492bd0ebf2884367a73144e4f544f641380f5c2dc4f9a7a342b46ca6"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/mce_prefixed_32-None-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": null,
+            "perf": {
+              "branch-misses:u": {
+                "count": 1656504,
+                "running_percent": 100.0,
+                "time_running_ns": 465777391
+              },
+              "branches:u": {
+                "count": 2019947171,
+                "running_percent": 100.0,
+                "time_running_ns": 465777391
+              },
+              "cycles:u": {
+                "count": 2081255305,
+                "running_percent": 100.0,
+                "time_running_ns": 465777391
+              },
+              "instructions:u": {
+                "count": 10277145700,
+                "running_percent": 100.0,
+                "time_running_ns": 465777391
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/mce_prefixed_32-None-1-before-23.json",
+            "report_sha256": "7e78b780b97123fa1651fc94fd57164b0a912509c7a7f90e244e632a1b36d109",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-0-before-3.csv",
+            "csv_sha256": "0c77c80c8c13e07c43b51fa487b98ebfa054eefc521f4f24efbad85212ec5f46",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-8-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12350,
+                "running_percent": 100.0,
+                "time_running_ns": 960550
+              },
+              "branches:u": {
+                "count": 228818,
+                "running_percent": 100.0,
+                "time_running_ns": 960550
+              },
+              "cycles:u": {
+                "count": 1309748,
+                "running_percent": 100.0,
+                "time_running_ns": 960550
+              },
+              "instructions:u": {
+                "count": 1104964,
+                "running_percent": 100.0,
+                "time_running_ns": 960550
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-8-0-before-3.json",
+            "report_sha256": "750e29eaaf5466502515436ec2ecfce97343a16ec9855b4f44f77739e6ea01ff",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-0-after-3.csv",
+            "csv_sha256": "7ca667cc17203588c8551a094f34af19e2046d3c453b4a46e37cc3054d9c3d90",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-8-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12268,
+                "running_percent": 100.0,
+                "time_running_ns": 889699
+              },
+              "branches:u": {
+                "count": 229576,
+                "running_percent": 100.0,
+                "time_running_ns": 889699
+              },
+              "cycles:u": {
+                "count": 1249418,
+                "running_percent": 100.0,
+                "time_running_ns": 889699
+              },
+              "instructions:u": {
+                "count": 1109919,
+                "running_percent": 100.0,
+                "time_running_ns": 889699
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-8-0-after-3.json",
+            "report_sha256": "3ccd0ef26e3b6e5739bba26a771398cbb9a49025fc5862a1c38f867c06db23c2",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-0-after-23.csv",
+            "csv_sha256": "48a7556d2a94b43bb19d4afee58098020614db249fb5706b06eb36f5a0d91c06",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-8-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 14461,
+                "running_percent": 100.0,
+                "time_running_ns": 1065109
+              },
+              "branches:u": {
+                "count": 680575,
+                "running_percent": 100.0,
+                "time_running_ns": 1065109
+              },
+              "cycles:u": {
+                "count": 1721907,
+                "running_percent": 100.0,
+                "time_running_ns": 1065109
+              },
+              "instructions:u": {
+                "count": 3355146,
+                "running_percent": 100.0,
+                "time_running_ns": 1065109
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-8-0-after-23.json",
+            "report_sha256": "ebce71348fade4de9bc8e358db736c0d95b9943653d83f1ebf8df7bad60bab42",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-0-before-23.csv",
+            "csv_sha256": "f21ecd2fb85b88c68c75880df4f785625f7949d72ee74c72d42837767736dcfe",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-8-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 14217,
+                "running_percent": 100.0,
+                "time_running_ns": 1076870
+              },
+              "branches:u": {
+                "count": 673815,
+                "running_percent": 100.0,
+                "time_running_ns": 1076870
+              },
+              "cycles:u": {
+                "count": 1761916,
+                "running_percent": 100.0,
+                "time_running_ns": 1076870
+              },
+              "instructions:u": {
+                "count": 3316651,
+                "running_percent": 100.0,
+                "time_running_ns": 1076870
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-8-0-before-23.json",
+            "report_sha256": "a29aaacf9d93f5f438cbc2b96028edc28800bc0a859c46a3789bfcd0e12e4f50",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-1-before-3.csv",
+            "csv_sha256": "baa4b83a8caf911d2bf10c416dd7f9731c8048835ae298805b18697c55fb0fc0",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-8-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12263,
+                "running_percent": 100.0,
+                "time_running_ns": 875419
+              },
+              "branches:u": {
+                "count": 228502,
+                "running_percent": 100.0,
+                "time_running_ns": 875419
+              },
+              "cycles:u": {
+                "count": 1005402,
+                "running_percent": 100.0,
+                "time_running_ns": 875419
+              },
+              "instructions:u": {
+                "count": 1103445,
+                "running_percent": 100.0,
+                "time_running_ns": 875419
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-8-1-before-3.json",
+            "report_sha256": "9e3ac1668e4e21448412da86a50a47fdf3e009522e639a42d30d4a3022b33032",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-1-after-3.csv",
+            "csv_sha256": "64fd3b88e7dd4cb5a3c772b75ebda1605973be0439b3613b76adb2491e227c61",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-8-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12008,
+                "running_percent": 100.0,
+                "time_running_ns": 825559
+              },
+              "branches:u": {
+                "count": 229095,
+                "running_percent": 100.0,
+                "time_running_ns": 825559
+              },
+              "cycles:u": {
+                "count": 990680,
+                "running_percent": 100.0,
+                "time_running_ns": 825559
+              },
+              "instructions:u": {
+                "count": 1108017,
+                "running_percent": 100.0,
+                "time_running_ns": 825559
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-8-1-after-3.json",
+            "report_sha256": "021b7da52b4a177fb889fda6d298cf0d5b7d289c76c2a5399b235f80bc5edc3a",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-1-after-23.csv",
+            "csv_sha256": "92ca742d917f1accbefda0f12fec26bebdcfa57ecba3a2c1e78a4c75d4f89945",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-8-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 14833,
+                "running_percent": 100.0,
+                "time_running_ns": 1012890
+              },
+              "branches:u": {
+                "count": 684589,
+                "running_percent": 100.0,
+                "time_running_ns": 1012890
+              },
+              "cycles:u": {
+                "count": 1657788,
+                "running_percent": 100.0,
+                "time_running_ns": 1012890
+              },
+              "instructions:u": {
+                "count": 3377366,
+                "running_percent": 100.0,
+                "time_running_ns": 1012890
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-8-1-after-23.json",
+            "report_sha256": "8866ea461026d0d2c5a76a75ccc58e77134de537dcc151a43442dd244c883b58",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-8-1-before-23.csv",
+            "csv_sha256": "e22369e776ea6e46b1025f9cbaff078a2ee578228b9528f978949655a962b064",
+            "identity": {
+              "input_bytes": 949,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-8-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 8,
+            "perf": {
+              "branch-misses:u": {
+                "count": 14707,
+                "running_percent": 100.0,
+                "time_running_ns": 1014240
+              },
+              "branches:u": {
+                "count": 673534,
+                "running_percent": 100.0,
+                "time_running_ns": 1014240
+              },
+              "cycles:u": {
+                "count": 1644730,
+                "running_percent": 100.0,
+                "time_running_ns": 1014240
+              },
+              "instructions:u": {
+                "count": 3313559,
+                "running_percent": 100.0,
+                "time_running_ns": 1014240
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-8-1-before-23.json",
+            "report_sha256": "796578b04be35042b9cbd5a4ee8a7661cc20544e9212148a94736aa51376f368",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-0-before-3.csv",
+            "csv_sha256": "2c31eb6152e4096cbe05a114503b12a6d93013a10b32dbdc7a9c7676b58c60b7",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-30-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12738,
+                "running_percent": 100.0,
+                "time_running_ns": 886230
+              },
+              "branches:u": {
+                "count": 277267,
+                "running_percent": 100.0,
+                "time_running_ns": 886230
+              },
+              "cycles:u": {
+                "count": 1071948,
+                "running_percent": 100.0,
+                "time_running_ns": 886230
+              },
+              "instructions:u": {
+                "count": 1324087,
+                "running_percent": 100.0,
+                "time_running_ns": 886230
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-30-0-before-3.json",
+            "report_sha256": "f4d27c57c286987fbde9ac1b265cc262ad065c545ab34429352b09cd64e83668",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-0-after-3.csv",
+            "csv_sha256": "6cc082727be7c4a81b81df6a158b7265d2806dc89c1f75d9a3082944cb93e7ee",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-30-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 13017,
+                "running_percent": 100.0,
+                "time_running_ns": 841410
+              },
+              "branches:u": {
+                "count": 298716,
+                "running_percent": 100.0,
+                "time_running_ns": 841410
+              },
+              "cycles:u": {
+                "count": 1075943,
+                "running_percent": 100.0,
+                "time_running_ns": 841410
+              },
+              "instructions:u": {
+                "count": 1428100,
+                "running_percent": 100.0,
+                "time_running_ns": 841410
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-30-0-after-3.json",
+            "report_sha256": "9107ab9a5b2458f77f534f2669d27bd7d4dcb8a20d074e0f8cdec8882ab715b0",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-0-after-23.csv",
+            "csv_sha256": "17e602940d20f5b1e09000d3d0b52f65604ca643cd57199486238b6933079611",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-30-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 15783,
+                "running_percent": 100.0,
+                "time_running_ns": 1081780
+              },
+              "branches:u": {
+                "count": 1013458,
+                "running_percent": 100.0,
+                "time_running_ns": 1081780
+              },
+              "cycles:u": {
+                "count": 1950855,
+                "running_percent": 100.0,
+                "time_running_ns": 1081780
+              },
+              "instructions:u": {
+                "count": 4886773,
+                "running_percent": 100.0,
+                "time_running_ns": 1081780
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-30-0-after-23.json",
+            "report_sha256": "69ed25fb4013b4b9e0e6ab6eb11812c799e6ea9ed2de6328a1a617d5d84c8f4f",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-0-before-23.csv",
+            "csv_sha256": "b5bdaf47dba8ebc52a9a0f5c30ac2c212f295e585e1b52cf2d77602bc2e8b93d",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-30-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 15478,
+                "running_percent": 100.0,
+                "time_running_ns": 1071820
+              },
+              "branches:u": {
+                "count": 910431,
+                "running_percent": 100.0,
+                "time_running_ns": 1071820
+              },
+              "cycles:u": {
+                "count": 1855401,
+                "running_percent": 100.0,
+                "time_running_ns": 1071820
+              },
+              "instructions:u": {
+                "count": 4379197,
+                "running_percent": 100.0,
+                "time_running_ns": 1071820
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-30-0-before-23.json",
+            "report_sha256": "08a099eb95b7a105397d276f18f8952b81c2f1bc4b4d7e594ae463b7cd1bb307",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-1-before-3.csv",
+            "csv_sha256": "213229a3aa5bdb7338ab735e6ad343b925cfb4451d506a277b0b4da4930fa3e2",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-30-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 12580,
+                "running_percent": 100.0,
+                "time_running_ns": 856810
+              },
+              "branches:u": {
+                "count": 276751,
+                "running_percent": 100.0,
+                "time_running_ns": 856810
+              },
+              "cycles:u": {
+                "count": 1056679,
+                "running_percent": 100.0,
+                "time_running_ns": 856810
+              },
+              "instructions:u": {
+                "count": 1322020,
+                "running_percent": 100.0,
+                "time_running_ns": 856810
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-30-1-before-3.json",
+            "report_sha256": "eaadeb0754b895ca16cd5486deb10808e10099895161aa9d5c2b06f08ecbac1f",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-1-after-3.csv",
+            "csv_sha256": "22d68f44cee6f5b8f31533461f3826e769b68909a38fbff31f40410ac7aad9dd",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-30-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 13055,
+                "running_percent": 100.0,
+                "time_running_ns": 854969
+              },
+              "branches:u": {
+                "count": 299199,
+                "running_percent": 100.0,
+                "time_running_ns": 854969
+              },
+              "cycles:u": {
+                "count": 1088244,
+                "running_percent": 100.0,
+                "time_running_ns": 854969
+              },
+              "instructions:u": {
+                "count": 1429893,
+                "running_percent": 100.0,
+                "time_running_ns": 854969
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-30-1-after-3.json",
+            "report_sha256": "edd22388b36a5af5e0b9d9b931bc8b049a8a95dc2fc7ddafda2e7d00858dd97f",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-1-after-23.csv",
+            "csv_sha256": "0590c0a1ba0f08b333838d173b7d5ad1ea4c9435398ae5cd2527fb9743310339",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-30-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 15537,
+                "running_percent": 100.0,
+                "time_running_ns": 1036560
+              },
+              "branches:u": {
+                "count": 1010980,
+                "running_percent": 100.0,
+                "time_running_ns": 1036560
+              },
+              "cycles:u": {
+                "count": 1935001,
+                "running_percent": 100.0,
+                "time_running_ns": 1036560
+              },
+              "instructions:u": {
+                "count": 4873775,
+                "running_percent": 100.0,
+                "time_running_ns": 1036560
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-30-1-after-23.json",
+            "report_sha256": "2dd2ece20d66161f67c6cffc5529fb5b0226a6ccb0f43aec0e44c5c46395e647",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-30-1-before-23.csv",
+            "csv_sha256": "36885d75a72b5f12d7695e76cc47dd4b6c5b597882fee0e5ca96982a6d569617",
+            "identity": {
+              "input_bytes": 1255,
+              "input_sha256": null,
+              "outcomes": [
+                "ok:779997f583d29183180d9b3096594e36bbf9b946475752a353c97a272a6a545d"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-30-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 30,
+            "perf": {
+              "branch-misses:u": {
+                "count": 15546,
+                "running_percent": 100.0,
+                "time_running_ns": 1041850
+              },
+              "branches:u": {
+                "count": 910701,
+                "running_percent": 100.0,
+                "time_running_ns": 1041850
+              },
+              "cycles:u": {
+                "count": 1833690,
+                "running_percent": 100.0,
+                "time_running_ns": 1041850
+              },
+              "instructions:u": {
+                "count": 4378485,
+                "running_percent": 100.0,
+                "time_running_ns": 1041850
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-30-1-before-23.json",
+            "report_sha256": "3244451869e5ec97d4da0d43a2551a809f2d82004e0ab4f9b135466c848ad46f",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-0-before-3.csv",
+            "csv_sha256": "619b6cb81b294d80023d9744417a1e01d48a4736196dac58d1673c4c3470c1e2",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-4096-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10301,
+                "running_percent": 100.0,
+                "time_running_ns": 1084979
+              },
+              "branches:u": {
+                "count": 1169351,
+                "running_percent": 100.0,
+                "time_running_ns": 1084979
+              },
+              "cycles:u": {
+                "count": 2009772,
+                "running_percent": 100.0,
+                "time_running_ns": 1084979
+              },
+              "instructions:u": {
+                "count": 6268031,
+                "running_percent": 100.0,
+                "time_running_ns": 1084979
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-4096-0-before-3.json",
+            "report_sha256": "533062d688d086a74aa2f71e6b8e2173eeb4465fcabd55abba09a8e15ee87b34",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-0-after-3.csv",
+            "csv_sha256": "78a7e99b77e876ecaf8e084e173cc4018f9cab32a6f4cb0b67982c8c0241b3e1",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-4096-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10274,
+                "running_percent": 100.0,
+                "time_running_ns": 1076599
+              },
+              "branches:u": {
+                "count": 1169370,
+                "running_percent": 100.0,
+                "time_running_ns": 1076599
+              },
+              "cycles:u": {
+                "count": 2022254,
+                "running_percent": 100.0,
+                "time_running_ns": 1076599
+              },
+              "instructions:u": {
+                "count": 6268658,
+                "running_percent": 100.0,
+                "time_running_ns": 1076599
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-4096-0-after-3.json",
+            "report_sha256": "711cc7c193378569050f4554470cbd80e6051de9551f6664b94a1e7ce21debcb",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-0-after-23.csv",
+            "csv_sha256": "61f40b375bb9c9e10049323e4cde505bc3b739e7ff5a2351fb9867400c8b677c",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-4096-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11239,
+                "running_percent": 100.0,
+                "time_running_ns": 1972109
+              },
+              "branches:u": {
+                "count": 4239769,
+                "running_percent": 100.0,
+                "time_running_ns": 1972109
+              },
+              "cycles:u": {
+                "count": 5926323,
+                "running_percent": 100.0,
+                "time_running_ns": 1972109
+              },
+              "instructions:u": {
+                "count": 23218997,
+                "running_percent": 100.0,
+                "time_running_ns": 1972109
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-4096-0-after-23.json",
+            "report_sha256": "91db4b057167d09f0e3aa30f60f5c3da0d1833502ff029e539e54a81658646a3",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-0-before-23.csv",
+            "csv_sha256": "9d9b669920c89de4ccaccd417022823803ef648ec08a6c6c4db33b1dc44143eb",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-4096-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11150,
+                "running_percent": 100.0,
+                "time_running_ns": 1951839
+              },
+              "branches:u": {
+                "count": 4239275,
+                "running_percent": 100.0,
+                "time_running_ns": 1951839
+              },
+              "cycles:u": {
+                "count": 5854165,
+                "running_percent": 100.0,
+                "time_running_ns": 1951839
+              },
+              "instructions:u": {
+                "count": 23213131,
+                "running_percent": 100.0,
+                "time_running_ns": 1951839
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-4096-0-before-23.json",
+            "report_sha256": "97b02220dfca7a80fbd2ec316f10615fc59cd9c42e9fa1e40b8877d1701af68d",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-1-before-3.csv",
+            "csv_sha256": "765a535574a503db54bb97338f8d450cde2f2449c2c1724779aaa164f50a1c24",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-4096-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10335,
+                "running_percent": 100.0,
+                "time_running_ns": 1085580
+              },
+              "branches:u": {
+                "count": 1169056,
+                "running_percent": 100.0,
+                "time_running_ns": 1085580
+              },
+              "cycles:u": {
+                "count": 1998450,
+                "running_percent": 100.0,
+                "time_running_ns": 1085580
+              },
+              "instructions:u": {
+                "count": 6266873,
+                "running_percent": 100.0,
+                "time_running_ns": 1085580
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-4096-1-before-3.json",
+            "report_sha256": "31617e94f5c58894970a508da1425d52e632f38647c9d011791137b7d6158153",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-1-after-3.csv",
+            "csv_sha256": "96803d49f2e19d8d629c4368ed39b72a4be8019f5a4254c5cf423290f45405ff",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-4096-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10293,
+                "running_percent": 100.0,
+                "time_running_ns": 1076719
+              },
+              "branches:u": {
+                "count": 1169400,
+                "running_percent": 100.0,
+                "time_running_ns": 1076719
+              },
+              "cycles:u": {
+                "count": 2026259,
+                "running_percent": 100.0,
+                "time_running_ns": 1076719
+              },
+              "instructions:u": {
+                "count": 6268711,
+                "running_percent": 100.0,
+                "time_running_ns": 1076719
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-4096-1-after-3.json",
+            "report_sha256": "a30516cff93a7ad51d79de6b50b014642cf6b84247a7724c051ef4fff11730f1",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-1-after-23.csv",
+            "csv_sha256": "48148856849d65d68f3171cba6efca523bad3e7a526a9c4c037bb7445346565e",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-4096-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10751,
+                "running_percent": 100.0,
+                "time_running_ns": 1931609
+              },
+              "branches:u": {
+                "count": 4239534,
+                "running_percent": 100.0,
+                "time_running_ns": 1931609
+              },
+              "cycles:u": {
+                "count": 5897055,
+                "running_percent": 100.0,
+                "time_running_ns": 1931609
+              },
+              "instructions:u": {
+                "count": 23216380,
+                "running_percent": 100.0,
+                "time_running_ns": 1931609
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-4096-1-after-23.json",
+            "report_sha256": "7cb73a5c3723587fbf807fa3719db75d551e435b5778f7cd0aef34eef164f5c1",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-4096-1-before-23.csv",
+            "csv_sha256": "c2c1567fe95b31cf949183d7ee1b2d16b2453b104cc982954298a6f647dfdf4f",
+            "identity": {
+              "input_bytes": 65271,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-4096-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 4096,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10961,
+                "running_percent": 100.0,
+                "time_running_ns": 1926959
+              },
+              "branches:u": {
+                "count": 4238596,
+                "running_percent": 100.0,
+                "time_running_ns": 1926959
+              },
+              "cycles:u": {
+                "count": 5831755,
+                "running_percent": 100.0,
+                "time_running_ns": 1926959
+              },
+              "instructions:u": {
+                "count": 23210583,
+                "running_percent": 100.0,
+                "time_running_ns": 1926959
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-4096-1-before-23.json",
+            "report_sha256": "17784601e76d98cf07ddd92640b2782ec972b17447faa7927675fb81aef87350",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-0-before-3.csv",
+            "csv_sha256": "6c7b4ba0d43197c4e127d3f8522cd4ae1f8acfd056a7a23254eb4469853597c3",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-16384-0-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10392,
+                "running_percent": 100.0,
+                "time_running_ns": 1896120
+              },
+              "branches:u": {
+                "count": 3801298,
+                "running_percent": 100.0,
+                "time_running_ns": 1896120
+              },
+              "cycles:u": {
+                "count": 5302988,
+                "running_percent": 100.0,
+                "time_running_ns": 1896120
+              },
+              "instructions:u": {
+                "count": 21249445,
+                "running_percent": 100.0,
+                "time_running_ns": 1896120
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-16384-0-before-3.json",
+            "report_sha256": "2c75330c09bea408955099e3201c84f2f6681e57d6039e3536b65f3074a6c28b",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-0-after-3.csv",
+            "csv_sha256": "b4fa55e8399c64aa109deea24e7b9c17648f2c224d83e900f9e48a325b6e7fb0",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-16384-0-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10460,
+                "running_percent": 100.0,
+                "time_running_ns": 1932580
+              },
+              "branches:u": {
+                "count": 3801341,
+                "running_percent": 100.0,
+                "time_running_ns": 1932580
+              },
+              "cycles:u": {
+                "count": 5418150,
+                "running_percent": 100.0,
+                "time_running_ns": 1932580
+              },
+              "instructions:u": {
+                "count": 21250079,
+                "running_percent": 100.0,
+                "time_running_ns": 1932580
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-16384-0-after-3.json",
+            "report_sha256": "ff4dae59cd285595eaa067faf398ed70418dc92e3f877916b080eb9a376c2be4",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-0-after-23.csv",
+            "csv_sha256": "b03634364481de9e03e39816eab7d236e856ebb3e29aa329e631c2ccdcf90071",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-16384-0-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11198,
+                "running_percent": 100.0,
+                "time_running_ns": 5066588
+              },
+              "branches:u": {
+                "count": 13998057,
+                "running_percent": 100.0,
+                "time_running_ns": 5066588
+              },
+              "cycles:u": {
+                "count": 19320492,
+                "running_percent": 100.0,
+                "time_running_ns": 5066588
+              },
+              "instructions:u": {
+                "count": 80206558,
+                "running_percent": 100.0,
+                "time_running_ns": 5066588
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-16384-0-after-23.json",
+            "report_sha256": "6fee2eb2fa2060d33a87dbe6d8eba8fb6a72515f6a9c880f4688785839d562fe",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-0-before-23.csv",
+            "csv_sha256": "34e1ea734eefc47e3da0ae1a35d71469af8eecf8cd12432aeef543728fa962c8",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-16384-0-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11334,
+                "running_percent": 100.0,
+                "time_running_ns": 4984768
+              },
+              "branches:u": {
+                "count": 13998681,
+                "running_percent": 100.0,
+                "time_running_ns": 4984768
+              },
+              "cycles:u": {
+                "count": 19115913,
+                "running_percent": 100.0,
+                "time_running_ns": 4984768
+              },
+              "instructions:u": {
+                "count": 80208014,
+                "running_percent": 100.0,
+                "time_running_ns": 4984768
+              }
+            },
+            "repeat": 0,
+            "report": "instructions-0/opc_relationship_declarations-16384-0-before-23.json",
+            "report_sha256": "4a960f5c1cf3560043d536ed660dcce7507e2547b2aabcfb47d2f1387f80a3d2",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-1-before-3.csv",
+            "csv_sha256": "61c1013c3ce111425c9e2f8789a7abb20ba8cd91d7c39df9e371e40c189172e2",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-16384-1-before-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10468,
+                "running_percent": 100.0,
+                "time_running_ns": 1903989
+              },
+              "branches:u": {
+                "count": 3801016,
+                "running_percent": 100.0,
+                "time_running_ns": 1903989
+              },
+              "cycles:u": {
+                "count": 5338265,
+                "running_percent": 100.0,
+                "time_running_ns": 1903989
+              },
+              "instructions:u": {
+                "count": 21248214,
+                "running_percent": 100.0,
+                "time_running_ns": 1903989
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-16384-1-before-3.json",
+            "report_sha256": "8941e5996d049b90e64d2fc804a9f4501fed3e9736b1a7109fa24dc35136f394",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-1-after-3.csv",
+            "csv_sha256": "b055485a18fad948290784840133a5fb33b9a29c6e34252872e34b631bfd1b66",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 3
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-16384-1-after-3.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 10476,
+                "running_percent": 100.0,
+                "time_running_ns": 1900770
+              },
+              "branches:u": {
+                "count": 3801250,
+                "running_percent": 100.0,
+                "time_running_ns": 1900770
+              },
+              "cycles:u": {
+                "count": 5339622,
+                "running_percent": 100.0,
+                "time_running_ns": 1900770
+              },
+              "instructions:u": {
+                "count": 21249684,
+                "running_percent": 100.0,
+                "time_running_ns": 1900770
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-16384-1-after-3.json",
+            "report_sha256": "1f0e5b348f8cd6b03d2d683c7dd40cecc06f4ce8c27b615adbd93893eedf5c27",
+            "samples": 3,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "07ea1a19cc596f0a808ce466dea8b0ea596b8ab48aaf30208ed8370b4701fadf",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-1-after-23.csv",
+            "csv_sha256": "928bebb206e5d285170368512864c65aae0dfd3323af73fe924f7daed8762caf",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "after",
+            "log": "instructions-0/opc_relationship_declarations-16384-1-after-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11239,
+                "running_percent": 100.0,
+                "time_running_ns": 5026188
+              },
+              "branches:u": {
+                "count": 13999290,
+                "running_percent": 100.0,
+                "time_running_ns": 5026188
+              },
+              "cycles:u": {
+                "count": 19365775,
+                "running_percent": 100.0,
+                "time_running_ns": 5026188
+              },
+              "instructions:u": {
+                "count": 80212630,
+                "running_percent": 100.0,
+                "time_running_ns": 5026188
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-16384-1-after-23.json",
+            "report_sha256": "bd432ae0299ee9b25ec99f99ad6df9a28f45c0468b8b8bf4bf9f06ce28c8995d",
+            "samples": 23,
+            "warmup": 2
+          },
+          {
+            "binary_sha256": "bad12fc27ff3fdcd5a64f4394349494be01e77175cabd9c8bd214ad5fe3aa791",
+            "case": "opc_relationship_declarations",
+            "csv": "instructions-0/opc_relationship_declarations-16384-1-before-23.csv",
+            "csv_sha256": "9c42db13a377acbe820ca442b56084f21240047cd8c76cf7465b9fea048682ea",
+            "identity": {
+              "input_bytes": 268263,
+              "input_sha256": null,
+              "outcomes": [
+                "err:Quick-XML error: start tag declares more than 256 namespace bindings; raise the limit with NamespaceResolver::set_max_declarations_per_element"
+              ],
+              "timings_count": 23
+            },
+            "leg": "before",
+            "log": "instructions-0/opc_relationship_declarations-16384-1-before-23.log",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "n": 16384,
+            "perf": {
+              "branch-misses:u": {
+                "count": 11236,
+                "running_percent": 100.0,
+                "time_running_ns": 4983018
+              },
+              "branches:u": {
+                "count": 13999318,
+                "running_percent": 100.0,
+                "time_running_ns": 4983018
+              },
+              "cycles:u": {
+                "count": 19192840,
+                "running_percent": 100.0,
+                "time_running_ns": 4983018
+              },
+              "instructions:u": {
+                "count": 80211330,
+                "running_percent": 100.0,
+                "time_running_ns": 4983018
+              }
+            },
+            "repeat": 1,
+            "report": "instructions-0/opc_relationship_declarations-16384-1-before-23.json",
+            "report_sha256": "d0c457880acd048f86fffcecd788c0abf20aeff4f7ad75168df2a326f6313f43",
+            "samples": 23,
+            "warmup": 2
+          }
+        ],
+        "scope": "Whole-process user counters; two repeats of 3 versus 23 measured operations, same two warmups. Difference/20 is a marginal estimate, not exact timed-region or function attribution. Instrumented elapsed times are excluded from native statistics."
+      },
+      "iterator_rows": 8,
+      "qualification": {
+        "csv": "instructions-0/qualification.csv",
+        "csv_sha256": "7f2cab2d39f63cdebeb3299807e466dccab63826e31471daffa27bf21cef91ed",
+        "exit": 0,
+        "log": "instructions-0/qualification.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "perf": {
+          "instructions:u": {
+            "count": 394918,
+            "running_percent": 100.0,
+            "time_running_ns": 22630642
+          }
+        },
+        "reason": null,
+        "supported": true
+      },
+      "rows": 56,
+      "supported": true
+    }
+  },
+  "limits": "Instruction values are whole-process user counters. Per-repeat (23-3)/20 values are marginal estimates and include process/report work; they are not exact timed-region or function attribution. Allocation totals are one whole-process heaptrack sample per case and leg and include startup, input construction, parsing, observation, and report serialization.",
+  "schema": "litchi-0777-xml-attribute-observations-v1"
+}

@@ -1,0 +1,18 @@
+{
+  "root": "/home/zhuhe/code/litchi-worktrees/0770-quick-xml-fail-fast-attribute-checks",
+  "head": "bf315b46a88e73aa5762b4640d1134a44c14e77c",
+  "review_edits": {
+    "crates/litchi-ole-common/src/xml_attributes.rs": "2e63d8d4e1b0588e8aa7d5cb7cec7ead888384b0298ea2d41c2dbeda9adfd66d",
+    "crates/litchi-opc/src/xml_attributes.rs": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "crates/litchi-sign/src/xml_attributes.rs": "b84dd293a042ae3871addb41ef2eb9bc0e6b98e7248d60f6d68ccf63181ba25b",
+    "crates/litchi-xldm/src/xml_attributes.rs": "b84dd293a042ae3871addb41ef2eb9bc0e6b98e7248d60f6d68ccf63181ba25b",
+    "crates/xml-minifier/src/xml_attributes.rs": "b84dd293a042ae3871addb41ef2eb9bc0e6b98e7248d60f6d68ccf63181ba25b",
+    "tools/perf-baseline/src/bin/attribute_checks_equivalence.rs": "20b13d3911b793157619b93e7d4f728a00220c512873ddad18665d3fad640dee"
+  },
+  "main_base": "87e926fcc6",
+  "main_unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

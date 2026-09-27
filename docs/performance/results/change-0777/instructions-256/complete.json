@@ -1,0 +1,8 @@
+{
+  "fixtures_unchanged": true,
+  "iterator_runs": 0,
+  "runs": 8,
+  "scope": "Whole-process user counters; two repeats of 3 versus 23 measured operations, same two warmups. Difference/20 is a marginal estimate, not exact timed-region or function attribution. Instrumented elapsed times are excluded from native statistics.",
+  "source_unchanged": true,
+  "supported": true
+}
