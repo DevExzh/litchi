@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0790 — direct counter evidence advances measurement work
+
+[0790](0790-fork-launcher-calibration.md) Ordinary-fork controls eliminate inherited startup high water while preserving counter/residency differences. Three trace qualification failures remain visible; the 0787 candidate stays rejected. OLE2/OOXML active, ODF deferred, iWork excluded; broad completion remains unproven.
+
 ## 0789 — memory calibration narrows the next experiment
 
 [0789](0789-rss-accounting-calibration.md) The source-backed counter mechanism now has known-page, affinity, launcher, and syscall evidence. The original candidate remains rejected and its historical RSS cause unresolved. OLE2/OOXML remain active, ODF deferred, iWork excluded, and the broad goal open.

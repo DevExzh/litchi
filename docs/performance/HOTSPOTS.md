@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0790 — launcher history isolated in ordinary controls
+
+[0790](0790-fork-launcher-calibration.md) An ordinary-fork control starts at 1,360–1,480 KiB instead of inherited 17–19 MiB. Direct wait4 still differs from observed RSS by up to 1,528 KiB in the named 32-worker case. Future qualifications must distinguish ordinary and traced launch topologies.
+
 ## 0789 — RSS counter path identified
 
 [0789](0789-rss-accounting-calibration.md) GNU time exactly matches traced kernel wait4 values. The 4 MiB/32-worker full-observer case has a 1,784/2,040 KiB gap across all CPUs versus −48/−52 KiB on one CPU, supporting per-CPU accounting effects. Historical candidate causality remains unresolved; predeclare independent memory observations before any new experiment.

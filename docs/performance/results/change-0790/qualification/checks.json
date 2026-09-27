@@ -1,0 +1,185 @@
+[
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher"
+    ],
+    "exit_code": 2,
+    "expected": 2,
+    "name": "invalid",
+    "stderr": {
+      "bytes": 61,
+      "path": "qualification/invalid.stderr.log",
+      "sha256": "39f97985a5068155d731b1060ed797b450f6ad776ba7eb516fcaeaf0d4f63328"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/invalid.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/relative.usage.json",
+      "relative"
+    ],
+    "exit_code": 2,
+    "expected": 2,
+    "name": "relative",
+    "stderr": {
+      "bytes": 61,
+      "path": "qualification/relative.stderr.log",
+      "sha256": "39f97985a5068155d731b1060ed797b450f6ad776ba7eb516fcaeaf0d4f63328"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/relative.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/missing.usage.json",
+      "/does-not-exist-0790"
+    ],
+    "exit_code": 127,
+    "expected": 127,
+    "name": "missing",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/missing.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/missing.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "usage": {
+      "bytes": 157,
+      "path": "qualification/missing.usage.json",
+      "sha256": "ec6d6d6cad08d04a37f671a32d8a6fb7adffea0a4b3240a5c7ccaad4187d4361"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/false.usage.json",
+      "/usr/bin/false"
+    ],
+    "exit_code": 1,
+    "expected": 1,
+    "name": "false",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/false.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/false.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "usage": {
+      "bytes": 153,
+      "path": "qualification/false.usage.json",
+      "sha256": "20f5defa9de48dae62d3bb9edfc68103e2db0d9440aec97ac083b421a76429fa"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/signal.usage.json",
+      "/bin/sh",
+      "-c",
+      "kill -TERM $$"
+    ],
+    "exit_code": 143,
+    "expected": 143,
+    "name": "signal",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/signal.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "qualification/signal.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "usage": {
+      "bytes": 154,
+      "path": "qualification/signal.usage.json",
+      "sha256": "e6657219e28998f19694db7ba5709617b42a0f3ca9ff7b2ff210c2e5019c3360"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/zero.usage.json",
+      "/home/zhuhe/code/litchi-target-0790/binary",
+      "--mib",
+      "0",
+      "--workers",
+      "0",
+      "--touch",
+      "main"
+    ],
+    "exit_code": 0,
+    "expected": 0,
+    "name": "zero",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/zero.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 454,
+      "path": "qualification/zero.stdout.txt",
+      "sha256": "8bad1d777754b5f4235fb9f69150bb68e4289688bc1aeb635b3d80407a104920"
+    },
+    "usage": {
+      "bytes": 151,
+      "path": "qualification/zero.usage.json",
+      "sha256": "a1d6e492c4b19c4b719dcfae252f313c1582acda8eda9312fec6cdc876ff2560"
+    }
+  },
+  {
+    "command": [
+      "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+      "--usage",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0790/qualification/payload.usage.json",
+      "/home/zhuhe/code/litchi-target-0790/binary",
+      "--mib",
+      "64",
+      "--workers",
+      "4",
+      "--touch",
+      "workers"
+    ],
+    "exit_code": 0,
+    "expected": 0,
+    "name": "payload",
+    "stderr": {
+      "bytes": 0,
+      "path": "qualification/payload.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 515,
+      "path": "qualification/payload.stdout.txt",
+      "sha256": "953e22a58eaa49dc4b9fc5b7b2e8318711a4fe93979d9d0cde33f0816a2c0ed3"
+    },
+    "usage": {
+      "bytes": 153,
+      "path": "qualification/payload.usage.json",
+      "sha256": "44ced7576e36a343b7be503413dee13ced1b0bfdf5833709b5fa51480a308a22"
+    }
+  }
+]

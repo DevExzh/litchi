@@ -1,0 +1,5356 @@
+{
+  "acceptance": "fail",
+  "acceptance_failures": [
+    {
+      "child_startup_kib": 1480,
+      "criterion": "direct startup lower than launcher pre-fork high water",
+      "index": 0,
+      "lane": "traces",
+      "launcher_startup_kib": 1172
+    },
+    {
+      "child_startup_kib": 1480,
+      "criterion": "direct startup lower than launcher pre-fork high water",
+      "index": 1,
+      "lane": "traces",
+      "launcher_startup_kib": 1172
+    },
+    {
+      "child_startup_kib": 1476,
+      "criterion": "direct startup lower than launcher pre-fork high water",
+      "index": 2,
+      "lane": "traces",
+      "launcher_startup_kib": 1172
+    }
+  ],
+  "children": 100,
+  "full_snapshots": 312,
+  "groups": [
+    {
+      "affinity": "all",
+      "children": 24,
+      "exit_equal_max_self": 20,
+      "full_observed_minus_exit_range_kib": [
+        32,
+        1528
+      ],
+      "launcher": "direct",
+      "startup_self_range_kib": [
+        1360,
+        1480
+      ]
+    },
+    {
+      "affinity": "single",
+      "children": 24,
+      "exit_equal_max_self": 20,
+      "full_observed_minus_exit_range_kib": [
+        -56,
+        332
+      ],
+      "launcher": "direct",
+      "startup_self_range_kib": [
+        1364,
+        1480
+      ]
+    },
+    {
+      "affinity": "all",
+      "children": 24,
+      "exit_equal_max_self": 20,
+      "full_observed_minus_exit_range_kib": [
+        32,
+        1528
+      ],
+      "launcher": "time",
+      "startup_self_range_kib": [
+        1476,
+        1480
+      ]
+    },
+    {
+      "affinity": "single",
+      "children": 24,
+      "exit_equal_max_self": 20,
+      "full_observed_minus_exit_range_kib": [
+        -52,
+        336
+      ],
+      "launcher": "time",
+      "startup_self_range_kib": [
+        1472,
+        1480
+      ]
+    }
+  ],
+  "identity_snapshots": 288,
+  "matrix_ack_deltas": [
+    {
+      "count": 141,
+      "delta_kib": 0,
+      "launcher": "direct",
+      "observer": "full"
+    },
+    {
+      "count": 2,
+      "delta_kib": 288,
+      "launcher": "direct",
+      "observer": "full"
+    },
+    {
+      "count": 1,
+      "delta_kib": 292,
+      "launcher": "direct",
+      "observer": "full"
+    },
+    {
+      "count": 141,
+      "delta_kib": 0,
+      "launcher": "direct",
+      "observer": "identity"
+    },
+    {
+      "count": 3,
+      "delta_kib": 288,
+      "launcher": "direct",
+      "observer": "identity"
+    },
+    {
+      "count": 144,
+      "delta_kib": 0,
+      "launcher": "time",
+      "observer": "full"
+    },
+    {
+      "count": 144,
+      "delta_kib": 0,
+      "launcher": "time",
+      "observer": "identity"
+    }
+  ],
+  "matrix_children": 96,
+  "qualification_checks": 7,
+  "rows": [
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 78
+      },
+      "index": 0,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 17644,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 17644,
+        "minor_faults": 235,
+        "system_seconds": 0.000857,
+        "user_seconds": 0.000403
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 79
+      },
+      "index": 1,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 17900,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 36,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 17900,
+        "minor_faults": 234,
+        "system_seconds": 0.0007859999999999999,
+        "user_seconds": 0.000432
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "touched",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "workers_joined",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 81
+      },
+      "index": 2,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 242,
+        "system_seconds": 0.000725,
+        "user_seconds": 0.000337
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 78
+      },
+      "index": 3,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 32,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 238,
+        "system_seconds": 8.7e-05,
+        "user_seconds": 0.0013089999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "touched",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "workers_joined",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 78
+      },
+      "index": 4,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18412,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 235,
+        "system_seconds": 0.000891,
+        "user_seconds": 0.000278
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 76
+      },
+      "index": 5,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18412,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 28,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 233,
+        "system_seconds": 0.000714,
+        "user_seconds": 0.000245
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "touched",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "workers_joined",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 78
+      },
+      "index": 6,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 241,
+        "system_seconds": 0.000767,
+        "user_seconds": 0.000233
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 79
+      },
+      "index": 7,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 32,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 241,
+        "system_seconds": 0.0,
+        "user_seconds": 0.00101
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "touched",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "workers_joined",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5748,
+        "minor_faults": 1102
+      },
+      "index": 8,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18412,
+      "max_self_kib": 5748,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 1259,
+        "system_seconds": 0.000137,
+        "user_seconds": 0.0017929999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1364
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5748,
+        "minor_faults": 1101
+      },
+      "index": 9,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18412,
+      "max_self_kib": 5748,
+      "observed_minus_exit_kib": 160,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18412,
+        "minor_faults": 1257,
+        "system_seconds": 0.000561,
+        "user_seconds": 0.0014089999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "touched",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "workers_joined",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5748
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5748
+        }
+      ],
+      "startup_self_kib": 1364
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1103
+      },
+      "index": 10,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1261,
+        "system_seconds": 0.0006219999999999999,
+        "user_seconds": 0.0013599999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1102
+      },
+      "index": 11,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1260,
+        "system_seconds": 0.0016829999999999998,
+        "user_seconds": 0.00031499999999999996
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "touched",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "workers_joined",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1102
+      },
+      "index": 12,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1260,
+        "system_seconds": 0.000946,
+        "user_seconds": 0.00081
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1102
+      },
+      "index": 13,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1258,
+        "system_seconds": 0.0008259999999999999,
+        "user_seconds": 0.000704
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "touched",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "workers_joined",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1104
+      },
+      "index": 14,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1264,
+        "system_seconds": 0.0,
+        "user_seconds": 0.0015119999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1104
+      },
+      "index": 15,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 336,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1265,
+        "system_seconds": 0.000919,
+        "user_seconds": 0.000646
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4196,
+          "phase": "touched",
+          "rss_kib": 5912,
+          "vmhwm_kib": 5912
+        },
+        {
+          "anonymous_kib": 4196,
+          "phase": "workers_joined",
+          "rss_kib": 5912,
+          "vmhwm_kib": 5912
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5744,
+        "minor_faults": 1111
+      },
+      "index": 16,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5744,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1268,
+        "system_seconds": 0.00138,
+        "user_seconds": 0.00066
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1360
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1111
+      },
+      "index": 17,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 492,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1269,
+        "system_seconds": 0.001558,
+        "user_seconds": 0.00029099999999999997
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4224,
+          "phase": "touched",
+          "rss_kib": 6068,
+          "vmhwm_kib": 6068
+        },
+        {
+          "anonymous_kib": 4224,
+          "phase": "workers_joined",
+          "rss_kib": 6068,
+          "vmhwm_kib": 6068
+        },
+        {
+          "anonymous_kib": 128,
+          "phase": "unmapped",
+          "rss_kib": 1972,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 128,
+          "phase": "final",
+          "rss_kib": 1972,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1114
+      },
+      "index": 18,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1272,
+        "system_seconds": 0.001419,
+        "user_seconds": 0.000646
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1115
+      },
+      "index": 19,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 496,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1276,
+        "system_seconds": 0.0019349999999999999,
+        "user_seconds": 0.000287
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1113
+      },
+      "index": 20,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.000646,
+        "user_seconds": 0.000966
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1113
+      },
+      "index": 21,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 200,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.000767,
+        "user_seconds": 0.000799
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5872,
+        "minor_faults": 1113
+      },
+      "index": 22,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5872,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1274,
+        "system_seconds": 0.0,
+        "user_seconds": 0.0015329999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5872,
+        "minor_faults": 1113
+      },
+      "index": 23,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5872,
+      "observed_minus_exit_kib": 196,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1275,
+        "system_seconds": 0.000678,
+        "user_seconds": 0.000923
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6068,
+          "vmhwm_kib": 6068
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6068,
+          "vmhwm_kib": 6068
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1972,
+          "vmhwm_kib": 5872
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1972,
+          "vmhwm_kib": 5872
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5748,
+        "minor_faults": 1112
+      },
+      "index": 24,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5748,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1270,
+        "system_seconds": 0.000327,
+        "user_seconds": 0.002533
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1364
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1113
+      },
+      "index": 25,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 496,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.000749,
+        "user_seconds": 0.001875
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1113
+      },
+      "index": 26,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5572,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1274,
+        "system_seconds": 0.0011719999999999999,
+        "user_seconds": 0.0019119999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1114
+      },
+      "index": 27,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5572,
+      "observed_minus_exit_kib": 500,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1275,
+        "system_seconds": 0.0,
+        "user_seconds": 0.0027589999999999997
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5572
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5572
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5872,
+        "minor_faults": 1112
+      },
+      "index": 28,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5872,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1267,
+        "system_seconds": 7.3e-05,
+        "user_seconds": 0.0015539999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1114
+      },
+      "index": 29,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 196,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.001361,
+        "user_seconds": 0.00019099999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1113
+      },
+      "index": 30,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1274,
+        "system_seconds": 0.00086,
+        "user_seconds": 0.000719
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1114
+      },
+      "index": 31,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 196,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1277,
+        "system_seconds": 0.000682,
+        "user_seconds": 0.000901
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4552,
+        "minor_faults": 1171
+      },
+      "index": 32,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 4552,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1329,
+        "system_seconds": 0.0042499999999999994,
+        "user_seconds": 0.0007279999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4552,
+        "minor_faults": 1171
+      },
+      "index": 33,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 4552,
+      "observed_minus_exit_kib": 1528,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1328,
+        "system_seconds": 0.000757,
+        "user_seconds": 0.003185
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "touched",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6080
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "workers_joined",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6080
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "unmapped",
+          "rss_kib": 1984,
+          "vmhwm_kib": 4552
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "final",
+          "rss_kib": 1984,
+          "vmhwm_kib": 4552
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4040,
+        "minor_faults": 1173
+      },
+      "index": 34,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 4040,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1334,
+        "system_seconds": 0.000305,
+        "user_seconds": 0.004736
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4552,
+        "minor_faults": 1172
+      },
+      "index": 35,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 4552,
+      "observed_minus_exit_kib": 1528,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1334,
+        "system_seconds": 0.003485,
+        "user_seconds": 0.0010479999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "touched",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6080
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "workers_joined",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6080
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "unmapped",
+          "rss_kib": 1984,
+          "vmhwm_kib": 4552
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "final",
+          "rss_kib": 1984,
+          "vmhwm_kib": 4552
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1170
+      },
+      "index": 36,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 6132,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1324,
+        "system_seconds": 0.000607,
+        "user_seconds": 0.0013109999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6128,
+        "minor_faults": 1169
+      },
+      "index": 37,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 6128,
+      "observed_minus_exit_kib": -56,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1325,
+        "system_seconds": 0.0012309999999999999,
+        "user_seconds": 0.0007369999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1804,
+          "vmhwm_kib": 1804
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1804,
+          "vmhwm_kib": 1804
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6128
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6128
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 6128
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 6128
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1174
+      },
+      "index": 38,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 6132,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1332,
+        "system_seconds": 0.0009609999999999999,
+        "user_seconds": 0.0009599999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1171
+      },
+      "index": 39,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 6132,
+      "observed_minus_exit_kib": -52,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1331,
+        "system_seconds": 0.001217,
+        "user_seconds": 0.000745
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "touched",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "workers_joined",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "unmapped",
+          "rss_kib": 1984,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "final",
+          "rss_kib": 1984,
+          "vmhwm_kib": 6132
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16463
+      },
+      "index": 40,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16620,
+        "system_seconds": 0.012606,
+        "user_seconds": 0.002492
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16463
+      },
+      "index": 41,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 336,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16620,
+        "system_seconds": 0.012801,
+        "user_seconds": 0.002794
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "touched",
+          "rss_kib": 67352,
+          "vmhwm_kib": 67352
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "workers_joined",
+          "rss_kib": 67352,
+          "vmhwm_kib": 67352
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16464
+      },
+      "index": 42,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16624,
+        "system_seconds": 0.013026999999999999,
+        "user_seconds": 0.000856
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16465
+      },
+      "index": 43,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 336,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16624,
+        "system_seconds": 0.012386999999999999,
+        "user_seconds": 0.001133
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "touched",
+          "rss_kib": 67352,
+          "vmhwm_kib": 67352
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "workers_joined",
+          "rss_kib": 67352,
+          "vmhwm_kib": 67352
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16463
+      },
+      "index": 44,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16619,
+        "system_seconds": 0.011262999999999999,
+        "user_seconds": 0.002141
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16461
+      },
+      "index": 45,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16618,
+        "system_seconds": 0.008806999999999999,
+        "user_seconds": 0.003235
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 65628,
+          "phase": "touched",
+          "rss_kib": 67344,
+          "vmhwm_kib": 67344
+        },
+        {
+          "anonymous_kib": 65628,
+          "phase": "workers_joined",
+          "rss_kib": 67344,
+          "vmhwm_kib": 67344
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67008,
+        "minor_faults": 16464
+      },
+      "index": 46,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67008,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67008,
+        "minor_faults": 16625,
+        "system_seconds": 0.01036,
+        "user_seconds": 0.0021449999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [],
+      "startup_self_kib": 1472
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16463
+      },
+      "index": 47,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16622,
+        "system_seconds": 0.010929,
+        "user_seconds": 0.001088
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1776,
+        "minor_faults": 79
+      },
+      "index": 48,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1476,
+      "observed_minus_exit_kib": 36,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 239,
+        "system_seconds": 0.0008349999999999999,
+        "user_seconds": 0.000457
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "touched",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "workers_joined",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 79
+      },
+      "index": 49,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 243,
+        "system_seconds": 0.0008439999999999999,
+        "user_seconds": 0.000536
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1776,
+        "minor_faults": 77
+      },
+      "index": 50,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 1476,
+      "observed_minus_exit_kib": 32,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 233,
+        "system_seconds": 0.0,
+        "user_seconds": 0.001186
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "touched",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "workers_joined",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1776,
+        "minor_faults": 76
+      },
+      "index": 51,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 1476,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 234,
+        "system_seconds": 0.00037099999999999996,
+        "user_seconds": 0.000704
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 80
+      },
+      "index": 52,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 36,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 239,
+        "system_seconds": 0.000832,
+        "user_seconds": 0.000266
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "touched",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "workers_joined",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 80
+      },
+      "index": 53,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 243,
+        "system_seconds": 0.0008169999999999999,
+        "user_seconds": 0.000233
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 79
+      },
+      "index": 54,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 32,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 236,
+        "system_seconds": 9.7e-05,
+        "user_seconds": 0.000861
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "touched",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "workers_joined",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 79
+      },
+      "index": 55,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 1480,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 237,
+        "system_seconds": 5.4e-05,
+        "user_seconds": 0.000888
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1103
+      },
+      "index": 56,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1262,
+        "system_seconds": 0.0,
+        "user_seconds": 0.001905
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "touched",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "workers_joined",
+          "rss_kib": 5908,
+          "vmhwm_kib": 5908
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1101
+      },
+      "index": 57,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1262,
+        "system_seconds": 0.0,
+        "user_seconds": 0.001712
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1101
+      },
+      "index": 58,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5572,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1258,
+        "system_seconds": 0.0,
+        "user_seconds": 0.001593
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "touched",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 4192,
+          "phase": "workers_joined",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5572
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5572
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1101
+      },
+      "index": 59,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5572,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1259,
+        "system_seconds": 0.0015639999999999999,
+        "user_seconds": 0.000314
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1101
+      },
+      "index": 60,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5572,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1262,
+        "system_seconds": 0.0015509999999999999,
+        "user_seconds": 0.00019999999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1804,
+          "vmhwm_kib": 1804
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1804,
+          "vmhwm_kib": 1804
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "touched",
+          "rss_kib": 5900,
+          "vmhwm_kib": 5900
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "workers_joined",
+          "rss_kib": 5900,
+          "vmhwm_kib": 5900
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "unmapped",
+          "rss_kib": 1804,
+          "vmhwm_kib": 5572
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "final",
+          "rss_kib": 1804,
+          "vmhwm_kib": 5572
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5572,
+        "minor_faults": 1103
+      },
+      "index": 61,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5572,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1264,
+        "system_seconds": 0.000843,
+        "user_seconds": 0.000762
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 4096,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1101
+      },
+      "index": 62,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1260,
+        "system_seconds": 0.001421,
+        "user_seconds": 0.000196
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "touched",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 4188,
+          "phase": "workers_joined",
+          "rss_kib": 5904,
+          "vmhwm_kib": 5904
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1103
+      },
+      "index": 63,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1262,
+        "system_seconds": 0.000821,
+        "user_seconds": 0.00069
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1115
+      },
+      "index": 64,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 500,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1275,
+        "system_seconds": 0.0009249999999999999,
+        "user_seconds": 0.001023
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1114
+      },
+      "index": 65,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1272,
+        "system_seconds": 0.001524,
+        "user_seconds": 0.000233
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1113
+      },
+      "index": 66,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 496,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1269,
+        "system_seconds": 0.000722,
+        "user_seconds": 0.001438
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1113
+      },
+      "index": 67,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1270,
+        "system_seconds": 0.00154,
+        "user_seconds": 0.000294
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1115
+      },
+      "index": 68,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 196,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1275,
+        "system_seconds": 0.000767,
+        "user_seconds": 0.000932
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1115
+      },
+      "index": 69,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1277,
+        "system_seconds": 0.0007469999999999999,
+        "user_seconds": 0.000877
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1114
+      },
+      "index": 70,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 200,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.000913,
+        "user_seconds": 0.0007599999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "main",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1115
+      },
+      "index": 71,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1273,
+        "system_seconds": 0.001387,
+        "user_seconds": 0.00019999999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1114
+      },
+      "index": 72,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observed_minus_exit_kib": 496,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1276,
+        "system_seconds": 0.002179,
+        "user_seconds": 0.000743
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "touched",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 4228,
+          "phase": "workers_joined",
+          "rss_kib": 6072,
+          "vmhwm_kib": 6072
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "unmapped",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        },
+        {
+          "anonymous_kib": 132,
+          "phase": "final",
+          "rss_kib": 1976,
+          "vmhwm_kib": 5576
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1115
+      },
+      "index": 73,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1277,
+        "system_seconds": 0.002629,
+        "user_seconds": 0.000339
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5748,
+        "minor_faults": 1115
+      },
+      "index": 74,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5748,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1273,
+        "system_seconds": 0.002387,
+        "user_seconds": 0.0006839999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5748
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5748
+        }
+      ],
+      "startup_self_kib": 1360
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5576,
+        "minor_faults": 1113
+      },
+      "index": 75,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5576,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.00187,
+        "user_seconds": 0.000944
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1115
+      },
+      "index": 76,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observed_minus_exit_kib": 200,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1273,
+        "system_seconds": 0.001509,
+        "user_seconds": 0.000195
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5876
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1116
+      },
+      "index": 77,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1276,
+        "system_seconds": 0.0006879999999999999,
+        "user_seconds": 0.000946
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 36,
+      "anon_growth_kib": 4132,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5748,
+        "minor_faults": 1114
+      },
+      "index": 78,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5748,
+      "observed_minus_exit_kib": 328,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1271,
+        "system_seconds": 0.0,
+        "user_seconds": 0.0015689999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5748
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 5748
+        }
+      ],
+      "startup_self_kib": 1364
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 4
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 5876,
+        "minor_faults": 1114
+      },
+      "index": 79,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 5876,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1269,
+        "system_seconds": 0.00138,
+        "user_seconds": 0.000197
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4808,
+        "minor_faults": 1171
+      },
+      "index": 80,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 4808,
+      "observed_minus_exit_kib": 1268,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1334,
+        "system_seconds": 0.00358,
+        "user_seconds": 0.0007329999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 92,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 92,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4232,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 4808
+        },
+        {
+          "anonymous_kib": 136,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 4808
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4040,
+        "minor_faults": 1174
+      },
+      "index": 81,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 4040,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1335,
+        "system_seconds": 0.0036539999999999997,
+        "user_seconds": 0.0015199999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4548,
+        "minor_faults": 1170
+      },
+      "index": 82,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 4548,
+      "observed_minus_exit_kib": 1528,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1328,
+        "system_seconds": 0.0,
+        "user_seconds": 0.004242
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "touched",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "workers_joined",
+          "rss_kib": 6076,
+          "vmhwm_kib": 6076
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "unmapped",
+          "rss_kib": 1980,
+          "vmhwm_kib": 4548
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "final",
+          "rss_kib": 1980,
+          "vmhwm_kib": 4548
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 4296,
+        "minor_faults": 1172
+      },
+      "index": 83,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 4296,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1328,
+        "system_seconds": 0.0035459999999999997,
+        "user_seconds": 0.000627
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1175
+      },
+      "index": 84,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 6132,
+      "observed_minus_exit_kib": -48,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1337,
+        "system_seconds": 0.001341,
+        "user_seconds": 0.0006349999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 4240,
+          "phase": "touched",
+          "rss_kib": 6084,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 4240,
+          "phase": "workers_joined",
+          "rss_kib": 6084,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 144,
+          "phase": "unmapped",
+          "rss_kib": 1988,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 144,
+          "phase": "final",
+          "rss_kib": 1988,
+          "vmhwm_kib": 6132
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1173
+      },
+      "index": 85,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 6132,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1335,
+        "system_seconds": 0.0017879999999999999,
+        "user_seconds": 0.000197
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 44,
+      "anon_growth_kib": 4140,
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1172
+      },
+      "index": 86,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 6132,
+      "observed_minus_exit_kib": -52,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1331,
+        "system_seconds": 0.000939,
+        "user_seconds": 0.0011149999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "touched",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 4236,
+          "phase": "workers_joined",
+          "rss_kib": 6080,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "unmapped",
+          "rss_kib": 1984,
+          "vmhwm_kib": 6132
+        },
+        {
+          "anonymous_kib": 140,
+          "phase": "final",
+          "rss_kib": 1984,
+          "vmhwm_kib": 6132
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 4,
+        "touch": "workers",
+        "workers": 32
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 6132,
+        "minor_faults": 1170
+      },
+      "index": 87,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 6132,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18588,
+        "minor_faults": 1326,
+        "system_seconds": 0.001776,
+        "user_seconds": 0.00019999999999999998
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16462
+      },
+      "index": 88,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16622,
+        "system_seconds": 0.012,
+        "user_seconds": 0.001026
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16464
+      },
+      "index": 89,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16623,
+        "system_seconds": 0.010199999999999999,
+        "user_seconds": 0.0026509999999999997
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16462
+      },
+      "index": 90,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16617,
+        "system_seconds": 0.011564,
+        "user_seconds": 0.001084
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16461
+      },
+      "index": 91,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67012,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16620,
+        "system_seconds": 0.009962,
+        "user_seconds": 0.002611
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16464
+      },
+      "index": 92,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16626,
+        "system_seconds": 0.011335,
+        "user_seconds": 0.0009809999999999999
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67016
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16462
+      },
+      "index": 93,
+      "lane": "matrix",
+      "launcher": "time",
+      "launcher_start_maxrss_kib": null,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16621,
+        "system_seconds": 0.011538999999999999,
+        "user_seconds": 0.000972
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16461
+      },
+      "index": 94,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67012,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16618,
+        "system_seconds": 0.009613,
+        "user_seconds": 0.002167
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 1808
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "touched",
+          "rss_kib": 67344,
+          "vmhwm_kib": 67344
+        },
+        {
+          "anonymous_kib": 65632,
+          "phase": "workers_joined",
+          "rss_kib": 67344,
+          "vmhwm_kib": 67344
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1808,
+          "vmhwm_kib": 67012
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1808,
+          "vmhwm_kib": 67012
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "single",
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16463
+      },
+      "index": 95,
+      "lane": "matrix",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 18588,
+      "max_self_kib": 67016,
+      "observer": "identity",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67016,
+        "minor_faults": 16620,
+        "system_seconds": 0.01055,
+        "user_seconds": 0.002059
+      },
+      "outer_wait4_scope": "launcher wrapper",
+      "repeat": 1,
+      "snapshots": [],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 300,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 80
+      },
+      "index": 0,
+      "lane": "traces",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 1172,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 36,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 17696,
+        "minor_faults": 563,
+        "system_seconds": 0.002075,
+        "user_seconds": 0.000895
+      },
+      "outer_wait4_scope": "strace wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "touched",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "workers_joined",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1816,
+          "vmhwm_kib": 1816
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 0,
+      "case": {
+        "mib": 0,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 1480,
+        "minor_faults": 77
+      },
+      "index": 1,
+      "lane": "traces",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 1172,
+      "max_self_kib": 1480,
+      "observed_minus_exit_kib": 332,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 18208,
+        "minor_faults": 565,
+        "system_seconds": 0.001777,
+        "user_seconds": 0.001969
+      },
+      "outer_wait4_scope": "strace wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 96,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "touched",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "workers_joined",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 96,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        }
+      ],
+      "startup_self_kib": 1480
+    },
+    {
+      "affinity": "single",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16462
+      },
+      "index": 2,
+      "lane": "traces",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 1172,
+      "max_self_kib": 67012,
+      "observed_minus_exit_kib": 336,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16945,
+        "system_seconds": 0.013894,
+        "user_seconds": 0.001098
+      },
+      "outer_wait4_scope": "strace wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67012
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 67012
+        }
+      ],
+      "startup_self_kib": 1476
+    },
+    {
+      "affinity": "all",
+      "anon_extra_kib": 0,
+      "anon_growth_kib": 65536,
+      "case": {
+        "mib": 64,
+        "touch": "main",
+        "workers": 0
+      },
+      "exit_minus_max_self_kib": 0,
+      "exit_usage": {
+        "major_faults": 0,
+        "maxrss_kib": 66944,
+        "minor_faults": 16462
+      },
+      "index": 3,
+      "lane": "traces",
+      "launcher": "direct",
+      "launcher_start_maxrss_kib": 1172,
+      "max_self_kib": 66944,
+      "observed_minus_exit_kib": 404,
+      "observer": "full",
+      "outer_wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 66944,
+        "minor_faults": 16947,
+        "system_seconds": 0.014702999999999999,
+        "user_seconds": 0.002147
+      },
+      "outer_wait4_scope": "strace wrapper",
+      "repeat": 0,
+      "snapshots": [
+        {
+          "anonymous_kib": 100,
+          "phase": "startup",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "mapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 1812
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "touched",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 65636,
+          "phase": "workers_joined",
+          "rss_kib": 67348,
+          "vmhwm_kib": 67348
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "unmapped",
+          "rss_kib": 1812,
+          "vmhwm_kib": 66944
+        },
+        {
+          "anonymous_kib": 100,
+          "phase": "final",
+          "rss_kib": 1812,
+          "vmhwm_kib": 66944
+        }
+      ],
+      "startup_self_kib": 1120
+    }
+  ],
+  "schema": "litchi.fork-launcher-analysis.0790.v1",
+  "scope": "diagnostic-only; no adoption, confidence intervals or transient peak claim",
+  "trace_checks": [
+    {
+      "index": 0,
+      "self_samples": 12,
+      "wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 1780,
+        "minor_faults": 80
+      }
+    },
+    {
+      "index": 1,
+      "self_samples": 12,
+      "wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 1480,
+        "minor_faults": 77
+      }
+    },
+    {
+      "index": 2,
+      "self_samples": 12,
+      "wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 67012,
+        "minor_faults": 16462
+      }
+    },
+    {
+      "index": 3,
+      "self_samples": 12,
+      "wait4": {
+        "major_faults": 0,
+        "maxrss_kib": 66944,
+        "minor_faults": 16462
+      }
+    }
+  ],
+  "trace_children": 4
+}

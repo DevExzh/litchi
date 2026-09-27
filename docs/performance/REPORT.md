@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0790 — fork calibration retained with a failed criterion
+
+[0790](0790-fork-launcher-calibration.md) All 100 children and seven launcher checks validate, but three traced controls violate one predeclared startup comparison. The result is retained as a failed overall qualification with useful ordinary-matrix evidence, not an adoption or production improvement.
+
 ## 0789 — accounting interfaces qualified
 
 [0789](0789-rss-accounting-calibration.md) Known-page checks and detailed traces support the kernel counter explanation for RSS disagreement. Direct launch also exposes pre-exec high-water contamination. Production source is unchanged and the 0787 rejection remains authoritative; all raw results and limitations are retained.
