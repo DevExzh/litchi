@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r1-c0-o1-before-small-fresh-0-4.heaptrack.525935.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-target-0788/before-native --route parts --shape small --state fresh --task-floor 0 --workers 4 --samples 30 --warmup 3 --output /home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r1-c0-o1-before-small-fresh-0-4.json
+finished reading file, now analyzing data:
+
+total runtime: 0.177000s.
+calls to allocation functions: 94484 (533807/s)
+temporary memory allocations: 38327 (216536/s)
+peak heap memory consumption: 980.16K
+peak RSS (including heaptrack overhead): 9.21M
+total memory leaked: 2.00K

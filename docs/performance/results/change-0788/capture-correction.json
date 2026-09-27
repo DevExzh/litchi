@@ -1,0 +1,24 @@
+{
+  "affected_children": 10,
+  "affected_lane": "qualification-before",
+  "after": {
+    "bytes": 27746,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/capture.py",
+    "sha256": "b9097b02c87e8a52c8af7d82a7e5997d6187ebd74db174b6feb3a189190d4337"
+  },
+  "before": {
+    "bytes": 27756,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/capture-pre-correction.py",
+    "sha256": "d706105fdb9715e81b3a87661a351a1ea4bcc2e1b152a040fd50541b6dba8c8c"
+  },
+  "build_frozen_driver_replay": "Use capture-pre-correction.py for the original capture.py hash; all other frozen input hashes unchanged.",
+  "existing_raw_aggregate": {
+    "bytes": 28657,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/qualification-before/receipts.json",
+    "sha256": "144eb9635238670747abe86f83d9d08a1a5ecc27c0855e5f388bfe5bb9f63451"
+  },
+  "existing_raw_artifacts_unchanged": true,
+  "reason": "GNU time %M %R %F is maximum RSS KiB, minor faults, major faults. The original JSON decoder mislabeled %R as elapsed_seconds; raw .time files remain correct.",
+  "schedule_plan_binaries_statistics_changed": false,
+  "schema": "litchi.cached-part-capture-correction.0788.v1"
+}

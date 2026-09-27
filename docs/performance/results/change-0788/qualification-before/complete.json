@@ -1,0 +1,15 @@
+{
+  "children": 10,
+  "lane": "qualification-before",
+  "receipts": {
+    "bytes": 28657,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/qualification-before/receipts.json",
+    "sha256": "144eb9635238670747abe86f83d9d08a1a5ecc27c0855e5f388bfe5bb9f63451"
+  },
+  "schema": "litchi.cached-part-memory-receipts.0788.v1",
+  "source": {
+    "bytes": 1202237,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/qualification-before/source.json",
+    "sha256": "510336ee32a379a5669ff090d12c543da71aa523bfe804c9d83202c437c125ac"
+  }
+}

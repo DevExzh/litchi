@@ -1,0 +1,61 @@
+heaptrack_print - analyze heaptrack data files.
+
+heaptrack is a heap memory profiler which records information
+about calls to heap allocation functions such as malloc, operator new etc. pp.
+This print utility can then be used to analyze the generated data files.
+
+Options:
+  -f [ --file ] arg                          The heaptrack data file to print.
+  -d [ --diff ] arg                          Find the differences to this file.
+  -t [ --shorten-templates ] [=arg(=1)] (=1) Shorten template identifiers.
+  -m [ --merge-backtraces ] [=arg(=1)] (=1)  Merge backtraces.
+                                             NOTE: the merged peak consumption is not correct.
+  -p [ --print-peaks ] [=arg(=1)] (=1)       Print backtraces to top allocators, sorted by peak consumption.
+  -a [ --print-allocators ] [=arg(=1)] (=1)  Print backtraces to top allocators, sorted by number of calls to 
+                                             allocation functions.
+  -T [ --print-temporary ] [=arg(=1)] (=1)   Print backtraces to top allocators, sorted by number of temporary 
+                                             allocations.
+  -l [ --print-leaks ] [=arg(=1)] (=0)       Print backtraces to leaked memory allocations.
+  -n [ --peak-limit ] [=arg(=10)] (=10)      Limit the number of reported peaks.
+  -s [ --sub-peak-limit ] [=arg(=5)] (=5)    Limit the number of reported backtraces of merged peak locations.
+  -H [ --print-histogram ] arg               Path to output file where an allocation size histogram will be written to.
+  --flamegraph-cost-type arg (=0)            The cost type to use when generating a flamegraph. Possible options are:
+                                               - allocations: number of allocations
+                                               - temporary: number of temporary allocations
+                                               - leaked: bytes not deallocated at the end
+                                               - peak: bytes consumed at highest total memory consumption
+  -F [ --print-flamegraph ] arg              Path to output file where a flame-graph compatible stack file will be 
+                                             written to.
+                                             To visualize the resulting file, use flamegraph.pl from 
+                                             https://github.com/brendangregg/FlameGraph:
+                                               heaptrack_print heaptrack.someapp.PID.gz -F stacks.txt
+                                               # optionally pass --reverse to flamegraph.pl
+                                               flamegraph.pl --title "heaptrack: allocations" --colors mem \
+                                                 --countname allocations < stacks.txt > heaptrack.someapp.PID.svg
+                                               [firefox|chromium] heaptrack.someapp.PID.svg
+                                             
+  -M [ --print-massif ] arg                  Path to output file where a massif compatible data file will be written 
+                                             to.
+  --massif-threshold arg (=1)                Percentage of current memory usage, below which allocations are aggregated
+                                             into a 'below threshold' entry.
+                                             This is only used in the massif output file so far.
+                                             
+  --massif-detailed-freq arg (=2)            Frequency of detailed snapshots in the massif output file. Increase  this 
+                                             to reduce the file size.
+                                             You can set the value to zero to disable detailed snapshots.
+                                             
+  --filter-bt-function arg                   Only print allocations where the backtrace contains the given function.
+  --suppressions arg                         Load list of leak suppressions from the specified file. Specify one 
+                                             suppression per line, and start each line with 'leak:', i.e. use the LSAN 
+                                             suppression file format.
+  --disable-embedded-suppressions            Ignore suppression definitions that are embedded into the heaptrack data 
+                                             file. By default, heaptrack will copy the suppressionsoptionally defined 
+                                             via a `const char *__lsan_default_suppressions()` symbol in the debuggee 
+                                             application. These are then always applied when analyzing the data, unless
+                                             this feature is explicitly disabled using this command line option.
+  --disable-builtin-suppressions             Ignore suppression definitions that are built into heaptrack. By default, 
+                                             heaptrack will suppress certain known leaks from common system libraries.
+  --print-suppressions [=arg(=1)] (=0)       Show statistics for matched suppressions.
+  -h [ --help ]                              Show this help message.
+  -v [ --version ]                           Displays version information.
+

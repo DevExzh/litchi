@@ -1,0 +1,12 @@
+heaptrack output will be written to "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c1-o1-after-small-primed-0-4.heaptrack.522271.zst"
+starting application, this might take some time...
+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent 
+unintended network delays during recording
+If you really want to use DEBUGINFOD, export HEAPTRACK_ENABLE_DEBUGINFOD=1
+heaptrack stats:
+	allocations:          	132666
+	leaked allocations:   	6
+	temporary allocations:	68716
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c1-o1-after-small-primed-0-4.heaptrack.522271.zst"

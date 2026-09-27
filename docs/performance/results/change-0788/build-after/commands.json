@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/tools/perf-execution/Cargo.toml"
+    ],
+    "ended": 1790533444.110171,
+    "exit_code": 0,
+    "log": {
+      "bytes": 307,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/build-after/native.log",
+      "sha256": "fe3c8735ee4db9a7107494bdb88ecbd35f7f99c8abffdfb048d13a7049858663"
+    },
+    "started": 1790533421.6932592
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--features",
+      "source-metrics"
+    ],
+    "ended": 1790533452.593112,
+    "exit_code": 0,
+    "log": {
+      "bytes": 223,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/build-after/memory.log",
+      "sha256": "9bd7cef54e03059f7abfdaffbb47412af7c2d2a432475e24750c6491e071c056"
+    },
+    "started": 1790533444.3250275
+  }
+]

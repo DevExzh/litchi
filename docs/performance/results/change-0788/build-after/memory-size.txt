@@ -1,0 +1,43 @@
+/home/zhuhe/code/litchi-target-0788/after-memory  :
+section                  size      addr
+.interp                    28       736
+.note.ABI-tag              32       764
+.note.gnu.build-id         36       796
+.dynsym                  1992       832
+.gnu.version              166      2824
+.gnu.version_r            288      2992
+.gnu.hash                  28      3280
+.dynstr                  1244      3308
+.rela.dyn               60504      4552
+.rela.plt                  48     65056
+.rodata                160712     65104
+.gcc_except_table       45436    225816
+.debug_gdb_scripts         34    271252
+.eh_frame_hdr           20348    271288
+.eh_frame              145384    291640
+.text                 1584571    441120
+.init                      27   2025692
+.fini                      13   2025720
+.plt                       48   2025744
+.tdata                     40   2029888
+.tbss                     144   2029928
+.fini_array                 8   2029928
+.init_array                16   2029936
+.data.rel.ro            38848   2029952
+.dynamic                  448   2068800
+.got                     5488   2069248
+.got.plt                   40   2074736
+.relro_padding           1896   2074776
+.tm_clone_table             0   2078872
+.data                    2632   2078872
+.bss                      296   2081504
+.comment                  177         0
+.debug_abbrev           13579         0
+.debug_info           3742114         0
+.debug_aranges          42736         0
+.debug_ranges         1296912         0
+.debug_str            4287890         0
+.debug_line           1191311         0
+Total                12645514
+
+

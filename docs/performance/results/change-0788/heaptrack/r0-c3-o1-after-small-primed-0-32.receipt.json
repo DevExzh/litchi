@@ -1,0 +1,120 @@
+{
+  "binary": {
+    "bytes": 12923968,
+    "path": "/home/zhuhe/code/litchi-target-0788/after-native",
+    "sha256": "735df29a3b18220272d50a3e296d81c29b899f06340ed991af53187ed52d91b8"
+  },
+  "case": {
+    "route": "parts",
+    "shape": "small",
+    "state": "primed",
+    "task_floor": 0,
+    "workers": 32
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.time",
+    "/usr/bin/heaptrack",
+    "--record-only",
+    "--output",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack.%p",
+    "/home/zhuhe/code/litchi-target-0788/after-native",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.json"
+  ],
+  "ended": 1790533574.104491,
+  "exit_code": 0,
+  "flamegraph": {
+    "bytes": 1561173,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack-peak.stacks",
+    "sha256": "1ed37f71a1d74bbaebb8adf3a794ff3c9100205a55fef7162ca693166ad7624e"
+  },
+  "lane": "heaptrack",
+  "leg": "after",
+  "log": {
+    "bytes": 795,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.log",
+    "sha256": "bc9e63df421d41c97a663fca38bac8279e24fcf418b02e954a31ece45e732fe2"
+  },
+  "mode": "heaptrack",
+  "print_command": [
+    "/usr/bin/heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack.524679.zst",
+    "-m",
+    "0",
+    "-p",
+    "1",
+    "-a",
+    "1",
+    "-T",
+    "0",
+    "-n",
+    "12",
+    "--flamegraph-cost-type",
+    "peak",
+    "-F",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack-peak.stacks"
+  ],
+  "print_exit_code": 0,
+  "raw_trace": {
+    "bytes": 77513,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack.524679.zst",
+    "sha256": "3037735e4a7182b5b6528c1ed9c180ffa62331d41743c975dcae2e9e5d014d54"
+  },
+  "repeat": 0,
+  "report": {
+    "bytes": 56613,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.json",
+    "sha256": "0a6b746b02ab31130819061811431bfcc4779e200b00dae06ae45969b54899c1"
+  },
+  "route": "parts",
+  "rss": {
+    "bytes": 76,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.rss",
+    "sha256": "7fb756c07a5d9393b8435144b6fbb4284e603e56928186a044ed667cf7ff2323"
+  },
+  "samples": 30,
+  "schema": "litchi.cached-part-memory-receipts.0788.v1",
+  "shape": "small",
+  "started": 1790533573.838047,
+  "state": "primed",
+  "summary": {
+    "bytes": 164819,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack-print.log",
+    "sha256": "20a80823bc62e54afdbb286f865accd44e7052d582d8a846d9eda57a53be8ede"
+  },
+  "task_floor": 0,
+  "time": {
+    "bytes": 15,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.time",
+    "sha256": "c1da8c75794aa4eec93ec58c3927efe16fea3f9d3475e4974738190564c8bfcd"
+  },
+  "trace": {
+    "bytes": 77513,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heaptrack/r0-c3-o1-after-small-primed-0-32.heaptrack.524679.zst",
+    "sha256": "3037735e4a7182b5b6528c1ed9c180ffa62331d41743c975dcae2e9e5d014d54"
+  },
+  "warmup": 3,
+  "workers": 32
+}

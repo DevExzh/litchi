@@ -1,0 +1,35 @@
+{
+  "artifacts": [
+    {
+      "bytes": 12702,
+      "path": "/usr/bin/heaptrack",
+      "sha256": "11ef8b89a93d43b63e4dec187f4c7dca2644f10254c5639e55a563fb5465b574"
+    },
+    {
+      "bytes": 346488,
+      "path": "/usr/bin/heaptrack_print",
+      "sha256": "aaef3e0ba4df8ce202f5418c4289e36504a5154b1a806e177d46384ac93ae01d"
+    },
+    {
+      "bytes": 27232,
+      "path": "/usr/bin/time",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88"
+    },
+    {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6"
+    },
+    {
+      "bytes": 2762,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/profiler-tooling/heaptrack-help.txt",
+      "sha256": "859e2fd2afecac1b56efa0ad174571553a0c56fc48a7f372848617dbf3c1a9f2"
+    },
+    {
+      "bytes": 5266,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/profiler-tooling/heaptrack-print-help.txt",
+      "sha256": "4683ba12adfa7204f611ad05b4f3ac065d69f2238757f177c2b38c608a119b3f"
+    }
+  ],
+  "trace_scope": "heaptrack --record-only records and interprets; compressed retained stream is tool-interpreted, not --raw addresses. Auto-analysis disabled. heaptrack_print runs afterward with unmerged backtraces."
+}

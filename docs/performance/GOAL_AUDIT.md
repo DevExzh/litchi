@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0788 — rejected candidate retained only as diagnostic evidence
+
+[0788](0788-cached-part-memory-attribution.md) The original small-process RSS cause remains unresolved. Counter disagreement and allocation/residency evidence narrow the next investigation without adopting the candidate or changing its failed policy. OLE2/OOXML remain active, ODF deferred, and iWork excluded; the broad performance goal stays open.
+
 ## 0787 — cached-Part optimization rejected by frozen memory policy
 
 [0787](0787-cached-part-scheduling.md) Correctness and latency benefits pass, but one statistically supported whole-child RSS regression rejects the candidate. All production/test source is restored and evidence retained. The broad goal remains active; OLE2/OOXML are in scope, ODF deferred and iWork excluded.

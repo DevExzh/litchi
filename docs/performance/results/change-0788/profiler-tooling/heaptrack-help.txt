@@ -1,0 +1,50 @@
+Usage: /usr/bin/heaptrack [--debug|-d] [--use-inject] [--record-only] DEBUGGEE [ARGUMENT]...
+or:    /usr/bin/heaptrack [--debug|-d] -p PID
+or:    /usr/bin/heaptrack -a FILE
+
+A heap memory usage profiler. It uses LD_PRELOAD to track all
+calls to the core memory allocation functions and logs these
+occurrences. Additionally, backtraces are obtained and logged.
+Combined this can give interesting answers to questions such as:
+
+  * How much heap memory is my application using?
+  * Where is heap memory being allocated, and how often?
+  * How much space are heap individual allocations requesting?
+
+To evaluate the generated heaptrack data, use heaptrack_print or heaptrack_gui.
+
+Mandatory arguments to heaptrack:
+  DEBUGGEE       The name or path to the application that should
+                 be run with heaptrack analyzation enabled.
+
+Alternatively, to attach to a running process:
+  -p, --pid PID  The process ID of a running process into which
+                 heaptrack will be injected. This only works with
+                 applications that already link against libdl.
+  WARNING: Runtime-attaching heaptrack is UNSTABLE and can lead to CRASHES
+           in your application, especially after you detach heaptrack again.
+           You are hereby warned, use it at your own risk!
+
+Optional arguments to heaptrack:
+  -r, --raw      Only record raw data, do not interpret it.
+  -d, --debug    Run the debuggee in GDB and heaptrack.
+ --use-inject    Use the same heaptrack_inject symbol interception mechanism instead of relying on
+                 the dynamic linker and LD_PRELOAD. This is an experimental flag for now.
+ --record-only   Only record and interpret the data, do not attempt to analyze it.
+  ARGUMENT       Any number of arguments that will be passed verbatim
+                 to the debuggee.
+  -h, --help     Show this help message and exit.
+  -v, --version  Displays version information.
+  -o, --output   Specifies the data-file for the captured data.
+                 %h in the file name string is replaced with the hostname of the system.
+                 %p in the file name string is replaced with the pid of the application being profiled.
+                 Parent directories will be created if output files are under non-existing directories.
+                 e.g.,
+                   ./%h/%p/outdat will be translated into ./<hostname>/<pid>/outdat.
+                   The directory ./<hostname>/<pid> will be created if it doesn't exist.
+
+Alternatively, to analyze a recorded heaptrack data file:
+  -a, --analyze FILE    Open the heaptrack data file in heaptrack_gui, if available,
+                        or fallback to heaptrack_print otherwise.
+                        Any options passed after --analyze will be passed along.
+

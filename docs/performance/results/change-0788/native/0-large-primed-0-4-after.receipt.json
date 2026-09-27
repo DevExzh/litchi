@@ -1,0 +1,76 @@
+{
+  "binary": {
+    "bytes": 12923968,
+    "path": "/home/zhuhe/code/litchi-target-0788/after-native",
+    "sha256": "735df29a3b18220272d50a3e296d81c29b899f06340ed991af53187ed52d91b8"
+  },
+  "block": 0,
+  "case": {
+    "route": "parts",
+    "shape": "large",
+    "state": "primed",
+    "task_floor": 0,
+    "workers": 4
+  },
+  "command": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.time",
+    "/home/zhuhe/code/litchi-target-0788/after-native",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.json"
+  ],
+  "ended": 1790533515.082191,
+  "exit_code": 0,
+  "lane": "native",
+  "leg": "after",
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "mode": "native",
+  "report": {
+    "bytes": 56644,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.json",
+    "sha256": "e1ecd1d4a0d71d95eb7307f2d198a914a2cd4cfa3a54c8253fd3a0c6457e7d77"
+  },
+  "route": "parts",
+  "rss": {
+    "bytes": 75,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.rss",
+    "sha256": "4d91b8f51f44e7079daecfeb490d893240d79195cdcf956479f1b9d6592f89e6"
+  },
+  "samples": 30,
+  "schema": "litchi.cached-part-memory-receipts.0788.v1",
+  "shape": "large",
+  "started": 1790533514.482509,
+  "state": "primed",
+  "task_floor": 0,
+  "time": {
+    "bytes": 14,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/native/0-large-primed-0-4-after.time",
+    "sha256": "5b84bfd3b77c8010f81da3ddd5a36a83ad1b9121d046d16dbe9be49c1b6e8aee"
+  },
+  "warmup": 3,
+  "workers": 4
+}

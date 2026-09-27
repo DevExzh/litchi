@@ -1,0 +1,51 @@
+There are 42 section headers, starting at offset 0xc529c0:
+
+Section Headers:
+  [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            0000000000000000 000000 000000 00      0   0  0
+  [ 1] .interp           PROGBITS        00000000000002e0 0002e0 00001c 00   A  0   0  1
+  [ 2] .note.ABI-tag     NOTE            00000000000002fc 0002fc 000020 00   A  0   0  4
+  [ 3] .note.gnu.build-id NOTE            000000000000031c 00031c 000024 00   A  0   0  4
+  [ 4] .dynsym           DYNSYM          0000000000000340 000340 0007b0 18   A  8   1  8
+  [ 5] .gnu.version      VERSYM          0000000000000af0 000af0 0000a4 02   A  4   0  2
+  [ 6] .gnu.version_r    VERNEED         0000000000000b94 000b94 000120 00   A  8   2  4
+  [ 7] .gnu.hash         GNU_HASH        0000000000000cb8 000cb8 00001c 00   A  4   0  8
+  [ 8] .dynstr           STRTAB          0000000000000cd4 000cd4 0004d5 00   A  0   0  1
+  [ 9] .rela.dyn         RELA            00000000000011b0 0011b0 00e9b8 18   A  4   0  8
+  [10] .rela.plt         RELA            000000000000fb68 00fb68 000030 18  AI  4  27  8
+  [11] .rodata           PROGBITS        000000000000fba0 00fba0 027110 00 AMS  0   0 16
+  [12] .gcc_except_table PROGBITS        0000000000036cb0 036cb0 00aef0 00   A  0   0  4
+  [13] .debug_gdb_scripts PROGBITS        0000000000041ba0 041ba0 000022 01 AMS  0   0  1
+  [14] .eh_frame_hdr     PROGBITS        0000000000041bc4 041bc4 004e8c 00   A  0   0  4
+  [15] .eh_frame         PROGBITS        0000000000046a50 046a50 0231b0 00   A  0   0  8
+  [16] .text             PROGBITS        000000000006ac00 069c00 17f7db 00  AX  0   0 16
+  [17] .init             PROGBITS        00000000001ea3dc 1e93dc 00001b 00  AX  0   0  4
+  [18] .fini             PROGBITS        00000000001ea3f8 1e93f8 00000d 00  AX  0   0  4
+  [19] .plt              PROGBITS        00000000001ea410 1e9410 000030 00  AX  0   0 16
+  [20] .tdata            PROGBITS        00000000001eb440 1e9440 000028 00 WAT  0   0  8
+  [21] .tbss             NOBITS          00000000001eb468 1e9468 000090 00 WAT  0   0  8
+  [22] .fini_array       FINI_ARRAY      00000000001eb468 1e9468 000008 08  WA  0   0  8
+  [23] .init_array       INIT_ARRAY      00000000001eb470 1e9470 000010 00 WAo  0   0  8
+  [24] .data.rel.ro      PROGBITS        00000000001eb480 1e9480 009620 00  WA  0   0 32
+  [25] .dynamic          DYNAMIC         00000000001f4aa0 1f2aa0 0001c0 10  WA  8   0  8
+  [26] .got              PROGBITS        00000000001f4c60 1f2c60 001530 00  WA  0   0  8
+  [27] .got.plt          PROGBITS        00000000001f6190 1f4190 000028 00  WA  0   0  8
+  [28] .relro_padding    NOBITS          00000000001f61b8 1f41b8 000e48 00  WA  0   0  1
+  [29] .tm_clone_table   PROGBITS        00000000001f71b8 1f41b8 000000 00  WA  0   0  8
+  [30] .data             PROGBITS        00000000001f71b8 1f41b8 000a08 00  WA  0   0  8
+  [31] .bss              NOBITS          00000000001f7bc0 1f4bc0 000128 00  WA  0   0  8
+  [32] .comment          PROGBITS        0000000000000000 1f4bc0 0000b1 01  MS  0   0  1
+  [33] .debug_abbrev     PROGBITS        0000000000000000 1f4c71 0034fa 00      0   0  1
+  [34] .debug_info       PROGBITS        0000000000000000 1f816b 387348 00      0   0  1
+  [35] .debug_aranges    PROGBITS        0000000000000000 57f4b3 00a450 00      0   0  1
+  [36] .debug_ranges     PROGBITS        0000000000000000 589903 138f00 00      0   0  1
+  [37] .debug_str        PROGBITS        0000000000000000 6c2803 40cc04 01  MS  0   0  1
+  [38] .debug_line       PROGBITS        0000000000000000 acf407 11f8c8 00      0   0  1
+  [39] .symtab           SYMTAB          0000000000000000 beecd0 017328 18     41 3175  8
+  [40] .shstrtab         STRTAB          0000000000000000 c05ff8 0001b4 00      0   0  1
+  [41] .strtab           STRTAB          0000000000000000 c061ac 04c811 00      0   0  1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+  L (link order), O (extra OS processing required), G (group), T (TLS),
+  C (compressed), x (unknown), o (OS specific), E (exclude),
+  D (mbind), l (large), p (processor specific)

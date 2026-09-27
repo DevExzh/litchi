@@ -1,0 +1,43 @@
+/home/zhuhe/code/litchi-target-0788/before-native  :
+section                  size      addr
+.interp                    28       736
+.note.ABI-tag              32       764
+.note.gnu.build-id         36       796
+.dynsym                  1968       832
+.gnu.version              164      2800
+.gnu.version_r            288      2964
+.gnu.hash                  28      3256
+.dynstr                  1237      3284
+.rela.dyn               59832      4528
+.rela.plt                  48     64360
+.rodata                160016     64416
+.gcc_except_table       44696    224432
+.debug_gdb_scripts         34    269128
+.eh_frame_hdr           20100    269164
+.eh_frame              143704    289264
+.text                 1567915    437072
+.init                      27   2004988
+.fini                      13   2005016
+.plt                       48   2005040
+.tdata                     40   2009184
+.tbss                     144   2009224
+.fini_array                 8   2009224
+.init_array                16   2009232
+.data.rel.ro            38432   2009248
+.dynamic                  448   2047680
+.got                     5424   2048128
+.got.plt                   40   2053552
+.relro_padding           2600   2053592
+.tm_clone_table             0   2057688
+.data                    2568   2057688
+.bss                      296   2060256
+.comment                  177         0
+.debug_abbrev           13562         0
+.debug_info           3694534         0
+.debug_aranges          42048         0
+.debug_ranges         1279680         0
+.debug_str            4238918         0
+.debug_line           1175966         0
+Total                12495115
+
+
