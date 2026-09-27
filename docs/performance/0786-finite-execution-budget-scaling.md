@@ -167,5 +167,13 @@ checked against their origin Git blobs by replay.
 The packet seals 3,304 payload files plus the seal itself. Both executable
 hashes were verified before removing 808,040,280 owned target file bytes.
 Full replay and the independent raw audit pass with the target absent.
-No production source changed. Integration and worktree cleanup are recorded
-after the evidence commit is merged.
+No production source changed. Evidence commit `f23126471b` was fast-forwarded
+into `feat/office-format-completeness`. All 3,309 committed packet/tool blob
+hashes match retained custody.
+
+The owned worktree, branch, copied root lockfile and three reference symlinks
+were removed after their identities were checked. Every pre-existing worktree
+and the three unrelated local-file hashes remain unchanged. From the main
+checkout, with both the owned target and worktree absent, final sealed replay
+and the independent raw audit pass again: 1,080 reports, 22,200 samples,
+120 scaling rows and six quality gates. The program-level goal remains open.
