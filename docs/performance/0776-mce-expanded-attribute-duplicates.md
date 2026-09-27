@@ -178,3 +178,13 @@ opaque extension output.
 The original dirty 0770 worktree remains outside this batch. Follow-up work
 must preserve this packet and the unrelated workspace changes while continuing
 the broader cold, range, scaling, CRUD, and format-completeness audits.
+
+## Integration and cleanup
+
+The validated branch was fast-forwarded into the main working branch at
+`b23919f31d`. Offline replay also passes from the integrated checkout. All
+970 packet files were checked against their staged bytes before commit; the
+packet seal binds 969 files plus its own separately committed seal. The three
+owned build targets, temporary generator executables, owned worktree, copied
+root lock and three reference symlinks have been removed. Original external
+worktrees and the three unrelated main-worktree files were preserved.
