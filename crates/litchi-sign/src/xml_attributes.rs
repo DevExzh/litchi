@@ -49,12 +49,14 @@ pub(crate) trait BytesStartExt {
 }
 
 impl BytesStartExt for BytesStart<'_> {
+    #[inline]
     fn checked_attributes(&self) -> CheckedAttributes<'_> {
         CheckedAttributes::new(self)
     }
 
     // The two calls quick-xml offers for an unchecked iterator.
     #[allow(clippy::disallowed_methods)]
+    #[inline]
     fn unchecked_attributes(&self) -> Attributes<'_> {
         let mut attributes = self.attributes();
         attributes.with_checks(false);
@@ -67,35 +69,68 @@ impl BytesStartExt for BytesStart<'_> {
 pub(crate) struct CheckedAttributes<'a> {
     tag: &'a BytesStart<'a>,
     attributes: Attributes<'a>,
-    phase: Phase,
-    /// From the 33rd name on: every name yielded so far, with its position.
-    names: BTreeMap<Name<'a>, usize>,
-    /// Where quick-xml starts to look for the next attribute: just after the
-    /// last one yielded (once this iterator checks the names).
-    next_start: usize,
+    phase: Phase<'a>,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Phase {
+#[derive(Clone, Debug)]
+enum Phase<'a> {
     /// quick-xml checks the names; this many have been yielded.
     QuickXml(usize),
     /// quick-xml's check is off; this iterator checks the names.
-    Own,
+    Own(Box<OwnCheck<'a>>),
     /// An error or the end has been yielded.
     Done,
+}
+
+/// This iterator's check of the names, from the 33rd on.
+#[derive(Clone, Debug)]
+struct OwnCheck<'a> {
+    /// Every name yielded so far, with its position.
+    names: BTreeMap<Name<'a>, usize>,
+    /// Where quick-xml starts to look for the next attribute: just after the
+    /// last one yielded.
+    next_start: usize,
 }
 
 impl<'a> CheckedAttributes<'a> {
     // quick-xml's checked iterator, used for the first 32 names only.
     #[allow(clippy::disallowed_methods)]
+    #[inline]
     fn new(tag: &'a BytesStart<'a>) -> Self {
         Self {
             tag,
             attributes: tag.attributes(),
             phase: Phase::QuickXml(0),
-            names: BTreeMap::new(),
-            next_start: 0,
         }
+    }
+
+    /// Everything after quick-xml's 32 names: the switch to this iterator's
+    /// own check, its check of each later name, and the end.
+    #[cold]
+    #[inline(never)]
+    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+        match self.phase {
+            Phase::Done => return None,
+            // quick-xml would hash the next name: turn its check off first.
+            Phase::QuickXml(_) => self.take_over(),
+            Phase::Own(_) => {},
+        }
+        let Some(item) = self.attributes.next() else {
+            self.phase = Phase::Done;
+            return None;
+        };
+        let checked = if let Phase::Own(check) = &mut self.phase {
+            check.check(self.tag, item)
+        } else {
+            let mut check = OwnCheck::after_quick_xml(self.tag);
+            let checked = check.check(self.tag, item);
+            self.phase = Phase::Own(Box::new(check));
+            checked
+        };
+        if checked.is_err() {
+            self.phase = Phase::Done;
+        }
+        Some(checked)
     }
 
     // Turning quick-xml's check off before its hashed check can run.
@@ -103,39 +138,46 @@ impl<'a> CheckedAttributes<'a> {
     fn take_over(&mut self) {
         self.attributes.with_checks(false);
     }
+}
 
-    /// Record the 32 names quick-xml has checked, with their positions, and
-    /// where the attribute after them starts. Reading them again without the
-    /// check yields the same attributes: the check never changes what is read.
-    fn record_checked_names(&mut self) {
-        let tag = self.tag;
+impl<'a> OwnCheck<'a> {
+    /// The 32 names quick-xml has checked, with their positions, and where
+    /// the attribute after them starts. Reading them again without the check
+    /// yields the same attributes: the check never changes what is read.
+    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+        let mut check = Self {
+            names: BTreeMap::new(),
+            next_start: 0,
+        };
         for attribute in tag
             .unchecked_attributes()
             .take(QUICK_XML_LINEAR_NAMES)
             .flatten()
         {
             let name = attribute.key.into_inner();
-            self.names.insert(Name(name), offset_in(tag, name));
-            self.next_start = end_of(tag, &attribute);
+            check.names.insert(Name(name), offset_in(tag, name));
+            check.next_start = end_of(tag, &attribute);
         }
-        debug_assert_eq!(self.names.len(), QUICK_XML_LINEAR_NAMES);
+        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+        check
     }
 
     fn check(
         &mut self,
+        tag: &'a BytesStart<'a>,
         item: Result<Attribute<'a>, AttrError>,
     ) -> Result<Attribute<'a>, AttrError> {
         let attribute = match item {
             Ok(attribute) => attribute,
-            Err(error) => return Err(self.duplicate_before_value(error)),
+            Err(error) => return Err(self.duplicate_before_value(tag, error)),
         };
         let name = attribute.key.into_inner();
-        let position = offset_in(self.tag, name);
+        let position = offset_in(tag, name);
         match self.names.entry(Name(name)) {
             Entry::Occupied(first) => Err(AttrError::Duplicated(position, *first.get())),
             Entry::Vacant(entry) => {
                 entry.insert(position);
-                self.next_start = end_of(self.tag, &attribute);
+                self.next_start = end_of(tag, &attribute);
                 Ok(attribute)
             },
         }
@@ -144,7 +186,7 @@ impl<'a> CheckedAttributes<'a> {
     /// quick-xml checks a name once it has read the name and the `=` after
     /// it, before the value: a repeated name followed by a malformed value is
     /// reported as a duplicate, not as the value's error.
-    fn duplicate_before_value(&self, error: AttrError) -> AttrError {
+    fn duplicate_before_value(&self, tag: &[u8], error: AttrError) -> AttrError {
         if !matches!(
             error,
             AttrError::UnquotedValue(_)
@@ -153,7 +195,7 @@ impl<'a> CheckedAttributes<'a> {
         ) {
             return error;
         }
-        let Some((position, name)) = name_at(self.tag, self.next_start) else {
+        let Some((position, name)) = name_at(tag, self.next_start) else {
             return error;
         };
         match self.names.get(&Name(name)) {
@@ -166,37 +208,21 @@ impl<'a> CheckedAttributes<'a> {
 impl<'a> Iterator for CheckedAttributes<'a> {
     type Item = Result<Attribute<'a>, AttrError>;
 
+    /// The first 32 names are quick-xml's checked iterator plus a counter.
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let item = match self.phase {
-            Phase::Done => return None,
-            Phase::QuickXml(yielded) if yielded < QUICK_XML_LINEAR_NAMES => {
-                let item = self.attributes.next();
-                self.phase = match item {
-                    Some(Ok(_)) => Phase::QuickXml(yielded + 1),
-                    _ => Phase::Done,
-                };
-                return item;
-            },
-            Phase::QuickXml(_) => {
-                self.take_over();
-                let item = self.attributes.next();
-                if item.is_some() {
-                    self.record_checked_names();
-                    self.phase = Phase::Own;
-                }
-                item
-            },
-            Phase::Own => self.attributes.next(),
-        };
-        let Some(item) = item else {
-            self.phase = Phase::Done;
-            return None;
-        };
-        let checked = self.check(item);
-        if checked.is_err() {
-            self.phase = Phase::Done;
+        if let Phase::QuickXml(yielded) = &mut self.phase
+            && *yielded < QUICK_XML_LINEAR_NAMES
+        {
+            let item = self.attributes.next();
+            if matches!(item, Some(Ok(_))) {
+                *yielded += 1;
+            } else {
+                self.phase = Phase::Done;
+            }
+            return item;
         }
-        Some(checked)
+        self.next_after_quick_xml()
     }
 }
 
