@@ -1,0 +1,17 @@
+{
+  "removed_binaries": [
+    {
+      "bytes": 14090448,
+      "path": "/home/zhuhe/code/litchi-target-0798/before-probe",
+      "sha256": "e96417e7c0a20238bb26050fa8196c6972f398cf1d27c358fb285c38b23dc70a"
+    },
+    {
+      "bytes": 14429624,
+      "path": "/home/zhuhe/code/litchi-target-0798/after-probe",
+      "sha256": "6b6744d9bae77db6528b69638d7884990734c3ba2f8a353fdeb76628f12e6317"
+    }
+  ],
+  "removed_target_bytes": 990773730,
+  "target": "/home/zhuhe/code/litchi-target-0798",
+  "target_removed": true
+}

@@ -1,0 +1,13 @@
+{
+  "exit_code": null,
+  "exit_code_nonzero": true,
+  "files": {
+    "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "Cargo.toml": "ef764a7b6285bab15ecf6ca0547894c9d395e4b79f119dd9d069edf10887c97d",
+    "Cargo.toml.template": "cec4314ae1238d98a73f8d2e738fd41c8446445a5046f0bd11b92b3268497f3e",
+    "error.log": "0ee74c98ca2fd296df2914b250d7e57a5ac423b170287ec184cb22509d652d55"
+  },
+  "reason": "probe feature incorrectly forwarded litchi-opc/attribute-census instead of enabling optional dependency",
+  "returncode_recorded": false,
+  "stage": "offline dependency resolution"
+}

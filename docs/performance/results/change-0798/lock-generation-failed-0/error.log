@@ -1,0 +1,9 @@
+error: failed to select a version for `litchi-opc`.
+    ... required by package `mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src)`
+versions that meet the requirements `*` are: 0.0.1
+
+package `mce-capabilities-probe` depends on `litchi-opc` with feature `attribute-census` but `litchi-opc` does not have that feature.
+ available features: default, performance-diagnostics, sign
+
+
+failed to select a version for `litchi-opc` which could resolve this conflict

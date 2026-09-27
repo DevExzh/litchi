@@ -1,0 +1,33 @@
+[package]
+name = "mce-capabilities-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+allocator-metrics = []
+capture-profile = []
+attribute-census = ["litchi-opc/attribute-census"]
+
+[[bin]]
+name = "namespace-uri-probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-pptx = { path = "@SRC@/crates/litchi-pptx" }
+litchi-opc = { path = "@SRC@/crates/litchi-opc", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+# This is an independent evidence project. The build driver materializes the
+# source-tree path above and invokes Cargo with this manifest explicitly.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

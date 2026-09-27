@@ -1,0 +1,438 @@
+{
+  "failed_attempts": [
+    {
+      "error_log": {
+        "bytes": 511,
+        "path": "lock-generation-failed-0/error.log",
+        "sha256": "0ee74c98ca2fd296df2914b250d7e57a5ac423b170287ec184cb22509d652d55"
+      },
+      "id": "lock-generation-failed-0",
+      "original_returncode": null,
+      "reason": "probe feature incorrectly forwarded litchi-opc/attribute-census instead of enabling optional dependency",
+      "resolved_lock_generation": {
+        "lock": {
+          "bytes": 30232,
+          "path": "probe-src/Cargo.lock",
+          "sha256": "3e8c73ff292567e4e0aa9272e9973f9f545bdeb913ad7868dfdcbe8d4382cdd3"
+        },
+        "receipt": {
+          "bytes": 462,
+          "path": "lock-generation.json",
+          "sha256": "3b9cb400f115faf53038432fbc7dde78dcbc6e9c627902554cccfd97723622dd"
+        }
+      },
+      "retained_files": [
+        {
+          "bytes": 30217,
+          "path": "lock-generation-failed-0/Cargo.lock",
+          "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+        },
+        {
+          "bytes": 778,
+          "path": "lock-generation-failed-0/Cargo.toml",
+          "sha256": "ef764a7b6285bab15ecf6ca0547894c9d395e4b79f119dd9d069edf10887c97d"
+        },
+        {
+          "bytes": 742,
+          "path": "lock-generation-failed-0/Cargo.toml.template",
+          "sha256": "cec4314ae1238d98a73f8d2e738fd41c8446445a5046f0bd11b92b3268497f3e"
+        },
+        {
+          "bytes": 511,
+          "path": "lock-generation-failed-0/error.log",
+          "sha256": "0ee74c98ca2fd296df2914b250d7e57a5ac423b170287ec184cb22509d652d55"
+        }
+      ],
+      "returncode_recorded": false,
+      "stage": "offline dependency resolution"
+    },
+    {
+      "commands": [
+        [
+          "cargo",
+          "generate-lockfile",
+          "--offline",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml"
+        ],
+        [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml",
+          "--",
+          "--test-threads=2",
+          "--skip",
+          "every_copy_of_the_module_is_the_canonical_code"
+        ]
+      ],
+      "exit_codes": [
+        0,
+        101
+      ],
+      "id": "quality-failed-0",
+      "logs": [
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/0.log",
+          "retained": {
+            "bytes": 66,
+            "path": "quality-failed-0/0.log",
+            "sha256": "b3ba9ced33cd350838421664dee5405f6fcf09bbc8a87dfaeeec6f49f024fa39"
+          }
+        },
+        {
+          "markers": [
+            "error[E0618]",
+            "shadowed by the local binding"
+          ],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/1.log",
+          "retained": {
+            "bytes": 1120,
+            "path": "quality-failed-0/1.log",
+            "sha256": "0deed02c06fe8d9f936f853176ac359c0aca0f6b7df4cc01e03a9a0384ccc732"
+          }
+        }
+      ],
+      "reason": "E0618 local tag binding shadowed test helper function",
+      "relocation": {
+        "bytes": 572,
+        "path": "quality-failed-0/relocation.json",
+        "sha256": "827a7be72b8c1a82afd4030d603c18765c2a7af13afdbb19c79f15380203cb36"
+      },
+      "source_archive": [
+        {
+          "bytes": 618,
+          "path": "hook-test-src-failed-0/Cargo.lock",
+          "sha256": "2b380fe1e23c75871232e780075631f8e08294e0e36763f41ec2a5ead2c9b3af"
+        },
+        {
+          "bytes": 137,
+          "path": "hook-test-src-failed-0/Cargo.toml",
+          "sha256": "22c502ac011af03f8d39ab0d2d6e7c2904d94a55408e3ccce3fcd19a80b9acfe"
+        },
+        {
+          "bytes": 6996,
+          "path": "hook-test-src-failed-0/src/census_tests_0798.rs",
+          "sha256": "d0a3f5753d28c8b6395b2d2fb04fd44ab881da5f7fd650061be44b1c6e78c8e6"
+        },
+        {
+          "bytes": 65,
+          "path": "hook-test-src-failed-0/src/lib.rs",
+          "sha256": "df268247aaf11975f6cc7a8452dd3966d362a470e1e8c3d1cd5ac510f83f671e"
+        },
+        {
+          "bytes": 15726,
+          "path": "hook-test-src-failed-0/src/xml_attributes/tests.rs",
+          "sha256": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b"
+        },
+        {
+          "bytes": 30773,
+          "path": "hook-test-src-failed-0/src/xml_attributes.rs",
+          "sha256": "dd2a85ed37f1f068e901a4d9cc6fd583ebadbcd46827a7fdae83b44804cd1e78"
+        }
+      ],
+      "stage": "isolated hook quality"
+    },
+    {
+      "commands": [
+        [
+          "cargo",
+          "generate-lockfile",
+          "--offline",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml"
+        ],
+        [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml",
+          "--",
+          "--test-threads=2",
+          "--skip",
+          "every_copy_of_the_module_is_the_canonical_code"
+        ],
+        [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      ],
+      "exit_codes": [
+        0,
+        0,
+        101
+      ],
+      "id": "quality-failed-1",
+      "logs": [
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/0.log",
+          "retained": {
+            "bytes": 66,
+            "path": "quality-failed-1/0.log",
+            "sha256": "b3ba9ced33cd350838421664dee5405f6fcf09bbc8a87dfaeeec6f49f024fa39"
+          }
+        },
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/1.log",
+          "retained": {
+            "bytes": 2642,
+            "path": "quality-failed-1/1.log",
+            "sha256": "124386e7820eaf63a26267ee0859810106eea706b77b7dfdd7ab980fa2d3fccc"
+          }
+        },
+        {
+          "markers": [
+            "clippy::needless-borrow",
+            "change this to: `self.tag`"
+          ],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/2.log",
+          "retained": {
+            "bytes": 961,
+            "path": "quality-failed-1/2.log",
+            "sha256": "928c40c177d8f28ee1f2024356bd101a5da85cf68142690644122be1f8a54b60"
+          }
+        }
+      ],
+      "reason": "Clippy needless_borrow in diagnostic Drop hook",
+      "relocation": {
+        "bytes": 565,
+        "path": "quality-failed-1/relocation.json",
+        "sha256": "9b5ddc4ca13451d1c923c78dac9ec8a360e5bf842e2e7b00db5d3c7f38ad9bb0"
+      },
+      "source_archive": [
+        {
+          "bytes": 618,
+          "path": "hook-test-src-failed-1/Cargo.lock",
+          "sha256": "2b380fe1e23c75871232e780075631f8e08294e0e36763f41ec2a5ead2c9b3af"
+        },
+        {
+          "bytes": 137,
+          "path": "hook-test-src-failed-1/Cargo.toml",
+          "sha256": "22c502ac011af03f8d39ab0d2d6e7c2904d94a55408e3ccce3fcd19a80b9acfe"
+        },
+        {
+          "bytes": 7051,
+          "path": "hook-test-src-failed-1/src/census_tests_0798.rs",
+          "sha256": "603c9b4aabf72663e1fb102e8574f45ba0c19b299a2346093b8cfc29e9102783"
+        },
+        {
+          "bytes": 65,
+          "path": "hook-test-src-failed-1/src/lib.rs",
+          "sha256": "df268247aaf11975f6cc7a8452dd3966d362a470e1e8c3d1cd5ac510f83f671e"
+        },
+        {
+          "bytes": 15726,
+          "path": "hook-test-src-failed-1/src/xml_attributes/tests.rs",
+          "sha256": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b"
+        },
+        {
+          "bytes": 30773,
+          "path": "hook-test-src-failed-1/src/xml_attributes.rs",
+          "sha256": "dd2a85ed37f1f068e901a4d9cc6fd583ebadbcd46827a7fdae83b44804cd1e78"
+        }
+      ],
+      "stage": "isolated hook quality"
+    },
+    {
+      "commands": [
+        [
+          "rustfmt",
+          "--check",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/src/main.rs"
+        ],
+        [
+          "cargo",
+          "build",
+          "--offline",
+          "--locked",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+          "--bin",
+          "namespace-uri-probe"
+        ],
+        [
+          "cargo",
+          "check",
+          "--offline",
+          "--locked",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+          "--bin",
+          "namespace-uri-probe"
+        ],
+        [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--release",
+          "--manifest-path",
+          "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+          "--bin",
+          "namespace-uri-probe",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0,
+        101
+      ],
+      "id": "build-before-failed-0",
+      "inputs": {
+        "bytes": 2474,
+        "path": "build-before-failed-0/inputs.json",
+        "sha256": "d4cf821cd42d2f943b93f003d44c3f3de465ac220c9a3bb140bfb68bf8e3355d"
+      },
+      "logs": [
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/0.log",
+          "retained": {
+            "bytes": 0,
+            "path": "build-before-failed-0/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/1.log",
+          "retained": {
+            "bytes": 8304,
+            "path": "build-before-failed-0/1.log",
+            "sha256": "8160e7268b97498ec223ccadffdf893bdb9b765f4498300ea472e08d2dd7fd0e"
+          }
+        },
+        {
+          "markers": [],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/2.log",
+          "retained": {
+            "bytes": 7730,
+            "path": "build-before-failed-0/2.log",
+            "sha256": "f754fb4ab90a3a83d0a412852a4410c48beb5fc7776c281be95a6951f22b6e52"
+          }
+        },
+        {
+          "markers": [
+            "function `enable` is never used",
+            "doc_lazy_continuation"
+          ],
+          "original": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/3.log",
+          "retained": {
+            "bytes": 6285,
+            "path": "build-before-failed-0/3.log",
+            "sha256": "3a7ef256075a5963fea0cda1509e43fbaa240da87405b5ec46fbc90a04689cc2"
+          }
+        }
+      ],
+      "probe_archive": [
+        {
+          "bytes": 30232,
+          "path": "probe-src-failed-0/Cargo.lock",
+          "sha256": "3e8c73ff292567e4e0aa9272e9973f9f545bdeb913ad7868dfdcbe8d4382cdd3"
+        },
+        {
+          "bytes": 765,
+          "path": "probe-src-failed-0/Cargo.toml",
+          "sha256": "17c6a37fd636ba292f4f15a89bbd41261e4789b314bfa27f1e428aa92e1c6fe4"
+        },
+        {
+          "bytes": 729,
+          "path": "probe-src-failed-0/Cargo.toml.template",
+          "sha256": "2f4397015b459035a87f3f00cfdae313d442562af38a558f7ac3544196912b33"
+        },
+        {
+          "bytes": 62279,
+          "path": "probe-src-failed-0/src/allocation_metrics.rs",
+          "sha256": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728"
+        },
+        {
+          "bytes": 10444,
+          "path": "probe-src-failed-0/src/counting_allocator.rs",
+          "sha256": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa"
+        },
+        {
+          "bytes": 44469,
+          "path": "probe-src-failed-0/src/main.rs",
+          "sha256": "45e913d2eaefec04d91220560cdc2b9925cb0c5d338b42b10192951c7e13b800"
+        }
+      ],
+      "reason": "Control build/check passed; Clippy rejected unused inherited allocation APIs and doc-list continuation.",
+      "relocation": {
+        "bytes": 944,
+        "path": "build-before-failed-0/relocation.json",
+        "sha256": "5e1ddeea7b03b05f4f99442ba061320c1e367406ed8f14ef72d4c7c4cbc93a81"
+      },
+      "source": {
+        "bytes": 1182921,
+        "path": "build-before-failed-0/source.json",
+        "sha256": "0cbb5bdec68e13754792968fca52929aa09c11198ece8655c6a99e510e95a9ac"
+      },
+      "stage": "control probe build"
+    }
+  ],
+  "path_policy": "receipt log paths are resolved through each retained relocation archive",
+  "production_changed": false,
+  "recovery": {
+    "build_before": {
+      "build": {
+        "bytes": 3324,
+        "path": "build-before/build.json",
+        "sha256": "d674e93de847e9e0d9690fac855bbb25ed1a69fb5f2e91e60746cfe1dd946573"
+      },
+      "commands": {
+        "bytes": 2340,
+        "path": "build-before/commands.json",
+        "sha256": "bc7fecd8aecf07ba9b7a02a8353eeaf95cdbecbf57b5aa34474c8c34cb063a92"
+      },
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "quality": {
+      "complete": {
+        "bytes": 2590,
+        "path": "quality/complete.json",
+        "sha256": "f8e6f1b3d1bee2fdcd740fa1a4f8a6222bd824b5186f2972792efd4c9d57df56"
+      },
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "receipts": {
+        "bytes": 1734,
+        "path": "quality/receipts.json",
+        "sha256": "f8aed2eec46a09737229842b7b6ab42776dc9e699c14ff857d1a0540f3b86fc0"
+      }
+    }
+  },
+  "schema": "litchi.performance.0798.failure-audit.v1"
+}

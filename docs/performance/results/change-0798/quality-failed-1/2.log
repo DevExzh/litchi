@@ -1,0 +1,16 @@
+    Checking memchr v2.8.3
+    Checking quick-xml v0.41.0
+    Checking attribute-census-hook-tests v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src)
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/xml_attributes.rs:265:26
+    |
+265 |         census_drop_0798(&self.tag, self.census.take());
+    |                          ^^^^^^^^^ help: change this to: `self.tag`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: could not compile `attribute-census-hook-tests` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `attribute-census-hook-tests` (lib test) due to 1 previous error

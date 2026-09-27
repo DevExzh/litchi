@@ -1,0 +1,6 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 17s

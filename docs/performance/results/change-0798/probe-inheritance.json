@@ -1,0 +1,7 @@
+{
+  "bytes": 20004,
+  "inherited_from": "docs/performance/results/change-0793/probe-src/src/main.rs",
+  "scope": "All output verification, deterministic fixture construction and following helper/test code unchanged",
+  "sha256": "32a32ff183ad834ff8622736477b4f5900e4ea16332355c9f3c45cd0c3ba9433",
+  "unchanged_tail_from": "fn verify_output("
+}

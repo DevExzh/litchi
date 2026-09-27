@@ -1,0 +1,39 @@
+{
+  "after": {
+    "path": "after/xml_attributes.rs",
+    "sha256": "25dfea29056f4e714136aefb1c0dc536211a86457ee2c52edc9d84284314a89f",
+    "source": "exact helper plus diagnostic census hooks"
+  },
+  "base_commit": "5f6ec5ca31df84ea7a103e5ba610a1d59e8f3c60",
+  "before": {
+    "path": "before/xml_attributes.rs",
+    "sha256": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "source": "exact current OPC helper at base commit"
+  },
+  "owner": "crates/litchi-opc/src/xml_attributes.rs",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "public_api": [
+    "begin_attribute_census_0798()",
+    "finish_attribute_census_0798() -> AttributeCensusReport0798"
+  ],
+  "schema": "litchi.performance.0798.attribute-census-instrumentation.v1",
+  "scope": {
+    "clone_accounting": "new row, same lineage, local counters reset, prefix retained",
+    "counter_policy": "checked increment with u64::MAX saturation and report flag",
+    "lexical_scan": "quick-xml unchecked_attributes at Drop or live-at-finish, through the first lexical error",
+    "measured_work": "begin/finish and report aggregation are outside the clock; iterator hooks and owner drops may execute inside the public operation and all instrumented timings are ignored",
+    "new_dependencies": false,
+    "registry": "calling-thread thread-local",
+    "unsafe_code": false
+  },
+  "source_hashes": {
+    "after/canonical_tests.rs": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b",
+    "after/census_tests_0798.rs": "603c9b4aabf72663e1fb102e8574f45ba0c19b299a2346093b8cfc29e9102783",
+    "after/xml_attributes.rs": "25dfea29056f4e714136aefb1c0dc536211a86457ee2c52edc9d84284314a89f"
+  },
+  "tests": {
+    "canonical": "after/canonical_tests.rs",
+    "diagnostic": "after/census_tests_0798.rs"
+  }
+}

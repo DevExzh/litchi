@@ -1,0 +1,87 @@
+[
+  {
+    "command": [
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/src/main.rs"
+    ],
+    "ended": 1790551313.2386727,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790551313.2107046
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe"
+    ],
+    "ended": 1790551406.9695697,
+    "exit_code": 0,
+    "log": {
+      "bytes": 8304,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/1.log",
+      "sha256": "8160e7268b97498ec223ccadffdf893bdb9b765f4498300ea472e08d2dd7fd0e"
+    },
+    "started": 1790551313.4353428
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe"
+    ],
+    "ended": 1790551427.628756,
+    "exit_code": 0,
+    "log": {
+      "bytes": 7730,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/2.log",
+      "sha256": "f754fb4ab90a3a83d0a412852a4410c48beb5fc7776c281be95a6951f22b6e52"
+    },
+    "started": 1790551407.166594
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790551428.1231456,
+    "exit_code": 101,
+    "log": {
+      "bytes": 6285,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-before/3.log",
+      "sha256": "3a7ef256075a5963fea0cda1509e43fbaa240da87405b5ec46fbc90a04689cc2"
+    },
+    "started": 1790551427.8248186
+  }
+]

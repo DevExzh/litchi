@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0798 — attribute distribution qualified before another prototype
+
+[0798](0798-pptx-attribute-consumption-census.md) Both repeats conserve 295,600 total instances and 438,800 yielded attributes, with full exhaustion and no errors, clones, partial consumption or overflow. Production is restored; the rejected prototypes remain rejected.
+
 ## 0797 — archive replay prototype without workflow advancement
 
 [0797](0797-xml-first-attribute-preflight.md) Single-attribute benefit qualifies, but 20 consumption cases trigger the frozen preflight regression rule. All 264 counter owners qualify and 66 paired rows match independent audits. No production edit or adoption follows.

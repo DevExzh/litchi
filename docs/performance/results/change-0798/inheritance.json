@@ -1,0 +1,22 @@
+{
+  "previous_seal": {
+    "bytes": 353864,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0797/seal.json",
+    "sha256": "ead9ff4d7c06686327c6a45208714286a4982d7f50f9ca27095bf1fb43721280"
+  },
+  "qualification_receipts": {
+    "bytes": 25542,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/qualification/receipts.json",
+    "sha256": "7a237b19448706ea38fceab7439ba8a74792dcff1dd4cf051607f6aaf6118ed1"
+  },
+  "qualification_seal": {
+    "bytes": 116356,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/seal.json",
+    "sha256": "69584f97d1e63cd072b3e3d7297ce8b0dab615cce0838c74a3c129b5a1f8af8c"
+  },
+  "workflow_probe": {
+    "bytes": 34412,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/src/main.rs",
+    "sha256": "1bc0c66d13982f942c3ec889d498e30623a16b1faba78d8ae81c8dadc7425d28"
+  }
+}

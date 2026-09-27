@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0798 — PPTX attribute-consumption census
+
+[0798](0798-pptx-attribute-consumption-census.md) All 45 captures and independent count/semantic audits pass. Both repeats match exactly; no early drops or partial consumption occur in the observed regions. The diagnostic retains production and establishes no timing or resource claim.
+
 ## 0797 — first-attribute candidate stopped at preflight
 
 [0797](0797-xml-first-attribute-preflight.md) The candidate passes helper semantics and 1,056 captures, but 20 consumption regressions prevent advancement to workflow trials. Both iterator sizes remain 120 bytes; production is unchanged.

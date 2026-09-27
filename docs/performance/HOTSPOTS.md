@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0798 — one- and two-attribute tags dominate large capture
+
+[0798](0798-pptx-attribute-consumption-census.md) One/two attributes cover 99.777% of observed large-capture OPC iterator instances; all observed iterators are fully consumed. A future short-tag design should avoid first-attribute replay while preserving early duplicate refusal. Counts do not predict speedup.
+
 ## 0797 — first-attribute replay adds multi-attribute cost
 
 [0797](0797-xml-first-attribute-preflight.md) Same-size iterator state preserves early duplicate refusal and helps one-attribute inputs, but two/three attributes regress 42.987%/33.387%. Quantify actual workload attribute distributions before another specialization.

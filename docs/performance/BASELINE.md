@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0798 — PPTX attribute census leaves baseline unchanged
+
+[0798](0798-pptx-attribute-consumption-census.md) All 45 reports pass semantic parity; two instrumented repeats agree exactly. Large capture has 49.528% one-attribute and 50.249% two-attribute iterator instances. No latency or production improvement is claimed.
+
 ## 0797 — first-attribute replay fails preflight
 
 [0797](0797-xml-first-attribute-preflight.md) The new prototype improves one-attribute consumption by 35.768% but regresses two-attribute consumption by 42.987%. All 1,056 reports/24,024 samples validate. Production baseline remains unchanged.
