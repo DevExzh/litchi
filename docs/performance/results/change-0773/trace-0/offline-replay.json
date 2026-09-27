@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0773/verify_trace.py",
+    "docs/performance/results/change-0773/trace-0/before.strace",
+    "docs/performance/results/change-0773/trace-0/after.strace",
+    "docs/performance/results/change-0773/trace-0/run.json",
+    "docs/performance/results/change-0773/trace-0/windows-replayed.json"
+  ],
+  "exit": 0,
+  "started": 1790471752.8512769,
+  "ended": 1790471752.8841157,
+  "log": "offline-replay.log",
+  "log_sha256": "77eb6badb4893b2bcad7e3f389af8951a5adc7c84c3371909d09c69519b8b8a3",
+  "verifier_sha256": "35f64e7d2bb512563006ef87ab25b48a0ffb8b0fe591e4b8f8753d6cb325d948",
+  "initial_verifier_sha256": "205ef02ef15974df806db09d51d2b72f163b458794c21fa71bb6b890d6325e0e",
+  "raw_trace_hashes": {
+    "before.strace": "ac831299c3353f9a8542f7a2264a39597efabfa00192d2a92feae8662ddc87c6",
+    "after.strace": "e3455d9ef0e011fb833ccc39423267080f9ec6b204b6aac807dc73583ce96fdd"
+  },
+  "temporary_replayed_report_removed_after_semantic_equality": true
+}

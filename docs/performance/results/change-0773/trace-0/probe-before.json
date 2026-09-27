@@ -1,0 +1,27 @@
+{
+  "binary_sha256": "04121d7f99eb57fd91676eeee2a6a8acaa3860d957921040dbab8ed710a12222",
+  "binary_source": "/home/zhuhe/code/litchi-target-0773-trace-before/debug/durability-probe",
+  "cargo_toml_sha256": "ad9c8dee737a2b80e0eef8d0bfd287d170e4f10b9f7e170ccf3963c56df2d966",
+  "features": [],
+  "leg": "before",
+  "lock_generation": {
+    "command": [
+      "cargo",
+      "generate-lockfile",
+      "--offline",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/before/probe/Cargo.toml"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "ended": 1790471408.2807515,
+    "log": "/home/zhuhe/code/litchi-worktrees/0773-durability-integration/docs/performance/results/change-0773/trace-0/build/before-lock.log",
+    "log_sha256": "54a7c16686d4a27cb3d947c3a11dedf8fa563195dc6f8e0afe689ded2f8a4392",
+    "returncode": 0,
+    "started": 1790471408.130485
+  },
+  "probe_lock_sha256": "c120af132181a8e6da5070d803f7e8f60dbe2cae67b53d7d230175b0d673fc43",
+  "probe_source_sha256": "a00e23cce68d326395ce3de83054afab8b7da6b4ec3444bb240489acfb25b16d",
+  "repo": "/home/zhuhe/code/litchi",
+  "target": "/home/zhuhe/code/litchi-target-0773-trace-before",
+  "workspace_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+}
