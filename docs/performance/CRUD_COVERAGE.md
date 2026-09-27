@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0783 — diagnostic coverage only
+
+[0783](0783-pptx-lifecycle-phase-attribution.md) The existing generated PPTX single-text-edit lifecycle now has consecutive phase timing and a feature-off control across three sizes. No registry row is promoted, no new public CRUD capability is claimed, and native-producer/provider/scaling coverage remains open.
+
 ## 0782 — Fresh PPT checks without production promotion
 
 [0782](0782-ppt-borrowed-slice-rejected.md) verifies both writer routes, borrowed source lifetime, rich mutation isolation, centered fallback, grouped text and existing text goldens. The inherited raw oracle preserves Unicode trailing spaces across 170 primary reports and 3,730 samples. Measured rejection restores baseline source and tests. No existing-document, native Office or coverage-index promotion follows.

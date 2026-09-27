@@ -1,0 +1,20 @@
+{
+  "binaries": {
+    "control": {
+      "bytes": 13742096,
+      "path": "/home/zhuhe/code/litchi-target-0783/control",
+      "sha256": "4f2872e0b9b54da7194fb76a6da38b5e05896719b9d0a167461686f1e9e96a85"
+    },
+    "phases": {
+      "bytes": 13750440,
+      "path": "/home/zhuhe/code/litchi-target-0783/phases",
+      "sha256": "781e2fc3103f7443490f90631aeda738f3c04f264ff6eaa7dad862d27eb3c750"
+    }
+  },
+  "preexisting_worktrees_unchanged": true,
+  "removed_file_bytes": 696897828,
+  "target": "/home/zhuhe/code/litchi-target-0783",
+  "unrelated_hashes_unchanged": true,
+  "verified_before_removal": true,
+  "worktree_created": false
+}

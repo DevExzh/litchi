@@ -1,0 +1,924 @@
+{
+  "schema": "litchi.pptx.lifecycle-phase-probe.v1",
+  "tool": "pptx-phase-probe-0783",
+  "mode": "lifecycle",
+  "shape": "large",
+  "slides": 100,
+  "shapes_per_slide": 100,
+  "timing_scope": "Package::opened_presentation, edit, set_shape_text, commit, apply_opened_presentation_commit, and Package::to_bytes; phase-timing is a diagnostic clock-boundary mode with clock overhead and no causal historical-regression claim",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 215220,
+    "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+  },
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 30600103,
+      "metrics": {
+        "elapsed_ns": 30600103,
+        "phase_apply_ns": 188341,
+        "phase_capture_ns": 21121152,
+        "phase_commit_ns": 1328066,
+        "phase_serialize_ns": 7138161,
+        "phase_stage_ns": 824383,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 30657103,
+      "metrics": {
+        "elapsed_ns": 30657103,
+        "phase_apply_ns": 196281,
+        "phase_capture_ns": 21122292,
+        "phase_commit_ns": 1322596,
+        "phase_serialize_ns": 7189941,
+        "phase_stage_ns": 825993,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 30637883,
+      "metrics": {
+        "elapsed_ns": 30637883,
+        "phase_apply_ns": 191231,
+        "phase_capture_ns": 21121322,
+        "phase_commit_ns": 1323165,
+        "phase_serialize_ns": 7167481,
+        "phase_stage_ns": 834684,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 30736524,
+      "metrics": {
+        "elapsed_ns": 30736524,
+        "phase_apply_ns": 192280,
+        "phase_capture_ns": 21164522,
+        "phase_commit_ns": 1331936,
+        "phase_serialize_ns": 7224642,
+        "phase_stage_ns": 823144,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 30715313,
+      "metrics": {
+        "elapsed_ns": 30715313,
+        "phase_apply_ns": 189051,
+        "phase_capture_ns": 21183232,
+        "phase_commit_ns": 1337716,
+        "phase_serialize_ns": 7183111,
+        "phase_stage_ns": 822203,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 30879274,
+      "metrics": {
+        "elapsed_ns": 30879274,
+        "phase_apply_ns": 202441,
+        "phase_capture_ns": 21322083,
+        "phase_commit_ns": 1330476,
+        "phase_serialize_ns": 7199081,
+        "phase_stage_ns": 825193,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 30752554,
+      "metrics": {
+        "elapsed_ns": 30752554,
+        "phase_apply_ns": 199610,
+        "phase_capture_ns": 21183232,
+        "phase_commit_ns": 1319476,
+        "phase_serialize_ns": 7222642,
+        "phase_stage_ns": 827594,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 30830234,
+      "metrics": {
+        "elapsed_ns": 30830234,
+        "phase_apply_ns": 213341,
+        "phase_capture_ns": 21247962,
+        "phase_commit_ns": 1321465,
+        "phase_serialize_ns": 7218462,
+        "phase_stage_ns": 829004,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 30736984,
+      "metrics": {
+        "elapsed_ns": 30736984,
+        "phase_apply_ns": 200861,
+        "phase_capture_ns": 21243592,
+        "phase_commit_ns": 1320616,
+        "phase_serialize_ns": 7143501,
+        "phase_stage_ns": 828414,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 30656614,
+      "metrics": {
+        "elapsed_ns": 30656614,
+        "phase_apply_ns": 192191,
+        "phase_capture_ns": 21140012,
+        "phase_commit_ns": 1316575,
+        "phase_serialize_ns": 7184262,
+        "phase_stage_ns": 823574,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 30653284,
+      "metrics": {
+        "elapsed_ns": 30653284,
+        "phase_apply_ns": 196770,
+        "phase_capture_ns": 21114242,
+        "phase_commit_ns": 1331546,
+        "phase_serialize_ns": 7189322,
+        "phase_stage_ns": 821404,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 30777914,
+      "metrics": {
+        "elapsed_ns": 30777914,
+        "phase_apply_ns": 192801,
+        "phase_capture_ns": 21186843,
+        "phase_commit_ns": 1331496,
+        "phase_serialize_ns": 7246831,
+        "phase_stage_ns": 819943,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 30728794,
+      "metrics": {
+        "elapsed_ns": 30728794,
+        "phase_apply_ns": 192431,
+        "phase_capture_ns": 21158522,
+        "phase_commit_ns": 1328725,
+        "phase_serialize_ns": 7232042,
+        "phase_stage_ns": 817074,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 30684513,
+      "metrics": {
+        "elapsed_ns": 30684513,
+        "phase_apply_ns": 194671,
+        "phase_capture_ns": 21148112,
+        "phase_commit_ns": 1329936,
+        "phase_serialize_ns": 7183401,
+        "phase_stage_ns": 828393,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 30849965,
+      "metrics": {
+        "elapsed_ns": 30849965,
+        "phase_apply_ns": 195441,
+        "phase_capture_ns": 21217893,
+        "phase_commit_ns": 1351786,
+        "phase_serialize_ns": 7235292,
+        "phase_stage_ns": 849553,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 31305917,
+      "metrics": {
+        "elapsed_ns": 31305917,
+        "phase_apply_ns": 226791,
+        "phase_capture_ns": 21561844,
+        "phase_commit_ns": 1379756,
+        "phase_serialize_ns": 7280312,
+        "phase_stage_ns": 857214,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 30758734,
+      "metrics": {
+        "elapsed_ns": 30758734,
+        "phase_apply_ns": 192940,
+        "phase_capture_ns": 21117082,
+        "phase_commit_ns": 1325846,
+        "phase_serialize_ns": 7263672,
+        "phase_stage_ns": 859194,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 30566004,
+      "metrics": {
+        "elapsed_ns": 30566004,
+        "phase_apply_ns": 192970,
+        "phase_capture_ns": 21069232,
+        "phase_commit_ns": 1323306,
+        "phase_serialize_ns": 7153942,
+        "phase_stage_ns": 826554,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 30625243,
+      "metrics": {
+        "elapsed_ns": 30625243,
+        "phase_apply_ns": 201671,
+        "phase_capture_ns": 21086282,
+        "phase_commit_ns": 1326756,
+        "phase_serialize_ns": 7179391,
+        "phase_stage_ns": 831143,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 30619143,
+      "metrics": {
+        "elapsed_ns": 30619143,
+        "phase_apply_ns": 192441,
+        "phase_capture_ns": 21077281,
+        "phase_commit_ns": 1323756,
+        "phase_serialize_ns": 7199131,
+        "phase_stage_ns": 826534,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 30728634,
+      "metrics": {
+        "elapsed_ns": 30728634,
+        "phase_apply_ns": 194281,
+        "phase_capture_ns": 21148012,
+        "phase_commit_ns": 1323146,
+        "phase_serialize_ns": 7231141,
+        "phase_stage_ns": 832054,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 30777274,
+      "metrics": {
+        "elapsed_ns": 30777274,
+        "phase_apply_ns": 193621,
+        "phase_capture_ns": 21221873,
+        "phase_commit_ns": 1320466,
+        "phase_serialize_ns": 7212651,
+        "phase_stage_ns": 828663,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 30785194,
+      "metrics": {
+        "elapsed_ns": 30785194,
+        "phase_apply_ns": 191801,
+        "phase_capture_ns": 21290483,
+        "phase_commit_ns": 1322865,
+        "phase_serialize_ns": 7150691,
+        "phase_stage_ns": 829354,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 30682854,
+      "metrics": {
+        "elapsed_ns": 30682854,
+        "phase_apply_ns": 194990,
+        "phase_capture_ns": 21189312,
+        "phase_commit_ns": 1320356,
+        "phase_serialize_ns": 7152482,
+        "phase_stage_ns": 825714,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 30875044,
+      "metrics": {
+        "elapsed_ns": 30875044,
+        "phase_apply_ns": 193541,
+        "phase_capture_ns": 21322793,
+        "phase_commit_ns": 1327346,
+        "phase_serialize_ns": 7205151,
+        "phase_stage_ns": 826213,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 30720824,
+      "metrics": {
+        "elapsed_ns": 30720824,
+        "phase_apply_ns": 193450,
+        "phase_capture_ns": 21225262,
+        "phase_commit_ns": 1319216,
+        "phase_serialize_ns": 7154372,
+        "phase_stage_ns": 828524,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 30686493,
+      "metrics": {
+        "elapsed_ns": 30686493,
+        "phase_apply_ns": 193021,
+        "phase_capture_ns": 21136402,
+        "phase_commit_ns": 1329796,
+        "phase_serialize_ns": 7201491,
+        "phase_stage_ns": 825783,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 30940885,
+      "metrics": {
+        "elapsed_ns": 30940885,
+        "phase_apply_ns": 193530,
+        "phase_capture_ns": 21407633,
+        "phase_commit_ns": 1342686,
+        "phase_serialize_ns": 7174782,
+        "phase_stage_ns": 822254,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 30816904,
+      "metrics": {
+        "elapsed_ns": 30816904,
+        "phase_apply_ns": 193841,
+        "phase_capture_ns": 21232583,
+        "phase_commit_ns": 1332236,
+        "phase_serialize_ns": 7230441,
+        "phase_stage_ns": 827803,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 30675684,
+      "metrics": {
+        "elapsed_ns": 30675684,
+        "phase_apply_ns": 195811,
+        "phase_capture_ns": 21152452,
+        "phase_commit_ns": 1336406,
+        "phase_serialize_ns": 7164241,
+        "phase_stage_ns": 826774,
+        "shapes_per_slide": 100,
+        "slides": 100
+      },
+      "source_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 529987,
+        "semantic_text_sha256": "c4378c04efc7d723415e156c9c7eec7cb13f6a80bf82f5f00ffbab429cb72a86",
+        "readback_bytes": 215240,
+        "readback_sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15",
+        "marker_matches": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "phases",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

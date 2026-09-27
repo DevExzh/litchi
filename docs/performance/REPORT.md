@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0783 — current PPTX lifecycle attribution
+
+[0783](0783-pptx-lifecycle-phase-attribution.md) The large generated PPTX workflow spends about 69% of diagnostic time in capture and 23% in serialization; staged commit is about 4%. Current phase/control measurements guide a capture profile but neither explain the 0780 regression nor establish a production speedup. Production code remains unchanged.
+
 ## 0782 — Borrowed-slice candidate rejected
 
 [0782](0782-ppt-borrowed-slice-rejected.md) passes six quality gates (1,287 tests; 11 ignored) and all ten-case preservation checks. Four persistent regressions outweigh payload benefits, so no production change is retained. All 120 native/40 allocator processes, 42 spread flags and 24 paired-series flags remain replayable with exact restored-source custody.
