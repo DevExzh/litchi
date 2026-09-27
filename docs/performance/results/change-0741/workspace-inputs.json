@@ -1,0 +1,9 @@
+{
+  "binding": "Additional workspace inputs match build-base HEAD; ignored root lock matches0738 sealed census (build uses tracked tools/perf-baseline/Cargo.lock). Initial tracked crate/harness census retained separately.",
+  "files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "Cargo.lock": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+    ".cargo/config.toml": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+    "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+  }
+}

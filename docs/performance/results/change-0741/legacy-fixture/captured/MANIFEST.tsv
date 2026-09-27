@@ -1,0 +1,12 @@
+change=0741
+fixture=owned-cross-copy-store-image
+baseline=unchanged-source-tree
+source_media_member=ppt/media/change-0741-store-image.png
+source_media_compression=store
+patch_format=LPCP0003
+artifact	bytes	sha256
+source.pptx	100665	d39dbc9fa63f17b3e1efd3e22e1dac6ffeb9e471b6aa27486669538e9a33d61a
+destination.pptx	30518	afc1033306bb423742c9d057b7a50a7e4cbb546a0a7737b66ae299cd2ba30b15
+forward.patch	5877	b5b5b24b01b5ae49911f5f05e938978d2ff0f683cf61b939fe26246f903dfb45
+inverse.patch	5877	e74c5bcaeacafcfb21e3f6ba37cc607a3a1b346f43d8c13d223a9f70291c56af
+expected-target.pptx	31907	ef7ae02f68964aa96071903b8d3481502882a20e416cc5201b94acd936ed88b6

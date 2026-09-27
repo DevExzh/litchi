@@ -1,0 +1,13 @@
+   Compiling change0741-legacy-fixture v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.85s
+     Running `/home/zhuhe/code/litchi-target-0741-baseline/release/change0741-legacy-fixture /home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/captured`
+captured /home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/captured
+source_bytes	100665
+destination_bytes	30518
+forward_patch_bytes	5877
+inverse_patch_bytes	5877
+expected_target_bytes	31907
+source_media_member	ppt/media/change-0741-store-image.png
+source_media_compression	store
+forward_patch_magic	LPCP0003
+inverse_patch_magic	LPCP0003

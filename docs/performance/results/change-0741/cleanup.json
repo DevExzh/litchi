@@ -1,0 +1,61 @@
+{
+  "utc": "2026-09-27T00:20:49.365048+00:00",
+  "target": "/home/zhuhe/code/litchi-target-0741-baseline",
+  "file_bytes_before": 2156373494,
+  "removed": true,
+  "verified_binary_identities": [
+    {
+      "lane": "native",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline"
+      ],
+      "started": 1790093457.0198638,
+      "ended": 1790093905.9934158,
+      "exit": 0,
+      "log_sha256": "ce2831431a8ec7ad9b71138f5d29e827d276239d1143150ea91516340dd05e34",
+      "binary": "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline",
+      "binary_sha256": "63cb80a878135f00d75e1d88da3f0dd0bb5df1edffe388a372b58068df0c5252",
+      "binary_bytes": 62939968
+    },
+    {
+      "lane": "allocation",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline-alloc",
+        "--features",
+        "allocator-metrics"
+      ],
+      "started": 1790093906.1920435,
+      "ended": 1790093997.8516245,
+      "exit": 0,
+      "log_sha256": "2a6799ce11d7688a5ca5fd9926b095114d75f6ac544a3862e1434e0d8905fba3",
+      "binary": "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline-alloc",
+      "binary_sha256": "f8869d455c9821e578d39b8654159bc6fe4a118115c9671fc44f71fae8e7ae7b",
+      "binary_bytes": 62828536
+    },
+    {
+      "binary": "/home/zhuhe/code/litchi-target-0741-baseline/release/change0741-legacy-fixture",
+      "binary_sha256": "66dcb9e3c851564dc21c781c57593d3912282323d055206a65d12c911f6a10bb",
+      "binary_bytes": 65459968
+    }
+  ],
+  "removed_python_caches": [
+    "docs/performance/results/change-0741/__pycache__"
+  ],
+  "scope": "Only the source-bound 0741 baseline target and packet Python caches; no current builds or unrelated files."
+}
