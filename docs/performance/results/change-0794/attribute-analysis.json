@@ -1,0 +1,322 @@
+{
+  "any_resource_increase": false,
+  "iterations": 84,
+  "iterator_size_bytes": {
+    "after": 192,
+    "before": 120
+  },
+  "latency_claim": false,
+  "reports": 2,
+  "rows": [
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "attributes": 0,
+      "before": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "attributes": 1,
+      "before": {
+        "allocated_bytes": 64,
+        "allocation_calls": 1,
+        "deallocated_bytes": 64,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 64,
+        "reallocation_calls": 0
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "attributes": 2,
+      "before": {
+        "allocated_bytes": 64,
+        "allocation_calls": 1,
+        "deallocated_bytes": 64,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 64,
+        "reallocation_calls": 0
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "attributes": 3,
+      "before": {
+        "allocated_bytes": 64,
+        "allocation_calls": 1,
+        "deallocated_bytes": 64,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 64,
+        "reallocation_calls": 0
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0,
+        "deallocated_bytes": 0,
+        "deallocation_calls": 0,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 0,
+        "reallocation_calls": 0
+      },
+      "attributes": 4,
+      "before": {
+        "allocated_bytes": 64,
+        "allocation_calls": 1,
+        "deallocated_bytes": 64,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 64,
+        "reallocation_calls": 0
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 128,
+        "allocation_calls": 1,
+        "deallocated_bytes": 128,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 128,
+        "reallocation_calls": 0
+      },
+      "attributes": 5,
+      "before": {
+        "allocated_bytes": 192,
+        "allocation_calls": 2,
+        "deallocated_bytes": 192,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 128,
+        "reallocation_calls": 1
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 128,
+        "allocation_calls": 1,
+        "deallocated_bytes": 128,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 128,
+        "reallocation_calls": 0
+      },
+      "attributes": 8,
+      "before": {
+        "allocated_bytes": 192,
+        "allocation_calls": 2,
+        "deallocated_bytes": 192,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 128,
+        "reallocation_calls": 1
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 384,
+        "allocation_calls": 2,
+        "deallocated_bytes": 384,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 256,
+        "reallocation_calls": 1
+      },
+      "attributes": 9,
+      "before": {
+        "allocated_bytes": 448,
+        "allocation_calls": 3,
+        "deallocated_bytes": 448,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 256,
+        "reallocation_calls": 2
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 384,
+        "allocation_calls": 2,
+        "deallocated_bytes": 384,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 256,
+        "reallocation_calls": 1
+      },
+      "attributes": 16,
+      "before": {
+        "allocated_bytes": 448,
+        "allocation_calls": 3,
+        "deallocated_bytes": 448,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 256,
+        "reallocation_calls": 2
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 896,
+        "allocation_calls": 3,
+        "deallocated_bytes": 896,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 2
+      },
+      "attributes": 17,
+      "before": {
+        "allocated_bytes": 960,
+        "allocation_calls": 4,
+        "deallocated_bytes": 960,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 3
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 896,
+        "allocation_calls": 3,
+        "deallocated_bytes": 896,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 2
+      },
+      "attributes": 31,
+      "before": {
+        "allocated_bytes": 960,
+        "allocation_calls": 4,
+        "deallocated_bytes": 960,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 3
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 896,
+        "allocation_calls": 3,
+        "deallocated_bytes": 896,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 2
+      },
+      "attributes": 32,
+      "before": {
+        "allocated_bytes": 960,
+        "allocation_calls": 4,
+        "deallocated_bytes": 960,
+        "deallocation_calls": 1,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 512,
+        "reallocation_calls": 3
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 2392,
+        "allocation_calls": 8,
+        "deallocated_bytes": 2392,
+        "deallocation_calls": 6,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 2008,
+        "reallocation_calls": 2
+      },
+      "attributes": 33,
+      "before": {
+        "allocated_bytes": 2488,
+        "allocation_calls": 10,
+        "deallocated_bytes": 2488,
+        "deallocation_calls": 7,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 2040,
+        "reallocation_calls": 3
+      },
+      "increases": []
+    },
+    {
+      "after": {
+        "allocated_bytes": 3512,
+        "allocation_calls": 12,
+        "deallocated_bytes": 3512,
+        "deallocation_calls": 10,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 2616,
+        "reallocation_calls": 2
+      },
+      "attributes": 64,
+      "before": {
+        "allocated_bytes": 3608,
+        "allocation_calls": 14,
+        "deallocated_bytes": 3608,
+        "deallocation_calls": 11,
+        "net_live_bytes": 0,
+        "peak_above_entry_bytes": 3160,
+        "reallocation_calls": 3
+      },
+      "increases": []
+    }
+  ],
+  "schema": "litchi.performance.0794.attribute-analysis.v1",
+  "scope": "Supplemental helper counts and layout only, outside public-workflow adoption policy"
+}

@@ -1,0 +1,21 @@
+{
+  "after_sha256": "29bf075076d1210a3df5df0e1e25642995e2416e7a3ee2315eb0724762c57a92",
+  "before_sha256": "a1d052783d89ab82389f2fe1e40f30898e4643645786fe1e2be2da228092b3fb",
+  "changed_file": "crates/litchi-ole-common/src/xml_attributes.rs",
+  "failed_archive": {
+    "bytes": 2687,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/candidate/compile-failure-1/manifest.json",
+    "sha256": "2c4f78a6a6a1fb83893a004f521e264124a0c739bb8b0c792117911e11604459"
+  },
+  "failed_checks": {
+    "bytes": 1801,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality-1/checks.json",
+    "sha256": "ab525c91314018a28a6a49c40955ac052d4fddf5eb47c4d546a991a0f5a139da"
+  },
+  "failed_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality-1/source.json",
+    "sha256": "6c12ad5f996468684bac678b18dee6be5f2c84bde2f924a9970770fef30895ea"
+  },
+  "reason": "Restore original OLE common public API after compiler E0603/E0599"
+}

@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0794/attribute-probe-src/Cargo.toml"
+  ],
+  "ended": 1790542314.95532,
+  "exit_code": 0,
+  "log": {
+    "bytes": 3525,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/attribute-before/build.log",
+    "sha256": "a38ac479543597009f60a78175e8519c0be82ae220d1dba655ea40ac8ca5b6eb"
+  },
+  "started": 1790542294.9890368
+}

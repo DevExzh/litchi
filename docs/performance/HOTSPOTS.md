@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0794 — fewer allocations do not establish faster iteration
+
+[0794](0794-xml-inline-duplicate-keys.md) Four qualified heap traces confirm large-capture owner calls fall from 72,106 to 10,781, while primary paired p50 medians all worsen. Iterator size grows 120→192 bytes. These costs motivate instruction/branch attribution before another layout experiment; no production optimization is retained.
+
 ## 0793 — duplicate-key allocation path investigated
 
 [0793](0793-pptx-capture-allocation-attribution.md) Large capture contains 61,342 raw wrapper-nested duplicate-check allocation calls in each trace. The frozen counter reconciliation fails through double-counted reallocations; no allocation fraction is authorized. Investigate bounded inline duplicate-key storage only under a corrected, predeclared qualification and full public regression matrix.

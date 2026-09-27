@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0794 — current paired XML attribute experiment rejected
+
+[0794](0794-xml-inline-duplicate-keys.md) All 255 primary reports/5,595 samples and thirteen cross-format reports/2,888 case samples preserve their exact source and output contracts. No PPTX timing benefit qualifies; tiny XLSX full-cell scanning regresses 5.511%. Production is restored; no new optimized baseline is adopted.
+
 ## 0793 — current capture allocation controls
 
 [0793](0793-pptx-capture-allocation-attribution.md) Fresh diagnostic controls and heap traces retain 50 reports/130 samples. All ten frozen allocation reconciliations fail because the formula counts reallocations twice; the source-corrected comparison is supplementary only. No timing baseline is replaced.

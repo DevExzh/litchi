@@ -1,0 +1,70 @@
+{
+  "raw_process_rows": 96,
+  "rejected": true,
+  "rows": [
+    {
+      "case": "docx_semantic_full_text",
+      "ci_high": 0.9969065745093728,
+      "ci_low": 0.9607794559400951,
+      "ratio": 0.9755536201715505,
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "case": "docx_semantic_full_text",
+      "ci_high": 0.9702815557146266,
+      "ci_low": 0.945357578027584,
+      "ratio": 0.960545346570691,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "docx_semantic_open",
+      "ci_high": 1.001852498592673,
+      "ci_low": 0.9656424292363202,
+      "ratio": 0.9898532185545627,
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "case": "docx_semantic_open",
+      "ci_high": 0.9970134818771583,
+      "ci_low": 0.979907464915629,
+      "ratio": 0.9888692458142152,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "ci_high": 1.0817912403636325,
+      "ci_low": 1.0502833330970665,
+      "ratio": 1.0551091435168414,
+      "reject": true,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "ci_high": 1.0069446617227866,
+      "ci_low": 0.998136611924086,
+      "ratio": 1.0053605367238532,
+      "reject": false,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_open_owned",
+      "ci_high": 1.0118043256217057,
+      "ci_low": 1.0028527293066458,
+      "ratio": 1.0080091254597576,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_open_owned",
+      "ci_high": 1.0420270411720405,
+      "ci_low": 0.9770899873035027,
+      "ratio": 1.002026276625859,
+      "reject": false,
+      "shape": "dense-wide"
+    }
+  ]
+}

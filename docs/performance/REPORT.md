@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0794 — inline duplicate-key candidate rejected
+
+[0794](0794-xml-inline-duplicate-keys.md) The five-file candidate passes six quality gates but fails the primary 3% benefit requirement and the tiny XLSX scan regression veto (+5.511%, ratio interval 1.050283–1.081791). All 274 reports and raw evidence are retained; production is restored exactly. Allocation reduction alone is insufficient for adoption.
+
 ## 0793 — allocation evidence retained with protocol failure
 
 [0793](0793-pptx-capture-allocation-attribution.md) All 50 diagnostic reports/130 samples preserve identity and readback; four builds and 35 probe tests pass. The allocation formula double-counts reallocations in all ten traces. The failed gate and supplementary source explanation are retained, with no production or speedup claim.

@@ -1,0 +1,13 @@
+{
+  "adoption-policy.json": "02874c2c0bcd4647e36a6cf5ec3eeacda9461ac75c4945140b0751f75e75f8fc",
+  "analysis-plan.json": "b089a5fce9957bbbc974e93d1455c90de2e0d2a94accbd8df30b815bc636e27d",
+  "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+  "build.py": "2b475d7873dea128864780c9c4268328a47fc8d7490e46af53867c64952649fc",
+  "capture.py": "4de2aca59be700774cad20a30d189c00941f5b16c8b34d088df1a0fd8983540d",
+  "host.json": "7128ef7168472a5d3caa91a95d200c7722dee2b5e55deab875e980a100b6c52f",
+  "inheritance.json": "970d87ff52813fa00e656623a67f84d83ea0cf95722db0c57fb75e3e4f8e0cd8",
+  "origin.json": "9d50fb600168624c3343df29b9faf859c4fe370d7b3d813686f49669c84a8ab5",
+  "plan.json": "157efb875abceb12ccaacb253f0641d4811438f632240cd9437b2d1bc5a58fd1",
+  "profile.py": "eb2ffe45da7c2f919e0b3e2aaf0f9d048ec781f6c326a36f059d2a650925b326",
+  "quality.py": "1adf3f57f1d66df478a9b5f262f3eb5edd203f42c23714eb891cd0a36f8279c1"
+}

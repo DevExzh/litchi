@@ -1,0 +1,89 @@
+{
+  "counter_semantics": "allocation_calls includes successful reallocations; do not add reallocation_calls",
+  "decodes": 8,
+  "nested_costs_overlap": true,
+  "qualified": true,
+  "reports": 4,
+  "rows": [
+    {
+      "checks": {
+        "counter_match": true,
+        "owner_public_descendant": true,
+        "owner_subset": true,
+        "whole_conservation": true
+      },
+      "expected_operation_calls": 72106,
+      "filtered_histogram_is_global": true,
+      "filtered_summary_is_global": true,
+      "leg": "before",
+      "nested_checked_attributes": 0,
+      "nested_notes_inspector": 61274,
+      "nested_quick_xml_duplicate_check": 61342,
+      "owner_calls": 72106,
+      "qualified": true,
+      "repeat": 0,
+      "whole_calls": 608290
+    },
+    {
+      "checks": {
+        "counter_match": true,
+        "owner_public_descendant": true,
+        "owner_subset": true,
+        "whole_conservation": true
+      },
+      "expected_operation_calls": 10781,
+      "filtered_histogram_is_global": true,
+      "filtered_summary_is_global": true,
+      "leg": "after",
+      "nested_checked_attributes": 17,
+      "nested_notes_inspector": 449,
+      "nested_quick_xml_duplicate_check": 0,
+      "owner_calls": 10781,
+      "qualified": true,
+      "repeat": 0,
+      "whole_calls": 241608
+    },
+    {
+      "checks": {
+        "counter_match": true,
+        "owner_public_descendant": true,
+        "owner_subset": true,
+        "whole_conservation": true
+      },
+      "expected_operation_calls": 10781,
+      "filtered_histogram_is_global": true,
+      "filtered_summary_is_global": true,
+      "leg": "after",
+      "nested_checked_attributes": 17,
+      "nested_notes_inspector": 449,
+      "nested_quick_xml_duplicate_check": 0,
+      "owner_calls": 10781,
+      "qualified": true,
+      "repeat": 1,
+      "whole_calls": 241608
+    },
+    {
+      "checks": {
+        "counter_match": true,
+        "owner_public_descendant": true,
+        "owner_subset": true,
+        "whole_conservation": true
+      },
+      "expected_operation_calls": 72106,
+      "filtered_histogram_is_global": true,
+      "filtered_summary_is_global": true,
+      "leg": "before",
+      "nested_checked_attributes": 0,
+      "nested_notes_inspector": 61274,
+      "nested_quick_xml_duplicate_check": 61342,
+      "owner_calls": 72106,
+      "qualified": true,
+      "repeat": 1,
+      "whole_calls": 608290
+    }
+  ],
+  "rss_claim": false,
+  "samples": 4,
+  "schema": "litchi.performance.0794.profile-analysis.v1",
+  "timing_claim": false
+}

@@ -1,0 +1,18 @@
+{
+  "fixture_packet": "../change-0792",
+  "fixture_seal": "5ccb3aa48b556a8c38b14a5cacc0804fc5586e9079f8236cc948aca29d7d89fa",
+  "prior_packet": "../change-0793",
+  "prior_seal": "f057007629b52852fdc6e6884fb2dbab684b3c7e07789f8ff23a9ece8a3e1301",
+  "probe_reference": {
+    "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+    "src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "src/main.rs": "1bc0c66d13982f942c3ec889d498e30623a16b1faba78d8ae81c8dadc7425d28"
+  },
+  "production_source": {
+    "bytes": 1182921,
+    "path": "../change-0793/build/source.json",
+    "sha256": "cc7b1867ae7368dc6d67e8ccab0d2ce30327ff154a7dfe395ca1246afedc5fd3"
+  }
+}

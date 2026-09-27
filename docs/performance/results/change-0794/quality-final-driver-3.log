@@ -1,0 +1,6 @@
+gate 1 exit 1
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0794/quality.py", line 26, in <module>
+    assert r.returncode==0,log
+           ^^^^^^^^^^^^^^^
+AssertionError: /home/zhuhe/code/litchi/docs/performance/results/change-0794/quality-3/00.log

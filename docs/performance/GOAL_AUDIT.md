@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0794 — allocation reduction rejected by workflow gates
+
+[0794](0794-xml-inline-duplicate-keys.md) Large capture allocation calls fall 85.048% and allocated bytes 82.316%, yet no primary latency benefit qualifies. Tiny XLSX scan triggers the significant 5% veto. All six quality gates pass (12,865 tests, 89 ignored); exact production restoration and retained failure evidence preserve the existing baseline. OLE2/OOXML remain active, ODF deferred, iWork excluded.
+
 ## 0793 — allocation semantics clarified
 
 [0793](0793-pptx-capture-allocation-attribution.md) Current capture traces and counter source identify a double-counted reallocation term in the frozen protocol. Retaining that failure advances measurement correctness and narrows the next XML experiment without a production change. OLE2/OOXML active, ODF deferred, iWork excluded; comprehensive completion remains open.
