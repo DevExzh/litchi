@@ -1,0 +1,35 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:u'
+# Event count (approx.): 28565174311
+#
+# Overhead  Command  Shared Object         Symbol                                                                                             
+# ........  .......  ....................  ...................................................................................................
+#
+    12.19%  profile  profile               [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     5.02%  profile  profile               [.] quick_xml::events::attributes::IterState::next
+     4.97%  profile  profile               [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     4.83%  profile  profile               [.] litchi_pptx::notes::codec::scan_processed_xml
+     4.79%  profile  profile               [.] litchi_pptx::presentation::model::Presentation::text
+     4.09%  profile  profile               [.] litchi_pptx::notes::resolved
+     3.91%  profile  profile               [.] quick_xml::name::NamespaceResolver::resolve_event
+     3.87%  profile  profile               [.] quick_xml::reader::Reader<R>::read_event_impl
+     3.64%  profile  profile               [.] sha2::sha256::x86_sha::compress
+     3.45%  profile  profile               [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     3.21%  profile  profile               [.] zlib_rs::deflate::longest_match::longest_match
+     2.35%  profile  profile               [.] litchi_pptx::parts::slide::validate_semantic_attributes
+     2.32%  profile  profile               [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     2.20%  profile  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     2.14%  profile  profile               [.] <litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next
+     2.04%  profile  profile               [.] quick_xml::reader::state::ReaderState::emit_start
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

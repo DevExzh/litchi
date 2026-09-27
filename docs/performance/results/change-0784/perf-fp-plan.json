@@ -1,0 +1,15 @@
+{
+  "binary": "profile-fp",
+  "build_rustflags": "-C force-frame-pointers=yes",
+  "call_graph": "fp",
+  "claim": "Count only samples with exact capture owner on stack; whole-process samples remain separate. Zero qualified samples or unresolved stacks forbid phase-fraction claims.",
+  "cpu": 12,
+  "event": "cycles:u",
+  "frequency": 499,
+  "owner": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+  "reason": "Ordinary DWARF decoding has zero exact capture-owner stacks despite successful record and resolved flat IP symbols. Separate frame-pointer diagnostic build to obtain qualified ancestry; original traces retained.",
+  "repeats": 2,
+  "samples": 100,
+  "shape": "large",
+  "warmup": 3
+}

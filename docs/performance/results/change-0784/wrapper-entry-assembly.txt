@@ -1,0 +1,65 @@
+
+/home/zhuhe/code/litchi-target-0784/profile:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000194ea0 <pptx_capture_probe::capture_region_0784>:
+  194ea0:	48 8d 15 f9 f7 e9 ff 	lea    -0x160807(%rip),%rdx        # 346a0 <anon.7d1f7c43824a99e7625b6b83caf5366f.7351.llvm.17713024149467970665>
+  194ea7:	ff 25 b3 50 0a 00    	jmp    *0xa50b3(%rip)        # 239f60 <_DYNAMIC+0x1160>
+  194ead:	cc                   	int3
+  194eae:	cc                   	int3
+  194eaf:	cc                   	int3
+
+0000000000194eb0 <pptx_capture_probe::executable_identity>:
+  194eb0:	55                   	push   %rbp
+  194eb1:	41 57                	push   %r15
+  194eb3:	41 56                	push   %r14
+  194eb5:	41 55                	push   %r13
+  194eb7:	41 54                	push   %r12
+  194eb9:	53                   	push   %rbx
+  194eba:	48 81 ec 88 00 00 00 	sub    $0x88,%rsp
+  194ec1:	48 89 fb             	mov    %rdi,%rbx
+  194ec4:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+  194ec9:	ff 15 81 51 0a 00    	call   *0xa5181(%rip)        # 23a050 <_DYNAMIC+0x1250>
+  194ecf:	48 8b 6c 24 10       	mov    0x10(%rsp),%rbp
+  194ed4:	48 89 e8             	mov    %rbp,%rax
+  194ed7:	48 f7 d8             	neg    %rax
+  194eda:	71 58                	jno    194f34 <pptx_capture_probe::executable_identity+0x84>
+  194edc:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+  194ee1:	89 c1                	mov    %eax,%ecx
+  194ee3:	83 e1 03             	and    $0x3,%ecx
+  194ee6:	8d 51 fe             	lea    -0x2(%rcx),%edx
+  194ee9:	83 fa 02             	cmp    $0x2,%edx
+  194eec:	0f 82 f7 00 00 00    	jb     194fe9 <pptx_capture_probe::executable_identity+0x139>
+  194ef2:	48 85 c9             	test   %rcx,%rcx
+  194ef5:	0f 84 ee 00 00 00    	je     194fe9 <pptx_capture_probe::executable_identity+0x139>
+  194efb:	4c 8d 70 ff          	lea    -0x1(%rax),%r14
+  194eff:	4c 8b 78 ff          	mov    -0x1(%rax),%r15
+  194f03:	4c 8b 60 07          	mov    0x7(%rax),%r12
+  194f07:	49 8b 04 24          	mov    (%r12),%rax
+  194f0b:	48 85 c0             	test   %rax,%rax
+  194f0e:	74 05                	je     194f15 <pptx_capture_probe::executable_identity+0x65>
+  194f10:	4c 89 ff             	mov    %r15,%rdi
+  194f13:	ff d0                	call   *%rax
+  194f15:	49 83 7c 24 08 00    	cmpq   $0x0,0x8(%r12)
+  194f1b:	74 09                	je     194f26 <pptx_capture_probe::executable_identity+0x76>
+  194f1d:	4c 89 ff             	mov    %r15,%rdi
+  194f20:	ff 15 0a 41 0a 00    	call   *0xa410a(%rip)        # 239030 <free@GLIBC_2.2.5>
+  194f26:	4c 89 f7             	mov    %r14,%rdi
+  194f29:	ff 15 01 41 0a 00    	call   *0xa4101(%rip)        # 239030 <free@GLIBC_2.2.5>
+  194f2f:	e9 b5 00 00 00       	jmp    194fe9 <pptx_capture_probe::executable_identity+0x139>
+  194f34:	4c 8b 7c 24 18       	mov    0x18(%rsp),%r15
+  194f39:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  194f3e:	48 85 c0             	test   %rax,%rax
+  194f41:	74 09                	je     194f4c <pptx_capture_probe::executable_identity+0x9c>
+  194f43:	41 80 3f 2f          	cmpb   $0x2f,(%r15)
+  194f47:	0f 94 c1             	sete   %cl
+  194f4a:	eb 02                	jmp    194f4e <pptx_capture_probe::executable_identity+0x9e>
+  194f4c:	31 c9                	xor    %ecx,%ecx
+  194f4e:	4c 89 7c 24 10       	mov    %r15,0x10(%rsp)
+  194f53:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+  194f58:	c6 44 24 20 06       	movb   $0x6,0x20(%rsp)
+  194f5d:	88                   	.byte 0x88
+  194f5e:	4c                   	rex.WR
+  194f5f:	24                   	.byte 0x24

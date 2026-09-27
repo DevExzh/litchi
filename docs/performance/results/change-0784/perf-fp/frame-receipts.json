@@ -1,0 +1,66 @@
+[
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/0.data"
+    ],
+    "compressed": {
+      "bytes": 224807,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/0.frames.gz",
+      "sha256": "a6ff1c1330a5be234541d65a8acec8342c7fe76419313e3154ab90114b630513"
+    },
+    "exit_code": 0,
+    "frames": {
+      "bytes": 5182035,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/0.frames",
+      "sha256": "3f5120679412909818e6143ebe71ce157e86b590f503d8db97737b73e5b688b1"
+    },
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/0.frames.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 605064,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/0.data",
+      "sha256": "cfd666286cd38d707867bc973f519aff82db20b694158758438ed40dfd023f54"
+    },
+    "repeat": 0
+  },
+  {
+    "command": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/1.data"
+    ],
+    "compressed": {
+      "bytes": 224009,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/1.frames.gz",
+      "sha256": "34d91cb40a10d1deff490a506cd23569e9d2b6341d70d762ca69f614fcbe5a0e"
+    },
+    "exit_code": 0,
+    "frames": {
+      "bytes": 5171823,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/1.frames",
+      "sha256": "9ff63d2891baa6f84e7e86588c3669f48debcc5893b4594cace8fdab62d35a34"
+    },
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/1.frames.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw": {
+      "bytes": 604576,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0784/perf-fp/1.data",
+      "sha256": "82d4f368217a6f81664f61429c87d031529a775374392733f11e15167e66adcb"
+    },
+    "repeat": 1
+  }
+]

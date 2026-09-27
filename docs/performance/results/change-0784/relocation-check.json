@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "exit_code": 0,
+      "script": "native_analysis.py",
+      "stderr": "",
+      "stdout": "Native capture controls replay PASS\n"
+    },
+    {
+      "exit_code": 0,
+      "script": "profile_analysis.py",
+      "stderr": "",
+      "stdout": "0784 profile analysis replay PASS\n"
+    },
+    {
+      "exit_code": 0,
+      "script": "perf_analysis.py",
+      "stderr": "",
+      "stdout": "Native sampled exact-owner replay PASS\n"
+    }
+  ],
+  "scope": "All three analyzers replay byte-for-byte from temporary relocated packet with minimal historical fixtures after binary cleanup and final no-phase-fractions correction.",
+  "temporary_tree_removed": true
+}

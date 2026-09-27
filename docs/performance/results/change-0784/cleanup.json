@@ -1,0 +1,25 @@
+{
+  "binaries": {
+    "control": {
+      "bytes": 13742616,
+      "path": "/home/zhuhe/code/litchi-target-0784/control",
+      "sha256": "ef0f5896a3a0903aad405648fb78560f36582ba083c2c45d6f0bec69ece28d71"
+    },
+    "profile": {
+      "bytes": 13742968,
+      "path": "/home/zhuhe/code/litchi-target-0784/profile",
+      "sha256": "246a2a18eaac0c55dbb3b9e44faecbdd00597c20165e85e4e6dc64611edd6a0d"
+    },
+    "profile-fp": {
+      "bytes": 13698056,
+      "path": "/home/zhuhe/code/litchi-target-0784/profile-fp",
+      "sha256": "ba6517b24fcfc4d5cb5d8c9a783348571af52738dc0ab518132ede6bbcb8f604"
+    }
+  },
+  "preexisting_worktrees_unchanged": true,
+  "removed_file_bytes": 1352362661,
+  "target": "/home/zhuhe/code/litchi-target-0784",
+  "unrelated_hashes_unchanged": true,
+  "verified_before_removal": true,
+  "worktree_created": false
+}

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0784 — scoped initial-capture attribution
+
+[0784](0784-pptx-initial-capture-profile.md) Six exact-boundary Callgrind captures and two qualified native frame-pointer profiles locate the large PPTX capture cost. Notes XML validation appears in 1,031/1,029 capture-owner stacks and fingerprinting in 97/93. One unresolved interior frame prevents native phase-fraction claims. Ordinary DWARF traces have zero qualified owner stacks and remain retained. No production change or speedup is claimed.
+
 ## 0783 — current PPTX lifecycle phases
 
 [0783](0783-pptx-lifecycle-phase-attribution.md) A six-block current-source diagnostic attributes about 69% of the large generated workflow to capture and 23% to serialization. All 1,080 measured publications pass exact readback. The phase build is 3.653% faster than its feature-off control, so shares remain instrumented diagnostics, not a production improvement or historical regression explanation.

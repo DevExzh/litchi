@@ -1,0 +1,13 @@
+{
+  "call_graph": "dwarf,16384",
+  "claim": "Count only samples with exact capture owner on stack; whole-process samples remain separate. Zero qualified samples or unresolved stacks forbid phase-fraction claims.",
+  "cpu": 12,
+  "event": "cycles:u",
+  "frequency": 499,
+  "owner": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+  "reason": "Callgrind large capture shows software SHA compression while host advertises sha_ni; qualify native sampled ancestry before prioritizing guest instruction fractions. Frozen after Callgrind, before native perf capture.",
+  "repeats": 2,
+  "samples": 100,
+  "shape": "large",
+  "warmup": 3
+}
