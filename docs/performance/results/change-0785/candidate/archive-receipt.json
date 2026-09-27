@@ -1,0 +1,39 @@
+{
+  "schema": "litchi.performance.0785.archive-receipt.v1",
+  "base_commit": "4d89ccf28d6ef6c61d7d2f35b716cd1fcfab7985",
+  "candidate": "length-dispatched exact known PPTX namespace URI resolution",
+  "archive_only": true,
+  "cargo_or_native_run": false,
+  "changed_files": [
+    "crates/litchi-pptx/src/notes/mod.rs"
+  ],
+  "before": {
+    "path": "candidate/before/crates/litchi-pptx/src/notes/mod.rs",
+    "bytes": 3776,
+    "sha256": "10b971f0fe4fe0202c3ee2d8395c28edbfae2767d98582e665b9134362eb778b"
+  },
+  "files": {
+    "path": "candidate/files/crates/litchi-pptx/src/notes/mod.rs",
+    "bytes": 11114,
+    "sha256": "7e5f2cabdde77d41e1fabbcc0cdef2028238a6f390abb8d537e375fb5061ede1"
+  },
+  "applied": {
+    "path": "candidate/applied/crates/litchi-pptx/src/notes/mod.rs",
+    "bytes": 11114,
+    "sha256": "7e5f2cabdde77d41e1fabbcc0cdef2028238a6f390abb8d537e375fb5061ede1"
+  },
+  "artifacts": {
+    "model.patch": {
+      "bytes": 8389,
+      "sha256": "465e16f60d1060497751ae918852c7b806cf1897ce4f00d294417c38f5e34170"
+    },
+    "changed-files.json": {
+      "bytes": 44,
+      "sha256": "1e5ccba4c3ded101a283950746dfce9addf2101fb356b21ce0f373f8b8d5cd4b"
+    },
+    "implementation-notes.md": {
+      "bytes": 2411,
+      "sha256": "4267c6b3a5fe44b65bfb3e0c6dca87fa4e1bc76a61fe5b5794e5c073f53aca9e"
+    }
+  }
+}
