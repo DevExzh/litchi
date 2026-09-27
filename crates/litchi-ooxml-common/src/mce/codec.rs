@@ -915,6 +915,7 @@ fn start(
         }
     }
     let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
+    validate_expanded_attribute_duplicates(&raw, resolver(scope, &c.ns))?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {
         let hoisted = if parent_active {
@@ -1396,6 +1397,54 @@ fn validate_alternate_attributes(
                 "AlternateContent attribute namespace is neither understood nor ignorable",
             ));
         }
+    }
+    Ok(())
+}
+
+/// Lexically different prefixes can still name the same attribute. Check
+/// before opaque/skipped branches return or directives discard attributes.
+/// Unprefixed attributes have no namespace and their lexical uniqueness was
+/// already checked; declarations cannot bind a prefix to the empty URI.
+///
+/// Up to eight prefixed names use bounded stack comparisons. Larger lists
+/// use a fallibly reserved vector and in-place sorting, never URI copies or
+/// URI-length-dependent hashing. Scratch is dropped before processing children.
+fn validate_expanded_attribute_duplicates(raw: &[Attr<'_>], ns: Resolver<'_>) -> R<()> {
+    let mut prefixed = raw
+        .iter()
+        .filter(|a| a.key.contains(':') && !a.key.starts_with("xmlns:"));
+    let Some(first) = prefixed.next() else {
+        return Ok(());
+    };
+    let Some(second) = prefixed.next() else {
+        return Ok(());
+    };
+    let mut inline = [(0, ""); 8];
+    let mut used = 0;
+    let mut overflow = Vec::new();
+    for attribute in std::iter::once(first)
+        .chain(std::iter::once(second))
+        .chain(prefixed)
+    {
+        let (namespace, local) = expand_parts(attribute.key, ns, false)?;
+        let name = (namespace.id, local);
+        if used < inline.len() {
+            if inline[..used].contains(&name) {
+                return Err(bad("duplicate attribute"));
+            }
+            inline[used] = name;
+            used += 1;
+        } else {
+            if overflow.is_empty() {
+                reserve_exact(&mut overflow, raw.len(), "MCE expanded attribute names")?;
+                overflow.extend_from_slice(&inline);
+            }
+            overflow.push(name);
+        }
+    }
+    overflow.sort_unstable();
+    if overflow.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(bad("duplicate attribute"));
     }
     Ok(())
 }
