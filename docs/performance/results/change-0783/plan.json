@@ -1,0 +1,50 @@
+{
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 783078
+  },
+  "cpu": 12,
+  "interpretation": "Report per-process p50 totals, per-sample phase shares and instrumentation ratios; >5% ratio with CI lower >1 flags material instrumentation perturbation. No inference that current phase timing explains 0780 regression. No warm/cold/remote/concurrency claim beyond warm in-memory generated corpus.",
+  "orders": [
+    [
+      "control",
+      "phases"
+    ],
+    [
+      "phases",
+      "control"
+    ],
+    [
+      "control",
+      "phases"
+    ],
+    [
+      "phases",
+      "control"
+    ],
+    [
+      "phases",
+      "control"
+    ],
+    [
+      "control",
+      "phases"
+    ]
+  ],
+  "phase_keys": [
+    "phase_capture_ns",
+    "phase_stage_ns",
+    "phase_commit_ns",
+    "phase_apply_ns",
+    "phase_serialize_ns"
+  ],
+  "purpose": "Current PPTX lifecycle phase attribution; no production change or historical regression causality claim",
+  "samples": 30,
+  "schema": "litchi.performance.0783.v1",
+  "shapes": [
+    "tiny",
+    "medium",
+    "large"
+  ],
+  "warmup": 3
+}

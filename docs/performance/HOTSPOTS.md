@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0783 — capture dominates the large PPTX diagnostic
+
+[0783](0783-pptx-lifecycle-phase-attribution.md) Initial capture occupies about 69% of the instrumented 100×100 workflow; serialization leads tiny/medium cases. Next profile initial capture with an operation-local boundary before selecting another optimization. A systematic phase/control timing difference remains disclosed; no particular parser, notes validator or fingerprint cost is proven by phase timing alone.
+
 ## 0782 — Simpler borrowed field still misses the guard
 
 [0782](0782-ppt-borrowed-slice-rejected.md) removes transient plain-text conversion allocations with an optional borrowed slice, but four public cases violate the frozen latency guard. Smaller field layout and fewer requests do not establish a useful general speedup. Further work requires operation or generated-code attribution before another representation trial; no cause is inferred from cross-run values.

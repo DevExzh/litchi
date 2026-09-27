@@ -1,0 +1,6 @@
+{
+  "exit_code": 0,
+  "scope": "Analyzer byte-for-byte replay from a temporary relocated packet after owned executable removal, with historical seal and referenced reports copied. Temporary tree removed by context manager.",
+  "stderr": "",
+  "stdout": "0783 analysis and phase table replay PASS\n"
+}

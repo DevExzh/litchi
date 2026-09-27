@@ -1,0 +1,20 @@
+{
+  "build_warnings": "Both release variants report the inherited 16 unused allocator/constructor helper warnings. This evidence build is not a production warning-denied gate.",
+  "format": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "docs/performance/results/change-0783/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "scope": "Evidence probe only; production source unchanged. Both release feature variants built, native sample readback and offline phase arithmetic serve as focused validation; production quality gates are not rerun or claimed as fresh."
+}

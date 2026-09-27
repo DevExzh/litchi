@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0783 — current PPTX lifecycle phases
+
+[0783](0783-pptx-lifecycle-phase-attribution.md) A six-block current-source diagnostic attributes about 69% of the large generated workflow to capture and 23% to serialization. All 1,080 measured publications pass exact readback. The phase build is 3.653% faster than its feature-off control, so shares remain instrumented diagnostics, not a production improvement or historical regression explanation.
+
 ## 0782 — Fresh borrowed-slice PPT pair
 
 [0782](0782-ppt-borrowed-slice-rejected.md) repeats the ten-case fresh-writer matrix with current baseline and candidate builds: 120 native and 40 allocator processes. ASCII payload write/lifecycle improves 24.328%/21.642%, while many-short cases regress 12.897%/11.089% and Unicode 20.650%/19.069%. The candidate is rejected and baseline source restored; historical 0781 timings are not pooled.
