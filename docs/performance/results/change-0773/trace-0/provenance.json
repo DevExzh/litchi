@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "baseline_source": "source-before.json",
+  "candidate_source": "source-after.json",
+  "source_sha256": {
+    "before": "9f651f8dee19e65f671dd5a51a943fcbaf1a22d19a4f178000cd87dcb81bbffa",
+    "after": "944487a36651984ba9a81558888496401434f525e99009e99675bac8dadcd530"
+  },
+  "probe_source": "probe-source.json",
+  "probe_lock_sha256": "c120af132181a8e6da5070d803f7e8f60dbe2cae67b53d7d230175b0d673fc43",
+  "binary_sha256": {
+    "before": "04121d7f99eb57fd91676eeee2a6a8acaa3860d957921040dbab8ed710a12222",
+    "after": "a13b6adc6e229a41ef79725c881f0d6460e6c5da9ddfb80d1db584aec8e0a32f"
+  },
+  "run_manifest": "run.json",
+  "verification": "windows.json",
+  "initial_verification": "windows-initial.json",
+  "initial_runner_exit": 1,
+  "completion": "successful offline verifier correction against unchanged native captures",
+  "build_profile": {
+    "profile": "dev",
+    "debug": "0",
+    "incremental": "0",
+    "timing_claim": false
+  },
+  "source_custody": [
+    "source-post-build.json",
+    "source-post-before-run.json",
+    "source-post-run.json"
+  ]
+}

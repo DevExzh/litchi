@@ -8,6 +8,7 @@
 use std::io::Write;
 use std::path::Path;
 
+use litchi_core::Durability;
 use litchi_opc::{OpcPackage, PackageWriter};
 
 use crate::error::Result;
@@ -29,9 +30,16 @@ pub(crate) fn write_to(package: &OpcPackage, writer: impl Write) -> Result<()> {
     Ok(PackageWriter::write_to_stream(writer, package)?)
 }
 
-/// Atomically publish a validated XLSX package to a filesystem path.
-pub(crate) fn save(package: &OpcPackage, path: impl AsRef<Path>) -> Result<()> {
-    Ok(PackageWriter::write(path, package)?)
+/// Atomically publish a validated XLSX package to a filesystem path at a
+/// caller-chosen durability level.
+pub(crate) fn save(
+    package: &OpcPackage,
+    path: impl AsRef<Path>,
+    durability: Durability,
+) -> Result<()> {
+    Ok(PackageWriter::write_with_durability(
+        path, package, durability,
+    )?)
 }
 
 /// Atomically publish already-encrypted managed-package bytes.

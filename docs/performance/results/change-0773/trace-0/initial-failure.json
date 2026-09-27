@@ -1,0 +1,9 @@
+{
+  "initial_runner_exit": 1,
+  "native_leg_exits": {
+    "after": 0,
+    "before": 0
+  },
+  "reason": "Both native runs completed successfully. Initial verifier rejected all FileOnly subsequences because its parent-directory lifecycle filter retained debug std fcntl(F_GETFD) before directory close. Replay will correct only the verifier against the identical raw captures; initial output is retained.",
+  "reran_native": false
+}

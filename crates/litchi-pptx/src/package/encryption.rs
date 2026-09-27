@@ -166,8 +166,23 @@ impl Package {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.save_plain_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Explicitly save a clear OPC package at a caller-chosen
+    /// [`Durability`](litchi_core::Durability), permitting an encryption
+    /// downgrade; see [`Self::save_with_durability`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
+    pub fn save_plain_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
         self.flush_presentation()?;
-        PackageWriter::write(path, &self.opc)?;
+        PackageWriter::write_with_durability(path, &self.opc, durability)?;
         Ok(())
     }
 

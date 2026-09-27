@@ -8,7 +8,7 @@ use crate::overlay::{
     ValidatedOverlayPlan, collect_chain_exact, finish_overlay_plan, path_refs, sector_offset,
     unavailable, validate_and_coalesce_spans,
 };
-use litchi_core::ReadAt;
+use litchi_core::{Durability, ReadAt};
 use std::cmp::Ordering;
 use std::io::Write;
 use std::path::Path;
@@ -195,6 +195,17 @@ impl ValidatedStreamMovePlan {
     /// Atomically publishes the complete moved artifact to `path`.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
         self.forward.save(path)
+    }
+
+    /// Atomically publishes the complete moved artifact to `path` at a
+    /// caller-chosen [`Durability`]; see
+    /// [`ValidatedOverlayPlan::save_with_durability`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: Durability,
+    ) -> Result<PublishReport, OverlayError> {
+        self.forward.save_with_durability(path, durability)
     }
 }
 

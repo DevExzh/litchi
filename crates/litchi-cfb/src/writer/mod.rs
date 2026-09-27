@@ -33,6 +33,14 @@ pub use layout::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport};
 mod core;
 pub(crate) use core::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
 
+/// The atomic sibling-temporary publication shared by every CFB save.
+mod publish;
+#[cfg(test)]
+pub(crate) use publish::testing;
+pub(crate) use publish::{
+    PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged,
+};
+
 /// Predeclared-layout, forward-only OLE writer.
 mod sequential;
 

@@ -1,0 +1,23 @@
+[package]
+name = "durability-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# The after leg only: the save_with_durability windows.
+levels = []
+
+[dependencies]
+litchi-core = { path = "@SRC@/crates/litchi-core" }
+litchi-opc = { path = "@SRC@/crates/litchi-opc" }
+litchi-cfb = { path = "@SRC@/crates/litchi-cfb", features = ["write"] }
+litchi-docx = { path = "@SRC@/crates/litchi-docx" }
+litchi-xlsx = { path = "@SRC@/crates/litchi-xlsx" }
+litchi-pptx = { path = "@SRC@/crates/litchi-pptx" }
+litchi-xlsb = { path = "@SRC@/crates/litchi-xlsb" }
+litchi-doc = { path = "@SRC@/crates/litchi-doc" }
+litchi-xls = { path = "@SRC@/crates/litchi-xls" }
+litchi-ppt = { path = "@SRC@/crates/litchi-ppt" }
+
+[workspace]

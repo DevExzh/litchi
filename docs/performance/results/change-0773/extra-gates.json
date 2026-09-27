@@ -1,0 +1,37 @@
+{
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "started": 1790471358.66159,
+      "ended": 1790471359.5698366,
+      "log": "harness-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--mode",
+        "structural"
+      ],
+      "exit": 0,
+      "started": 1790471693.7179728,
+      "ended": 1790471693.7643082,
+      "log": "claims.log",
+      "sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+    }
+  ]
+}

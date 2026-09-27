@@ -1143,6 +1143,19 @@ impl Commit {
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
         self.plan.save(path).map_err(Error::Overlay)
     }
+
+    /// Publishes through the common sibling-temp/atomic-rename path at a
+    /// caller-chosen [`Durability`](litchi_core::Durability); see
+    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
+    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<PublishReport> {
+        self.plan
+            .save_with_durability(path, durability)
+            .map_err(Error::Overlay)
+    }
 }
 
 /// A source-checked reversible equal-length DOC paragraph splice.
