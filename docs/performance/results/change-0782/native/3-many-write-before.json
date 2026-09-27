@@ -1,0 +1,1106 @@
+{
+  "schema": "litchi.ppt.borrowed-text-probe.v1",
+  "tool": "ppt-borrowed-text-probe-0781",
+  "mode": "write",
+  "shape": "many",
+  "slides": 100,
+  "boxes_per_slide": 10,
+  "text_boxes": 1000,
+  "timing_scope": "Writer::write_to only; Writer construction and slide/text-box authoring are outside the clock",
+  "source": {
+    "bytes": 49836,
+    "sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e"
+  },
+  "expected_semantic_text_bytes": 41098,
+  "expected_raw_text_bytes": 41098,
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 267621,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 267621,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 270011,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 270011,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 274871,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 274871,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 268231,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 268231,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 273161,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 273161,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 267431,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 267431,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 268551,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 268551,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 271061,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 271061,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 283901,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 283901,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 272461,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 272461,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 276801,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 276801,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 274661,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 274661,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 274571,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 274571,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 283391,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 283391,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 282201,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 282201,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 275411,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 275411,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 272471,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 272471,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 273291,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 273291,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 270401,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 270401,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 279711,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 279711,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 272041,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 272041,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 268081,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 268081,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 275891,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 275891,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 273501,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 273501,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 271431,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 271431,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 282101,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 282101,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 271461,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 271461,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 273451,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 273451,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 278381,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 278381,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 273861,
+      "metrics": {
+        "boxes_per_slide": 10,
+        "elapsed_ns": 273861,
+        "slides": 100
+      },
+      "source_sha256": "4e420378c097ecc22a34a7807151e91fc31ff272ff563b2005a502d44abe438e",
+      "output": {
+        "bytes": 227328,
+        "sha256": "58ac8faadd70f4e81a41b3fa661c527b1169ba1cfccf5472226a75fff425b224"
+      },
+      "verification": {
+        "reopened": true,
+        "slide_count": 100,
+        "expected_slide_count": 100,
+        "slide_count_match": true,
+        "semantic_check": true,
+        "expected_semantic_text_bytes": 41098,
+        "expected_semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "semantic_text_bytes": 41098,
+        "semantic_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "exact_text_match": true,
+        "raw_text_check": true,
+        "expected_raw_text_bytes": 41098,
+        "expected_raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_bytes": 41098,
+        "raw_text_sha256": "d0d4e9ef4268d1538cf4305543dae958ec9609a6df9da87acdc942461086b57b",
+        "raw_text_box_count": 1000,
+        "expected_raw_text_box_count": 1000,
+        "raw_text_atom_count": 1000,
+        "raw_text_boxes_match": true,
+        "raw_text_match": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-native",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

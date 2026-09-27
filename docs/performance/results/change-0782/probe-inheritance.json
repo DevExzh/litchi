@@ -1,0 +1,12 @@
+{
+  "files": {
+    "probe-src/Cargo.lock": "c91e04df1fc8e132b49f327a725c284b92d3e2ff1d98f979fa1e49bec9526bc3",
+    "probe-src/Cargo.toml.template": "c109f56304de723583c3361edbac09025374d12eb6c58933dce646b0299c60d9",
+    "probe-src/src/allocation_metrics.rs": "440ca9ee4dd3abe4f30e7a65ba5d1b7428f0a50012114202a4e1bd1057c9461c",
+    "probe-src/src/counting_allocator.rs": "e347aebb3c863cb447b41211be42fcedfc7b4ab9a43a82f919fb1db15344538d",
+    "probe-src/src/main.rs": "3d66336fe7778ce605b0b2815afe70bffd716e42d2d09e27c6f7372c7ce207a3"
+  },
+  "scope": "Exact corrected 0781 probe source, template and lock reused. Identifiers and authored fixtures are intentionally unchanged. New builds and measurements use new paths and the current base; no historical timing comparison.",
+  "source_commit": "6b817fc663587ed009b0b6c5fb67602be5d26ddf",
+  "source_packet": "docs/performance/results/change-0781"
+}

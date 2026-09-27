@@ -1,0 +1,31 @@
+{
+  "command": [
+    "heaptrack_print",
+    "-f",
+    "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/heaptrack-before/trace.zst",
+    "-H",
+    "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/heaptrack-before/histogram",
+    "-n",
+    "15",
+    "-s",
+    "3"
+  ],
+  "ended": 1790498857.6100016,
+  "exit_code": 0,
+  "histogram": {
+    "bytes": 1046,
+    "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/heaptrack-before/histogram",
+    "sha256": "560036c9673c5f428e1adb2b862212fe8f58f51283052976e9e7f2ffb3695c05"
+  },
+  "log": {
+    "bytes": 310464,
+    "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/heaptrack-before/print.log",
+    "sha256": "67b8eb7e56cda181f9987ffe6a248d747caf1d2f9bf12df1b0101b841187cb02"
+  },
+  "started": 1790498857.5855713,
+  "trace": {
+    "bytes": 47609,
+    "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/heaptrack-before/trace.zst",
+    "sha256": "58ffc91633ddd5fe4af2812f53e75dd5b11eae70e8a0c25a4afe464b516fddc1"
+  }
+}

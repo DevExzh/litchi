@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/probe-src/Cargo.toml",
+      "--locked"
+    ],
+    "ended": 1790519531.030436,
+    "exit_code": 0,
+    "log": {
+      "bytes": 4856,
+      "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/build-after/native.log",
+      "sha256": "9243244501c14340ee79f9ba6a04668ae08aeb99f9b61eb1d13b187d1113bf57"
+    },
+    "started": 1790519497.1616993
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/probe-src/Cargo.toml",
+      "--features",
+      "allocator-metrics",
+      "--locked"
+    ],
+    "ended": 1790519539.014698,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1880,
+      "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/build-after/allocation.log",
+      "sha256": "f44ab95047d9ffcce0a6ea7ea8ef1e16ecf667225f9a793f89e95c6f985ac129"
+    },
+    "started": 1790519531.2275448
+  }
+]

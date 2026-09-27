@@ -1,0 +1,27 @@
+{
+  "draft_patch": {
+    "bytes": 18824,
+    "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/candidate/model.patch",
+    "sha256": "35a7af255660310db93214333b2b58247bcf2cf85fc9b6a85bfa3c4476d9f4bf"
+  },
+  "files": {
+    "crates/litchi-ppt/src/writer/core/codec.rs": "7f453675adf9258303af5f8e8a0ae1fe4f5a5699229798127e2bbde9b82817fa",
+    "crates/litchi-ppt/src/writer/core/package.rs": "badb166ee253c80d5bfa3b2faf7fb0f86e317e5deeb19d7fbe75dcecae033de4",
+    "crates/litchi-ppt/src/writer/core/tests.rs": "74f3e08f7128dd58f27b9386749bfd9078dda3db219d01d10cd81b8d89a018b2",
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs": "ba8ef8192bf1992fa20b7a9b0555deaa6f1d5f6c5d2fe61aa753fd2392735642",
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs": "7882bb79da431d61efade55368edc97ceb4df7e1596e46a91c72dda0d3a35e6b",
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs": "f8891e0b1616cb1c6c9e2dd2de80ad83221481e2f4547f9bda80fc5b1c97ff24",
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs": "28abfdec9e65491fe53274fa0b4c7a7d6ecd65afc99898c51ede4c3b75c96b2f",
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs": "b82828219643d848ea83d3814bedf6c3404233900c384f4943fb865505f39e22",
+    "crates/litchi-ppt/src/writer/escher/model.rs": "fbe3723b4dbae425664f03b2e2ddd10ed9b5f183948472b2bb432a3c06989d90",
+    "crates/litchi-ppt/src/writer/escher/semantic.rs": "26941995cd59539bc024ab722901c53e91af7365c099a8b9ec40f56f1d956700",
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs": "d95a3ba9825526b28fa5a7b4766637e0072e24d0094cb31417f735d6d2d590e3",
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs": "079ddcf258f502f926a31cc8a7995bfbe8f1162a8594f742e618a0ae4d714520"
+  },
+  "patch": {
+    "bytes": 18824,
+    "path": "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/docs/performance/results/change-0782/candidate/selected-model.patch",
+    "sha256": "35a7af255660310db93214333b2b58247bcf2cf85fc9b6a85bfa3c4476d9f4bf"
+  },
+  "scope": "Coordinator-selected archive before application and formatting; final applied archive binds measured source."
+}

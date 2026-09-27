@@ -1,0 +1,14 @@
+[
+  "crates/litchi-ppt/src/writer/core/codec.rs",
+  "crates/litchi-ppt/src/writer/core/package.rs",
+  "crates/litchi-ppt/src/writer/core/tests.rs",
+  "crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+  "crates/litchi-ppt/src/writer/escher/codec/group.rs",
+  "crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+  "crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+  "crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+  "crates/litchi-ppt/src/writer/escher/model.rs",
+  "crates/litchi-ppt/src/writer/escher/semantic.rs",
+  "crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+  "crates/litchi-ppt/src/writer/escher/tests/legacy.rs"
+]

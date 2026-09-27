@@ -1,0 +1,28 @@
+{
+  "cpu": 12,
+  "heaptrack": {
+    "mode": "write",
+    "samples": 3,
+    "scope": "Whole-process attribution of plain-text conversion allocations; no timing/RSS/causal claim.",
+    "shape": "payload",
+    "warmup": 0
+  },
+  "perf_stat": {
+    "blocks": 3,
+    "cases": [
+      {
+        "mode": "write",
+        "shape": "payload"
+      },
+      {
+        "mode": "lifecycle",
+        "shape": "payload"
+      }
+    ],
+    "events": "instructions:u,cycles:u",
+    "samples": 30,
+    "scope": "Whole process including setup and verification; not operation-region counters.",
+    "warmup": 3
+  },
+  "schema": "litchi.performance.0782.observers.v1"
+}

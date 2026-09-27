@@ -1,0 +1,30 @@
+[package]
+name = "ppt-borrowed-text-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+allocator-metrics = []
+
+[[bin]]
+name = "ppt-borrowed-text-probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-ppt = { path = "/home/zhuhe/code/litchi-worktrees/0782-ppt-borrowed-slice/crates/litchi-ppt" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+# This is an independent evidence project. The build driver materializes its
+# manifest and invokes Cargo with this manifest explicitly.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

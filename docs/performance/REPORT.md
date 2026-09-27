@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0782 — Borrowed-slice candidate rejected
+
+[0782](0782-ppt-borrowed-slice-rejected.md) passes six quality gates (1,287 tests; 11 ignored) and all ten-case preservation checks. Four persistent regressions outweigh payload benefits, so no production change is retained. All 120 native/40 allocator processes, 42 spread flags and 24 paired-series flags remain replayable with exact restored-source custody.
+
 ## 0781 — CI matrix repaired; PPT candidate rejected
 
 [0781](0781-ppt-text-ownership-and-ci-matrix.md) replaces stale 37-case/201-row CI assertions with manifest-backed 41-case/213-row validation and consistently selects the active CRUD v2 index. Six CI gates pass with 75 tests. The PPT candidate passes six quality gates (1,286 tests) but is rejected for consistent 10–12% short-text regressions; all measured gains, flags, failed preflight history, and archived source remain available.
