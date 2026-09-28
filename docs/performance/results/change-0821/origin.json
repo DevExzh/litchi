@@ -1,0 +1,39 @@
+{
+  "base": "8312aaa29b59f73d2a7409cb501828989320a8c9",
+  "previous_packet": "docs/performance/results/change-0820",
+  "previous_turn": "progress:8312aaa29b repaired the process-wide allocator test and committed the fresh six-gate quality result; the 0820 durability matrix remained unexecuted",
+  "production_changed": false,
+  "quality_reuse": {
+    "cargo_commands_executed": false,
+    "inputs": "docs/performance/results/change-0820/repair/inputs.json",
+    "mode": "committed-receipt-replay",
+    "previous_seal_checked": true,
+    "quality": "docs/performance/results/change-0820/repair/quality.json",
+    "required_gate_count": 6,
+    "required_test_counts": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 641,
+      "suites": 28
+    },
+    "result_and_log_descriptors_checked": true,
+    "revision_change": "0820 repair source file hashes are byte-identical; only the checked revision identifier advances to this packet base",
+    "schema": "litchi.performance.0821.quality-reuse.v1",
+    "seal": "docs/performance/results/change-0820/seal.json",
+    "source": "docs/performance/results/change-0820/repair/source.json",
+    "source_hashes_checked": true,
+    "source_packet": "docs/performance/results/change-0820/repair",
+    "test_summary": "docs/performance/results/change-0820/repair/test-summary.json"
+  },
+  "runtime_harness_changed": false,
+  "schema": "litchi.performance.0821.origin.v1",
+  "scratch": "/home/zhuhe/code/litchi-fs-0821",
+  "target": "/home/zhuhe/code/litchi-target-0821",
+  "tool_allowlist": [],
+  "tool_changed": false,
+  "unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

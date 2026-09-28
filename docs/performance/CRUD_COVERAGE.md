@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0821 — real-file save durability variants measured
+
+[0821](0821-real-file-save-durability.md) Three admitted real DOCX/XLSX/PPTX files now have lifecycle and path-save measurements under default, full, file-only, and no-sync policies. Native timing, observer diagnostics, and qualification are separate. This adds policy attribution for these inputs, not crash-recovery or broad-producer coverage.
+
 ## 0820 — allocator test repaired; scenario coverage unchanged
 
 [0820](0820-allocator-test-quality-repair.md) A test-only global allocator accounting repair unblocks fresh quality verification. The planned 24 real-file format/phase/durability cases remain unmeasured; no CRUD performance coverage advances.

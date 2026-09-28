@@ -1,0 +1,30 @@
+{
+  "application": "LibreOffice 26.2.5.2",
+  "corpus": {
+    "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx": {
+      "bytes": 8435,
+      "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    "test-data/ooxml/docx/documentProperties.docx": {
+      "bytes": 23503,
+      "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    "test-data/ooxml/pptx/shapes.pptx": {
+      "bytes": 68822,
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  },
+  "current_edits": {
+    "docx": "append one ordinary paragraph with harness marker; historical provenance instead replaced paragraph0",
+    "pptx": "first admitted slide/shape text replacement using harness marker; target positions independently verified from actual manifest",
+    "xlsx": "replace first sheet A1 with harness marker"
+  },
+  "producer_claim": "No Microsoft producer application is inferred for DOCX or PPTX.",
+  "quality_reuse": "docs/performance/results/change-0820/repair/quality.json",
+  "reference": {
+    "path": "test-data/office-interop/PROVENANCE.md",
+    "sha256": "8c74aed505bbc5e71b3af5c7afe29557cda71a98669690b9fd869c13d3ba31ba"
+  },
+  "schema": "litchi.performance.0821.provenance.v1",
+  "scope": "Fresh 0821 real-file durability-policy attribution packet on the repaired 8312aaa29b base; corpus and provenance witness are reused byte-for-byte from 0820; no external Office resave in this batch."
+}

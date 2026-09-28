@@ -1,0 +1,19 @@
+{
+  "accepted": true,
+  "artifact_admission": {
+    "bytes": 23000,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifact-admission.json",
+    "sha256": "90dfbe37d2d35886321fbc9ad44a38e71cdbaef11c2519dccc3340a371be899d"
+  },
+  "ended": 1790605149.9636912,
+  "plan_sha256": "aff9859063007cf96c9311dc44f3bf5cb5d71903572431916e726d1f7e93ae28",
+  "qualification_complete": {
+    "bytes": 845,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/qualification/complete.json",
+    "sha256": "b1a99a4b59c32745bded2ff93ae37f3b142002a5194a77ba2566e21e9a08754a"
+  },
+  "reports": 24,
+  "samples": 24,
+  "schema": "litchi.performance.0821.qualification-admission.v1",
+  "started": 1790605149.957976
+}

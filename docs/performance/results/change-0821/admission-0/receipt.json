@@ -1,0 +1,35 @@
+{
+  "auditor": {
+    "bytes": 61571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifact_audit.py",
+    "sha256": "9045207557c1efb4c45a1a55b5aa743591784f2c69e0f0a63e15621037354756"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifact_audit.py",
+    "--artifacts",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0821/admission-0/artifact-audit.json"
+  ],
+  "ended": 1790605067.5970058,
+  "exit_code": 0,
+  "log": {
+    "bytes": 33,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/admission-0/audit.log",
+    "sha256": "9bf5d597ef1cce6c355e1727229cc29f9433e59b89ec5ce3fdd64387b7217581"
+  },
+  "manifest": {
+    "bytes": 27908,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/manifest.json",
+    "sha256": "1557cf519f24963a0e6345c991ea6652d8d89fb9f0639b55ed3a1e34c0fbbdc9"
+  },
+  "report": {
+    "bytes": 2603942,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/admission-0/artifact-audit.json",
+    "sha256": "ae0c65577b6964d5f0bbe89b9c452d897014f22e2bf0879a9b41332102607dfe"
+  },
+  "schema": "litchi.performance.0821.admission-attempt.v1",
+  "started": 1790605066.2748659
+}

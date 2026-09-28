@@ -1,0 +1,514 @@
+{
+  "accepted": true,
+  "artifact_complete": {
+    "bytes": 1048,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts.complete.json",
+    "sha256": "1e179c3d975e75bdd9c5bcea58bb919f9dda3ef61c0502296baa86b1efc8f6d2"
+  },
+  "audit": {
+    "bytes": 2603942,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifact-audit.json",
+    "sha256": "ae0c65577b6964d5f0bbe89b9c452d897014f22e2bf0879a9b41332102607dfe"
+  },
+  "auditor": {
+    "bytes": 61571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifact_audit.py",
+    "sha256": "9045207557c1efb4c45a1a55b5aa743591784f2c69e0f0a63e15621037354756"
+  },
+  "ended": 1790605106.3391895,
+  "manifest": {
+    "bytes": 27908,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/manifest.json",
+    "sha256": "1557cf519f24963a0e6345c991ea6652d8d89fb9f0639b55ed3a1e34c0fbbdc9"
+  },
+  "plan_sha256": "aff9859063007cf96c9311dc44f3bf5cb5d71903572431916e726d1f7e93ae28",
+  "schema": "litchi.performance.0821.artifact-admission.v1",
+  "selectors": [
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/default.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/full.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/file-only.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/no-sync.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/default.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/full.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/file-only.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 23535,
+        "path": "real-000-docx/no-sync.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      "policy_output_bytes": 23535,
+      "policy_output_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/default.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/full.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/file-only.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/no-sync.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/default.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/full.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/file-only.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 8521,
+        "path": "real-001-xlsx/no-sync.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "policy_output_bytes": 8521,
+      "policy_output_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/default.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/full.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/file-only.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/no-sync.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "default",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/default.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "full",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/full.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "file-only",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/file-only.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "no-sync",
+      "policy_output": {
+        "bytes": 68284,
+        "path": "real-002-pptx/no-sync.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "policy_output_bytes": 68284,
+      "policy_output_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "policy_publication": "save_with_durability",
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  ],
+  "started": 1790605104.9993489,
+  "zip_preservation": {
+    "bytes": 48411,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/zip-preservation.json",
+    "sha256": "055a2534da38e3632b447bd6cbf15f84f84f50de024cbd81f26eb5c272efc7c4"
+  }
+}

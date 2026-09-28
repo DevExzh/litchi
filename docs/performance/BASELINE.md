@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0821 — real-file durability policy comparison
+
+[0821](0821-real-file-save-durability.md) Fresh 24-case measurements retain 216 reports and 4,488 samples. All six explicit-full/default paired intervals include 1.0. File-only/default ratios span 0.62841–0.75003; no-sync/default spans 0.01676–0.28031. These are changed-durability configurations, with no production optimization or default weakening.
+
 ## 0820 — 0819 baseline retained after allocator test repair
 
 [0820](0820-allocator-test-quality-repair.md) The allocator wrapper test now checks process-wide byte conservation rather than a per-allocation net live-byte increase. No release build or timing capture occurred; all 0819 measurements remain the admitted baseline.

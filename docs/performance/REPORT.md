@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0821 — real-file durability attribution completed
+
+[0821](0821-real-file-save-durability.md) Six native blocks over 24 selectors establish full/default controls and weaker-policy ratios for three small real files. Seventeen cases retain 27 tail/mean spread flags and six retain p99/p50 flags; no p50 spread flag appears. Runtime source is unchanged, full durability remains the default, and no historical speedup is claimed.
+
 ## 0820 — process-wide allocator test accounting repaired
 
 [0820](0820-allocator-test-quality-repair.md) The allocator test now checks signed byte conservation and monotonic high-water accounting while retaining successful allocation/deallocation checks. Original failure evidence remains intact. Production and benchmark runtime are unchanged; there are zero new exports or timing samples.

@@ -1,0 +1,25 @@
+{
+  "build_sha256": "c311a612b8ef1d6da5e2dd5b5ff14ffba22952cf71be7e87e74d64ae616aafd1",
+  "cases": 6,
+  "children": 1,
+  "manifest": {
+    "bytes": 27908,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/manifest.json",
+    "sha256": "1557cf519f24963a0e6345c991ea6652d8d89fb9f0639b55ed3a1e34c0fbbdc9"
+  },
+  "plan_sha256": "aff9859063007cf96c9311dc44f3bf5cb5d71903572431916e726d1f7e93ae28",
+  "quality_sha256": "6bc5fda5024a560a5b682f18fa4d6d0e42691a5b3829accf9215050c4ee29d2f",
+  "receipt": {
+    "bytes": 11492,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts-receipt.json",
+    "sha256": "4a6e7a673d93e3de40699976536e04ecc10eac97525dac9050b38f974830dce7"
+  },
+  "reports": 0,
+  "samples": 0,
+  "schema": "litchi.performance.0821.artifacts.complete.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts-source.json",
+    "sha256": "a05e69e89853a209d4a28ba6732d265775b0faaa5891874cab16924d138d2e33"
+  }
+}

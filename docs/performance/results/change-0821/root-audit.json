@@ -1,0 +1,10 @@
+{
+  "absolute_intervals": 24,
+  "native_reports": 144,
+  "native_samples": 4320,
+  "paired_intervals": 24,
+  "rows": 24,
+  "schema": "litchi.performance.0821.root-audit.v1",
+  "scope": "independent raw quantiles, block spreads, tails, and paired bootstrap; custody validated separately",
+  "status": "pass"
+}

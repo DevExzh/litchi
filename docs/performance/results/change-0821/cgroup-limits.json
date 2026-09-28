@@ -1,0 +1,32 @@
+[
+  {
+    "cpu.max": "max 100000",
+    "cpuset.cpus.effective": null,
+    "memory.max": "max",
+    "path": "/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service/tmux-spawn-c202d3ce-a134-410d-ac17-e606486bf0c1.scope"
+  },
+  {
+    "cpu.max": "max 100000",
+    "cpuset.cpus.effective": null,
+    "memory.max": "max",
+    "path": "/sys/fs/cgroup/user.slice/user-1001.slice/user@1001.service"
+  },
+  {
+    "cpu.max": "max 100000",
+    "cpuset.cpus.effective": null,
+    "memory.max": "max",
+    "path": "/sys/fs/cgroup/user.slice/user-1001.slice"
+  },
+  {
+    "cpu.max": "max 100000",
+    "cpuset.cpus.effective": "0-31",
+    "memory.max": "max",
+    "path": "/sys/fs/cgroup/user.slice"
+  },
+  {
+    "cpu.max": null,
+    "cpuset.cpus.effective": "0-31",
+    "memory.max": null,
+    "path": "/sys/fs/cgroup"
+  }
+]

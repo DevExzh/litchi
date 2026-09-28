@@ -1,0 +1,732 @@
+{
+  "schema_version": 1,
+  "kind": "ordinary-save-artifact-export",
+  "generator": "litchi-perf-ordinary-save-artifacts-v1",
+  "output_directory": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts",
+  "filesystem_root": "/home/zhuhe/code/litchi-fs-0821",
+  "cases": [
+    {
+      "case_id": "generated-docx-medium",
+      "format": "DOCX",
+      "origin": "generated-harness-corpus",
+      "corpus": {
+        "name": "docx-semantic-medium",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 200,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 10000,
+        "archive_bytes": 9051,
+        "archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "source_archive": {
+        "path": "generated-docx-medium/source.docx",
+        "bytes": 9051,
+        "sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9"
+      },
+      "source_archive_bytes": 9051,
+      "source_archive_sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9",
+      "published_bytes": 9070,
+      "published_sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+      "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+      "edit_target": {
+        "main_part": "word/document.xml"
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "generated-docx-medium/default.docx",
+            "bytes": 9070,
+            "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+          },
+          "bytes": 9070,
+          "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-docx-medium/full.docx",
+            "bytes": 9070,
+            "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+          },
+          "bytes": 9070,
+          "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-docx-medium/file-only.docx",
+            "bytes": 9070,
+            "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+          },
+          "bytes": 9070,
+          "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-docx-medium/no-sync.docx",
+            "bytes": 9070,
+            "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+          },
+          "bytes": 9070,
+          "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "generated-docx-medium/stream.docx",
+          "bytes": 9070,
+          "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+        },
+        "bytes": 9070,
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    },
+    {
+      "case_id": "generated-xlsx-medium",
+      "format": "XLSX",
+      "origin": "generated-harness-corpus",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "source_archive": {
+        "path": "generated-xlsx-medium/source.xlsx",
+        "bytes": 4226429,
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "source_archive_bytes": 4226429,
+      "source_archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "published_bytes": 4226568,
+      "published_sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+      "edit_description": "Workbook::edit().sheet(\"Sheet1\").set(\"A1\", \"litchi-perf-0638-ordinary-save\") and commit",
+      "edit_target": {
+        "main_part": "xl/workbook.xml",
+        "xlsx_sheet": "Sheet1",
+        "xlsx_address": "A1"
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "generated-xlsx-medium/default.xlsx",
+            "bytes": 4226568,
+            "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+          },
+          "bytes": 4226568,
+          "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-xlsx-medium/full.xlsx",
+            "bytes": 4226568,
+            "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+          },
+          "bytes": 4226568,
+          "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-xlsx-medium/file-only.xlsx",
+            "bytes": 4226568,
+            "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+          },
+          "bytes": 4226568,
+          "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-xlsx-medium/no-sync.xlsx",
+            "bytes": 4226568,
+            "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+          },
+          "bytes": 4226568,
+          "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "generated-xlsx-medium/stream.xlsx",
+          "bytes": 4226568,
+          "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+        },
+        "bytes": 4226568,
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    },
+    {
+      "case_id": "generated-pptx-medium",
+      "format": "PPTX",
+      "origin": "generated-harness-corpus",
+      "corpus": {
+        "name": "pptx-semantic-medium",
+        "generator": "litchi-pptx-semantic-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 96,
+        "archive_member_count": 61,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 4992,
+        "archive_bytes": 40788,
+        "archive_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+        "target_entry": "slide:0/shape:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "df3eb487ffb9797f6f4a8d93931ca0589029d5ae4f50468119c8959c4e87e5a5",
+        "xlsx": null
+      },
+      "source_archive": {
+        "path": "generated-pptx-medium/source.pptx",
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      },
+      "source_archive_bytes": 40788,
+      "source_archive_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+      "published_bytes": 40802,
+      "published_sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+      "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+      "edit_target": {
+        "main_part": "ppt/presentation.xml",
+        "pptx_slide": 0,
+        "pptx_shape": 0
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "generated-pptx-medium/default.pptx",
+            "bytes": 40802,
+            "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+          },
+          "bytes": 40802,
+          "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-pptx-medium/full.pptx",
+            "bytes": 40802,
+            "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+          },
+          "bytes": 40802,
+          "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-pptx-medium/file-only.pptx",
+            "bytes": 40802,
+            "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+          },
+          "bytes": 40802,
+          "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "generated-pptx-medium/no-sync.pptx",
+            "bytes": 40802,
+            "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+          },
+          "bytes": 40802,
+          "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "generated-pptx-medium/stream.pptx",
+          "bytes": 40802,
+          "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+        },
+        "bytes": 40802,
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    },
+    {
+      "case_id": "real-000-docx",
+      "format": "DOCX",
+      "origin": "caller-named-real-file",
+      "input_path": "/home/zhuhe/code/litchi/test-data/ooxml/docx/documentProperties.docx",
+      "corpus": {
+        "name": "docx-real-file-save",
+        "generator": "litchi-docx-real-file-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "real-file",
+        "payload_kind": "real-producer-ooxml",
+        "compression": "deflate",
+        "entry_count": 12,
+        "archive_member_count": 12,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 44910,
+        "archive_bytes": 23503,
+        "archive_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5",
+        "target_entry": "word/document.xml",
+        "target_payload_bytes": 1319,
+        "target_payload_sha256": "10b39588b3cd710291b9268db93bed9b00238f547d24f80b53024205753087c0",
+        "xlsx": null
+      },
+      "source_archive": {
+        "path": "real-000-docx/source.docx",
+        "bytes": 23503,
+        "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+      },
+      "source_archive_bytes": 23503,
+      "source_archive_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5",
+      "published_bytes": 23535,
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "edit_description": "Package::document_mut().add_paragraph_with_text(\"litchi-perf-0638-ordinary-save\")",
+      "edit_target": {
+        "main_part": "word/document.xml"
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "real-000-docx/default.docx",
+            "bytes": 23535,
+            "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+          },
+          "bytes": 23535,
+          "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-000-docx/full.docx",
+            "bytes": 23535,
+            "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+          },
+          "bytes": 23535,
+          "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-000-docx/file-only.docx",
+            "bytes": 23535,
+            "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+          },
+          "bytes": 23535,
+          "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-000-docx/no-sync.docx",
+            "bytes": 23535,
+            "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+          },
+          "bytes": 23535,
+          "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "real-000-docx/stream.docx",
+          "bytes": 23535,
+          "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+        },
+        "bytes": 23535,
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    },
+    {
+      "case_id": "real-001-xlsx",
+      "format": "XLSX",
+      "origin": "caller-named-real-file",
+      "input_path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "corpus": {
+        "name": "xlsx-real-file-save",
+        "generator": "litchi-xlsx-real-file-save-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "real-file",
+        "payload_kind": "real-producer-ooxml",
+        "compression": "deflate",
+        "entry_count": 10,
+        "archive_member_count": 10,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 15304,
+        "archive_bytes": 8435,
+        "archive_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4",
+        "target_entry": "xl/workbook.xml",
+        "target_payload_bytes": 1275,
+        "target_payload_sha256": "033f58107edff53315c8409a31ceab9000f65a41e46f5cdbb82ae310033f7bf8",
+        "xlsx": null
+      },
+      "source_archive": {
+        "path": "real-001-xlsx/source.xlsx",
+        "bytes": 8435,
+        "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+      },
+      "source_archive_bytes": 8435,
+      "source_archive_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4",
+      "published_bytes": 8521,
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "edit_description": "Workbook::edit().sheet(\"Munka1\").set(\"A1\", \"litchi-perf-0638-ordinary-save\") and commit",
+      "edit_target": {
+        "main_part": "xl/workbook.xml",
+        "xlsx_sheet": "Munka1",
+        "xlsx_address": "A1"
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "real-001-xlsx/default.xlsx",
+            "bytes": 8521,
+            "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+          },
+          "bytes": 8521,
+          "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-001-xlsx/full.xlsx",
+            "bytes": 8521,
+            "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+          },
+          "bytes": 8521,
+          "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-001-xlsx/file-only.xlsx",
+            "bytes": 8521,
+            "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+          },
+          "bytes": 8521,
+          "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-001-xlsx/no-sync.xlsx",
+            "bytes": 8521,
+            "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+          },
+          "bytes": 8521,
+          "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "real-001-xlsx/stream.xlsx",
+          "bytes": 8521,
+          "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+        },
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    },
+    {
+      "case_id": "real-002-pptx",
+      "format": "PPTX",
+      "origin": "caller-named-real-file",
+      "input_path": "/home/zhuhe/code/litchi/test-data/ooxml/pptx/shapes.pptx",
+      "corpus": {
+        "name": "pptx-real-file-save",
+        "generator": "litchi-pptx-real-file-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "real-file",
+        "payload_kind": "real-producer-ooxml",
+        "compression": "deflate",
+        "entry_count": 48,
+        "archive_member_count": 48,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 154250,
+        "archive_bytes": 68822,
+        "archive_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+        "target_entry": "ppt/presentation.xml",
+        "target_payload_bytes": 3383,
+        "target_payload_sha256": "8f442363d6b104c0444c93209a0f8dff067933d48b60cff35d4a7196eb0e26a7",
+        "xlsx": null
+      },
+      "source_archive": {
+        "path": "real-002-pptx/source.pptx",
+        "bytes": 68822,
+        "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+      },
+      "source_archive_bytes": 68822,
+      "source_archive_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+      "published_bytes": 68284,
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+      "edit_target": {
+        "main_part": "ppt/presentation.xml",
+        "pptx_slide": 0,
+        "pptx_shape": 0
+      },
+      "edit_admitted": true,
+      "edit_outcome": "admitted",
+      "refused_output_source_exact": false,
+      "policy_outputs": [
+        {
+          "policy": "default",
+          "publication": "save",
+          "output": {
+            "path": "real-002-pptx/default.pptx",
+            "bytes": 68284,
+            "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+          },
+          "bytes": 68284,
+          "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "full",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-002-pptx/full.pptx",
+            "bytes": 68284,
+            "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+          },
+          "bytes": 68284,
+          "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "file-only",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-002-pptx/file-only.pptx",
+            "bytes": 68284,
+            "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+          },
+          "bytes": 68284,
+          "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        },
+        {
+          "policy": "no-sync",
+          "publication": "save_with_durability",
+          "output": {
+            "path": "real-002-pptx/no-sync.pptx",
+            "bytes": 68284,
+            "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+          },
+          "bytes": 68284,
+          "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+          "matches_reference": true,
+          "matches_source": false,
+          "source_unchanged": true,
+          "reopen_admitted": true
+        }
+      ],
+      "stream_output": {
+        "policy": "stream",
+        "publication": "sequential_sink",
+        "output": {
+          "path": "real-002-pptx/stream.pptx",
+          "bytes": 68284,
+          "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+        },
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+        "matches_reference": true,
+        "matches_source": false,
+        "source_unchanged": true,
+        "reopen_admitted": true
+      }
+    }
+  ]
+}

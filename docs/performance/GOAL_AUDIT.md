@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0821 — synchronization policy attribution established
+
+[0821](0821-real-file-save-durability.md) Exact source/input verification reuses the committed 0820 six-gate repair quality. Three fresh release builds, six-corpus/thirty-output admission, 24 qualification selectors, 144 native reports, and 48 observer reports pass. Independent raw statistics reproduce all paired intervals. Root admission ordering and two reader-schema failures are retained with bounded recoveries.
+
 ## 0820 — quality failure retained and test invariant repaired
 
 [0820](0820-allocator-test-quality-repair.md) The original full-test failure is retained with immutable source and input witnesses. The repair changes only allocator test assertions; runtime and production bytes remain unchanged. Fresh verification and a separate repair origin preserve the failed attempt; durability attribution remains queued.
