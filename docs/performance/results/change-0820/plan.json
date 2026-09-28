@@ -1,0 +1,381 @@
+{
+  "admission": "fresh release export of six corpora/five policy outputs; independent XML and ZIP preservation gates before qualification; all24selectors bound to admitted source and policy hash; retain typed refusals and failures",
+  "affinity": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "base": "096b810f23cc66fe01ec8c96c74f36888f954eff",
+  "binaries": {
+    "artifacts": {
+      "cargo_bin": "ordinary_save_artifacts",
+      "features": [],
+      "latency": "untimed"
+    },
+    "native": {
+      "cargo_bin": "litchi-perf-baseline",
+      "features": [],
+      "latency": "native"
+    },
+    "observer": {
+      "cargo_bin": "litchi-perf-baseline-alloc",
+      "features": [
+        "allocator-metrics",
+        "ordinary-save-process-metrics"
+      ],
+      "latency": "diagnostic_only"
+    }
+  },
+  "bootstrap": {
+    "confidence": 0.95,
+    "high_rank": 9749,
+    "low_rank": 250,
+    "paired_statistic": "median of six matched process-block policy/default p50 ratios",
+    "resamples": 10000,
+    "seed": 820820,
+    "statistic": "median of six process p50 values"
+  },
+  "build": {
+    "codegen_units": 1,
+    "debug": 1,
+    "incremental": false,
+    "jobs": 2,
+    "lto": "thin",
+    "opt_level": 3,
+    "panic": "unwind",
+    "rustflags": null
+  },
+  "cases": [
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "default"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "full"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "file-only"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "policy": "no-sync"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "default"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "full"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "file-only"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "id": "docx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "policy": "no-sync"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "default"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "full"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "file-only"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "policy": "no-sync"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "default"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "full"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "file-only"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "id": "xlsx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "policy": "no-sync"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__default",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "default"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__full",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "full"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__file-only",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "file-only"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_lifecycle__no-sync",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "policy": "no-sync"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__default",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "default"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__full",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "full"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__file-only",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "file-only"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "id": "pptx_real_file_ordinary_save_atomic_publish__no-sync",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "policy": "no-sync"
+    }
+  ],
+  "comparison": "within-block policy/default ratios for the same format and phase; full/default controls explicit API route; weaker-policy differences change durability semantics",
+  "expected": {
+    "artifact_cases": 6,
+    "artifact_policy_outputs_per_case": 5,
+    "native_reports": 144,
+    "native_samples": 4320,
+    "observer_reports": 48,
+    "observer_samples": 144,
+    "qualification_reports": 24,
+    "qualification_samples": 24,
+    "total_reports": 216,
+    "total_samples": 4488
+  },
+  "lanes": {
+    "native": {
+      "binary": "native",
+      "blocks": 6,
+      "orders": [
+        "forward",
+        "reverse",
+        "forward",
+        "reverse",
+        "reverse",
+        "forward"
+      ],
+      "policy_orders": [
+        [
+          "default",
+          "full",
+          "file-only",
+          "no-sync"
+        ],
+        [
+          "no-sync",
+          "file-only",
+          "full",
+          "default"
+        ],
+        [
+          "full",
+          "file-only",
+          "no-sync",
+          "default"
+        ],
+        [
+          "default",
+          "no-sync",
+          "file-only",
+          "full"
+        ],
+        [
+          "file-only",
+          "no-sync",
+          "default",
+          "full"
+        ],
+        [
+          "full",
+          "default",
+          "no-sync",
+          "file-only"
+        ]
+      ],
+      "samples": 30,
+      "warmup": 3
+    },
+    "observer": {
+      "binary": "observer",
+      "blocks": 2,
+      "orders": [
+        "forward",
+        "reverse"
+      ],
+      "policy_orders": [
+        [
+          "default",
+          "full",
+          "file-only",
+          "no-sync"
+        ],
+        [
+          "no-sync",
+          "file-only",
+          "full",
+          "default"
+        ]
+      ],
+      "samples": 3,
+      "warmup": 0
+    },
+    "qualification": {
+      "binary": "observer",
+      "blocks": 1,
+      "orders": [
+        "forward"
+      ],
+      "policy_orders": [
+        [
+          "default",
+          "full",
+          "file-only",
+          "no-sync"
+        ]
+      ],
+      "samples": 1,
+      "warmup": 0
+    }
+  },
+  "policies": [
+    "default",
+    "full",
+    "file-only",
+    "no-sync"
+  ],
+  "policy_semantics": {
+    "default": "documented save; full durability",
+    "file-only": "explicit FileOnly; temporary file sync_all, no parent-directory sync",
+    "full": "explicit save_with_durability Full; temporary file sync_all and parent-directory sync",
+    "no-sync": "explicit NoSync; neither temporary-file nor parent-directory sync"
+  },
+  "quantile": "nearest rank within each process; median over six process blocks",
+  "regression_policy": "configuration attribution only; no production optimization, historical timing comparisons, or weakened default adoption",
+  "schema": "litchi.performance.0820.plan.v1",
+  "scope": "warm filesystem/provider caches; paired durability-policy configuration attribution; default/full contract retained; phases independently prepared and not additive; native and observer latencies never pooled",
+  "scratch": "/home/zhuhe/code/litchi-fs-0820",
+  "source": {
+    "harness_changed": false,
+    "lock_graph": "existing tracked perf-baseline Cargo.lock; exact differences from workspace lock retained",
+    "production_changed": false,
+    "runtime_harness_changed": false
+  },
+  "spread_flag": "max/min block metric > 1.05",
+  "tail_flag": "median process p99 / median process p50 > 1.05",
+  "target": "/home/zhuhe/code/litchi-target-0820"
+}

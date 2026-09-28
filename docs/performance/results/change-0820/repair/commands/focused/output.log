@@ -1,0 +1,13 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 0.73s
+     Running unittests src/bin/docx_replayable_tail_append.rs (/home/zhuhe/code/litchi-target-0820/quality-1/debug/deps/docx_replayable_tail_append-5b02909397ac34dc)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_process_live_accounting ... ok
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

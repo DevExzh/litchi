@@ -1,0 +1,20 @@
+{
+  "ended": 1790603384.6644373,
+  "release_binaries_built": 0,
+  "removed": [
+    {
+      "files": 5204,
+      "logical_bytes": 3685472529,
+      "path": "/home/zhuhe/code/litchi-target-0820"
+    }
+  ],
+  "schema": "litchi.performance.0820.cleanup.v1",
+  "scratch_removed": true,
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/source.json",
+    "sha256": "644e41148584b9ddd1518bb6c5af5bf8ed0a0de8a0af8aff61c70ecb3bc16a5a"
+  },
+  "started": 1790603384.190541,
+  "target_removed": true
+}

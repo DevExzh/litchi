@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0820 — allocator test repaired; scenario coverage unchanged
+
+[0820](0820-allocator-test-quality-repair.md) A test-only global allocator accounting repair unblocks fresh quality verification. The planned 24 real-file format/phase/durability cases remain unmeasured; no CRUD performance coverage advances.
+
 ## 0819 — twelve ordinary real-file save cases measured
 
 [0819](0819-real-file-ordinary-save-baseline.md) Three checked-in DOCX/XLSX/PPTX inputs now have admitted open/edit/save, edit, full-durability path-save, and counting-sink measurements: 72 native, 24 observer, and 12 qualification reports. Edit publishes nothing; PPTX counting materializes to_bytes and is not streaming evidence. Broader corpus, external resave, and physical cold/network coverage remain open.

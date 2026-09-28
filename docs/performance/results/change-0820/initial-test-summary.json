@@ -1,0 +1,10 @@
+{
+  "failed": 2,
+  "ignored": 1,
+  "passed": 568,
+  "primary_failure": "global_allocator_records_successful_alloc_and_dealloc_with_live_peak: during.live_bytes >= before.live_bytes + 256",
+  "schema": "litchi.performance.0820.initial-test-failure.v1",
+  "scope": "incomplete original all-features suite; stopped at docx_replayable_tail_append allocator tests",
+  "secondary_failure": "global_allocator_records_zeroed_alloc_and_zeroes_memory: TEST_LOCK PoisonError after primary assertion panic",
+  "suites_reached": 6
+}

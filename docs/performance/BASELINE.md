@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0820 — 0819 baseline retained after allocator test repair
+
+[0820](0820-allocator-test-quality-repair.md) The allocator wrapper test now checks process-wide byte conservation rather than a per-allocation net live-byte increase. No release build or timing capture occurred; all 0819 measurements remain the admitted baseline.
+
 ## 0819 — admitted real-file ordinary-save baseline
 
 [0819](0819-real-file-ordinary-save-baseline.md) Fresh DOCX/XLSX/PPTX lifecycle p50 medians are 5.220218/5.419553/7.422314 ms with default full durability. Twelve cases retain 108 reports and 2,244 samples, with native timing separate from allocator/procfs observations. Six corpora and thirty policy outputs pass fresh preservation admission. Production is unchanged; no historical speedup is claimed.
