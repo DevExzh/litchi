@@ -1,0 +1,23 @@
+probes 1 PASS
+probes 2 PASS
+probes 3 PASS
+probes 4 PASS
+probes 5 PASS
+probes 6 PASS
+probes 7 PASS
+probes 8 PASS
+probes 9 PASS
+probes 10 PASS
+probes 11 PASS
+probes 12 PASS
+probes 13 PASS
+probes 14 PASS
+probes 15 PASS
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0823/quality.py", line 107, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0823/quality.py", line 96, in main
+    assert completed.returncode == 0, str(log)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: /home/zhuhe/code/litchi/docs/performance/results/change-0823/quality-probes-2/15.log

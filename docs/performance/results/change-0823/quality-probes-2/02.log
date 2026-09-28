@@ -1,0 +1,13 @@
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0823/synthetic-probe-src)
+    Finished `test` profile [unoptimized] target(s) in 0.41s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0823/quality/debug/deps/namespace_uri_probe-6b58d3bb2d04bfe6)
+
+running 5 tests
+test tests::cli_shape_identities_round_trip_through_serde ... ok
+test tests::unicode_uris_are_valid_utf8_and_preserve_known_uri_byte_lengths ... ok
+test tests::namespace_injection_keeps_non_text_tags_and_places_declarations_on_root ... ok
+test tests::valid_four_attribute_oracle_requires_the_exact_four_name_value_pairs ... ok
+test tests::valid_four_attributes_are_distinct_quoted_and_well_formed ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

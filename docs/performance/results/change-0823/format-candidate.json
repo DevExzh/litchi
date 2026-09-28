@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config-path",
+    "rustfmt.toml",
+    "docs/performance/results/change-0823/candidate/after/reader.rs"
+  ],
+  "started": 1790611049.104281,
+  "ended": 1790611049.135147,
+  "exit_code": 0,
+  "before_sha256": "ab055e508ec59f4f8816fcea4612837ac9eed8553e9c2311e0017c5816b49288",
+  "after_sha256": "81b94833ab615cfc3cfd4885892b6932db59b004c8a4edcead01fb8f2298d611",
+  "patch_sha256": "028ee153d9ba0e8d5665226f2e9b34a3b392e5854a4dbc0e736cd55ab2280f94"
+}

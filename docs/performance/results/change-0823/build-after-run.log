@@ -1,0 +1,5 @@
+after synthetic-native built
+after synthetic-allocation built
+after real-native built
+after real-allocation built
+0823 after build PASS: four serial native/allocation binaries

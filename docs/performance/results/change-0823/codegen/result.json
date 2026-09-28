@@ -1,0 +1,68 @@
+{
+  "rows": [
+    {
+      "assembly": {
+        "bytes": 87012,
+        "path": "docs/performance/results/change-0823/codegen/before.asm",
+        "sha256": "34baeb76d6d1ff98269cd3ebaf69a062164895ee0277e69ab83f84865f7b9230"
+      },
+      "binary": {
+        "bytes": 13795320,
+        "path": "/home/zhuhe/code/litchi-target-0823/before-real-native",
+        "sha256": "2504e37bfc18bdf5df548547b57ea53f3a642a59eb7534a6192ffce415c0803d"
+      },
+      "calls": {
+        "NamespaceResolver::push": [],
+        "NamespaceResolver::resolve_event": [],
+        "NsReader<R>::process_event": [
+          "138753:\tcall   179e40 <quick_xml::reader::ns_reader::NsReader<R>::process_event>"
+        ]
+      },
+      "demangled_symbol": [
+        "0000000000138160",
+        "0000000000002824",
+        "T",
+        "litchi_pptx::shape::reader::Scene::read_with"
+      ],
+      "leg": "before",
+      "raw_symbol": [
+        "0000000000138160",
+        "0000000000002824",
+        "T",
+        "_ZN11litchi_pptx5shape6reader5Scene9read_with17h99b248994a26f7e5E"
+      ]
+    },
+    {
+      "assembly": {
+        "bytes": 101049,
+        "path": "docs/performance/results/change-0823/codegen/after.asm",
+        "sha256": "4d306b084f645c1329d7e8fe0c0bfef64fe6d0e9b349abcb15e07ed8db131394"
+      },
+      "binary": {
+        "bytes": 13802440,
+        "path": "/home/zhuhe/code/litchi-target-0823/after-real-native",
+        "sha256": "2d2c7bc419ac9a5ca559b490ea3fdd976c0408dbd21be952438971558820e996"
+      },
+      "calls": {
+        "NamespaceResolver::push": [],
+        "NamespaceResolver::resolve_event": [],
+        "NsReader<R>::process_event": []
+      },
+      "demangled_symbol": [
+        "0000000000138310",
+        "0000000000002cdd",
+        "T",
+        "litchi_pptx::shape::reader::Scene::read_with"
+      ],
+      "leg": "after",
+      "raw_symbol": [
+        "0000000000138310",
+        "0000000000002cdd",
+        "T",
+        "_ZN11litchi_pptx5shape6reader5Scene9read_with17h99b248994a26f7e5E"
+      ]
+    }
+  ],
+  "schema": "litchi.performance.0823.codegen.v1",
+  "symbol": "litchi_pptx::shape::reader::Scene::read_with"
+}

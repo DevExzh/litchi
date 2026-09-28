@@ -1,0 +1,26 @@
+[
+  {
+    "argv": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "docs/performance/results/change-0823/synthetic-probe-src/Cargo.toml"
+    ],
+    "started": 1790610889.3738189,
+    "ended": 1790610889.4287467,
+    "exit_code": 0,
+    "log": "docs/performance/results/change-0823/format-synthetic-probe.log"
+  },
+  {
+    "argv": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "docs/performance/results/change-0823/real-probe-src/Cargo.toml"
+    ],
+    "started": 1790610889.4288516,
+    "ended": 1790610889.4753191,
+    "exit_code": 0,
+    "log": "docs/performance/results/change-0823/format-real-probe.log"
+  }
+]

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0823 — Scene transport trial rejected
+
+[0823](0823-pptx-scene-reader-workflow.md) Fresh paired trial: real edit ratio 0.976062 (95% interval 0.974798–0.984336); no eligible row reaches the frozen 3% benefit gate. All nineteen allocation rows are unchanged. Baseline production remains authoritative; 342 admitted reports/7,106 samples are retained.
+
 ## 0822 — real-file PPTX edit profile
 
 [0822](0822-real-file-pptx-edit-profile.md) Fresh diagnostic controls retain ordinary/direct p50 1.428437 ms, wrapped/control ratio 1.000137 [0.997252–1.002430], and fp/wrapped 1.009094 [1.005815–1.012671]. The 23 reports/4,549 samples include separate qualification, native, and perf lanes. No production change or historical speedup is claimed.

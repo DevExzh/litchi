@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0823 — measured Scene transport change not adopted
+
+[0823](0823-pptx-scene-reader-workflow.md) The candidate passes both six-gate production checks and all nineteen correctness/allocation workflows, but its best eligible paired p50 gain is 2.394%, below the frozen 3% threshold. Production is restored; failed attempts, independent replay, cleanup, and exact custody are retained. The program-level goal remains open.
+
 ## 0822 — real-file edit work localized
 
 [0822](0822-real-file-pptx-edit-profile.md) The unchanged production source reuses its committed six-gate result; the new probe passes five fresh gates and three tests. Serial qualification, native controls, two perf recordings, and exact-binary decoding retain 23 reports/4,549 samples. Independent audits account for one empty stack explicitly. The broad non-iWork goal remains active.

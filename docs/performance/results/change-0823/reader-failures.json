@@ -1,0 +1,20 @@
+{
+  "failures": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "docs/performance/results/change-0823/analysis.py",
+        "--write"
+      ],
+      "exit_code": 1,
+      "log": {
+        "path": "analysis-write-0.log",
+        "bytes": 45,
+        "sha256": "8d7c80fca0093fe4a632d0f1200ef43e20d3138d514ae787caaa4c22bef29b58"
+      },
+      "source_archive": "reader-attempt-0",
+      "reason": "Reader used production_changed instead of actual production_changed_at_freeze; static review also found lock descriptors omit bytes by design."
+    }
+  ]
+}

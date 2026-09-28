@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0823 — Scene candidate covers nineteen PPTX workflows
+
+[0823](0823-pptx-scene-reader-workflow.md) Six synthetic fixtures × capture/commit/lifecycle plus one admitted real-file public edit pass output/semantic qualification on both legs. Full paired timing and allocation evidence rejects the candidate at its benefit gate. Coverage excludes real path-save/fsync and cold cache.
+
 ## 0822 — public real-file PPTX edit CPU attribution
 
 [0822](0822-real-file-pptx-edit-profile.md) One admitted shapes.pptx input now has exact-owner CPU profiles of its public shape-text transaction/commit/apply sequence. Every measured output equals the sealed default-save reference and passes complete-text, target, and slide-count readback. This adds diagnostic attribution, not new CRUD capability, save durability, or broad-producer coverage.

@@ -1,0 +1,16 @@
+{
+  "reason": "Native test Clippy exposed the split-region-only segment_before field; preserve source before narrowing its documented unused-field allowance.",
+  "files": {
+    "real-probe-src/Cargo.lock": "b709bca72e65d4f0da1f016e672cc6b940a882ed1ed759970699b51b0edf8058",
+    "real-probe-src/Cargo.toml": "5fd5409360383888e8ccdb9c4d4622612f71dc10aee5a0cef15a61c5cf40f826",
+    "synthetic-probe-src/Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+    "synthetic-probe-src/Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "synthetic-probe-src/Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+    "synthetic-probe-src/src/counting_allocator.rs": "48f28be8a34777df975797d685b6d4df5d9467ba040a5851bbf0f995a24e0d05",
+    "synthetic-probe-src/src/allocation_metrics.rs": "4b42c6a7bcccc52aa866c1460105c646bea0ee2423f2a63c973c0f9e725dd115",
+    "synthetic-probe-src/src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f",
+    "real-probe-src/src/counting_allocator.rs": "56bc320dee0418529b544026180f319f2342ca78f7a45d3eeb63b67cd728c86d",
+    "real-probe-src/src/allocation_metrics.rs": "acd092ab57fcc69a42d92d848fd24209ee49d05494119a484c6300ffcc613af5",
+    "real-probe-src/src/main.rs": "900d472a7118b1f4c7e27c4daeaf85b07c911aac1a28b19ec7ab5b830f5153dc"
+  }
+}

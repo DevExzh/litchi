@@ -1,0 +1,22 @@
+native 0-before-synthetic-tiny-capture PASS
+native 0-after-synthetic-tiny-capture PASS
+native 0-before-synthetic-tiny-commit PASS
+native 0-after-synthetic-tiny-commit PASS
+native 0-before-synthetic-tiny-lifecycle PASS
+native 0-after-synthetic-tiny-lifecycle PASS
+native 0-before-synthetic-medium-capture PASS
+native 0-after-synthetic-medium-capture PASS
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0823/capture.py", line 176, in <module>
+    run_child(
+    ~~~~~~~~~^
+        leg=leg, block=block, case=case,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        samples=lane_plan["samples"], warmup=lane_plan["warmup"],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0823/capture.py", line 162, in run_child
+    assert c.source() == current_expected, "production source changed during capture"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: production source changed during capture

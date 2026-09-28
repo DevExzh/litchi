@@ -1,0 +1,16 @@
+{
+  "reason": "Real probe synthetic counter unit tests were receiving actual test-harness GlobalAlloc callbacks; align test allocator installation with the existing synthetic probe and serialize direct counter users.",
+  "files": {
+    "real-probe-src/Cargo.lock": "b709bca72e65d4f0da1f016e672cc6b940a882ed1ed759970699b51b0edf8058",
+    "real-probe-src/Cargo.toml": "5fd5409360383888e8ccdb9c4d4622612f71dc10aee5a0cef15a61c5cf40f826",
+    "synthetic-probe-src/Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+    "synthetic-probe-src/Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "synthetic-probe-src/Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+    "synthetic-probe-src/src/counting_allocator.rs": "48f28be8a34777df975797d685b6d4df5d9467ba040a5851bbf0f995a24e0d05",
+    "synthetic-probe-src/src/allocation_metrics.rs": "b8ad787a2a3a0ebb81b87f10e004e243e728b467be24ca741ee7d1b59ee89fc3",
+    "synthetic-probe-src/src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f",
+    "real-probe-src/src/counting_allocator.rs": "56bc320dee0418529b544026180f319f2342ca78f7a45d3eeb63b67cd728c86d",
+    "real-probe-src/src/allocation_metrics.rs": "44ab6b704813c351c90ad5586d08755529d10ccdeffd41e23f2cca4d7e097076",
+    "real-probe-src/src/main.rs": "900d472a7118b1f4c7e27c4daeaf85b07c911aac1a28b19ec7ab5b830f5153dc"
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "schema": "litchi.performance.0823.pptx-edit-trial.v1",
+  "tool": "pptx-edit-profile-0822",
+  "base_revision": "b76786208d",
+  "mode": "direct",
+  "timing_scope": "opened_presentation_transaction set_shape_text(0, 0), commit, and apply_opened_presentation_commit; Package::open, Package owner drop, serialization, hashing, semantic readback, and allocator-region observer reads are outside the clock; the returned commit Snapshot is dropped inside the helper",
+  "input": {
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "reference": {
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "output": {
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "marker": "litchi-perf-0638-ordinary-save",
+  "target": {
+    "slide": 0,
+    "shape": 0
+  },
+  "target_text": "litchi-perf-0638-ordinary-save",
+  "full_text_sha256": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "full_text_digest": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "slide_count": 6,
+  "warmup": 0,
+  "samples_requested": 3,
+  "warmup_verified": true,
+  "all_verified": true,
+  "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+      1586238,
+      1494907,
+      1477487
+    ],
+    "sample_order": [
+      0,
+      1,
+      2
+    ]
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1586238,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 7682,
+        "deallocation_calls": 7028,
+        "reallocation_calls": 599,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2719494,
+        "deallocated_bytes": 2560509,
+        "live_bytes_before": 384321,
+        "live_bytes_after": 543306,
+        "peak_live_bytes_before": 620541,
+        "peak_live_bytes_after": 690291,
+        "region_peak_live_bytes": 690291
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1494907,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 7682,
+        "deallocation_calls": 7028,
+        "reallocation_calls": 599,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2719494,
+        "deallocated_bytes": 2560509,
+        "live_bytes_before": 384385,
+        "live_bytes_after": 543370,
+        "peak_live_bytes_before": 1075489,
+        "peak_live_bytes_after": 1075489,
+        "region_peak_live_bytes": 690355
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1477487,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 7682,
+        "deallocation_calls": 7028,
+        "reallocation_calls": 599,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 2719494,
+        "deallocated_bytes": 2560509,
+        "live_bytes_before": 384449,
+        "live_bytes_after": 543434,
+        "peak_live_bytes_before": 1075553,
+        "peak_live_bytes_after": 1075553,
+        "region_peak_live_bytes": 690419
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "after-real-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

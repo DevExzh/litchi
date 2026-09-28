@@ -1,0 +1,439 @@
+--- a/crates/litchi-pptx/src/shape/reader.rs
++++ b/crates/litchi-pptx/src/shape/reader.rs
+@@ -8,11 +8,13 @@
+     DRAWINGML_CHART_NAMESPACE, DRAWINGML_NAMESPACE, STRICT_DRAWINGML_CHART_NAMESPACE,
+     STRICT_DRAWINGML_NAMESPACE, decode_xml_reference, unqualified_attribute_value,
+ };
++#[cfg(test)]
++use quick_xml::reader::NsReader;
+ use quick_xml::{
+     XmlVersion,
+     events::{BytesStart, Event},
+-    name::{Namespace, QName, ResolveResult},
+-    reader::NsReader,
++    name::{Namespace, NamespaceResolver, QName, ResolveResult},
++    reader::Reader,
+ };
+ use thiserror::Error as ThisError;
+ 
+@@ -453,19 +455,159 @@
+     }
+ 
+     fn scan(mut self) -> Result<(Vec<Record>, String)> {
+-        let mut reader = NsReader::from_reader(self.xml);
++        let mut reader = Reader::from_reader(self.xml);
++        let mut resolver = NamespaceResolver::default();
++        let mut pending_pop = false;
+         // Spans are byte offsets into the owner XML, whose leading
+         // byte-order mark precedes reader position zero.
+         let origin = ReaderOrigin::of(self.xml);
+         loop {
+             let start = position(&reader, origin)?;
+             let decoder = reader.decoder();
++            // Match NsReader's deferred scope pop: an Empty or End scope is
++            // still active while its returned event is inspected. NsReader
++            // performs this immediately before its underlying read.
++            if pending_pop {
++                resolver.pop();
++                pending_pop = false;
++            }
++            let event = reader.read_event()?;
++            // NsReader pushes declarations while producing Start/Empty and
++            // marks Empty/End for the pop before the next read. Do that work
++            // before the post-read position so a resolver error has the same
++            // precedence as the original implementation.
++            match &event {
++                Event::Start(element) => {
++                    resolver.push(element).map_err(quick_xml::Error::from)?;
++                },
++                Event::Empty(element) => {
++                    resolver.push(element).map_err(quick_xml::Error::from)?;
++                    pending_pop = true;
++                },
++                Event::End(_) => pending_pop = true,
++                _ => {},
++            }
++            let end = position(&reader, origin)?;
++            match event {
++                Event::Start(element) => {
++                    let namespace = resolver.resolve_element(element.name()).0;
++                    self.count_node()?;
++                    let event_depth = self.enter_depth()?;
++                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
++                    self.start_element(
++                        &namespace,
++                        &element,
++                        decoder,
++                        start,
++                        event_depth,
++                        parent_is_nv_pr,
++                        false,
++                        end,
++                    )?;
++                    self.pml_nv_pr_stack.push(is_pml(
++                        &namespace,
++                        element.local_name().into_inner(),
++                        b"nvPr",
++                    ));
++                    self.depth = event_depth;
++                },
++                Event::Empty(element) => {
++                    let namespace = resolver.resolve_element(element.name()).0;
++                    self.count_node()?;
++                    let event_depth = self.enter_depth()?;
++                    let parent_is_nv_pr = self.pml_nv_pr_stack.last().copied().unwrap_or(false);
++                    self.start_element(
++                        &namespace,
++                        &element,
++                        decoder,
++                        start,
++                        event_depth,
++                        parent_is_nv_pr,
++                        true,
++                        end,
++                    )?;
++                },
++                Event::Text(text) => {
++                    self.reject_placeholder_character_data(Some(text.as_ref()), false)?;
++                    if self
++                        .active
++                        .last()
++                        .is_some_and(|value| value.text_depth.is_some())
++                    {
++                        let decoded = text
++                            .xml_content(XmlVersion::Explicit1_0)
++                            .map_err(|error| Error::Xml(error.to_string()))?;
++                        let decoded = quick_xml::escape::unescape(&decoded)
++                            .map_err(|error| Error::Xml(error.to_string()))?;
++                        self.append_text(&decoded)?;
++                    }
++                },
++                Event::CData(text) => {
++                    self.reject_placeholder_character_data(Some(text.as_ref()), true)?;
++                    if self
++                        .active
++                        .last()
++                        .is_some_and(|value| value.text_depth.is_some())
++                    {
++                        let decoded = text
++                            .xml_content(XmlVersion::Explicit1_0)
++                            .map_err(|error| Error::Xml(error.to_string()))?;
++                        self.append_text(&decoded)?;
++                    }
++                },
++                Event::GeneralRef(reference) => {
++                    self.reject_placeholder_character_data(None, true)?;
++                    if self
++                        .active
++                        .last()
++                        .is_some_and(|value| value.text_depth.is_some())
++                    {
++                        self.append_text(&decode_xml_reference(&reference)?)?;
++                    }
++                },
++                Event::End(element) => {
++                    // Resolve before the deferred pop. The closing element's
++                    // prefix is governed by the scope opened by its parent
++                    // (and, for a self-declared element, by that element's
++                    // own declaration), exactly as NsReader does.
++                    let namespace = resolver.resolve_element(element.name()).0;
++                    self.end_element(&namespace, element.name(), end)?;
++                    self.pml_nv_pr_stack.pop().ok_or_else(|| {
++                        Error::Invalid("shape XML element stack became inconsistent".into())
++                    })?;
++                },
++                Event::DocType(_) | Event::PI(_) => {
++                    return Err(Error::Invalid(
++                        "DOCTYPE and processing instructions are forbidden in shape XML".into(),
++                    ));
++                },
++                Event::Eof => break,
++                _ => {},
++            }
++        }
++        if self.depth != 0 || !self.active.is_empty() || !self.pml_nv_pr_stack.is_empty() {
++            return Err(Error::Invalid(
++                "shape XML ended with unclosed elements".into(),
++            ));
++        }
++        Ok((self.records, self.strings))
++    }
++
++    #[cfg(test)]
++    fn scan_with_nsreader_oracle(mut self) -> Result<(Vec<Record>, String)> {
++        let mut reader = NsReader::from_reader(self.xml);
++        // Spans are byte offsets into the owner XML, whose leading
++        // byte-order mark precedes reader position zero.
++        let origin = ReaderOrigin::of(self.xml);
++        loop {
++            let start = ns_position(&reader, origin)?;
++            let decoder = reader.decoder();
+             // A slice reader's events borrow the input, not the reader, and the
+             // resolved namespace borrows the reader only until the next read.
+             // Neither needs a per-event copy: owning the event or cloning the
+             // resolver would reproduce exactly these bytes and bindings.
+             let event = reader.read_event()?;
+-            let end = position(&reader, origin)?;
++            let end = ns_position(&reader, origin)?;
+             let (namespace, event) = reader.resolver().resolve_event(event);
+             match event {
+                 Event::Start(element) => {
+@@ -1492,8 +1634,257 @@
+     Ok(false)
+ }
+ 
+-fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
++fn position(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+     origin
+         .offset(reader.buffer_position())
+         .ok_or_else(|| Error::Invalid("shape XML position does not fit usize".into()))
+ }
++
++#[cfg(test)]
++fn ns_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
++    origin
++        .offset(reader.buffer_position())
++        .ok_or_else(|| Error::Invalid("shape XML position does not fit usize".into()))
++}
++
++#[cfg(test)]
++mod tests {
++    use std::borrow::Cow;
++
++    use super::*;
++
++    const PML_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
++    const DML_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
++
++    fn outcome(result: Result<(Vec<Record>, String)>) -> String {
++        match result {
++            Ok((records, strings)) => format!("ok:{records:?}|{strings:?}"),
++            Err(error) => format!("err:{error:?}"),
++        }
++    }
++
++    fn assert_scan_parity(xml: &[u8], limits: Limits) {
++        let candidate = outcome(Scanner::new(xml, limits).scan());
++        let oracle = outcome(Scanner::new(xml, limits).scan_with_nsreader_oracle());
++        assert_eq!(candidate, oracle, "candidate/oracle mismatch for {xml:?}");
++    }
++
++    fn rich_scene() -> Vec<u8> {
++        format!(
++            r#"<p:spTree xmlns:p="{PML_NS}" xmlns:a="{DML_NS}" xmlns="urn:outer-default">
++                <p:nvGrpSpPr/><p:grpSpPr/>
++                <p:sp><p:nvSpPr><p:cNvPr id="1" name="First"/></p:nvSpPr><p:spPr/>
++                    <a:txBody><a:p><a:r><text-wrapper xmlns:a="urn:shadow"><a:t xmlns:a="{DML_NS}">text</a:t></text-wrapper></a:r></a:p></a:txBody>
++                </p:sp>
++                <holder xmlns="" xmlns:a="urn:shadow"><a:empty/><inner xmlns:a=""><a:empty/></inner></holder>
++                <p:sp><p:nvSpPr><p:cNvPr id="2" name="Second"/></p:nvSpPr>
++                    <p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm></p:spPr>
++                    <a:txBody><a:p><a:r><a:t>second</a:t></a:r></a:p></a:txBody>
++                </p:sp>
++            </p:spTree>"#
++        )
++        .into_bytes()
++    }
++
++    fn assert_rich_semantics(xml: &[u8]) {
++        let (records, strings) = Scanner::new(xml, Limits::DEFAULT)
++            .scan()
++            .expect("rich scene");
++        let scene = Scene {
++            xml: Cow::Borrowed(xml),
++            records,
++            strings,
++            limits: Limits::DEFAULT,
++        };
++        assert_eq!(scene.len(), 2);
++        assert_eq!(scene.roots().count(), 2);
++        let first = scene.at(0).expect("first shape");
++        assert_eq!(first.id(), Some(1));
++        assert_eq!(first.name(), Some("First"));
++        assert_eq!(first.text(), Some("text"));
++        assert_eq!(first.bounds(), None);
++        let second = scene.at(1).expect("second shape");
++        assert_eq!(second.id(), Some(2));
++        assert_eq!(second.name(), Some("Second"));
++        assert_eq!(second.text(), Some("second"));
++        assert_eq!(
++            second
++                .bounds()
++                .map(|bounds| (bounds.x(), bounds.y(), bounds.width(), bounds.height(),)),
++            Some((1, 2, 3, 4))
++        );
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_for_rich_scopes_and_end_resolution() {
++        let xml = rich_scene();
++        assert_scan_parity(&xml, Limits::DEFAULT);
++        assert_rich_semantics(&xml);
++    }
++
++    #[test]
++    fn borrowed_resolver_preserves_bom_offsets_and_deferred_empty_pop() {
++        let mut xml = b"\xEF\xBB\xBF".to_vec();
++        xml.extend_from_slice(&rich_scene());
++        assert_scan_parity(&xml, Limits::DEFAULT);
++        let (records, _) = Scanner::new(&xml, Limits::DEFAULT)
++            .scan()
++            .expect("BOM scene");
++        assert!(!records.is_empty());
++        assert!(records.iter().all(|record| record.span.start >= 3));
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_on_invalid_names_and_malformed_xml() {
++        let cases = [
++            format!(r#"<p:spTree xmlns:p="{PML_NS}"><u:sp/></p:spTree>"#).into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}"><p:sp xmlns:xml="urn:invalid"/></p:spTree>"#)
++                .into_bytes(),
++            format!(
++                r#"<p:spTree xmlns:p="{PML_NS}"><p:sp xmlns:xmlns="urn:invalid"></p:sp></p:spTree>"#
++            )
++            .into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}" xmlns:xml="urn:invalid"/>"#).into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}" xmlns:xmlns="urn:invalid"/>"#).into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}"><p:sp></p:spTree>"#).into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}""#).into_bytes(),
++            format!(r#"<p:spTree xmlns:p="{PML_NS}"><p:sp bad="/></p:spTree>"#).into_bytes(),
++            format!(r#"<?shape-pi?><p:spTree xmlns:p="{PML_NS}"/>"#).into_bytes(),
++            format!(r#"<!DOCTYPE p:spTree><p:spTree xmlns:p="{PML_NS}"/>"#).into_bytes(),
++        ];
++        for xml in cases {
++            assert_scan_parity(&xml, Limits::DEFAULT);
++            if xml.starts_with(b"<?") || xml.starts_with(b"<!DOCTYPE") {
++                assert!(Scanner::new(&xml, Limits::DEFAULT).scan().is_err());
++            }
++        }
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_for_default_strict_and_unknown_roots() {
++        let default_namespace = format!(
++            r#"<spTree xmlns="{PML_NS}"><nvGrpSpPr/><grpSpPr/><sp><nvSpPr><cNvPr id="7" name="Default"/></nvSpPr></sp></spTree>"#
++        )
++        .into_bytes();
++        let strict_namespace = br#"<p:spTree xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="8" name="Strict"/></p:nvSpPr></p:sp></p:spTree>"#.to_vec();
++        let unknown_root =
++            format!(r#"<u:spTree xmlns:p="{PML_NS}"><p:nvGrpSpPr/><p:grpSpPr/><p:sp/></u:spTree>"#)
++                .into_bytes();
++        for xml in [default_namespace, strict_namespace, unknown_root] {
++            assert_scan_parity(&xml, Limits::DEFAULT);
++        }
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_for_cdata_entities_and_duplicate_attributes() {
++        let cdata = format!(
++            r#"<p:spTree xmlns:p="{PML_NS}" xmlns:a="{DML_NS}"><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="1" name="CData"/></p:nvSpPr><a:txBody><a:p><a:r><a:t><![CDATA[A < B]]></a:t></a:r></a:p></a:txBody></p:sp></p:spTree>"#
++        )
++        .into_bytes();
++        let entity = format!(
++            r#"<p:spTree xmlns:p="{PML_NS}" xmlns:a="{DML_NS}"><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="1" name="Entity"/></p:nvSpPr><a:txBody><a:p><a:r><a:t>A &amp; B &#65;</a:t></a:r></a:p></a:txBody></p:sp></p:spTree>"#
++        )
++        .into_bytes();
++        let duplicate_attribute = format!(
++            r#"<p:spTree xmlns:p="{PML_NS}"><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="1" id="2" name="Duplicate"/></p:nvSpPr></p:sp></p:spTree>"#
++        )
++        .into_bytes();
++        for xml in [cdata, entity, duplicate_attribute] {
++            assert_scan_parity(&xml, Limits::DEFAULT);
++        }
++    }
++
++    #[test]
++    fn borrowed_resolver_restores_shadowed_default_drawingml_scope() {
++        let xml = format!(
++            r#"<p:spTree xmlns="{DML_NS}" xmlns:p="{PML_NS}"><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="9" name="DefaultDml"/></p:nvSpPr><p:txBody><p><r><t>A</t><t xmlns="urn:shadow"/><t>B</t><scope xmlns="urn:shadow"><t xmlns="{DML_NS}">C</t></scope><t>D</t></r></p></p:txBody></p:sp></p:spTree>"#
++        )
++        .into_bytes();
++        assert_scan_parity(&xml, Limits::DEFAULT);
++        let (records, strings) = Scanner::new(&xml, Limits::DEFAULT)
++            .scan()
++            .expect("default DrawingML scene");
++        let scene = Scene {
++            xml: Cow::Borrowed(&xml),
++            records,
++            strings,
++            limits: Limits::DEFAULT,
++        };
++        assert_eq!(scene.len(), 1);
++        assert_eq!(scene.at(0).expect("shape").text(), Some("ABCD"));
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_at_scanner_resource_boundaries() {
++        let xml = rich_scene();
++        for nodes in [1, 2, 4, 8, 16, 32, 64] {
++            let limits = Limits::new(
++                64 * 1024 * 1024,
++                64 * 1024 * 1024,
++                256,
++                nodes,
++                100_000,
++                16 * 1024 * 1024,
++            )
++            .expect("finite limits");
++            assert_scan_parity(&xml, limits);
++        }
++        for depth in [1, 2, 3, 4, 8, 256] {
++            let limits = Limits::new(
++                64 * 1024 * 1024,
++                64 * 1024 * 1024,
++                depth,
++                1_000_000,
++                100_000,
++                16 * 1024 * 1024,
++            )
++            .expect("finite limits");
++            assert_scan_parity(&xml, limits);
++        }
++        for shapes in [1, 2, 3, 100_000] {
++            let limits = Limits::new(
++                64 * 1024 * 1024,
++                64 * 1024 * 1024,
++                256,
++                1_000_000,
++                shapes,
++                16 * 1024 * 1024,
++            )
++            .expect("finite limits");
++            assert_scan_parity(&xml, limits);
++        }
++        for retained_text_bytes in [1, 4, 5, 16, 16 * 1024 * 1024] {
++            let limits = Limits::new(
++                64 * 1024 * 1024,
++                64 * 1024 * 1024,
++                256,
++                1_000_000,
++                100_000,
++                retained_text_bytes,
++            )
++            .expect("finite limits");
++            assert_scan_parity(&xml, limits);
++        }
++    }
++
++    #[test]
++    fn borrowed_resolver_matches_nsreader_at_namespace_declaration_ceiling() {
++        for additional in [255, 256] {
++            let mut declarations = format!(r#"xmlns:p="{PML_NS}""#);
++            for index in 0..additional {
++                declarations.push_str(&format!(r##" xmlns:n{index}="urn:n{index}""##));
++            }
++            let empty = format!(r#"<p:spTree {declarations}/>"#).into_bytes();
++            let closed = format!(r#"<p:spTree {declarations}></p:spTree>"#).into_bytes();
++            let succeeds = additional == 255;
++            for xml in [empty, closed] {
++                assert_scan_parity(&xml, Limits::DEFAULT);
++                assert_eq!(
++                    Scanner::new(&xml, Limits::DEFAULT).scan().is_ok(),
++                    succeeds,
++                    "unexpected declaration-boundary result for {additional} additional declarations"
++                );
++            }
++        }
++    }
++}

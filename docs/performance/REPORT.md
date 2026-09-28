@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0823 — PPTX Scene reader trial rejected
+
+[0823](0823-pptx-scene-reader-workflow.md) The 342-report/7,106-sample trial does not meet its frozen benefit threshold: real edit ratio 0.976062, interval 0.974798–0.984336, with unchanged allocations and no latency veto. Production remains unchanged; raw evidence, retained failure logs, and verified target cleanup are complete.
+
 ## 0822 — PPTX edit profile completed without source change
 
 [0822](0822-real-file-pptx-edit-profile.md) The wrapper control interval includes 1.0; the frame-pointer control adds about 0.9%. No latency spread or p99/p50 diagnostic exceeds 5%; wrapped and fp whole-process RSS spreads do. Two exact-owner profiles localize XML, decompression, and fingerprint work. No optimization is adopted and durability defaults remain unchanged.

@@ -1,0 +1,42 @@
+{
+  "repeats": [
+    {
+      "compressed_frames": {
+        "bytes": 600775,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/perf/0.frames.gz",
+        "sha256": "715e340ac838d64beed123f7448f64ebef537f7e8c3ba1b6af1c6236d7ed4c0a"
+      },
+      "inclusive_presence_in_scene_stacks": {
+        "litchi_pptx::opened::transaction::compaction_scene": 301,
+        "litchi_pptx::shape::reader::Scene::read_with": 636,
+        "quick_xml::events::attributes::IterState::next": 62,
+        "quick_xml::name::NamespaceResolver::resolve_event": 124,
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event": 128
+      },
+      "owner_samples": 2971,
+      "repeat": 0,
+      "scene_samples": 636,
+      "whole_samples": 6164
+    },
+    {
+      "compressed_frames": {
+        "bytes": 596124,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/perf/1.frames.gz",
+        "sha256": "fa5267bf06c9259c787464e76f6faaadaaebc8e8a569f4241b21e3d27d5bc3a3"
+      },
+      "inclusive_presence_in_scene_stacks": {
+        "litchi_pptx::opened::transaction::compaction_scene": 304,
+        "litchi_pptx::shape::reader::Scene::read_with": 624,
+        "quick_xml::events::attributes::IterState::next": 62,
+        "quick_xml::name::NamespaceResolver::resolve_event": 116,
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event": 157
+      },
+      "owner_samples": 2996,
+      "repeat": 1,
+      "scene_samples": 624,
+      "whole_samples": 6160
+    }
+  ],
+  "schema": "litchi.performance.0823.profile-basis.v1",
+  "scope": "0822 exact-owner call-path diagnostics; overlapping counts, no Amdahl estimate"
+}

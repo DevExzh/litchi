@@ -1,0 +1,14 @@
+{
+  "kind": "retained tool-result transcript, not an original process log",
+  "operation": "ad-hoc read-only report inspection",
+  "tool_chunk": "73182a",
+  "exit_code": 1,
+  "requested_keys": [
+    "process_median",
+    "rss_process_median",
+    "spread"
+  ],
+  "output": "Traceback (most recent call last):\n  File \"<stdin>\", line 4, in <module>\nKeyError: 'spread'\n",
+  "mutation": false,
+  "effect": "No data changed; corrected inspection used existing keys only."
+}

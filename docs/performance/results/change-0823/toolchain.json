@@ -1,0 +1,20 @@
+{
+  "schema": "litchi.performance.0823.toolchain.v1",
+  "cargo -V": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "rustc -Vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "python3 --version": "Python 3.14.4",
+  "git --version": "git version 2.53.0",
+  "perf --version": "perf version 7.0.14",
+  "build_contract": {
+    "offline": true,
+    "locked": true,
+    "release": true,
+    "jobs": 2,
+    "opt_level": 3,
+    "debug": 1,
+    "thin_lto": true,
+    "codegen_units": 1,
+    "incremental": false,
+    "panic": "unwind"
+  }
+}

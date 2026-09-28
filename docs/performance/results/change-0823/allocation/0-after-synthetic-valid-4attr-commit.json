@@ -1,0 +1,241 @@
+{
+  "schema": "litchi.pptx.public-workflow-probe-0806.v1",
+  "tool": "public-pptx-probe-0806",
+  "mode": "commit",
+  "shape": "valid-4attr",
+  "slides": 12,
+  "shapes_per_slide": 8,
+  "timing_scope": "Transaction::commit only; package capture and one set_shape_text staging are outside the clock",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 42304,
+    "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+  },
+  "fixture": {
+    "injection": "valid-four-distinct-namespaced-extension-attributes",
+    "slide_parts": 12,
+    "replaced_text_tags": 96,
+    "namespace_declarations": 4,
+    "namespaced_attributes": 4,
+    "namespace_uris": [
+      "urn:litchi:perf:0806:extension:one",
+      "urn:litchi:perf:0806:extension:two",
+      "urn:litchi:perf:0806:extension:three",
+      "urn:litchi:perf:0806:extension:four"
+    ],
+    "attribute_names": [
+      "lx1:probeOne",
+      "lx2:probeTwo",
+      "lx3:probeThree",
+      "lx4:probeFour"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 359571,
+      "metrics": {
+        "elapsed_ns": 359571,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3138,
+        "deallocation_calls": 2736,
+        "reallocation_calls": 435,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 265257,
+        "deallocated_bytes": 257591,
+        "live_bytes_before": 449632,
+        "live_bytes_after": 457298,
+        "peak_live_bytes_before": 1149360,
+        "peak_live_bytes_after": 1149360,
+        "region_peak_live_bytes": 548109
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 364562,
+      "metrics": {
+        "elapsed_ns": 364562,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3138,
+        "deallocation_calls": 2736,
+        "reallocation_calls": 435,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 265257,
+        "deallocated_bytes": 257591,
+        "live_bytes_before": 451041,
+        "live_bytes_after": 458707,
+        "peak_live_bytes_before": 1149360,
+        "peak_live_bytes_after": 1149360,
+        "region_peak_live_bytes": 549518
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 349712,
+      "metrics": {
+        "elapsed_ns": 349712,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3138,
+        "deallocation_calls": 2736,
+        "reallocation_calls": 435,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 265257,
+        "deallocated_bytes": 257591,
+        "live_bytes_before": 452386,
+        "live_bytes_after": 460052,
+        "peak_live_bytes_before": 1149360,
+        "peak_live_bytes_after": 1149360,
+        "region_peak_live_bytes": 550863
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "after-synthetic-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

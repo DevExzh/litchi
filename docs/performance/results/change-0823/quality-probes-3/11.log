@@ -1,0 +1,11 @@
+   Compiling pptx-edit-profile-0822 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0823/real-probe-src)
+    Finished `test` profile [unoptimized] target(s) in 0.36s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0823/quality/debug/deps/pptx_edit_profile_0822-39d41bd85ddf5d4f)
+
+running 3 tests
+test tests::cli_rejects_unknown_and_out_of_bounds_values ... ok
+test tests::wrong_source_or_reference_identity_is_rejected ... ok
+test tests::direct_and_wrapped_match_the_pinned_real_file_bytes_and_semantics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

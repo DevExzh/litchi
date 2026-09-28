@@ -1,0 +1,149 @@
+   Compiling stable_deref_trait v1.2.1
+   Compiling zerofrom v0.1.8
+   Compiling cfg-if v1.0.5
+   Compiling litemap v0.8.3
+   Compiling yoke v0.8.3
+   Compiling zerovec v0.11.8
+   Compiling writeable v0.6.4
+   Compiling zerotrie v0.2.5
+   Compiling generic-array v0.14.7
+   Compiling tinystr v0.8.4
+   Compiling icu_locale_core v2.3.0
+   Compiling potential_utf v0.1.6
+   Compiling crossbeam-utils v0.8.23
+   Compiling hybrid-array v0.4.15
+   Compiling smallvec v1.16.2
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling crossbeam-epoch v0.9.21
+   Compiling libc v0.2.189
+   Compiling block-buffer v0.12.1
+   Compiling crossbeam-deque v0.8.8
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.4.3
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.11.3
+   Compiling serde v1.0.229
+   Compiling digest v0.10.7
+   Compiling icu_normalizer v2.3.0
+   Compiling num-traits v0.2.19
+   Compiling icu_properties v2.3.0
+   Compiling rayon-core v1.13.0
+   Compiling zmij v1.0.23
+   Compiling chacha20 v0.10.2
+   Compiling bitflags v2.13.2
+   Compiling zlib-rs v0.6.8
+   Compiling either v1.18.0
+   Compiling chrono v0.4.45
+   Compiling rayon v1.12.0
+   Compiling rustix v1.1.5
+   Compiling serde_json v1.0.151
+   Compiling flate2 v1.1.10
+   Compiling sha2 v0.10.9
+   Compiling thiserror v2.0.21
+   Compiling rand v0.10.3
+   Compiling idna_adapter v1.2.2
+   Compiling crc32fast v1.5.2
+   Compiling zerocopy v0.8.58
+   Compiling sha2 v0.11.0
+   Compiling tinyvec v1.13.3
+   Compiling unicode-normalization v0.1.25
+   Compiling tempfile v3.27.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling idna v1.1.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling url v2.5.8
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling caseless v0.2.2
+   Compiling ryu v1.0.23
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0823/synthetic-probe-src)
+warning: function `enable` is never used
+  --> src/allocation_metrics.rs:89:8
+   |
+89 | pub fn enable() {
+   |        ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `record_deallocation` is never used
+  --> src/allocation_metrics.rs:99:8
+   |
+99 | pub fn record_deallocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_reallocation` is never used
+   --> src/allocation_metrics.rs:104:8
+    |
+104 | pub fn record_reallocation(old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_failed_allocation` is never used
+   --> src/allocation_metrics.rs:109:8
+    |
+109 | pub fn record_failed_allocation() {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Snapshot` is never constructed
+   --> src/allocation_metrics.rs:118:12
+    |
+118 | pub struct Snapshot {
+    |            ^^^^^^^^
+
+warning: function `snapshot` is never used
+   --> src/allocation_metrics.rs:136:8
+    |
+136 | pub fn snapshot() -> Snapshot {
+    |        ^^^^^^^^
+
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:203:15
+    |
+203 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+
+warning: `mce-capabilities-probe` (bin "namespace-uri-probe" test) generated 7 warnings
+    Finished `test` profile [unoptimized] target(s) in 24.80s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0823/quality/debug/deps/namespace_uri_probe-6b58d3bb2d04bfe6)
+
+running 31 tests
+test allocation_metrics::tests::checked_difference_turns_counter_wrap_into_overflow_status ... ok
+test allocation_metrics::tests::concurrent_allocations_retain_the_exact_overlapping_peak ... ok
+test allocation_metrics::tests::counter_arithmetic_overflow_and_live_underflow_are_sticky ... ok
+test allocation_metrics::tests::concurrent_begin_race_grants_one_region_and_marks_others_unavailable ... ok
+test allocation_metrics::tests::disabled_region_publishes_no_sample ... ok
+test allocation_metrics::tests::dropping_a_split_region_after_an_error_releases_the_token ... ok
+test allocation_metrics::tests::failed_allocation_does_not_change_live_or_peak_bytes ... ok
+test allocation_metrics::tests::missing_split_peak_is_sticky_overflow_for_both_finish_paths ... ok
+test allocation_metrics::tests::multi_step_counter_state_matches_an_independent_live_reference ... ok
+test allocation_metrics::tests::nested_callback_entry_is_suppressed_and_invalidates_future_regions ... ok
+test allocation_metrics::tests::one_allocation_then_deallocation_retains_peak_live_bytes ... ok
+test allocation_metrics::tests::reallocation_growth_and_shrink_update_live_bytes_without_losing_peak ... ok
+test allocation_metrics::tests::reentrant_callback_makes_active_and_future_regions_unavailable ... ok
+test allocation_metrics::tests::poisoned_observer_is_recovered_as_unavailable ... ok
+test allocation_metrics::tests::region_counts_cross_thread_totals_without_resetting_absolute_counters ... ok
+test allocation_metrics::tests::region_guard_rejects_overlap_without_heap_scope_state ... ok
+test allocation_metrics::tests::region_peak_includes_concurrent_callbacks_before_finish ... ok
+test allocation_metrics::tests::region_peak_is_separate_from_historical_process_peak ... ok
+test allocation_metrics::tests::region_peak_retains_an_entry_allocation_after_it_is_freed ... ok
+test allocation_metrics::tests::region_reallocation_growth_shrink_and_failed_allocations_are_ordered ... ok
+test allocation_metrics::tests::repeated_boundaries_and_dropped_regions_release_only_the_owner ... ok
+test allocation_metrics::tests::sample_status_serialization_is_explicit ... ok
+test allocation_metrics::tests::split_phase_counter_faults_remain_overflow_without_partial_values ... ok
+test allocation_metrics::tests::split_boundary_observer_poison_and_reentry_remain_unavailable ... ok
+test allocation_metrics::tests::split_regions_are_sequential_and_preserve_the_combined_interval ... ok
+test allocation_metrics::tests::split_regions_publish_measured_zero_and_repeated_boundaries ... ok
+test tests::cli_shape_identities_round_trip_through_serde ... ok
+test tests::unicode_uris_are_valid_utf8_and_preserve_known_uri_byte_lengths ... ok
+test tests::valid_four_attribute_oracle_requires_the_exact_four_name_value_pairs ... ok
+test tests::namespace_injection_keeps_non_text_tags_and_places_declarations_on_root ... ok
+test tests::valid_four_attributes_are_distinct_quoted_and_well_formed ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

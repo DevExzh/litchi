@@ -1,0 +1,11 @@
+{
+  "allocation_resource_violations": 0,
+  "analysis_sha256": "a333e3652a21335b046dc6c08e5732f5e7950fe351a4ea43567d75ef49d40c76",
+  "benefit_satisfied": false,
+  "decision": "reject",
+  "latency_vetoes": 0,
+  "reason": "No eligible workflow reaches the frozen 3% paired p50 benefit threshold with upper confidence endpoint below 1.",
+  "restored_sha256": "58e88e86ffc9d4053b694d7928377a05beacbfcb47368cefc9d2fc229b1af26e",
+  "restored_source": "crates/litchi-pptx/src/shape/reader.rs",
+  "schema": "litchi.performance.0823.disposition.v1"
+}
