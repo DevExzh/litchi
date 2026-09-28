@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0825 — ordinary-save qualification checker failed
+
+[0825](0825-ordinary-save-qualification-failure.md) Fresh quality and baseline artifact admission passed, but the frozen checker rejected per-sample allocation arrays on the first qualification report. No comparative captures or performance claims follow. Committed production is restored, failure evidence is retained, and both owned temporary roots are removed. The complete-save effect of 0824 remains open.
+
 ## 0824 — whitespace-only PPTX compaction avoids duplicate reads
 
 [0824](0824-pptx-outer-whitespace-compaction.md) One admitted real-file public shape-text edit and eighteen synthetic capture/commit/lifecycle rows pass exact output qualification. The adopted proof preserves initial validation, final capture, unknown root bytes, and fallback comparisons. Coverage remains scoped to these inputs; path-save/fsync, cold cache, and broad producers are outside the trial.

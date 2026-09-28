@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/capture.py", line 418, in <module>
+    run_qualification(LEG)
+    ~~~~~~~~~~~~~~~~~^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/capture.py", line 293, in run_qualification
+    c.validate_report(report, case, lane_plan["samples"], lane_plan["warmup"], "observer", admission)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/custody.py", line 473, in validate_report
+    check_alloc(result.get("operation_metrics", {}).get("allocation"), case["case"])
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/custody.py", line 427, in check_alloc
+    assert isinstance(value.get(field), int) and value[field] >= 0, f"{label}.{field}"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: docx_real_file_ordinary_save_lifecycle.allocation_calls

@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py", line 690, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py", line 683, in main
+    artifact_admission(leg)
+    ~~~~~~~~~~~~~~~~~~^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py", line 479, in artifact_admission
+    preservation_path = run_preservation(leg, attempt)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py", line 336, in run_preservation
+    run_checked("write", command, write_log)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py", line 331, in run_checked
+    assert completed.returncode == 0, f"preservation {action} failed; retained {log_path}"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: preservation write failed; retained /home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-before/preservation-write.log

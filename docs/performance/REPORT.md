@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0825 — ordinary-save qualification checker failed
+
+[0825](0825-ordinary-save-qualification-failure.md) Fresh quality and baseline artifact admission passed, but the frozen checker rejected per-sample allocation arrays on the first qualification report. No comparative captures or performance claims follow. Committed production is restored, failure evidence is retained, and both owned temporary roots are removed. The complete-save effect of 0824 remains open.
+
 ## 0824 — PPTX compaction proof adopted
 
 [0824](0824-pptx-outer-whitespace-compaction.md) The real-file edit meets the frozen benefit rule: paired ratio 0.895935, interval 0.892216–0.899349, with fewer allocation calls/bytes and unchanged net-live/peak-above-entry values. All nineteen rows pass guards; slower synthetic controls and tail/RSS spread flags remain visible. The exact-byte proof preserves output and validation contracts.

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0825 — ordinary-save qualification checker failed
+
+[0825](0825-ordinary-save-qualification-failure.md) Fresh quality and baseline artifact admission passed, but the frozen checker rejected per-sample allocation arrays on the first qualification report. No comparative captures or performance claims follow. Committed production is restored, failure evidence is retained, and both owned temporary roots are removed. The complete-save effect of 0824 remains open.
+
 ## 0824 — exact-root compaction proof adopted
 
 [0824](0824-pptx-outer-whitespace-compaction.md) Fresh matched real-file edit p50 changes 1.436052→1.286512 ms; paired ratio 0.895935 [0.892216–0.899349], a 10.407% improvement. Allocations fall 7,682→7,384 calls. The 342-report/7,106-sample record retains all nineteen rows, including 3.636% slower large capture; no full-save or tail benefit is claimed.
