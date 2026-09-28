@@ -1,0 +1,218 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 988330
+cmd:  /home/zhuhe/code/litchi-target-0802/attribute-boundary-probe --leg before --case syntax-flag-after-0 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0802/profiles/1-syntax-flag-after-0-consume-before.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 196140
+desc: Trigger: --dump-after=attribute_boundary_probe::before_consume
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 253 26 8 3 1
+
+
+ob=(6) /home/zhuhe/code/litchi-target-0802/attribute-boundary-probe
+fl=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0802/probe-src/src/main.rs
+fn=(864) attribute_boundary_probe::main
+cfn=(1270) attribute_boundary_probe::before_consume
+calls=1 885 
+1029 253 26 8 3 1
+
+fn=(1270)
+885 10
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 17
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2533 2
+fe=(250)
+843 2
+fi=(174)
+2457 6
+fi=(236)
+1916 2
+fi=(254)
+772 1 1 1
+0 3
+fi=(174)
+844 2
+fi=(298) /home/zhuhe/code/litchi/docs/performance/results/change-0802/probe-src/src/baseline.rs
+114 21
+0 2
+228 4 2 1
++3 3
+cfi=(296) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs
+cfn=(1164) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=1 697 
+* 119 15 1 2
++1 2 1
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+805 2 1 1
+fi=(298)
+235 1
++2 6
+fe=(250)
+816 7 2 1
+fi=(298)
+0 1
+fe=(250)
+823 4
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 3
+fe=(250)
+790 5 0 0 1 1
+0 3
+fi=(284) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+2029 2
+fe=(250)
+799 2
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+632 2 1 1
+fi=(233)
+805 5 2 2
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+0 1
+fi=(283)
+491 3
+fe=(250)
+897 8
+
+fl=(296)
+fn=(1164)
+697 6
++1 4 0 0 1
+cfn=(1166) quick_xml::events::attributes::IterState::next
+calls=28 1222 
+* 93 14 1 1
+* 3 1
++3 6
+0 2
+703 5
+
+fn=(1166)
+1222 7
++1 3
+1055 3 0 0 1
+0 1
+1055 1
+fi=(276) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+568 2 1
+fi=(180) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+1720 2
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 1 1
+fe=(296)
+1224 1
+fi=(276)
+89 4
+-89 1
+fe=(296)
+1229 2
+fi=(297) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/utils.rs
+322 1 1
+fe=(296)
+1229 2
+fi=(297)
+322 1 1
+0 2 1 1
+fi=(180)
+1720 3
+fi=(277)
+180 1 1
+fe=(296)
+1360 9
+fi=(277)
+180 8
+0 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(180)
+1720 3
+fi=(277)
+180 3 3
+fe=(296)
+1242 12 3
++39 2
+-80 2 1
+fi=(244) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+0 3
+fe=(296)
+1201 9
+fi=(305) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/lib.rs
+0 1
+fe=(296)
+
+fl=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+fn=(598) std::rt::lang_start_internal
+fi=(306) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 253 26 8 3 1
+fe=(172)
+
+fn=(860)
+cfi=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+cfn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 162 
+206 253 26 8 3 1
+
+fl=(164) ???
+fn=(564) (below main)
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(165) ./csu/../csu/libc-start.c
+cfn=(566) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 253 26 8 3 1
+
+fn=(596) main
+cfi=(172)
+cfn=(598)
+calls=0 152 
+0 253 26 8 3 1
+
+fl=(249)
+fn=(862)
+fi=(306)
+cfi=(250)
+cfn=(864)
+calls=0 384 
+250 253 26 8 3 1
+fe=(249)
+
+ob=(2)
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(588) (below main)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 253 26 8 3 1
+
+fl=(165)
+fn=(566)
+cfi=(168)
+cfn=(588)
+calls=0 30 
+360 253 26 8 3 1
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 253 26 8 3 1
+
+totals: 253 26 8 3 1

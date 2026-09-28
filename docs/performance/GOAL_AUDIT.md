@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0802 — retain malformed-input performance guards
+
+[0802](0802-xml-bounded-prefix-preflight.md) Both benefit gates pass, yet four protected syntax regressions reject the candidate. All 1,248 reports, 28,392 samples and 624 counter dumps pass independent replay. Failed quality evidence and cleanup are retained; production and the wider incomplete requirements remain unchanged.
+
 ## 0801 — preserve the preflight veto after removing replay
 
 [0801](0801-xml-no-replay-preflight.md) Both short-tag benefits qualify, but one protected and twelve other consume regressions remain. All 1,248 reports, 28,392 samples and 624 counter dumps pass replay and independent audits. Candidate archived; production unchanged; broader requirements remain incomplete.
