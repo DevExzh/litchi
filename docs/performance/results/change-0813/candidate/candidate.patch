@@ -1,0 +1,48 @@
+--- a/crates/litchi-pptx/src/notes/codec.rs
++++ b/crates/litchi-pptx/src/notes/codec.rs
+@@ -386,8 +386,8 @@
+             resolver.pop();
+             pending_pop = false;
+         }
+-        match reader.read_event().map_err(xml_error)? {
+-            Event::Start(element) => {
++        match reader.read_event() {
++            Ok(Event::Start(element)) => {
+                 resolver
+                     .push(&element)
+                     .map_err(quick_xml::Error::from)
+@@ -412,7 +412,7 @@
+                 )?;
+                 root_seen = true;
+             },
+-            Event::Empty(element) => {
++            Ok(Event::Empty(element)) => {
+                 resolver
+                     .push(&element)
+                     .map_err(quick_xml::Error::from)
+@@ -437,19 +437,20 @@
+                 )?;
+                 root_seen = true;
+             },
+-            Event::End(_) => {
++            Ok(Event::End(_)) => {
+                 pending_pop = true;
+                 if depth == 0 {
+                     return Err(invalid("unexpected XML closing element"));
+                 }
+                 depth -= 1;
+             },
+-            Event::DocType(_) | Event::PI(_) => {
++            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+                 return Err(invalid("DTDs and processing instructions are rejected"));
+             },
+-            Event::CData(_) => return Err(invalid("CDATA is rejected")),
+-            Event::Eof => break,
+-            _ => {},
++            Ok(Event::CData(_)) => return Err(invalid("CDATA is rejected")),
++            Ok(Event::Eof) => break,
++            Ok(_) => {},
++            Err(error) => return Err(xml_error(error)),
+         }
+     }
+     if !root_seen || depth != 0 {

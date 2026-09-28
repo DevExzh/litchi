@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0813 — direct PPTX event-result matching retained
+
+[0813](0813-pptx-direct-result-workflow.md) The one-file change passes six production quality gates and the frozen public workflow policy: six benefits of 3.120–10.544%, zero latency vetoes, and all 144 allocation comparisons equal. The packet contains 310 reports/6,718 verified outputs with independent replay. Four isolated block p99 increases, five paired RSS increases above 5%, and all spread diagnostics remain explicit. No public API or dependency changes.
+
 ## 0812 — scanner instruction diagnosis identifies the next bounded experiment
 
 [0812](0812-pptx-scanner-instruction-localization.md) The batch retains two fresh profiles/200 verified outputs, exact-binary assembly and inline source attribution, independent offset counts, and the failed historical reconstruction. Samples concentrate in Result::map_err payload movement. No production change or speedup is claimed; explicit event matching is the next candidate to qualify. The post-capture assembly script failure and assembly-only recovery remain recorded.

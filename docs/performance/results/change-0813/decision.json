@@ -1,0 +1,60 @@
+{
+  "adoption_eligible": true,
+  "decided_at": 1790582020.740077,
+  "diagnostic_limits": [
+    "Four individual block p99 increases above 5% remain visible; no general tail-latency claim.",
+    "Five paired RSS increases above 5% and nine RSS spread flags remain visible; no median increase above 5% and no memory-saving claim.",
+    "Callgrind Ir is guest attribution, not native phase fractions or causal cycle savings.",
+    "The eighteen-row deterministic PPTX matrix does not establish universal, cross-format, cold-cache, or concurrency benefits."
+  ],
+  "evidence": {
+    "analysis.json": {
+      "bytes": 3711400,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/analysis.json",
+      "sha256": "fef44f6f30432d60065f3e2f3d8f314eeaa1962780f2539f1c5c6d7f21a46973"
+    },
+    "codegen-analysis.json": {
+      "bytes": 11649,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-analysis.json",
+      "sha256": "347eb44567fdef1fac87ca2c847cb11b1cec42f998539d77de747fd218d36db7"
+    },
+    "codegen-gate.json": {
+      "bytes": 1607,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-gate.json",
+      "sha256": "852c99482c310558c02f88fba3407558a4aa2cb4e4121b6072ac69f9a57edc37"
+    },
+    "profile-analysis.json": {
+      "bytes": 156224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profile-analysis.json",
+      "sha256": "ea6b92cef6d07db57664b22fc4c051897e05be4805ec778da79b03906616d1d1"
+    },
+    "profile-review.md": {
+      "bytes": 5535,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profile-review.md",
+      "sha256": "0c677c6830a66444b07dfa7577f264166cde38eeb93edea7e7d754c9a6ad08cd"
+    },
+    "quality-summary.json": {
+      "bytes": 26272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/quality-summary.json",
+      "sha256": "4465fb9f1e589ef6d9d2a4f669a0752596a5d7fb7e3d4fd985919997506e76ad"
+    },
+    "results-review.md": {
+      "bytes": 3669,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/results-review.md",
+      "sha256": "76c63bf0bcfa8417ab30372ee8e8f9705091d2b92521aff8c3b9bd6f74e5740a"
+    },
+    "root-audit.json": {
+      "bytes": 63326,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/root-audit.json",
+      "sha256": "13d9aa613fc392707f94cbccf14f15dd74a61f15c8d36c2f223591bfd00b5b96"
+    },
+    "source-review.md": {
+      "bytes": 5081,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/source-review.md",
+      "sha256": "f7ab8a7f63c21c51131eb6fc715586d3e849cb581e78b4a9fa806750deac5a18"
+    }
+  },
+  "production_adoption": true,
+  "reason": "Six capture/lifecycle rows pass the frozen benefit threshold, with no latency veto and equality for all 144 paired allocation comparisons. Quality, source semantics, exact code generation, independent numerical replay, and scoped profile checks pass.",
+  "schema": "litchi.performance.0813.decision.v1"
+}

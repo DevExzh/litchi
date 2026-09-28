@@ -1,0 +1,494 @@
+
+/home/zhuhe/code/litchi-target-0813/before-native:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000001329a0 <litchi_pptx::notes::codec::scan_processed_xml>:
+  1329a0:	push   %rbp
+  1329a1:	push   %r15
+  1329a3:	push   %r14
+  1329a5:	push   %r13
+  1329a7:	push   %r12
+  1329a9:	push   %rbx
+  1329aa:	sub    $0x2a8,%rsp
+  1329b1:	mov    %r9d,0x14(%rsp)
+  1329b6:	cmp    %r8,%rcx
+  1329b9:	jbe    1329e2 <litchi_pptx::notes::codec::scan_processed_xml+0x42>
+  1329bb:	movb   $0x9,0x8(%rdi)
+  1329bf:	mov    %r8,0x10(%rdi)
+  1329c3:	lea    -0xfef29(%rip),%rax        # 33aa1 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.3185451642111344503+0x530>
+  1329ca:	mov    %rax,0x18(%rdi)
+  1329ce:	movq   $0xf,0x20(%rdi)
+  1329d6:	movq   $0x1,(%rdi)
+  1329dd:	jmp    1332aa <litchi_pptx::notes::codec::scan_processed_xml+0x90a>
+  1329e2:	cmp    %r8,%rdx
+  1329e5:	jbe    132a0e <litchi_pptx::notes::codec::scan_processed_xml+0x6e>
+  1329e7:	movb   $0x9,0x8(%rdi)
+  1329eb:	mov    %r8,0x10(%rdi)
+  1329ef:	lea    -0xfef6e(%rip),%rax        # 33a88 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.3185451642111344503+0x517>
+  1329f6:	mov    %rax,0x18(%rdi)
+  1329fa:	movq   $0x19,0x20(%rdi)
+  132a02:	movq   $0x1,(%rdi)
+  132a09:	jmp    1332aa <litchi_pptx::notes::codec::scan_processed_xml+0x90a>
+  132a0e:	mov    %rdi,0x8(%rsp)
+  132a13:	mov    %rsi,0x1a0(%rsp)
+  132a1b:	mov    %rdx,0x1a8(%rsp)
+  132a23:	movq   $0x0,0x150(%rsp)
+  132a2f:	movq   $0x1,0x158(%rsp)
+  132a3b:	xorps  %xmm0,%xmm0
+  132a3e:	movups %xmm0,0x160(%rsp)
+  132a46:	movq   $0x8,0x170(%rsp)
+  132a52:	movq   $0x0,0x178(%rsp)
+  132a5e:	movl   $0x0,0x17f(%rsp)
+  132a69:	movw   $0x1,0x183(%rsp)
+  132a73:	movb   $0x1,0x185(%rsp)
+  132a7b:	movups %xmm0,0x186(%rsp)
+  132a83:	movl   $0x0,0x195(%rsp)
+  132a8e:	lea    0xc8(%rsp),%rdi
+  132a96:	call   *0x11cfcc(%rip)        # 24fa68 <_DYNAMIC+0x8e8>
+  132a9c:	movq   $0x0,0xb8(%rsp)
+  132aa8:	movq   $0x0,0xc0(%rsp)
+  132ab4:	movq   $0x0,0x108(%rsp)
+  132ac0:	movq   $0x8,0x110(%rsp)
+  132acc:	xorps  %xmm0,%xmm0
+  132acf:	movups %xmm0,0x118(%rsp)
+  132ad7:	movq   $0x8,0x128(%rsp)
+  132ae3:	movups %xmm0,0x130(%rsp)
+  132aeb:	movq   $0x8,0x140(%rsp)
+  132af7:	movq   $0x0,0x148(%rsp)
+  132b03:	lea    0x1b7(%rsp),%r14
+  132b0b:	lea    0x1e7(%rsp),%r13
+  132b13:	xor    %ebx,%ebx
+  132b15:	xor    %ebp,%ebp
+  132b17:	xor    %r12d,%r12d
+  132b1a:	xor    %r15d,%r15d
+  132b1d:	jmp    132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132b1f:	nop
+  132b20:	mov    0xa0(%rsp),%rdi
+  132b28:	call   *0x11c84a(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  132b2e:	test   $0x1,%bl
+  132b31:	lea    0x60(%rsp),%rbx
+  132b36:	je     132bc4 <litchi_pptx::notes::codec::scan_processed_xml+0x224>
+  132b3c:	movzwl 0x100(%rsp),%edx
+  132b44:	cmp    $0x1,%dx
+  132b48:	adc    $0xffffffff,%edx
+  132b4b:	mov    %dx,0x100(%rsp)
+  132b53:	mov    0xe8(%rsp),%rax
+  132b5b:	mov    0xf0(%rsp),%rsi
+  132b63:	mov    %rsi,%rcx
+  132b66:	shl    $0x5,%rcx
+  132b6a:	lea    (%rax,%rcx,1),%r8
+  132b6e:	xor    %edi,%edi
+  132b70:	test   %rcx,%rcx
+  132b73:	je     132bb0 <litchi_pptx::notes::codec::scan_processed_xml+0x210>
+  132b75:	add    $0xffffffffffffffe0,%rcx
+  132b79:	inc    %rdi
+  132b7c:	cmp    %dx,-0x8(%r8)
+  132b81:	lea    -0x20(%r8),%r8
+  132b85:	ja     132b70 <litchi_pptx::notes::codec::scan_processed_xml+0x1d0>
+  132b87:	mov    %rsi,%rdx
+  132b8a:	sub    %rdi,%rdx
+  132b8d:	inc    %rdx
+  132b90:	cmp    %rsi,%rdx
+  132b93:	jae    132bc4 <litchi_pptx::notes::codec::scan_processed_xml+0x224>
+  132b95:	mov    0x20(%rax,%rcx,1),%rax
+  132b9a:	cmp    0xd8(%rsp),%rax
+  132ba2:	jbe    132bb4 <litchi_pptx::notes::codec::scan_processed_xml+0x214>
+  132ba4:	jmp    132bbc <litchi_pptx::notes::codec::scan_processed_xml+0x21c>
+  132ba6:	cs nopw 0x0(%rax,%rax,1)
+  132bb0:	xor    %eax,%eax
+  132bb2:	xor    %edx,%edx
+  132bb4:	mov    %rax,0xd8(%rsp)
+  132bbc:	mov    %rdx,0xf0(%rsp)
+  132bc4:	mov    %rbx,%rdi
+  132bc7:	lea    0x150(%rsp),%rsi
+  132bcf:	call   18b6d0 <quick_xml::reader::Reader<R>::read_event_impl>
+  132bd4:	movabs $0x800000000000000e,%rax
+  132bde:	inc    %rax
+  132be1:	cmp    %rax,0x60(%rsp)
+  132be6:	jne    132e72 <litchi_pptx::notes::codec::scan_processed_xml+0x4d2>
+  132bec:	lea    0x68(%rsp),%rcx
+  132bf1:	mov    0x20(%rcx),%rax
+  132bf5:	mov    %rax,0x20(%r14)
+  132bf9:	movups (%rcx),%xmm0
+  132bfc:	movups 0x10(%rcx),%xmm1
+  132c00:	movups %xmm1,0x10(%r14)
+  132c05:	movups %xmm0,(%r14)
+  132c09:	mov    0x20(%r14),%rax
+  132c0d:	mov    %rax,0x20(%r13)
+  132c11:	movups (%r14),%xmm0
+  132c15:	movups 0x10(%r14),%xmm1
+  132c1a:	movups %xmm1,0x10(%r13)
+  132c1f:	movups %xmm0,0x0(%r13)
+  132c24:	movups 0x0(%r13),%xmm0
+  132c29:	movups 0x10(%r13),%xmm1
+  132c2e:	movaps %xmm0,0x90(%rsp)
+  132c36:	movaps %xmm1,0xa0(%rsp)
+  132c3e:	mov    0x20(%r13),%rax
+  132c42:	mov    %rax,0xb0(%rsp)
+  132c4a:	mov    0x90(%rsp),%rax
+  132c52:	cmp    $0xa,%rax
+  132c56:	ja     132e10 <litchi_pptx::notes::codec::scan_processed_xml+0x470>
+  132c5c:	lea    -0x10e0c7(%rip),%rdx        # 24b9c <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x3ed4>
+  132c63:	movslq (%rdx,%rax,4),%rcx
+  132c67:	add    %rdx,%rcx
+  132c6a:	jmp    *%rcx
+  132c6c:	movups 0x8(%r13),%xmm0
+  132c71:	movups 0x18(%r13),%xmm1
+  132c76:	movaps %xmm1,0x70(%rsp)
+  132c7b:	movaps %xmm0,0x60(%rsp)
+  132c80:	lea    0x18(%rsp),%rdi
+  132c85:	lea    0xc8(%rsp),%rsi
+  132c8d:	mov    %rbx,%rdx
+  132c90:	call   *0x11d42a(%rip)        # 2500c0 <_DYNAMIC+0xf40>
+  132c96:	cmpl   $0x6,0x18(%rsp)
+  132c9b:	jne    13316f <litchi_pptx::notes::codec::scan_processed_xml+0x7cf>
+  132ca1:	inc    %rbp
+  132ca4:	cmp    $0x80,%rbp
+  132cab:	ja     132fd8 <litchi_pptx::notes::codec::scan_processed_xml+0x638>
+  132cb1:	inc    %r12
+  132cb4:	cmp    $0x186a0,%r12
+  132cbb:	ja     132fbe <litchi_pptx::notes::codec::scan_processed_xml+0x61e>
+  132cc1:	not    %r15b
+  132cc4:	movzbl %r15b,%eax
+  132cc8:	and    $0x1,%eax
+  132ccb:	movzbl 0x14(%rsp),%ecx
+  132cd0:	lea    0x18(%rsp),%rdi
+  132cd5:	lea    0xc8(%rsp),%rsi
+  132cdd:	mov    %rbx,%rdx
+  132ce0:	mov    0x2e0(%rsp),%r8
+  132ce8:	mov    0x2e8(%rsp),%r9
+  132cf0:	lea    0x108(%rsp),%r10
+  132cf8:	push   %r10
+  132cfa:	lea    0xc8(%rsp),%r10
+  132d02:	push   %r10
+  132d04:	lea    0xc8(%rsp),%r10
+  132d0c:	push   %r10
+  132d0e:	push   %rax
+  132d0f:	call   1310b0 <litchi_pptx::notes::codec::inspect_element>
+  132d14:	add    $0x20,%rsp
+  132d18:	cmpb   $0x27,0x18(%rsp)
+  132d1d:	jne    1331ed <litchi_pptx::notes::codec::scan_processed_xml+0x84d>
+  132d23:	cmpq   $0x0,0x60(%rsp)
+  132d29:	jle    132d36 <litchi_pptx::notes::codec::scan_processed_xml+0x396>
+  132d2b:	mov    0x68(%rsp),%rdi
+  132d30:	call   *0x11c642(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  132d36:	mov    $0x1,%r15b
+  132d39:	xor    %ebx,%ebx
+  132d3b:	jmp    132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132d40:	movups 0x8(%r13),%xmm0
+  132d45:	movups 0x18(%r13),%xmm1
+  132d4a:	movaps %xmm1,0x70(%rsp)
+  132d4f:	movaps %xmm0,0x60(%rsp)
+  132d54:	lea    0x18(%rsp),%rdi
+  132d59:	lea    0xc8(%rsp),%rsi
+  132d61:	mov    %rbx,%rdx
+  132d64:	call   *0x11d356(%rip)        # 2500c0 <_DYNAMIC+0xf40>
+  132d6a:	cmpl   $0x6,0x18(%rsp)
+  132d6f:	jne    1331af <litchi_pptx::notes::codec::scan_processed_xml+0x80f>
+  132d75:	inc    %r12
+  132d78:	cmp    $0x186a0,%r12
+  132d7f:	ja     132fbe <litchi_pptx::notes::codec::scan_processed_xml+0x61e>
+  132d85:	cmp    $0x7f,%rbp
+  132d89:	ja     132fd8 <litchi_pptx::notes::codec::scan_processed_xml+0x638>
+  132d8f:	not    %r15b
+  132d92:	movzbl %r15b,%eax
+  132d96:	and    $0x1,%eax
+  132d99:	movzbl 0x14(%rsp),%ecx
+  132d9e:	lea    0x18(%rsp),%rdi
+  132da3:	lea    0xc8(%rsp),%rsi
+  132dab:	mov    %rbx,%rdx
+  132dae:	mov    0x2e0(%rsp),%r8
+  132db6:	mov    0x2e8(%rsp),%r9
+  132dbe:	lea    0x108(%rsp),%r10
+  132dc6:	push   %r10
+  132dc8:	lea    0xc8(%rsp),%r10
+  132dd0:	push   %r10
+  132dd2:	lea    0xc8(%rsp),%r10
+  132dda:	push   %r10
+  132ddc:	push   %rax
+  132ddd:	call   1310b0 <litchi_pptx::notes::codec::inspect_element>
+  132de2:	add    $0x20,%rsp
+  132de6:	cmpb   $0x27,0x18(%rsp)
+  132deb:	jne    1331ed <litchi_pptx::notes::codec::scan_processed_xml+0x84d>
+  132df1:	cmpq   $0x0,0x60(%rsp)
+  132df7:	jle    132e04 <litchi_pptx::notes::codec::scan_processed_xml+0x464>
+  132df9:	mov    0x68(%rsp),%rdi
+  132dfe:	call   *0x11c574(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  132e04:	mov    $0x1,%r15b
+  132e07:	mov    $0x1,%bl
+  132e09:	jmp    132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132e0e:	xchg   %ax,%ax
+  132e10:	xor    %ebx,%ebx
+  132e12:	add    $0xfffffffffffffffd,%rax
+  132e16:	cmp    $0x6,%rax
+  132e1a:	ja     132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132e20:	lea    -0x10e25f(%rip),%rcx        # 24bc8 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x3f00>
+  132e27:	movslq (%rcx,%rax,4),%rax
+  132e2b:	add    %rcx,%rax
+  132e2e:	jmp    *%rax
+  132e30:	xor    %ebx,%ebx
+  132e32:	cmpq   $0x0,0x98(%rsp)
+  132e3b:	jg     132b20 <litchi_pptx::notes::codec::scan_processed_xml+0x180>
+  132e41:	jmp    132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132e46:	cs nopw 0x0(%rax,%rax,1)
+  132e50:	test   %rbp,%rbp
+  132e53:	je     1330de <litchi_pptx::notes::codec::scan_processed_xml+0x73e>
+  132e59:	dec    %rbp
+  132e5c:	mov    $0x1,%bl
+  132e5e:	cmpq   $0x0,0x98(%rsp)
+  132e67:	jg     132b20 <litchi_pptx::notes::codec::scan_processed_xml+0x180>
+  132e6d:	jmp    132b2e <litchi_pptx::notes::codec::scan_processed_xml+0x18e>
+  132e72:	movups 0x60(%rsp),%xmm0
+  132e77:	movups 0x70(%rsp),%xmm1
+  132e7c:	movups 0x80(%rsp),%xmm2
+  132e84:	movaps %xmm2,0x230(%rsp)
+  132e8c:	movaps %xmm1,0x220(%rsp)
+  132e94:	movaps %xmm0,0x210(%rsp)
+  132e9c:	lea    0x18(%rsp),%rdi
+  132ea1:	lea    0x210(%rsp),%rsi
+  132ea9:	call   12c230 <litchi_pptx::tag::shape::validation::xml_error>
+  132eae:	movzbl 0x18(%rsp),%eax
+  132eb3:	movups 0x19(%rsp),%xmm0
+  132eb8:	movaps %xmm0,0x1b0(%rsp)
+  132ec0:	movups 0x29(%rsp),%xmm0
+  132ec5:	movaps %xmm0,0x1c0(%rsp)
+  132ecd:	movups 0x38(%rsp),%xmm0
+  132ed2:	movups %xmm0,0x1cf(%rsp)
+  132eda:	mov    0x58(%rsp),%rcx
+  132edf:	mov    0x8(%rsp),%rdx
+  132ee4:	mov    %rcx,0x48(%rdx)
+  132ee8:	movups 0x48(%rsp),%xmm0
+  132eed:	movups %xmm0,0x38(%rdx)
+  132ef1:	movaps 0x1b0(%rsp),%xmm0
+  132ef9:	movaps 0x1c0(%rsp),%xmm1
+  132f01:	movaps %xmm0,0x1e0(%rsp)
+  132f09:	movaps %xmm1,0x1f0(%rsp)
+  132f11:	movups 0x1cf(%rsp),%xmm1
+  132f19:	movups %xmm1,0x1ff(%rsp)
+  132f21:	movups 0x1ff(%rsp),%xmm1
+  132f29:	movups %xmm1,0x28(%rdx)
+  132f2d:	movaps 0x1f0(%rsp),%xmm1
+  132f35:	movups %xmm1,0x19(%rdx)
+  132f39:	movups %xmm0,0x9(%rdx)
+  132f3d:	mov    %al,0x8(%rdx)
+  132f40:	movq   $0x1,(%rdx)
+  132f47:	lea    0x108(%rsp),%rdi
+  132f4f:	call   174c80 <core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>>
+  132f54:	cmpq   $0x0,0xc8(%rsp)
+  132f5d:	jne    133251 <litchi_pptx::notes::codec::scan_processed_xml+0x8b1>
+  132f63:	jmp    13325f <litchi_pptx::notes::codec::scan_processed_xml+0x8bf>
+  132f68:	mov    $0x2d,%edi
+  132f6d:	call   *0x11c3f5(%rip)        # 24f368 <malloc@GLIBC_2.2.5>
+  132f73:	test   %rax,%rax
+  132f76:	je     133326 <litchi_pptx::notes::codec::scan_processed_xml+0x986>
+  132f7c:	movups -0x10ce95(%rip),%xmm0        # 260ee <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5426>
+  132f83:	movups %xmm0,0x1d(%rax)
+  132f87:	movups -0x10cead(%rip),%xmm0        # 260e1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5419>
+  132f8e:	movups %xmm0,0x10(%rax)
+  132f92:	movups -0x10cec8(%rip),%xmm0        # 260d1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5409>
+  132f99:	movups %xmm0,(%rax)
+  132f9c:	mov    0x8(%rsp),%rcx
+  132fa1:	movb   $0x8,0x8(%rcx)
+  132fa5:	movq   $0x2d,0x10(%rcx)
+  132fad:	mov    %rax,0x18(%rcx)
+  132fb1:	movq   $0x2d,0x20(%rcx)
+  132fb9:	jmp    13312a <litchi_pptx::notes::codec::scan_processed_xml+0x78a>
+  132fbe:	mov    0x8(%rsp),%rcx
+  132fc3:	movb   $0x9,0x8(%rcx)
+  132fc7:	movq   $0x186a0,0x10(%rcx)
+  132fcf:	lea    -0xff57d(%rip),%rax        # 33a59 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.3185451642111344503+0x4e8>
+  132fd6:	jmp    132ff0 <litchi_pptx::notes::codec::scan_processed_xml+0x650>
+  132fd8:	mov    0x8(%rsp),%rcx
+  132fdd:	movb   $0x9,0x8(%rcx)
+  132fe1:	movq   $0x80,0x10(%rcx)
+  132fe9:	lea    -0xff588(%rip),%rax        # 33a68 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.3185451642111344503+0x4f7>
+  132ff0:	mov    %rax,0x18(%rcx)
+  132ff4:	movq   $0xf,0x20(%rcx)
+  132ffc:	movq   $0x1,(%rcx)
+  133003:	cmpq   $0x0,0x60(%rsp)
+  133009:	jg     13322e <litchi_pptx::notes::codec::scan_processed_xml+0x88e>
+  13300f:	jmp    133239 <litchi_pptx::notes::codec::scan_processed_xml+0x899>
+  133014:	lea    0x90(%rsp),%rdi
+  13301c:	call   173620 <core::ptr::drop_in_place<quick_xml::events::Event>>
+  133021:	test   %rbp,%rbp
+  133024:	sete   %al
+  133027:	test   %al,%r15b
+  13302a:	je     1332bc <litchi_pptx::notes::codec::scan_processed_xml+0x91c>
+  133030:	mov    0x148(%rsp),%rax
+  133038:	mov    0x8(%rsp),%rcx
+  13303d:	mov    %rax,0x48(%rcx)
+  133041:	movups 0x108(%rsp),%xmm0
+  133049:	movups 0x118(%rsp),%xmm1
+  133051:	movups 0x128(%rsp),%xmm2
+  133059:	movups 0x138(%rsp),%xmm3
+  133061:	movups %xmm3,0x38(%rcx)
+  133065:	movups %xmm2,0x28(%rcx)
+  133069:	movups %xmm1,0x18(%rcx)
+  13306d:	movups %xmm0,0x8(%rcx)
+  133071:	movq   $0x0,(%rcx)
+  133078:	lea    0xc8(%rsp),%rdi
+  133080:	call   174dd0 <core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>>
+  133085:	lea    0x150(%rsp),%rdi
+  13308d:	call   175ed0 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+  133092:	jmp    1332aa <litchi_pptx::notes::codec::scan_processed_xml+0x90a>
+  133097:	mov    $0x11,%r14d
+  13309d:	mov    $0x11,%edi
+  1330a2:	call   *0x11c2c0(%rip)        # 24f368 <malloc@GLIBC_2.2.5>
+  1330a8:	test   %rax,%rax
+  1330ab:	je     133338 <litchi_pptx::notes::codec::scan_processed_xml+0x998>
+  1330b1:	movups -0xff641(%rip),%xmm0        # 33a77 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.3185451642111344503+0x506>
+  1330b8:	movups %xmm0,(%rax)
+  1330bb:	movb   $0x64,0x10(%rax)
+  1330bf:	mov    0x8(%rsp),%rcx
+  1330c4:	movb   $0x8,0x8(%rcx)
+  1330c8:	movq   $0x11,0x10(%rcx)
+  1330d0:	mov    %rax,0x18(%rcx)
+  1330d4:	movq   $0x11,0x20(%rcx)
+  1330dc:	jmp    13312a <litchi_pptx::notes::codec::scan_processed_xml+0x78a>
+  1330de:	mov    $0x1e,%r14d
+  1330e4:	mov    $0x1e,%edi
+  1330e9:	call   *0x11c279(%rip)        # 24f368 <malloc@GLIBC_2.2.5>
+  1330ef:	test   %rax,%rax
+  1330f2:	je     133338 <litchi_pptx::notes::codec::scan_processed_xml+0x998>
+  1330f8:	movups -0x10cff2(%rip),%xmm0        # 2610d <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5445>
+  1330ff:	movups %xmm0,0xe(%rax)
+  133103:	movups -0x10d00b(%rip),%xmm0        # 260ff <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5437>
+  13310a:	movups %xmm0,(%rax)
+  13310d:	mov    0x8(%rsp),%rcx
+  133112:	movb   $0x8,0x8(%rcx)
+  133116:	movq   $0x1e,0x10(%rcx)
+  13311e:	mov    %rax,0x18(%rcx)
+  133122:	movq   $0x1e,0x20(%rcx)
+  13312a:	movq   $0x1,(%rcx)
+  133131:	cmpq   $0x0,0x98(%rsp)
+  13313a:	jle    133239 <litchi_pptx::notes::codec::scan_processed_xml+0x899>
+  133140:	mov    0xa0(%rsp),%rdi
+  133148:	call   *0x11c22a(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  13314e:	lea    0x108(%rsp),%rdi
+  133156:	call   174c80 <core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>>
+  13315b:	cmpq   $0x0,0xc8(%rsp)
+  133164:	jne    133251 <litchi_pptx::notes::codec::scan_processed_xml+0x8b1>
+  13316a:	jmp    13325f <litchi_pptx::notes::codec::scan_processed_xml+0x8bf>
+  13316f:	movups 0x18(%rsp),%xmm0
+  133174:	movups 0x28(%rsp),%xmm1
+  133179:	movups %xmm1,0x260(%rsp)
+  133181:	movups %xmm0,0x250(%rsp)
+  133189:	movabs $0x800000000000000e,%rax
+  133193:	mov    %rax,0x248(%rsp)
+  13319b:	lea    0x18(%rsp),%rdi
+  1331a0:	lea    0x248(%rsp),%rsi
+  1331a8:	call   12c230 <litchi_pptx::tag::shape::validation::xml_error>
+  1331ad:	jmp    1331ed <litchi_pptx::notes::codec::scan_processed_xml+0x84d>
+  1331af:	movups 0x18(%rsp),%xmm0
+  1331b4:	movups 0x28(%rsp),%xmm1
+  1331b9:	movups %xmm1,0x290(%rsp)
+  1331c1:	movups %xmm0,0x280(%rsp)
+  1331c9:	movabs $0x800000000000000e,%rax
+  1331d3:	mov    %rax,0x278(%rsp)
+  1331db:	lea    0x18(%rsp),%rdi
+  1331e0:	lea    0x278(%rsp),%rsi
+  1331e8:	call   12c230 <litchi_pptx::tag::shape::validation::xml_error>
+  1331ed:	mov    0x58(%rsp),%rax
+  1331f2:	mov    0x8(%rsp),%rcx
+  1331f7:	mov    %rax,0x48(%rcx)
+  1331fb:	movups 0x18(%rsp),%xmm0
+  133200:	movups 0x28(%rsp),%xmm1
+  133205:	movups 0x38(%rsp),%xmm2
+  13320a:	movups 0x48(%rsp),%xmm3
+  13320f:	movups %xmm3,0x38(%rcx)
+  133213:	movups %xmm2,0x28(%rcx)
+  133217:	movups %xmm1,0x18(%rcx)
+  13321b:	movups %xmm0,0x8(%rcx)
+  13321f:	movq   $0x1,(%rcx)
+  133226:	cmpq   $0x0,0x60(%rsp)
+  13322c:	jle    133239 <litchi_pptx::notes::codec::scan_processed_xml+0x899>
+  13322e:	mov    0x68(%rsp),%rdi
+  133233:	call   *0x11c13f(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  133239:	lea    0x108(%rsp),%rdi
+  133241:	call   174c80 <core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>>
+  133246:	cmpq   $0x0,0xc8(%rsp)
+  13324f:	je     13325f <litchi_pptx::notes::codec::scan_processed_xml+0x8bf>
+  133251:	mov    0xd0(%rsp),%rdi
+  133259:	call   *0x11c119(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  13325f:	cmpq   $0x0,0xe0(%rsp)
+  133268:	je     133278 <litchi_pptx::notes::codec::scan_processed_xml+0x8d8>
+  13326a:	mov    0xe8(%rsp),%rdi
+  133272:	call   *0x11c100(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  133278:	cmpq   $0x0,0x150(%rsp)
+  133281:	je     133291 <litchi_pptx::notes::codec::scan_processed_xml+0x8f1>
+  133283:	mov    0x158(%rsp),%rdi
+  13328b:	call   *0x11c0e7(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  133291:	cmpq   $0x0,0x168(%rsp)
+  13329a:	je     1332aa <litchi_pptx::notes::codec::scan_processed_xml+0x90a>
+  13329c:	mov    0x170(%rsp),%rdi
+  1332a4:	call   *0x11c0ce(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  1332aa:	add    $0x2a8,%rsp
+  1332b1:	pop    %rbx
+  1332b2:	pop    %r12
+  1332b4:	pop    %r13
+  1332b6:	pop    %r14
+  1332b8:	pop    %r15
+  1332ba:	pop    %rbp
+  1332bb:	ret
+  1332bc:	mov    $0x20,%edi
+  1332c1:	call   *0x11c0a1(%rip)        # 24f368 <malloc@GLIBC_2.2.5>
+  1332c7:	test   %rax,%rax
+  1332ca:	mov    0x8(%rsp),%rcx
+  1332cf:	je     133348 <litchi_pptx::notes::codec::scan_processed_xml+0x9a8>
+  1332d1:	movups -0x119f18(%rip),%xmm0        # 193c0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x365>
+  1332d8:	movups %xmm0,0x10(%rax)
+  1332dc:	movups -0x119f33(%rip),%xmm0        # 193b0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x355>
+  1332e3:	movups %xmm0,(%rax)
+  1332e6:	movb   $0x8,0x8(%rcx)
+  1332ea:	movq   $0x20,0x10(%rcx)
+  1332f2:	mov    %rax,0x18(%rcx)
+  1332f6:	movq   $0x20,0x20(%rcx)
+  1332fe:	movq   $0x1,(%rcx)
+  133305:	lea    0x108(%rsp),%rdi
+  13330d:	call   174c80 <core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>>
+  133312:	cmpq   $0x0,0xc8(%rsp)
+  13331b:	jne    133251 <litchi_pptx::notes::codec::scan_processed_xml+0x8b1>
+  133321:	jmp    13325f <litchi_pptx::notes::codec::scan_processed_xml+0x8bf>
+  133326:	mov    $0x1,%edi
+  13332b:	mov    $0x2d,%esi
+  133330:	call   *0x11c07a(%rip)        # 24f3b0 <_DYNAMIC+0x230>
+  133336:	jmp    133358 <litchi_pptx::notes::codec::scan_processed_xml+0x9b8>
+  133338:	mov    $0x1,%edi
+  13333d:	mov    %r14,%rsi
+  133340:	call   *0x11c06a(%rip)        # 24f3b0 <_DYNAMIC+0x230>
+  133346:	jmp    133358 <litchi_pptx::notes::codec::scan_processed_xml+0x9b8>
+  133348:	mov    $0x1,%edi
+  13334d:	mov    $0x20,%esi
+  133352:	call   *0x11c058(%rip)        # 24f3b0 <_DYNAMIC+0x230>
+  133358:	ud2
+  13335a:	jmp    13338e <litchi_pptx::notes::codec::scan_processed_xml+0x9ee>
+  13335c:	jmp    13338e <litchi_pptx::notes::codec::scan_processed_xml+0x9ee>
+  13335e:	jmp    133360 <litchi_pptx::notes::codec::scan_processed_xml+0x9c0>
+  133360:	mov    %rax,%rbx
+  133363:	lea    0x90(%rsp),%rdi
+  13336b:	call   173620 <core::ptr::drop_in_place<quick_xml::events::Event>>
+  133370:	jmp    1333a9 <litchi_pptx::notes::codec::scan_processed_xml+0xa09>
+  133372:	jmp    1333a6 <litchi_pptx::notes::codec::scan_processed_xml+0xa06>
+  133374:	mov    %rax,%rbx
+  133377:	lea    0x150(%rsp),%rdi
+  13337f:	call   175ed0 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+  133384:	mov    %rbx,%rdi
+  133387:	call   244860 <_Unwind_Resume@plt>
+  13338c:	jmp    13338e <litchi_pptx::notes::codec::scan_processed_xml+0x9ee>
+  13338e:	mov    %rax,%rbx
+  133391:	cmpq   $0x0,0x60(%rsp)
+  133397:	jle    1333a9 <litchi_pptx::notes::codec::scan_processed_xml+0xa09>
+  133399:	mov    0x68(%rsp),%rdi
+  13339e:	call   *0x11bfd4(%rip)        # 24f378 <free@GLIBC_2.2.5>
+  1333a4:	jmp    1333a9 <litchi_pptx::notes::codec::scan_processed_xml+0xa09>
+  1333a6:	mov    %rax,%rbx
+  1333a9:	lea    0x108(%rsp),%rdi
+  1333b1:	call   174c80 <core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>>
+  1333b6:	lea    0xc8(%rsp),%rdi
+  1333be:	call   174dd0 <core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>>
+  1333c3:	lea    0x150(%rsp),%rdi
+  1333cb:	call   175ed0 <core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>>
+  1333d0:	mov    %rbx,%rdi
+  1333d3:	call   244860 <_Unwind_Resume@plt>

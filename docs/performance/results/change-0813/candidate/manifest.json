@@ -1,0 +1,84 @@
+{
+  "schema": "litchi.performance.0813.candidate-manifest.v1",
+  "base_commit": "03305a82aa23ea33b9e0a72470731d77cd8d8007",
+  "candidate_name": "direct-result-event-match",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "production_path": "crates/litchi-pptx/src/notes/codec.rs",
+  "before": {
+    "path": "candidate/before/codec.rs",
+    "bytes": 52375,
+    "sha256": "466e504588843a0b2538fc25ce3378b6fb9bf13aa9b0d74efebcb73ca0ebab5e"
+  },
+  "after": {
+    "path": "candidate/after/codec.rs",
+    "bytes": 52443,
+    "sha256": "007c2429b44027c37bb6f648f8a2841bfce7ef74b164aa70ed08fd06248b4f0d"
+  },
+  "patch": {
+    "path": "candidate/candidate.patch",
+    "bytes": 1737,
+    "sha256": "da23ae2c0b7e92c0b58ad41c79b3617f3e430604bb6f5f7f8356936bcd11085b",
+    "scope": "one production path; git apply compatible"
+  },
+  "implementation": {
+    "reader": "quick_xml::Reader<&[u8]>",
+    "event_dispatch": "direct match on Reader::read_event() Result<Event, quick_xml::Error>",
+    "success_arms": "all existing event arms wrapped in Ok, including the DocType/PI alternative and wildcard",
+    "error_arm": "Err(error) returns xml_error(error)",
+    "event_bodies_changed": false,
+    "event_order_changed": false,
+    "buffered_scan_oracle_changed": false,
+    "inspect_element_oracle_changed": false,
+    "new_tests": false,
+    "unsafe_code": false,
+    "new_dependency": false,
+    "public_api_changed": false,
+    "ambient_state": false
+  },
+  "existing_coverage": [
+    "empty_attribute_tail_candidate_matches_buffered_oracle_boundaries",
+    "the_borrowed_scanner_matches_the_buffered_oracle_on_handcrafted_and_mutated_xml",
+    "the_borrowed_scanner_matches_the_buffered_oracle_on_the_pptx_corpus"
+  ],
+  "formatting": {
+    "status": "root-owned-rustfmt-pass",
+    "manifest_hash_refresh_required": false,
+    "owner": "root",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config-path",
+      "rustfmt.toml",
+      "docs/performance/results/change-0813/candidate/after/codec.rs"
+    ],
+    "exit_code": 0
+  },
+  "required_gates": [
+    "byte-identical before source against the current production base",
+    "git apply --check succeeds against the production path",
+    "buffered oracle, refusal corpus, and full differential tests remain byte-identical",
+    "format and warning-denied quality checks",
+    "fresh native/profile evidence before any adoption decision",
+    "final source disposition audit (retain only if all adoption gates pass; otherwise restore exact baseline)"
+  ],
+  "workflow_advancement": false,
+  "performance_claim": false,
+  "files": {
+    "notes_codec": {
+      "production_path": "crates/litchi-pptx/src/notes/codec.rs",
+      "before": {
+        "path": "candidate/before/codec.rs",
+        "bytes": 52375,
+        "sha256": "466e504588843a0b2538fc25ce3378b6fb9bf13aa9b0d74efebcb73ca0ebab5e"
+      },
+      "after": {
+        "path": "candidate/after/codec.rs",
+        "bytes": 52443,
+        "sha256": "007c2429b44027c37bb6f648f8a2841bfce7ef74b164aa70ed08fd06248b4f0d"
+      }
+    }
+  }
+}

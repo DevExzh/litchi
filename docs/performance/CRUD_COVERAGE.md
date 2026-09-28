@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0813 — capture, commit, and lifecycle qualify direct matching
+
+[0813](0813-pptx-direct-result-workflow.md) Six shapes across all three public workflows preserve source/output/full semantic oracles. Six candidate quality gates pass (1,241 tests, three ignored), both probes pass 36 tests, and all 144 resource comparisons are equal. The private codec change adds no public capability; iWork and other formats are outside this trial.
+
 ## 0812 — capture semantics preserved during instruction diagnosis
 
 [0812](0812-pptx-scanner-instruction-localization.md) All 200 fresh large-capture outputs match the sealed source/output/semantic oracles. Production, six probe files, and all 35 normative inputs are unchanged. This adds instruction attribution only; no new CRUD capability or production quality-gate run is claimed.

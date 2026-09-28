@@ -1,0 +1,62 @@
+{
+  "commands": [
+    {
+      "command": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "ended": 1790580299.230902,
+      "exit_code": 0,
+      "started": 1790580299.2126846,
+      "stderr": "",
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "ended": 1790580299.245519,
+      "exit_code": 0,
+      "started": 1790580299.2309055,
+      "stderr": "",
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+    },
+    {
+      "command": [
+        "valgrind",
+        "--version"
+      ],
+      "ended": 1790580299.2465265,
+      "exit_code": 0,
+      "started": 1790580299.245521,
+      "stderr": "",
+      "stdout": "valgrind-3.26.0\n"
+    },
+    {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "ended": 1790580299.2473607,
+      "exit_code": 0,
+      "started": 1790580299.2465293,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "ended": 1790580299.2484024,
+      "exit_code": 0,
+      "started": 1790580299.2473626,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    }
+  ],
+  "observation_phase": "after baseline release builds, during baseline probe quality; not represented as a pre-build freeze",
+  "schema": "litchi.performance.0813.toolchain.v1"
+}

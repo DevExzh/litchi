@@ -1,0 +1,17 @@
+{
+  "children": 18,
+  "plan_sha256": "5c1e339481befb55d9d2a00366f979b0458d0564fa913f68ab2facbba7080782",
+  "receipts": {
+    "bytes": 116853,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/qualification/receipts.json",
+    "sha256": "27c5f1dc032a9ff8147a6884a74ef215b84d3beef93a8de0d9f3964859932421"
+  },
+  "reports": 18,
+  "samples": 18,
+  "schema": "litchi.performance.0813.qualification.complete.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/qualification/source.json",
+    "sha256": "b96e6e4299ec7b9442b2aba79c51495109b3c83dac3c8a69e8d45d3457afad0e"
+  }
+}
