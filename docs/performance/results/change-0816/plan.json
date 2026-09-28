@@ -1,0 +1,729 @@
+{
+  "affinity": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "bootstrap": {
+    "confidence": 0.95,
+    "high_rank": 9749,
+    "low_rank": 250,
+    "resamples": 10000,
+    "seed": 816816,
+    "statistic": "median of six paired block ratios"
+  },
+  "cases": [
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "cfb",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536,
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    }
+  ],
+  "counts": {
+    "reports": 648,
+    "samples": 13320
+  },
+  "interpretation": "Descriptive finite-budget scaling and source-model controls on unchanged production. No adoption threshold or production optimization claim. Source sleeps are requested durations, not measured network RTT.",
+  "limits": [
+    "synthetic immutable in-memory corpus",
+    "caller-source simulation only",
+    "no physical cold or network",
+    "CPU and RSS scopes differ from wall time",
+    "separate observer counter build",
+    "no cross-session contention",
+    "no native-format CRUD or cross-format speedup claim"
+  ],
+  "native": {
+    "blocks": 6,
+    "orders": [
+      "forward",
+      "reverse",
+      "forward",
+      "reverse",
+      "reverse",
+      "forward"
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "orders": [
+      "forward",
+      "reverse"
+    ],
+    "samples": 2,
+    "warmup": 0
+  },
+  "qualification": {
+    "blocks": 1,
+    "orders": [
+      "forward"
+    ],
+    "samples": 1,
+    "warmup": 0
+  },
+  "schema": "litchi.performance.0816.plan.v1",
+  "source_profiles": {
+    "capped": {
+      "source_delay_us": 0,
+      "source_max_read_bytes": 65536
+    },
+    "delayed": {
+      "source_delay_us": 250,
+      "source_max_read_bytes": 65536
+    },
+    "local": {
+      "source_delay_us": 0,
+      "source_max_read_bytes": 0
+    }
+  }
+}

@@ -1,0 +1,72 @@
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling hybrid-array v0.4.14
+   Compiling crossbeam-utils v0.8.22
+   Compiling generic-array v0.14.9
+   Compiling crossbeam-epoch v0.9.20
+   Compiling serde_core v1.0.229
+   Compiling cpufeatures v0.3.1
+   Compiling rand_core v0.10.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling num-traits v0.2.19
+   Compiling serde v1.0.229
+   Compiling rayon-core v1.13.0
+   Compiling zmij v1.0.19
+   Compiling getrandom v0.4.3
+   Compiling chacha20 v0.10.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling once_cell v1.21.4
+   Compiling either v1.18.0
+   Compiling itoa v1.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling chrono v0.4.45
+   Compiling serde_json v1.0.149
+   Compiling rayon v1.12.0
+   Compiling thiserror v2.0.18
+   Compiling digest v0.10.7
+   Compiling rand v0.10.2
+   Compiling zerocopy v0.8.56
+   Compiling sha2 v0.11.0
+   Compiling smallvec v1.16.0
+   Compiling bitflags v2.13.1
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling cpufeatures v0.2.17
+   Compiling zlib-rs v0.6.7
+   Compiling linux-raw-sys v0.12.1
+   Compiling rustix v1.1.4
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling sha2 v0.10.9
+   Compiling flate2 v1.1.10
+   Compiling crc32fast v1.5.1
+   Compiling getrandom v0.3.4
+   Compiling debug_unsafe v0.1.4
+   Compiling fastrand v2.5.0
+   Compiling atoi_simd v0.18.1
+   Compiling tempfile v3.27.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi/tools/perf-execution)
+    Finished `test` profile [unoptimized] target(s) in 10.59s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0816/quality-0/debug/deps/litchi_perf_execution-a7e44c1272d474d2)
+
+running 7 tests
+test tests::capped_source_metrics_conserve_reads_and_bytes ... ok
+test tests::capped_source_reconstructs_and_handles_eof_and_empty_reads ... ok
+test tests::capped_source_settings_preserve_resource_release_and_oracles ... ok
+test tests::public_routes_verify_order_and_release_resources ... ok
+test tests::source_options_have_bounds_duplicate_and_opc_rejections ... ok
+test tests::zero_io_budget_refuses_before_first_payload_read ... ok
+test tests::generator_identity_and_argument_bounds ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+

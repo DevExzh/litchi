@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0816 — source latency changes useful concurrency
+
+[0816](0816-delayed-source-budget-scaling.md) Delayed large CFB/Part reads show 7.364×/5.674× width-eight speedup, while mixed requests observe a maximum of one simultaneous read and stay near 1× under the 64 KiB task floor. Primed Parts have zero timed reads and severe requested-width overhead. CFB capping raises large calls 32→128; the selected compressed Parts remain below the cap. These are scoped measurements of current behavior, not native CPU phase attribution.
+
 ## 0815 — fewer arm copies do not improve the workflow
 
 [0815](0815-pptx-borrowed-event-arms-workflow.md) Ordinary/profile scanners shrink 2,320→2,107 bytes and two 32-byte arm copy sequences disappear. Scanner self Ir changes 16,724,054→16,713,423, while first-pair inclusive Ir rises 313,977,875→317,662,247 and the candidate adds 282,612 result-drop calls. Native large capture/lifecycle worsen 4.270%/5.299%. Reject this source spelling; static copy removal is not a workflow benefit.

@@ -1,0 +1,29 @@
+{
+  "observed_before_build": true,
+  "rows": [
+    {
+      "command": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "ended": 1790586571.1829097,
+      "exit_code": 0,
+      "started": 1790586571.1654763,
+      "stderr": "",
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "ended": 1790586571.1971035,
+      "exit_code": 0,
+      "started": 1790586571.1829126,
+      "stderr": "",
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+    }
+  ],
+  "schema": "litchi.performance.0816.toolchain.v1"
+}

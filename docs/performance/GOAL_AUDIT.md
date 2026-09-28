@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0816 — bounded source and execution evidence added
+
+[0816](0816-delayed-source-budget-scaling.md) The reusable execution harness gains opt-in bounded short reads and per-call delay. The 72-case matrix closes this current CFB/Part finite-budget/cache-state source-model gap, with separate timing and source-observer builds. Mixed-floor serialization and primed-Part overhead remain explicit. This does not complete the broader goal; tracked Office ordinary-save inputs are the next queued corpus step, and iWork stays excluded.
+
 ## 0815 — copy-removal hypothesis closed by rejection
 
 [0815](0815-pptx-borrowed-event-arms-workflow.md) The two targeted arm copies disappear, but zero eligible benefits and a large-lifecycle veto reject the change. Both numerical readers agree and the exact baseline is restored. All 144 resource comparisons are equal. This completes the bounded event-arm hypothesis; broader corpus, CRUD, I/O, cold-cache, and scaling gaps remain open. iWork is excluded.

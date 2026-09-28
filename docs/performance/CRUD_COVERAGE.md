@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0816 — provider and scaling intersection measured
+
+[0816](0816-delayed-source-budget-scaling.md) Category 15 now crosses CFB bulk reads and ordered OPC Parts with finite budgets, 1/2/4/8 workers, large/mixed fresh and large primed sessions, capped returns and delayed calls. All 13,320 outputs pass byte/order/resource checks. Native-format CRUD, physical cold/network I/O, cross-session contention and allocation coverage remain open.
+
 ## 0815 — borrowed event-arm workflow trial
 
 [0815](0815-pptx-borrowed-event-arms-workflow.md) Six shapes across capture, commit, and lifecycle retain exact source/output/full-semantic oracles for all 6,718 measured outputs. Candidate quality passes 1,241 tests with three ignored; both probes pass 36 tests. The latency policy rejects the candidate, restoring the baseline. No public capability or cross-format coverage is added.

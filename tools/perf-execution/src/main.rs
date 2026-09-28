@@ -20,9 +20,10 @@ use std::io::Cursor;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const SCHEMA: &str = "litchi.execution-baseline.v1";
+const RANGE_SCHEMA: &str = "litchi.execution-range-baseline.v1";
 const MEMBER_COUNT: usize = 32;
 const SMALL_BYTES: usize = 4 * 1024;
 const LARGE_BYTES: usize = 256 * 1024;
@@ -30,6 +31,8 @@ const MIN_PARALLEL_BYTES: u64 = 64 * 1024;
 const MAX_WORKERS: usize = MEMBER_COUNT;
 const MAX_SAMPLES: usize = 10_000;
 const MAX_WARMUP: usize = 10_000;
+const MAX_SOURCE_READ_BYTES: usize = 1024 * 1024;
+const MAX_SOURCE_DELAY_US: u64 = 100_000;
 const CPU_TASK_LIMIT: u64 = 1_000_000;
 const MAX_IN_FLIGHT_BYTES: u64 = 16 * 1024 * 1024;
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -121,6 +124,8 @@ struct Config {
     state: State,
     samples: usize,
     warmup: usize,
+    source_max_read_bytes: usize,
+    source_delay_us: u64,
     output: PathBuf,
 }
 
@@ -170,6 +175,8 @@ struct ReportConfig {
     state: State,
     samples: usize,
     warmup: usize,
+    source_max_read_bytes: usize,
+    source_delay_us: u64,
     cpu_task_limit: u64,
 }
 
@@ -296,8 +303,50 @@ fn parse_task_floor(value: &str) -> Result<u64, String> {
     Ok(parsed)
 }
 
+fn parse_source_max_read_bytes(value: &str) -> Result<usize, String> {
+    let parsed = value.parse::<usize>().map_err(|_| {
+        format!("--source-max-read-bytes must be an unsigned integer; got {value:?}")
+    })?;
+    if parsed > MAX_SOURCE_READ_BYTES {
+        return Err(format!(
+            "--source-max-read-bytes must be in the inclusive range 0..={MAX_SOURCE_READ_BYTES}; got {parsed}"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn parse_source_delay_us(value: &str) -> Result<u64, String> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|_| format!("--source-delay-us must be an unsigned integer; got {value:?}"))?;
+    if parsed > MAX_SOURCE_DELAY_US {
+        return Err(format!(
+            "--source-delay-us must be in the inclusive range 0..={MAX_SOURCE_DELAY_US}; got {parsed}"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn source_settings_enabled(source_max_read_bytes: usize, source_delay_us: u64) -> bool {
+    source_max_read_bytes != 0 || source_delay_us != 0
+}
+
+fn validate_source_settings(
+    route: Route,
+    source_max_read_bytes: usize,
+    source_delay_us: u64,
+) -> Result<(), String> {
+    if route == Route::Opc && source_settings_enabled(source_max_read_bytes, source_delay_us) {
+        return Err(
+            "--source-max-read-bytes and --source-delay-us require --route cfb or --route parts; opc uses from_bytes and bypasses ReadAt"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 fn usage() -> &'static str {
-    "usage: litchi-perf-execution --route opc|cfb|parts --shape small|large|mixed --workers N --task-floor BYTES --state fresh|primed --samples N --warmup N --output PATH"
+    "usage: litchi-perf-execution --route opc|cfb|parts --shape small|large|mixed --workers N --task-floor BYTES --state fresh|primed --samples N --warmup N [--source-max-read-bytes N] [--source-delay-us N] --output PATH"
 }
 
 fn parse_args_from<I>(args: I) -> Result<Config, String>
@@ -311,6 +360,8 @@ where
     let mut state = None;
     let mut samples = None;
     let mut warmup = None;
+    let mut source_max_read_bytes = None;
+    let mut source_delay_us = None;
     let mut output = None;
     let mut args = args.into_iter();
     while let Some(flag) = args.next() {
@@ -342,6 +393,12 @@ where
                 }
                 warmup = Some(parsed);
             },
+            "--source-max-read-bytes" if source_max_read_bytes.is_none() => {
+                source_max_read_bytes = Some(parse_source_max_read_bytes(&value)?);
+            },
+            "--source-delay-us" if source_delay_us.is_none() => {
+                source_delay_us = Some(parse_source_delay_us(&value)?);
+            },
             "--output" if output.is_none() => {
                 if value.is_empty() {
                     return Err("--output must not be empty".to_string());
@@ -351,7 +408,7 @@ where
             _ => return Err(format!("unknown or duplicate option {flag}; {}", usage())),
         }
     }
-    Ok(Config {
+    let config = Config {
         route: route.ok_or_else(|| "missing --route".to_string())?,
         shape: shape.ok_or_else(|| "missing --shape".to_string())?,
         workers: workers.ok_or_else(|| "missing --workers".to_string())?,
@@ -359,8 +416,16 @@ where
         state: state.ok_or_else(|| "missing --state".to_string())?,
         samples: samples.ok_or_else(|| "missing --samples".to_string())?,
         warmup: warmup.ok_or_else(|| "missing --warmup".to_string())?,
+        source_max_read_bytes: source_max_read_bytes.unwrap_or(0),
+        source_delay_us: source_delay_us.unwrap_or(0),
         output: output.ok_or_else(|| "missing --output".to_string())?,
-    })
+    };
+    validate_source_settings(
+        config.route,
+        config.source_max_read_bytes,
+        config.source_delay_us,
+    )?;
+    Ok(config)
 }
 
 fn parse_args() -> Result<Config, String> {
@@ -536,15 +601,24 @@ impl ObserverCounters {
 struct InMemoryReadAt {
     bytes: Arc<Vec<u8>>,
     version: SourceVersion,
+    source_max_read_bytes: usize,
+    source_delay_us: u64,
     #[cfg(feature = "source-metrics")]
     observer: ObserverCounters,
 }
 
 impl InMemoryReadAt {
-    fn new(bytes: Vec<u8>, version: SourceVersion) -> Self {
+    fn new(
+        bytes: Vec<u8>,
+        version: SourceVersion,
+        source_max_read_bytes: usize,
+        source_delay_us: u64,
+    ) -> Self {
         Self {
             bytes: Arc::new(bytes),
             version,
+            source_max_read_bytes,
+            source_delay_us,
             #[cfg(feature = "source-metrics")]
             observer: ObserverCounters::new(),
         }
@@ -621,8 +695,14 @@ impl ReadAt for InMemoryReadAt {
             if start >= self.bytes.len() {
                 return Ok(0);
             }
-            let count = output.len().min(self.bytes.len() - start);
+            let mut count = output.len().min(self.bytes.len() - start);
+            if self.source_max_read_bytes != 0 {
+                count = count.min(self.source_max_read_bytes);
+            }
             output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            if count != 0 && self.source_delay_us != 0 {
+                std::thread::sleep(Duration::from_micros(self.source_delay_us));
+            }
             Ok(count)
         })();
 
@@ -935,6 +1015,8 @@ fn run_cfb_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<
     let source = Arc::new(InMemoryReadAt::new(
         corpus.cfb_bytes.clone(),
         SourceVersion::new(0x0786_0001, 1),
+        config.source_max_read_bytes,
+        config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
     let file = SharedOleFile::open_with_limits(source_for_reader, SharedOleFileLimits::default())?;
@@ -992,6 +1074,8 @@ fn run_parts_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResul
     let source = Arc::new(InMemoryReadAt::new(
         corpus.opc_bytes.clone(),
         SourceVersion::new(0x0786_0002, 1),
+        config.source_max_read_bytes,
+        config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
     let package = SourceBackedPackage::from_read_at_with_execution_context(
@@ -1041,6 +1125,12 @@ fn run_parts_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResul
 }
 
 fn run_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<SampleReport> {
+    validate_source_settings(
+        config.route,
+        config.source_max_read_bytes,
+        config.source_delay_us,
+    )
+    .map_err(boxed_error)?;
     match config.route {
         Route::Opc => run_opc_sample(config, corpus, sample),
         Route::Cfb => run_cfb_sample(config, corpus, sample),
@@ -1048,20 +1138,30 @@ fn run_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<Samp
     }
 }
 
-fn report_scope(route: Route, state: State) -> Scope {
+fn report_scope(config: &Config) -> Scope {
+    let simulated_source =
+        source_settings_enabled(config.source_max_read_bytes, config.source_delay_us);
     Scope {
-        ingress: match route {
+        ingress: match config.route {
             Route::Opc => "OpenSession::from_bytes borrowed in-memory ZIP".to_string(),
             Route::Cfb => "SharedOleFile owned immutable in-memory ReadAt".to_string(),
             Route::Parts => "SourceBackedPackage owned immutable in-memory ReadAt".to_string(),
         },
-        source: "in-memory immutable source; no disk or network".to_string(),
-        source_metrics_claim: if route == Route::Opc {
+        source: if simulated_source {
+            "in-memory immutable source with simulated caller-side ReadAt cap/delay; no physical disk or network latency"
+                .to_string()
+        } else {
+            "in-memory immutable source; no disk or network".to_string()
+        },
+        source_metrics_claim: if config.route == Route::Opc {
             "external ReadAt not applicable to from_bytes".to_string()
+        } else if simulated_source {
+            "logical ReadAt observer only when source-metrics is enabled; cap/delay model simulated caller latency"
+                .to_string()
         } else {
             "logical ReadAt observer only when source-metrics is enabled".to_string()
         },
-        timing: match state {
+        timing: match config.state {
             State::Fresh => {
                 "first public operation after session/package metadata setup".to_string()
             },
@@ -1081,12 +1181,16 @@ fn report_scope(route: Route, state: State) -> Scope {
     }
 }
 
-fn metrics_availability(route: Route) -> MetricsAvailability {
+fn metrics_availability(route: Route, simulated_source: bool) -> MetricsAvailability {
     MetricsAvailability {
         source_metrics_feature: cfg!(feature = "source-metrics"),
-        source_metrics_scope:
+        source_metrics_scope: if simulated_source {
+            "CFB and source-backed Parts timed operation only; counters reset after preload; source cap/delay are simulated in-memory caller latency"
+                .to_string()
+        } else {
             "CFB and source-backed Parts timed operation only; counters reset after preload"
-                .to_string(),
+                .to_string()
+        },
         opc_external_read_at: if route == Route::Opc {
             "not-applicable".to_string()
         } else {
@@ -1126,6 +1230,12 @@ fn write_report(path: &PathBuf, report: &Report) -> AnyResult<()> {
 }
 
 fn run(config: Config) -> AnyResult<()> {
+    validate_source_settings(
+        config.route,
+        config.source_max_read_bytes,
+        config.source_delay_us,
+    )
+    .map_err(boxed_error)?;
     if config.output.exists() {
         return Err(boxed_error(format!(
             "output already exists: {}",
@@ -1144,8 +1254,12 @@ fn run(config: Config) -> AnyResult<()> {
         samples.push(run_sample(&config, &corpus, sample)?);
     }
     let report = Report {
-        schema: SCHEMA,
-        scope: report_scope(config.route, config.state),
+        schema: if source_settings_enabled(config.source_max_read_bytes, config.source_delay_us) {
+            RANGE_SCHEMA
+        } else {
+            SCHEMA
+        },
+        scope: report_scope(&config),
         config: ReportConfig {
             route: config.route,
             shape: config.shape,
@@ -1155,10 +1269,15 @@ fn run(config: Config) -> AnyResult<()> {
             state: config.state,
             samples: config.samples,
             warmup: config.warmup,
+            source_max_read_bytes: config.source_max_read_bytes,
+            source_delay_us: config.source_delay_us,
             cpu_task_limit: CPU_TASK_LIMIT,
         },
         corpus,
-        metrics: metrics_availability(config.route),
+        metrics: metrics_availability(
+            config.route,
+            source_settings_enabled(config.source_max_read_bytes, config.source_delay_us),
+        ),
         samples,
     };
     write_report(&config.output, &report)
@@ -1236,6 +1355,130 @@ mod tests {
     }
 
     #[test]
+    fn capped_source_reconstructs_and_handles_eof_and_empty_reads() {
+        let expected: Vec<u8> = (0_u8..11).collect();
+        let source =
+            InMemoryReadAt::new(expected.clone(), SourceVersion::new(0x0816_0001, 1), 3, 0);
+        let mut reconstructed = Vec::new();
+        let mut offset = 0_u64;
+        loop {
+            let mut output = [0_u8; 5];
+            let returned = source
+                .read_at(offset, &mut output)
+                .expect("capped read succeeds");
+            assert!(returned <= 3);
+            if returned == 0 {
+                break;
+            }
+            reconstructed.extend_from_slice(&output[..returned]);
+            offset += returned as u64;
+        }
+        assert_eq!(reconstructed, expected);
+
+        let mut eof = [0_u8; 4];
+        assert_eq!(source.read_at(expected.len() as u64, &mut eof).unwrap(), 0);
+        let mut empty = [0_u8; 0];
+        assert_eq!(source.read_at(0, &mut empty).unwrap(), 0);
+        let mut invalid_or_eof = [0_u8; 1];
+        let result = source.read_at(u64::MAX, &mut invalid_or_eof);
+        if usize::try_from(u64::MAX).is_ok() {
+            assert_eq!(result.unwrap(), 0);
+        } else {
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn source_options_have_bounds_duplicate_and_opc_rejections() {
+        let mut configured = valid_args();
+        configured.extend(args(&[
+            "--source-max-read-bytes",
+            "1048576",
+            "--source-delay-us",
+            "100000",
+        ]));
+        let parsed = parse_args_from(configured).expect("maximum source settings parse");
+        assert_eq!(parsed.source_max_read_bytes, MAX_SOURCE_READ_BYTES);
+        assert_eq!(parsed.source_delay_us, MAX_SOURCE_DELAY_US);
+
+        let mut too_many_bytes = valid_args();
+        too_many_bytes.extend(args(&["--source-max-read-bytes", "1048577"]));
+        assert!(parse_args_from(too_many_bytes).is_err());
+
+        let mut too_much_delay = valid_args();
+        too_much_delay.extend(args(&["--source-delay-us", "100001"]));
+        assert!(parse_args_from(too_much_delay).is_err());
+
+        let mut duplicate = valid_args();
+        duplicate.extend(args(&["--source-delay-us", "1", "--source-delay-us", "2"]));
+        assert!(parse_args_from(duplicate).is_err());
+
+        let mut opc_cap = valid_args();
+        opc_cap[1] = "opc".to_string();
+        opc_cap.extend(args(&["--source-max-read-bytes", "1"]));
+        assert!(parse_args_from(opc_cap).is_err());
+
+        let mut opc_delay = valid_args();
+        opc_delay[1] = "opc".to_string();
+        opc_delay.extend(args(&["--source-delay-us", "1"]));
+        assert!(parse_args_from(opc_delay).is_err());
+    }
+
+    #[test]
+    fn capped_source_settings_preserve_resource_release_and_oracles() {
+        let corpus = build_corpus(Shape::Small).expect("corpus");
+        for route in [Route::Cfb, Route::Parts] {
+            let config = Config {
+                route,
+                shape: Shape::Small,
+                workers: 1,
+                task_floor: 0,
+                state: State::Fresh,
+                samples: 1,
+                warmup: 0,
+                source_max_read_bytes: 3,
+                source_delay_us: 0,
+                output: PathBuf::from("unused.json"),
+            };
+            let sample = run_sample(&config, &corpus, 0).expect("capped route sample");
+            assert!(sample.verification.ordered);
+            assert!(sample.verification.all_member_sha256_match);
+            assert!(sample.resources.worker_and_io_released);
+            assert!(sample.resources.cpu_tasks_within_limit);
+        }
+    }
+
+    #[cfg(feature = "source-metrics")]
+    #[test]
+    fn capped_source_metrics_conserve_reads_and_bytes() {
+        let source = InMemoryReadAt::new(
+            (0_u8..11).collect(),
+            SourceVersion::new(0x0816_0002, 1),
+            3,
+            0,
+        );
+        for offset in [0_u64, 3, 6, 9] {
+            let mut output = [0_u8; 5];
+            let returned = source.read_at(offset, &mut output).expect("data read");
+            assert!(returned <= 3);
+        }
+        let mut eof = [0_u8; 4];
+        assert_eq!(source.read_at(11, &mut eof).unwrap(), 0);
+        let mut empty = [0_u8; 0];
+        assert_eq!(source.read_at(0, &mut empty).unwrap(), 0);
+
+        let report = source.observer_report();
+        assert_eq!(report.logical_calls, Some(6));
+        assert_eq!(report.requested_bytes, Some(24));
+        assert_eq!(report.returned_bytes, Some(11));
+        assert_eq!(report.short_reads, Some(5));
+        assert_eq!(report.active_reads_after_operation, Some(0));
+        assert_eq!(report.max_simultaneous_reads, Some(1));
+        let histogram = report.request_size_histogram.expect("request histogram");
+        assert_eq!(histogram.iter().sum::<u64>(), 6);
+    }
+
+    #[test]
     fn public_routes_verify_order_and_release_resources() {
         let corpus = build_corpus(Shape::Small).expect("corpus");
         for route in [Route::Opc, Route::Cfb, Route::Parts] {
@@ -1247,6 +1490,8 @@ mod tests {
                 state: State::Fresh,
                 samples: 1,
                 warmup: 0,
+                source_max_read_bytes: 0,
+                source_delay_us: 0,
                 output: PathBuf::from("unused.json"),
             };
             let sample = run_sample(&config, &corpus, 0).expect("route sample");

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0816 — finite-budget delayed-source baseline
+
+[0816](0816-delayed-source-budget-scaling.md) Current CFB/ordered-Part measurements retain 648 reports and 13,320 outputs across 72 cases. Delayed large fresh reads scale 7.364×/5.674× at eight requested workers; mixed-size cases stay near 1× and primed Parts remain a zero-timed-read scheduling control. Matched local, capped and delayed providers separate source effects. Production is unchanged; these are configuration comparisons, not an adopted optimization.
+
 ## 0815 — borrowed event arms rejected
 
 [0815](0815-pptx-borrowed-event-arms-workflow.md) Fresh evidence covers 310 reports/6,718 outputs. Large capture p50 worsens 4.270% (ratio 1.042703, interval 1.037801–1.056069); large lifecycle worsens 5.299% (1.052994, 1.049081–1.057175), triggering the veto. No eligible benefit; all 144 allocation comparisons are equal. Production is restored exactly and the performance baseline does not advance.

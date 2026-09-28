@@ -20,8 +20,18 @@ litchi-perf-execution \
   --state fresh|primed \
   --samples N \
   --warmup N \
+  [--source-max-read-bytes N] \
+  [--source-delay-us N] \
   --output PATH
 ```
+
+`--source-max-read-bytes` and `--source-delay-us` apply only to the CFB and
+source-backed Parts routes.  They default to `0`, meaning an uncapped source
+and no delay.  A nonzero maximum read is an in-memory short-read simulation and
+may be at most 1 MiB; a nonzero delay is applied in microseconds after each
+successful nonempty read and may be at most 100,000 microseconds.  Supplying
+either option nonzero for `--route opc` is rejected because
+`OpenSession::from_bytes` bypasses `ReadAt`.
 
 The generated corpus always has 32 distinct members. `small` uses 4 KiB per
 member, `large` uses 256 KiB per member, and `mixed` uses 31 large members plus
@@ -52,13 +62,23 @@ timed operation after the source counters are reset; they do not establish disk,
 network, cold-cache, or physical-read claims. OPC uses `from_bytes`, so external
 `ReadAt` metrics are recorded as not applicable for that route.
 
+When source simulation is enabled, every successful nonempty `ReadAt` call
+returns no more than the configured maximum (unless the remaining source is
+smaller), then sleeps for the configured delay while the observer's active-read
+window is still open. Empty, EOF, and error calls do not sleep. The delay models
+caller-visible latency in this in-memory harness only; it does not represent a
+physical network, filesystem, remote-range, or cold-cache measurement.
+
 CPU time is read with safe `rustix` `ProcessCPUTime` support on Linux. It is
 reported as unavailable on targets where that clock is not compiled in. The
 process CPU interval is labelled slightly wider than the wall interval because
 the two clock reads bracket the operation with separate calls.
 
 The final output path is created only after all samples and byte checks pass;
-write failure removes the file created by that run. Its schema is
-`litchi.execution-baseline.v1` and contains the exact per-member SHA-256 values,
-corpus hashes, raw wall/CPU durations, verification status, observer
-availability, configuration, and resource snapshots.
+write failure removes the file created by that run. With the default source
+settings its schema is `litchi.execution-baseline.v1`; when either source
+setting is nonzero it is `litchi.execution-range-baseline.v1`. Both schemas
+contain the exact per-member SHA-256 values, corpus hashes, raw wall/CPU
+durations, verification status, observer availability, the exact source
+configuration, and resource snapshots. The range schema identifies the
+simulated in-memory source scope described above.

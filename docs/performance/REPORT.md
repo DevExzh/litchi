@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0816 — delayed-source finite-budget scaling
+
+[0816](0816-delayed-source-budget-scaling.md) Added bounded caller-source simulation to the reusable harness and completed 648 reports/13,320 outputs. All six quality gates and seven harness tests pass. Results distinguish useful delayed-read concurrency from mixed-floor serialization and zero-read cache overhead. Production is unchanged; no physical-network, cold-cache, allocation-saving or universal-scaling claim follows.
+
 ## 0815 — borrowed event-arm candidate rejected
 
 [0815](0815-pptx-borrowed-event-arms-workflow.md) The fresh 310-report/6,718-output trial rejects borrowing the two event payloads: no qualifying benefit and one latency veto (+5.299% large lifecycle). Allocation metrics remain equal. All quality, semantic, assembly, and independent replay checks pass, but production is restored exactly. The packet retains tail/RSS variation and guest-profile limits; the broader goal remains open.
