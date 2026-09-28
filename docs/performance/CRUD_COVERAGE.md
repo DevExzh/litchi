@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0803 — exact-empty check placement diagnostic
+
+[0803](0803-xml-empty-check-placement.md) A 39-case helper diagnostic verifies empty-check relocation against the rejected 0802 control, including duplicate/syntax errors and clone/fusion. All 1,248 reports and 28,392 samples replay. No public CRUD, producer or cross-format coverage is promoted.
+
 ## 0802 — no coverage promotion after syntax vetoes
 
 [0802](0802-xml-bounded-prefix-preflight.md) The bounded linear prefix passes 170 isolated helper tests and the 39-case semantic oracle, but fails protected syntax-cost guards. No public CRUD, producer, cold/range, resource or concurrency coverage is promoted.

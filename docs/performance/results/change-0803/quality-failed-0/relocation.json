@@ -1,0 +1,8 @@
+{
+  "candidate": "candidate-failed-0",
+  "candidate.patch": "candidate-failed-0.patch",
+  "fix": "Amend only after empty test for First before request, Done after first None, clone and repeated None; implementation stays single-factor",
+  "quality": "quality-failed-0",
+  "reason": "After tests retain old private-state assertion Phase::Done at construction; relocated check intentionally starts First until first next",
+  "test-src": "test-src-failed-0"
+}

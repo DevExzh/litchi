@@ -1,0 +1,155 @@
+--- a/litchi-ole-common-xml_attributes.rs
++++ b/litchi-ole-common-xml_attributes.rs
+@@ -153,14 +153,7 @@
+         Self {
+             tag,
+             attributes,
+-            // The exact raw tail is empty, so no parser step can yield an
+-            // attribute. Do not classify whitespace here; malformed or
+-            // whitespace tails still follow quick-xml's normal path.
+-            phase: if tag.as_ref().len() == tag.name().as_ref().len() {
+-                Phase::Done
+-            } else {
+-                Phase::First
+-            },
++            phase: Phase::First,
+         }
+     }
+ 
+@@ -168,6 +161,12 @@
+     /// already the checked result.
+     #[inline]
+     fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        // Decide exact emptiness at the first request, not during construction.
++        // Whitespace and malformed tails still follow the parser.
++        if self.tag.as_ref().len() == self.tag.name().as_ref().len() {
++            self.phase = Phase::Done;
++            return None;
++        }
+         let item = self.attributes.next();
+         match &item {
+             Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
+--- a/litchi-opc-xml_attributes.rs
++++ b/litchi-opc-xml_attributes.rs
+@@ -153,14 +153,7 @@
+         Self {
+             tag,
+             attributes,
+-            // The exact raw tail is empty, so no parser step can yield an
+-            // attribute. Do not classify whitespace here; malformed or
+-            // whitespace tails still follow quick-xml's normal path.
+-            phase: if tag.as_ref().len() == tag.name().as_ref().len() {
+-                Phase::Done
+-            } else {
+-                Phase::First
+-            },
++            phase: Phase::First,
+         }
+     }
+ 
+@@ -168,6 +161,12 @@
+     /// already the checked result.
+     #[inline]
+     fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        // Decide exact emptiness at the first request, not during construction.
++        // Whitespace and malformed tails still follow the parser.
++        if self.tag.as_ref().len() == self.tag.name().as_ref().len() {
++            self.phase = Phase::Done;
++            return None;
++        }
+         let item = self.attributes.next();
+         match &item {
+             Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
+--- a/litchi-sign-xml_attributes.rs
++++ b/litchi-sign-xml_attributes.rs
+@@ -153,14 +153,7 @@
+         Self {
+             tag,
+             attributes,
+-            // The exact raw tail is empty, so no parser step can yield an
+-            // attribute. Do not classify whitespace here; malformed or
+-            // whitespace tails still follow quick-xml's normal path.
+-            phase: if tag.as_ref().len() == tag.name().as_ref().len() {
+-                Phase::Done
+-            } else {
+-                Phase::First
+-            },
++            phase: Phase::First,
+         }
+     }
+ 
+@@ -168,6 +161,12 @@
+     /// already the checked result.
+     #[inline]
+     fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        // Decide exact emptiness at the first request, not during construction.
++        // Whitespace and malformed tails still follow the parser.
++        if self.tag.as_ref().len() == self.tag.name().as_ref().len() {
++            self.phase = Phase::Done;
++            return None;
++        }
+         let item = self.attributes.next();
+         match &item {
+             Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
+--- a/litchi-xldm-xml_attributes.rs
++++ b/litchi-xldm-xml_attributes.rs
+@@ -153,14 +153,7 @@
+         Self {
+             tag,
+             attributes,
+-            // The exact raw tail is empty, so no parser step can yield an
+-            // attribute. Do not classify whitespace here; malformed or
+-            // whitespace tails still follow quick-xml's normal path.
+-            phase: if tag.as_ref().len() == tag.name().as_ref().len() {
+-                Phase::Done
+-            } else {
+-                Phase::First
+-            },
++            phase: Phase::First,
+         }
+     }
+ 
+@@ -168,6 +161,12 @@
+     /// already the checked result.
+     #[inline]
+     fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        // Decide exact emptiness at the first request, not during construction.
++        // Whitespace and malformed tails still follow the parser.
++        if self.tag.as_ref().len() == self.tag.name().as_ref().len() {
++            self.phase = Phase::Done;
++            return None;
++        }
+         let item = self.attributes.next();
+         match &item {
+             Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
+--- a/xml-minifier-xml_attributes.rs
++++ b/xml-minifier-xml_attributes.rs
+@@ -153,14 +153,7 @@
+         Self {
+             tag,
+             attributes,
+-            // The exact raw tail is empty, so no parser step can yield an
+-            // attribute. Do not classify whitespace here; malformed or
+-            // whitespace tails still follow quick-xml's normal path.
+-            phase: if tag.as_ref().len() == tag.name().as_ref().len() {
+-                Phase::Done
+-            } else {
+-                Phase::First
+-            },
++            phase: Phase::First,
+         }
+     }
+ 
+@@ -168,6 +161,12 @@
+     /// already the checked result.
+     #[inline]
+     fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        // Decide exact emptiness at the first request, not during construction.
++        // Whitespace and malformed tails still follow the parser.
++        if self.tag.as_ref().len() == self.tag.name().as_ref().len() {
++            self.phase = Phase::Done;
++            return None;
++        }
+         let item = self.attributes.next();
+         match &item {
+             Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {

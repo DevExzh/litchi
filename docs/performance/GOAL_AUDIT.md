@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0803 — exact-empty check placement diagnostic
+
+[0803](0803-xml-empty-check-placement.md) Exact-empty check placement is now isolated from the bounded linear backend: both layouts are 128 bytes, construction improves against the rejected control, and no diagnostic regression flag occurs. Production is unchanged; workflow advancement/adoption remain false and the broader GOAL is incomplete.
+
 ## 0802 — retain malformed-input performance guards
 
 [0802](0802-xml-bounded-prefix-preflight.md) Both benefit gates pass, yet four protected syntax regressions reject the candidate. All 1,248 reports, 28,392 samples and 624 counter dumps pass independent replay. Failed quality evidence and cleanup are retained; production and the wider incomplete requirements remain unchanged.

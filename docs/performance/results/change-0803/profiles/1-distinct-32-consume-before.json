@@ -1,0 +1,812 @@
+{
+  "schema": "litchi.attribute-boundary-probe.v1",
+  "tool": "attribute-boundary-probe-0803",
+  "binary": "attribute-boundary-probe",
+  "leg": "before",
+  "case": "distinct-32",
+  "category": "distinct",
+  "attribute_count": 32,
+  "mode": "consume",
+  "iterations": 1,
+  "warmup": 0,
+  "samples_requested": 1,
+  "timing_scope": "selected named consumption owner call, including its common call dispatch",
+  "source": {
+    "bytes": 269,
+    "encoding": "utf8",
+    "value": "e n0=\"0\" n1=\"1\" n2=\"2\" n3=\"3\" n4=\"4\" n5=\"5\" n6=\"6\" n7=\"7\" n8=\"8\" n9=\"9\" n10=\"10\" n11=\"11\" n12=\"12\" n13=\"13\" n14=\"14\" n15=\"15\" n16=\"16\" n17=\"17\" n18=\"18\" n19=\"19\" n20=\"20\" n21=\"21\" n22=\"22\" n23=\"23\" n24=\"24\" n25=\"25\" n26=\"26\" n27=\"27\" n28=\"28\" n29=\"29\" n30=\"30\" n31=\"31\""
+  },
+  "semantic_oracle": {
+    "quick_xml": {
+      "accepted": 32,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 1606914568624971618,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626983344707000793,
+          "value_bytes": 1,
+          "value_hash": 12638137722532372501
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626982245195372582,
+          "value_bytes": 1,
+          "value_hash": 12638136623020744290
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626985543730257215,
+          "value_bytes": 1,
+          "value_hash": 12638131125462603235
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626984444218629004,
+          "value_bytes": 1,
+          "value_hash": 12638130025950975024
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626987742753513637,
+          "value_bytes": 1,
+          "value_hash": 12638133324485859657
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626986643241885426,
+          "value_bytes": 1,
+          "value_hash": 12638132224974231446
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626989941776770059,
+          "value_bytes": 1,
+          "value_hash": 12638144319602141767
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626988842265141848,
+          "value_bytes": 1,
+          "value_hash": 12638143220090513556
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436163832418259920,
+          "value_bytes": 2,
+          "value_hash": 574369514284255396
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436164931929888131,
+          "value_bytes": 2,
+          "value_hash": 574370613795883607
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436166031441516342,
+          "value_bytes": 2,
+          "value_hash": 574371713307511818
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436167130953144553,
+          "value_bytes": 2,
+          "value_hash": 574372812819140029
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436168230464772764,
+          "value_bytes": 2,
+          "value_hash": 574365116237742552
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436169329976400975,
+          "value_bytes": 2,
+          "value_hash": 574366215749370763
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436170429488029186,
+          "value_bytes": 2,
+          "value_hash": 574367315260998974
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436171528999657397,
+          "value_bytes": 2,
+          "value_hash": 574368414772627185
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436172628511285608,
+          "value_bytes": 2,
+          "value_hash": 574360718191229708
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436173728022913819,
+          "value_bytes": 2,
+          "value_hash": 574361817702857919
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438998373395220203,
+          "value_bytes": 2,
+          "value_hash": 577309608377523935
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438997273883591992,
+          "value_bytes": 2,
+          "value_hash": 577308508865895724
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439000572418476625,
+          "value_bytes": 2,
+          "value_hash": 577311807400780357
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438999472906848414,
+          "value_bytes": 2,
+          "value_hash": 577310707889152146
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439002771441733047,
+          "value_bytes": 2,
+          "value_hash": 577305210331011091
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439001671930104836,
+          "value_bytes": 2,
+          "value_hash": 577304110819382880
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439004970464989469,
+          "value_bytes": 2,
+          "value_hash": 577307409354267513
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439003870953361258,
+          "value_bytes": 2,
+          "value_hash": 577306309842639302
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438989577302194515,
+          "value_bytes": 2,
+          "value_hash": 577318404470549623
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438988477790566304,
+          "value_bytes": 2,
+          "value_hash": 577317304958921412
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438006613906763106,
+          "value_bytes": 2,
+          "value_hash": 576317848889066838
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438007713418391317,
+          "value_bytes": 2,
+          "value_hash": 576318948400695049
+        }
+      ]
+    },
+    "baseline": {
+      "accepted": 32,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 1606914568624971618,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626983344707000793,
+          "value_bytes": 1,
+          "value_hash": 12638137722532372501
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626982245195372582,
+          "value_bytes": 1,
+          "value_hash": 12638136623020744290
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626985543730257215,
+          "value_bytes": 1,
+          "value_hash": 12638131125462603235
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626984444218629004,
+          "value_bytes": 1,
+          "value_hash": 12638130025950975024
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626987742753513637,
+          "value_bytes": 1,
+          "value_hash": 12638133324485859657
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626986643241885426,
+          "value_bytes": 1,
+          "value_hash": 12638132224974231446
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626989941776770059,
+          "value_bytes": 1,
+          "value_hash": 12638144319602141767
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626988842265141848,
+          "value_bytes": 1,
+          "value_hash": 12638143220090513556
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436163832418259920,
+          "value_bytes": 2,
+          "value_hash": 574369514284255396
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436164931929888131,
+          "value_bytes": 2,
+          "value_hash": 574370613795883607
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436166031441516342,
+          "value_bytes": 2,
+          "value_hash": 574371713307511818
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436167130953144553,
+          "value_bytes": 2,
+          "value_hash": 574372812819140029
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436168230464772764,
+          "value_bytes": 2,
+          "value_hash": 574365116237742552
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436169329976400975,
+          "value_bytes": 2,
+          "value_hash": 574366215749370763
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436170429488029186,
+          "value_bytes": 2,
+          "value_hash": 574367315260998974
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436171528999657397,
+          "value_bytes": 2,
+          "value_hash": 574368414772627185
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436172628511285608,
+          "value_bytes": 2,
+          "value_hash": 574360718191229708
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436173728022913819,
+          "value_bytes": 2,
+          "value_hash": 574361817702857919
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438998373395220203,
+          "value_bytes": 2,
+          "value_hash": 577309608377523935
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438997273883591992,
+          "value_bytes": 2,
+          "value_hash": 577308508865895724
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439000572418476625,
+          "value_bytes": 2,
+          "value_hash": 577311807400780357
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438999472906848414,
+          "value_bytes": 2,
+          "value_hash": 577310707889152146
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439002771441733047,
+          "value_bytes": 2,
+          "value_hash": 577305210331011091
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439001671930104836,
+          "value_bytes": 2,
+          "value_hash": 577304110819382880
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439004970464989469,
+          "value_bytes": 2,
+          "value_hash": 577307409354267513
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439003870953361258,
+          "value_bytes": 2,
+          "value_hash": 577306309842639302
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438989577302194515,
+          "value_bytes": 2,
+          "value_hash": 577318404470549623
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438988477790566304,
+          "value_bytes": 2,
+          "value_hash": 577317304958921412
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438006613906763106,
+          "value_bytes": 2,
+          "value_hash": 576317848889066838
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438007713418391317,
+          "value_bytes": 2,
+          "value_hash": 576318948400695049
+        }
+      ]
+    },
+    "candidate": {
+      "accepted": 32,
+      "first_error": null,
+      "repeated_none_calls": 2,
+      "sequence_hash": 1606914568624971618,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626983344707000793,
+          "value_bytes": 1,
+          "value_hash": 12638137722532372501
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626982245195372582,
+          "value_bytes": 1,
+          "value_hash": 12638136623020744290
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626985543730257215,
+          "value_bytes": 1,
+          "value_hash": 12638131125462603235
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626984444218629004,
+          "value_bytes": 1,
+          "value_hash": 12638130025950975024
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626987742753513637,
+          "value_bytes": 1,
+          "value_hash": 12638133324485859657
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626986643241885426,
+          "value_bytes": 1,
+          "value_hash": 12638132224974231446
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626989941776770059,
+          "value_bytes": 1,
+          "value_hash": 12638144319602141767
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626988842265141848,
+          "value_bytes": 1,
+          "value_hash": 12638143220090513556
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436163832418259920,
+          "value_bytes": 2,
+          "value_hash": 574369514284255396
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436164931929888131,
+          "value_bytes": 2,
+          "value_hash": 574370613795883607
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436166031441516342,
+          "value_bytes": 2,
+          "value_hash": 574371713307511818
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436167130953144553,
+          "value_bytes": 2,
+          "value_hash": 574372812819140029
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436168230464772764,
+          "value_bytes": 2,
+          "value_hash": 574365116237742552
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436169329976400975,
+          "value_bytes": 2,
+          "value_hash": 574366215749370763
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436170429488029186,
+          "value_bytes": 2,
+          "value_hash": 574367315260998974
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436171528999657397,
+          "value_bytes": 2,
+          "value_hash": 574368414772627185
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436172628511285608,
+          "value_bytes": 2,
+          "value_hash": 574360718191229708
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2436173728022913819,
+          "value_bytes": 2,
+          "value_hash": 574361817702857919
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438998373395220203,
+          "value_bytes": 2,
+          "value_hash": 577309608377523935
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438997273883591992,
+          "value_bytes": 2,
+          "value_hash": 577308508865895724
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439000572418476625,
+          "value_bytes": 2,
+          "value_hash": 577311807400780357
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438999472906848414,
+          "value_bytes": 2,
+          "value_hash": 577310707889152146
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439002771441733047,
+          "value_bytes": 2,
+          "value_hash": 577305210331011091
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439001671930104836,
+          "value_bytes": 2,
+          "value_hash": 577304110819382880
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439004970464989469,
+          "value_bytes": 2,
+          "value_hash": 577307409354267513
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2439003870953361258,
+          "value_bytes": 2,
+          "value_hash": 577306309842639302
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438989577302194515,
+          "value_bytes": 2,
+          "value_hash": 577318404470549623
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438988477790566304,
+          "value_bytes": 2,
+          "value_hash": 577317304958921412
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438006613906763106,
+          "value_bytes": 2,
+          "value_hash": 576317848889066838
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 3,
+          "key_hash": 2438007713418391317,
+          "value_bytes": 2,
+          "value_hash": 576318948400695049
+        }
+      ]
+    },
+    "baseline_matches_quick_xml": true,
+    "candidate_matches_quick_xml": true,
+    "clone_checks": [
+      {
+        "advance": 0,
+        "quick_xml_sequence_hash": 1606914568624971618,
+        "baseline_sequence_hash": 1606914568624971618,
+        "candidate_sequence_hash": 1606914568624971618,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 1,
+        "quick_xml_sequence_hash": 7507892338485443953,
+        "baseline_sequence_hash": 7507892338485443953,
+        "candidate_sequence_hash": 7507892338485443953,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 2,
+        "quick_xml_sequence_hash": 894016446572913918,
+        "baseline_sequence_hash": 894016446572913918,
+        "candidate_sequence_hash": 894016446572913918,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 3,
+        "quick_xml_sequence_hash": 14204747879558554810,
+        "baseline_sequence_hash": 14204747879558554810,
+        "candidate_sequence_hash": 14204747879558554810,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 4,
+        "quick_xml_sequence_hash": 10353313171539369413,
+        "baseline_sequence_hash": 10353313171539369413,
+        "candidate_sequence_hash": 10353313171539369413,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 5,
+        "quick_xml_sequence_hash": 3395599397480723528,
+        "baseline_sequence_hash": 3395599397480723528,
+        "candidate_sequence_hash": 3395599397480723528,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 32,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 33,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      }
+    ],
+    "all_checks_passed": true
+  },
+  "iterator_sizes": {
+    "baseline_checked_attributes": 128,
+    "candidate_checked_attributes": 128
+  },
+  "expected_result": {
+    "checksum": 254882874371455292,
+    "accepted": 32,
+    "error_marker": 0
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1872879,
+      "checksum": 254882874371455292,
+      "accepted": 32,
+      "error_marker": 0
+    }
+  ]
+}
