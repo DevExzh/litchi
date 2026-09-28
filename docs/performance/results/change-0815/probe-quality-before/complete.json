@@ -1,0 +1,15 @@
+{
+  "gate_count": 3,
+  "inputs": {
+    "bytes": 1206754,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/inputs.json",
+    "sha256": "1eeebeb35776da2aa0c32efb482ca13e616ce5946dc2a364c2b0a613e6479d20"
+  },
+  "receipts": {
+    "bytes": 1840,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/receipts.json",
+    "sha256": "c1501f3264ad66a3e7ab3dac1fbdf9da5458f2827a59df3e351321a270fee581"
+  },
+  "schema": "litchi.performance.0815.probe-quality-before.v1",
+  "tests_passed": 36
+}

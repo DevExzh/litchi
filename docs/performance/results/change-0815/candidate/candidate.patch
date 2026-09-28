@@ -1,0 +1,44 @@
+--- a/crates/litchi-pptx/src/notes/codec.rs
++++ b/crates/litchi-pptx/src/notes/codec.rs
+@@ -387,9 +387,9 @@
+             pending_pop = false;
+         }
+         match reader.read_event() {
+-            Ok(Event::Start(element)) => {
++            Ok(Event::Start(ref element)) => {
+                 resolver
+-                    .push(&element)
++                    .push(element)
+                     .map_err(quick_xml::Error::from)
+                     .map_err(xml_error)?;
+                 nodes += 1;
+@@ -402,7 +402,7 @@
+                 }
+                 inspect_element(
+                     &resolver,
+-                    &element,
++                    element,
+                     conformance,
+                     expected_root,
+                     !root_seen,
+@@ -412,9 +412,9 @@
+                 )?;
+                 root_seen = true;
+             },
+-            Ok(Event::Empty(element)) => {
++            Ok(Event::Empty(ref element)) => {
+                 resolver
+-                    .push(&element)
++                    .push(element)
+                     .map_err(quick_xml::Error::from)
+                     .map_err(xml_error)?;
+                 pending_pop = true;
+@@ -427,7 +427,7 @@
+                 }
+                 inspect_element(
+                     &resolver,
+-                    &element,
++                    element,
+                     conformance,
+                     expected_root,
+                     !root_seen,

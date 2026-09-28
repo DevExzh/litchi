@@ -1,0 +1,16 @@
+{
+  "schema": "litchi.performance.0815.analysis-plan.v1",
+  "pairing": "same block, case, and sample index; six alternating native blocks and two alternating allocation blocks",
+  "process_quantile": "nearest rank ceil(n*p)-1",
+  "bootstrap": {
+    "draw": "Python random.Random.randrange with replacement over six paired process ratios per draw",
+    "resamples": 10000,
+    "seed": 815815,
+    "statistic": "median",
+    "sorted_zero_based_endpoints": [250, 9749]
+  },
+  "benefit": "At least one capture or lifecycle row must improve by at least 3 percent with bootstrap high endpoint below 1.",
+  "veto": "Any of the eighteen rows with ratio above 1.05 and bootstrap low endpoint above 1 rejects adoption.",
+  "resource_guard": "Compare each paired allocation block median for allocation calls, allocated bytes, net live bytes, and peak above entry; preserve all samples and report spread.",
+  "profile": "Parse four owner-scoped Callgrind Ir publications for exact owner namespace_uri_probe::capture_region_0793; do not infer latency or RSS."
+}

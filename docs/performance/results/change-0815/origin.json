@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.performance.0815.origin.v1",
+  "base": "55bb2ead3498043dd22b53555507b24402486248",
+  "branch": "feat/office-format-completeness",
+  "worktree": "/home/zhuhe/code/litchi",
+  "production_source": {
+    "revision": "55bb2ead3498043dd22b53555507b24402486248",
+    "tracked_file_count": 9196,
+    "status": "current production source is frozen before the first 0815 build; unrelated workspace files are excluded",
+    "candidate_allowlist": [
+      "crates/litchi-pptx/src/notes/codec.rs"
+    ],
+    "before_build_is_authoritative": true,
+    "candidate_before_sha256": "007c2429b44027c37bb6f648f8a2841bfce7ef74b164aa70ed08fd06248b4f0d"
+  },
+  "unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "root_inputs": {
+    "copies_captured_before_first_build": true,
+    "root-Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "candidate_archive": {
+    "path": "candidate/",
+    "owner": "separate review agent",
+    "application": "root-only apply_candidate.py after before qualification",
+    "restore": "root-only restore_candidate.py after a rejected gate"
+  },
+  "historical_timing_pool": false,
+  "cross_format_lane": false,
+  "iwork": "out of scope",
+  "target": "/home/zhuhe/code/litchi-target-0815"
+}

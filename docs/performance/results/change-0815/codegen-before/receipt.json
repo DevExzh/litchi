@@ -1,0 +1,131 @@
+{
+  "leg": "before",
+  "rows": [
+    {
+      "address": 1255824,
+      "binary": {
+        "bytes": 14430728,
+        "path": "/home/zhuhe/code/litchi-target-0815/before-native",
+        "sha256": "08ab0a8e601463b09ec759bf5d7392e4b312129f46f1b19efd01d277375e1c9e"
+      },
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0815/before-native"
+        ],
+        "ended": 1790584678.802749,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790584678.7911046,
+        "symbols": {
+          "bytes": 105,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/native.symbol.txt",
+          "sha256": "ac7aa90918327cf696791978eb55a2a2564302cc69646e37a23bf31b21704f11"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 19411,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/native.assembly.txt",
+          "sha256": "38f5ff137531d6b0c7fe73f30ae292097862f4b35564b640881151b5d7329671"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x132990",
+          "--stop-address=0x1332a0",
+          "/home/zhuhe/code/litchi-target-0815/before-native"
+        ],
+        "ended": 1790584678.8059862,
+        "exit_code": 0,
+        "started": 1790584678.8028135
+      },
+      "size": 2320,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/build-before/source.json",
+        "sha256": "6b4aa1eed9194edbd32ab7b9a7518cb9e82a61b3573554632555865a10110f4a"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+      "variant": "native"
+    },
+    {
+      "address": 1255872,
+      "binary": {
+        "bytes": 14431584,
+        "path": "/home/zhuhe/code/litchi-target-0815/before-profile",
+        "sha256": "245f5b515d64d41cc1f389a6d4e6e79ce8c6f7af38790e39ee5040dbbef2e38a"
+      },
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0815/before-profile"
+        ],
+        "ended": 1790584679.0298774,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790584679.0171561,
+        "symbols": {
+          "bytes": 105,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/profile.symbol.txt",
+          "sha256": "a437e11ecdd07bde06a68cf549c4df11e6ee25db59a20ef8f3e7d894d5bcd0ef"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 19412,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/profile.assembly.txt",
+          "sha256": "949cad6f716f4499c22f2f2d4fc63723b48587a32c0500bc3e74f4c34d6c023f"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x1329c0",
+          "--stop-address=0x1332d0",
+          "/home/zhuhe/code/litchi-target-0815/before-profile"
+        ],
+        "ended": 1790584679.033008,
+        "exit_code": 0,
+        "started": 1790584679.0299494
+      },
+      "size": 2320,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/build-before/source.json",
+        "sha256": "6b4aa1eed9194edbd32ab7b9a7518cb9e82a61b3573554632555865a10110f4a"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+      "variant": "profile"
+    }
+  ],
+  "schema": "litchi.performance.0815.codegen.v1",
+  "scope": "Exact per-leg ordinary/profile scanner assembly; no causal cycle share or adoption claim.",
+  "tools": {
+    "nm": {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "objdump": {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    }
+  }
+}

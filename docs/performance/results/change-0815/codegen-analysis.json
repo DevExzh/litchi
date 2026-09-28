@@ -1,0 +1,1292 @@
+{
+  "rows": [
+    {
+      "all_vector_moves": [
+        {
+          "instruction": "movups %xmm0,0x150(%rsp)",
+          "offset": 156
+        },
+        {
+          "instruction": "movups %xmm0,0x176(%rsp)",
+          "offset": 217
+        },
+        {
+          "instruction": "movups %xmm0,0x108(%rsp)",
+          "offset": 301
+        },
+        {
+          "instruction": "movups %xmm0,0x120(%rsp)",
+          "offset": 321
+        },
+        {
+          "instruction": "movups 0x8(%rax),%xmm0",
+          "offset": 625
+        },
+        {
+          "instruction": "movups 0x18(%rax),%xmm1",
+          "offset": 629
+        },
+        {
+          "instruction": "movaps %xmm1,0x20(%rsp)",
+          "offset": 633
+        },
+        {
+          "instruction": "movaps %xmm0,0x10(%rsp)",
+          "offset": 638
+        },
+        {
+          "instruction": "movups 0x8(%rax),%xmm0",
+          "offset": 856
+        },
+        {
+          "instruction": "movups 0x18(%rax),%xmm1",
+          "offset": 860
+        },
+        {
+          "instruction": "movaps %xmm1,0x20(%rsp)",
+          "offset": 864
+        },
+        {
+          "instruction": "movaps %xmm0,0x10(%rsp)",
+          "offset": 869
+        },
+        {
+          "instruction": "movups 0x78(%rsp),%xmm0",
+          "offset": 1171
+        },
+        {
+          "instruction": "movups 0x88(%rsp),%xmm1",
+          "offset": 1176
+        },
+        {
+          "instruction": "movups 0x98(%rsp),%xmm2",
+          "offset": 1184
+        },
+        {
+          "instruction": "movaps %xmm2,0x1c0(%rsp)",
+          "offset": 1192
+        },
+        {
+          "instruction": "movaps %xmm1,0x1b0(%rsp)",
+          "offset": 1200
+        },
+        {
+          "instruction": "movaps %xmm0,0x1a0(%rsp)",
+          "offset": 1208
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1243
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1248
+        },
+        {
+          "instruction": "movups 0x50(%rsp),%xmm2",
+          "offset": 1253
+        },
+        {
+          "instruction": "movups 0x60(%rsp),%xmm3",
+          "offset": 1258
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1263
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1267
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1271
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1275
+        },
+        {
+          "instruction": "movups -0x10cdc8(%rip),%xmm0        # 260ee <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5426>",
+          "offset": 1311
+        },
+        {
+          "instruction": "movups %xmm0,0x1d(%rax)",
+          "offset": 1318
+        },
+        {
+          "instruction": "movups -0x10cde0(%rip),%xmm0        # 260e1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5419>",
+          "offset": 1322
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1329
+        },
+        {
+          "instruction": "movups -0x10cdfb(%rip),%xmm0        # 260d1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5409>",
+          "offset": 1333
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1340
+        },
+        {
+          "instruction": "movups 0xf8(%rsp),%xmm0",
+          "offset": 1488
+        },
+        {
+          "instruction": "movups 0x108(%rsp),%xmm1",
+          "offset": 1496
+        },
+        {
+          "instruction": "movups 0x118(%rsp),%xmm2",
+          "offset": 1504
+        },
+        {
+          "instruction": "movups 0x128(%rsp),%xmm3",
+          "offset": 1512
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1520
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1524
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1528
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1532
+        },
+        {
+          "instruction": "movups -0xff560(%rip),%xmm0        # 33a77 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.5132140142830697001+0x506>",
+          "offset": 1600
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1607
+        },
+        {
+          "instruction": "movups -0x10cf0c(%rip),%xmm0        # 2610d <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5445>",
+          "offset": 1666
+        },
+        {
+          "instruction": "movups %xmm0,0xe(%rax)",
+          "offset": 1673
+        },
+        {
+          "instruction": "movups -0x10cf25(%rip),%xmm0        # 260ff <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5437>",
+          "offset": 1677
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1684
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1746
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1751
+        },
+        {
+          "instruction": "movups %xmm1,0x1f0(%rsp)",
+          "offset": 1756
+        },
+        {
+          "instruction": "movups %xmm0,0x1e0(%rsp)",
+          "offset": 1764
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1810
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1815
+        },
+        {
+          "instruction": "movups %xmm1,0x220(%rsp)",
+          "offset": 1820
+        },
+        {
+          "instruction": "movups %xmm0,0x210(%rsp)",
+          "offset": 1828
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1881
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1886
+        },
+        {
+          "instruction": "movups 0x50(%rsp),%xmm2",
+          "offset": 1891
+        },
+        {
+          "instruction": "movups 0x60(%rsp),%xmm3",
+          "offset": 1896
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1901
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1905
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1909
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1913
+        },
+        {
+          "instruction": "movups -0x119e01(%rip),%xmm0        # 193c0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x365>",
+          "offset": 2090
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 2097
+        },
+        {
+          "instruction": "movups -0x119e1c(%rip),%xmm0        # 193b0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x355>",
+          "offset": 2101
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 2108
+        }
+      ],
+      "arm_copy_sequences": [
+        {
+          "bytes": 32,
+          "instructions": [
+            {
+              "instruction": "movups 0x8(%rax),%xmm0",
+              "offset": 625
+            },
+            {
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "offset": 629
+            },
+            {
+              "instruction": "movaps %xmm1,0x20(%rsp)",
+              "offset": 633
+            },
+            {
+              "instruction": "movaps %xmm0,0x10(%rsp)",
+              "offset": 638
+            }
+          ],
+          "offset": 625
+        },
+        {
+          "bytes": 32,
+          "instructions": [
+            {
+              "instruction": "movups 0x8(%rax),%xmm0",
+              "offset": 856
+            },
+            {
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "offset": 860
+            },
+            {
+              "instruction": "movaps %xmm1,0x20(%rsp)",
+              "offset": 864
+            },
+            {
+              "instruction": "movaps %xmm0,0x10(%rsp)",
+              "offset": 869
+            }
+          ],
+          "offset": 856
+        }
+      ],
+      "binary": {
+        "bytes": 14430728,
+        "path": "/home/zhuhe/code/litchi-target-0815/before-native",
+        "sha256": "08ab0a8e601463b09ec759bf5d7392e4b312129f46f1b19efd01d277375e1c9e"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 434,
+      "leg": "before",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b590 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 561
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 566
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 576
+        },
+        {
+          "instruction": "cmp    %rax,0x78(%rsp)",
+          "offset": 579
+        },
+        {
+          "instruction": "jne    132e23 <litchi_pptx::notes::codec::scan_processed_xml+0x493>",
+          "offset": 584
+        },
+        {
+          "instruction": "mov    0x80(%rsp),%rax",
+          "offset": 590
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 598
+        },
+        {
+          "instruction": "ja     132dc0 <litchi_pptx::notes::codec::scan_processed_xml+0x430>",
+          "offset": 602
+        },
+        {
+          "instruction": "movslq (%r12,%rax,4),%rcx",
+          "offset": 608
+        },
+        {
+          "instruction": "add    %r12,%rcx",
+          "offset": 612
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 615
+        }
+      ],
+      "receipt": {
+        "bytes": 4764,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/receipt.json",
+        "sha256": "aa333bb420ebe6cf081dc9dab73b81193c0280d467bd64ac5fd8ea79f4bbe839"
+      },
+      "symbol_bytes": 2320,
+      "variant": "native",
+      "vector_moves_in_window": 0
+    },
+    {
+      "all_vector_moves": [
+        {
+          "instruction": "movups %xmm0,0x150(%rsp)",
+          "offset": 156
+        },
+        {
+          "instruction": "movups %xmm0,0x176(%rsp)",
+          "offset": 217
+        },
+        {
+          "instruction": "movups %xmm0,0x108(%rsp)",
+          "offset": 301
+        },
+        {
+          "instruction": "movups %xmm0,0x120(%rsp)",
+          "offset": 321
+        },
+        {
+          "instruction": "movups 0x8(%rax),%xmm0",
+          "offset": 625
+        },
+        {
+          "instruction": "movups 0x18(%rax),%xmm1",
+          "offset": 629
+        },
+        {
+          "instruction": "movaps %xmm1,0x20(%rsp)",
+          "offset": 633
+        },
+        {
+          "instruction": "movaps %xmm0,0x10(%rsp)",
+          "offset": 638
+        },
+        {
+          "instruction": "movups 0x8(%rax),%xmm0",
+          "offset": 856
+        },
+        {
+          "instruction": "movups 0x18(%rax),%xmm1",
+          "offset": 860
+        },
+        {
+          "instruction": "movaps %xmm1,0x20(%rsp)",
+          "offset": 864
+        },
+        {
+          "instruction": "movaps %xmm0,0x10(%rsp)",
+          "offset": 869
+        },
+        {
+          "instruction": "movups 0x78(%rsp),%xmm0",
+          "offset": 1171
+        },
+        {
+          "instruction": "movups 0x88(%rsp),%xmm1",
+          "offset": 1176
+        },
+        {
+          "instruction": "movups 0x98(%rsp),%xmm2",
+          "offset": 1184
+        },
+        {
+          "instruction": "movaps %xmm2,0x1c0(%rsp)",
+          "offset": 1192
+        },
+        {
+          "instruction": "movaps %xmm1,0x1b0(%rsp)",
+          "offset": 1200
+        },
+        {
+          "instruction": "movaps %xmm0,0x1a0(%rsp)",
+          "offset": 1208
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1243
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1248
+        },
+        {
+          "instruction": "movups 0x50(%rsp),%xmm2",
+          "offset": 1253
+        },
+        {
+          "instruction": "movups 0x60(%rsp),%xmm3",
+          "offset": 1258
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1263
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1267
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1271
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1275
+        },
+        {
+          "instruction": "movups -0x10cdf8(%rip),%xmm0        # 260ee <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5426>",
+          "offset": 1311
+        },
+        {
+          "instruction": "movups %xmm0,0x1d(%rax)",
+          "offset": 1318
+        },
+        {
+          "instruction": "movups -0x10ce10(%rip),%xmm0        # 260e1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5419>",
+          "offset": 1322
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1329
+        },
+        {
+          "instruction": "movups -0x10ce2b(%rip),%xmm0        # 260d1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5409>",
+          "offset": 1333
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1340
+        },
+        {
+          "instruction": "movups 0xf8(%rsp),%xmm0",
+          "offset": 1488
+        },
+        {
+          "instruction": "movups 0x108(%rsp),%xmm1",
+          "offset": 1496
+        },
+        {
+          "instruction": "movups 0x118(%rsp),%xmm2",
+          "offset": 1504
+        },
+        {
+          "instruction": "movups 0x128(%rsp),%xmm3",
+          "offset": 1512
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1520
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1524
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1528
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1532
+        },
+        {
+          "instruction": "movups -0xff590(%rip),%xmm0        # 33a77 <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.5132140142830697001+0x506>",
+          "offset": 1600
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1607
+        },
+        {
+          "instruction": "movups -0x10cf3c(%rip),%xmm0        # 2610d <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5445>",
+          "offset": 1666
+        },
+        {
+          "instruction": "movups %xmm0,0xe(%rax)",
+          "offset": 1673
+        },
+        {
+          "instruction": "movups -0x10cf55(%rip),%xmm0        # 260ff <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5437>",
+          "offset": 1677
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1684
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1746
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1751
+        },
+        {
+          "instruction": "movups %xmm1,0x1f0(%rsp)",
+          "offset": 1756
+        },
+        {
+          "instruction": "movups %xmm0,0x1e0(%rsp)",
+          "offset": 1764
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1810
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1815
+        },
+        {
+          "instruction": "movups %xmm1,0x220(%rsp)",
+          "offset": 1820
+        },
+        {
+          "instruction": "movups %xmm0,0x210(%rsp)",
+          "offset": 1828
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm0",
+          "offset": 1881
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm1",
+          "offset": 1886
+        },
+        {
+          "instruction": "movups 0x50(%rsp),%xmm2",
+          "offset": 1891
+        },
+        {
+          "instruction": "movups 0x60(%rsp),%xmm3",
+          "offset": 1896
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1901
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1905
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1909
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1913
+        },
+        {
+          "instruction": "movups -0x119e31(%rip),%xmm0        # 193c0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x365>",
+          "offset": 2090
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 2097
+        },
+        {
+          "instruction": "movups -0x119e4c(%rip),%xmm0        # 193b0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x355>",
+          "offset": 2101
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 2108
+        }
+      ],
+      "arm_copy_sequences": [
+        {
+          "bytes": 32,
+          "instructions": [
+            {
+              "instruction": "movups 0x8(%rax),%xmm0",
+              "offset": 625
+            },
+            {
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "offset": 629
+            },
+            {
+              "instruction": "movaps %xmm1,0x20(%rsp)",
+              "offset": 633
+            },
+            {
+              "instruction": "movaps %xmm0,0x10(%rsp)",
+              "offset": 638
+            }
+          ],
+          "offset": 625
+        },
+        {
+          "bytes": 32,
+          "instructions": [
+            {
+              "instruction": "movups 0x8(%rax),%xmm0",
+              "offset": 856
+            },
+            {
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "offset": 860
+            },
+            {
+              "instruction": "movaps %xmm1,0x20(%rsp)",
+              "offset": 864
+            },
+            {
+              "instruction": "movaps %xmm0,0x10(%rsp)",
+              "offset": 869
+            }
+          ],
+          "offset": 856
+        }
+      ],
+      "binary": {
+        "bytes": 14431584,
+        "path": "/home/zhuhe/code/litchi-target-0815/before-profile",
+        "sha256": "245f5b515d64d41cc1f389a6d4e6e79ce8c6f7af38790e39ee5040dbbef2e38a"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 434,
+      "leg": "before",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b5c0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 561
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 566
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 576
+        },
+        {
+          "instruction": "cmp    %rax,0x78(%rsp)",
+          "offset": 579
+        },
+        {
+          "instruction": "jne    132e53 <litchi_pptx::notes::codec::scan_processed_xml+0x493>",
+          "offset": 584
+        },
+        {
+          "instruction": "mov    0x80(%rsp),%rax",
+          "offset": 590
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 598
+        },
+        {
+          "instruction": "ja     132df0 <litchi_pptx::notes::codec::scan_processed_xml+0x430>",
+          "offset": 602
+        },
+        {
+          "instruction": "movslq (%r12,%rax,4),%rcx",
+          "offset": 608
+        },
+        {
+          "instruction": "add    %r12,%rcx",
+          "offset": 612
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 615
+        }
+      ],
+      "receipt": {
+        "bytes": 4764,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/receipt.json",
+        "sha256": "aa333bb420ebe6cf081dc9dab73b81193c0280d467bd64ac5fd8ea79f4bbe839"
+      },
+      "symbol_bytes": 2320,
+      "variant": "profile",
+      "vector_moves_in_window": 0
+    },
+    {
+      "all_vector_moves": [
+        {
+          "instruction": "movups %xmm0,0x130(%rsp)",
+          "offset": 156
+        },
+        {
+          "instruction": "movups %xmm0,0x156(%rsp)",
+          "offset": 217
+        },
+        {
+          "instruction": "movups %xmm0,0xe8(%rsp)",
+          "offset": 295
+        },
+        {
+          "instruction": "movups %xmm0,0x100(%rsp)",
+          "offset": 315
+        },
+        {
+          "instruction": "movups 0x68(%rsp),%xmm0",
+          "offset": 1033
+        },
+        {
+          "instruction": "movups 0x78(%rsp),%xmm1",
+          "offset": 1038
+        },
+        {
+          "instruction": "movups 0x88(%rsp),%xmm2",
+          "offset": 1043
+        },
+        {
+          "instruction": "movaps %xmm2,0x1a0(%rsp)",
+          "offset": 1051
+        },
+        {
+          "instruction": "movaps %xmm1,0x190(%rsp)",
+          "offset": 1059
+        },
+        {
+          "instruction": "movaps %xmm0,0x180(%rsp)",
+          "offset": 1067
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1102
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1107
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm2",
+          "offset": 1112
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm3",
+          "offset": 1117
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1122
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1126
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1130
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1134
+        },
+        {
+          "instruction": "movups -0x10cd36(%rip),%xmm0        # 260d2 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x540a>",
+          "offset": 1169
+        },
+        {
+          "instruction": "movups %xmm0,0x1d(%rax)",
+          "offset": 1176
+        },
+        {
+          "instruction": "movups -0x10cd4e(%rip),%xmm0        # 260c5 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x53fd>",
+          "offset": 1180
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1187
+        },
+        {
+          "instruction": "movups -0x10cd69(%rip),%xmm0        # 260b5 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x53ed>",
+          "offset": 1191
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1198
+        },
+        {
+          "instruction": "movups 0xd8(%rsp),%xmm0",
+          "offset": 1328
+        },
+        {
+          "instruction": "movups 0xe8(%rsp),%xmm1",
+          "offset": 1336
+        },
+        {
+          "instruction": "movups 0xf8(%rsp),%xmm2",
+          "offset": 1344
+        },
+        {
+          "instruction": "movups 0x108(%rsp),%xmm3",
+          "offset": 1352
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1360
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1364
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1368
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1372
+        },
+        {
+          "instruction": "movups -0xff4bc(%rip),%xmm0        # 33a5b <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.5164233090725441441+0x506>",
+          "offset": 1440
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1447
+        },
+        {
+          "instruction": "movups -0x10ce68(%rip),%xmm0        # 260f1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5429>",
+          "offset": 1506
+        },
+        {
+          "instruction": "movups %xmm0,0xe(%rax)",
+          "offset": 1513
+        },
+        {
+          "instruction": "movups -0x10ce81(%rip),%xmm0        # 260e3 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x541b>",
+          "offset": 1517
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1524
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1716
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1721
+        },
+        {
+          "instruction": "movups %xmm1,0x200(%rsp)",
+          "offset": 1726
+        },
+        {
+          "instruction": "movups %xmm0,0x1f0(%rsp)",
+          "offset": 1734
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1786
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1791
+        },
+        {
+          "instruction": "movups %xmm1,0x1d0(%rsp)",
+          "offset": 1796
+        },
+        {
+          "instruction": "movups %xmm0,0x1c0(%rsp)",
+          "offset": 1804
+        },
+        {
+          "instruction": "movups -0x119d07(%rip),%xmm0        # 193c0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x365>",
+          "offset": 1872
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1879
+        },
+        {
+          "instruction": "movups -0x119d22(%rip),%xmm0        # 193b0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x355>",
+          "offset": 1883
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1890
+        }
+      ],
+      "arm_copy_sequences": [],
+      "binary": {
+        "bytes": 14429184,
+        "path": "/home/zhuhe/code/litchi-target-0815/after-native",
+        "sha256": "428479cb74e36167670c0e4fd48fe13c47597637db8d0d1af9e97e31ba06dc41"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 393,
+      "leg": "after",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b4a0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 545
+        },
+        {
+          "instruction": "movabs $0x800000000000000f,%rax",
+          "offset": 550
+        },
+        {
+          "instruction": "cmp    %rax,0x68(%rsp)",
+          "offset": 560
+        },
+        {
+          "instruction": "jne    132d79 <litchi_pptx::notes::codec::scan_processed_xml+0x409>",
+          "offset": 565
+        },
+        {
+          "instruction": "xor    %r13d,%r13d",
+          "offset": 571
+        },
+        {
+          "instruction": "mov    0x70(%rsp),%rax",
+          "offset": 574
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 579
+        },
+        {
+          "instruction": "ja     132ae0 <litchi_pptx::notes::codec::scan_processed_xml+0x170>",
+          "offset": 583
+        },
+        {
+          "instruction": "movslq (%r15,%rax,4),%rax",
+          "offset": 589
+        },
+        {
+          "instruction": "add    %r15,%rax",
+          "offset": 593
+        },
+        {
+          "instruction": "jmp    *%rax",
+          "offset": 596
+        }
+      ],
+      "receipt": {
+        "bytes": 4752,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-after/receipt.json",
+        "sha256": "161968fc42686a378d2611abb314340e2d42dcbe405138391993af32abfd0fb2"
+      },
+      "symbol_bytes": 2107,
+      "variant": "native",
+      "vector_moves_in_window": 0
+    },
+    {
+      "all_vector_moves": [
+        {
+          "instruction": "movups %xmm0,0x130(%rsp)",
+          "offset": 156
+        },
+        {
+          "instruction": "movups %xmm0,0x156(%rsp)",
+          "offset": 217
+        },
+        {
+          "instruction": "movups %xmm0,0xe8(%rsp)",
+          "offset": 295
+        },
+        {
+          "instruction": "movups %xmm0,0x100(%rsp)",
+          "offset": 315
+        },
+        {
+          "instruction": "movups 0x68(%rsp),%xmm0",
+          "offset": 1033
+        },
+        {
+          "instruction": "movups 0x78(%rsp),%xmm1",
+          "offset": 1038
+        },
+        {
+          "instruction": "movups 0x88(%rsp),%xmm2",
+          "offset": 1043
+        },
+        {
+          "instruction": "movaps %xmm2,0x1a0(%rsp)",
+          "offset": 1051
+        },
+        {
+          "instruction": "movaps %xmm1,0x190(%rsp)",
+          "offset": 1059
+        },
+        {
+          "instruction": "movaps %xmm0,0x180(%rsp)",
+          "offset": 1067
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1102
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1107
+        },
+        {
+          "instruction": "movups 0x30(%rsp),%xmm2",
+          "offset": 1112
+        },
+        {
+          "instruction": "movups 0x40(%rsp),%xmm3",
+          "offset": 1117
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1122
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1126
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1130
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1134
+        },
+        {
+          "instruction": "movups -0x10cd66(%rip),%xmm0        # 260d2 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x540a>",
+          "offset": 1169
+        },
+        {
+          "instruction": "movups %xmm0,0x1d(%rax)",
+          "offset": 1176
+        },
+        {
+          "instruction": "movups -0x10cd7e(%rip),%xmm0        # 260c5 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x53fd>",
+          "offset": 1180
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1187
+        },
+        {
+          "instruction": "movups -0x10cd99(%rip),%xmm0        # 260b5 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x53ed>",
+          "offset": 1191
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1198
+        },
+        {
+          "instruction": "movups 0xd8(%rsp),%xmm0",
+          "offset": 1328
+        },
+        {
+          "instruction": "movups 0xe8(%rsp),%xmm1",
+          "offset": 1336
+        },
+        {
+          "instruction": "movups 0xf8(%rsp),%xmm2",
+          "offset": 1344
+        },
+        {
+          "instruction": "movups 0x108(%rsp),%xmm3",
+          "offset": 1352
+        },
+        {
+          "instruction": "movups %xmm3,0x38(%rbx)",
+          "offset": 1360
+        },
+        {
+          "instruction": "movups %xmm2,0x28(%rbx)",
+          "offset": 1364
+        },
+        {
+          "instruction": "movups %xmm1,0x18(%rbx)",
+          "offset": 1368
+        },
+        {
+          "instruction": "movups %xmm0,0x8(%rbx)",
+          "offset": 1372
+        },
+        {
+          "instruction": "movups -0xff4ec(%rip),%xmm0        # 33a5b <anon.7d1f7c43824a99e7625b6b83caf5366f.5242.llvm.5164233090725441441+0x506>",
+          "offset": 1440
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1447
+        },
+        {
+          "instruction": "movups -0x10ce98(%rip),%xmm0        # 260f1 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x5429>",
+          "offset": 1506
+        },
+        {
+          "instruction": "movups %xmm0,0xe(%rax)",
+          "offset": 1513
+        },
+        {
+          "instruction": "movups -0x10ceb1(%rip),%xmm0        # 260e3 <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x541b>",
+          "offset": 1517
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1524
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1716
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1721
+        },
+        {
+          "instruction": "movups %xmm1,0x200(%rsp)",
+          "offset": 1726
+        },
+        {
+          "instruction": "movups %xmm0,0x1f0(%rsp)",
+          "offset": 1734
+        },
+        {
+          "instruction": "movups 0x10(%rsp),%xmm0",
+          "offset": 1786
+        },
+        {
+          "instruction": "movups 0x20(%rsp),%xmm1",
+          "offset": 1791
+        },
+        {
+          "instruction": "movups %xmm1,0x1d0(%rsp)",
+          "offset": 1796
+        },
+        {
+          "instruction": "movups %xmm0,0x1c0(%rsp)",
+          "offset": 1804
+        },
+        {
+          "instruction": "movups -0x119d37(%rip),%xmm0        # 193c0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x365>",
+          "offset": 1872
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rax)",
+          "offset": 1879
+        },
+        {
+          "instruction": "movups -0x119d52(%rip),%xmm0        # 193b0 <anon.58baeeae7d5fe476157d296c9f08f803.334.llvm.5844774155465566772+0x355>",
+          "offset": 1883
+        },
+        {
+          "instruction": "movups %xmm0,(%rax)",
+          "offset": 1890
+        }
+      ],
+      "arm_copy_sequences": [],
+      "binary": {
+        "bytes": 14430040,
+        "path": "/home/zhuhe/code/litchi-target-0815/after-profile",
+        "sha256": "ad565a40267a02331256bd49a8debcc0a38f09f8b88337d83713674fb965c142"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 393,
+      "leg": "after",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b4d0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 545
+        },
+        {
+          "instruction": "movabs $0x800000000000000f,%rax",
+          "offset": 550
+        },
+        {
+          "instruction": "cmp    %rax,0x68(%rsp)",
+          "offset": 560
+        },
+        {
+          "instruction": "jne    132da9 <litchi_pptx::notes::codec::scan_processed_xml+0x409>",
+          "offset": 565
+        },
+        {
+          "instruction": "xor    %r13d,%r13d",
+          "offset": 571
+        },
+        {
+          "instruction": "mov    0x70(%rsp),%rax",
+          "offset": 574
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 579
+        },
+        {
+          "instruction": "ja     132b10 <litchi_pptx::notes::codec::scan_processed_xml+0x170>",
+          "offset": 583
+        },
+        {
+          "instruction": "movslq (%r15,%rax,4),%rax",
+          "offset": 589
+        },
+        {
+          "instruction": "add    %r15,%rax",
+          "offset": 593
+        },
+        {
+          "instruction": "jmp    *%rax",
+          "offset": 596
+        }
+      ],
+      "receipt": {
+        "bytes": 4752,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-after/receipt.json",
+        "sha256": "161968fc42686a378d2611abb314340e2d42dcbe405138391993af32abfd0fb2"
+      },
+      "symbol_bytes": 2107,
+      "variant": "profile",
+      "vector_moves_in_window": 0
+    }
+  ],
+  "schema": "litchi.performance.0815.codegen-analysis.v1",
+  "scope": "Static exact-binary instruction windows and syntactic 32-byte copy sequences. Counts are not runtime frequency, causal savings, or adoption evidence."
+}

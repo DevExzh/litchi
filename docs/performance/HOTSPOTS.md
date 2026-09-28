@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0815 — fewer arm copies do not improve the workflow
+
+[0815](0815-pptx-borrowed-event-arms-workflow.md) Ordinary/profile scanners shrink 2,320→2,107 bytes and two 32-byte arm copy sequences disappear. Scanner self Ir changes 16,724,054→16,713,423, while first-pair inclusive Ir rises 313,977,875→317,662,247 and the candidate adds 282,612 result-drop calls. Native large capture/lifecycle worsen 4.270%/5.299%. Reject this source spelling; static copy removal is not a workflow benefit.
+
 ## 0814 — post-dispatch event payload moves remain visible
 
 [0814](0814-pptx-current-native-attribution.md) Scanner self leaves lead at 150/142 of 851/853 exact-owner samples. Offsets 0x25b and 0x33b map to arm-local payload loads in the exact fp binary; ordinary/wrapper assembly contains equivalent moves. Test borrowing Start/Empty payloads without changing event bodies or error/namespace ordering. Wrapper perturbation, unresolved interiors, and sampling skid prevent causal phase-cost estimates.

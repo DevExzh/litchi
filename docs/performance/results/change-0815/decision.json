@@ -1,0 +1,60 @@
+{
+  "adoption_eligible": false,
+  "decided_at": 1790586100.007911,
+  "diagnostic_limits": [
+    "26 individual paired p95/p99 increases above 5% remain visible; no general tail-latency claim.",
+    "Three paired RSS increases above 5% and 23 native spread flags remain explicit; no memory-saving claim.",
+    "Callgrind Ir and new result-drop edges describe guest attribution, not causal native cycles or phase fractions.",
+    "The deterministic PPTX trial does not establish cold-cache, remote-source, non-seek-output, concurrency, cross-format, or universal-document behavior."
+  ],
+  "evidence": {
+    "analysis.json": {
+      "bytes": 3712552,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/analysis.json",
+      "sha256": "005712a549f4794d22743cd06059990563caa31c9fbd10bfc13732dcd955aac5"
+    },
+    "codegen-analysis.json": {
+      "bytes": 35922,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-analysis.json",
+      "sha256": "fde36988312465ee23f713e0a158ad85f37afa930baa5b56bb8f8e7d2e011817"
+    },
+    "codegen-gate.json": {
+      "bytes": 1843,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-gate.json",
+      "sha256": "dbbbefca864f257d57999d52c308e6689f98924c2a6594c686a253b9c9aec997"
+    },
+    "profile-analysis.json": {
+      "bytes": 157557,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/profile-analysis.json",
+      "sha256": "0ce9156f4a8edd2e842ae04284d85bf874f070db1770558993a45ca560e355bc"
+    },
+    "profile-review.md": {
+      "bytes": 5359,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/profile-review.md",
+      "sha256": "1959417bed8a002db1eb3ef3b2284572e2e41d95d0691e0e2eb7600c43bd8c8a"
+    },
+    "quality-summary.json": {
+      "bytes": 26272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-summary.json",
+      "sha256": "b9a44285fdf2f26e786c373ac2bd63705a32f203136d40732d096c33b2a90607"
+    },
+    "results-review.md": {
+      "bytes": 8458,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/results-review.md",
+      "sha256": "3b5516652e002ab8f0c2db883f3d321dba77a782f51b68d6439f0f9a531ae6b4"
+    },
+    "root-audit.json": {
+      "bytes": 56504,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/root-audit.json",
+      "sha256": "1bf738551ea36a9769984bb972ff236c6d934f11cc37f818d5db74f9aba524d5"
+    },
+    "source-review.md": {
+      "bytes": 4899,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/source-review.md",
+      "sha256": "1fd1c510f12833996857b578c3732b07e559e9e80f212e44df51277dcb725e13"
+    }
+  },
+  "production_adoption": false,
+  "reason": "Reject: no capture or lifecycle row meets the frozen benefit threshold, and large lifecycle regresses 5.299437% with ratio 1.0529943722710606 and bootstrap interval [1.0490809594395747, 1.0571747958438187], triggering the latency veto. All 144 allocation comparisons are equal. Semantic, quality, assembly and independent numerical/profile checks pass; static copy removal does not satisfy the workflow benefit gate. Restore the exact baseline.",
+  "schema": "litchi.performance.0815.decision.v1"
+}

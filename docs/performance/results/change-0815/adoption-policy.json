@@ -1,0 +1,30 @@
+{
+  "schema": "litchi.performance.0815.adoption-policy.v1",
+  "scope": "All eighteen PPTX capture, commit, and lifecycle rows, including ordinary, vendor, unicode-vendor, and valid-4attr controls.",
+  "frozen_before_build": true,
+  "useful_public_workflow_benefit_required": true,
+  "allocation_count_alone_sufficient": false,
+  "benefit": {
+    "eligible_modes": ["capture", "lifecycle"],
+    "at_least_one_case_required": true,
+    "minimum_improvement_percent": 3.0,
+    "bootstrap95_high_below": 1.0
+  },
+  "latency": {
+    "metric": "paired process p50",
+    "maximum_ratio": 1.05,
+    "bootstrap95_low_must_exceed": 1.0,
+    "any_case_violation_rejects": true,
+    "resamples": 10000,
+    "seed": 815815
+  },
+  "memory": {
+    "allocation_calls_increase_allowed": 0,
+    "allocated_bytes_increase_allowed": 0,
+    "net_live_increase_allowed": 0,
+    "peak_above_entry_increase_allowed": 0,
+    "comparison": "each paired allocation block median"
+  },
+  "quantile": "nearest rank ceil(n*p)-1",
+  "cross_format": "not included in this private PPTX codec experiment"
+}

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0815 — copy-removal hypothesis closed by rejection
+
+[0815](0815-pptx-borrowed-event-arms-workflow.md) The two targeted arm copies disappear, but zero eligible benefits and a large-lifecycle veto reject the change. Both numerical readers agree and the exact baseline is restored. All 144 resource comparisons are equal. This completes the bounded event-arm hypothesis; broader corpus, CRUD, I/O, cold-cache, and scaling gaps remain open. iWork is excluded.
+
 ## 0814 — next bounded scanner experiment localized
 
 [0814](0814-pptx-current-native-attribution.md) Exact current binaries place 125/150 and 114/142 scanner self samples at Start/Empty arm-local payload moves, distinct from the pre-dispatch copies removed in 0813. Borrowed arm bindings are a conditional next trial; broader native-producer, I/O, cold-cache, and scaling evidence remains open. The broad non-iWork goal stays active.

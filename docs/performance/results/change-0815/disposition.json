@@ -1,0 +1,11 @@
+{
+  "production_change_retained": false,
+  "reason": "Reject: no capture or lifecycle row meets the frozen benefit threshold, and large lifecycle regresses 5.299437% with ratio 1.0529943722710606 and bootstrap interval [1.0490809594395747, 1.0571747958438187], triggering the latency veto. All 144 allocation comparisons are equal. Semantic, quality, assembly and independent numerical/profile checks pass; static copy removal does not satisfy the workflow benefit gate. Restore the exact baseline.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/restored-source.json",
+    "sha256": "6b4aa1eed9194edbd32ab7b9a7518cb9e82a61b3573554632555865a10110f4a"
+  },
+  "schema": "litchi.performance.0815.disposition.v1",
+  "status": "rejected"
+}
