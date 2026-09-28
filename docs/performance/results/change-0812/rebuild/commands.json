@@ -1,0 +1,104 @@
+{
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+      "--features",
+      "capture-profile"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "ended": 1790578728.5696392,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0811",
+      "RUSTFLAGS": "-C force-frame-pointers=yes",
+      "inherited_compiler_environment": {
+        "CARGO_BUILD_RUSTFLAGS": null,
+        "CARGO_ENCODED_RUSTFLAGS": null,
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": null,
+        "RUSTC_WORKSPACE_WRAPPER": null,
+        "RUSTC_WRAPPER": null,
+        "RUSTFLAGS": null,
+        "RUSTUP_TOOLCHAIN": null
+      }
+    },
+    "exit_code": 0,
+    "log": {
+      "bytes": 7191,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/build.log",
+      "sha256": "e3c3784c7aebef3e4508c197f2d46a669c7f7ec833a5c843ca219d48d1ce08d9"
+    },
+    "source_after": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-after.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "source_before": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-before.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "source_files_equal": true,
+    "started": 1790578634.8813171
+  },
+  "nm": null,
+  "objdump": null,
+  "schema": "litchi.performance.0812.rebuild-commands.v1",
+  "tool_versions": {
+    "cargo": {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended": 1790578634.8662596,
+      "exit_code": 0,
+      "started": 1790578634.8512154,
+      "stderr": "",
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+    },
+    "nm": {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended": 1790578634.8673623,
+      "exit_code": 0,
+      "started": 1790578634.8662627,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "objdump": {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended": 1790578634.8686175,
+      "exit_code": 0,
+      "started": 1790578634.8673677,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "rustc": {
+      "command": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/home/zhuhe/code/litchi",
+      "ended": 1790578634.8512099,
+      "exit_code": 0,
+      "started": 1790578634.8326917,
+      "stderr": "",
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    }
+  }
+}

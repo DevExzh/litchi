@@ -1,0 +1,25 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "command": [
+    "objdump",
+    "-d",
+    "--demangle",
+    "--no-show-raw-insn",
+    "--start-address=0x12a2d0",
+    "--stop-address=0x12acec",
+    "/home/zhuhe/code/litchi-target-0811/fp"
+  ],
+  "ended": 1790578926.4911366,
+  "exit_code": 0,
+  "output": {
+    "bytes": 21882,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/scanner-assembly.txt",
+    "sha256": "aff29bea18d366182cfd526766d5e3ea5980c8eeb3c1c4e478f75dc3bfb6846b"
+  },
+  "started": 1790578926.4879823,
+  "stderr": ""
+}

@@ -1,0 +1,374 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "event": "cycles:u",
+  "inputs": {
+    "complete": {
+      "bytes": 1175,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/complete.json",
+      "sha256": "b1ac2540ddabe816d133b56aadda3a9ee62dd266715364ee1d5cc0c5723b193c"
+    },
+    "compression": {
+      "bytes": 1991,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/compression.json",
+      "sha256": "af4098a3b60716a50f6817bfda5ad5727dc0bc35de76b41d54144e7a18923076"
+    },
+    "decode": {
+      "bytes": 2291,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/decode.json",
+      "sha256": "0e9490b1ad521112e6ef4b1223f28943e7b103a0be1ae45c57766d4168ce22e4"
+    },
+    "frozen": {
+      "bytes": 2723,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/frozen.json",
+      "sha256": "013a5b0a351f8793061ca421cc9dbbf1bc44cf4d4baa0057f0d461c114013c8f"
+    },
+    "oracle": {
+      "bytes": 112421,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/0.json",
+      "sha256": "db9db1df73bfd2ca3c21659f6e66987166cd68a9090592dbe665f8f9c4681881"
+    },
+    "receipts": {
+      "bytes": 3134,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/receipts.json",
+      "sha256": "ceafbcd0fdd951ca3703f90b1b19f1e22fe3f8d2cd76e03aabec3db6fdf1a43b"
+    },
+    "reports": [
+      {
+        "bytes": 112421,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.json",
+        "sha256": "e1f420863f0ec44c1b4fa8c8e0cb421582614da7be622cbfde2cb930669030ac"
+      },
+      {
+        "bytes": 112421,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.json",
+        "sha256": "491e8e908711d68ea228460ffcafe3a56169ff17fe5443c915f9170e8f317fff"
+      }
+    ]
+  },
+  "owner": "namespace_uri_probe::capture_region_0793",
+  "rows": [
+    {
+      "frames": {
+        "compressed": {
+          "bytes": 208074,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.frames.gz",
+          "sha256": "43c6719e5a0095632339a29acee8b1364be5e06221e00b00a343b3787579847e"
+        },
+        "gzip_mtime": 0,
+        "kind": "frames",
+        "original": {
+          "bytes": 4606874,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.frames",
+          "sha256": "9aef7a82c13c784b8a92d20611a713f0a10be871ae96db6d01d12f40bc4b6186"
+        },
+        "repeat": 0
+      },
+      "lost_event_lines": 0,
+      "lost_event_period": 0,
+      "offsets": [
+        {
+          "offset_hex": "0x17d",
+          "period": 17632062,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x1b0",
+          "period": 8824179,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1bd",
+          "period": 8796137,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1d1",
+          "period": 8823282,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1d7",
+          "period": 8817160,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x212",
+          "period": 26439668,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x215",
+          "period": 8824393,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x221",
+          "period": 17607984,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x235",
+          "period": 8789278,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x242",
+          "period": 8821122,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x24d",
+          "period": 1701594315,
+          "samples": 193
+        },
+        {
+          "offset_hex": "0x251",
+          "period": 17630128,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x266",
+          "period": 8833818,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x26b",
+          "period": 8809591,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x278",
+          "period": 8837642,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x28b",
+          "period": 17607427,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x29d",
+          "period": 17646092,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x2b2",
+          "period": 8802210,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2b5",
+          "period": 8802318,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2bc",
+          "period": 35286477,
+          "samples": 4
+        },
+        {
+          "offset_hex": "0x368",
+          "period": 26438617,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x3a0",
+          "period": 8823057,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3a5",
+          "period": 8814003,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3d6",
+          "period": 8787973,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3fa",
+          "period": 8807871,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x43b",
+          "period": 8800021,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x46a",
+          "period": 8816295,
+          "samples": 1
+        }
+      ],
+      "owner_qualified_period": 8465232890,
+      "owner_qualified_samples": 960,
+      "path": "0.frames.gz",
+      "repeat": 0,
+      "report": {
+        "bytes": 112421,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.json",
+        "sha256": "e1f420863f0ec44c1b4fa8c8e0cb421582614da7be622cbfde2cb930669030ac"
+      },
+      "scanner_leaf_period": 2036513120,
+      "scanner_leaf_samples": 231,
+      "scanner_leaf_symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+      "unknown_interior_frames": 2,
+      "unknown_interior_samples": 2,
+      "unresolved_frames": 16,
+      "unresolved_samples": 11,
+      "whole_process_period": 26955925809,
+      "whole_process_samples": 3066
+    },
+    {
+      "frames": {
+        "compressed": {
+          "bytes": 204215,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.frames.gz",
+          "sha256": "e3b6bb7d4872523dbe04e30bd5821b47da901ad9f47a631d23d18415eea92b93"
+        },
+        "gzip_mtime": 0,
+        "kind": "frames",
+        "original": {
+          "bytes": 4644671,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.frames",
+          "sha256": "f4d5dbf69e7ae7ef3ec3e7651cc93e78b3a2821b876d71e308fb22a6d2d69ff5"
+        },
+        "repeat": 1
+      },
+      "lost_event_lines": 0,
+      "lost_event_period": 0,
+      "offsets": [
+        {
+          "offset_hex": "0x18d",
+          "period": 8813146,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1a2",
+          "period": 8797874,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1c9",
+          "period": 35255450,
+          "samples": 4
+        },
+        {
+          "offset_hex": "0x1d1",
+          "period": 17616278,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x221",
+          "period": 8799703,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x22b",
+          "period": 8795647,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x235",
+          "period": 8814672,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x242",
+          "period": 8830391,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x24d",
+          "period": 1568656582,
+          "samples": 178
+        },
+        {
+          "offset_hex": "0x25e",
+          "period": 8810134,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x266",
+          "period": 26372019,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x278",
+          "period": 43443676,
+          "samples": 5
+        },
+        {
+          "offset_hex": "0x29d",
+          "period": 26468723,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x2b2",
+          "period": 8830067,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2bc",
+          "period": 87745372,
+          "samples": 10
+        },
+        {
+          "offset_hex": "0x368",
+          "period": 35300462,
+          "samples": 4
+        },
+        {
+          "offset_hex": "0x3a5",
+          "period": 61730191,
+          "samples": 7
+        },
+        {
+          "offset_hex": "0x41b",
+          "period": 8815872,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x44b",
+          "period": 17659823,
+          "samples": 2
+        }
+      ],
+      "owner_qualified_period": 8548237375,
+      "owner_qualified_samples": 970,
+      "path": "1.frames.gz",
+      "repeat": 1,
+      "report": {
+        "bytes": 112421,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.json",
+        "sha256": "491e8e908711d68ea228460ffcafe3a56169ff17fe5443c915f9170e8f317fff"
+      },
+      "scanner_leaf_period": 1999556082,
+      "scanner_leaf_samples": 227,
+      "scanner_leaf_symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+      "unknown_interior_frames": 0,
+      "unknown_interior_samples": 0,
+      "unresolved_frames": 29,
+      "unresolved_samples": 16,
+      "whole_process_period": 27203324487,
+      "whole_process_samples": 3095
+    }
+  ],
+  "schema": "litchi.performance.0812.fresh-offset-audit.v1",
+  "scope": "Independent fresh 0812 cycles:u frame census for the exact rebuilt binary and owner. Public-workflow output and verification fields are checked against the sealed 0811 oracle. Counts and offsets are sampled diagnostics; no assembly mapping, instruction cost, phase fraction, speedup, or adoption claim is made.",
+  "verification": {
+    "assembly_dependency": false,
+    "exact_owner_and_dso_verified": true,
+    "gzip_members_and_decompressed_identities": true,
+    "oracle_output_and_verification_fields_verified": true,
+    "public_workflow_reports": 2,
+    "public_workflow_samples": 200,
+    "strict_cycles_u_headers": true
+  }
+}

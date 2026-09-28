@@ -1,0 +1,23 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "command": [
+    "addr2line",
+    "-afiC",
+    "-e",
+    "/home/zhuhe/code/litchi-target-0811/fp",
+    "0x12a51d",
+    "0x12a54d"
+  ],
+  "ended": 1790579036.5810237,
+  "exit_code": 0,
+  "schema": "litchi.performance.0812.line-mapping.v1",
+  "scope": "DWARF source attribution for the fresh exact binary; no historical mapping or causal cost.",
+  "started": 1790579036.5075426,
+  "stderr": "",
+  "stdout": "0x000000000012a51d\ncore::result::Result<T,E>::map_err\n/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:967\nlitchi_pptx::notes::codec::scan_processed_xml\n/home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:389\n0x000000000012a54d\nlitchi_pptx::notes::codec::scan_processed_xml\n/home/zhuhe/code/litchi/crates/litchi-pptx/src/notes/codec.rs:389\n",
+  "tool_version": "GNU addr2line (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+}

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0812 — event-result copying localized in the scanner
+
+[0812](0812-pptx-scanner-instruction-localization.md) Fresh exact-owner scanner leaves concentrate at offset 0x24d (193/231 and 178/227). Disassembly shows successive 40-byte payload copies after Reader::read_event_impl; DWARF attributes the sampled instruction to Result::map_err at codec.rs:389. Test an explicit success/error match before the unchanged event dispatch. Sampling skid and frame-pointer perturbation preclude causal savings estimates; simple namespace/attribute fusion is deferred for ordering risk.
+
 ## 0811 — scanner remains the leading native leaf
 
 [0811](0811-pptx-current-native-attribution.md) Current native profiles contain 960/957 exact-owner samples; scanner self leaves account for 217/254 samples, hardware SHA for 89/90. Reader, inspector, UTF-8, and attribute checks remain visible. Large frame-pointer overhead is 6.925%; nested counts overlap. Isolate scanner/event and namespace/attribute work before a new candidate; software-SHA guest cost and short root/name projections do not establish native savings.

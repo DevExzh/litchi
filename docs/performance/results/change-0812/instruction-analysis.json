@@ -1,0 +1,399 @@
+{
+  "assembly": {
+    "address": 1221328,
+    "mangled_symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+    "objdump": {
+      "bytes": 21882,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/scanner-assembly.txt",
+      "sha256": "aff29bea18d366182cfd526766d5e3ea5980c8eeb3c1c4e478f75dc3bfb6846b"
+    },
+    "size": 2588,
+    "symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+    "symbols": {
+      "bytes": 424522,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/symbols-resumed.txt",
+      "sha256": "120092804799ce52cb0c2c2053e95e2259801d7616dba3312cfd4ebff1808120"
+    }
+  },
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "historical_offsets_mapped": false,
+  "inputs": {
+    "architecture_files": 35,
+    "production_files": 9196,
+    "sealed_packet": {
+      "bytes": 32145,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/seal.json",
+      "sha256": "826b6f060773beef9ea8ce4d939bdf384b36ea518f5df09aead99ded61af5a76"
+    },
+    "source": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/build/source.json",
+      "sha256": "f3e5e972b1311dd40a5d6788665372669629da8c8d6b24de5740f92dd278a395"
+    }
+  },
+  "measured_outputs_verified": 200,
+  "reports": [
+    {
+      "bytes": 112421,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.json",
+      "sha256": "e1f420863f0ec44c1b4fa8c8e0cb421582614da7be622cbfde2cb930669030ac"
+    },
+    {
+      "bytes": 112421,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.json",
+      "sha256": "491e8e908711d68ea228460ffcafe3a56169ff17fe5443c915f9170e8f317fff"
+    }
+  ],
+  "rows": [
+    {
+      "leaf_period": 2036513120,
+      "leaf_samples": 231,
+      "lost_event_lines": 0,
+      "offsets": [
+        {
+          "instruction": "test   $0x1,%bl",
+          "offset": 381,
+          "offset_hex": "0x17d",
+          "period": 17632062,
+          "samples": 2
+        },
+        {
+          "instruction": "mov    %rsi,%rcx",
+          "offset": 432,
+          "offset_hex": "0x1b0",
+          "period": 8824179,
+          "samples": 1
+        },
+        {
+          "instruction": "nopl   (%rax)",
+          "offset": 445,
+          "offset_hex": "0x1bd",
+          "period": 8796137,
+          "samples": 1
+        },
+        {
+          "instruction": "lea    -0x20(%r8),%r8",
+          "offset": 465,
+          "offset_hex": "0x1d1",
+          "period": 8823282,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    %rsi,%rdx",
+          "offset": 471,
+          "offset_hex": "0x1d7",
+          "period": 8817160,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    %rbx,%rdi",
+          "offset": 530,
+          "offset_hex": "0x212",
+          "period": 26439668,
+          "samples": 3
+        },
+        {
+          "instruction": "lea    -0x1e8(%rbp),%rsi",
+          "offset": 533,
+          "offset_hex": "0x215",
+          "period": 8824393,
+          "samples": 1
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 545,
+          "offset_hex": "0x221",
+          "period": 17607984,
+          "samples": 2
+        },
+        {
+          "instruction": "jne    12a7b1 <litchi_pptx::notes::codec::scan_processed_xml+0x4e1>",
+          "offset": 565,
+          "offset_hex": "0x235",
+          "period": 8789278,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    0x20(%rcx),%rax",
+          "offset": 578,
+          "offset_hex": "0x242",
+          "period": 8821122,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": 589,
+          "offset_hex": "0x24d",
+          "period": 1701594315,
+          "samples": 193
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r15)",
+          "offset": 593,
+          "offset_hex": "0x251",
+          "period": 17630128,
+          "samples": 2
+        },
+        {
+          "instruction": "movups 0x10(%r15),%xmm1",
+          "offset": 614,
+          "offset_hex": "0x266",
+          "period": 8833818,
+          "samples": 1
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r14)",
+          "offset": 619,
+          "offset_hex": "0x26b",
+          "period": 8809591,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x10(%r14),%xmm1",
+          "offset": 632,
+          "offset_hex": "0x278",
+          "period": 8837642,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    0x20(%r14),%rax",
+          "offset": 651,
+          "offset_hex": "0x28b",
+          "period": 17607427,
+          "samples": 2
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 669,
+          "offset_hex": "0x29d",
+          "period": 17646092,
+          "samples": 2
+        },
+        {
+          "instruction": "add    %rdx,%rcx",
+          "offset": 690,
+          "offset_hex": "0x2b2",
+          "period": 8802210,
+          "samples": 1
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 693,
+          "offset_hex": "0x2b5",
+          "period": 8802318,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x18(%r14),%xmm1",
+          "offset": 700,
+          "offset_hex": "0x2bc",
+          "period": 35286477,
+          "samples": 4
+        },
+        {
+          "instruction": "jne    12ab0d <litchi_pptx::notes::codec::scan_processed_xml+0x83d>",
+          "offset": 872,
+          "offset_hex": "0x368",
+          "period": 26438617,
+          "samples": 3
+        },
+        {
+          "instruction": "movups 0x8(%r14),%xmm0",
+          "offset": 928,
+          "offset_hex": "0x3a0",
+          "period": 8823057,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x18(%r14),%xmm1",
+          "offset": 933,
+          "offset_hex": "0x3a5",
+          "period": 8814003,
+          "samples": 1
+        },
+        {
+          "instruction": "jne    12aad0 <litchi_pptx::notes::codec::scan_processed_xml+0x800>",
+          "offset": 982,
+          "offset_hex": "0x3d6",
+          "period": 8787973,
+          "samples": 1
+        },
+        {
+          "instruction": "not    %al",
+          "offset": 1018,
+          "offset_hex": "0x3fa",
+          "period": 8807871,
+          "samples": 1
+        },
+        {
+          "instruction": "call   128a50 <litchi_pptx::notes::codec::inspect_element>",
+          "offset": 1083,
+          "offset_hex": "0x43b",
+          "period": 8800021,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    %rax,-0x38(%rbp)",
+          "offset": 1130,
+          "offset_hex": "0x46a",
+          "period": 8816295,
+          "samples": 1
+        }
+      ],
+      "owner_samples": 960,
+      "repeat": 0,
+      "unknown_interior": 2,
+      "whole_samples": 3066
+    },
+    {
+      "leaf_period": 1999556082,
+      "leaf_samples": 227,
+      "lost_event_lines": 0,
+      "offsets": [
+        {
+          "instruction": "movzwl -0x108(%rbp),%edx",
+          "offset": 397,
+          "offset_hex": "0x18d",
+          "period": 8813146,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    -0x120(%rbp),%rax",
+          "offset": 418,
+          "offset_hex": "0x1a2",
+          "period": 8797874,
+          "samples": 1
+        },
+        {
+          "instruction": "inc    %rdi",
+          "offset": 457,
+          "offset_hex": "0x1c9",
+          "period": 35255450,
+          "samples": 4
+        },
+        {
+          "instruction": "lea    -0x20(%r8),%r8",
+          "offset": 465,
+          "offset_hex": "0x1d1",
+          "period": 17616278,
+          "samples": 2
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 545,
+          "offset_hex": "0x221",
+          "period": 8799703,
+          "samples": 1
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 555,
+          "offset_hex": "0x22b",
+          "period": 8795647,
+          "samples": 1
+        },
+        {
+          "instruction": "jne    12a7b1 <litchi_pptx::notes::codec::scan_processed_xml+0x4e1>",
+          "offset": 565,
+          "offset_hex": "0x235",
+          "period": 8814672,
+          "samples": 1
+        },
+        {
+          "instruction": "mov    0x20(%rcx),%rax",
+          "offset": 578,
+          "offset_hex": "0x242",
+          "period": 8830391,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": 589,
+          "offset_hex": "0x24d",
+          "period": 1568656582,
+          "samples": 178
+        },
+        {
+          "instruction": "mov    %rax,0x20(%r14)",
+          "offset": 606,
+          "offset_hex": "0x25e",
+          "period": 8810134,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x10(%r15),%xmm1",
+          "offset": 614,
+          "offset_hex": "0x266",
+          "period": 26372019,
+          "samples": 3
+        },
+        {
+          "instruction": "movups 0x10(%r14),%xmm1",
+          "offset": 632,
+          "offset_hex": "0x278",
+          "period": 43443676,
+          "samples": 5
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 669,
+          "offset_hex": "0x29d",
+          "period": 26468723,
+          "samples": 3
+        },
+        {
+          "instruction": "add    %rdx,%rcx",
+          "offset": 690,
+          "offset_hex": "0x2b2",
+          "period": 8830067,
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x18(%r14),%xmm1",
+          "offset": 700,
+          "offset_hex": "0x2bc",
+          "period": 87745372,
+          "samples": 10
+        },
+        {
+          "instruction": "jne    12ab0d <litchi_pptx::notes::codec::scan_processed_xml+0x83d>",
+          "offset": 872,
+          "offset_hex": "0x368",
+          "period": 35300462,
+          "samples": 4
+        },
+        {
+          "instruction": "movups 0x18(%r14),%xmm1",
+          "offset": 933,
+          "offset_hex": "0x3a5",
+          "period": 61730191,
+          "samples": 7
+        },
+        {
+          "instruction": "mov    0x18(%rbp),%r9",
+          "offset": 1051,
+          "offset_hex": "0x41b",
+          "period": 8815872,
+          "samples": 1
+        },
+        {
+          "instruction": "jne    12ab0d <litchi_pptx::notes::codec::scan_processed_xml+0x83d>",
+          "offset": 1099,
+          "offset_hex": "0x44b",
+          "period": 17659823,
+          "samples": 2
+        }
+      ],
+      "owner_samples": 970,
+      "repeat": 1,
+      "unknown_interior": 0,
+      "whole_samples": 3095
+    }
+  ],
+  "schema": "litchi.performance.0812.instruction-analysis.v1",
+  "scope": "Fresh exact-binary sample localization; sampling skid and frame-pointer perturbation apply. No causal instruction cost or ordinary-build phase fractions."
+}

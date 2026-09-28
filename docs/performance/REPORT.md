@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0812 — scanner instruction diagnosis identifies the next bounded experiment
+
+[0812](0812-pptx-scanner-instruction-localization.md) The batch retains two fresh profiles/200 verified outputs, exact-binary assembly and inline source attribution, independent offset counts, and the failed historical reconstruction. Samples concentrate in Result::map_err payload movement. No production change or speedup is claimed; explicit event matching is the next candidate to qualify. The post-capture assembly script failure and assembly-only recovery remain recorded.
+
 ## 0811 — current-source native attribution completed
 
 [0811](0811-pptx-current-native-attribution.md) The evidence-only batch retains 56 reports/1,820 verified outputs, two decoded native profiles, and independent numerical replay. Scanner work leads sampled self leaves; frame pointers add 6.925% to large-capture p50. Tail/RSS variability and unresolved frames are explicit. Production stays unchanged, fresh probe gates pass, and the six production gates are reused by exact source identity.

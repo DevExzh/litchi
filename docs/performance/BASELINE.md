@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0812 — fresh scanner instruction localization
+
+[0812](0812-pptx-scanner-instruction-localization.md) Two new profiles verify 200 capture outputs on unchanged source. An attempted exact 0811 binary reconstruction fails SHA equality, so old offsets remain unmapped. Fresh scanner leaves total 231/227; offset 0x24d accounts for 193/178 and maps to event-result payload copying. No latency or resource comparison is claimed.
+
 ## 0811 — current native capture baseline
 
 [0811](0811-pptx-current-native-attribution.md) Fresh current-source controls cover 54 reports/1,620 samples plus two native profiles/200 samples. Ordinary tiny/medium/large median process p50 is 0.230741/0.441233/17.753220 ms. Large wrapper/control is 1.002151; frame-pointer/profile is 1.069250, with interval [1.061059, 1.078472]. Instrumentation perturbation limits profile interpretation; no production speedup is claimed.
