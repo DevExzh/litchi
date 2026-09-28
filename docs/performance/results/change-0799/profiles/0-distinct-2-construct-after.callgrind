@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 920891
+cmd:  /home/zhuhe/code/litchi-target-0799/attribute-boundary-probe --leg after --case distinct-2 --mode construct --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0799/profiles/0-distinct-2-construct-after.json
+part: 2
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 201895 - 219172
+desc: Trigger: Program termination
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 0
+
+
+totals: 0

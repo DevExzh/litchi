@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0799 — replay cost moves to the third item
+
+[0799](0799-xml-two-attribute-preflight.md) Avoiding duplicate state for two items improves both observed dominant classes, but the next-item replay raises three-attribute consumption by 55.276%. The next design must avoid rebuilding prior state instead of merely moving the replay boundary.
+
 ## 0798 — one- and two-attribute tags dominate large capture
 
 [0798](0798-pptx-attribute-consumption-census.md) One/two attributes cover 99.777% of observed large-capture OPC iterator instances; all observed iterators are fully consumed. A future short-tag design should avoid first-attribute replay while preserving early duplicate refusal. Counts do not predict speedup.

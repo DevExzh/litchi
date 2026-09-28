@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0799 — direct helper preflight, no coverage promotion
+
+[0799](0799-xml-two-attribute-preflight.md) Thirty-nine hot inputs test the two-to-three transition with exact errors, clones, and bounded fallback. Isolated helper and direct-probe checks do not establish public-workflow or producer coverage. No coverage is promoted.
+
 ## 0798 — bounded generated-workflow census
 
 [0798](0798-pptx-attribute-consumption-census.md) The OPC caller-thread census covers five existing PPTX fixtures and capture/commit/lifecycle regions. Other owners, skipped iterators and threads are excluded. No real-producer, cold/range, concurrency, or CRUD coverage is promoted.

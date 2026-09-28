@@ -1,0 +1,51 @@
+    Checking xml-minifier v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0799/test-src/after/crates/xml-minifier)
+    Checking litchi-opc v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0799/test-src/after/crates/litchi-opc)
+error: this `if` statement can be collapsed
+   --> crates/xml-minifier/src/xml_attributes.rs:169:9
+    |
+169 | /         if let (
+170 | |             Some((first_position, first_name, _)),
+171 | |             Some((position, name, has_equals)),
+172 | |         ) = (
+...   |
+180 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+175 ~         )
+176 ~             && has_equals && name == first_name {
+177 |                 self.phase = Phase::Done;
+178 |                 return Some(Err(AttrError::Duplicated(position, first_position)));
+179 ~             }
+    |
+
+error: could not compile `xml-minifier` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: this `if` statement can be collapsed
+   --> crates/litchi-opc/src/xml_attributes.rs:164:9
+    |
+164 | /         if let (
+165 | |             Some((first_position, first_name, _)),
+166 | |             Some((position, name, has_equals)),
+167 | |         ) = (
+...   |
+175 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+170 ~         )
+171 ~             && has_equals && name == first_name {
+172 |                 self.phase = Phase::Done;
+173 |                 return Some(Err(AttrError::Duplicated(position, first_position)));
+174 ~             }
+    |
+
+error: could not compile `litchi-opc` (lib test) due to 1 previous error

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0799 — retain the frozen error-boundary veto
+
+[0799](0799-xml-two-attribute-preflight.md) Both dominant-class benefits qualify, but six protected consume rows regress approximately 50–56%. All 312 counter owners qualify and all 78 native rows match independent replay. The candidate is archived without workflow advancement.
+
 ## 0798 — attribute distribution qualified before another prototype
 
 [0798](0798-pptx-attribute-consumption-census.md) Both repeats conserve 295,600 total instances and 438,800 yielded attributes, with full exhaustion and no errors, clones, partial consumption or overflow. Production is restored; the rejected prototypes remain rejected.

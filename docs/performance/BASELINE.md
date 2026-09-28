@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0799 — two-attribute candidate stopped at preflight
+
+[0799](0799-xml-two-attribute-preflight.md) One/two-attribute consumption improves 34.898%/16.716%, but six protected error-boundary regressions veto advancement. All 1,248 reports and 28,392 samples validate. Production remains unchanged.
+
 ## 0798 — PPTX attribute census leaves baseline unchanged
 
 [0798](0798-pptx-attribute-consumption-census.md) All 45 reports pass semantic parity; two instrumented repeats agree exactly. Large capture has 49.528% one-attribute and 50.249% two-attribute iterator instances. No latency or production improvement is claimed.

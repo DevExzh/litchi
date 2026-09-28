@@ -1,0 +1,24 @@
+{
+  "build": "build-failed-0",
+  "fix": "Exclude only unintended duplicate-unquoted-after-2 from generator; frozen fixtures/plan unchanged.",
+  "original_binary": {
+    "bytes": 3075248,
+    "path": "/home/zhuhe/code/litchi-target-0799/attribute-boundary-probe",
+    "sha256": "848005772040e0101b076b5c0a22f3b261a10309622bad21fe520da07b5a732c"
+  },
+  "probe-src": "probe-src-failed-0",
+  "probe_inputs": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "src/baseline.rs": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "src/candidate.rs": "fc3772f153a0103b4a4f128589526bfdb8fbdb072ab0e299b7935dfc4f3d6d80",
+    "src/main.rs": "741cdf366dcda1fd6c2a3194f248784e64af451ee2c5d8fe38e15d2dba614090"
+  },
+  "reason": "All four compile gates and catalog/self-check processes exited zero; independent frozen fixture audit found40cases instead of39, extra duplicate-unquoted-after-2.",
+  "retained_binary": {
+    "bytes": 3075248,
+    "path": "/home/zhuhe/code/litchi-target-0799/failed-0-probe",
+    "sha256": "848005772040e0101b076b5c0a22f3b261a10309622bad21fe520da07b5a732c"
+  }
+}
