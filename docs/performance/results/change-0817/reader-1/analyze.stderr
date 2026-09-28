@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 2123, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 2114, in main
+    analyze(write=args.write or not args.check, check=args.check)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 2098, in analyze
+    result = build_analysis()
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 1979, in build_analysis
+    quality = load_quality(custody_value, build)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 983, in load_quality
+    recovery = load_quality_recovery(quality_directory, value, build)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0817/analyze.py", line 800, in load_quality_recovery
+    and old_frozen_value.get("root_inputs") == custody_value["root_inputs"]
+                                               ^^^^^^^^^^^^^
+NameError: name 'custody_value' is not defined. Did you mean: 'custody_value_root'?

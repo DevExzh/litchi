@@ -1,0 +1,10 @@
+{
+  "classification": "input-freeze coordination failure; no compiler/test failure",
+  "evidence_limit": "Original in-memory packet hash dictionary was not serialized by quality.py before the guard failure. Snapshots in guard-recovery reflect files at recovery, not a claim to reproduce the initial packet. Artifact auditor mtime falls between check start and finish; it was still being finalized.",
+  "exit_code": 1,
+  "failed_check": "custody.check_stable: packet_hashes() == packet",
+  "observed": 1790590381.950017,
+  "recovery": "Retain original logs/checks/source, serialize pre-gate frozen inputs in revised driver, rerun numbered quality attempt after all auditor edits stop. No build or workload has run.",
+  "schema": "litchi.performance.0817.guard-failure.v1",
+  "successful_cargo_gates": 2
+}

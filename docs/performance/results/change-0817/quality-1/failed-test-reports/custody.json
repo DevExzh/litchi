@@ -1,0 +1,18 @@
+{
+  "files": [
+    {
+      "bytes": 24253,
+      "retained": "docs/performance/results/change-0817/quality-1/failed-test-reports/normal.json",
+      "sha256": "aed80ea7746027e3db07d27afd4dd3b5da7717f39ba8337a235a73c40d945b52",
+      "source": "/tmp/litchi-perf-xlsx-planning-allocation-test-1691607-1790591427805669390/normal.json"
+    },
+    {
+      "bytes": 29218,
+      "retained": "docs/performance/results/change-0817/quality-1/failed-test-reports/allocator.json",
+      "sha256": "5e6d381e160fbe7eb10ea0c2416b243837bf5ca0859a17799721e28b926739b3",
+      "source": "/tmp/litchi-perf-xlsx-planning-allocation-test-1691607-1790591427805669390/allocator.json"
+    }
+  ],
+  "removed_after_exact_copy": true,
+  "source_directory": "/tmp/litchi-perf-xlsx-planning-allocation-test-1691607-1790591427805669390"
+}

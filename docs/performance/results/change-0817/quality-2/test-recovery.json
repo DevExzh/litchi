@@ -1,0 +1,303 @@
+{
+  "amended_plan_sha256": "00b690cfd636f1f548e4def635891b2e350bb55fa52aefba74cda4f6fc7c2bd6",
+  "carried_suites": [
+    {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 555,
+      "status": "ok",
+      "suite": "unittests src/lib.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/attribute_checks.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/attribute_checks_equivalence.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/docx_bounded_tail_append_compare.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/docx_plain_paragraph_tail_append.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/docx_replayable_tail_append.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 12,
+      "status": "ok",
+      "suite": "unittests src/bin/docx_source_selected_paragraph.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/main.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/litchi-perf-baseline-alloc.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/odp_native_tail_append_probe.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/ordinary_save_artifacts.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/pptx_external_cross_copy.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/pptx_metadata_spool.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/pptx_native_copy_probe.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/pptx_semantic_inventory.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 7,
+      "status": "ok",
+      "suite": "unittests src/bin/security_corpus.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 11,
+      "status": "ok",
+      "suite": "unittests src/bin/xls_source_attribution.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 9,
+      "status": "ok",
+      "suite": "unittests src/bin/xlsb_crud.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/xlsb_synthetic_fixture.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 2,
+      "status": "ok",
+      "suite": "unittests src/bin/xlsx_cell_values_abba.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/xlsx_merge_source_abba.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/xlsx_planning_guard.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "status": "ok",
+      "suite": "unittests src/bin/xml_attribute_bounds.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/xml_stream_audit.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5,
+      "status": "ok",
+      "suite": "unittests src/bin/zip_directory_spool.rs"
+    },
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4,
+      "status": "ok",
+      "suite": "tests/xlsx_filesystem.rs"
+    }
+  ],
+  "changed_test": "tools/perf-baseline/tests/xlsx_planning_allocations.rs",
+  "inherited_ignored": 1,
+  "inherited_passed": 640,
+  "inherited_successful_suites": 26,
+  "new_test_sha256": "60b75c8f38d247fecb153e1ae87d569d18a79c15ea13f72d4550779cf57eac3d",
+  "old_plan_sha256": "28e5b0ab10fc6332698060f5304ac936530554afa3de8d18635b4e0e64ce302b",
+  "old_test_sha256": "c947077f9517a1d39003b4234e0eeff106652920b2aa615ab48884948bb88cf8",
+  "prior_frozen_inputs": {
+    "bytes": 8308,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-1/frozen-inputs.json",
+    "sha256": "23c8856e503b51206c2ae81c89b0f5cb49b46d204546ca8a1eafe67e06ae341e"
+  },
+  "prior_log": {
+    "bytes": 72708,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-1/02.log",
+    "sha256": "5b9a20d22afc72f938385c9e57ba9e74d2dfe39686384b184cef84fb5bed24fe"
+  },
+  "prior_source": {
+    "bytes": 1212252,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-1/source.json",
+    "sha256": "fefb04760e004d66c7662100515efbd1e507c671d4cd70c81a7f554609d6d3db"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--test",
+        "xlsx_planning_allocations",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790591995.559715,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0817/quality-1",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "log": {
+        "bytes": 491,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-2/test-recovery-0.log",
+        "sha256": "8d165305f537970daf7706b6de441d08b88debf390f6f6811cb9bc76b6034bce"
+      },
+      "started": 1790591981.1588426
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--test",
+        "xlsx_planning_allocations",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790592034.084446,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0817/quality-1",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "log": {
+        "bytes": 559,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-2/test-recovery-1.log",
+        "sha256": "a2714859766766057560738e8d371f877b67fd938d04f927a9a8f33f5a0335d1"
+      },
+      "started": 1790591995.7925317
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--doc",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790592035.624511,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0817/quality-1",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "log": {
+        "bytes": 208,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/quality-2/test-recovery-2.log",
+        "sha256": "90f0436fb45165a17051cb9f41f82c92483930106821345ff60dda2bd2de4d0b"
+      },
+      "started": 1790592034.3169518
+    }
+  ],
+  "runtime_and_production_unchanged": true,
+  "schema": "litchi.performance.0817.test-recovery.v1"
+}

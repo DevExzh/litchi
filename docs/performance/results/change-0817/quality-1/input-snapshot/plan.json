@@ -1,0 +1,186 @@
+{
+  "admission": "export current artifacts, verify exact three real inputs and independent ZIP/XML preservation audit before qualification/native; retain refusals and failures; no silent corpus substitution",
+  "affinity": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "base": "953866d382c8e8248de2463ce317279fdd77d5b4",
+  "binaries": {
+    "artifacts": {
+      "cargo_bin": "ordinary_save_artifacts",
+      "features": [],
+      "latency": "untimed"
+    },
+    "native": {
+      "cargo_bin": "litchi-perf-baseline",
+      "features": [],
+      "latency": "native"
+    },
+    "observer": {
+      "cargo_bin": "litchi-perf-baseline-alloc",
+      "features": [
+        "allocator-metrics",
+        "ordinary-save-process-metrics"
+      ],
+      "latency": "diagnostic_only"
+    }
+  },
+  "bootstrap": {
+    "confidence": 0.95,
+    "high_rank": 9749,
+    "low_rank": 250,
+    "resamples": 10000,
+    "seed": 817817,
+    "statistic": "median of six process p50 values"
+  },
+  "build": {
+    "codegen_units": 1,
+    "debug": 1,
+    "incremental": false,
+    "jobs": 2,
+    "lto": "thin",
+    "opt_level": 3,
+    "panic": "unwind",
+    "rustflags": null
+  },
+  "cases": [
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_edit",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "edit"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_counting_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "counting_publish"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "edit"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_counting_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "counting_publish"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_edit",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "edit"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_counting_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "counting_publish"
+    }
+  ],
+  "expected": {
+    "artifact_cases": 6,
+    "artifact_policy_outputs_per_case": 5,
+    "native_reports": 72,
+    "native_samples": 2160,
+    "observer_reports": 24,
+    "observer_samples": 72,
+    "qualification_reports": 12,
+    "qualification_samples": 12,
+    "total_reports": 108,
+    "total_samples": 2244
+  },
+  "lanes": {
+    "native": {
+      "binary": "native",
+      "blocks": 6,
+      "orders": [
+        "forward",
+        "reverse",
+        "forward",
+        "reverse",
+        "reverse",
+        "forward"
+      ],
+      "samples": 30,
+      "warmup": 3
+    },
+    "observer": {
+      "binary": "observer",
+      "blocks": 2,
+      "orders": [
+        "forward",
+        "reverse"
+      ],
+      "samples": 3,
+      "warmup": 0
+    },
+    "qualification": {
+      "binary": "observer",
+      "blocks": 1,
+      "orders": [
+        "forward"
+      ],
+      "samples": 1,
+      "warmup": 0
+    }
+  },
+  "quantile": "nearest rank within each process; median over six process blocks",
+  "regression_policy": "baseline only; no candidate adoption or historical timing comparisons",
+  "schema": "litchi.performance.0817.plan.v1",
+  "scope": "warm filesystem/provider caches; full durability default; independent phases are not an additive decomposition; native and observer latencies never pooled",
+  "scratch": "/home/zhuhe/code/litchi-fs-0817",
+  "source": {
+    "harness_changed": false,
+    "lock_graph": "existing tracked perf-baseline Cargo.lock; exact differences from workspace lock retained",
+    "production_changed": false
+  },
+  "spread_flag": "max/min block metric > 1.05",
+  "tail_flag": "median process p99 / median process p50 > 1.05",
+  "target": "/home/zhuhe/code/litchi-target-0817"
+}

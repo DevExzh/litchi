@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0817 — ordinary-save preservation gate
+
+[0817](0817-real-file-ordinary-save.md) Current real DOCX/XLSX/PPTX edits reached artifact export. The frozen all-three-input admission failed; no qualification or timing ran. PPTX passed the local audit, DOCX reordered existing relationships, and XLSX calculation invalidation exceeded the audit’s declared closure. This adds preservation/admission evidence, not completed performance coverage.
+
 ## 0816 — provider and scaling intersection measured
 
 [0816](0816-delayed-source-budget-scaling.md) Category 15 now crosses CFB bulk reads and ordered OPC Parts with finite budgets, 1/2/4/8 workers, large/mixed fresh and large primed sessions, capped returns and delayed calls. All 13,320 outputs pass byte/order/resource checks. Native-format CRUD, physical cold/network I/O, cross-session contention and allocation coverage remain open.

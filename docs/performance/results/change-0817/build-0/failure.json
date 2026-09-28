@@ -1,0 +1,18 @@
+{
+  "cargo_started": false,
+  "corrected_script": {
+    "path": "build.py",
+    "sha256": "9fcd5997e1f28688aa3ef7bbcd8e4a85a8f657c46a0f0d624589d36470acbde9"
+  },
+  "exit_code": 1,
+  "failed_attempt": 0,
+  "failure": "AssertionError at build.py:118: reader omitted plan binaries[*].cargo_bin",
+  "original_script": {
+    "path": "build-0/build.py",
+    "sha256": "ec15cd02d694af65d67ff64e34bc8768f568c596b5c68330f0cfa8992cd29f7c"
+  },
+  "quality_sha256": "6775012473b9fa34cdd1d9d2ac07917c2db38e36e3fe68730e9827c436d902e9",
+  "recorded_at": 1790592438.3537626,
+  "schema": "litchi.performance.0817.build-driver-recovery.v1",
+  "scope": "Use exact existing cargo_bin plan key. Plan, Rust source, commands, features, profiles, dependencies and quality results unchanged."
+}
