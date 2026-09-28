@@ -1,0 +1,584 @@
+
+/home/zhuhe/code/litchi-target-0822/fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000017d6a0 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E>:
+_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:294
+  17d6a0:	55                   	push   %rbp
+  17d6a1:	48 89 e5             	mov    %rsp,%rbp
+  17d6a4:	41 57                	push   %r15
+  17d6a6:	41 56                	push   %r14
+  17d6a8:	53                   	push   %rbx
+  17d6a9:	48 81 ec a8 0e 00 00 	sub    $0xea8,%rsp
+  17d6b0:	48 89 fb             	mov    %rdi,%rbx
+_ZN11litchi_pptx7package5model7Package19opened_presentation17ha0360c6e94353e35E():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+  17d6b3:	48 8d 15 fe a4 ea ff 	lea    -0x155b02(%rip),%rdx        # 27bb8 <anon.7d1f7c43824a99e7625b6b83caf5366f.7352.llvm.12345718685658067336>
+  17d6ba:	48 8d bd 40 f1 ff ff 	lea    -0xec0(%rbp),%rdi
+  17d6c1:	48 89 de             	mov    %rbx,%rsi
+  17d6c4:	ff 15 4e 45 0a 00    	call   *0xa454e(%rip)        # 221c18 <_DYNAMIC+0x1158>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h025bf79bd2badb3eE():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17d6ca:	4c 8b b5 40 f1 ff ff 	mov    -0xec0(%rbp),%r14
+  17d6d1:	4c 89 f0             	mov    %r14,%rax
+  17d6d4:	48 f7 d8             	neg    %rax
+  17d6d7:	0f 10 85 48 f1 ff ff 	movups -0xeb8(%rbp),%xmm0
+  17d6de:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  17d6e2:	0f 10 85 58 f1 ff ff 	movups -0xea8(%rbp),%xmm0
+  17d6e9:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  17d6ed:	0f 10 85 68 f1 ff ff 	movups -0xe98(%rbp),%xmm0
+  17d6f4:	0f 29 45 c0          	movaps %xmm0,-0x40(%rbp)
+  17d6f8:	0f 10 85 78 f1 ff ff 	movups -0xe88(%rbp),%xmm0
+  17d6ff:	0f 29 45 d0          	movaps %xmm0,-0x30(%rbp)
+  17d703:	48 8b 85 88 f1 ff ff 	mov    -0xe78(%rbp),%rax
+  17d70a:	48 89 45 e0          	mov    %rax,-0x20(%rbp)
+  17d70e:	71 3c                	jno    17d74c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0xac>
+_ZN11litchi_pptx7package5model7Package31opened_presentation_transaction17ha640f8addc26d875E():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17d710:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17d714:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17d718:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17d71c:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17d720:	0f 29 85 f0 fe ff ff 	movaps %xmm0,-0x110(%rbp)
+  17d727:	0f 29 8d 00 ff ff ff 	movaps %xmm1,-0x100(%rbp)
+  17d72e:	0f 29 95 10 ff ff ff 	movaps %xmm2,-0xf0(%rbp)
+  17d735:	0f 29 9d 20 ff ff ff 	movaps %xmm3,-0xe0(%rbp)
+  17d73c:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17d740:	48 89 85 30 ff ff ff 	mov    %rax,-0xd0(%rbp)
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h8e8cf10a1db3f0d0E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17d747:	e9 f0 00 00 00       	jmp    17d83c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x19c>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h025bf79bd2badb3eE():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17d74c:	48 8d b5 90 f1 ff ff 	lea    -0xe70(%rbp),%rsi
+_ZN11litchi_pptx7package5model7Package31opened_presentation_transaction17ha640f8addc26d875E():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17d753:	48 8d bd c0 fd ff ff 	lea    -0x240(%rbp),%rdi
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h025bf79bd2badb3eE():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17d75a:	ba 98 00 00 00       	mov    $0x98,%edx
+  17d75f:	ff 15 63 35 0a 00    	call   *0xa3563(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+_ZN11litchi_pptx7package5model7Package31opened_presentation_transaction17ha640f8addc26d875E():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17d765:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17d769:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17d76d:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17d771:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17d775:	0f 11 85 78 fd ff ff 	movups %xmm0,-0x288(%rbp)
+  17d77c:	0f 11 8d 88 fd ff ff 	movups %xmm1,-0x278(%rbp)
+  17d783:	0f 11 95 98 fd ff ff 	movups %xmm2,-0x268(%rbp)
+  17d78a:	0f 11 9d a8 fd ff ff 	movups %xmm3,-0x258(%rbp)
+  17d791:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17d795:	48 89 85 b8 fd ff ff 	mov    %rax,-0x248(%rbp)
+  17d79c:	4c 89 b5 70 fd ff ff 	mov    %r14,-0x290(%rbp)
+  17d7a3:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+  17d7aa:	48 8d b5 70 fd ff ff 	lea    -0x290(%rbp),%rsi
+  17d7b1:	ff 15 01 44 0a 00    	call   *0xa4401(%rip)        # 221bb8 <_DYNAMIC+0x10f8>
+  17d7b7:	49 bf 00 00 00 00 00 00 00 80 	movabs $0x8000000000000000,%r15
+  17d7c1:	4c 8b b5 40 f9 ff ff 	mov    -0x6c0(%rbp),%r14
+  17d7c8:	0f 10 85 48 f9 ff ff 	movups -0x6b8(%rbp),%xmm0
+  17d7cf:	0f 29 85 f0 fe ff ff 	movaps %xmm0,-0x110(%rbp)
+  17d7d6:	0f 10 85 58 f9 ff ff 	movups -0x6a8(%rbp),%xmm0
+  17d7dd:	0f 29 85 00 ff ff ff 	movaps %xmm0,-0x100(%rbp)
+  17d7e4:	0f 10 85 68 f9 ff ff 	movups -0x698(%rbp),%xmm0
+  17d7eb:	0f 29 85 10 ff ff ff 	movaps %xmm0,-0xf0(%rbp)
+  17d7f2:	0f 10 85 78 f9 ff ff 	movups -0x688(%rbp),%xmm0
+  17d7f9:	0f 29 85 20 ff ff ff 	movaps %xmm0,-0xe0(%rbp)
+  17d800:	48 8b 85 88 f9 ff ff 	mov    -0x678(%rbp),%rax
+  17d807:	48 89 85 30 ff ff ff 	mov    %rax,-0xd0(%rbp)
+  17d80e:	48 8d b5 90 f9 ff ff 	lea    -0x670(%rbp),%rsi
+  17d815:	48 8d bd 68 f5 ff ff 	lea    -0xa98(%rbp),%rdi
+  17d81c:	ba d8 03 00 00       	mov    $0x3d8,%edx
+  17d821:	ff 15 a1 34 0a 00    	call   *0xa34a1(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+  17d827:	48 8d bd 70 fd ff ff 	lea    -0x290(%rbp),%rdi
+  17d82e:	e8 fd c1 fd ff       	call   159a30 <_ZN4core3ptr57drop_in_place$LT$litchi_pptx..opened..model..Snapshot$GT$17h814b00157261d02eE.llvm.12345718685658067336>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h8e8cf10a1db3f0d0E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17d833:	4d 39 fe             	cmp    %r15,%r14
+  17d836:	0f 85 e4 00 00 00    	jne    17d920 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x280>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2175
+  17d83c:	48 8b 85 30 ff ff ff 	mov    -0xd0(%rbp),%rax
+  17d843:	48 89 45 80          	mov    %rax,-0x80(%rbp)
+  17d847:	0f 28 85 f0 fe ff ff 	movaps -0x110(%rbp),%xmm0
+  17d84e:	0f 28 8d 00 ff ff ff 	movaps -0x100(%rbp),%xmm1
+  17d855:	0f 28 95 10 ff ff ff 	movaps -0xf0(%rbp),%xmm2
+  17d85c:	0f 28 9d 20 ff ff ff 	movaps -0xe0(%rbp),%xmm3
+  17d863:	0f 29 9d 70 ff ff ff 	movaps %xmm3,-0x90(%rbp)
+  17d86a:	0f 29 95 60 ff ff ff 	movaps %xmm2,-0xa0(%rbp)
+  17d871:	0f 29 8d 50 ff ff ff 	movaps %xmm1,-0xb0(%rbp)
+  17d878:	0f 29 85 40 ff ff ff 	movaps %xmm0,-0xc0(%rbp)
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:276
+  17d87f:	48 89 85 80 f9 ff ff 	mov    %rax,-0x680(%rbp)
+  17d886:	0f 29 9d 70 f9 ff ff 	movaps %xmm3,-0x690(%rbp)
+  17d88d:	0f 29 95 60 f9 ff ff 	movaps %xmm2,-0x6a0(%rbp)
+  17d894:	0f 29 8d 50 f9 ff ff 	movaps %xmm1,-0x6b0(%rbp)
+  17d89b:	0f 29 85 40 f9 ff ff 	movaps %xmm0,-0x6c0(%rbp)
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17d8a2:	bf 48 00 00 00       	mov    $0x48,%edi
+  17d8a7:	ff 15 fb 33 0a 00    	call   *0xa33fb(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17d8ad:	48 85 c0             	test   %rax,%rax
+  17d8b0:	0f 84 48 05 00 00    	je     17ddfe <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x75e>
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17d8b6:	48 8b 4d 80          	mov    -0x80(%rbp),%rcx
+  17d8ba:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  17d8be:	0f 28 85 40 ff ff ff 	movaps -0xc0(%rbp),%xmm0
+  17d8c5:	0f 28 8d 50 ff ff ff 	movaps -0xb0(%rbp),%xmm1
+  17d8cc:	0f 28 95 60 ff ff ff 	movaps -0xa0(%rbp),%xmm2
+  17d8d3:	0f 28 9d 70 ff ff ff 	movaps -0x90(%rbp),%xmm3
+  17d8da:	0f 11 58 30          	movups %xmm3,0x30(%rax)
+  17d8de:	0f 11 50 20          	movups %xmm2,0x20(%rax)
+  17d8e2:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+  17d8e6:	0f 11 00             	movups %xmm0,(%rax)
+  17d8e9:	48 8d 1d 68 d6 09 00 	lea    0x9d668(%rip),%rbx        # 21af58 <anon.36ed52a356df1d485c12dcce85027138.3.llvm.13583809507907854616+0x610>
+_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:295
+  17d8f0:	48 89 45 90          	mov    %rax,-0x70(%rbp)
+  17d8f4:	48 89 5d 98          	mov    %rbx,-0x68(%rbp)
+  17d8f8:	48 8d 45 90          	lea    -0x70(%rbp),%rax
+_ZN4core4hint9black_box17h76126f79ad9f4ecaE():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  17d8fc:	48 89 85 40 f9 ff ff 	mov    %rax,-0x6c0(%rbp)
+  17d903:	48 8d 85 40 f9 ff ff 	lea    -0x6c0(%rbp),%rax
+_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:298
+  17d90a:	48 8b 45 90          	mov    -0x70(%rbp),%rax
+  17d90e:	48 8b 55 98          	mov    -0x68(%rbp),%rdx
+  17d912:	48 81 c4 a8 0e 00 00 	add    $0xea8,%rsp
+  17d919:	5b                   	pop    %rbx
+  17d91a:	41 5e                	pop    %r14
+  17d91c:	41 5f                	pop    %r15
+  17d91e:	5d                   	pop    %rbp
+  17d91f:	c3                   	ret
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h8e8cf10a1db3f0d0E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17d920:	48 8b 85 30 ff ff ff 	mov    -0xd0(%rbp),%rax
+  17d927:	48 89 45 80          	mov    %rax,-0x80(%rbp)
+  17d92b:	0f 28 85 f0 fe ff ff 	movaps -0x110(%rbp),%xmm0
+  17d932:	0f 28 8d 00 ff ff ff 	movaps -0x100(%rbp),%xmm1
+  17d939:	0f 28 95 10 ff ff ff 	movaps -0xf0(%rbp),%xmm2
+  17d940:	0f 28 9d 20 ff ff ff 	movaps -0xe0(%rbp),%xmm3
+  17d947:	0f 29 9d 70 ff ff ff 	movaps %xmm3,-0x90(%rbp)
+  17d94e:	0f 29 95 60 ff ff ff 	movaps %xmm2,-0xa0(%rbp)
+  17d955:	0f 29 8d 50 ff ff ff 	movaps %xmm1,-0xb0(%rbp)
+  17d95c:	0f 29 85 40 ff ff ff 	movaps %xmm0,-0xc0(%rbp)
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:276
+  17d963:	48 8d bd 90 f1 ff ff 	lea    -0xe70(%rbp),%rdi
+  17d96a:	48 8d b5 68 f5 ff ff 	lea    -0xa98(%rbp),%rsi
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h8e8cf10a1db3f0d0E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17d971:	ba d8 03 00 00       	mov    $0x3d8,%edx
+  17d976:	ff 15 4c 33 0a 00    	call   *0xa334c(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:276
+  17d97c:	0f 28 85 40 ff ff ff 	movaps -0xc0(%rbp),%xmm0
+  17d983:	0f 28 8d 50 ff ff ff 	movaps -0xb0(%rbp),%xmm1
+  17d98a:	0f 28 95 60 ff ff ff 	movaps -0xa0(%rbp),%xmm2
+  17d991:	0f 28 9d 70 ff ff ff 	movaps -0x90(%rbp),%xmm3
+  17d998:	0f 11 85 48 f1 ff ff 	movups %xmm0,-0xeb8(%rbp)
+  17d99f:	0f 11 8d 58 f1 ff ff 	movups %xmm1,-0xea8(%rbp)
+  17d9a6:	0f 11 95 68 f1 ff ff 	movups %xmm2,-0xe98(%rbp)
+  17d9ad:	0f 11 9d 78 f1 ff ff 	movups %xmm3,-0xe88(%rbp)
+  17d9b4:	48 8b 45 80          	mov    -0x80(%rbp),%rax
+  17d9b8:	48 89 85 88 f1 ff ff 	mov    %rax,-0xe78(%rbp)
+  17d9bf:	4c 89 b5 40 f1 ff ff 	mov    %r14,-0xec0(%rbp)
+  17d9c6:	48 8d bd 68 f5 ff ff 	lea    -0xa98(%rbp),%rdi
+  17d9cd:	48 8d b5 40 f1 ff ff 	lea    -0xec0(%rbp),%rsi
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:277
+  17d9d4:	e8 07 9e ff ff       	call   1777e0 <_ZN11litchi_pptx6opened11transaction11Transaction14set_shape_text17h2afb2a1965a200a5E>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h348dc0511f3036e6E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17d9d9:	0f b6 8d 68 f5 ff ff 	movzbl -0xa98(%rbp),%ecx
+  17d9e0:	0f b6 85 69 f5 ff ff 	movzbl -0xa97(%rbp),%eax
+  17d9e7:	80 f9 27             	cmp    $0x27,%cl
+  17d9ea:	0f 85 db 00 00 00    	jne    17dacb <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x42b>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:277
+  17d9f0:	a8 01                	test   $0x1,%al
+  17d9f2:	0f 84 7b 01 00 00    	je     17db73 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x4d3>
+  17d9f8:	4c 8d b5 40 f9 ff ff 	lea    -0x6c0(%rbp),%r14
+  17d9ff:	48 8d b5 40 f1 ff ff 	lea    -0xec0(%rbp),%rsi
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:280
+  17da06:	ba 28 04 00 00       	mov    $0x428,%edx
+  17da0b:	4c 89 f7             	mov    %r14,%rdi
+  17da0e:	ff 15 b4 32 0a 00    	call   *0xa32b4(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+  17da14:	48 8d bd 68 f5 ff ff 	lea    -0xa98(%rbp),%rdi
+  17da1b:	4c 89 f6             	mov    %r14,%rsi
+  17da1e:	ff 15 24 41 0a 00    	call   *0xa4124(%rip)        # 221b48 <_DYNAMIC+0x1088>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h99389ce6bf66b322E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17da24:	4c 8b b5 68 f5 ff ff 	mov    -0xa98(%rbp),%r14
+  17da2b:	0f 10 85 70 f5 ff ff 	movups -0xa90(%rbp),%xmm0
+  17da32:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  17da36:	0f 10 85 80 f5 ff ff 	movups -0xa80(%rbp),%xmm0
+  17da3d:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  17da41:	0f 10 85 90 f5 ff ff 	movups -0xa70(%rbp),%xmm0
+  17da48:	0f 29 45 c0          	movaps %xmm0,-0x40(%rbp)
+  17da4c:	0f 10 85 a0 f5 ff ff 	movups -0xa60(%rbp),%xmm0
+  17da53:	0f 29 45 d0          	movaps %xmm0,-0x30(%rbp)
+  17da57:	48 8b 85 b0 f5 ff ff 	mov    -0xa50(%rbp),%rax
+  17da5e:	48 89 45 e0          	mov    %rax,-0x20(%rbp)
+  17da62:	4d 39 fe             	cmp    %r15,%r14
+  17da65:	0f 85 87 01 00 00    	jne    17dbf2 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x552>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:280
+  17da6b:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17da6f:	48 89 85 80 f9 ff ff 	mov    %rax,-0x680(%rbp)
+  17da76:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17da7a:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17da7e:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17da82:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17da86:	0f 29 9d 70 f9 ff ff 	movaps %xmm3,-0x690(%rbp)
+  17da8d:	0f 29 95 60 f9 ff ff 	movaps %xmm2,-0x6a0(%rbp)
+  17da94:	0f 29 8d 50 f9 ff ff 	movaps %xmm1,-0x6b0(%rbp)
+  17da9b:	0f 29 85 40 f9 ff ff 	movaps %xmm0,-0x6c0(%rbp)
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17daa2:	bf 48 00 00 00       	mov    $0x48,%edi
+  17daa7:	ff 15 fb 31 0a 00    	call   *0xa31fb(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17daad:	48 85 c0             	test   %rax,%rax
+  17dab0:	0f 85 c1 02 00 00    	jne    17dd77 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x6d7>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:250
+  17dab6:	bf 08 00 00 00       	mov    $0x8,%edi
+  17dabb:	be 48 00 00 00       	mov    $0x48,%esi
+  17dac0:	ff 15 92 32 0a 00    	call   *0xa3292(%rip)        # 220d58 <_DYNAMIC+0x298>
+  17dac6:	e9 9d 03 00 00       	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h348dc0511f3036e6E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2175
+  17dacb:	48 8b 95 a8 f5 ff ff 	mov    -0xa58(%rbp),%rdx
+  17dad2:	48 89 95 80 f9 ff ff 	mov    %rdx,-0x680(%rbp)
+  17dad9:	0f 10 85 6a f5 ff ff 	movups -0xa96(%rbp),%xmm0
+  17dae0:	0f 10 8d 7a f5 ff ff 	movups -0xa86(%rbp),%xmm1
+  17dae7:	0f 10 95 8a f5 ff ff 	movups -0xa76(%rbp),%xmm2
+  17daee:	0f 10 9d 9a f5 ff ff 	movups -0xa66(%rbp),%xmm3
+  17daf5:	0f 11 9d 72 f9 ff ff 	movups %xmm3,-0x68e(%rbp)
+  17dafc:	0f 11 95 62 f9 ff ff 	movups %xmm2,-0x69e(%rbp)
+  17db03:	0f 11 8d 52 f9 ff ff 	movups %xmm1,-0x6ae(%rbp)
+  17db0a:	0f 11 85 42 f9 ff ff 	movups %xmm0,-0x6be(%rbp)
+_ZN153_$LT$core..result..Result$LT$T$C$F$GT$$u20$as$u20$core..ops..try_trait..FromResidual$LT$core..result..Result$LT$core..convert..Infallible$C$E$GT$$GT$$GT$13from_residual17h107c843afe04f07bE():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2189
+  17db11:	88 8d 40 f9 ff ff    	mov    %cl,-0x6c0(%rbp)
+  17db17:	88 85 41 f9 ff ff    	mov    %al,-0x6bf(%rbp)
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17db1d:	bf 48 00 00 00       	mov    $0x48,%edi
+  17db22:	ff 15 80 31 0a 00    	call   *0xa3180(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17db28:	48 85 c0             	test   %rax,%rax
+  17db2b:	0f 84 df 02 00 00    	je     17de10 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x770>
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17db31:	48 8b 8d 80 f9 ff ff 	mov    -0x680(%rbp),%rcx
+  17db38:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  17db3c:	0f 10 85 40 f9 ff ff 	movups -0x6c0(%rbp),%xmm0
+  17db43:	0f 10 8d 50 f9 ff ff 	movups -0x6b0(%rbp),%xmm1
+  17db4a:	0f 10 95 60 f9 ff ff 	movups -0x6a0(%rbp),%xmm2
+  17db51:	0f 10 9d 70 f9 ff ff 	movups -0x690(%rbp),%xmm3
+  17db58:	0f 11 58 30          	movups %xmm3,0x30(%rax)
+  17db5c:	0f 11 50 20          	movups %xmm2,0x20(%rax)
+  17db60:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+  17db64:	49 89 c6             	mov    %rax,%r14
+  17db67:	0f 11 00             	movups %xmm0,(%rax)
+  17db6a:	48 8d 1d e7 d3 09 00 	lea    0x9d3e7(%rip),%rbx        # 21af58 <anon.36ed52a356df1d485c12dcce85027138.3.llvm.13583809507907854616+0x610>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17db71:	eb 6b                	jmp    17dbde <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x53e>
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17db73:	bf 27 00 00 00       	mov    $0x27,%edi
+  17db78:	ff 15 2a 31 0a 00    	call   *0xa312a(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:468
+  17db7e:	48 85 c0             	test   %rax,%rax
+  17db81:	0f 84 bf 02 00 00    	je     17de46 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7a6>
+_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_():
+  17db87:	49 89 c6             	mov    %rax,%r14
+_RINvNtCsgEmfK2I1SDS_4core3ptr19copy_nonoverlappinghECslNYArtu3iFV_5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:547
+  17db8a:	0f 10 05 03 d2 ea ff 	movups -0x152dfd(%rip),%xmm0        # 2ad94 <_RNvNtCsiGO2KWI1TB6_12panic_unwind3imp6CANARY.llvm.5566994946562375346+0xe91>
+  17db91:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  17db95:	0f 10 05 e8 d1 ea ff 	movups -0x152e18(%rip),%xmm0        # 2ad84 <_RNvNtCsiGO2KWI1TB6_12panic_unwind3imp6CANARY.llvm.5566994946562375346+0xe81>
+  17db9c:	0f 11 00             	movups %xmm0,(%rax)
+  17db9f:	48 b8 6f 20 63 68 61 6e 67 65 	movabs $0x65676e616863206f,%rax
+  17dba9:	49 89 46 1f          	mov    %rax,0x1f(%r14)
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17dbad:	bf 18 00 00 00       	mov    $0x18,%edi
+  17dbb2:	ff 15 f0 30 0a 00    	call   *0xa30f0(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17dbb8:	48 85 c0             	test   %rax,%rax
+  17dbbb:	0f 84 61 02 00 00    	je     17de22 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x782>
+_RNvMNtCslNYArtu3iFV_5alloc5boxedINtB2_3BoxNtNvXsf_NtB2_7convertIBv_DNtNtCsgEmfK2I1SDS_4core5error5ErrorNtNtB18_6marker4SyncNtB1F_4SendEL_EINtNtB18_7convert4FromNtNtB4_6string6StringE4from11StringErrorE3newB4_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17dbc1:	48 c7 00 27 00 00 00 	movq   $0x27,(%rax)
+  17dbc8:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  17dbcc:	49 89 c6             	mov    %rax,%r14
+  17dbcf:	48 c7 40 10 27 00 00 00 	movq   $0x27,0x10(%rax)
+  17dbd7:	48 8d 1d f2 9c 09 00 	lea    0x99cf2(%rip),%rbx        # 2178d0 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17dbde:	48 8d bd 40 f1 ff ff 	lea    -0xec0(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:289
+  17dbe5:	e8 f6 b6 00 00       	call   1892e0 <_ZN4core3ptr66drop_in_place$LT$litchi_pptx..opened..transaction..Transaction$GT$17h534dec6f5cfeeb99E>
+  17dbea:	4c 89 f0             	mov    %r14,%rax
+  17dbed:	e9 fe fc ff ff       	jmp    17d8f0 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x250>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h99389ce6bf66b322E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17dbf2:	48 8d b5 b8 f5 ff ff 	lea    -0xa48(%rbp),%rsi
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:280
+  17dbf9:	48 8d bd c0 fd ff ff 	lea    -0x240(%rbp),%rdi
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17h99389ce6bf66b322E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17dc00:	ba 30 01 00 00       	mov    $0x130,%edx
+  17dc05:	ff 15 bd 30 0a 00    	call   *0xa30bd(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:280
+  17dc0b:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17dc0f:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17dc13:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17dc17:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17dc1b:	0f 11 85 78 fd ff ff 	movups %xmm0,-0x288(%rbp)
+  17dc22:	0f 11 8d 88 fd ff ff 	movups %xmm1,-0x278(%rbp)
+  17dc29:	0f 11 95 98 fd ff ff 	movups %xmm2,-0x268(%rbp)
+  17dc30:	0f 11 9d a8 fd ff ff 	movups %xmm3,-0x258(%rbp)
+  17dc37:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17dc3b:	48 89 85 b8 fd ff ff 	mov    %rax,-0x248(%rbp)
+  17dc42:	4c 89 b5 70 fd ff ff 	mov    %r14,-0x290(%rbp)
+_ZN11litchi_pptx6opened5patch5Patch8is_empty17hbc14229dcf4b310aE():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/patch.rs:308
+  17dc49:	48 83 bd 80 fe ff ff 00 	cmpq   $0x0,-0x180(%rbp)
+  17dc51:	0f 85 85 00 00 00    	jne    17dcdc <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x63c>
+  17dc57:	4c 39 bd 88 fe ff ff 	cmp    %r15,-0x178(%rbp)
+  17dc5e:	75 7c                	jne    17dcdc <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x63c>
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17dc60:	bf 2d 00 00 00       	mov    $0x2d,%edi
+  17dc65:	ff 15 3d 30 0a 00    	call   *0xa303d(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner15try_allocate_inB7_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:468
+  17dc6b:	48 85 c0             	test   %rax,%rax
+  17dc6e:	0f 84 e4 01 00 00    	je     17de58 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7b8>
+_RINvXs_NvMNtCslNYArtu3iFV_5alloc5sliceSp9to_vec_inhNtB5_10ConvertVec6to_vecNtNtBa_5alloc6GlobalEBa_():
+  17dc74:	49 89 c6             	mov    %rax,%r14
+_RINvNtCsgEmfK2I1SDS_4core3ptr19copy_nonoverlappinghECslNYArtu3iFV_5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:547
+  17dc77:	0f 10 05 4a d1 ea ff 	movups -0x152eb6(%rip),%xmm0        # 2adc8 <_RNvNtCsiGO2KWI1TB6_12panic_unwind3imp6CANARY.llvm.5566994946562375346+0xec5>
+  17dc7e:	0f 11 40 1d          	movups %xmm0,0x1d(%rax)
+  17dc82:	0f 10 05 32 d1 ea ff 	movups -0x152ece(%rip),%xmm0        # 2adbb <_RNvNtCsiGO2KWI1TB6_12panic_unwind3imp6CANARY.llvm.5566994946562375346+0xeb8>
+  17dc89:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  17dc8d:	0f 10 05 17 d1 ea ff 	movups -0x152ee9(%rip),%xmm0        # 2adab <_RNvNtCsiGO2KWI1TB6_12panic_unwind3imp6CANARY.llvm.5566994946562375346+0xea8>
+  17dc94:	0f 11 00             	movups %xmm0,(%rax)
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc5alloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17dc97:	bf 18 00 00 00       	mov    $0x18,%edi
+  17dc9c:	ff 15 06 30 0a 00    	call   *0xa3006(%rip)        # 220ca8 <malloc@GLIBC_2.2.5>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17dca2:	48 85 c0             	test   %rax,%rax
+  17dca5:	0f 84 89 01 00 00    	je     17de34 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x794>
+_RNvMNtCslNYArtu3iFV_5alloc5boxedINtB2_3BoxNtNvXsf_NtB2_7convertIBv_DNtNtCsgEmfK2I1SDS_4core5error5ErrorNtNtB18_6marker4SyncNtB1F_4SendEL_EINtNtB18_7convert4FromNtNtB4_6string6StringE4from11StringErrorE3newB4_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17dcab:	48 c7 00 2d 00 00 00 	movq   $0x2d,(%rax)
+  17dcb2:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  17dcb6:	48 c7 40 10 2d 00 00 00 	movq   $0x2d,0x10(%rax)
+  17dcbe:	48 8d bd 70 fd ff ff 	lea    -0x290(%rbp),%rdi
+  17dcc5:	48 89 c3             	mov    %rax,%rbx
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:289
+  17dcc8:	e8 b3 af 00 00       	call   188c80 <_ZN4core3ptr61drop_in_place$LT$litchi_pptx..opened..transaction..Commit$GT$17h3b38eccbc4744058E>
+  17dccd:	48 89 d8             	mov    %rbx,%rax
+  17dcd0:	48 8d 1d f9 9b 09 00 	lea    0x99bf9(%rip),%rbx        # 2178d0 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+  17dcd7:	e9 14 fc ff ff       	jmp    17d8f0 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x250>
+  17dcdc:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+  17dce3:	48 8d 95 70 fd ff ff 	lea    -0x290(%rbp),%rdx
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:287
+  17dcea:	48 89 de             	mov    %rbx,%rsi
+  17dced:	ff 15 2d 3f 0a 00    	call   *0xa3f2d(%rip)        # 221c20 <_DYNAMIC+0x1160>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17hfcb9ade2bd695382E():
+  17dcf3:	48 8b 85 88 f9 ff ff 	mov    -0x678(%rbp),%rax
+  17dcfa:	48 89 45 e0          	mov    %rax,-0x20(%rbp)
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17dcfe:	48 8b 9d 40 f9 ff ff 	mov    -0x6c0(%rbp),%rbx
+  17dd05:	0f 10 85 48 f9 ff ff 	movups -0x6b8(%rbp),%xmm0
+  17dd0c:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  17dd10:	0f 10 85 58 f9 ff ff 	movups -0x6a8(%rbp),%xmm0
+  17dd17:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  17dd1b:	0f 10 85 68 f9 ff ff 	movups -0x698(%rbp),%xmm0
+  17dd22:	0f 29 45 c0          	movaps %xmm0,-0x40(%rbp)
+  17dd26:	0f 10 85 78 f9 ff ff 	movups -0x688(%rbp),%xmm0
+  17dd2d:	0f 29 45 d0          	movaps %xmm0,-0x30(%rbp)
+  17dd31:	4c 39 fb             	cmp    %r15,%rbx
+  17dd34:	75 5e                	jne    17dd94 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x6f4>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:287
+  17dd36:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17dd3a:	48 89 85 80 f9 ff ff 	mov    %rax,-0x680(%rbp)
+  17dd41:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17dd45:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17dd49:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17dd4d:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17dd51:	0f 29 9d 70 f9 ff ff 	movaps %xmm3,-0x690(%rbp)
+  17dd58:	0f 29 95 60 f9 ff ff 	movaps %xmm2,-0x6a0(%rbp)
+  17dd5f:	0f 29 8d 50 f9 ff ff 	movaps %xmm1,-0x6b0(%rbp)
+  17dd66:	0f 29 85 40 f9 ff ff 	movaps %xmm0,-0x6c0(%rbp)
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:286
+  17dd6d:	bf 48 00 00 00       	mov    $0x48,%edi
+  17dd72:	e8 09 88 ff ff       	call   176580 <_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17dd77:	48 8b 4d e0          	mov    -0x20(%rbp),%rcx
+  17dd7b:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  17dd7f:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17dd83:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17dd87:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17dd8b:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17dd8f:	e9 46 fb ff ff       	jmp    17d8da <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x23a>
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17hfcb9ade2bd695382E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17dd94:	48 8d b5 90 f9 ff ff 	lea    -0x670(%rbp),%rsi
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:287
+  17dd9b:	48 8d bd b8 f5 ff ff 	lea    -0xa48(%rbp),%rdi
+_ZN79_$LT$core..result..Result$LT$T$C$E$GT$$u20$as$u20$core..ops..try_trait..Try$GT$6branch17hfcb9ade2bd695382E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17dda2:	ba 98 00 00 00       	mov    $0x98,%edx
+  17dda7:	ff 15 1b 2f 0a 00    	call   *0xa2f1b(%rip)        # 220cc8 <memcpy@GLIBC_2.14>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:287
+  17ddad:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  17ddb1:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  17ddb5:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  17ddb9:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  17ddbd:	0f 11 85 70 f5 ff ff 	movups %xmm0,-0xa90(%rbp)
+  17ddc4:	0f 11 8d 80 f5 ff ff 	movups %xmm1,-0xa80(%rbp)
+  17ddcb:	0f 11 95 90 f5 ff ff 	movups %xmm2,-0xa70(%rbp)
+  17ddd2:	0f 11 9d a0 f5 ff ff 	movups %xmm3,-0xa60(%rbp)
+  17ddd9:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  17dddd:	48 89 85 b0 f5 ff ff 	mov    %rax,-0xa50(%rbp)
+  17dde4:	48 89 9d 68 f5 ff ff 	mov    %rbx,-0xa98(%rbp)
+  17ddeb:	48 8d bd 68 f5 ff ff 	lea    -0xa98(%rbp),%rdi
+  17ddf2:	e8 d9 a9 00 00       	call   1887d0 <_ZN4core3ptr57drop_in_place$LT$litchi_pptx..opened..model..Snapshot$GT$17h1757140b38caaf5cE>
+  17ddf7:	31 c0                	xor    %eax,%eax
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:289
+  17ddf9:	e9 f2 fa ff ff       	jmp    17d8f0 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x250>
+_RNvNtCslNYArtu3iFV_5alloc5boxed14box_new_uninit():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:250
+  17ddfe:	bf 08 00 00 00       	mov    $0x8,%edi
+  17de03:	be 48 00 00 00       	mov    $0x48,%esi
+  17de08:	ff 15 4a 2f 0a 00    	call   *0xa2f4a(%rip)        # 220d58 <_DYNAMIC+0x298>
+  17de0e:	eb 58                	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+  17de10:	bf 08 00 00 00       	mov    $0x8,%edi
+  17de15:	be 48 00 00 00       	mov    $0x48,%esi
+  17de1a:	ff 15 38 2f 0a 00    	call   *0xa2f38(%rip)        # 220d58 <_DYNAMIC+0x298>
+  17de20:	eb 46                	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+  17de22:	bf 08 00 00 00       	mov    $0x8,%edi
+  17de27:	be 18 00 00 00       	mov    $0x18,%esi
+  17de2c:	ff 15 26 2f 0a 00    	call   *0xa2f26(%rip)        # 220d58 <_DYNAMIC+0x298>
+  17de32:	eb 34                	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+  17de34:	bf 08 00 00 00       	mov    $0x8,%edi
+  17de39:	be 18 00 00 00       	mov    $0x18,%esi
+  17de3e:	ff 15 14 2f 0a 00    	call   *0xa2f14(%rip)        # 220d58 <_DYNAMIC+0x298>
+  17de44:	eb 22                	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner16with_capacity_inB7_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:441
+  17de46:	bf 01 00 00 00       	mov    $0x1,%edi
+  17de4b:	be 27 00 00 00       	mov    $0x27,%esi
+  17de50:	ff 15 9a 2e 0a 00    	call   *0xa2e9a(%rip)        # 220cf0 <_DYNAMIC+0x230>
+  17de56:	eb 10                	jmp    17de68 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x7c8>
+  17de58:	bf 01 00 00 00       	mov    $0x1,%edi
+  17de5d:	be 2d 00 00 00       	mov    $0x2d,%esi
+  17de62:	ff 15 88 2e 0a 00    	call   *0xa2e88(%rip)        # 220cf0 <_DYNAMIC+0x230>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17de68:	0f 0b                	ud2
+  17de6a:	48 89 c3             	mov    %rax,%rbx
+  17de6d:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17de74:	e8 37 96 00 00       	call   1874b0 <_ZN4core3ptr46drop_in_place$LT$litchi_pptx..error..Error$GT$17h3bf71d0142488fb0E>
+  17de79:	e9 9e 00 00 00       	jmp    17df1c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x87c>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17de7e:	ff 15 94 30 0a 00    	call   *0xa3094(%rip)        # 220f18 <_DYNAMIC+0x458>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17de84:	48 89 c3             	mov    %rax,%rbx
+  17de87:	eb 28                	jmp    17deb1 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x811>
+  17de89:	48 89 c3             	mov    %rax,%rbx
+  17de8c:	eb 65                	jmp    17def3 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x853>
+  17de8e:	48 89 c3             	mov    %rax,%rbx
+  17de91:	48 8d bd 70 fd ff ff 	lea    -0x290(%rbp),%rdi
+_ZN11litchi_pptx7package5model7Package31opened_presentation_transaction17ha640f8addc26d875E():
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17de98:	e8 93 bb fd ff       	call   159a30 <_ZN4core3ptr57drop_in_place$LT$litchi_pptx..opened..model..Snapshot$GT$17h814b00157261d02eE.llvm.12345718685658067336>
+  17de9d:	eb 7d                	jmp    17df1c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x87c>
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:276
+  17de9f:	ff 15 73 30 0a 00    	call   *0xa3073(%rip)        # 220f18 <_DYNAMIC+0x458>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17dea5:	48 89 c3             	mov    %rax,%rbx
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7dealloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:48
+  17dea8:	4c 89 f7             	mov    %r14,%rdi
+  17deab:	ff 15 07 2e 0a 00    	call   *0xa2e07(%rip)        # 220cb8 <free@GLIBC_2.2.5>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17deb1:	48 8d bd 70 fd ff ff 	lea    -0x290(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:289
+  17deb8:	e8 c3 ad 00 00       	call   188c80 <_ZN4core3ptr61drop_in_place$LT$litchi_pptx..opened..transaction..Commit$GT$17h3b38eccbc4744058E>
+  17debd:	eb 5d                	jmp    17df1c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x87c>
+  17debf:	48 89 c3             	mov    %rax,%rbx
+  17dec2:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17dec9:	e8 e2 95 00 00       	call   1874b0 <_ZN4core3ptr46drop_in_place$LT$litchi_pptx..error..Error$GT$17h3bf71d0142488fb0E>
+  17dece:	eb 4c                	jmp    17df1c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x87c>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17ded0:	ff 15 42 30 0a 00    	call   *0xa3042(%rip)        # 220f18 <_DYNAMIC+0x458>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17ded6:	48 89 c3             	mov    %rax,%rbx
+_RNvXNtNtNtCsjrHSEGnQ3l9_3std3sys5alloc4unixNtNtB8_5alloc6SystemNtNtNtCsgEmfK2I1SDS_4core5alloc6global11GlobalAlloc7dealloc():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:48
+  17ded9:	4c 89 f7             	mov    %r14,%rdi
+  17dedc:	ff 15 d6 2d 0a 00    	call   *0xa2dd6(%rip)        # 220cb8 <free@GLIBC_2.2.5>
+_RNvMNtCslNYArtu3iFV_5alloc5boxedINtB2_3BoxNtNvXsf_NtB2_7convertIBv_DNtNtCsgEmfK2I1SDS_4core5error5ErrorNtNtB18_6marker4SyncNtB1F_4SendEL_EINtNtB18_7convert4FromNtNtB4_6string6StringE4from11StringErrorE3newB4_():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17dee2:	eb 0f                	jmp    17def3 <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x853>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17dee4:	48 89 c3             	mov    %rax,%rbx
+  17dee7:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17deee:	e8 bd 95 00 00       	call   1874b0 <_ZN4core3ptr46drop_in_place$LT$litchi_pptx..error..Error$GT$17h3bf71d0142488fb0E>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+  17def3:	48 8d bd 40 f1 ff ff 	lea    -0xec0(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:289
+  17defa:	e8 e1 b3 00 00       	call   1892e0 <_ZN4core3ptr66drop_in_place$LT$litchi_pptx..opened..transaction..Transaction$GT$17h534dec6f5cfeeb99E>
+  17deff:	eb 1b                	jmp    17df1c <_ZN22pptx_edit_profile_082216edit_region_082217hca2e342bd92dd609E+0x87c>
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17df01:	ff 15 11 30 0a 00    	call   *0xa3011(%rip)        # 220f18 <_DYNAMIC+0x458>
+_ZN22pptx_edit_profile_082216edit_helper_082217hf6f83888d3022f1eE():
+/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/src/main.rs:275
+  17df07:	ff 15 0b 30 0a 00    	call   *0xa300b(%rip)        # 220f18 <_DYNAMIC+0x458>
+  17df0d:	48 89 c3             	mov    %rax,%rbx
+  17df10:	48 8d bd 40 f9 ff ff 	lea    -0x6c0(%rbp),%rdi
+_ZN5alloc5boxed12Box$LT$T$GT$3new17hecd3a0cd39559e20E():
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17df17:	e8 94 95 00 00       	call   1874b0 <_ZN4core3ptr46drop_in_place$LT$litchi_pptx..error..Error$GT$17h3bf71d0142488fb0E>
+  17df1c:	48 89 df             	mov    %rbx,%rdi
+  17df1f:	e8 8c 88 09 00       	call   2167b0 <_Unwind_Resume@plt>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17df24:	ff 15 ee 2f 0a 00    	call   *0xa2fee(%rip)        # 220f18 <_DYNAMIC+0x458>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

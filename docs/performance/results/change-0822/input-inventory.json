@@ -1,0 +1,21 @@
+{
+  "schema": "litchi.performance.0822.input-inventory.v1",
+  "input_selector": "pinnedshapes",
+  "reference_selector": "0821realPPTXdefault",
+  "reference_archive": {
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "source_archive": {
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "source_copy": {
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "scope": "The probe opens the checked-in 0821 default artifact and serializes its edit result in memory; no 0822 filesystem scratch root or atomic publication timing is used."
+}

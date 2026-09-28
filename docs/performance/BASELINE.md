@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0822 — real-file PPTX edit profile
+
+[0822](0822-real-file-pptx-edit-profile.md) Fresh diagnostic controls retain ordinary/direct p50 1.428437 ms, wrapped/control ratio 1.000137 [0.997252–1.002430], and fp/wrapped 1.009094 [1.005815–1.012671]. The 23 reports/4,549 samples include separate qualification, native, and perf lanes. No production change or historical speedup is claimed.
+
 ## 0821 — real-file durability policy comparison
 
 [0821](0821-real-file-save-durability.md) Fresh 24-case measurements retain 216 reports and 4,488 samples. All six explicit-full/default paired intervals include 1.0. File-only/default ratios span 0.62841–0.75003; no-sync/default spans 0.01676–0.28031. These are changed-durability configurations, with no production optimization or default weakening.

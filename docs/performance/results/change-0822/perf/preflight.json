@@ -1,0 +1,12 @@
+{
+  "ended": 1790608608.6427152,
+  "perf_event_paranoid": "1",
+  "perf_event_paranoid_path": "/proc/sys/kernel/perf_event_paranoid",
+  "perf_event_paranoid_readable": true,
+  "perf_path": "/usr/bin/perf",
+  "schema": "litchi.performance.0822.perf-preflight.v1",
+  "started": 1790608608.62521,
+  "status": "ready",
+  "version": "perf version 7.0.14",
+  "version_exit_code": 0
+}

@@ -1,0 +1,254 @@
+{
+  "architecture": {
+    "docs/CRUD_Scenario_Checklist.md": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/adr/0001-priorities-and-api-layers.md": "813bf4faf62cedac56fbfa3bf9b7600121b42a3ed5d4cec0028f8c8f2ac2798e",
+    "docs/adr/0002-crate-topology.md": "73f4372ef6948f5a36c83fbf27a96f0b1f680225f331f201c470e04913417719",
+    "docs/adr/0003-snapshots-edits-and-patches.md": "9200d3546d91f1604d44a9ade7ad0a6bdea50b6442d12a0517b09db5e8e802ef",
+    "docs/adr/0004-semantic-api-design.md": "acc23f6b2d334ed1dc1f088d420ddaeee17661cd74a963036935b482b276b393",
+    "docs/adr/0005-io-memory-and-performance.md": "8279fd2dc0b074aa104bf0c83df6187d12e18756cd8c8d7f25750b2a997cb0aa",
+    "docs/adr/0006-validation-security-and-compatibility.md": "ae21189eda0acc9524a7c5a57e87bb3566405ede5c015c87105e01337666f44b",
+    "docs/adr/0007-office-object-models.md": "8808b79dcb35eaeaa6be778b5a9593101dd302f866ef20ff4f8fdf8df5d8b100",
+    "docs/adr/0008-migration-and-verification.md": "5c72d79a7ba78a044471b40ba22ab3f32f7b8f4f878614ab05b416e60b0163a2",
+    "docs/adr/0009-odf-detection-ownership.md": "1e9d8a7de81a6d36d03f67acd9887b2b1debbe0727b278a4118d4577c90b5437",
+    "docs/adr/0010-facade-archive-ownership.md": "4e1af2c4019842d187804f8356299aa80ba8a6abd8d35a4a021e1bce3c2a6590",
+    "docs/adr/0011-ooxml-physical-package-ownership.md": "3a1644536af0b66fed47c1a154e829c0e0008cccb89dec679a0328036d305e04",
+    "docs/adr/0012-biff8-formula-reference-types.md": "44cc6b58237288bfc919fc9c8f4b9a0bd89e8c7d611a7c05b7da8ecd3e0d1eae",
+    "docs/adr/0013-pptx-notes-deletion.md": "9aba58d68e54bcf75c371ba30ce97f92c46f1fc57a8ca7b06351fbcce10d6600",
+    "docs/adr/0014-core-properties-reader-ownership.md": "5667f580efc4650bdb6874143528d237ac04bddd8386e6ff2d2d8b76ca20bdad",
+    "docs/adr/0015-lossless-core-properties-crud.md": "dd0b0cd2f9beebee61cb70582ea6c6cac61105a412e5e5929ccfd05af66aef43",
+    "docs/adr/0016-biff8-writer-location-types.md": "b9afa735a0b94ea4cedf8a68af9c6a8d2484f17d10e34bc0a464872e8cdc8023",
+    "docs/adr/0017-ooxml-producer-template-ownership.md": "0d5e076c1e940f7c35c6c907f2291d4adfb731c64e6fe077af45c922b92be046",
+    "docs/adr/0018-xlsx-calculation-chain-ownership.md": "7007d34208fdd2e2072f2126b71a79a369e9ef753cb6905c2677a211e1675f7b",
+    "docs/adr/0019-docx-web-settings-ownership.md": "8195cb3c4663d3e503cd58b3fe14cfcf398e812cd56716d2c2b65fc58b49aa63",
+    "docs/adr/0020-pptx-table-style-ownership.md": "6d3a23493e12913220a91ba94e6c1cc61e09aed55ea69c03350ad8e0f0829461",
+    "docs/adr/0021-docx-glossary-ownership.md": "a6dad467defd96651e8bdc56110dcc85213cc83570c88eaa9aad780188b650e3",
+    "docs/adr/0022-pptx-embedded-font-ownership.md": "d2672e0413d93cbb295f57fad45d004645a02b6173875f081975fc12c3c5543c",
+    "docs/adr/0023-odf-family-crate-split.md": "e906a090afac6de32c338b190927cc4932e01a138b74f527b14284c78fee40a9",
+    "docs/adr/0024-current-topology.md": "cc134b2a4eb8797a3769cf815f1f09618fd26e215bd7305de1c9890093dbb1b6",
+    "docs/adr/0025-ograph-chart-area-transactions.md": "a3370829c8ff45d9c54c5347591ae2dbb1c43ae4bb7f5f5c612a8c52e6f8a6ea",
+    "docs/adr/0026-ole-directory-metadata-binding.md": "20e1ebef0bbf3ecd7a4e49964e1c90500688f75a537faa21a09dbf46a3ea9532",
+    "docs/adr/0027-xls-sheet-anchor-ownership.md": "f5333e1a245ccbfe8391219830359de01e1c40e9609401df2abe061600ac8580",
+    "docs/adr/0028-iwa-monolith-exit.md": "d746f84441a6623c8a6e3731701e614c39544467433615ad83af001da4e52023",
+    "docs/adr/0029-iwa-index-foundation.md": "d3f246d7cfb61975a703d1cb47b7ec441f506436ec09e2ea3bcf9c29b1b02df2",
+    "docs/adr/0030-lazy-opc-part-decode.md": "f0a2a679aeb4578f6ca3c4a762e546a820493d27dd205a462ffe2ba89c9f1561",
+    "docs/adr/0031-execution-context-budgets.md": "ce7e16baa101cfdd8abfc6d606dc0a56fad6d86cc79eba997d338f919a063eb3",
+    "docs/adr/0032-snapshot-derived-value-memos.md": "33e68f71a2845132ff53aec30422300194b1bc40caa6dd9503848278e342ed70",
+    "docs/adr/README.md": "2af0e5814378c2765c12213e495d02c2895a27f142bc618ca1f3037824bbe028"
+  },
+  "binaries": {
+    "fp": {
+      "artifact": {
+        "bytes": 13688424,
+        "path": "/home/zhuhe/code/litchi-target-0822/fp",
+        "sha256": "6aede36b425cb02dc0a59a8a5aa73da2298b5c7a4934eae30b06295dffa32f82"
+      },
+      "cargo_name": "pptx-edit-profile-0822",
+      "features": [],
+      "rustflags": "-C force-frame-pointers=yes"
+    },
+    "ordinary": {
+      "artifact": {
+        "bytes": 13732440,
+        "path": "/home/zhuhe/code/litchi-target-0822/ordinary",
+        "sha256": "0d423fb727c7aa013c841e03907fa6339ef74196b0cd22f1c6be294e639f21c4"
+      },
+      "cargo_name": "pptx-edit-profile-0822",
+      "features": [],
+      "rustflags": null
+    }
+  },
+  "corpus": {
+    "reference": {
+      "bytes": 68284,
+      "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    },
+    "source": {
+      "bytes": 68822,
+      "path": "test-data/ooxml/pptx/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  },
+  "environment_contract": {
+    "jobs": 2,
+    "locked": true,
+    "offline": true,
+    "preserve_binaries": true,
+    "release": true
+  },
+  "frozen_inputs": {
+    "bytes": 1223131,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/frozen-inputs.json",
+    "sha256": "50c96ea22bf328e98d6ad6832da47a2266d8ab97938c7a174745d09d9719a304"
+  },
+  "host": "f152a4b62f2577ddcbf65bef27f37d877c8b00b8018d084c7ef024953077c6ac",
+  "locks": {
+    "packet_tool": {
+      "bytes": 56919,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/inputs/tool-Cargo.lock",
+      "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+    },
+    "probe": {
+      "bytes": 30217,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/Cargo.lock",
+      "sha256": "b709bca72e65d4f0da1f016e672cc6b940a882ed1ed759970699b51b0edf8058"
+    },
+    "root": {
+      "bytes": 138443,
+      "path": "/home/zhuhe/code/litchi/Cargo.lock",
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+    },
+    "tool": {
+      "bytes": 56919,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+      "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+    }
+  },
+  "probe": {
+    "bytes": 256,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/probe.json",
+    "sha256": "0c004d51126ce97bf9c72c07c341f1eb2e99a8c989a907fc748243bb67b8b2e6"
+  },
+  "probe_source": {
+    "Cargo.lock": "b709bca72e65d4f0da1f016e672cc6b940a882ed1ed759970699b51b0edf8058",
+    "Cargo.toml": "de52c5103c4ff76f6e2fdf8be432566f3ca2f65f4c92f99b7ebc830d01df5708",
+    "src/main.rs": "bb71ca8a0cc6c25ef86d40849aaddbbbd354e3d45fbcc4578f968e74f6205087"
+  },
+  "profile": {
+    "codegen_units": 1,
+    "debug": 1,
+    "features": [],
+    "fp_rustflags": "-C force-frame-pointers=yes",
+    "incremental": false,
+    "jobs": 2,
+    "lto": "thin",
+    "opt_level": 3,
+    "ordinary_rustflags": null,
+    "panic": "unwind"
+  },
+  "provenance": {
+    "edit": "One deterministic public PPTX edit region is exercised in direct and named-wrapper modes; probe output validation remains separate from native timing.",
+    "input_selector": "pinnedshapes",
+    "producer_claim": "No Microsoft producer application is inferred.",
+    "quality_reuse": "docs/performance/results/change-0821/quality.json",
+    "reference_archive": {
+      "bytes": 68284,
+      "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    },
+    "reference_report": {
+      "bytes": 26085,
+      "path": "docs/performance/results/change-0821/native/00-pptx_real_file_ordinary_save_lifecycle__default.json",
+      "sha256": "707ef512f90eefc7fccd7e2f0058f151437f2eabd6ada18565d40bf9d44c001d"
+    },
+    "reference_selector": "0821realPPTXdefault",
+    "schema": "litchi.performance.0822.provenance.v1",
+    "scope": "Fresh 0822 bounded PPTX public-edit profile on unchanged production and tool source; the canonical input is checked in and the reference output is a pinned 0821 artifact.",
+    "source_archive": {
+      "bytes": 68822,
+      "path": "test-data/ooxml/pptx/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    "source_copy": {
+      "bytes": 68822,
+      "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  },
+  "root_inputs": {
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "rows": [
+    {
+      "cargo_binary": "pptx-edit-profile-0822",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/Cargo.toml",
+        "--bin",
+        "pptx-edit-profile-0822"
+      ],
+      "ended": 1790608471.3176925,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0822",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTFLAGS": null
+      },
+      "exit_code": 0,
+      "features": [],
+      "log": {
+        "bytes": 3788,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/ordinary.log",
+        "sha256": "b8ed05ee41fed93e3ebfd61dfa30c936aa60b4c1f590c614ce4b9b0dfa37d516"
+      },
+      "rustflags": null,
+      "started": 1790608378.3953445,
+      "variant": "ordinary"
+    },
+    {
+      "cargo_binary": "pptx-edit-profile-0822",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0822/probe-src/Cargo.toml",
+        "--bin",
+        "pptx-edit-profile-0822"
+      ],
+      "ended": 1790608564.2917695,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0822",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTFLAGS": "-C force-frame-pointers=yes"
+      },
+      "exit_code": 0,
+      "features": [],
+      "log": {
+        "bytes": 3788,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/fp.log",
+        "sha256": "eb32386052130a033849b2f27f71f819f65329743c5a60f8ecb981256b799409"
+      },
+      "rustflags": "-C force-frame-pointers=yes",
+      "started": 1790608471.5677733,
+      "variant": "fp"
+    }
+  ],
+  "schema": "litchi.performance.0822.build.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/source.json",
+    "sha256": "fa5c004d78f8984741019eabecba4d56794a0d65049b93bcc00a28cfc360fe7d"
+  },
+  "source_revision": "353aa00a7da2795e6b4c28708138a103a143917e",
+  "target": "/home/zhuhe/code/litchi-target-0822",
+  "unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

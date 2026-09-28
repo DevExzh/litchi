@@ -1,0 +1,26 @@
+{
+  "blocks": 6,
+  "build_sha256": "0266b3297ca9edc25db3bc22afa7f90bcf53c2a56771a9eb5fe69954141cd9e0",
+  "expected_reports": 18,
+  "expected_samples": 540,
+  "plan_sha256": "040cc6f9f94a3827ef0c49752cfa909ee03476c6ade09a6be2d05bf142845a43",
+  "probe": {
+    "bytes": 256,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/probe.json",
+    "sha256": "0c004d51126ce97bf9c72c07c341f1eb2e99a8c989a907fc748243bb67b8b2e6"
+  },
+  "receipts": {
+    "bytes": 52910,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/native/receipts.json",
+    "sha256": "0e5b128f84532a062b7538668ffc4e802e4340e775cab85c33cb8dee44f3f56e"
+  },
+  "reports": 18,
+  "samples": 540,
+  "schema": "litchi.performance.0822.native.complete.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/source.json",
+    "sha256": "fa5c004d78f8984741019eabecba4d56794a0d65049b93bcc00a28cfc360fe7d"
+  },
+  "status": "pass"
+}

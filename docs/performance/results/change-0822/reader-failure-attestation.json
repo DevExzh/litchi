@@ -1,0 +1,52 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0822/analysis.py",
+    "--write"
+  ],
+  "evidence_kind": "retrospective agent attestation; not original console capture",
+  "failures": [
+    {
+      "exit_code": null,
+      "order": 1,
+      "reported_error": "pinned PPTX input contract changed"
+    },
+    {
+      "exit_code": null,
+      "order": 2,
+      "reported_error": "build frozen previous_seal custody changed"
+    },
+    {
+      "exit_code": null,
+      "order": 3,
+      "reported_error": "build frozen plan custody changed"
+    },
+    {
+      "exit_code": null,
+      "order": 4,
+      "reported_error": "resolve_path() missing 1 required positional argument: 'label'"
+    },
+    {
+      "exit_code": null,
+      "order": 5,
+      "reported_error": "perf decode symbol descriptor changed"
+    },
+    {
+      "exit_code": null,
+      "order": 6,
+      "reported_error": "perf 0 raw compressed: original identity missing"
+    }
+  ],
+  "limitation": "Six failed reader attempts were not redirected to durable logs; exact errors and order are reported by their execution owner. No timestamps or unobserved exit codes are reconstructed.",
+  "original_failure_logs_retained": false,
+  "reader_source_versions_retained": false,
+  "root_duplicate_write_log": "reader-attempt-0.log",
+  "schema": "litchi.performance.0822.reader-failure-attestation.v1",
+  "source": "analysis_0822 agent handoff after explicit root audit question",
+  "subsequent_successes": [
+    "analysis.py --write",
+    "analysis.py --check",
+    "validate.py"
+  ]
+}

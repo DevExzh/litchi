@@ -1,0 +1,25 @@
+{
+  "binary": {
+    "bytes": 13688424,
+    "path": "/home/zhuhe/code/litchi-target-0822/fp",
+    "sha256": "6aede36b425cb02dc0a59a8a5aa73da2298b5c7a4934eae30b06295dffa32f82"
+  },
+  "build": {
+    "bytes": 12349,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build.json",
+    "sha256": "0266b3297ca9edc25db3bc22afa7f90bcf53c2a56771a9eb5fe69954141cd9e0"
+  },
+  "plan_sha256": "040cc6f9f94a3827ef0c49752cfa909ee03476c6ade09a6be2d05bf142845a43",
+  "schema": "litchi.performance.0822.symbols.complete.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/build-0/source.json",
+    "sha256": "fa5c004d78f8984741019eabecba4d56794a0d65049b93bcc00a28cfc360fe7d"
+  },
+  "status": "pass",
+  "symbol": {
+    "bytes": 4192,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/symbols/symbol.json",
+    "sha256": "b27fb39fd3f5375a5f11d5f4af78fbe3894aba039f3190a511736a43f6c16820"
+  }
+}
