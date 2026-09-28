@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0809 — independent quality blocker removed
+
+[0809](0809-pptx-refusal-test-quality-repair.md) The baseline Clippy failures reproduced in 0808 are repaired in test code only. Six package quality gates pass. The event candidate remains unadopted and awaits fresh paired workflow measurements; the broader non-iWork goal remains incomplete.
+
 ## 0808 — event candidate deferred by a baseline quality blocker
 
 [0808](0808-pptx-direct-event-handling.md) The reviewed one-file event-handling candidate passes formatting, checking, and semantic tests, then stops at existing opened/tests.rs Clippy errors. The exact baseline is restored; no optimization is adopted and no performance gate is evaluated. Repair baseline test lint before fresh trials. The broader non-iWork goal remains open.

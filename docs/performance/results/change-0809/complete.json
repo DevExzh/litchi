@@ -1,0 +1,14 @@
+{
+  "checks_sha256": "af7971d3db3b92837941461040e072c912ab1081f89b7b4fa773867fc323083f",
+  "gates_passed": 6,
+  "plan_sha256": "e8ef9da80b5543625a91c71fc10f9deeea62a3711854857efb633e41450074d1",
+  "schema": "litchi.performance.0809.quality.v1",
+  "source_sha256": "867aa576235882e9a0175ef53d3c70cf6d2c365aedd8061f229dc9a1250d0bda",
+  "test_groups": 85,
+  "tests": {
+    "failed": 0,
+    "ignored": 3,
+    "measured": 0,
+    "passed": 1238
+  }
+}

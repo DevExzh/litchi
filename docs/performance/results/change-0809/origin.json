@@ -1,0 +1,19 @@
+{
+  "schema": "litchi.performance.0809.origin.v1",
+  "base": "679114b237209f42ba6d844299dad9abb7fb2bc2",
+  "previous_turn": "progress: committed0808 semantic qualification and reproduced independentbaselineClippyblocker",
+  "scope": [
+    "crates/litchi-pptx/src/opened/tests.rs"
+  ],
+  "before_sha256": "575d4e0737c52e90a8f062f9fb3d064a2ce58551102254005f8fbfdb37a84253",
+  "architecture_reference": "../change-0808/architecture-inputs.json",
+  "baseline_source_reference": "../change-0808/build-before/source.json",
+  "reason": "Test-only quality repair required before a fresh direct-event performance experiment; no runtime or performance claim.",
+  "architecture_sha256": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+  "baseline_source_sha256": "1d3e7906f1467b460d4110decb365c92faa842e9bf7099336a801af13472dcf3",
+  "unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

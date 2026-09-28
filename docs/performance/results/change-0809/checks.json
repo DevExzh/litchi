@@ -1,0 +1,125 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-pptx",
+      "--",
+      "--check"
+    ],
+    "ended": 1790573030.7224784,
+    "exit_code": 0,
+    "gate": 1,
+    "log": {
+      "bytes": 0,
+      "path": "01.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790573029.6212842
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790573059.7781453,
+    "exit_code": 0,
+    "gate": 2,
+    "log": {
+      "bytes": 6244,
+      "path": "02.log",
+      "sha256": "03e87b6aca8c4911a9c5b288c18340b79122fe7394f76b31a4b208b895e180d4"
+    },
+    "started": 1790573030.9043937
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790573182.0822027,
+    "exit_code": 0,
+    "gate": 3,
+    "log": {
+      "bytes": 138002,
+      "path": "03.log",
+      "sha256": "1a5c488b13d728c2f7bfc4c761c72cdf3a9acebf2d03a980eab73816b622af46"
+    },
+    "started": 1790573059.9634674
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790573205.4530127,
+    "exit_code": 0,
+    "gate": 4,
+    "log": {
+      "bytes": 1207,
+      "path": "04.log",
+      "sha256": "3c06548d4e583413c0df0f45cfa586c7bc5d0b735237d3a97f105365f31208c3"
+    },
+    "started": 1790573182.2678134
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "ended": 1790573208.8875682,
+    "exit_code": 0,
+    "gate": 5,
+    "log": {
+      "bytes": 213,
+      "path": "05.log",
+      "sha256": "e98d7b027613c822187a6448fdffeb2d221c0dc6b3a5f72d443466a11d994f99"
+    },
+    "started": 1790573205.637211
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "ended": 1790573474.2431893,
+    "exit_code": 0,
+    "gate": 6,
+    "log": {
+      "bytes": 565,
+      "path": "06.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "started": 1790573209.0709882
+  }
+]

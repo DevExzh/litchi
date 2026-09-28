@@ -461,8 +461,7 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
     ];
     let error =
         crate::notes::load_snapshot_with_slide_root_proofs(&package.opc, &presentation, 2, &exact)
-            .err()
-            .expect("exact invalid proofs must refuse the notes graph");
+            .expect_err("exact invalid proofs must refuse the notes graph");
     assert!(matches!(
         error,
         Error::Invalid(message) if message == "invalid sld root or namespace"
@@ -535,8 +534,7 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
     pad_part_blob(&mut notes_limited, &slide, crate::notes::MAX_SLIDE_XML + 1)?;
     let error = notes_limited
         .opened_presentation()
-        .err()
-        .expect("the 16 MiB slide root limit must refuse capture");
+        .expect_err("the 16 MiB slide root limit must refuse capture");
     assert!(matches!(
         error,
         Error::Invalid(message) if message == "invalid sld root or namespace"
@@ -554,8 +552,7 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
     )?;
     let error = part_limited
         .opened_presentation()
-        .err()
-        .expect("the 64 MiB part limit must refuse capture");
+        .expect_err("the 64 MiB part limit must refuse capture");
     assert!(matches!(
         error,
         Error::Limit {
