@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0809 — baseline quality repaired without new measurements
+
+[0809](0809-pptx-refusal-test-quality-repair.md) The three test-only Clippy blockers are fixed. All six PPTX quality gates pass, including 1,238 tests with three ignored and warning-denied all-targets Clippy. No baseline performance metric changes; the next event-handling trial must capture fresh paired builds.
+
 ## 0808 — baseline qualified; paired experiment not reached
 
 [0808](0808-pptx-direct-event-handling.md) The eighteen before-only workflow reports pass exact sealed source/output/text/extension oracles. Three baseline binaries and the 36-test probe quality lane pass. Candidate production quality stops at three pre-existing Clippy errors; no paired timing or allocation result is available, and production is restored exactly.

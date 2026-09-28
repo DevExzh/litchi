@@ -1,0 +1,23 @@
+{
+  "schema": "litchi.performance.0809.additional-inputs.v1",
+  "capture_phase": "after Cargo gates, during boundary gate; original mtimes precede first gate and all Cargo dependency commands use --locked",
+  "first_gate_started": 1790573029.6212842,
+  "inputs": [
+    {
+      "repository_path": "Cargo.lock",
+      "retained_path": "inputs/Cargo.lock",
+      "bytes": 138443,
+      "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+      "mtime_ns": 1790287085392485161,
+      "mtime_precedes_first_gate": true
+    },
+    {
+      "repository_path": "rustfmt.toml",
+      "retained_path": "inputs/rustfmt.toml",
+      "bytes": 79,
+      "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+      "mtime_ns": 1788453673444348582,
+      "mtime_precedes_first_gate": true
+    }
+  ]
+}

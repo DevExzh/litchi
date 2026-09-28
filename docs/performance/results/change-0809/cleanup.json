@@ -1,0 +1,8 @@
+{
+  "schema": "litchi.performance.0809.cleanup.v1",
+  "target": "/home/zhuhe/code/litchi-target-0809",
+  "removed": true,
+  "files": 7120,
+  "logical_bytes": 1947648722,
+  "source_sha256": "867aa576235882e9a0175ef53d3c70cf6d2c365aedd8061f229dc9a1250d0bda"
+}

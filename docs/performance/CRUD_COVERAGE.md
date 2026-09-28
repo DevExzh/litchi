@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0809 — existing refusal coverage preserved
+
+[0809](0809-pptx-refusal-test-quality-repair.md) Three assertions now use expect_err while preserving fixtures and typed refusal checks. The existing PPTX suite passes 1,238 tests with three ignored; no public capability or new CRUD category is promoted.
+
 ## 0808 — semantic candidate tests without capability promotion
 
 [0808](0808-pptx-direct-event-handling.md) The six-shape capture/commit/lifecycle baseline matrix retains 18 reports/18 samples. Candidate PPTX tests pass (1,241 passed, three ignored), including three namespace-order differential tests. Existing Clippy blockers prevent performance trials. This adds no public capability, native Office, cross-format, or comprehensive CRUD coverage.

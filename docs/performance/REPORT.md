@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0809 — refusal-test quality repair
+
+[0809](0809-pptx-refusal-test-quality-repair.md) Replaces three err().expect expressions with expect_err, preserving all typed error assertions. Formatting, checking, 1,238 tests, warning-denied Clippy/rustdoc, and crate boundaries pass. This removes the 0808 prerequisite failure without a performance claim.
+
 ## 0808 — direct event handling deferred before performance trials
 
 [0808](0808-pptx-direct-event-handling.md) Baseline qualification passes all 18 outputs, and candidate production tests pass 1,241 tests with three ignored. Warning-denied Clippy fails on three unchanged test expressions outside the candidate file. Production is restored, failure evidence is retained, and all paired measurements are unexecuted. The next step is a separate baseline lint repair before a fresh experiment.

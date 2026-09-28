@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0809 — event experiment prerequisite repaired
+
+[0809](0809-pptx-refusal-test-quality-repair.md) The three baseline test lint failures are resolved, with all six quality gates passing. No runtime path or measured hotspot changes. Resume the 0807 event-handoff hypothesis using fresh before/after evidence and the existing semantic constraints.
+
 ## 0808 — event handoff hypothesis remains unmeasured
 
 [0808](0808-pptx-direct-event-handling.md) Direct Reader events with the same NamespaceResolver pass all focused differential tests, preserving both buffered oracle functions. Three existing Clippy errors stop the trial before paired captures or profiles. The 0807 event-handoff hypothesis remains open; there is no new instruction-cost or speedup evidence.

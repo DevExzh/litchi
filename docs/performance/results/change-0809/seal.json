@@ -1,0 +1,33 @@
+{
+  "files": {
+    "crates/litchi-pptx/src/opened/tests.rs": "e6034305a611b2742178cbc49f94f6fb0c96865398d07d5882f3700e51177995",
+    "docs/performance/0809-pptx-refusal-test-quality-repair.md": "9cf3f7d5a86d8650794b7513adf73109e0e2983e38902d293b363e27ed9f4c45",
+    "docs/performance/BASELINE.md": "3ba8a2694820f871bd945a3175819cbe329a5eada38bb4db39c604f525225101",
+    "docs/performance/CRUD_COVERAGE.md": "7225dcabdea1880c00075858cbda26e2a116766bb6c906310173750032b5cfad",
+    "docs/performance/GOAL_AUDIT.md": "ffe91af76a13347992a03af3798743646a87b16e80c188e39cc83082f81b76b6",
+    "docs/performance/HOTSPOTS.md": "010edd6b0cf0262b65bb6bc101a34c0124fa2c2ea976dd17af749da4e54dafbc",
+    "docs/performance/REPORT.md": "f7c6d1ff78e11ecd85d5b830364dd1581d233c68ac094c5fd5dadb97b593ad9b",
+    "docs/performance/results/change-0809/.gitattributes": "e9becd2bbee495d31e6c26377813ce47f94e021123f01d55df9bbe7c64c9f941",
+    "docs/performance/results/change-0809/01.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/performance/results/change-0809/02.log": "03e87b6aca8c4911a9c5b288c18340b79122fe7394f76b31a4b208b895e180d4",
+    "docs/performance/results/change-0809/03.log": "1a5c488b13d728c2f7bfc4c761c72cdf3a9acebf2d03a980eab73816b622af46",
+    "docs/performance/results/change-0809/04.log": "3c06548d4e583413c0df0f45cfa586c7bc5d0b735237d3a97f105365f31208c3",
+    "docs/performance/results/change-0809/05.log": "e98d7b027613c822187a6448fdffeb2d221c0dc6b3a5f72d443466a11d994f99",
+    "docs/performance/results/change-0809/06.log": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1",
+    "docs/performance/results/change-0809/README.md": "6edc93683e96e86fed580ebf2403fac54fc019eacbf464453e0dab46e2817a2d",
+    "docs/performance/results/change-0809/additional-inputs.json": "4d0072c705ff20774a1c2a185dab9c6639df29c6064f1de9cee42598150649c6",
+    "docs/performance/results/change-0809/checks.json": "af7971d3db3b92837941461040e072c912ab1081f89b7b4fa773867fc323083f",
+    "docs/performance/results/change-0809/cleanup.json": "5c84e6f6134c0c635cb124c64071d655b90b629b05666f896d5124fd5f1aba81",
+    "docs/performance/results/change-0809/complete.json": "8f4e6e3dbb6625d01dee37881f122a608b570851e98a64d75e316f5be4a23b24",
+    "docs/performance/results/change-0809/inputs/Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "docs/performance/results/change-0809/inputs/rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "docs/performance/results/change-0809/origin.json": "87d63432bc8ae028c267a5f67b3a32da569f4c1901bae668438ed91c2aac169a",
+    "docs/performance/results/change-0809/plan.json": "e8ef9da80b5543625a91c71fc10f9deeea62a3711854857efb633e41450074d1",
+    "docs/performance/results/change-0809/quality.py": "2067728dcc9e4165524a6150fd89f24de9877a516137c0893e7eb6480b4a4505",
+    "docs/performance/results/change-0809/review.md": "dee54de80fbd6050b21211a1f7590e33bbe2367747755e8191cb2fb4a431c887",
+    "docs/performance/results/change-0809/seal.py": "8439cfe34609dbbc4329fe56d330be37b52d1cba4871f0bd58d72aa5381b147c",
+    "docs/performance/results/change-0809/source.json": "867aa576235882e9a0175ef53d3c70cf6d2c365aedd8061f229dc9a1250d0bda",
+    "docs/performance/results/change-0809/validate.py": "66305dd6a32516fc68ec2c9db7d26c6a73daca8daf5132b65301e8c5142be4df"
+  },
+  "schema": "litchi.performance.0809.seal.v1"
+}
