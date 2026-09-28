@@ -1,0 +1,20 @@
+{
+  "blocks": 2,
+  "build_sha256": "c311a612b8ef1d6da5e2dd5b5ff14ffba22952cf71be7e87e74d64ae616aafd1",
+  "children": 48,
+  "plan_sha256": "aff9859063007cf96c9311dc44f3bf5cb5d71903572431916e726d1f7e93ae28",
+  "quality_sha256": "6bc5fda5024a560a5b682f18fa4d6d0e42691a5b3829accf9215050c4ee29d2f",
+  "receipts": {
+    "bytes": 546456,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/observer/receipts.json",
+    "sha256": "6c4173f9660c3964057826ca9311c19e6871605e1cb830a17630f23343c90ed2"
+  },
+  "reports": 48,
+  "samples": 144,
+  "schema": "litchi.performance.0821.observer.complete.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/observer/source.json",
+    "sha256": "a05e69e89853a209d4a28ba6732d265775b0faaa5891874cab16924d138d2e33"
+  }
+}

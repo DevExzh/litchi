@@ -1,0 +1,18 @@
+[
+  {
+    "command": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0821/admission.py",
+      "artifacts"
+    ],
+    "root_session": 8294,
+    "exit_code": 1,
+    "stage": "after successful artifact audit, before artifact-admission.json publication",
+    "error": "FileNotFoundError: zip-preservation.json missing",
+    "reason": "root invoked admission before the standalone preservation witness producer",
+    "retained_attempt": "admission-0",
+    "artifact_audit_exit_code": 0,
+    "timing_started": false
+  }
+]

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0821 — durability policy materially affects path-save latency
+
+[0821](0821-real-file-save-durability.md) Default/full controls agree within paired 95% intervals; weaker-policy latencies are markedly lower with identical observed median allocation counts, bytes, and peak-above-entry values. This supports synchronization as material on the measured ext4/NVMe host, without assigning individual syscall costs or authorizing default changes. Profile the ordinary PPTX edit/publication CPU path next.
+
 ## 0820 — durability attribution deferred at quality gate
 
 [0820](0820-allocator-test-quality-repair.md) The planned default/full/file-only/no-sync comparison produced no measurements because the original quality gate exposed an invalid process-global live-byte assertion. The test-only repair supports resuming attribution from a fresh base; no hotspot or speedup claim changes.
