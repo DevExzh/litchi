@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0830/native/native-01-fp.rss",
+    "/home/zhuhe/code/litchi-target-0830/fp/release/xlsx-edit-profile-0830",
+    "--mode",
+    "wrapped",
+    "--input",
+    "/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "--reference",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-001-xlsx/default.xlsx",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0830/native/native-01-fp.json",
+    "--samples",
+    "30",
+    "--warmup",
+    "3"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0830/fp",
+    "LC_ALL": "C",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes",
+    "TZ": "UTC"
+  },
+  "input_inventory_sha256": "0897f89abb56551a2bc45cc4d84739d3f53571886d0dd2c557ec1112c94408fb",
+  "started_unix": 1790629748.5652308
+}

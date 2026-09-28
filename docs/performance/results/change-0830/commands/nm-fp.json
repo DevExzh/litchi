@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "nm",
+    "-S",
+    "--defined-only",
+    "--demangle=rust",
+    "/home/zhuhe/code/litchi-target-0830/fp/release/xlsx-edit-profile-0830"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0830/fp",
+    "LC_ALL": "C",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790629729.6807802,
+  "input_inventory_sha256": "0897f89abb56551a2bc45cc4d84739d3f53571886d0dd2c557ec1112c94408fb",
+  "log_sha256": "70db8f519208608309c3778b5eca1bd59fd4844990377959c4e45dc148c85b1e",
+  "started_unix": 1790629729.665072
+}

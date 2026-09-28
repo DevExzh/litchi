@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0830 — XLSX edit allocation maps localized
+
+[0830](0830-xlsx-edit-allocation-profile.md) Exact-owner Heaptrack attribution localizes 90.45% of the real XLSX edit’s requested bytes to three dense column-assignment maps. The empty-action validator map alone contributes 18.09%. This is a diagnostic result on one fixture, with no speedup, peak-memory or production change claim; matched candidate measurement is next.
+
 ## 0829 — current PPTX edit phases measured
 
 [0829](0829-pptx-edit-phase-profile.md) Fresh phase profiling completes without production changes: exact edit-owner samples total 2,670/2,685, with capture the largest bucket. The wrapper interval includes 1.0; frame pointers add about 2.375%. Four spread flags and one unclassified owner sample remain explicit. No wall-clock phase fraction, Amdahl estimate or new full-save speedup is claimed.

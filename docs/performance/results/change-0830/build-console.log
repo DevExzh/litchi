@@ -1,0 +1,7 @@
+build-ordinary 0
+nm-ordinary 0
+objdump-ordinary 0
+build-fp 0
+nm-fp 0
+objdump-fp 0
+build PASS

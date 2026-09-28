@@ -1,0 +1,115 @@
+{
+  "schema": "litchi.performance.0830.xlsx-edit-profile.v1",
+  "tool": "xlsx-edit-profile-0830",
+  "base_revision": "87eb57182be1622385dc3b28dfc3c7be868dca32",
+  "mode": "wrapped",
+  "timing_scope": "Workbook::open is outside the clock; Workbook::edit, sheet(\"Munka1\"), set(\"A1\", marker), commit, patch non-empty check, commit.into_workbook adoption, and the old Workbook drop at assignment are inside the clock; serialization, owner drop, hashing, and complete stored-cell semantic readback are outside the clock",
+  "input": {
+    "path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "bytes": 8435,
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+  },
+  "reference": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-001-xlsx/default.xlsx",
+    "bytes": 8521,
+    "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+  },
+  "output": {
+    "bytes": 8521,
+    "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+  },
+  "marker": "litchi-perf-0638-ordinary-save",
+  "target": {
+    "sheet": "Munka1",
+    "address": "A1"
+  },
+  "target_value": "litchi-perf-0638-ordinary-save",
+  "worksheet_count": 1,
+  "stored_cell_count": 8,
+  "semantic_sha256": "9c5bd593d7f62d01dda3c67ea7613a15f03d4b0135d03bfd1f61de6ed729f367",
+  "warmup": 0,
+  "samples_requested": 3,
+  "warmup_verified": true,
+  "all_verified": true,
+  "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+      722103,
+      475293,
+      311512
+    ],
+    "sample_order": [
+      0,
+      1,
+      2
+    ]
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 722103,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 475293,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 311512,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    }
+  ]
+}

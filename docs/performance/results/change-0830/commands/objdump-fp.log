@@ -1,0 +1,350 @@
+
+/home/zhuhe/code/litchi-target-0830/fp/release/xlsx-edit-profile-0830:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000058b2a0 <xlsx_edit_profile_0830::edit_region_0830>:
+  58b2a0:	55                   	push   %rbp
+  58b2a1:	48 89 e5             	mov    %rsp,%rbp
+  58b2a4:	41 57                	push   %r15
+  58b2a6:	41 56                	push   %r14
+  58b2a8:	41 54                	push   %r12
+  58b2aa:	53                   	push   %rbx
+  58b2ab:	48 81 ec 00 0a 00 00 	sub    $0xa00,%rsp
+  58b2b2:	4c 8b 37             	mov    (%rdi),%r14
+  58b2b5:	f0 49 ff 06          	lock incq (%r14)
+  58b2b9:	0f 8e 1f 06 00 00    	jle    58b8de <xlsx_edit_profile_0830::edit_region_0830+0x63e>
+  58b2bf:	48 89 fb             	mov    %rdi,%rbx
+  58b2c2:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b2c9:	4c 89 f6             	mov    %r14,%rsi
+  58b2cc:	e8 df 94 ec ff       	call   4547b0 <litchi_xlsx::workbook::edit::semantic::transaction::Edit::new>
+  58b2d1:	4c 8b bd 20 fc ff ff 	mov    -0x3e0(%rbp),%r15
+  58b2d8:	0f 10 85 28 fc ff ff 	movups -0x3d8(%rbp),%xmm0
+  58b2df:	0f 29 85 c0 f8 ff ff 	movaps %xmm0,-0x740(%rbp)
+  58b2e6:	0f 10 85 38 fc ff ff 	movups -0x3c8(%rbp),%xmm0
+  58b2ed:	0f 29 85 d0 f8 ff ff 	movaps %xmm0,-0x730(%rbp)
+  58b2f4:	0f 10 85 48 fc ff ff 	movups -0x3b8(%rbp),%xmm0
+  58b2fb:	0f 29 85 e0 f8 ff ff 	movaps %xmm0,-0x720(%rbp)
+  58b302:	0f 10 85 58 fc ff ff 	movups -0x3a8(%rbp),%xmm0
+  58b309:	0f 29 85 f0 f8 ff ff 	movaps %xmm0,-0x710(%rbp)
+  58b310:	48 8b 85 68 fc ff ff 	mov    -0x398(%rbp),%rax
+  58b317:	48 89 85 00 f9 ff ff 	mov    %rax,-0x700(%rbp)
+  58b31e:	49 83 ff 02          	cmp    $0x2,%r15
+  58b322:	0f 85 9f 00 00 00    	jne    58b3c7 <xlsx_edit_profile_0830::edit_region_0830+0x127>
+  58b328:	48 8b 85 00 f9 ff ff 	mov    -0x700(%rbp),%rax
+  58b32f:	48 89 85 60 fc ff ff 	mov    %rax,-0x3a0(%rbp)
+  58b336:	0f 28 85 c0 f8 ff ff 	movaps -0x740(%rbp),%xmm0
+  58b33d:	0f 28 8d d0 f8 ff ff 	movaps -0x730(%rbp),%xmm1
+  58b344:	0f 28 95 e0 f8 ff ff 	movaps -0x720(%rbp),%xmm2
+  58b34b:	0f 28 9d f0 f8 ff ff 	movaps -0x710(%rbp),%xmm3
+  58b352:	0f 29 9d 50 fc ff ff 	movaps %xmm3,-0x3b0(%rbp)
+  58b359:	0f 29 95 40 fc ff ff 	movaps %xmm2,-0x3c0(%rbp)
+  58b360:	0f 29 8d 30 fc ff ff 	movaps %xmm1,-0x3d0(%rbp)
+  58b367:	0f 29 85 20 fc ff ff 	movaps %xmm0,-0x3e0(%rbp)
+  58b36e:	bf 48 00 00 00       	mov    $0x48,%edi
+  58b373:	ff 15 47 6c 04 00    	call   *0x46c47(%rip)        # 5d1fc0 <malloc@GLIBC_2.2.5>
+  58b379:	48 85 c0             	test   %rax,%rax
+  58b37c:	0f 84 16 05 00 00    	je     58b898 <xlsx_edit_profile_0830::edit_region_0830+0x5f8>
+  58b382:	48 89 c3             	mov    %rax,%rbx
+  58b385:	48 8b 85 00 f9 ff ff 	mov    -0x700(%rbp),%rax
+  58b38c:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  58b390:	0f 28 85 c0 f8 ff ff 	movaps -0x740(%rbp),%xmm0
+  58b397:	0f 28 8d d0 f8 ff ff 	movaps -0x730(%rbp),%xmm1
+  58b39e:	0f 28 95 e0 f8 ff ff 	movaps -0x720(%rbp),%xmm2
+  58b3a5:	0f 28 9d f0 f8 ff ff 	movaps -0x710(%rbp),%xmm3
+  58b3ac:	0f 11 5b 30          	movups %xmm3,0x30(%rbx)
+  58b3b0:	0f 11 53 20          	movups %xmm2,0x20(%rbx)
+  58b3b4:	0f 11 4b 10          	movups %xmm1,0x10(%rbx)
+  58b3b8:	0f 11 03             	movups %xmm0,(%rbx)
+  58b3bb:	4c 8d 35 4e 35 04 00 	lea    0x4354e(%rip),%r14        # 5ce910 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.6956743042218978285+0x740>
+  58b3c2:	e9 74 03 00 00       	jmp    58b73b <xlsx_edit_profile_0830::edit_region_0830+0x49b>
+  58b3c7:	48 8d b5 70 fc ff ff 	lea    -0x390(%rbp),%rsi
+  58b3ce:	48 8d bd a0 f7 ff ff 	lea    -0x860(%rbp),%rdi
+  58b3d5:	ba 20 01 00 00       	mov    $0x120,%edx
+  58b3da:	ff 15 a8 6b 04 00    	call   *0x46ba8(%rip)        # 5d1f88 <memcpy@GLIBC_2.14>
+  58b3e0:	0f 28 85 c0 f8 ff ff 	movaps -0x740(%rbp),%xmm0
+  58b3e7:	0f 28 8d d0 f8 ff ff 	movaps -0x730(%rbp),%xmm1
+  58b3ee:	0f 28 95 e0 f8 ff ff 	movaps -0x720(%rbp),%xmm2
+  58b3f5:	0f 28 9d f0 f8 ff ff 	movaps -0x710(%rbp),%xmm3
+  58b3fc:	0f 11 85 58 f7 ff ff 	movups %xmm0,-0x8a8(%rbp)
+  58b403:	0f 11 8d 68 f7 ff ff 	movups %xmm1,-0x898(%rbp)
+  58b40a:	0f 11 95 78 f7 ff ff 	movups %xmm2,-0x888(%rbp)
+  58b411:	0f 11 9d 88 f7 ff ff 	movups %xmm3,-0x878(%rbp)
+  58b418:	48 8b 85 00 f9 ff ff 	mov    -0x700(%rbp),%rax
+  58b41f:	48 89 85 98 f7 ff ff 	mov    %rax,-0x868(%rbp)
+  58b426:	4c 89 bd 50 f7 ff ff 	mov    %r15,-0x8b0(%rbp)
+  58b42d:	48 8d bd c0 f8 ff ff 	lea    -0x740(%rbp),%rdi
+  58b434:	48 8d b5 50 f7 ff ff 	lea    -0x8b0(%rbp),%rsi
+  58b43b:	e8 80 95 ff ff       	call   5849c0 <litchi_xlsx::workbook::edit::semantic::transaction::Edit::sheet>
+  58b440:	0f b6 85 c0 f8 ff ff 	movzbl -0x740(%rbp),%eax
+  58b447:	3c 25                	cmp    $0x25,%al
+  58b449:	0f 85 2f 01 00 00    	jne    58b57e <xlsx_edit_profile_0830::edit_region_0830+0x2de>
+  58b44f:	48 8b 85 c8 f8 ff ff 	mov    -0x738(%rbp),%rax
+  58b456:	48 85 c0             	test   %rax,%rax
+  58b459:	0f 84 9e 01 00 00    	je     58b5fd <xlsx_edit_profile_0830::edit_region_0830+0x35d>
+  58b45f:	48 8b 8d d0 f8 ff ff 	mov    -0x730(%rbp),%rcx
+  58b466:	48 89 85 e0 f5 ff ff 	mov    %rax,-0xa20(%rbp)
+  58b46d:	48 89 8d e8 f5 ff ff 	mov    %rcx,-0xa18(%rbp)
+  58b474:	48 8d bd c0 f8 ff ff 	lea    -0x740(%rbp),%rdi
+  58b47b:	48 8d b5 e0 f5 ff ff 	lea    -0xa20(%rbp),%rsi
+  58b482:	e8 e9 97 ff ff       	call   584c70 <litchi_xlsx::workbook::edit::semantic::worksheet::WorksheetEdit::set>
+  58b487:	0f b6 85 c0 f8 ff ff 	movzbl -0x740(%rbp),%eax
+  58b48e:	3c 25                	cmp    $0x25,%al
+  58b490:	0f 85 e1 01 00 00    	jne    58b677 <xlsx_edit_profile_0830::edit_region_0830+0x3d7>
+  58b496:	49 bc 01 00 00 00 00 	movabs $0x8000000000000001,%r12
+  58b49d:	00 00 80 
+  58b4a0:	4c 8d bd e0 f5 ff ff 	lea    -0xa20(%rbp),%r15
+  58b4a7:	48 8d b5 50 f7 ff ff 	lea    -0x8b0(%rbp),%rsi
+  58b4ae:	ba 70 01 00 00       	mov    $0x170,%edx
+  58b4b3:	4c 89 ff             	mov    %r15,%rdi
+  58b4b6:	ff 15 cc 6a 04 00    	call   *0x46acc(%rip)        # 5d1f88 <memcpy@GLIBC_2.14>
+  58b4bc:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b4c3:	4c 89 fe             	mov    %r15,%rsi
+  58b4c6:	ff 15 5c 85 04 00    	call   *0x4855c(%rip)        # 5d3a28 <_DYNAMIC+0x1cc8>
+  58b4cc:	4c 8b bd 20 fc ff ff 	mov    -0x3e0(%rbp),%r15
+  58b4d3:	0f 10 85 28 fc ff ff 	movups -0x3d8(%rbp),%xmm0
+  58b4da:	0f 29 45 80          	movaps %xmm0,-0x80(%rbp)
+  58b4de:	0f 10 85 38 fc ff ff 	movups -0x3c8(%rbp),%xmm0
+  58b4e5:	0f 29 45 90          	movaps %xmm0,-0x70(%rbp)
+  58b4e9:	0f 10 85 48 fc ff ff 	movups -0x3b8(%rbp),%xmm0
+  58b4f0:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  58b4f4:	0f 10 85 58 fc ff ff 	movups -0x3a8(%rbp),%xmm0
+  58b4fb:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  58b4ff:	48 8b 85 68 fc ff ff 	mov    -0x398(%rbp),%rax
+  58b506:	48 89 45 c0          	mov    %rax,-0x40(%rbp)
+  58b50a:	4d 39 e7             	cmp    %r12,%r15
+  58b50d:	0f 85 5a 02 00 00    	jne    58b76d <xlsx_edit_profile_0830::edit_region_0830+0x4cd>
+  58b513:	48 8b 45 c0          	mov    -0x40(%rbp),%rax
+  58b517:	48 89 85 60 fc ff ff 	mov    %rax,-0x3a0(%rbp)
+  58b51e:	0f 28 45 80          	movaps -0x80(%rbp),%xmm0
+  58b522:	0f 28 4d 90          	movaps -0x70(%rbp),%xmm1
+  58b526:	0f 28 55 a0          	movaps -0x60(%rbp),%xmm2
+  58b52a:	0f 28 5d b0          	movaps -0x50(%rbp),%xmm3
+  58b52e:	0f 29 9d 50 fc ff ff 	movaps %xmm3,-0x3b0(%rbp)
+  58b535:	0f 29 95 40 fc ff ff 	movaps %xmm2,-0x3c0(%rbp)
+  58b53c:	0f 29 8d 30 fc ff ff 	movaps %xmm1,-0x3d0(%rbp)
+  58b543:	0f 29 85 20 fc ff ff 	movaps %xmm0,-0x3e0(%rbp)
+  58b54a:	bf 48 00 00 00       	mov    $0x48,%edi
+  58b54f:	ff 15 6b 6a 04 00    	call   *0x46a6b(%rip)        # 5d1fc0 <malloc@GLIBC_2.2.5>
+  58b555:	48 85 c0             	test   %rax,%rax
+  58b558:	0f 84 70 03 00 00    	je     58b8ce <xlsx_edit_profile_0830::edit_region_0830+0x62e>
+  58b55e:	48 89 c3             	mov    %rax,%rbx
+  58b561:	48 8b 45 c0          	mov    -0x40(%rbp),%rax
+  58b565:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  58b569:	0f 28 45 80          	movaps -0x80(%rbp),%xmm0
+  58b56d:	0f 28 4d 90          	movaps -0x70(%rbp),%xmm1
+  58b571:	0f 28 55 a0          	movaps -0x60(%rbp),%xmm2
+  58b575:	0f 28 5d b0          	movaps -0x50(%rbp),%xmm3
+  58b579:	e9 2e fe ff ff       	jmp    58b3ac <xlsx_edit_profile_0830::edit_region_0830+0x10c>
+  58b57e:	8b 8d c1 f8 ff ff    	mov    -0x73f(%rbp),%ecx
+  58b584:	8b 95 c4 f8 ff ff    	mov    -0x73c(%rbp),%edx
+  58b58a:	89 95 24 fc ff ff    	mov    %edx,-0x3dc(%rbp)
+  58b590:	89 8d 21 fc ff ff    	mov    %ecx,-0x3df(%rbp)
+  58b596:	0f 10 85 c8 f8 ff ff 	movups -0x738(%rbp),%xmm0
+  58b59d:	0f 10 8d d8 f8 ff ff 	movups -0x728(%rbp),%xmm1
+  58b5a4:	0f 11 8d 38 fc ff ff 	movups %xmm1,-0x3c8(%rbp)
+  58b5ab:	0f 10 8d e8 f8 ff ff 	movups -0x718(%rbp),%xmm1
+  58b5b2:	0f 11 8d 48 fc ff ff 	movups %xmm1,-0x3b8(%rbp)
+  58b5b9:	0f 10 8d f8 f8 ff ff 	movups -0x708(%rbp),%xmm1
+  58b5c0:	0f 11 8d 58 fc ff ff 	movups %xmm1,-0x3a8(%rbp)
+  58b5c7:	88 85 20 fc ff ff    	mov    %al,-0x3e0(%rbp)
+  58b5cd:	0f 11 85 28 fc ff ff 	movups %xmm0,-0x3d8(%rbp)
+  58b5d4:	bf 48 00 00 00       	mov    $0x48,%edi
+  58b5d9:	ff 15 e1 69 04 00    	call   *0x469e1(%rip)        # 5d1fc0 <malloc@GLIBC_2.2.5>
+  58b5df:	48 85 c0             	test   %rax,%rax
+  58b5e2:	0f 85 07 01 00 00    	jne    58b6ef <xlsx_edit_profile_0830::edit_region_0830+0x44f>
+  58b5e8:	bf 08 00 00 00       	mov    $0x8,%edi
+  58b5ed:	be 48 00 00 00       	mov    $0x48,%esi
+  58b5f2:	ff 15 f8 69 04 00    	call   *0x469f8(%rip)        # 5d1ff0 <_DYNAMIC+0x290>
+  58b5f8:	e9 e1 02 00 00       	jmp    58b8de <xlsx_edit_profile_0830::edit_region_0830+0x63e>
+  58b5fd:	48 8d 05 64 33 04 00 	lea    0x43364(%rip),%rax        # 5ce968 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.6956743042218978285+0x798>
+  58b604:	48 89 85 c0 f8 ff ff 	mov    %rax,-0x740(%rbp)
+  58b60b:	48 8d 05 1e 98 00 00 	lea    0x981e(%rip),%rax        # 594e30 <<&T as core::fmt::Debug>::fmt>
+  58b612:	48 89 85 c8 f8 ff ff 	mov    %rax,-0x738(%rbp)
+  58b619:	48 8d 35 47 e5 a8 ff 	lea    -0x571ab9(%rip),%rsi        # 19b67 <anon.ffd5d0e83a3b19fdbe6e6746df1065cb.49.llvm.8416246378183695742+0x47d>
+  58b620:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b627:	48 8d 95 c0 f8 ff ff 	lea    -0x740(%rbp),%rdx
+  58b62e:	ff 15 f4 69 04 00    	call   *0x469f4(%rip)        # 5d2028 <_DYNAMIC+0x2c8>
+  58b634:	4c 8b a5 20 fc ff ff 	mov    -0x3e0(%rbp),%r12
+  58b63b:	4c 8b bd 28 fc ff ff 	mov    -0x3d8(%rbp),%r15
+  58b642:	4c 8b b5 30 fc ff ff 	mov    -0x3d0(%rbp),%r14
+  58b649:	bf 18 00 00 00       	mov    $0x18,%edi
+  58b64e:	ff 15 6c 69 04 00    	call   *0x4696c(%rip)        # 5d1fc0 <malloc@GLIBC_2.2.5>
+  58b654:	48 85 c0             	test   %rax,%rax
+  58b657:	0f 84 4d 02 00 00    	je     58b8aa <xlsx_edit_profile_0830::edit_region_0830+0x60a>
+  58b65d:	48 89 c3             	mov    %rax,%rbx
+  58b660:	4c 89 20             	mov    %r12,(%rax)
+  58b663:	4c 89 78 08          	mov    %r15,0x8(%rax)
+  58b667:	4c 89 70 10          	mov    %r14,0x10(%rax)
+  58b66b:	4c 8d 35 76 72 03 00 	lea    0x37276(%rip),%r14        # 5c28e8 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+  58b672:	e9 b8 00 00 00       	jmp    58b72f <xlsx_edit_profile_0830::edit_region_0830+0x48f>
+  58b677:	8b 8d c1 f8 ff ff    	mov    -0x73f(%rbp),%ecx
+  58b67d:	8b 95 c4 f8 ff ff    	mov    -0x73c(%rbp),%edx
+  58b683:	89 95 24 fc ff ff    	mov    %edx,-0x3dc(%rbp)
+  58b689:	89 8d 21 fc ff ff    	mov    %ecx,-0x3df(%rbp)
+  58b68f:	48 8b 8d c8 f8 ff ff 	mov    -0x738(%rbp),%rcx
+  58b696:	0f 10 85 d0 f8 ff ff 	movups -0x730(%rbp),%xmm0
+  58b69d:	0f 11 85 30 fc ff ff 	movups %xmm0,-0x3d0(%rbp)
+  58b6a4:	0f 10 85 e0 f8 ff ff 	movups -0x720(%rbp),%xmm0
+  58b6ab:	0f 11 85 40 fc ff ff 	movups %xmm0,-0x3c0(%rbp)
+  58b6b2:	0f 10 85 f0 f8 ff ff 	movups -0x710(%rbp),%xmm0
+  58b6b9:	0f 11 85 50 fc ff ff 	movups %xmm0,-0x3b0(%rbp)
+  58b6c0:	48 8b 95 00 f9 ff ff 	mov    -0x700(%rbp),%rdx
+  58b6c7:	48 89 95 60 fc ff ff 	mov    %rdx,-0x3a0(%rbp)
+  58b6ce:	88 85 20 fc ff ff    	mov    %al,-0x3e0(%rbp)
+  58b6d4:	48 89 8d 28 fc ff ff 	mov    %rcx,-0x3d8(%rbp)
+  58b6db:	bf 48 00 00 00       	mov    $0x48,%edi
+  58b6e0:	ff 15 da 68 04 00    	call   *0x468da(%rip)        # 5d1fc0 <malloc@GLIBC_2.2.5>
+  58b6e6:	48 85 c0             	test   %rax,%rax
+  58b6e9:	0f 84 cd 01 00 00    	je     58b8bc <xlsx_edit_profile_0830::edit_region_0830+0x61c>
+  58b6ef:	48 89 c3             	mov    %rax,%rbx
+  58b6f2:	48 8b 85 60 fc ff ff 	mov    -0x3a0(%rbp),%rax
+  58b6f9:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  58b6fd:	0f 10 85 20 fc ff ff 	movups -0x3e0(%rbp),%xmm0
+  58b704:	0f 10 8d 30 fc ff ff 	movups -0x3d0(%rbp),%xmm1
+  58b70b:	0f 10 95 40 fc ff ff 	movups -0x3c0(%rbp),%xmm2
+  58b712:	0f 10 9d 50 fc ff ff 	movups -0x3b0(%rbp),%xmm3
+  58b719:	0f 11 5b 30          	movups %xmm3,0x30(%rbx)
+  58b71d:	0f 11 53 20          	movups %xmm2,0x20(%rbx)
+  58b721:	0f 11 4b 10          	movups %xmm1,0x10(%rbx)
+  58b725:	0f 11 03             	movups %xmm0,(%rbx)
+  58b728:	4c 8d 35 e1 31 04 00 	lea    0x431e1(%rip),%r14        # 5ce910 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.6956743042218978285+0x740>
+  58b72f:	48 8d bd 50 f7 ff ff 	lea    -0x8b0(%rbp),%rdi
+  58b736:	e8 45 18 01 00       	call   59cf80 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::semantic::transaction::Edit>>
+  58b73b:	48 89 5d d0          	mov    %rbx,-0x30(%rbp)
+  58b73f:	4c 89 75 d8          	mov    %r14,-0x28(%rbp)
+  58b743:	48 8d 45 d0          	lea    -0x30(%rbp),%rax
+  58b747:	48 89 85 20 fc ff ff 	mov    %rax,-0x3e0(%rbp)
+  58b74e:	48 8d 85 20 fc ff ff 	lea    -0x3e0(%rbp),%rax
+  58b755:	48 8b 45 d0          	mov    -0x30(%rbp),%rax
+  58b759:	48 8b 55 d8          	mov    -0x28(%rbp),%rdx
+  58b75d:	48 81 c4 00 0a 00 00 	add    $0xa00,%rsp
+  58b764:	5b                   	pop    %rbx
+  58b765:	41 5c                	pop    %r12
+  58b767:	41 5e                	pop    %r14
+  58b769:	41 5f                	pop    %r15
+  58b76b:	5d                   	pop    %rbp
+  58b76c:	c3                   	ret
+  58b76d:	48 8d b5 70 fc ff ff 	lea    -0x390(%rbp),%rsi
+  58b774:	48 8d bd 10 f9 ff ff 	lea    -0x6f0(%rbp),%rdi
+  58b77b:	ba 10 03 00 00       	mov    $0x310,%edx
+  58b780:	ff 15 02 68 04 00    	call   *0x46802(%rip)        # 5d1f88 <memcpy@GLIBC_2.14>
+  58b786:	0f 28 45 80          	movaps -0x80(%rbp),%xmm0
+  58b78a:	0f 28 4d 90          	movaps -0x70(%rbp),%xmm1
+  58b78e:	0f 28 55 a0          	movaps -0x60(%rbp),%xmm2
+  58b792:	0f 28 5d b0          	movaps -0x50(%rbp),%xmm3
+  58b796:	0f 11 85 c8 f8 ff ff 	movups %xmm0,-0x738(%rbp)
+  58b79d:	0f 11 8d d8 f8 ff ff 	movups %xmm1,-0x728(%rbp)
+  58b7a4:	0f 11 95 e8 f8 ff ff 	movups %xmm2,-0x718(%rbp)
+  58b7ab:	0f 11 9d f8 f8 ff ff 	movups %xmm3,-0x708(%rbp)
+  58b7b2:	48 8b 45 c0          	mov    -0x40(%rbp),%rax
+  58b7b6:	48 89 85 08 f9 ff ff 	mov    %rax,-0x6f8(%rbp)
+  58b7bd:	4c 89 bd c0 f8 ff ff 	mov    %r15,-0x740(%rbp)
+  58b7c4:	49 8d 44 24 ff       	lea    -0x1(%r12),%rax
+  58b7c9:	49 39 c7             	cmp    %rax,%r15
+  58b7cc:	0f 85 82 00 00 00    	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b7d2:	48 83 bd 80 fb ff ff 	cmpq   $0x0,-0x480(%rbp)
+  58b7d9:	00 
+  58b7da:	75 78                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b7dc:	48 83 bd 90 fb ff ff 	cmpq   $0x0,-0x470(%rbp)
+  58b7e3:	00 
+  58b7e4:	75 6e                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b7e6:	48 83 bd a0 fb ff ff 	cmpq   $0x0,-0x460(%rbp)
+  58b7ed:	00 
+  58b7ee:	75 64                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b7f0:	48 83 bd b0 fb ff ff 	cmpq   $0x0,-0x450(%rbp)
+  58b7f7:	00 
+  58b7f8:	75 5a                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b7fa:	48 83 bd c0 fb ff ff 	cmpq   $0x0,-0x440(%rbp)
+  58b801:	00 
+  58b802:	75 50                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b804:	48 83 bd d0 fb ff ff 	cmpq   $0x0,-0x430(%rbp)
+  58b80b:	00 
+  58b80c:	75 46                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b80e:	4c 39 a5 60 f9 ff ff 	cmp    %r12,-0x6a0(%rbp)
+  58b815:	75 3d                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b817:	48 83 bd e0 fb ff ff 	cmpq   $0x0,-0x420(%rbp)
+  58b81e:	00 
+  58b81f:	75 33                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b821:	48 83 bd f0 fb ff ff 	cmpq   $0x0,-0x410(%rbp)
+  58b828:	00 
+  58b829:	75 29                	jne    58b854 <xlsx_edit_profile_0830::edit_region_0830+0x5b4>
+  58b82b:	48 8d 3d fe 1e aa ff 	lea    -0x55e102(%rip),%rdi        # 2d730 <anon.58baeeae7d5fe476157d296c9f08f803.400.llvm.5844774155465566772+0x4ab>
+  58b832:	be 20 00 00 00       	mov    $0x20,%esi
+  58b837:	ff 15 5b 68 04 00    	call   *0x4685b(%rip)        # 5d2098 <_DYNAMIC+0x338>
+  58b83d:	48 89 c3             	mov    %rax,%rbx
+  58b840:	49 89 d6             	mov    %rdx,%r14
+  58b843:	48 8d bd c0 f8 ff ff 	lea    -0x740(%rbp),%rdi
+  58b84a:	e8 81 fe 00 00       	call   59b6d0 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Commit>>
+  58b84f:	e9 e7 fe ff ff       	jmp    58b73b <xlsx_edit_profile_0830::edit_region_0830+0x49b>
+  58b854:	4c 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%r15
+  58b85b:	48 8d b5 c0 f8 ff ff 	lea    -0x740(%rbp),%rsi
+  58b862:	ba 60 03 00 00       	mov    $0x360,%edx
+  58b867:	4c 89 ff             	mov    %r15,%rdi
+  58b86a:	ff 15 18 67 04 00    	call   *0x46718(%rip)        # 5d1f88 <memcpy@GLIBC_2.14>
+  58b870:	4c 8b a5 78 ff ff ff 	mov    -0x88(%rbp),%r12
+  58b877:	4c 89 ff             	mov    %r15,%rdi
+  58b87a:	e8 81 ea f0 ff       	call   49a300 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Patch>>
+  58b87f:	f0 49 ff 0e          	lock decq (%r14)
+  58b883:	75 09                	jne    58b88e <xlsx_edit_profile_0830::edit_region_0830+0x5ee>
+  58b885:	48 89 df             	mov    %rbx,%rdi
+  58b888:	ff 15 4a 81 04 00    	call   *0x4814a(%rip)        # 5d39d8 <_DYNAMIC+0x1c78>
+  58b88e:	4c 89 23             	mov    %r12,(%rbx)
+  58b891:	31 db                	xor    %ebx,%ebx
+  58b893:	e9 a3 fe ff ff       	jmp    58b73b <xlsx_edit_profile_0830::edit_region_0830+0x49b>
+  58b898:	bf 08 00 00 00       	mov    $0x8,%edi
+  58b89d:	be 48 00 00 00       	mov    $0x48,%esi
+  58b8a2:	ff 15 48 67 04 00    	call   *0x46748(%rip)        # 5d1ff0 <_DYNAMIC+0x290>
+  58b8a8:	eb 34                	jmp    58b8de <xlsx_edit_profile_0830::edit_region_0830+0x63e>
+  58b8aa:	bf 08 00 00 00       	mov    $0x8,%edi
+  58b8af:	be 18 00 00 00       	mov    $0x18,%esi
+  58b8b4:	ff 15 36 67 04 00    	call   *0x46736(%rip)        # 5d1ff0 <_DYNAMIC+0x290>
+  58b8ba:	eb 22                	jmp    58b8de <xlsx_edit_profile_0830::edit_region_0830+0x63e>
+  58b8bc:	bf 08 00 00 00       	mov    $0x8,%edi
+  58b8c1:	be 48 00 00 00       	mov    $0x48,%esi
+  58b8c6:	ff 15 24 67 04 00    	call   *0x46724(%rip)        # 5d1ff0 <_DYNAMIC+0x290>
+  58b8cc:	eb 10                	jmp    58b8de <xlsx_edit_profile_0830::edit_region_0830+0x63e>
+  58b8ce:	bf 08 00 00 00       	mov    $0x8,%edi
+  58b8d3:	be 48 00 00 00       	mov    $0x48,%esi
+  58b8d8:	ff 15 12 67 04 00    	call   *0x46712(%rip)        # 5d1ff0 <_DYNAMIC+0x290>
+  58b8de:	0f 0b                	ud2
+  58b8e0:	4c 89 23             	mov    %r12,(%rbx)
+  58b8e3:	48 89 c7             	mov    %rax,%rdi
+  58b8e6:	e8 95 5e 03 00       	call   5c1780 <_Unwind_Resume@plt>
+  58b8eb:	49 89 c6             	mov    %rax,%r14
+  58b8ee:	48 8d bd c0 f8 ff ff 	lea    -0x740(%rbp),%rdi
+  58b8f5:	e8 d6 fd 00 00       	call   59b6d0 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Commit>>
+  58b8fa:	eb 7e                	jmp    58b97a <xlsx_edit_profile_0830::edit_region_0830+0x6da>
+  58b8fc:	49 89 c6             	mov    %rax,%r14
+  58b8ff:	eb 50                	jmp    58b951 <xlsx_edit_profile_0830::edit_region_0830+0x6b1>
+  58b901:	49 89 c6             	mov    %rax,%r14
+  58b904:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b90b:	e8 e0 e3 00 00       	call   599cf0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  58b910:	eb 68                	jmp    58b97a <xlsx_edit_profile_0830::edit_region_0830+0x6da>
+  58b912:	ff 15 08 6a 04 00    	call   *0x46a08(%rip)        # 5d2320 <_DYNAMIC+0x5c0>
+  58b918:	49 89 c6             	mov    %rax,%r14
+  58b91b:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b922:	e8 c9 e3 00 00       	call   599cf0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  58b927:	eb 28                	jmp    58b951 <xlsx_edit_profile_0830::edit_region_0830+0x6b1>
+  58b929:	ff 15 f1 69 04 00    	call   *0x469f1(%rip)        # 5d2320 <_DYNAMIC+0x5c0>
+  58b92f:	49 89 c6             	mov    %rax,%r14
+  58b932:	4d 85 e4             	test   %r12,%r12
+  58b935:	74 1a                	je     58b951 <xlsx_edit_profile_0830::edit_region_0830+0x6b1>
+  58b937:	4c 89 ff             	mov    %r15,%rdi
+  58b93a:	ff 15 60 66 04 00    	call   *0x46660(%rip)        # 5d1fa0 <free@GLIBC_2.2.5>
+  58b940:	eb 0f                	jmp    58b951 <xlsx_edit_profile_0830::edit_region_0830+0x6b1>
+  58b942:	49 89 c6             	mov    %rax,%r14
+  58b945:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b94c:	e8 9f e3 00 00       	call   599cf0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  58b951:	48 8d bd 50 f7 ff ff 	lea    -0x8b0(%rbp),%rdi
+  58b958:	e8 23 16 01 00       	call   59cf80 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::semantic::transaction::Edit>>
+  58b95d:	eb 1b                	jmp    58b97a <xlsx_edit_profile_0830::edit_region_0830+0x6da>
+  58b95f:	ff 15 bb 69 04 00    	call   *0x469bb(%rip)        # 5d2320 <_DYNAMIC+0x5c0>
+  58b965:	ff 15 b5 69 04 00    	call   *0x469b5(%rip)        # 5d2320 <_DYNAMIC+0x5c0>
+  58b96b:	49 89 c6             	mov    %rax,%r14
+  58b96e:	48 8d bd 20 fc ff ff 	lea    -0x3e0(%rbp),%rdi
+  58b975:	e8 76 e3 00 00       	call   599cf0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  58b97a:	4c 89 f7             	mov    %r14,%rdi
+  58b97d:	e8 fe 5d 03 00       	call   5c1780 <_Unwind_Resume@plt>
+  58b982:	ff 15 98 69 04 00    	call   *0x46998(%rip)        # 5d2320 <_DYNAMIC+0x5c0>

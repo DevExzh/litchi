@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0830 — XLSX edit allocation maps localized
+
+[0830](0830-xlsx-edit-allocation-profile.md) Fresh controls complete 23 reports / 559 measured samples. Ordinary/direct edit p50 is 0.284002 ms. Both instrumentation p50 intervals include 1.0; ten spread flags and three tail flags remain visible. Two Heaptrack captures each attribute 12,550 calls / 14,491,270 requested bytes to five public edits. No production improvement is claimed.
+
 ## 0829 — current PPTX edit phases measured
 
 [0829](0829-pptx-edit-phase-profile.md) Fresh current-source controls complete 23 reports / 4,549 samples. Ordinary/direct edit p50 is 1.270951 ms; wrapped/direct ratio is 1.000715 [0.996008–1.003981], and frame-pointer/wrapped is 1.023752 [1.020221–1.027284]. Independent replay passes. These are instrumentation controls, with no production speedup claim.

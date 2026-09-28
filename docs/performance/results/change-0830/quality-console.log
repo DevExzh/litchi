@@ -1,0 +1,6 @@
+quality-fmt 0
+quality-check 0
+quality-test 0
+quality-clippy 0
+quality-doc 0
+quality PASS

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0830 — XLSX edit allocation maps localized
+
+[0830](0830-xlsx-edit-allocation-profile.md) Five fresh probe gates, both builds, all captures and independent allocation/native arithmetic audits pass. The measured next candidate is an unused 512 KiB column-action map; production remains unchanged. Reader failures and retries remain retained, the owned target is cleaned, and the broader non-iWork goal remains open.
+
 ## 0829 — current PPTX edit phases measured
 
 [0829](0829-pptx-edit-phase-profile.md) Corrected address-bounded symbol admission and independent preflight resolve the 0828 capture blocker. Five fresh probe gates, both builds, all captures and independent numerical/frame replay pass. Phase costs remain descriptive samples; no optimization is adopted and the broader performance objective remains open.

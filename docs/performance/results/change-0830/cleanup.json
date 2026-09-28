@@ -1,0 +1,18 @@
+{
+  "binaries": {
+    "fp": {
+      "bytes": 35299472,
+      "path": "/home/zhuhe/code/litchi-target-0830/fp/release/xlsx-edit-profile-0830",
+      "sha256": "3be8986030a72f0f880ae436b9be40adfbfdbe40c463b453dd438a5d5ee3d361"
+    },
+    "ordinary": {
+      "bytes": 35439392,
+      "path": "/home/zhuhe/code/litchi-target-0830/ordinary/release/xlsx-edit-profile-0830",
+      "sha256": "b94b3be7677900ca6396e758b0e74ec30f8bbb63841a2566d1877cf217db48f1"
+    }
+  },
+  "removed_bytes": 2861187648,
+  "removed_files": 3968,
+  "status": "pass",
+  "target": "/home/zhuhe/code/litchi-target-0830"
+}
