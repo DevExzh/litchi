@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0824 — exact-root compaction proof adopted
+
+[0824](0824-pptx-outer-whitespace-compaction.md) Fresh matched real-file edit p50 changes 1.436052→1.286512 ms; paired ratio 0.895935 [0.892216–0.899349], a 10.407% improvement. Allocations fall 7,682→7,384 calls. The 342-report/7,106-sample record retains all nineteen rows, including 3.636% slower large capture; no full-save or tail benefit is claimed.
+
 ## 0823 — Scene transport trial rejected
 
 [0823](0823-pptx-scene-reader-workflow.md) Fresh paired trial: real edit ratio 0.976062 (95% interval 0.974798–0.984336); no eligible row reaches the frozen 3% benefit gate. All nineteen allocation rows are unchanged. Baseline production remains authoritative; 342 admitted reports/7,106 samples are retained.

@@ -1,0 +1,23 @@
+{
+  "after": {
+    "docs/performance/results/change-0824/candidate/after/transaction.rs": "6fbb903269a6a8855e7ecda2934df592eae1101a8c7a2c0cca3598a26529cf11",
+    "docs/performance/results/change-0824/candidate/after/xml.rs": "1a2c5e1f3858bae7e5a21f3c25a9bbd4838bb68079a16835e7d45d8522f57849"
+  },
+  "before": {
+    "docs/performance/results/change-0824/candidate/after/transaction.rs": "6fbb903269a6a8855e7ecda2934df592eae1101a8c7a2c0cca3598a26529cf11",
+    "docs/performance/results/change-0824/candidate/after/xml.rs": "1a2c5e1f3858bae7e5a21f3c25a9bbd4838bb68079a16835e7d45d8522f57849"
+  },
+  "command": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config-path",
+    "/home/zhuhe/code/litchi/rustfmt.toml",
+    "docs/performance/results/change-0824/candidate/after/transaction.rs",
+    "docs/performance/results/change-0824/candidate/after/xml.rs"
+  ],
+  "ended": 1790614804.909736,
+  "exit_code": 0,
+  "reason": "Move new test module after production items to satisfy strict Clippy.",
+  "started": 1790614804.867468
+}

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0824 — outer-whitespace compaction no longer reparses an identical root
+
+[0824](0824-pptx-outer-whitespace-compaction.md) Exact complete-root and outside non-text byte equality removes two redundant Scene reads on the staged real-file path. Real edit improves 10.407% and saves 298 allocation calls/21,688 bytes. Required fingerprint work and final capture remain. Large synthetic capture slows 3.636%; its cause is not assigned to this untimed compaction branch.
+
 ## 0823 — removing Scene event transport is insufficient
 
 [0823](0823-pptx-scene-reader-workflow.md) The exact Scene symbol loses its direct NsReader::process_event call but grows 10,276→11,485 bytes. Real edit improves 2.394%; all eligible synthetic gains remain below 3%. Reject this spelling and investigate repeated Scene construction/compaction under existing preservation and bounded-cache contracts.

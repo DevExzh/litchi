@@ -1,0 +1,22 @@
+{
+  "cargo_lock_changes": "No lockfile generation or update is permitted during this trial.",
+  "probe_locks": {
+    "real": {
+      "path": "real-probe-src/Cargo.lock",
+      "sha256": "b709bca72e65d4f0da1f016e672cc6b940a882ed1ed759970699b51b0edf8058"
+    },
+    "synthetic": {
+      "path": "synthetic-probe-src/Cargo.lock",
+      "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+    }
+  },
+  "root_lock": {
+    "path": "inputs/root-Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.performance.0824.lock-parity.v1",
+  "tool_lock": {
+    "path": "inputs/tool-Cargo.lock",
+    "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+  }
+}

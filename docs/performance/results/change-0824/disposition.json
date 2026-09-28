@@ -1,0 +1,18 @@
+{
+  "allocation_resource_violations": 0,
+  "analysis_sha256": "792bdab30cad733624ce6dc4c6742bc4cd1e680bdcdf8b77d6e3409ab9a16077",
+  "benefit_satisfied": true,
+  "decision": "adopt",
+  "latency_vetoes": 0,
+  "limitations": [
+    "One admitted real PPTX file and six fixed synthetic fixtures on one host.",
+    "Warm state; real timed region excludes open, serialization, readback, package destruction and fsync.",
+    "Several capture controls and synthetic workflows slow down; their causes are not attributed to the compaction shortcut.",
+    "Thirteen rows have p99 process spread above 5%; no tail benefit is claimed."
+  ],
+  "quality_recovery": "Original after-0 failure retained in pre-repair-0 and quality-after-0. Only a new cold-path test expectation changed from zero to one read; fresh baseline freeze/build/qualification and complete candidate quality preceded all comparative captures.",
+  "reason": "Real/direct paired p50 ratio 0.8959345405356571, CI95 [0.8922160716469381, 0.8993489851185047], qualifies under frozen 3% rule. All 19 rows pass latency/allocation guards. Synthetic slowdowns remain visible; large capture is +3.636%, below the 5% lower-bound veto. No broad synthetic or tail benefit is claimed. Initial/final validation, bytes, and resource limits are unchanged.",
+  "rss_review": "No paired RSS review threshold was triggered. Seven native rows have process RSS spread above 5%; no RSS saving is claimed.",
+  "schema": "litchi.performance.0824.disposition.v1",
+  "selected_archive": "after"
+}

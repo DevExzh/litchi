@@ -1,0 +1,509 @@
+--- a/crates/litchi-pptx/src/opened/transaction.rs
++++ b/crates/litchi-pptx/src/opened/transaction.rs
+@@ -1384,22 +1384,49 @@
+         } else {
+             Some(compaction_scene(after.blob())?)
+         };
+-        let compact = super::xml::compact_changed_slide_xml(after.blob())?;
+-        // Compaction that reproduces the staged bytes exactly reads back as
+-        // the scene read from those bytes; only different bytes are read
+-        // again and compared.
+-        if compact.as_slice() != after_blob {
+-            let expected = match expected {
+-                Some(expected) => expected,
+-                None => compaction_scene(after.blob())?,
+-            };
+-            if compaction_scene(&compact)? != expected {
+-                return Err(invalid(
+-                    "opened-presentation slide compaction changed shape semantics",
+-                ));
++        let compacted = super::xml::compact_changed_slide_xml(after.blob())?;
++        // Compaction that reproduces the staged bytes exactly needs no read
++        // back. For a different payload, an exact root witness can prove the
++        // same semantic scene; all other payloads use the original comparison.
++        if compacted.xml.as_slice() != after_blob {
++            if compacted.root_unchanged {
++                // An exact root-byte witness leaves only the already-ignored
++                // outer ASCII whitespace changed. Keep a debug differential
++                // oracle for both the staged-read and cold paths; direct
++                // `shape_semantics` calls are deliberately outside the read
++                // counter used to measure this production shortcut.
++                #[cfg(debug_assertions)]
++                if let Some(expected) = expected.as_ref() {
++                    debug_assert!(
++                        shape_semantics(&compacted.xml)
++                            .as_ref()
++                            .is_ok_and(|actual| actual == expected),
++                        "root-byte proof changed staged shape semantics",
++                    );
++                } else {
++                    debug_assert!(
++                        matches!(
++                            (shape_semantics(&compacted.xml), shape_semantics(after.blob())),
++                            (Ok(compacted), Ok(staged)) if compacted == staged
++                        ),
++                        "root-byte proof changed read-back shape semantics",
++                    );
++                }
++            } else {
++                let expected = match expected {
++                    Some(expected) => expected,
++                    None => compaction_scene(after.blob())?,
++                };
++                if compaction_scene(&compacted.xml)? != expected {
++                    return Err(invalid(
++                        "opened-presentation slide compaction changed shape semantics",
++                    ));
++                }
+             }
+         }
+-        working.get_part_mut(&slide.part_name)?.set_blob(compact);
++        working
++            .get_part_mut(&slide.part_name)?
++            .set_blob(compacted.xml);
+     }
+     Ok(())
+ }
+@@ -2072,6 +2099,28 @@
+         Package::from_vec(package.to_bytes()?)?.opened_presentation()
+     }
+ 
++    fn three_slide_snapshot_with_outer_crlf() -> Result<super::Snapshot> {
++        let mut package = Package::new()?;
++        for index in 0..3 {
++            let slide = package.presentation_mut()?.add_slide()?;
++            slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
++        }
++        let mut package = Package::from_vec(package.to_bytes()?)?;
++        let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
++        let original = package.opc.get_part(&part_name)?.blob().to_vec();
++        let declaration_end = original
++            .windows(2)
++            .position(|bytes| bytes == b"?>")
++            .expect("writer emits an XML declaration")
++            + 2;
++        let mut changed = Vec::with_capacity(original.len() + 2);
++        changed.extend_from_slice(&original[..declaration_end]);
++        changed.extend_from_slice(b"\r\n");
++        changed.extend_from_slice(&original[declaration_end..]);
++        package.opc.get_part_mut(&part_name)?.set_blob(changed);
++        Package::from_vec(package.to_bytes()?)?.opened_presentation()
++    }
++
+     fn blob(package: &litchi_opc::OpcPackage, slide: &super::Slide) -> Arc<Vec<u8>> {
+         package.get_part(&slide.part_name).unwrap().blob_arc()
+     }
+@@ -2079,6 +2128,7 @@
+     #[test]
+     fn untouched_slides_keep_their_allocation_and_a_reproduced_compaction_keeps_its_bytes()
+     -> Result<()> {
++        take_scene_reads();
+         let snapshot = three_slide_snapshot()?;
+         let mut working = snapshot.package.as_ref().clone();
+         let edited = &snapshot.slides[1];
+@@ -2094,6 +2144,11 @@
+             &snapshot.slides,
+             &std::collections::HashMap::new(),
+         )?;
++        assert_eq!(
++            take_scene_reads(),
++            1,
++            "cold byte-identical compaction keeps its initial validation read"
++        );
+         for untouched in [&snapshot.slides[0], &snapshot.slides[2]] {
+             assert!(Arc::ptr_eq(
+                 &blob(&working, untouched),
+@@ -2106,6 +2161,7 @@
+ 
+     #[test]
+     fn a_compaction_that_changes_bytes_is_read_back_and_compared() -> Result<()> {
++        take_scene_reads();
+         let snapshot = three_slide_snapshot()?;
+         let mut working = snapshot.package.as_ref().clone();
+         let edited = &snapshot.slides[0];
+@@ -2122,6 +2178,11 @@
+             &snapshot.slides,
+             &std::collections::HashMap::new(),
+         )?;
++        assert_eq!(
++            take_scene_reads(),
++            2,
++            "root-different compaction keeps both reads"
++        );
+         let compacted = blob(&working, edited);
+         assert_ne!(compacted.as_slice(), staged.as_bytes());
+         assert_eq!(
+@@ -2190,6 +2251,101 @@
+     }
+ 
+     #[test]
++    fn a_staged_read_with_outer_crlf_uses_the_root_witness() -> Result<()> {
++        let snapshot = three_slide_snapshot_with_outer_crlf()?;
++        let mut edit = snapshot.edit();
++        assert!(edit.set_shape_text(0, 0, "read once")?);
++        take_scene_reads();
++        let commit = edit.commit()?;
++        assert_eq!(
++            take_scene_reads(),
++            0,
++            "the staged read and unchanged root prove compaction"
++        );
++        let blob = commit
++            .snapshot()
++            .package
++            .get_part(&snapshot.slides[0].part_name)?
++            .blob();
++        assert!(!blob.windows(2).any(|bytes| bytes == b"\r\n"));
++        Ok(())
++    }
++
++    #[test]
++    fn a_cold_outer_crlf_compaction_keeps_the_initial_read_only() -> Result<()> {
++        let snapshot = three_slide_snapshot_with_outer_crlf()?;
++        let mut working = snapshot.package.as_ref().clone();
++        let edited = &snapshot.slides[0];
++        let staged = String::from_utf8(blob(&working, edited).to_vec())
++            .unwrap()
++            .replace("compaction 0", "compaction zero");
++        working
++            .get_part_mut(&edited.part_name)?
++            .set_blob(staged.into_bytes());
++        take_scene_reads();
++        compact_changed_slides(
++            &mut working,
++            snapshot.package.as_ref(),
++            &snapshot.slides,
++            &std::collections::HashMap::new(),
++        )?;
++        assert_eq!(
++            take_scene_reads(),
++            1,
++            "the staged validation remains; compacted root needs no second read"
++        );
++        Ok(())
++    }
++
++    #[test]
++    fn admitted_real_fixture_root_witness_has_a_scene_differential_oracle() -> Result<()> {
++        let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
++        let package = Package::from_vec(bytes)?;
++        let snapshot = package.opened_presentation()?;
++        let mut witnessed = 0usize;
++        for slide in &snapshot.slides {
++            let xml = snapshot.package.get_part(&slide.part_name)?.blob();
++            let compacted = super::super::xml::compact_changed_slide_xml(xml)?;
++            if compacted.root_unchanged {
++                let original = super::shape_semantics(xml)?;
++                let compacted_semantics = super::shape_semantics(&compacted.xml)?;
++                assert_eq!(compacted_semantics, original, "{}", slide.part_name);
++                witnessed += 1;
++            }
++        }
++        assert!(witnessed > 0, "the admitted fixture had no root witness");
++        Ok(())
++    }
++
++    #[test]
++    fn admitted_real_fixture_crlf_after_declaration_skips_two_readbacks() -> Result<()> {
++        let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
++        let package = Package::from_vec(bytes)?;
++        let snapshot = package.opened_presentation()?;
++        let source = snapshot
++            .package
++            .get_part(&snapshot.slides[0].part_name)?
++            .blob();
++        assert!(source.windows(10).any(|bytes| bytes == b"?>\r\n<p:sld"));
++        let mut edit = snapshot.edit();
++        assert!(edit.set_shape_text(0, 0, "root-witness")?);
++        take_scene_reads();
++        let commit = edit.commit()?;
++        assert_eq!(
++            take_scene_reads(),
++            0,
++            "the real fixture's staged read and exact root skip both readbacks"
++        );
++        let output = commit
++            .snapshot()
++            .package
++            .get_part(&snapshot.slides[0].part_name)?
++            .blob();
++        assert!(!output.windows(10).any(|bytes| bytes == b"?>\r\n<p:sld"));
++        Ok(())
++    }
++
++    #[test]
+     fn a_payload_replaced_after_its_scene_read_is_read_again_at_commit() -> Result<()> {
+         let mut package = Package::new()?;
+         let slide = package.presentation_mut()?.add_slide()?;
+--- a/crates/litchi-pptx/src/opened/xml.rs
++++ b/crates/litchi-pptx/src/opened/xml.rs
+@@ -18,14 +18,24 @@
+ const MAX_XML_DEPTH: usize = 256;
+ const MAX_XML_NODES: usize = 1_000_000;
+ 
++/// The compacted bytes and the conservative witness that the document root
++/// survived byte-for-byte. The witness is transient and is not retained in a
++/// transaction or snapshot.
++#[derive(Debug)]
++pub(crate) struct CompactedSlide {
++    pub(crate) xml: Vec<u8>,
++    pub(crate) root_unchanged: bool,
++}
++
+ /// Re-emit a changed slide without inter-element formatting.
+ ///
+ /// A leading UTF-8 byte-order mark, which the reader consumes before its
+ /// first event, is carried to the output unchanged: it is a byte the producer
+ /// wrote, not formatting.
+-pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
++pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide> {
+     let mut reader = Reader::from_reader(source);
+     reader.config_mut().trim_text(false);
++    let origin = ReaderOrigin::of(source);
+     let mut output = Vec::new();
+     output
+         .try_reserve_exact(source.len())
+@@ -38,17 +48,27 @@
+     let mut pending_whitespace = Vec::new();
+     let mut text_run_has_content = false;
+     let mut roots = 0usize;
++    let mut source_root_start = None;
++    let mut source_root_end = None;
++    let mut output_root_start = None;
++    let mut output_root_end = None;
++    let mut outside_non_text_exact = true;
+     loop {
+-        match reader
++        let source_event_start = origin.offset(reader.buffer_position());
++        let event = reader
+             .read_event()
+-            .map_err(|error| Error::Xml(error.to_string()))?
+-        {
++            .map_err(|error| Error::Xml(error.to_string()))?;
++        let source_event_end = origin.offset(reader.buffer_position());
++        match event {
+             Event::Start(element) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+-                if preserve_space.is_empty() {
++                let is_root = preserve_space.is_empty();
++                if is_root {
+                     roots = roots
+                         .checked_add(1)
+                         .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
++                    source_root_start = source_event_start;
++                    output_root_start = Some(output.len());
+                 }
+                 let inherited = preserve_space.last().copied().unwrap_or(false);
+                 preserve_space.push(element_preserves_space(
+@@ -60,23 +80,35 @@
+             },
+             Event::Empty(element) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+-                if preserve_space.is_empty() {
++                let is_root = preserve_space.is_empty();
++                if is_root {
+                     roots = roots
+                         .checked_add(1)
+                         .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
++                    source_root_start = source_event_start;
++                    output_root_start = Some(output.len());
+                 }
+                 let inherited = preserve_space.last().copied().unwrap_or(false);
+                 let _preserve = element_preserves_space(&element, reader.decoder(), inherited)?;
+                 write_compact_start(&mut output, &element, reader.decoder(), true)?;
++                if is_root {
++                    source_root_end = origin.offset(reader.buffer_position());
++                    output_root_end = Some(output.len());
++                }
+             },
+             Event::End(element) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
++                let is_root = preserve_space.len() == 1;
+                 preserve_space.pop().ok_or_else(|| {
+                     invalid("opened-presentation slide has an unexpected end element")
+                 })?;
+                 output.extend_from_slice(b"</");
+                 output.extend_from_slice(element.name().as_ref());
+                 output.push(b'>');
++                if is_root {
++                    source_root_end = origin.offset(reader.buffer_position());
++                    output_root_end = Some(output.len());
++                }
+             },
+             Event::Text(text) => {
+                 let bytes = text.as_ref();
+@@ -131,21 +163,54 @@
+             },
+             Event::Decl(declaration) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
++                let output_event_start = output.len();
+                 output.extend_from_slice(b"<?");
+                 output.extend_from_slice(declaration.as_ref());
+                 output.extend_from_slice(b"?>");
++                if preserve_space.is_empty() {
++                    outside_non_text_exact &= exact_event_bytes(
++                        source,
++                        &output,
++                        source_event_start,
++                        source_event_end,
++                        output_event_start,
++                        output.len(),
++                    );
++                }
+             },
+             Event::PI(instruction) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
++                let output_event_start = output.len();
+                 output.extend_from_slice(b"<?");
+                 output.extend_from_slice(instruction.as_ref());
+                 output.extend_from_slice(b"?>");
++                if preserve_space.is_empty() {
++                    outside_non_text_exact &= exact_event_bytes(
++                        source,
++                        &output,
++                        source_event_start,
++                        source_event_end,
++                        output_event_start,
++                        output.len(),
++                    );
++                }
+             },
+             Event::Comment(comment) => {
+                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
++                let output_event_start = output.len();
+                 output.extend_from_slice(b"<!--");
+                 output.extend_from_slice(comment.as_ref());
+                 output.extend_from_slice(b"-->");
++                if preserve_space.is_empty() {
++                    outside_non_text_exact &= exact_event_bytes(
++                        source,
++                        &output,
++                        source_event_start,
++                        source_event_end,
++                        output_event_start,
++                        output.len(),
++                    );
++                }
+             },
+             Event::DocType(_) => {
+                 return Err(invalid(
+@@ -163,7 +228,39 @@
+             "opened-presentation slide must contain exactly one closed root",
+         ));
+     }
+-    Ok(output)
++    let root_unchanged = match (
++        source_root_start,
++        source_root_end,
++        output_root_start,
++        output_root_end,
++    ) {
++        (Some(source_start), Some(source_end), Some(output_start), Some(output_end)) => source
++            .get(source_start..source_end)
++            .zip(output.get(output_start..output_end))
++            .is_some_and(|(source_root, output_root)| source_root == output_root),
++        _ => false,
++    };
++    Ok(CompactedSlide {
++        xml: output,
++        root_unchanged: root_unchanged && outside_non_text_exact,
++    })
++}
++
++fn exact_event_bytes(
++    source: &[u8],
++    output: &[u8],
++    source_start: Option<usize>,
++    source_end: Option<usize>,
++    output_start: usize,
++    output_end: usize,
++) -> bool {
++    let (Some(source_start), Some(source_end)) = (source_start, source_end) else {
++        return false;
++    };
++    source
++        .get(source_start..source_end)
++        .zip(output.get(output_start..output_end))
++        .is_some_and(|(source_event, output_event)| source_event == output_event)
+ }
+ 
+ fn finish_compact_text_run(pending_whitespace: &mut Vec<u8>, has_content: &mut bool) {
+@@ -1825,3 +1922,78 @@
+     matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
+         || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
+ }
++
++#[cfg(test)]
++mod compaction_tests {
++    use super::compact_changed_slide_xml;
++    use crate::Result;
++
++    fn assert_compacted(source: &[u8], expected: &[u8], root_unchanged: bool) -> Result<()> {
++        let compacted = compact_changed_slide_xml(source)?;
++        assert_eq!(compacted.xml, expected);
++        assert_eq!(compacted.root_unchanged, root_unchanged);
++        Ok(())
++    }
++
++    #[test]
++    fn outer_declaration_whitespace_keeps_the_root_witness() -> Result<()> {
++        let source = b"<?xml version=\"1.0\"?>\r\n<p:sld xmlns:p=\"urn:p\"/>\r\n";
++        let expected = b"<?xml version=\"1.0\"?><p:sld xmlns:p=\"urn:p\"/>";
++        assert_compacted(source, expected, true)
++    }
++
++    #[test]
++    fn bom_and_empty_root_are_included_in_the_exact_byte_contract() -> Result<()> {
++        let source = b"\xEF\xBB\xBF\n<p:sld xmlns:p=\"urn:p\"/>\n";
++        let expected = b"\xEF\xBB\xBF<p:sld xmlns:p=\"urn:p\"/>";
++        assert_compacted(source, expected, true)
++    }
++
++    #[test]
++    fn outside_processing_instruction_is_copied_before_root_comparison() -> Result<()> {
++        let source = b"<?litchi mode=\"x\"?>\n<p:sld xmlns:p=\"urn:p\"/>";
++        let expected = b"<?litchi mode=\"x\"?><p:sld xmlns:p=\"urn:p\"/>";
++        assert_compacted(source, expected, true)
++    }
++
++    #[test]
++    fn outside_comment_is_copied_before_root_comparison() -> Result<()> {
++        let source = b"<!--before-->\n<p:sld xmlns:p=\"urn:p\"/>\n<!--after-->";
++        let expected = b"<!--before--><p:sld xmlns:p=\"urn:p\"/><!--after-->";
++        assert_compacted(source, expected, true)
++    }
++
++    #[test]
++    fn unknown_markup_inside_the_root_is_preserved_by_the_witness() -> Result<()> {
++        let source = b"<p:sld xmlns:p=\"urn:p\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\" mc:Ignorable=\"x\"><x:future/></p:sld>";
++        assert_compacted(source, source, true)
++    }
++
++    #[test]
++    fn root_content_whitespace_and_attribute_quote_changes_fall_back() -> Result<()> {
++        let whitespace = b"<p:sld xmlns:p=\"urn:p\"> \n <p:child/> </p:sld>";
++        assert_compacted(
++            whitespace,
++            b"<p:sld xmlns:p=\"urn:p\"><p:child/></p:sld>",
++            false,
++        )?;
++
++        let quote = b"<p:sld xmlns:p='urn:p'/>";
++        assert_compacted(quote, b"<p:sld xmlns:p=\"urn:p\"/>", false)
++    }
++
++    #[test]
++    fn entity_and_invalid_outside_markup_keep_the_existing_refusals() -> Result<()> {
++        let entity = b"<p:sld xmlns:p=\"urn:p\">&amp;</p:sld>";
++        assert_compacted(entity, entity, true)?;
++        assert!(compact_changed_slide_xml(b"<p:sld xmlns:p=\"urn:p\"/>text").is_err());
++        assert!(compact_changed_slide_xml(b"<!DOCTYPE p:sld><p:sld/>").is_err());
++        Ok(())
++    }
++
++    #[test]
++    fn invalid_root_shape_does_not_create_a_witness() {
++        assert!(compact_changed_slide_xml(b"<p:sld/> <p:sld/>").is_err());
++        assert!(compact_changed_slide_xml(b"<p:sld>").is_err());
++    }
++}

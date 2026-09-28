@@ -1,0 +1,1573 @@
+{
+  "schema": "litchi.pptx.public-workflow-probe-0806.v1",
+  "tool": "public-pptx-probe-0806",
+  "mode": "lifecycle",
+  "shape": "valid-4attr",
+  "slides": 12,
+  "shapes_per_slide": 8,
+  "timing_scope": "Package::opened_presentation, edit, set_shape_text, commit, apply_opened_presentation_commit, and Package::to_bytes",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 42304,
+    "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+  },
+  "fixture": {
+    "injection": "valid-four-distinct-namespaced-extension-attributes",
+    "slide_parts": 12,
+    "replaced_text_tags": 96,
+    "namespace_declarations": 4,
+    "namespaced_attributes": 4,
+    "namespace_uris": [
+      "urn:litchi:perf:0806:extension:one",
+      "urn:litchi:perf:0806:extension:two",
+      "urn:litchi:perf:0806:extension:three",
+      "urn:litchi:perf:0806:extension:four"
+    ],
+    "attribute_names": [
+      "lx1:probeOne",
+      "lx2:probeTwo",
+      "lx3:probeThree",
+      "lx4:probeFour"
+    ]
+  },
+  "warmup": 3,
+  "samples_requested": 30,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 2090251,
+      "metrics": {
+        "elapsed_ns": 2090251,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 2105360,
+      "metrics": {
+        "elapsed_ns": 2105360,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 2098030,
+      "metrics": {
+        "elapsed_ns": 2098030,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 2098250,
+      "metrics": {
+        "elapsed_ns": 2098250,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 2110300,
+      "metrics": {
+        "elapsed_ns": 2110300,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 2124651,
+      "metrics": {
+        "elapsed_ns": 2124651,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 2104460,
+      "metrics": {
+        "elapsed_ns": 2104460,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 2105291,
+      "metrics": {
+        "elapsed_ns": 2105291,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 2094180,
+      "metrics": {
+        "elapsed_ns": 2094180,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 2093331,
+      "metrics": {
+        "elapsed_ns": 2093331,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 2092590,
+      "metrics": {
+        "elapsed_ns": 2092590,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 2094581,
+      "metrics": {
+        "elapsed_ns": 2094581,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 2097840,
+      "metrics": {
+        "elapsed_ns": 2097840,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 2095280,
+      "metrics": {
+        "elapsed_ns": 2095280,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 2094190,
+      "metrics": {
+        "elapsed_ns": 2094190,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 2094500,
+      "metrics": {
+        "elapsed_ns": 2094500,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 2099180,
+      "metrics": {
+        "elapsed_ns": 2099180,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 2093300,
+      "metrics": {
+        "elapsed_ns": 2093300,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 2099610,
+      "metrics": {
+        "elapsed_ns": 2099610,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 2096870,
+      "metrics": {
+        "elapsed_ns": 2096870,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 2094310,
+      "metrics": {
+        "elapsed_ns": 2094310,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 2102020,
+      "metrics": {
+        "elapsed_ns": 2102020,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 2094180,
+      "metrics": {
+        "elapsed_ns": 2094180,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 2098810,
+      "metrics": {
+        "elapsed_ns": 2098810,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 2095010,
+      "metrics": {
+        "elapsed_ns": 2095010,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 2100660,
+      "metrics": {
+        "elapsed_ns": 2100660,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 2108500,
+      "metrics": {
+        "elapsed_ns": 2108500,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 2099920,
+      "metrics": {
+        "elapsed_ns": 2099920,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 2105340,
+      "metrics": {
+        "elapsed_ns": 2105340,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 2082720,
+      "metrics": {
+        "elapsed_ns": 2082720,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42323,
+        "readback_sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133",
+        "marker_matches": true,
+        "unknown_namespace_check": null,
+        "unknown_namespace_occurrences": null,
+        "extension_preservation_check": true,
+        "extension_text_tags": 96,
+        "extension_attributes_per_text_tag": 4,
+        "extension_attribute_occurrences": 384,
+        "extension_value_occurrences": 384,
+        "extension_namespace_declarations_per_slide": 4,
+        "extension_namespace_uris": [
+          "urn:litchi:perf:0806:extension:one",
+          "urn:litchi:perf:0806:extension:two",
+          "urn:litchi:perf:0806:extension:three",
+          "urn:litchi:perf:0806:extension:four"
+        ],
+        "extension_attribute_names": [
+          "lx1:probeOne",
+          "lx2:probeTwo",
+          "lx3:probeThree",
+          "lx4:probeFour"
+        ],
+        "extension_attribute_values": [
+          "litchi-perf-0806-valid-4attr-one",
+          "litchi-perf-0806-valid-4attr-two",
+          "litchi-perf-0806-valid-4attr-three",
+          "litchi-perf-0806-valid-4attr-four"
+        ]
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-synthetic-native",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}

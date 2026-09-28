@@ -1,0 +1,37 @@
+{
+  "binaries": [
+    {
+      "bytes": 13681000,
+      "path": "/home/zhuhe/code/litchi-target-0824/before-real-allocation",
+      "sha256": "5b6b1a195dd970f49536c822bfe9c4b7f286eee9d968166df64436d188534d5d"
+    },
+    {
+      "bytes": 13795304,
+      "path": "/home/zhuhe/code/litchi-target-0824/before-real-native",
+      "sha256": "99f0f1dc91bb9712cb142b02d5606c0a640a5e84a2b43f4d21e7cb0031c0b0dc"
+    },
+    {
+      "bytes": 14357880,
+      "path": "/home/zhuhe/code/litchi-target-0824/before-synthetic-allocation",
+      "sha256": "8039373e168764169870cad2fad4fe2d48a5dd17bada0cfa0ab1a0f710f2f73c"
+    },
+    {
+      "bytes": 14430736,
+      "path": "/home/zhuhe/code/litchi-target-0824/before-synthetic-native",
+      "sha256": "0837a69386bce8a25e3601c1a40be1447d15f58f54c3cf217130521ae78cfd1f"
+    }
+  ],
+  "ended": 1790615754.9566274,
+  "files": 1031,
+  "logical_bytes": 768731181,
+  "quality_target_retained": true,
+  "removed": [
+    "/home/zhuhe/code/litchi-target-0824/before-real-allocation",
+    "/home/zhuhe/code/litchi-target-0824/before-synthetic-allocation",
+    "/home/zhuhe/code/litchi-target-0824/release",
+    "/home/zhuhe/code/litchi-target-0824/before-real-native",
+    "/home/zhuhe/code/litchi-target-0824/.rustc_info.json",
+    "/home/zhuhe/code/litchi-target-0824/before-synthetic-native"
+  ],
+  "started": 1790615754.9034631
+}

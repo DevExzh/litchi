@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0824 — duplicate compaction reads removed with measured benefit
+
+[0824](0824-pptx-outer-whitespace-compaction.md) Both six-gate production checks and eighteen probe commands pass; candidate tests total 1,253 passed/0 failed/3 ignored. The original incorrect cold-read test assertion and complete recovery are retained. Independent replay admits the 10.407% real-edit p50 improvement with no latency/allocation veto; verified target cleanup is complete. The broader goal remains open.
+
 ## 0823 — measured Scene transport change not adopted
 
 [0823](0823-pptx-scene-reader-workflow.md) The candidate passes both six-gate production checks and all nineteen correctness/allocation workflows, but its best eligible paired p50 gain is 2.394%, below the frozen 3% threshold. Production is restored; failed attempts, independent replay, cleanup, and exact custody are retained. The program-level goal remains open.

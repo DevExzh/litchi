@@ -1,0 +1,22 @@
+{
+  "after": {
+    "docs/performance/results/change-0824/candidate/after/transaction.rs": "6fbb903269a6a8855e7ecda2934df592eae1101a8c7a2c0cca3598a26529cf11",
+    "docs/performance/results/change-0824/candidate/after/xml.rs": "8232bd8cef67ad555ff6c025059c4d518f00a575eab9e9209daa47607ecc09ab"
+  },
+  "before": {
+    "docs/performance/results/change-0824/candidate/after/transaction.rs": "dbbe113855490169cf3e048c0cb898ea57183c9ad4ac276f2a91491991ef4bba",
+    "docs/performance/results/change-0824/candidate/after/xml.rs": "8232bd8cef67ad555ff6c025059c4d518f00a575eab9e9209daa47607ecc09ab"
+  },
+  "command": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "--config-path",
+    "/home/zhuhe/code/litchi/rustfmt.toml",
+    "docs/performance/results/change-0824/candidate/after/transaction.rs",
+    "docs/performance/results/change-0824/candidate/after/xml.rs"
+  ],
+  "ended": 1790614716.4032426,
+  "exit_code": 0,
+  "started": 1790614716.3612905
+}

@@ -1,0 +1,2 @@
+0824 failure audit PASS: original failure retained; only cold-path test assertion repaired; fresh baseline restarted
+{"final": false, "reports": 342, "samples": 7106, "status": "accepted"}

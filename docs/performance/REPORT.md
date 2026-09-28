@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0824 — PPTX compaction proof adopted
+
+[0824](0824-pptx-outer-whitespace-compaction.md) The real-file edit meets the frozen benefit rule: paired ratio 0.895935, interval 0.892216–0.899349, with fewer allocation calls/bytes and unchanged net-live/peak-above-entry values. All nineteen rows pass guards; slower synthetic controls and tail/RSS spread flags remain visible. The exact-byte proof preserves output and validation contracts.
+
 ## 0823 — PPTX Scene reader trial rejected
 
 [0823](0823-pptx-scene-reader-workflow.md) The 342-report/7,106-sample trial does not meet its frozen benefit threshold: real edit ratio 0.976062, interval 0.974798–0.984336, with unchanged allocations and no latency veto. Production remains unchanged; raw evidence, retained failure logs, and verified target cleanup are complete.

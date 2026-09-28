@@ -1,0 +1,35 @@
+{
+  "compaction_changes_after_exact_target_text_replacement": [
+    {
+      "kind": "delete",
+      "output_hex": "",
+      "output_span": [
+        55,
+        55
+      ],
+      "source_hex": "0d0a",
+      "source_span": [
+        55,
+        57
+      ]
+    }
+  ],
+  "input": {
+    "bytes": 68822,
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "input_part_bytes": 20740,
+  "part": "ppt/slides/slide1.xml",
+  "published_part_bytes": 20755,
+  "published_sha256": "710663fb7ed44199a5ee855318b313adab617fc86cae7e7d3b1792924b7d6504",
+  "reference": {
+    "bytes": 68284,
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "schema": "litchi.performance.0824.fixture-basis.v1",
+  "scope": "Byte-difference evidence for one pinned fixture; no timing or general semantic proof.",
+  "staged_part_bytes": 20757,
+  "staged_sha256": "acc5c5a1991e805a33a2a6a90b9ebb033e9e50ca017ab911f68d0552ca5ecba8"
+}

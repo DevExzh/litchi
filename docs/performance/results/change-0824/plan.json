@@ -1,0 +1,270 @@
+{
+  "schema": "litchi.performance.0824.pptx-outer-whitespace.v1",
+  "purpose": "Fresh before/after public PPTX workflow and allocation trial for the opened transaction/XML outer-whitespace compaction candidate.",
+  "base": "7b268927bfe3ed9c9000bfd567fc4ce656ec0cd9",
+  "cpu": 12,
+  "target": "/home/zhuhe/code/litchi-target-0824",
+  "source_allowlist": [
+    "crates/litchi-pptx/src/opened/transaction.rs",
+    "crates/litchi-pptx/src/opened/xml.rs"
+  ],
+  "candidate": {
+    "name": "opened-transaction-xml-outer-whitespace-compaction",
+    "production_files": [
+      "crates/litchi-pptx/src/opened/transaction.rs",
+      "crates/litchi-pptx/src/opened/xml.rs"
+    ],
+    "mechanism": "Use an exact complete root-byte equality witness to compact the opened transaction/XML write path: remove only outside-root ASCII whitespace, skip redundant Scene comparisons, and preserve written bytes, initial validation, transaction durability ordering, and all public workflow semantics.",
+    "public_api_change": false,
+    "dependency_change": false,
+    "oracle_scope": "The candidate review must retain or add a cfg(test) differential/refusal oracle in the allowlisted files; it is reviewed before application."
+  },
+  "probes": {
+    "synthetic": {
+      "directory": "synthetic-probe-src",
+      "manifest": "docs/performance/results/change-0824/synthetic-probe-src/Cargo.toml",
+      "template": "docs/performance/results/change-0824/synthetic-probe-src/Cargo.toml.template",
+      "cargo_binary": "namespace-uri-probe",
+      "package": "mce-capabilities-probe",
+      "features": {
+        "native": [],
+        "allocation": [
+          "allocator-metrics"
+        ]
+      },
+      "source_contract": "sealed change-0813 probe corpus and timed bodies, with the current process-wide live-byte conservation test fix in counting_allocator.rs and only the materialized local dependency path in Cargo.toml"
+    },
+    "real": {
+      "directory": "real-probe-src",
+      "manifest": "docs/performance/results/change-0824/real-probe-src/Cargo.toml",
+      "cargo_binary": "pptx-edit-profile-0822",
+      "package": "pptx-edit-profile-0822",
+      "features": {
+        "native": [],
+        "allocation": [
+          "allocator-metrics"
+        ]
+      },
+      "source_contract": "packet-local copy of the admitted change-0822 real-file probe; no production or harness dependency"
+    }
+  },
+  "cases": [
+    {
+      "probe": "synthetic",
+      "shape": "tiny",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "tiny",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "tiny",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "medium",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "medium",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "medium",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "large",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "large",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "large",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "vendor",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "vendor",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "vendor",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "unicode-vendor",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "unicode-vendor",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "unicode-vendor",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "valid-4attr",
+      "mode": "capture"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "valid-4attr",
+      "mode": "commit"
+    },
+    {
+      "probe": "synthetic",
+      "shape": "valid-4attr",
+      "mode": "lifecycle"
+    },
+    {
+      "probe": "real",
+      "mode": "direct",
+      "input_selector": "pinnedshapes",
+      "reference_selector": "0821realPPTXdefault"
+    }
+  ],
+  "qualification": {
+    "purpose": "Observer-only semantic and refusal qualification before timed comparisons; no timing decision is made from this lane.",
+    "legs": [
+      "before",
+      "after"
+    ],
+    "blocks": 1,
+    "samples": 1,
+    "warmup": 0,
+    "binary": "allocation",
+    "reports": 38,
+    "samples_total": 38
+  },
+  "native": {
+    "legs": [
+      "before",
+      "after"
+    ],
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3,
+    "reports": 228,
+    "samples_total": 6840,
+    "rss": "maximum resident set size in KiB from /usr/bin/time"
+  },
+  "allocation": {
+    "legs": [
+      "before",
+      "after"
+    ],
+    "blocks": 2,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 3,
+    "warmup": 0,
+    "reports": 76,
+    "samples_total": 228,
+    "rss": "maximum resident set size in KiB from /usr/bin/time"
+  },
+  "build": {
+    "jobs": 2,
+    "opt_level": 3,
+    "debug": 1,
+    "lto": "thin",
+    "codegen_units": 1,
+    "incremental": false,
+    "panic": "unwind",
+    "offline": true,
+    "locked": true,
+    "release": true
+  },
+  "inputs": {
+    "real_source": {
+      "path": "test-data/ooxml/pptx/shapes.pptx",
+      "bytes": 68822,
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    "real_reference": {
+      "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "bytes": 68284,
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    }
+  },
+  "policy": {
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 824824,
+    "sorted_zero_based_endpoints": [
+      250,
+      9749
+    ],
+    "eligible_benefit_cases": "All twelve synthetic commit/lifecycle rows plus the real/direct row; synthetic capture rows are retained as negative controls because timed capture precedes the commit compaction path.",
+    "benefit_gate": "At least one eligible representative public workflow has median after/before <= 0.97 and bootstrap upper endpoint < 1.00.",
+    "latency_veto": "Any of all nineteen measured rows with bootstrap lower endpoint > 1.05 vetoes adoption.",
+    "allocation_gate": "Paired allocation medians must not increase calls, allocated bytes, net live bytes, or peak above entry.",
+    "rss_review": "A paired process-RSS increase above 5 percent requires explicit review; RSS is diagnostic and cannot establish a memory saving.",
+    "claims": "No universal, cross-format, cold-cache, tail-latency, RSS, or historical speedup claim."
+  },
+  "totals": {
+    "qualification_reports": 38,
+    "qualification_samples": 38,
+    "native_reports": 228,
+    "native_samples": 6840,
+    "allocation_reports": 76,
+    "allocation_samples": 228,
+    "reports": 342,
+    "samples": 7106
+  }
+}
