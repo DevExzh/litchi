@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0827/driver_preflight.py", line 184, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0827/driver_preflight.py", line 171, in main
+    value = derive()
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0827/driver_preflight.py", line 120, in derive
+    c.validate_report(
+    ~~~~~~~~~~~~~~~~~^
+        path, case, row["samples"], row["warmup"], binary_name, admission
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0827/custody.py", line 513, in validate_report
+    assert len(published) == 1 and isinstance(published[0], str)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+0827 retained reader attempt 0: exit 1

@@ -1,0 +1,12 @@
+{
+  "cargo_lock_changes": "No lockfile generation or update is permitted during this trial.",
+  "root_lock": {
+    "path": "inputs/root-Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "schema": "litchi.performance.0827.lock-parity.v1",
+  "tool_lock": {
+    "path": "inputs/tool-Cargo.lock",
+    "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+  }
+}

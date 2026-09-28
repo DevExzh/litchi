@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0827 — matched ordinary-save effect measured
+
+[0827](0827-ordinary-save-compaction-effect.md) Fresh harness quality passes (641 tests passed / zero failed / one ignored), with exact-source historical PPTX quality reuse explicitly distinguished. Independent replay accepts 216 reports / 4,488 samples after seven retained preflight/reader failures. All captures passed; production is restored and both owned temporary roots are removed. The scoped PPTX lifecycle improvement is 2.494%; the broader goal remains open.
+
 ## 0826 — allocation schema preflight repaired
 
 [0826](0826-allocation-schema-preflight.md) A reusable vector validator passes 30 regression tests in normal and optimized Python and checks 325 pinned historical reports. The original 0825 checker failure is reproduced and corrected without changing Rust or collecting new timings. Full ordinary-save comparison remains the next measurement.

@@ -1,0 +1,1999 @@
+//! Namespace-aware, range-preserving XML edits for the transaction root.
+
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::ops::Range;
+
+use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
+use quick_xml::Reader;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::reader::NsReader;
+
+use super::model::{Slide, invalid};
+use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+const MAX_XML_DEPTH: usize = 256;
+const MAX_XML_NODES: usize = 1_000_000;
+
+/// The compacted bytes and the conservative witness that the document root
+/// survived byte-for-byte. The witness is transient and is not retained in a
+/// transaction or snapshot.
+#[derive(Debug)]
+pub(crate) struct CompactedSlide {
+    pub(crate) xml: Vec<u8>,
+    pub(crate) root_unchanged: bool,
+}
+
+/// Re-emit a changed slide without inter-element formatting.
+///
+/// A leading UTF-8 byte-order mark, which the reader consumes before its
+/// first event, is carried to the output unchanged: it is a byte the producer
+/// wrote, not formatting.
+pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide> {
+    let mut reader = Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let origin = ReaderOrigin::of(source);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation compact slide XML",
+            source,
+        })?;
+    output.extend_from_slice(&source[..ReaderOrigin::of(source).skipped()]);
+    let mut preserve_space = Vec::new();
+    let mut pending_whitespace = Vec::new();
+    let mut text_run_has_content = false;
+    let mut roots = 0usize;
+    let mut source_root_start = None;
+    let mut source_root_end = None;
+    let mut output_root_start = None;
+    let mut output_root_end = None;
+    let mut outside_non_text_exact = true;
+    loop {
+        let source_event_start = origin.offset(reader.buffer_position());
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let source_event_end = origin.offset(reader.buffer_position());
+        match event {
+            Event::Start(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let is_root = preserve_space.is_empty();
+                if is_root {
+                    roots = roots
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                    source_root_start = source_event_start;
+                    output_root_start = Some(output.len());
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                preserve_space.push(element_preserves_space(
+                    &element,
+                    reader.decoder(),
+                    inherited,
+                )?);
+                write_compact_start(&mut output, &element, reader.decoder(), false)?;
+            },
+            Event::Empty(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let is_root = preserve_space.is_empty();
+                if is_root {
+                    roots = roots
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                    source_root_start = source_event_start;
+                    output_root_start = Some(output.len());
+                }
+                let inherited = preserve_space.last().copied().unwrap_or(false);
+                let _preserve = element_preserves_space(&element, reader.decoder(), inherited)?;
+                write_compact_start(&mut output, &element, reader.decoder(), true)?;
+                if is_root {
+                    source_root_end = origin.offset(reader.buffer_position());
+                    output_root_end = Some(output.len());
+                }
+            },
+            Event::End(element) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let is_root = preserve_space.len() == 1;
+                preserve_space.pop().ok_or_else(|| {
+                    invalid("opened-presentation slide has an unexpected end element")
+                })?;
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(element.name().as_ref());
+                output.push(b'>');
+                if is_root {
+                    source_root_end = origin.offset(reader.buffer_position());
+                    output_root_end = Some(output.len());
+                }
+            },
+            Event::Text(text) => {
+                let bytes = text.as_ref();
+                if preserve_space.is_empty() {
+                    if bytes.iter().all(u8::is_ascii_whitespace) {
+                        continue;
+                    }
+                    return Err(invalid(
+                        "opened-presentation slide has text outside its root",
+                    ));
+                }
+                if bytes.iter().all(u8::is_ascii_whitespace)
+                    && !preserve_space.last().copied().unwrap_or(false)
+                {
+                    if text_run_has_content {
+                        output.extend_from_slice(bytes);
+                    } else {
+                        pending_whitespace.extend_from_slice(bytes);
+                    }
+                } else {
+                    output.extend_from_slice(&pending_whitespace);
+                    pending_whitespace.clear();
+                    output.extend_from_slice(bytes);
+                    text_run_has_content = true;
+                }
+            },
+            Event::CData(data) => {
+                if preserve_space.is_empty() {
+                    return Err(invalid(
+                        "opened-presentation slide has CDATA outside its root",
+                    ));
+                }
+                output.extend_from_slice(&pending_whitespace);
+                pending_whitespace.clear();
+                output.extend_from_slice(b"<![CDATA[");
+                output.extend_from_slice(data.as_ref());
+                output.extend_from_slice(b"]]>");
+                text_run_has_content = true;
+            },
+            Event::GeneralRef(reference) => {
+                if preserve_space.is_empty() {
+                    return Err(invalid(
+                        "opened-presentation slide has an entity outside its root",
+                    ));
+                }
+                output.extend_from_slice(&pending_whitespace);
+                pending_whitespace.clear();
+                output.push(b'&');
+                output.extend_from_slice(reference.as_ref());
+                output.push(b';');
+                text_run_has_content = true;
+            },
+            Event::Decl(declaration) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(declaration.as_ref());
+                output.extend_from_slice(b"?>");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
+            },
+            Event::PI(instruction) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(instruction.as_ref());
+                output.extend_from_slice(b"?>");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
+            },
+            Event::Comment(comment) => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
+                output.extend_from_slice(b"<!--");
+                output.extend_from_slice(comment.as_ref());
+                output.extend_from_slice(b"-->");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
+            },
+            Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation slide document types are not publishable",
+                ));
+            },
+            Event::Eof => {
+                finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                break;
+            },
+        }
+    }
+    if !preserve_space.is_empty() || roots != 1 {
+        return Err(invalid(
+            "opened-presentation slide must contain exactly one closed root",
+        ));
+    }
+    let root_unchanged = match (
+        source_root_start,
+        source_root_end,
+        output_root_start,
+        output_root_end,
+    ) {
+        (Some(source_start), Some(source_end), Some(output_start), Some(output_end)) => source
+            .get(source_start..source_end)
+            .zip(output.get(output_start..output_end))
+            .is_some_and(|(source_root, output_root)| source_root == output_root),
+        _ => false,
+    };
+    Ok(CompactedSlide {
+        xml: output,
+        root_unchanged: root_unchanged && outside_non_text_exact,
+    })
+}
+
+fn exact_event_bytes(
+    source: &[u8],
+    output: &[u8],
+    source_start: Option<usize>,
+    source_end: Option<usize>,
+    output_start: usize,
+    output_end: usize,
+) -> bool {
+    let (Some(source_start), Some(source_end)) = (source_start, source_end) else {
+        return false;
+    };
+    source
+        .get(source_start..source_end)
+        .zip(output.get(output_start..output_end))
+        .is_some_and(|(source_event, output_event)| source_event == output_event)
+}
+
+fn finish_compact_text_run(pending_whitespace: &mut Vec<u8>, has_content: &mut bool) {
+    pending_whitespace.clear();
+    *has_content = false;
+}
+
+fn element_preserves_space(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    inherited: bool,
+) -> Result<bool> {
+    let mut preserve = inherited;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() != b"xml:space" {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        preserve = match value.as_ref() {
+            "preserve" => true,
+            "default" => false,
+            _ => {
+                return Err(invalid(
+                    "opened-presentation slide xml:space must be default or preserve",
+                ));
+            },
+        };
+    }
+    Ok(preserve)
+}
+
+fn write_compact_start(
+    output: &mut Vec<u8>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    empty: bool,
+) -> Result<()> {
+    output.push(b'<');
+    output.extend_from_slice(element.name().as_ref());
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        output.push(b' ');
+        output.extend_from_slice(attribute.key.as_ref());
+        output.extend_from_slice(b"=\"");
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        output.extend_from_slice(quick_xml::escape::escape(value.as_ref()).as_bytes());
+        output.push(b'"');
+    }
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    Ok(())
+}
+
+#[derive(Debug)]
+struct SlideIdElement {
+    id: u32,
+    relationship_id: String,
+    span: Range<usize>,
+    element_name: Option<Vec<u8>>,
+    element_namespace: Option<Vec<u8>>,
+    relationship_attribute_name: Option<Vec<u8>>,
+    relationship_namespace: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct OpenElement {
+    id: u32,
+    relationship_id: String,
+    start: usize,
+    depth: usize,
+}
+
+#[derive(Debug)]
+struct TextElement {
+    span: Range<usize>,
+    empty_name: Option<Vec<u8>>,
+}
+
+struct ShapeTextEdit<'a> {
+    index: usize,
+    shape: Range<usize>,
+    text: &'a str,
+    changed: bool,
+}
+
+pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> Result<Vec<u8>> {
+    let mut current_bindings = Vec::new();
+    current_bindings
+        .try_reserve_exact(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide bindings",
+            source,
+        })?;
+    for slide in current {
+        current_bindings.push((slide.id, slide.relationship_id.as_str()));
+    }
+    let mut ordered_bindings = Vec::new();
+    ordered_bindings
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide bindings",
+            source,
+        })?;
+    for id in ordered {
+        let relationship_id = current
+            .iter()
+            .find(|slide| slide.id == *id)
+            .map_or("", |slide| slide.relationship_id.as_str());
+        ordered_bindings.push((*id, relationship_id));
+    }
+    reorder_slide_bindings(xml, &current_bindings, &ordered_bindings, None)
+}
+
+/// Validate and reorder a raw `p:sldIdLst` against exact `(id, r:id)` bindings.
+///
+/// The entry spans are permuted as opaque byte ranges. Every byte before the
+/// first entry, between entry slots, and after the final entry remains at its
+/// original position; IDs and relationship IDs are never regenerated.
+pub(crate) fn reorder_slide_bindings(
+    xml: &[u8],
+    current: &[(u32, &str)],
+    ordered: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<Vec<u8>> {
+    if ordered.len() != current.len() {
+        return Err(invalid(
+            "opened-presentation slide order is not a complete permutation",
+        ));
+    }
+    let elements = slide_id_elements(xml, false, context)?;
+    validate_slide_elements(&elements, current, context)?;
+    let mut selected = Vec::new();
+    selected
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide permutation",
+            source,
+        })?;
+    let mut seen_ids = HashSet::new();
+    let mut seen_relationships = HashSet::new();
+    seen_ids
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide IDs",
+            source,
+        })?;
+    seen_relationships
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide relationship IDs",
+            source,
+        })?;
+    let mut indexes = HashMap::new();
+    indexes
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide binding index",
+            source,
+        })?;
+    for (index, binding) in current.iter().enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if indexes.insert(*binding, index).is_some() {
+            return Err(invalid(
+                "opened-presentation slide-order bindings are ambiguous",
+            ));
+        }
+    }
+    for (index, (id, relationship_id)) in ordered.iter().enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if !seen_ids.insert(*id) || !seen_relationships.insert(*relationship_id) {
+            return Err(invalid(
+                "opened-presentation slide order repeats an identity",
+            ));
+        }
+        let index = indexes
+            .get(&(*id, *relationship_id))
+            .copied()
+            .ok_or_else(|| {
+                invalid("opened-presentation slide order references an unknown binding")
+            })?;
+        selected.push(index);
+    }
+    if selected
+        .iter()
+        .enumerate()
+        .all(|(left, right)| left == *right)
+    {
+        check_execution_context(context)?;
+        return clone_xml_bytes(xml, "opened-presentation unchanged XML");
+    }
+    let first = elements
+        .first()
+        .ok_or_else(|| invalid("opened-presentation slide list is empty"))?;
+    let last = elements
+        .last()
+        .ok_or_else(|| invalid("opened-presentation slide list is empty"))?;
+    check_execution_context(context)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation reordered XML",
+            source,
+        })?;
+    output.extend_from_slice(span_bytes(xml, 0..first.span.start)?);
+    for (position, source_index) in selected.into_iter().enumerate() {
+        if position % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        let source = elements
+            .get(source_index)
+            .ok_or_else(|| invalid("opened-presentation slide order lost a binding"))?;
+        output.extend_from_slice(span_bytes(xml, source.span.clone())?);
+        if let (Some(current), Some(next)) = (elements.get(position), elements.get(position + 1)) {
+            output.extend_from_slice(span_bytes(xml, current.span.end..next.span.start)?);
+        }
+    }
+    output.extend_from_slice(span_bytes(xml, last.span.end..xml.len())?);
+    Ok(output)
+}
+
+/// Validate that a raw presentation XML stream has exactly the supplied
+/// ordered slide bindings without producing a rewritten buffer.
+pub(crate) fn validate_slide_bindings(
+    xml: &[u8],
+    current: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<()> {
+    let elements = slide_id_elements(xml, false, context)?;
+    validate_slide_elements(&elements, current, context)
+}
+
+fn validate_slide_elements(
+    elements: &[SlideIdElement],
+    current: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<()> {
+    if elements.len() != current.len() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    let mut current_ids = HashSet::new();
+    let mut current_relationships = HashSet::new();
+    current_ids
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide IDs",
+            source,
+        })?;
+    current_relationships
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide relationship IDs",
+            source,
+        })?;
+    for (index, (element, (id, relationship_id))) in elements.iter().zip(current).enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if element.id != *id || element.relationship_id != *relationship_id {
+            return Err(invalid(
+                "opened-presentation slide-order binding changed during staging",
+            ));
+        }
+        if !current_ids.insert(*id) || !current_relationships.insert(*relationship_id) {
+            return Err(invalid(
+                "opened-presentation slide-order bindings are ambiguous",
+            ));
+        }
+    }
+    check_execution_context(context)?;
+    Ok(())
+}
+
+pub(crate) fn remove_slide(xml: &[u8], current: &[Slide], id: u32) -> Result<Vec<u8>> {
+    let elements = slide_id_elements(xml, false, None)?;
+    if elements.len() != current.len() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    for (element, slide) in elements.iter().zip(current) {
+        if element.id != slide.id || element.relationship_id != slide.relationship_id {
+            return Err(invalid(
+                "opened-presentation slide-order binding changed during staging",
+            ));
+        }
+    }
+    let target = elements
+        .iter()
+        .find(|element| element.id == id)
+        .ok_or_else(|| invalid("opened-presentation slide removal identity is missing"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len().saturating_sub(target.span.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide removal XML",
+            source,
+        })?;
+    output.extend_from_slice(span_bytes(xml, 0..target.span.start)?);
+    output.extend_from_slice(span_bytes(xml, target.span.end..xml.len())?);
+    Ok(output)
+}
+
+pub(crate) fn insert_slide(
+    xml: &[u8],
+    current: &[Slide],
+    position: usize,
+    id: u32,
+    relationship_id: &str,
+) -> Result<Vec<u8>> {
+    insert_slide_binding(
+        xml,
+        current
+            .iter()
+            .map(|slide| (slide.id, slide.relationship_id.as_str())),
+        position,
+        id,
+        relationship_id,
+    )
+}
+
+/// Insert one self-contained `p:sldId` entry while validating only the lexical
+/// presentation binding supplied by the caller.
+///
+/// Source-backed presentations deliberately avoid materializing opened
+/// [`Slide`] values.  This binding-based variant preserves the exact source
+/// XML ranges while remaining usable by both presentation facades.
+pub(crate) fn insert_slide_binding<'a, I>(
+    xml: &[u8],
+    current: I,
+    position: usize,
+    id: u32,
+    relationship_id: &str,
+) -> Result<Vec<u8>>
+where
+    I: ExactSizeIterator<Item = (u32, &'a str)>,
+{
+    let current_len = current.len();
+    if position > current_len {
+        return Err(invalid(
+            "opened-presentation slide insertion position is out of bounds",
+        ));
+    }
+    let elements = slide_id_elements(xml, true, None)?;
+    if elements.len() != current_len {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    let mut current = current;
+    for element in &elements {
+        let Some((expected_id, expected_relationship_id)) = current.next() else {
+            return Err(invalid(
+                "opened-presentation slide-order XML differs from the semantic graph",
+            ));
+        };
+        if element.id != expected_id || element.relationship_id != expected_relationship_id {
+            return Err(invalid(
+                "opened-presentation slide-order binding changed during staging",
+            ));
+        }
+    }
+    if current.next().is_some() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    let exemplar = elements
+        .first()
+        .ok_or_else(|| invalid("opened-presentation slide list is empty"))?;
+    let element_name = exemplar
+        .element_name
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation slide entry name is missing"))?;
+    let relationship_attribute_name = exemplar
+        .relationship_attribute_name
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation relationship attribute name is missing"))?;
+    let element_namespace = exemplar
+        .element_namespace
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation slide entry namespace is missing"))?;
+    let relationship_namespace = exemplar
+        .relationship_namespace
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation relationship namespace is missing"))?;
+    if !relationship_attribute_name.contains(&b':') {
+        return Err(invalid(
+            "opened-presentation relationship attribute has no namespace prefix",
+        ));
+    }
+    let insertion = elements
+        .get(position)
+        .map_or_else(
+            || elements.last().map(|element| element.span.end),
+            |element| Some(element.span.start),
+        )
+        .ok_or_else(|| invalid("opened-presentation slide insertion point is missing"))?;
+    let mut fragment = Vec::new();
+    let capacity = element_name
+        .len()
+        .checked_add(relationship_attribute_name.len())
+        .and_then(|value| value.checked_add(element_namespace.len()))
+        .and_then(|value| value.checked_add(relationship_namespace.len()))
+        .and_then(|value| value.checked_add(96))
+        .ok_or_else(|| invalid("opened-presentation slide entry size overflow"))?;
+    fragment
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation inserted slide entry",
+            source,
+        })?;
+    fragment.push(b'<');
+    fragment.extend_from_slice(element_name);
+    append_namespace_binding(&mut fragment, element_name, element_namespace)?;
+    append_namespace_binding(
+        &mut fragment,
+        relationship_attribute_name,
+        relationship_namespace,
+    )?;
+    fragment.extend_from_slice(b" id=\"");
+    fragment.extend_from_slice(id.to_string().as_bytes());
+    fragment.extend_from_slice(b"\" ");
+    fragment.extend_from_slice(relationship_attribute_name);
+    fragment.extend_from_slice(b"=\"");
+    fragment.extend_from_slice(relationship_id.as_bytes());
+    fragment.extend_from_slice(b"\"/>");
+    let output_len = xml
+        .len()
+        .checked_add(fragment.len())
+        .ok_or_else(|| invalid("opened-presentation inserted XML size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation inserted slide XML",
+            source,
+        })?;
+    output.extend_from_slice(span_bytes(xml, 0..insertion)?);
+    output.extend_from_slice(&fragment);
+    output.extend_from_slice(span_bytes(xml, insertion..xml.len())?);
+    Ok(output)
+}
+
+fn append_namespace_binding(output: &mut Vec<u8>, name: &[u8], namespace: &[u8]) -> Result<()> {
+    output.extend_from_slice(b" xmlns");
+    if let Some(separator) = name.iter().position(|byte| *byte == b':') {
+        if separator == 0 {
+            return Err(invalid("opened-presentation XML name has an empty prefix"));
+        }
+        output.push(b':');
+        output.extend_from_slice(&name[..separator]);
+    }
+    output.extend_from_slice(b"=\"");
+    output.extend_from_slice(namespace);
+    output.push(b'"');
+    Ok(())
+}
+
+pub(crate) fn rewrite_shape_text(
+    xml: &[u8],
+    shape: Range<usize>,
+    text: &str,
+    max_text_bytes: usize,
+) -> Result<Vec<u8>> {
+    let edits = [ShapeTextEdit {
+        index: 0,
+        shape,
+        text,
+        changed: true,
+    }];
+    rewrite_shape_texts(
+        xml,
+        &edits,
+        max_text_bytes,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )?
+    .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
+}
+
+pub(crate) fn stage_shape_texts(
+    xml: &[u8],
+    replacements: &[super::ShapeTextReplacement<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    if replacements.is_empty() {
+        return Ok((None, 0));
+    }
+    if replacements.len() > super::MAX_SHAPE_TEXT_REPLACEMENTS {
+        return Err(Error::Limit {
+            resource: "opened-presentation shape text replacements",
+            limit: super::MAX_SHAPE_TEXT_REPLACEMENTS,
+        });
+    }
+    let aggregate_text_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+        total
+            .checked_add(replacement.text().len())
+            .ok_or_else(|| invalid("opened-presentation aggregate shape text size overflow"))
+    })?;
+    if aggregate_text_bytes > max_text_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation aggregate shape text bytes",
+            limit: max_text_bytes,
+        });
+    }
+
+    let scene = crate::shape::Scene::read(xml)?;
+    if scene.is_rewritten() {
+        return Err(Error::UnsafeEdit {
+            operation: "set_shape_texts",
+            reason: "atomic shape text batches do not support markup-compatibility branch selection",
+        });
+    }
+    if replacements.len() > scene.len() {
+        return Err(Error::Limit {
+            resource: "opened-presentation selected shape texts",
+            limit: scene.len(),
+        });
+    }
+    let mut selected = HashSet::new();
+    selected
+        .try_reserve(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text identities",
+            source,
+        })?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text edit plan",
+            source,
+        })?;
+    for replacement in replacements {
+        let shape = scene.shape(replacement.selector())?;
+        let index = shape.common().index();
+        if !selected.insert(index) {
+            return Err(Error::DuplicateShapeTextSelection { index });
+        }
+        let current = shape
+            .common()
+            .text()
+            .ok_or_else(|| invalid("opened-presentation selected shape has no text body"))?;
+        edits.push(ShapeTextEdit {
+            index,
+            shape: shape.common().span()?.range(xml.len())?,
+            text: replacement.text(),
+            changed: current != replacement.text(),
+        });
+    }
+    edits.sort_unstable_by_key(|edit| (edit.shape.start, edit.shape.end));
+    for pair in edits.windows(2) {
+        if pair[0].shape.end > pair[1].shape.start {
+            return Err(invalid("opened-presentation shape text selections overlap"));
+        }
+    }
+    let changed = edits.iter().filter(|edit| edit.changed).count();
+    let staged = rewrite_shape_texts(xml, &edits, max_text_bytes, max_output_bytes)?;
+    let Some(candidate) = staged.as_deref() else {
+        return Ok((None, 0));
+    };
+    let published = crate::shape::Scene::read(candidate)?;
+    if published.is_rewritten() || published.len() != scene.len() {
+        return Err(invalid(
+            "opened-presentation shape text batch changed the semantic shape graph",
+        ));
+    }
+    for edit in &edits {
+        if published.at(edit.index)?.common().text() != Some(edit.text) {
+            return Err(invalid(
+                "opened-presentation shape text batch did not round-trip semantically",
+            ));
+        }
+    }
+    Ok((staged, changed))
+}
+
+fn rewrite_shape_texts(
+    xml: &[u8],
+    edits: &[ShapeTextEdit<'_>],
+    max_text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Vec<u8>>> {
+    for edit in edits {
+        if edit.text.len() > max_text_bytes {
+            return Err(Error::Limit {
+                resource: "opened-presentation shape text bytes",
+                limit: max_text_bytes,
+            });
+        }
+        if !edit.text.chars().all(is_xml_char) {
+            return Err(invalid(
+                "opened-presentation shape text contains an invalid XML character",
+            ));
+        }
+        if edit.shape.start >= edit.shape.end || edit.shape.end > xml.len() {
+            return Err(invalid("opened-presentation shape range is invalid"));
+        }
+    }
+    let mut owners = Vec::new();
+    owners
+        .try_reserve_exact(edits.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text owner ranges",
+            source,
+        })?;
+    owners.extend(edits.iter().map(|edit| edit.shape.clone()));
+    let elements = drawing_text_elements_for_owners(xml, &owners)?;
+    if elements.iter().any(Vec::is_empty) {
+        return Err(invalid(
+            "opened-presentation selected shape has no DrawingML text run",
+        ));
+    }
+    if !edits.iter().any(|edit| edit.changed) {
+        return Ok(None);
+    }
+    let mut escaped = Vec::new();
+    escaped
+        .try_reserve_exact(edits.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation escaped shape texts",
+            source,
+        })?;
+    escaped.extend(
+        edits
+            .iter()
+            .map(|edit| quick_xml::escape::escape(edit.text)),
+    );
+    let mut removed = 0usize;
+    let mut emitted = 0usize;
+    // The emission below copies the bytes between consecutive spans, so the
+    // spans it writes must be in bounds, in document order and disjoint. The
+    // locator produces them that way; a violation is refused here rather
+    // than reaching a slice.
+    let mut planned_end = 0usize;
+    for ((edit, spans), replacement) in edits.iter().zip(&elements).zip(&escaped) {
+        if !edit.changed {
+            continue;
+        }
+        for (position, span) in spans.iter().enumerate() {
+            if span.span.start < planned_end
+                || span.span.start > span.span.end
+                || span.span.end > xml.len()
+            {
+                return Err(invalid(
+                    "opened-presentation shape text spans are out of order",
+                ));
+            }
+            planned_end = span.span.end;
+            removed = removed
+                .checked_add(span.span.len())
+                .ok_or_else(|| invalid("opened-presentation shape text size overflow"))?;
+            emitted = emitted
+                .checked_add(text_element_output_len(
+                    xml,
+                    span,
+                    position,
+                    replacement.len(),
+                )?)
+                .ok_or_else(|| invalid("opened-presentation shape text size overflow"))?;
+        }
+    }
+    let output_len = xml
+        .len()
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(emitted))
+        .ok_or_else(|| invalid("opened-presentation shape text output size overflow"))?;
+    if output_len > max_output_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation shape text output bytes",
+            limit: max_output_bytes,
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text XML",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for ((edit, spans), replacement) in edits.iter().zip(&elements).zip(&escaped) {
+        if !edit.changed {
+            continue;
+        }
+        for (position, span) in spans.iter().enumerate() {
+            output.extend_from_slice(text_span_bytes(xml, cursor..span.span.start)?);
+            write_text_element(&mut output, xml, span, position, replacement.as_bytes())?;
+            cursor = span.span.end;
+        }
+    }
+    output.extend_from_slice(text_span_bytes(xml, cursor..xml.len())?);
+    if output.len() != output_len {
+        return Err(invalid(
+            "opened-presentation shape text output length changed during emission",
+        ));
+    }
+    Ok(Some(output))
+}
+
+fn text_element_output_len(
+    xml: &[u8],
+    element: &TextElement,
+    position: usize,
+    escaped_len: usize,
+) -> Result<usize> {
+    if position != 0 {
+        return Ok(element
+            .empty_name
+            .as_ref()
+            .map_or(0, |_| element.span.len()));
+    }
+    let Some(name) = &element.empty_name else {
+        return Ok(escaped_len);
+    };
+    let open_end = empty_text_open_end(text_span_bytes(xml, element.span.clone())?)?;
+    open_end
+        .checked_add(escaped_len)
+        .and_then(|length| length.checked_add(name.len()))
+        .and_then(|length| length.checked_add(4))
+        .ok_or_else(|| invalid("opened-presentation empty text expansion size overflow"))
+}
+
+fn write_text_element(
+    output: &mut Vec<u8>,
+    xml: &[u8],
+    element: &TextElement,
+    position: usize,
+    escaped: &[u8],
+) -> Result<()> {
+    if position != 0 {
+        if element.empty_name.is_some() {
+            output.extend_from_slice(text_span_bytes(xml, element.span.clone())?);
+        }
+        return Ok(());
+    }
+    let Some(name) = &element.empty_name else {
+        output.extend_from_slice(escaped);
+        return Ok(());
+    };
+    let raw = text_span_bytes(xml, element.span.clone())?;
+    let open_end = empty_text_open_end(raw)?;
+    output.extend_from_slice(&raw[..open_end]);
+    output.push(b'>');
+    output.extend_from_slice(escaped);
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name);
+    output.push(b'>');
+    Ok(())
+}
+
+/// The bytes of one planned text span, or a typed refusal for a range that is
+/// reversed or out of bounds, so no span can turn into a slicing panic.
+fn text_span_bytes(xml: &[u8], range: Range<usize>) -> Result<&[u8]> {
+    xml.get(range)
+        .ok_or_else(|| invalid("opened-presentation shape text spans are out of order"))
+}
+
+/// The bytes of `range` in `xml`, or a typed refusal for a range that is
+/// reversed or out of bounds. Every span an edit copies around comes from a
+/// reader pass over the same bytes and is ordered by construction; this keeps
+/// a violation of that invariant a refusal rather than a slicing panic.
+pub(crate) fn span_bytes(xml: &[u8], range: Range<usize>) -> Result<&[u8]> {
+    xml.get(range)
+        .ok_or_else(|| invalid("opened-presentation XML span is out of order or out of bounds"))
+}
+
+fn empty_text_open_end(raw: &[u8]) -> Result<usize> {
+    let slash = raw
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .ok_or_else(|| invalid("opened-presentation empty text tag is malformed"))?;
+    let mut open_end = slash;
+    while open_end > 0 && raw[open_end - 1].is_ascii_whitespace() {
+        open_end -= 1;
+    }
+    Ok(open_end)
+}
+
+pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
+    if fragment.is_empty() {
+        return Err(invalid(
+            "opened-presentation shape fragment cannot be empty",
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut tree_depth = None;
+    let mut trees = 0usize;
+    let mut insertion = None;
+    loop {
+        let start = position(&reader, origin)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let pml_namespace = is_presentation_namespace(&namespace);
+        let event = event.into_owned();
+        drop(namespace);
+        match event {
+            Event::Start(element) => {
+                bump(&mut nodes)?;
+                if depth >= MAX_XML_DEPTH {
+                    return Err(Error::Limit {
+                        resource: "opened-presentation XML depth",
+                        limit: MAX_XML_DEPTH,
+                    });
+                }
+                depth += 1;
+                if pml_namespace && element.local_name().as_ref() == b"spTree" {
+                    trees = trees.saturating_add(1);
+                    if trees != 1 || tree_depth.replace(depth).is_some() {
+                        return Err(invalid(
+                            "opened-presentation slide has multiple shape trees",
+                        ));
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                bump(&mut nodes)?;
+                if pml_namespace && element.local_name().as_ref() == b"spTree" {
+                    return Err(invalid(
+                        "opened-presentation cannot append to an empty shape-tree element",
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if tree_depth == Some(depth)
+                    && pml_namespace
+                    && element.local_name().as_ref() == b"spTree"
+                {
+                    insertion = Some(start);
+                    tree_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation XML depth underflow"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || tree_depth.is_some() {
+        return Err(invalid("opened-presentation slide XML is unterminated"));
+    }
+    if trees != 1 {
+        return Err(invalid(
+            "opened-presentation slide must have one shape tree",
+        ));
+    }
+    let insertion =
+        insertion.ok_or_else(|| invalid("opened-presentation slide has no shape tree"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(xml.len().saturating_add(fragment.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation appended shape XML",
+            source,
+        })?;
+    output.extend_from_slice(span_bytes(xml, 0..insertion)?);
+    output.extend_from_slice(fragment);
+    output.extend_from_slice(span_bytes(xml, insertion..xml.len())?);
+    Ok(output)
+}
+
+pub(crate) fn remap_shape_fragment(
+    source: &[u8],
+    root_source_id: u32,
+    root_name: &str,
+    shape_ids: &HashMap<u32, u32>,
+    relationships: &HashMap<String, String>,
+) -> Result<Vec<u8>> {
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut output = Vec::with_capacity(source.len());
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut remap = ShapeRemap {
+        root_source_id,
+        root_name,
+        shape_ids,
+        relationships,
+        written_shape_ids: HashSet::new(),
+    };
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) => {
+                if depth == 0 {
+                    roots = roots.saturating_add(1);
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("opened-presentation shape depth overflow"))?;
+                write_remapped_shape_start(
+                    &mut output,
+                    &element,
+                    reader.decoder(),
+                    reader.resolver(),
+                    false,
+                    &mut remap,
+                )?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    roots = roots.saturating_add(1);
+                }
+                write_remapped_shape_start(
+                    &mut output,
+                    &element,
+                    reader.decoder(),
+                    reader.resolver(),
+                    true,
+                    &mut remap,
+                )?;
+            },
+            Event::End(element) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation shape depth underflow"))?;
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(element.name().as_ref());
+                output.push(b'>');
+            },
+            Event::Text(text) => output.extend_from_slice(text.as_ref()),
+            Event::CData(data) => {
+                output.extend_from_slice(b"<![CDATA[");
+                output.extend_from_slice(data.as_ref());
+                output.extend_from_slice(b"]]");
+                output.push(b'>');
+            },
+            Event::GeneralRef(reference) => {
+                output.push(b'&');
+                output.extend_from_slice(reference.as_ref());
+                output.push(b';');
+            },
+            Event::Comment(comment) => {
+                output.extend_from_slice(b"<!--");
+                output.extend_from_slice(comment.as_ref());
+                output.extend_from_slice(b"-->");
+            },
+            Event::PI(instruction) => {
+                output.extend_from_slice(b"<?");
+                output.extend_from_slice(instruction.as_ref());
+                output.extend_from_slice(b"?>");
+            },
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation shape fragment contains document-level markup",
+                ));
+            },
+            Event::Eof => break,
+        }
+    }
+    if depth != 0 || roots != 1 || !remap.written_shape_ids.contains(&root_source_id) {
+        return Err(invalid(
+            "opened-presentation transferred shape must have one root and a complete identity map",
+        ));
+    }
+    Ok(output)
+}
+
+pub(crate) fn connector_connection_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
+    let mut reader = Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut connections = BTreeSet::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn") =>
+            {
+                let mut identity = None;
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    if attribute.key.as_ref() != b"id" {
+                        continue;
+                    }
+                    if identity.is_some() {
+                        return Err(invalid(
+                            "opened-presentation connector endpoint repeats its identity attribute",
+                        ));
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(
+                            quick_xml::XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        )
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    identity = Some(value.parse::<u32>().map_err(|_err| {
+                        invalid("opened-presentation connector endpoint identity is invalid")
+                    })?);
+                }
+                connections.insert(identity.ok_or_else(|| {
+                    invalid("opened-presentation connector endpoint identity is missing")
+                })?);
+            },
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(invalid(
+                    "opened-presentation shape fragment contains document-level markup",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(connections)
+}
+
+struct ShapeRemap<'a> {
+    root_source_id: u32,
+    root_name: &'a str,
+    shape_ids: &'a HashMap<u32, u32>,
+    relationships: &'a HashMap<String, String>,
+    written_shape_ids: HashSet<u32>,
+}
+
+fn write_remapped_shape_start(
+    output: &mut Vec<u8>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    empty: bool,
+    remap: &mut ShapeRemap<'_>,
+) -> Result<()> {
+    let is_identity = element.local_name().as_ref() == b"cNvPr";
+    let is_connection = matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn");
+    let mut attributes = Vec::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let decoded = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        attributes.push((attribute.key.as_ref().to_vec(), decoded.into_owned()));
+    }
+    let source_identity = if is_identity {
+        shape_identity_from_attributes(&attributes)?
+    } else {
+        None
+    };
+    let mapped_identity = source_identity
+        .map(|source_id| {
+            remap
+                .shape_ids
+                .get(&source_id)
+                .copied()
+                .map(|destination_id| (source_id, destination_id))
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "opened-presentation transferred shape identity {source_id} was not remapped"
+                    ))
+                })
+        })
+        .transpose()?
+        .map(|(source_id, destination_id)| {
+            if !remap.written_shape_ids.insert(source_id) {
+                return Err(invalid(format!(
+                    "opened-presentation transferred shape repeats identity {source_id}"
+                )));
+            }
+            Ok((source_id, destination_id))
+        })
+        .transpose()?;
+    output.push(b'<');
+    output.extend_from_slice(element.name().as_ref());
+    for (key, decoded) in attributes {
+        output.push(b' ');
+        output.extend_from_slice(&key);
+        output.extend_from_slice(b"=\"");
+        let value = if let Some((_source_id, destination_id)) = mapped_identity
+            && key == b"id"
+        {
+            destination_id.to_string()
+        } else if let Some((source_id, destination_id)) = mapped_identity
+            && key == b"name"
+        {
+            if source_id == remap.root_source_id {
+                remap.root_name.to_owned()
+            } else {
+                format!("{decoded} Copy {destination_id}")
+            }
+        } else if is_connection && key == b"id" {
+            let connected_id = decoded.parse::<u32>().map_err(|_err| {
+                invalid("opened-presentation connector endpoint identity is invalid")
+            })?;
+            remap
+                .shape_ids
+                .get(&connected_id)
+                .ok_or_else(|| {
+                    Error::ShapeTransfer {
+                        kind: crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
+                        detail: format!(
+                            "connector endpoint {connected_id} lies outside the planned transfer closure"
+                        ),
+                    }
+                })?
+                .to_string()
+        } else {
+            let (namespace, _) = resolver.resolve_attribute(quick_xml::name::QName(key.as_slice()));
+            let is_relationship_namespace = matches!(
+                &namespace,
+                ResolveResult::Bound(Namespace(value))
+                    if *value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
+                        || *value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
+            );
+            let is_inherited_relationship_alias = matches!(
+                &namespace,
+                ResolveResult::Unknown(prefix)
+                    if prefix.as_slice() == b"r"
+                        || remap.relationships.contains_key(decoded.as_str())
+            );
+            if is_relationship_namespace || is_inherited_relationship_alias {
+                remap
+                    .relationships
+                    .get(decoded.as_str())
+                    .cloned()
+                    .ok_or_else(|| {
+                        invalid(format!(
+                            "opened-presentation transferred relationship {decoded} was not remapped"
+                        ))
+                    })?
+            } else {
+                decoded
+            }
+        };
+        output.extend_from_slice(quick_xml::escape::escape(&value).as_bytes());
+        output.push(b'"');
+    }
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    Ok(())
+}
+
+fn shape_identity_from_attributes(attributes: &[(Vec<u8>, String)]) -> Result<Option<u32>> {
+    let mut identities = attributes
+        .iter()
+        .filter(|(key, _)| key.as_slice() == b"id")
+        .map(|(_, value)| value);
+    let Some(value) = identities.next() else {
+        return Ok(None);
+    };
+    if identities.next().is_some() {
+        return Err(invalid(
+            "opened-presentation non-visual identity has duplicate id attributes",
+        ));
+    }
+    value
+        .parse::<u32>()
+        .map(Some)
+        .map_err(|_err| invalid("opened-presentation non-visual shape identity is invalid"))
+}
+
+fn slide_id_elements(
+    xml: &[u8],
+    capture_names: bool,
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<Vec<SlideIdElement>> {
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut list_depth = None;
+    let mut lists = 0usize;
+    let mut open = None;
+    let mut elements = Vec::new();
+    loop {
+        let start = position(&reader, origin)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let pml_namespace = is_presentation_namespace(&namespace);
+        let captured_element_namespace = if capture_names
+            && elements.is_empty()
+            && list_depth == Some(depth)
+            && matches!(&event, Event::Empty(element) if element.local_name().as_ref() == b"sldId")
+        {
+            match &namespace {
+                ResolveResult::Bound(Namespace(value)) if pml_namespace => Some(clone_xml_name(
+                    value,
+                    "opened-presentation slide entry namespace",
+                )?),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let event = event.into_owned();
+        drop(namespace);
+        let end = position(&reader, origin)?;
+        match event {
+            Event::Start(element) => {
+                bump(&mut nodes)?;
+                if nodes % 256 == 0 {
+                    check_execution_context(context)?;
+                }
+                if depth >= MAX_XML_DEPTH {
+                    return Err(Error::Limit {
+                        resource: "opened-presentation XML depth",
+                        limit: MAX_XML_DEPTH,
+                    });
+                }
+                if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
+                    if depth != 1 {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list must be a direct root child",
+                        ));
+                    }
+                    lists = lists.checked_add(1).ok_or_else(|| {
+                        invalid("opened-presentation slide-ID list count overflow")
+                    })?;
+                    if lists != 1 {
+                        return Err(invalid("opened-presentation has multiple slide-ID lists"));
+                    }
+                    list_depth = Some(depth + 1);
+                } else if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if list_depth != Some(depth) {
+                        return Err(invalid(
+                            "opened-presentation slide ID is not a direct slide-list child",
+                        ));
+                    }
+                    if capture_names {
+                        return Err(invalid(
+                            "slide-copy requires empty presentation slide-ID entries",
+                        ));
+                    }
+                    if open.is_some() {
+                        return Err(invalid("opened-presentation slide IDs overlap"));
+                    }
+                    let (id, relationship_id, _relationship_attribute_name, _) =
+                        parse_slide_id(&element, &reader, false)?;
+                    open = Some(OpenElement {
+                        id,
+                        relationship_id,
+                        start,
+                        depth: depth + 1,
+                    });
+                } else if list_depth == Some(depth) {
+                    if !pml_namespace || element.local_name().as_ref() != b"sldId" {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list has an unsupported child",
+                        ));
+                    }
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                bump(&mut nodes)?;
+                if nodes % 256 == 0 {
+                    check_execution_context(context)?;
+                }
+                if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
+                    if depth != 1 || lists != 0 {
+                        return Err(invalid(
+                            "opened-presentation has an additional or nested slide-ID list",
+                        ));
+                    }
+                    lists = lists.checked_add(1).ok_or_else(|| {
+                        invalid("opened-presentation slide-ID list count overflow")
+                    })?;
+                } else if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if list_depth != Some(depth) {
+                        return Err(invalid(
+                            "opened-presentation slide ID is not a direct slide-list child",
+                        ));
+                    }
+                    let capture_element_names = capture_names && elements.is_empty();
+                    let (id, relationship_id, relationship_attribute_name, relationship_namespace) =
+                        parse_slide_id(&element, &reader, capture_element_names)?;
+                    push_slide_id_element(
+                        &mut elements,
+                        SlideIdElement {
+                            id,
+                            relationship_id,
+                            span: start..end,
+                            element_name: if capture_element_names {
+                                Some(clone_xml_name(
+                                    element.name().as_ref(),
+                                    "opened-presentation slide entry name",
+                                )?)
+                            } else {
+                                None
+                            },
+                            element_namespace: captured_element_namespace,
+                            relationship_attribute_name,
+                            relationship_namespace,
+                        },
+                    )?;
+                } else if list_depth == Some(depth) {
+                    if !pml_namespace || element.local_name().as_ref() != b"sldId" {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list has an unsupported child",
+                        ));
+                    }
+                }
+            },
+            Event::End(element) => {
+                if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if open.as_ref().is_none_or(|active| active.depth != depth) {
+                        return Err(invalid(
+                            "opened-presentation slide ID is nested or not opened",
+                        ));
+                    }
+                    let active = open
+                        .take()
+                        .ok_or_else(|| invalid("opened-presentation slide ID disappeared"))?;
+                    push_slide_id_element(
+                        &mut elements,
+                        SlideIdElement {
+                            id: active.id,
+                            relationship_id: active.relationship_id,
+                            span: active.start..end,
+                            element_name: None,
+                            element_namespace: None,
+                            relationship_attribute_name: None,
+                            relationship_namespace: None,
+                        },
+                    )?;
+                }
+                if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
+                    if list_depth != Some(depth) {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list is nested or not opened",
+                        ));
+                    }
+                    list_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation XML depth underflow"))?;
+            },
+            Event::Text(value) if list_depth == Some(depth) => {
+                if !value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("opened-presentation slide-ID list contains text"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if list_depth == Some(depth) => {
+                return Err(invalid(
+                    "opened-presentation slide-ID list contains unsupported content",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || open.is_some() || list_depth.is_some() {
+        return Err(invalid("opened-presentation XML is unterminated"));
+    }
+    if lists != 1 {
+        return Err(invalid("opened-presentation has no slide-ID list"));
+    }
+    check_execution_context(context)?;
+    Ok(elements)
+}
+
+fn push_slide_id_element(
+    elements: &mut Vec<SlideIdElement>,
+    element: SlideIdElement,
+) -> Result<()> {
+    elements
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide ID elements",
+            source,
+        })?;
+    elements.push(element);
+    Ok(())
+}
+
+fn parse_slide_id(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    capture_relationship_name: bool,
+) -> Result<(u32, String, Option<Vec<u8>>, Option<Vec<u8>>)> {
+    let value =
+        litchi_ooxml_common::xml::unqualified_attribute_value(element, b"id", reader.decoder())?
+            .ok_or_else(|| invalid("opened-presentation slide ID lacks id"))?;
+    let id = value
+        .parse::<u32>()
+        .map_err(|_err| invalid("opened-presentation slide ID is invalid"))?;
+    let relationship_id = crate::parts::relationship_attribute(element, reader)?
+        .ok_or_else(|| invalid("opened-presentation slide ID lacks r:id"))?;
+    let mut relationship_attribute_name = None;
+    let mut relationship_namespace = None;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"id" {
+            continue;
+        }
+        let resolved = reader.resolver().resolve_attribute(attribute.key).0;
+        if capture_relationship_name
+            && matches!(&resolved, ResolveResult::Bound(Namespace(value))
+                if *value == b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    || *value == b"http://purl.oclc.org/ooxml/officeDocument/relationships")
+        {
+            if relationship_attribute_name
+                .replace(clone_xml_name(
+                    attribute.key.as_ref(),
+                    "opened-presentation relationship attribute name",
+                )?)
+                .is_some()
+            {
+                return Err(invalid(
+                    "opened-presentation slide ID repeats its relationship attribute",
+                ));
+            }
+            let ResolveResult::Bound(Namespace(value)) = resolved else {
+                unreachable!("relationship namespace was matched above");
+            };
+            relationship_namespace = Some(clone_xml_name(
+                value,
+                "opened-presentation relationship namespace",
+            )?);
+        }
+    }
+    if capture_relationship_name && relationship_attribute_name.is_none() {
+        return Err(invalid(
+            "opened-presentation slide ID relationship name is unresolved",
+        ));
+    }
+    Ok((
+        id,
+        relationship_id,
+        relationship_attribute_name,
+        relationship_namespace,
+    ))
+}
+
+fn clone_xml_name(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn clone_xml_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn drawing_text_elements_for_owners(
+    xml: &[u8],
+    owners: &[Range<usize>],
+) -> Result<Vec<Vec<TextElement>>> {
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    let mut spans = Vec::new();
+    spans
+        .try_reserve_exact(owners.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation shape text span groups",
+            source,
+        })?;
+    spans.resize_with(owners.len(), Vec::new);
+    let mut active: Option<(usize, usize, usize)> = None;
+    let mut owner_position = 0usize;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        let start = position(&reader, origin)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let drawing_namespace = is_drawing(&namespace);
+        // The event borrows the input slice, not the reader; only the
+        // namespace holds the reader, so ending that borrow needs no copy of
+        // the event.
+        drop(namespace);
+        let end = position(&reader, origin)?;
+        match event {
+            Event::Start(element) => {
+                bump(&mut nodes)?;
+                if depth >= MAX_XML_DEPTH {
+                    return Err(Error::Limit {
+                        resource: "opened-presentation XML depth",
+                        limit: MAX_XML_DEPTH,
+                    });
+                }
+                depth += 1;
+                while owners
+                    .get(owner_position)
+                    .is_some_and(|owner| start >= owner.end)
+                {
+                    owner_position += 1;
+                }
+                let owner = owners
+                    .get(owner_position)
+                    .filter(|owner| owner.contains(&start));
+                if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
+                    if active.replace((end, depth, owner_position)).is_some() {
+                        return Err(invalid(
+                            "opened-presentation DrawingML text elements overlap",
+                        ));
+                    }
+                } else if active.is_some() {
+                    return Err(invalid(
+                        "opened-presentation DrawingML text contains child markup",
+                    ));
+                }
+            },
+            Event::Empty(element) => {
+                bump(&mut nodes)?;
+                while owners
+                    .get(owner_position)
+                    .is_some_and(|owner| start >= owner.end)
+                {
+                    owner_position += 1;
+                }
+                let owner = owners
+                    .get(owner_position)
+                    .filter(|owner| owner.contains(&start));
+                let text_element =
+                    owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t";
+                // Nothing may sit inside an open text element, an empty `a:t`
+                // included: recording one would give the rewrite a span that
+                // starts inside the enclosing element's span.
+                if active.is_some() {
+                    return Err(invalid(if text_element {
+                        "opened-presentation DrawingML text elements overlap"
+                    } else {
+                        "opened-presentation DrawingML text contains child markup"
+                    }));
+                }
+                if text_element {
+                    let group = spans.get_mut(owner_position).ok_or_else(|| {
+                        invalid("opened-presentation shape text span owner disappeared")
+                    })?;
+                    group.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "opened-presentation shape text spans",
+                        source,
+                    })?;
+                    group.push(TextElement {
+                        span: start..end,
+                        empty_name: Some(element.name().as_ref().to_vec()),
+                    });
+                }
+            },
+            Event::End(element) => {
+                if let Some((content_start, active_depth, owner)) = active
+                    && active_depth == depth
+                    && drawing_namespace
+                    && element.local_name().as_ref() == b"t"
+                {
+                    let group = spans.get_mut(owner).ok_or_else(|| {
+                        invalid("opened-presentation shape text span owner disappeared")
+                    })?;
+                    group.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "opened-presentation shape text spans",
+                        source,
+                    })?;
+                    group.push(TextElement {
+                        span: content_start..start,
+                        empty_name: None,
+                    });
+                    active = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("opened-presentation XML depth underflow"))?;
+            },
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            Event::Comment(_) if active.is_some() => {
+                return Err(invalid(
+                    "opened-presentation DrawingML text contains a comment",
+                ));
+            },
+            Event::Decl(_) | Event::PI(_) | Event::DocType(_) if active.is_some() => {
+                return Err(invalid(
+                    "opened-presentation DrawingML text contains forbidden markup",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || active.is_some() {
+        return Err(invalid("opened-presentation slide XML is unterminated"));
+    }
+    Ok(spans)
+}
+
+fn is_drawing(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+    )
+}
+
+fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::PRESENTATIONML_NAMESPACE
+                || *value == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE
+    )
+}
+
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("opened-presentation XML position exceeds usize"))
+}
+
+fn check_execution_context(context: Option<&litchi_core::ExecutionContext>) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(|error| {
+            Error::Opc(match error {
+                litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })?;
+    }
+    Ok(())
+}
+
+fn bump(nodes: &mut usize) -> Result<()> {
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| invalid("opened-presentation XML node count overflow"))?;
+    if *nodes > MAX_XML_NODES {
+        return Err(Error::Limit {
+            resource: "opened-presentation XML nodes",
+            limit: MAX_XML_NODES,
+        });
+    }
+    Ok(())
+}
+
+fn is_xml_char(value: char) -> bool {
+    matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
+        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
+}
+
+#[cfg(test)]
+mod compaction_tests {
+    use super::compact_changed_slide_xml;
+    use crate::Result;
+
+    fn assert_compacted(source: &[u8], expected: &[u8], root_unchanged: bool) -> Result<()> {
+        let compacted = compact_changed_slide_xml(source)?;
+        assert_eq!(compacted.xml, expected);
+        assert_eq!(compacted.root_unchanged, root_unchanged);
+        Ok(())
+    }
+
+    #[test]
+    fn outer_declaration_whitespace_keeps_the_root_witness() -> Result<()> {
+        let source = b"<?xml version=\"1.0\"?>\r\n<p:sld xmlns:p=\"urn:p\"/>\r\n";
+        let expected = b"<?xml version=\"1.0\"?><p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn bom_and_empty_root_are_included_in_the_exact_byte_contract() -> Result<()> {
+        let source = b"\xEF\xBB\xBF\n<p:sld xmlns:p=\"urn:p\"/>\n";
+        let expected = b"\xEF\xBB\xBF<p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn outside_processing_instruction_is_copied_before_root_comparison() -> Result<()> {
+        let source = b"<?litchi mode=\"x\"?>\n<p:sld xmlns:p=\"urn:p\"/>";
+        let expected = b"<?litchi mode=\"x\"?><p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn outside_comment_is_copied_before_root_comparison() -> Result<()> {
+        let source = b"<!--before-->\n<p:sld xmlns:p=\"urn:p\"/>\n<!--after-->";
+        let expected = b"<!--before--><p:sld xmlns:p=\"urn:p\"/><!--after-->";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn unknown_markup_inside_the_root_is_preserved_by_the_witness() -> Result<()> {
+        let source = b"<p:sld xmlns:p=\"urn:p\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\" mc:Ignorable=\"x\"><x:future/></p:sld>";
+        assert_compacted(source, source, true)
+    }
+
+    #[test]
+    fn root_content_whitespace_and_attribute_quote_changes_fall_back() -> Result<()> {
+        let whitespace = b"<p:sld xmlns:p=\"urn:p\"> \n <p:child/> </p:sld>";
+        assert_compacted(
+            whitespace,
+            b"<p:sld xmlns:p=\"urn:p\"><p:child/></p:sld>",
+            false,
+        )?;
+
+        let quote = b"<p:sld xmlns:p='urn:p'/>";
+        assert_compacted(quote, b"<p:sld xmlns:p=\"urn:p\"/>", false)
+    }
+
+    #[test]
+    fn entity_and_invalid_outside_markup_keep_the_existing_refusals() -> Result<()> {
+        let entity = b"<p:sld xmlns:p=\"urn:p\">&amp;</p:sld>";
+        assert_compacted(entity, entity, true)?;
+        assert!(compact_changed_slide_xml(b"<p:sld xmlns:p=\"urn:p\"/>text").is_err());
+        assert!(compact_changed_slide_xml(b"<!DOCTYPE p:sld><p:sld/>").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_root_shape_does_not_create_a_witness() {
+        assert!(compact_changed_slide_xml(b"<p:sld/> <p:sld/>").is_err());
+        assert!(compact_changed_slide_xml(b"<p:sld>").is_err());
+    }
+}

@@ -1,0 +1,79 @@
+{
+  "0821_policy_counts": {
+    "default": 54,
+    "file-only": 54,
+    "full": 54,
+    "no-sync": 54
+  },
+  "case_count": 12,
+  "counts": {
+    "0819/native": {
+      "reports": 72,
+      "sample_envelopes": 2160
+    },
+    "0819/observer": {
+      "reports": 24,
+      "sample_envelopes": 72
+    },
+    "0819/qualification": {
+      "reports": 12,
+      "sample_envelopes": 12
+    },
+    "0821/native": {
+      "reports": 144,
+      "sample_envelopes": 4320
+    },
+    "0821/observer": {
+      "reports": 48,
+      "sample_envelopes": 144
+    },
+    "0821/qualification": {
+      "reports": 24,
+      "sample_envelopes": 24
+    },
+    "0825/failed-qualification": {
+      "reports": 1,
+      "sample_envelopes": 1
+    }
+  },
+  "fixtures": {
+    "bytes": 132140,
+    "path": "docs/performance/results/change-0826/fixtures.json",
+    "sha256": "b8a075de51441265a7a94055f944911f71830da2cfac57d7d38df440ce0e159e"
+  },
+  "historical_artifact_admission": {
+    "bytes": 17287,
+    "path": "docs/performance/results/change-0825/artifact-admission-before.json",
+    "sha256": "f51dd5312db85214fb042b1fc0e4fa575d550ef32ef7b13d5df4b54fb6b4b228"
+  },
+  "historical_seals": {
+    "0819": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0819/seal.json",
+      "sha256": "5190a08231e272284f05af3c6573073d23be1b2acee9409b5b77f2410cba764e"
+    },
+    "0821": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/seal.json",
+      "sha256": "e0cc97156f5a9a45c64141864a41a752ee9c576ae98af9daa1a21d79547840e2"
+    },
+    "0825": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/seal.json",
+      "sha256": "673b0f2257f444e150311464dbc77ec161525e51597187726c6448c270646f8a"
+    }
+  },
+  "new_measurements": 0,
+  "performance_claim": null,
+  "reports": 325,
+  "sample_envelopes": 6733,
+  "schema": "litchi.performance.0827.driver-preflight.v1",
+  "status": "pass",
+  "validator": {
+    "bytes": 10254,
+    "path": "/home/zhuhe/code/litchi/tools/perf_allocation_schema.py",
+    "sha256": "baf82d34b3dfa39be592d3ac6c48da0efc66edc95a2b39a74d43d423534df97a"
+  },
+  "validator_seal": {
+    "helper_sha256": "baf82d34b3dfa39be592d3ac6c48da0efc66edc95a2b39a74d43d423534df97a",
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0826/seal.json",
+    "sha256": "3b3aee45e00c4c3bca122b8f17891f7cc7f98becb4788d5ae1d03601ec3ad666"
+  }
+}

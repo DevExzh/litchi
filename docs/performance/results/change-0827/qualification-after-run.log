@@ -1,0 +1,13 @@
+0827 qualification after 00-docx-lifecycle PASS
+0827 qualification after 01-docx-edit PASS
+0827 qualification after 02-docx-atomic_publish PASS
+0827 qualification after 03-docx-counting_publish PASS
+0827 qualification after 04-xlsx-lifecycle PASS
+0827 qualification after 05-xlsx-edit PASS
+0827 qualification after 06-xlsx-atomic_publish PASS
+0827 qualification after 07-xlsx-counting_publish PASS
+0827 qualification after 08-pptx-lifecycle PASS
+0827 qualification after 09-pptx-edit PASS
+0827 qualification after 10-pptx-atomic_publish PASS
+0827 qualification after 11-pptx-counting_publish PASS
+0827 qualification after PASS: 12 reports/12 samples

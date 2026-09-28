@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0827 — matched ordinary-save effect measured
+
+[0827](0827-ordinary-save-compaction-effect.md) Fresh matched capture completes 216 reports / 4,488 samples. On the admitted PPTX file, lifecycle p50 is 7.474618→7.304064 ms, with paired ratio 0.975058 [0.973040–0.982246]; edit ratio is 0.884765 [0.882642–0.887019]. All twelve rows, resource counters, and spread flags remain visible. No frozen p50/allocation/RSS threshold is triggered.
+
 ## 0826 — allocation schema preflight repaired
 
 [0826](0826-allocation-schema-preflight.md) A reusable vector validator passes 30 regression tests in normal and optimized Python and checks 325 pinned historical reports. The original 0825 checker failure is reproduced and corrected without changing Rust or collecting new timings. Full ordinary-save comparison remains the next measurement.

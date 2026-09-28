@@ -1,0 +1,121 @@
+[
+  {
+    "binary": "native",
+    "cargo_bin": "litchi-perf-baseline",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "ended": 1790623908.7062104,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "thin",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0827",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "exit_code": 0,
+    "features": [],
+    "leg": "after",
+    "log": {
+      "bytes": 306,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/build-after/native.log",
+      "sha256": "9b8c469d815a7cee13d4ddc1f0ed562281559d801f0edb389dd4765ce5c8e92a"
+    },
+    "schema": "litchi.performance.0827.build-receipt.v1",
+    "started": 1790623632.9497526
+  },
+  {
+    "binary": "artifacts",
+    "cargo_bin": "ordinary_save_artifacts",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "ordinary_save_artifacts"
+    ],
+    "ended": 1790623950.6443188,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "thin",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0827",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "exit_code": 0,
+    "features": [],
+    "leg": "after",
+    "log": {
+      "bytes": 162,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/build-after/artifacts.log",
+      "sha256": "a611241db709557b6022a0a875cea1880f83c1896f6b52bdd7e9d9da138a1b60"
+    },
+    "schema": "litchi.performance.0827.build-receipt.v1",
+    "started": 1790623909.1382136
+  },
+  {
+    "binary": "observer",
+    "cargo_bin": "litchi-perf-baseline-alloc",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline-alloc",
+      "--features",
+      "allocator-metrics,ordinary-save-process-metrics"
+    ],
+    "ended": 1790624211.6358044,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "thin",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0827",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "exit_code": 0,
+    "features": [
+      "allocator-metrics",
+      "ordinary-save-process-metrics"
+    ],
+    "leg": "after",
+    "log": {
+      "bytes": 162,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/build-after/observer.log",
+      "sha256": "0147b57e7371af9061621bf86b180cac0647a09204ba4ca661274af09ed9d415"
+    },
+    "schema": "litchi.performance.0827.build-receipt.v1",
+    "started": 1790623950.920209
+  }
+]

@@ -1,0 +1,3 @@
+0827 custody audit PASS: frozen full source, exact commands, six binaries, and serial capture order
+{"final": true, "reports": 216, "samples": 4488, "status": "accepted"}
+0827 retained reader attempt 13: exit 0
