@@ -1,0 +1,138 @@
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling litchi-sign v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/test-src/before/crates/litchi-sign)
+   Compiling xml-minifier v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/test-src/before/crates/xml-minifier)
+   Compiling litchi-xldm v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/test-src/before/crates/litchi-xldm)
+   Compiling litchi-ole-common v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/test-src/before/crates/litchi-ole-common)
+   Compiling litchi-opc v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/test-src/before/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.61s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0801/helper-tests/debug/deps/litchi_ole_common-52f04514e76851af)
+
+running 14 tests
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0801/helper-tests/debug/deps/litchi_opc-ca211a760f3c6097)
+
+running 14 tests
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0801/helper-tests/debug/deps/litchi_sign-147885bd9f543dbf)
+
+running 14 tests
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0801/helper-tests/debug/deps/litchi_xldm-f048a225832ad554)
+
+running 14 tests
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0801/helper-tests/debug/deps/xml_minifier-c3c1852f5a49a12f)
+
+running 14 tests
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::every_copy_of_the_module_is_the_canonical_code ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::unusual_duplicate_keys_keep_error_precedence_at_the_switch ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+   Doc-tests litchi_ole_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_opc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_sign
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_xldm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests xml_minifier
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

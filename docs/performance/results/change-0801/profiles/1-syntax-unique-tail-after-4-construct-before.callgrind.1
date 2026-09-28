@@ -1,0 +1,120 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 965814
+cmd:  /home/zhuhe/code/litchi-target-0801/attribute-boundary-probe --leg before --case syntax-unique-tail-after-4 --mode construct --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0801/profiles/1-syntax-unique-tail-after-4-construct-before.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 217957
+desc: Trigger: --dump-after=attribute_boundary_probe::before_construct
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 70 5 4
+
+
+ob=(6) /home/zhuhe/code/litchi-target-0801/attribute-boundary-probe
+fl=(164) ???
+fn=(564) (below main)
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(165) ./csu/../csu/libc-start.c
+cfn=(566) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 70 5 4
+
+fn=(596) main
+cfi=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+cfn=(598) std::rt::lang_start_internal
+calls=0 152 
+0 70 5 4
+
+fl=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(311) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/src/main.rs
+cfn=(864) attribute_boundary_probe::main
+calls=0 384 
+250 70 5 4
+fe=(249)
+
+fl=(172)
+fn=(598)
+fi=(311)
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 70 5 4
+fe=(172)
+
+fn=(860)
+cfi=(249)
+cfn=(862)
+calls=0 162 
+206 70 5 4
+
+fl=(250)
+fn=(864)
+cfn=(1408) attribute_boundary_probe::before_construct
+calls=1 849 
+1029 70 5 4
+
+fn=(1408)
+849 9
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 11
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2457 1
+fi=(236)
+1916 3
+fi=(254)
+772 1 1 1
+fi=(298) /home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/src/baseline.rs
+114 16
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 3
+fe=(250)
+858 5
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+632 2 1 1
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+805 5 2 2
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+0 1
+fi=(283)
+491 3
+fe=(250)
+864 8
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 70 5 4
+
+ob=(2)
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(588) (below main)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 70 5 4
+
+fl=(165)
+fn=(566)
+cfi=(168)
+cfn=(588)
+calls=0 30 
+360 70 5 4
+
+totals: 70 5 4

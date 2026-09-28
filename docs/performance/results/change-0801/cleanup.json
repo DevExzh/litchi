@@ -1,0 +1,19 @@
+{
+  "removed_binaries": [
+    {
+      "bytes": 3090520,
+      "path": "/home/zhuhe/code/litchi-target-0801/attribute-boundary-probe",
+      "sha256": "dfe9d792e010ec9f324d22fa2faaa26ffc1c453cf6144e1c6e0bf702b37f59c7"
+    }
+  ],
+  "removed_failed_binaries": [
+    {
+      "bytes": 3090512,
+      "path": "/home/zhuhe/code/litchi-target-0801/failed-build-0/attribute-boundary-probe",
+      "sha256": "701adf451692bd7c269e47da9ed04a57af9ac4f681a6d7900f19dce58897c066"
+    }
+  ],
+  "removed_target_bytes": 180293462,
+  "target": "/home/zhuhe/code/litchi-target-0801",
+  "target_removed": true
+}

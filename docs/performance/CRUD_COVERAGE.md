@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0801 — no workflow advancement
+
+[0801](0801-xml-no-replay-preflight.md) The no-replay helper candidate fails its protected empty-input guard. All 39 direct cases and 165 isolated helper tests pass semantically, but no public CRUD, producer, cold/range or concurrency coverage is promoted.
+
 ## 0800 — malformed-input parity regression coverage
 
 [0800](0800-xml-duplicate-error-parity.md) A new differential matrix covers 540 duplicate cases and 270 lexical/nonduplicate controls per helper copy. Full affected-crate tests pass; this adds no document producer, CRUD, cold/range, or concurrency coverage.

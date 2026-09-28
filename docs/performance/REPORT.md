@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0801 — reject no-replay candidate without changing production
+
+[0801](0801-xml-no-replay-preflight.md) The candidate removes value replay and improves dominant short classes, but the frozen empty-tag regression guard vetoes advancement. The 128-byte iterator replaces a 120-byte baseline only in evidence builds. No speedup or memory claim is adopted; failed attempts, all regressions and cleanup remain retained.
+
 ## 0800 — restore the checked iterator’s first-error contract
 
 [0800](0800-xml-duplicate-error-parity.md) The five canonical helpers now return the required duplicate error and positions at the bounded handoff for unusual raw keys. Six production files change. Correctness gates pass; no candidate performance trial or adoption occurs.

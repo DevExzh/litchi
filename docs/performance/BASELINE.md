@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0801 — no-replay direct preflight rejected
+
+[0801](0801-xml-no-replay-preflight.md) Fresh paired helper measurements show one/two/three-attribute consume ratios 0.610504/0.806294/0.908208, but empty consumption regresses 7.542% with CI wholly above 1. No workflow or resource baseline is replaced; production remains unchanged.
+
 ## 0800 — correct duplicate-error parity before further performance work
 
 [0800](0800-xml-duplicate-error-parity.md) The bounded XML fallback now preserves quick-xml’s duplicate error for leading-equals keys with malformed values after 32 attributes. Five helper copies and the shared test are corrected; no performance improvement is claimed.

@@ -1,0 +1,135 @@
+{
+  "advance_to_workflow_trials": false,
+  "all_consume_regressions": [
+    {
+      "bootstrap_ci_high": 1.0770574013408063,
+      "bootstrap_ci_low": 1.0627263206018547,
+      "case": "distinct-0",
+      "change_percent_median": 7.541984476032759,
+      "mode": "consume",
+      "ratio_median": 1.0754198447603276
+    },
+    {
+      "bootstrap_ci_high": 1.7242339166180054,
+      "bootstrap_ci_low": 1.667177653590055,
+      "case": "distinct-16",
+      "change_percent_median": 68.03428653305484,
+      "mode": "consume",
+      "ratio_median": 1.6803428653305483
+    },
+    {
+      "bootstrap_ci_high": 1.6613843917553937,
+      "bootstrap_ci_low": 1.6199275820454173,
+      "case": "distinct-17",
+      "change_percent_median": 63.43889564565419,
+      "mode": "consume",
+      "ratio_median": 1.634388956456542
+    },
+    {
+      "bootstrap_ci_high": 1.667345153700808,
+      "bootstrap_ci_low": 1.5821820211906759,
+      "case": "distinct-32",
+      "change_percent_median": 59.94068882216956,
+      "mode": "consume",
+      "ratio_median": 1.5994068882216956
+    },
+    {
+      "bootstrap_ci_high": 1.6389385546332575,
+      "bootstrap_ci_low": 1.5941462082854572,
+      "case": "distinct-4",
+      "change_percent_median": 61.11774305251947,
+      "mode": "consume",
+      "ratio_median": 1.6111774305251947
+    },
+    {
+      "bootstrap_ci_high": 1.4106130826893493,
+      "bootstrap_ci_low": 1.2962247911027052,
+      "case": "distinct-5",
+      "change_percent_median": 32.750428846098686,
+      "mode": "consume",
+      "ratio_median": 1.327504288460987
+    },
+    {
+      "bootstrap_ci_high": 1.4971956039977004,
+      "bootstrap_ci_low": 1.4428792441261695,
+      "case": "distinct-8",
+      "change_percent_median": 46.69471790730739,
+      "mode": "consume",
+      "ratio_median": 1.466947179073074
+    },
+    {
+      "bootstrap_ci_high": 1.443409458929624,
+      "bootstrap_ci_low": 1.3720583616594269,
+      "case": "distinct-9",
+      "change_percent_median": 40.173724983544105,
+      "mode": "consume",
+      "ratio_median": 1.401737249835441
+    },
+    {
+      "bootstrap_ci_high": 1.487779925470576,
+      "bootstrap_ci_low": 1.4217042754302782,
+      "case": "duplicate-valid-after-4",
+      "change_percent_median": 44.74080699005194,
+      "mode": "consume",
+      "ratio_median": 1.4474080699005194
+    },
+    {
+      "bootstrap_ci_high": 1.1982240062745775,
+      "bootstrap_ci_low": 1.1446064760010626,
+      "case": "duplicate-valid-after-5",
+      "change_percent_median": 17.310258957508708,
+      "mode": "consume",
+      "ratio_median": 1.173102589575087
+    },
+    {
+      "bootstrap_ci_high": 1.6684114480547914,
+      "bootstrap_ci_low": 1.6142493269273737,
+      "case": "syntax-equals-value-after-4",
+      "change_percent_median": 63.64391026653347,
+      "mode": "consume",
+      "ratio_median": 1.6364391026653347
+    },
+    {
+      "bootstrap_ci_high": 1.6350191154084723,
+      "bootstrap_ci_low": 1.619036582514661,
+      "case": "syntax-flag-after-4",
+      "change_percent_median": 62.62102208978004,
+      "mode": "consume",
+      "ratio_median": 1.6262102208978004
+    },
+    {
+      "bootstrap_ci_high": 1.3829006531960637,
+      "bootstrap_ci_low": 1.3489962335453982,
+      "case": "syntax-unique-tail-after-4",
+      "change_percent_median": 36.77535230638171,
+      "mode": "consume",
+      "ratio_median": 1.3677535230638171
+    }
+  ],
+  "analysis": {
+    "bytes": 8160984,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/analysis.json",
+    "sha256": "b2419df7f2470efd35a26ad43766d1296822699181f1d32ec978283e83d1225c"
+  },
+  "dominant_class_benefits": {
+    "distinct-1": true,
+    "distinct-2": true
+  },
+  "independent_audit": {
+    "bytes": 16571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/root-native-audit.json",
+    "sha256": "311acab26a318b9e115a9423d1ffe79fb99960a1e3b868f838842819c655f861"
+  },
+  "production_adoption": false,
+  "protected_consume_regressions": [
+    {
+      "bootstrap_ci_high": 1.0770574013408063,
+      "bootstrap_ci_low": 1.0627263206018547,
+      "case": "distinct-0",
+      "change_percent_median": 7.541984476032759,
+      "mode": "consume",
+      "ratio_median": 1.0754198447603276
+    }
+  ],
+  "schema": "litchi.performance.0801.preflight-decision.v1"
+}

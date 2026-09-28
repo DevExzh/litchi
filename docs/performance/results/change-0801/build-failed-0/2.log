@@ -1,0 +1,21 @@
+    Checking serde_core v1.0.229
+    Checking memchr v2.8.3
+    Checking zmij v1.0.23
+    Checking itoa v1.0.18
+    Checking quick-xml v0.41.0
+    Checking serde_json v1.0.151
+    Checking serde v1.0.229
+    Checking attribute-boundary-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src)
+warning: method `unchecked_attributes` is never used
+  --> src/candidate.rs:68:8
+   |
+51 | pub trait BytesStartExt {
+   |           ------------- method in this trait
+...
+68 |     fn unchecked_attributes(&self) -> Attributes<'_>;
+   |        ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `attribute-boundary-probe` (bin "attribute-boundary-probe") generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.06s
