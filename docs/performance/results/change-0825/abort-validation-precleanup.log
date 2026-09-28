@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort_validate.py", line 188, in <module>
+    check(final=sys.argv[1:] == ["--final"])
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort_validate.py", line 85, in check
+    verify(row["log"])
+    ~~~~~~^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort_validate.py", line 25, in verify
+    path = Path(value["path"])
+                ~~~~~^^^^^^^^
+TypeError: string indices must be integers, not 'str'

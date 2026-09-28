@@ -1,0 +1,32 @@
+{
+  "action": "write",
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0825/preservation.py",
+    "--leg",
+    "before",
+    "--write"
+  ],
+  "ended": 1790619709.015156,
+  "error": null,
+  "exit_code": 0,
+  "leg": "before",
+  "log": {
+    "bytes": 36,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-before-retry1/preservation-write.log",
+    "sha256": "ea3a8cfb8fa37ad15a751b51a8ef7b4e2071fcfeb8f5e0b20b02c17d2c0e4231"
+  },
+  "report": {
+    "bytes": 847433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/zip-preservation-before.json",
+    "sha256": "d847dde761923c59b1518aa657ebbd4d1b14666731aa501992f385dfd1aa7f2d"
+  },
+  "schema": "litchi.performance.0825.preservation-attempt.v1",
+  "script": {
+    "bytes": 21533,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/preservation.py",
+    "sha256": "cc64e442c8d214b4a45b714d3046937673892e10d90d1c6c0e0eb6171fb5887f"
+  },
+  "started": 1790619708.8134334
+}

@@ -1,0 +1,33 @@
+{
+  "artifact_directory": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/artifacts-before",
+  "auditor": {
+    "bytes": 61571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/artifact_audit.py",
+    "sha256": "50ea7df9d24a4f39b757f862abbebc8c75b36f20bb48d027148241b6e1b61ce8"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0825/artifact_audit.py",
+    "--artifacts",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0825/artifacts-before",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-before/artifact-audit.json"
+  ],
+  "ended": 1790619670.932557,
+  "error": null,
+  "exit_code": 0,
+  "leg": "before",
+  "log": {
+    "bytes": 33,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-before/artifact-audit.log",
+    "sha256": "9bf5d597ef1cce6c355e1727229cc29f9433e59b89ec5ce3fdd64387b7217581"
+  },
+  "report": {
+    "bytes": 2604166,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-before/artifact-audit.json",
+    "sha256": "72a5ade5c8dea1b5568982f3dd289787a711c88c46d2f1ae98df46e988b67736"
+  },
+  "schema": "litchi.performance.0825.artifact-audit-attempt.v1",
+  "started": 1790619669.61401
+}

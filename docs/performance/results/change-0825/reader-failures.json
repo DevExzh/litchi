@@ -1,0 +1,417 @@
+{
+  "failures": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission.py",
+        "artifacts",
+        "before"
+      ],
+      "exit_code": 1,
+      "log": {
+        "bytes": 1121,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/admission-artifacts-before-run.log",
+        "sha256": "64251f64c28bb458d05138c517e8741cf3ee6305269121f2258f384e3235b587"
+      },
+      "reason": "ZIP member comment bytes passed semantic checks but were not JSON serializable; no preservation report was written.",
+      "repair": "Encode comment bytes as hex, retaining exact equality; use a new admission attempt directory.",
+      "sources": [
+        {
+          "bytes": 30560,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/admission.py",
+          "sha256": "54e2fbf36c5441cfe7a12e3e06cb876a54408d347d7716c0ce2e0c29c6de1f25"
+        },
+        {
+          "bytes": 100490,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/analysis.py",
+          "sha256": "f50013be2b79f4692b0bf759d490bf25975a9b801100a65d1c71d3cbb46b2df1"
+        },
+        {
+          "bytes": 61571,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/artifact_audit.py",
+          "sha256": "50ea7df9d24a4f39b757f862abbebc8c75b36f20bb48d027148241b6e1b61ce8"
+        },
+        {
+          "bytes": 5700,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/build.py",
+          "sha256": "e938b46f46b4526bdefe6bbc03adc4f55cf8d7bdab57d2d1040db163fe87f031"
+        },
+        {
+          "bytes": 17134,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/capture.py",
+          "sha256": "62f51d31488241e731c89633d57dc4a2e87155748a65bc806fac1183e28818ce"
+        },
+        {
+          "bytes": 2986,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/cleanup.py",
+          "sha256": "a86f77e86e8c21150e209c2d0dd487386c637b7677b9fb7e6367e333c672aa2a"
+        },
+        {
+          "bytes": 19314,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/custody.py",
+          "sha256": "613c44253232062d4f065959a352b7af25c1d2b78a4acd896b98300cba7ab499"
+        },
+        {
+          "bytes": 8760,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/custody_audit.py",
+          "sha256": "fac4bc8b6260e0602c91c705cbb9ed9b7c89f4caf3f1e5e38530423ce3b222e7"
+        },
+        {
+          "bytes": 1873,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/freeze.py",
+          "sha256": "5e926d51a3a552c66e4dab3d2e5a74f1ece3e6fd19d8961be4f6f4a6e9f57cc1"
+        },
+        {
+          "bytes": 1546,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/install_source.py",
+          "sha256": "fb7270dd91d2633d90e02e73937b49dc9a63eff3f0b0106f35f3f074af714a5a"
+        },
+        {
+          "bytes": 3495,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/prepare.py",
+          "sha256": "a840a226ae2a1a2819b757c6a1d160fb1627a910f0227f53a4620bdbe0a99f5f"
+        },
+        {
+          "bytes": 21520,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/preservation.py",
+          "sha256": "d10d0c02dde5ee3c379c4a5f59d6144ab01d502e406dff3e9f209554c8ccef3b"
+        },
+        {
+          "bytes": 5179,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/quality.py",
+          "sha256": "7d275fa6d782ac9e1c0a8f860f79f72cb4495910a7317ec3886eda495c884257"
+        },
+        {
+          "bytes": 18136,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/raw_audit.py",
+          "sha256": "8e2604217d0934287de789923112e063b2f007c9068e6cdfce31fcf8de0478c4"
+        },
+        {
+          "bytes": 2469,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/seal.py",
+          "sha256": "5f32614495083204bee75f15570cc0498eb73118bbfdbe9b783335dc4ae10da4"
+        },
+        {
+          "bytes": 11300,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/0-admission-before/validate.py",
+          "sha256": "eddcde599f5c4d22498c693d40896233cc21e504f62f92352e903d3a449c3749"
+        }
+      ]
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0825/capture.py",
+        "qualification",
+        "before"
+      ],
+      "disposition": "Abort this attempt before comparative timing; retain frozen drivers unchanged and all artifacts, source snapshots, and one qualification report.",
+      "exit_code": 1,
+      "log": {
+        "bytes": 1124,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/qualification-before-run.log",
+        "sha256": "8c55abe9a743e4f05ffb881c78b17d3551334521cb331f670e90625169df9ef4"
+      },
+      "reason": "Frozen custody.check_alloc expects scalar allocation counters; harness report contains metric objects with per-sample values arrays. Child process exit 0; wrapper exit 1.",
+      "sources": [
+        {
+          "bytes": 30607,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/admission.py",
+          "sha256": "a8d464f66981466c44ff8799e73d9e32cf7f1d04540084e7fc3f4d850ee118bc"
+        },
+        {
+          "bytes": 100490,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/analysis.py",
+          "sha256": "f50013be2b79f4692b0bf759d490bf25975a9b801100a65d1c71d3cbb46b2df1"
+        },
+        {
+          "bytes": 61571,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/artifact_audit.py",
+          "sha256": "50ea7df9d24a4f39b757f862abbebc8c75b36f20bb48d027148241b6e1b61ce8"
+        },
+        {
+          "bytes": 5700,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/build.py",
+          "sha256": "e938b46f46b4526bdefe6bbc03adc4f55cf8d7bdab57d2d1040db163fe87f031"
+        },
+        {
+          "bytes": 17134,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/capture.py",
+          "sha256": "62f51d31488241e731c89633d57dc4a2e87155748a65bc806fac1183e28818ce"
+        },
+        {
+          "bytes": 2986,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/cleanup.py",
+          "sha256": "a86f77e86e8c21150e209c2d0dd487386c637b7677b9fb7e6367e333c672aa2a"
+        },
+        {
+          "bytes": 19314,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/custody.py",
+          "sha256": "613c44253232062d4f065959a352b7af25c1d2b78a4acd896b98300cba7ab499"
+        },
+        {
+          "bytes": 8760,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/custody_audit.py",
+          "sha256": "fac4bc8b6260e0602c91c705cbb9ed9b7c89f4caf3f1e5e38530423ce3b222e7"
+        },
+        {
+          "bytes": 1873,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/freeze.py",
+          "sha256": "5e926d51a3a552c66e4dab3d2e5a74f1ece3e6fd19d8961be4f6f4a6e9f57cc1"
+        },
+        {
+          "bytes": 1546,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/install_source.py",
+          "sha256": "fb7270dd91d2633d90e02e73937b49dc9a63eff3f0b0106f35f3f074af714a5a"
+        },
+        {
+          "bytes": 3495,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/prepare.py",
+          "sha256": "a840a226ae2a1a2819b757c6a1d160fb1627a910f0227f53a4620bdbe0a99f5f"
+        },
+        {
+          "bytes": 21533,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/preservation.py",
+          "sha256": "cc64e442c8d214b4a45b714d3046937673892e10d90d1c6c0e0eb6171fb5887f"
+        },
+        {
+          "bytes": 5179,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/quality.py",
+          "sha256": "7d275fa6d782ac9e1c0a8f860f79f72cb4495910a7317ec3886eda495c884257"
+        },
+        {
+          "bytes": 18136,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/raw_audit.py",
+          "sha256": "8e2604217d0934287de789923112e063b2f007c9068e6cdfce31fcf8de0478c4"
+        },
+        {
+          "bytes": 2469,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/seal.py",
+          "sha256": "5f32614495083204bee75f15570cc0498eb73118bbfdbe9b783335dc4ae10da4"
+        },
+        {
+          "bytes": 11300,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/1-qualification-before/validate.py",
+          "sha256": "eddcde599f5c4d22498c693d40896233cc21e504f62f92352e903d3a449c3749"
+        }
+      ]
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort_validate.py"
+      ],
+      "exit_code": 1,
+      "log": {
+        "bytes": 612,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort-validation-precleanup.log",
+        "sha256": "795572fd2c8717d9f427a7f58582279f319cb5d3d6edced5f0c5420ef7e4b950"
+      },
+      "reason": "Aborted-packet validator assumed historical quality log descriptors were objects; 0824 logs use separate path, size, and hash fields.",
+      "repair": "Resolve legacy path/size/hash explicitly; no runtime or evidence changes.",
+      "sources": [
+        {
+          "bytes": 9720,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/abort_validate.py",
+          "sha256": "9f4b5ef5110c264a6ac52aa814acaf773db194f467d9ecde7d7cb906742420cc"
+        },
+        {
+          "bytes": 30607,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/admission.py",
+          "sha256": "a8d464f66981466c44ff8799e73d9e32cf7f1d04540084e7fc3f4d850ee118bc"
+        },
+        {
+          "bytes": 100490,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/analysis.py",
+          "sha256": "f50013be2b79f4692b0bf759d490bf25975a9b801100a65d1c71d3cbb46b2df1"
+        },
+        {
+          "bytes": 61571,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/artifact_audit.py",
+          "sha256": "50ea7df9d24a4f39b757f862abbebc8c75b36f20bb48d027148241b6e1b61ce8"
+        },
+        {
+          "bytes": 5700,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/build.py",
+          "sha256": "e938b46f46b4526bdefe6bbc03adc4f55cf8d7bdab57d2d1040db163fe87f031"
+        },
+        {
+          "bytes": 17134,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/capture.py",
+          "sha256": "62f51d31488241e731c89633d57dc4a2e87155748a65bc806fac1183e28818ce"
+        },
+        {
+          "bytes": 2986,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/cleanup.py",
+          "sha256": "a86f77e86e8c21150e209c2d0dd487386c637b7677b9fb7e6367e333c672aa2a"
+        },
+        {
+          "bytes": 19314,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/custody.py",
+          "sha256": "613c44253232062d4f065959a352b7af25c1d2b78a4acd896b98300cba7ab499"
+        },
+        {
+          "bytes": 8760,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/custody_audit.py",
+          "sha256": "fac4bc8b6260e0602c91c705cbb9ed9b7c89f4caf3f1e5e38530423ce3b222e7"
+        },
+        {
+          "bytes": 1873,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/freeze.py",
+          "sha256": "5e926d51a3a552c66e4dab3d2e5a74f1ece3e6fd19d8961be4f6f4a6e9f57cc1"
+        },
+        {
+          "bytes": 1546,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/install_source.py",
+          "sha256": "fb7270dd91d2633d90e02e73937b49dc9a63eff3f0b0106f35f3f074af714a5a"
+        },
+        {
+          "bytes": 2986,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/planned_cleanup.py",
+          "sha256": "a86f77e86e8c21150e209c2d0dd487386c637b7677b9fb7e6367e333c672aa2a"
+        },
+        {
+          "bytes": 3495,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/prepare.py",
+          "sha256": "a840a226ae2a1a2819b757c6a1d160fb1627a910f0227f53a4620bdbe0a99f5f"
+        },
+        {
+          "bytes": 21533,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/preservation.py",
+          "sha256": "cc64e442c8d214b4a45b714d3046937673892e10d90d1c6c0e0eb6171fb5887f"
+        },
+        {
+          "bytes": 5179,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/quality.py",
+          "sha256": "7d275fa6d782ac9e1c0a8f860f79f72cb4495910a7317ec3886eda495c884257"
+        },
+        {
+          "bytes": 18136,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/raw_audit.py",
+          "sha256": "8e2604217d0934287de789923112e063b2f007c9068e6cdfce31fcf8de0478c4"
+        },
+        {
+          "bytes": 2469,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/seal.py",
+          "sha256": "5f32614495083204bee75f15570cc0498eb73118bbfdbe9b783335dc4ae10da4"
+        },
+        {
+          "bytes": 11300,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/2-abort-validator/validate.py",
+          "sha256": "eddcde599f5c4d22498c693d40896233cc21e504f62f92352e903d3a449c3749"
+        }
+      ]
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort_validate.py"
+      ],
+      "exit_code": 1,
+      "log": {
+        "bytes": 495,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/abort-validation-precleanup-retry1.log",
+        "sha256": "7206aa7cec73e72b132402c1c20bed97f8a42fd42c483da3b0613472f4529045"
+      },
+      "reason": "Preservation replay compared Python tuples in ZIP date_time metadata with JSON arrays.",
+      "repair": "Compare canonical JSON exactly as preservation --check does, preserving all fields.",
+      "sources": [
+        {
+          "bytes": 9818,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/abort_validate.py",
+          "sha256": "349d5f93276c15534b9b7e536cab8e87fe0c00f9008e94ec223cba444ec58cdf"
+        },
+        {
+          "bytes": 30607,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/admission.py",
+          "sha256": "a8d464f66981466c44ff8799e73d9e32cf7f1d04540084e7fc3f4d850ee118bc"
+        },
+        {
+          "bytes": 100490,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/analysis.py",
+          "sha256": "f50013be2b79f4692b0bf759d490bf25975a9b801100a65d1c71d3cbb46b2df1"
+        },
+        {
+          "bytes": 61571,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/artifact_audit.py",
+          "sha256": "50ea7df9d24a4f39b757f862abbebc8c75b36f20bb48d027148241b6e1b61ce8"
+        },
+        {
+          "bytes": 5700,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/build.py",
+          "sha256": "e938b46f46b4526bdefe6bbc03adc4f55cf8d7bdab57d2d1040db163fe87f031"
+        },
+        {
+          "bytes": 17134,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/capture.py",
+          "sha256": "62f51d31488241e731c89633d57dc4a2e87155748a65bc806fac1183e28818ce"
+        },
+        {
+          "bytes": 2871,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/cleanup.py",
+          "sha256": "4d8c687ed29e0257fa108812ae6893b05539168b51baa35eef9efcba9cd30264"
+        },
+        {
+          "bytes": 19314,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/custody.py",
+          "sha256": "613c44253232062d4f065959a352b7af25c1d2b78a4acd896b98300cba7ab499"
+        },
+        {
+          "bytes": 8760,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/custody_audit.py",
+          "sha256": "fac4bc8b6260e0602c91c705cbb9ed9b7c89f4caf3f1e5e38530423ce3b222e7"
+        },
+        {
+          "bytes": 1873,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/freeze.py",
+          "sha256": "5e926d51a3a552c66e4dab3d2e5a74f1ece3e6fd19d8961be4f6f4a6e9f57cc1"
+        },
+        {
+          "bytes": 1546,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/install_source.py",
+          "sha256": "fb7270dd91d2633d90e02e73937b49dc9a63eff3f0b0106f35f3f074af714a5a"
+        },
+        {
+          "bytes": 2986,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/planned_cleanup.py",
+          "sha256": "a86f77e86e8c21150e209c2d0dd487386c637b7677b9fb7e6367e333c672aa2a"
+        },
+        {
+          "bytes": 3495,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/prepare.py",
+          "sha256": "a840a226ae2a1a2819b757c6a1d160fb1627a910f0227f53a4620bdbe0a99f5f"
+        },
+        {
+          "bytes": 21533,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/preservation.py",
+          "sha256": "cc64e442c8d214b4a45b714d3046937673892e10d90d1c6c0e0eb6171fb5887f"
+        },
+        {
+          "bytes": 5179,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/quality.py",
+          "sha256": "7d275fa6d782ac9e1c0a8f860f79f72cb4495910a7317ec3886eda495c884257"
+        },
+        {
+          "bytes": 18136,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/raw_audit.py",
+          "sha256": "8e2604217d0934287de789923112e063b2f007c9068e6cdfce31fcf8de0478c4"
+        },
+        {
+          "bytes": 2479,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/seal.py",
+          "sha256": "61315862274980dcc02a824c191e4888875272bd1b21a1bb4abf53753dec7c94"
+        },
+        {
+          "bytes": 11300,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0825/reader-failures/3-abort-validator/validate.py",
+          "sha256": "eddcde599f5c4d22498c693d40896233cc21e504f62f92352e903d3a449c3749"
+        }
+      ]
+    }
+  ],
+  "schema": "litchi.performance.0825.reader-failures.v1"
+}

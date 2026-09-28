@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0825 — ordinary-save qualification checker failed
+
+[0825](0825-ordinary-save-qualification-failure.md) Fresh quality and baseline artifact admission passed, but the frozen checker rejected per-sample allocation arrays on the first qualification report. No comparative captures or performance claims follow. Committed production is restored, failure evidence is retained, and both owned temporary roots are removed. The complete-save effect of 0824 remains open.
+
 ## 0824 — duplicate compaction reads removed with measured benefit
 
 [0824](0824-pptx-outer-whitespace-compaction.md) Both six-gate production checks and eighteen probe commands pass; candidate tests total 1,253 passed/0 failed/3 ignored. The original incorrect cold-read test assertion and complete recovery are retained. Independent replay admits the 10.407% real-edit p50 improvement with no latency/allocation veto; verified target cleanup is complete. The broader goal remains open.

@@ -1,0 +1,281 @@
+{
+  "schema": "litchi.performance.0825.plan.v1",
+  "purpose": "Fresh matched ordinary-save validation of the shipped 0824 PPTX outer-whitespace compaction against its exact pre-change source on the three real OOXML formats.",
+  "base": "032b0e89cdeb93b6a741c1712863b6687baeb6e5",
+  "cpu": 12,
+  "target": "/home/zhuhe/code/litchi-target-0825",
+  "scratch": "/home/zhuhe/code/litchi-fs-0825",
+  "scratch_marker": "litchi-performance-0825-owned-scratch-v1\n",
+  "source_allowlist": [
+    "crates/litchi-pptx/src/opened/transaction.rs",
+    "crates/litchi-pptx/src/opened/xml.rs"
+  ],
+  "candidate": {
+    "name": "shipped-0824-opened-transaction-xml-outer-whitespace-compaction",
+    "attribution": "This packet validates the already shipped 0824 change; it makes no new adoption or rejection decision.",
+    "before_archives": {
+      "crates/litchi-pptx/src/opened/transaction.rs": {
+        "path": "docs/performance/results/change-0825/candidate/before/transaction.rs",
+        "bytes": 86796,
+        "sha256": "e4a34b403fe45738047beaec7cb0a0a41d272872013fbfb1bddca2c9919f7984"
+      },
+      "crates/litchi-pptx/src/opened/xml.rs": {
+        "path": "docs/performance/results/change-0825/candidate/before/xml.rs",
+        "bytes": 69459,
+        "sha256": "1892ba1f6cfb09aa1540270f620204728d18e2b916e9f25e34d6ab3b358d2a86"
+      }
+    },
+    "after_archives": {
+      "crates/litchi-pptx/src/opened/transaction.rs": {
+        "path": "docs/performance/results/change-0825/candidate/after/transaction.rs",
+        "bytes": 93248,
+        "sha256": "01352c03f17c8cdbed0902ac582a9d94368ddce6ae3b6f79c157c89f6b7cb310"
+      },
+      "crates/litchi-pptx/src/opened/xml.rs": {
+        "path": "docs/performance/results/change-0825/candidate/after/xml.rs",
+        "bytes": 76248,
+        "sha256": "1a2c5e1f3858bae7e5a21f3c25a9bbd4838bb68079a16835e7d45d8522f57849"
+      }
+    },
+    "source_contract": "At freeze HEAD is the shipped after source. The root may temporarily install exactly the two before archive bytes for the before build/capture, then must restore the frozen after bytes. Git HEAD must remain the declared base throughout."
+  },
+  "binaries": {
+    "native": {
+      "cargo_bin": "litchi-perf-baseline",
+      "features": [],
+      "latency": "timed_native"
+    },
+    "artifacts": {
+      "cargo_bin": "ordinary_save_artifacts",
+      "features": [],
+      "latency": "untimed_artifact_export"
+    },
+    "observer": {
+      "cargo_bin": "litchi-perf-baseline-alloc",
+      "features": [
+        "allocator-metrics",
+        "ordinary-save-process-metrics"
+      ],
+      "latency": "diagnostic_observer"
+    }
+  },
+  "cases": [
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_edit",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "edit"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_counting_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "counting_publish"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "edit"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_counting_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "counting_publish"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_edit",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "edit"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_counting_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "counting_publish"
+    }
+  ],
+  "paths": {
+    "artifact_output": {
+      "before": "artifacts-before",
+      "after": "artifacts-after"
+    },
+    "artifact_complete": {
+      "before": "artifacts-before.complete.json",
+      "after": "artifacts-after.complete.json"
+    },
+    "artifact_admission": {
+      "before": "artifact-admission-before.json",
+      "after": "artifact-admission-after.json"
+    },
+    "qualification_output": {
+      "before": "qualification-before",
+      "after": "qualification-after"
+    },
+    "qualification_complete": {
+      "before": "qualification-before/complete.json",
+      "after": "qualification-after/complete.json"
+    }
+  },
+  "expected": {
+    "artifact_cases_per_leg": 6,
+    "artifact_policy_outputs_per_case": 5,
+    "qualification_reports_per_leg": 12,
+    "qualification_samples_per_leg": 12,
+    "native_reports": 144,
+    "native_samples": 4320,
+    "observer_reports": 48,
+    "observer_samples": 144,
+    "total_reports": 216,
+    "total_samples": 4488
+  },
+  "totals": {
+    "qualification_reports": 24,
+    "qualification_samples": 24,
+    "native_reports": 144,
+    "native_samples": 4320,
+    "observer_reports": 48,
+    "observer_samples": 144,
+    "reports": 216,
+    "samples": 4488
+  },
+  "lanes": {
+    "qualification": {
+      "legs": ["before", "after"],
+      "blocks": 1,
+      "orders": [["before"], ["after"]],
+      "samples": 1,
+      "warmup": 0,
+      "reports": 24,
+      "samples_total": 24,
+      "binary": "observer"
+    },
+    "native": {
+      "legs": ["before", "after"],
+      "blocks": 6,
+      "orders": [
+        ["after", "before"],
+        ["before", "after"],
+        ["after", "before"],
+        ["before", "after"],
+        ["before", "after"],
+        ["after", "before"]
+      ],
+      "samples": 30,
+      "warmup": 3,
+      "reports": 144,
+      "samples_total": 4320,
+      "binary": "native"
+    },
+    "observer": {
+      "legs": ["before", "after"],
+      "blocks": 2,
+      "orders": [
+        ["after", "before"],
+        ["before", "after"]
+      ],
+      "samples": 3,
+      "warmup": 0,
+      "reports": 48,
+      "samples_total": 144,
+      "binary": "observer"
+    }
+  },
+  "build": {
+    "jobs": 2,
+    "opt_level": 3,
+    "debug": 1,
+    "lto": "thin",
+    "codegen_units": 1,
+    "incremental": false,
+    "panic": "unwind",
+    "offline": true,
+    "locked": true,
+    "release": true
+  },
+  "bootstrap": {
+    "confidence": 0.95,
+    "resamples": 10000,
+    "seed": 825825,
+    "statistic": "paired after/before process p50 over six counterbalanced native blocks",
+    "low_rank": 250,
+    "high_rank": 9749,
+    "sorted_zero_based_endpoints": [250, 9749]
+  },
+  "policy": {
+    "purpose": "Attribute observed matched before/after differences to the already shipped 0824 change; do not make a new adoption or rejection decision.",
+    "p50_ci_flag": "Flag a case when the bootstrap lower endpoint of its paired after/before p50 ratio is greater than 1.05.",
+    "spread_flag": "Flag any lane/case/block family whose maximum divided by minimum block metric exceeds 1.05.",
+    "allocation_flag": "Flag any paired median increase in allocation calls, allocated bytes, net live bytes, or peak above entry.",
+    "rss_flag": "Flag a paired process-RSS increase above 5 percent; RSS is diagnostic and cannot establish a memory saving.",
+    "claims": "Report paired intervals and all spread/allocation/RSS flags. Do not pool native and observer latency, add phase medians, generalize beyond these three real inputs and four phases, or claim a new adoption/rejection result."
+  },
+  "inputs": {
+    "test-data/ooxml/docx/documentProperties.docx": {
+      "bytes": 23503,
+      "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx": {
+      "bytes": 8435,
+      "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    "test-data/ooxml/pptx/shapes.pptx": {
+      "bytes": 68822,
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  },
+  "corpus": {
+    "test-data/ooxml/docx/documentProperties.docx": {
+      "bytes": 23503,
+      "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx": {
+      "bytes": 8435,
+      "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    "test-data/ooxml/pptx/shapes.pptx": {
+      "bytes": 68822,
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  },
+  "regression_policy": "Attribution only: no new adoption or rejection decision.",
+  "scope": "Warm filesystem/provider caches, full durability default. The edit, atomic-publish, and counting-publish phases are separate workflows; their times are not additive. Artifact export is untimed and separately admitted for each leg."
+}
