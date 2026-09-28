@@ -1,0 +1,53 @@
+{
+  "artifacts_manifest": {
+    "bytes": 27908,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/artifacts/manifest.json",
+    "sha256": "8293d809be070c2eee6cd8773551103f36c1b2e33363b80395ff90b9c3a0e402"
+  },
+  "auditor": {
+    "bytes": 61571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0818/artifact_audit.py",
+    "sha256": "f3fbb57f7a8e10aa1b45a18874d49003cd5b033c62548265b134f8338b049026"
+  },
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0818/artifact_audit.py",
+    "--artifacts",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0817/artifacts",
+    "--report",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0818/preflight/artifact-audit.json"
+  ],
+  "exit_code": 1,
+  "expected_error_scope": {
+    "case_count": 6,
+    "error_count": 3,
+    "failing_case": "real-000-docx",
+    "output_count": 30,
+    "passing_cases": [
+      "generated-docx-medium",
+      "generated-xlsx-medium",
+      "generated-pptx-medium",
+      "real-001-xlsx",
+      "real-002-pptx"
+    ]
+  },
+  "frozen_0817_auditor": {
+    "bytes": 49320,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0817/artifact_audit.py",
+    "sha256": "f8df2023231e0f61ea67db712310654657c778d35263fd5c148c369b6afddc3c"
+  },
+  "log": {
+    "bytes": 298,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0818/preflight/audit.log",
+    "sha256": "f156e38af25990a3c058f5c9e9687303b99061a2f2c17f4ff773f55bdd94b379"
+  },
+  "report": {
+    "bytes": 2609567,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0818/preflight/artifact-audit.json",
+    "sha256": "5d61b31c43d3985395fab3ebc707b8fb6ce30bb28e2150997d3603a926509c49"
+  },
+  "schema": "litchi.performance.0818.preflight.v1",
+  "source_packet": "docs/performance/results/change-0817",
+  "source_packet_immutable": true
+}

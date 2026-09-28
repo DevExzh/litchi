@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0818 — ordinary DOCX edit/save relationship preservation
+
+[0818](0818-docx-relationship-preservation.md) A paragraph append now retains untouched relationship XML bytes, order, compressed payload, and ZIP metadata. A changed external hyperlink still serializes and reopens with its typed edge. Fresh six-case/thirty-output audit passes; native measurements remain a separate queued step.
+
 ## 0817 — ordinary-save preservation gate
 
 [0817](0817-real-file-ordinary-save.md) Current real DOCX/XLSX/PPTX edits reached artifact export. The frozen all-three-input admission failed; no qualification or timing ran. PPTX passed the local audit, DOCX reordered existing relationships, and XLSX calculation invalidation exceeded the audit’s declared closure. This adds preservation/admission evidence, not completed performance coverage.

@@ -1,0 +1,8 @@
+{
+  "ok": false,
+  "errors": [
+    "real-000-docx: OPC relationship graph changed outside the edit closure",
+    "real-000-docx: decompressed member changed outside target: word/_rels/document.xml.rels",
+    "real-000-docx: canonical XML changed outside target: word/_rels/document.xml.rels"
+  ]
+}

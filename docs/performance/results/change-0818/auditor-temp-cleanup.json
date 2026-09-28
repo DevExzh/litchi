@@ -1,0 +1,16 @@
+{
+  "agent_reported_removed": [
+    "/tmp/litchi-0818-preflight.json",
+    "/tmp/litchi-0818-preflight-2.json",
+    "/tmp/litchi-0818-preflight-2.log",
+    "/tmp/litchi-0818-preflight-check.log",
+    "/tmp/litchi-0818-preflight-check-2.log",
+    "/tmp/litchi-0818-preflight-check-final.log",
+    "/tmp/litchi-0818-preflight-check-final2.log",
+    "/tmp/litchi-0818-preflight-exit"
+  ],
+  "durable_preflight": "preflight/",
+  "root_verified_absent": true,
+  "schema": "litchi.performance.0818.auditor-temp-cleanup.v1",
+  "temporary_adversarial_directories": "agent reports TemporaryDirectory automatically cleaned"
+}

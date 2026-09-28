@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0818 — failed admission resolved with a bounded repair
+
+[0818](0818-docx-relationship-preservation.md) DOCX publication updates the existing main Part in place, preserving package-level relationship provenance while OPC checks exact semantic binding. The corrected independent audit distinguishes generated workload accounting and the exact XLSX calculation closure without relaxing DOCX ordering. All six quality gates and fresh artifact admission pass; 1,938 tests pass with 32 ignored.
+
 ## 0817 — failed admission retained
 
 [0817](0817-real-file-ordinary-save.md) The batch retains six corpora and thirty outputs with zero measured timing samples. The audit’s 22 errors include fifteen generated-metadata assumptions; exact diagnosis separates DOCX ordering from XLSX recalculation behavior. A stale feature-label test is fixed and all six quality gates pass through an explicit checked recovery. Production remains unchanged.

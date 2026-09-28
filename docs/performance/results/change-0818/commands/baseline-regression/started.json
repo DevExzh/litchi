@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--test",
+    "real_file_preservation",
+    "--",
+    "--test-threads=2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "f82bed8f77654b7fee0523440c7393cf7a7661721d4e610561681e9bc5296575",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0818"
+  },
+  "label": "baseline-regression",
+  "plan_sha256": "a08cc71f6a575edd6c75d3fcaaa7d8fba9397e42b773fc7df9da58758ce7dff3",
+  "schema": "litchi.performance.0818.command.v1",
+  "source": {
+    "path": "sources/b907c71c61bfc883a3de8be468215ad1ee7699c4baeac3120f4cd6f81cdd4d28.json",
+    "sha256": "b907c71c61bfc883a3de8be468215ad1ee7699c4baeac3120f4cd6f81cdd4d28"
+  },
+  "started": 1790594485.0375662
+}

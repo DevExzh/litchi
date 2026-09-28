@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0818 — preservation repaired; native timing remains queued
+
+[0818](0818-docx-relationship-preservation.md) Untimed fresh admission passes for six corpora and thirty outputs after repairing DOCX main-part relationship provenance. The byte-preservation regression fails on base and passes after the fix; five nonaffected corpus output hashes match 0817. No timing baseline or speedup is claimed.
+
 ## 0817 — real-file baseline not admitted
 
 [0817](0817-real-file-ordinary-save.md) Six corpora / thirty publication outputs were retained, but the independent audit rejected admission and all twelve timing cases were withheld. DOCX relationship ordering, expected XLSX recalculation changes, and generated-corpus reader assumptions are distinguished. No latency, allocation, or throughput baseline advances.

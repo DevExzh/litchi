@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0818 — untouched DOCX relationship bytes preserved
+
+[0818](0818-docx-relationship-preservation.md) The real-file regression fails before the fix and passes after it; changed hyperlink graphs remain publishable. Six quality gates pass, including 1,938 tests with 32 ignored. Independent fresh admission covers six corpora/thirty outputs plus untouched ZIP metadata and compressed payloads. No performance measurement is claimed.
+
 ## 0817 — real-file timing withheld
 
 [0817](0817-real-file-ordinary-save.md) Artifact export succeeded for six corpora across five policies, then the frozen independent audit rejected admission. No benchmark report was collected. The record distinguishes relationship reordering, expected calculation invalidation, and reader mistakes; retains failures and outputs; and fixes only a feature-dependent test expectation.

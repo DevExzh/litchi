@@ -1,0 +1,11 @@
+{
+  "purpose": "untimed preservation and semantic artifact validation",
+  "cargo_profile": "dev",
+  "manifest": "tools/perf-baseline/Cargo.toml",
+  "binary": "ordinary_save_artifacts",
+  "features": [],
+  "offline": true,
+  "locked": true,
+  "performance_timing": false,
+  "reason": "This batch establishes correctness and admission only. Native timing requires its own release-build protocol."
+}
