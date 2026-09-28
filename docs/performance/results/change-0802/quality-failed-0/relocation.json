@@ -1,0 +1,8 @@
+{
+  "candidate": "candidate-failed-0",
+  "candidate.patch": "candidate-failed-0.patch",
+  "fix": "Replace let Some(...) else return None with the equivalent question-mark operator in all five helper copies; no parser strategy change",
+  "quality": "quality-failed-0",
+  "reason": "Candidate Clippy rejected question_mark in OrderedCheck::next after both test legs passed",
+  "test-src": "test-src-failed-0"
+}

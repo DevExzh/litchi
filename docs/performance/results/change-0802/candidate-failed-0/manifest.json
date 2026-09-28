@@ -1,0 +1,49 @@
+{
+  "after": [
+    "after/litchi-ole-common-xml_attributes.rs",
+    "after/litchi-opc-xml_attributes-tests.rs",
+    "after/litchi-opc-xml_attributes.rs",
+    "after/litchi-sign-xml_attributes.rs",
+    "after/litchi-xldm-xml_attributes.rs",
+    "after/xml-minifier-xml_attributes.rs"
+  ],
+  "base_commit": "334a22f10185d6c9be291fc16e983baa73e25035",
+  "before": [
+    "before/litchi-ole-common-xml_attributes.rs",
+    "before/litchi-opc-xml_attributes-tests.rs",
+    "before/litchi-opc-xml_attributes.rs",
+    "before/litchi-sign-xml_attributes.rs",
+    "before/litchi-xldm-xml_attributes.rs",
+    "before/xml-minifier-xml_attributes.rs"
+  ],
+  "candidate_name": "checked-bounded-prefix-no-replay",
+  "implementation": {
+    "bounded_linear": "single boxed array of32 borrowed Name slices, seeded after third successful item with non-whitespace tail",
+    "complexity": "fixed32-name linear prefix then O(n log n) ordered comparisons; no hashing",
+    "empty_shortcut": "exact raw tail length zero becomes Done at construction; whitespace remains parsed",
+    "new_dependency": false,
+    "ordered_handoff": "unique33rd item checks the32 stored names, then seeds ordered map only if another raw tail remains",
+    "phase": "OwnCheck enum stored directly in Phase, no redundant outer Box",
+    "positions": "recovered from borrowed key offsets for linear duplicates and ordered-map seeding",
+    "short_prefix": "0801 first/second/third raw-key preflight without value replay",
+    "unsafe_code": false
+  },
+  "owners": [
+    "litchi-opc",
+    "litchi-ole-common",
+    "litchi-sign",
+    "litchi-xldm",
+    "xml-minifier"
+  ],
+  "production_adoption": false,
+  "production_source_changed": false,
+  "required_gates": [
+    "five-copy semantic/clone/fused/comparison-bound tests",
+    "leading-equals error-priority matrix",
+    "39-case exact semantic preflight",
+    "native and counter protocols, seed802080",
+    "fresh public-workflow/resource/cross-format gates before any adoption"
+  ],
+  "schema": "litchi.performance.0802.candidate-manifest.v1",
+  "status": "source_only_untested_at_handoff"
+}

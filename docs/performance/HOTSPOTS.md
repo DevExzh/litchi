@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0802 — constructor and syntax costs need isolation
+
+[0802](0802-xml-bounded-prefix-preflight.md) The empty shortcut improves its consume case, while flag/equals syntax after zero or two attributes regresses. Opaque construction ratios are 3.176686–3.406122, and middle-size linear checking still regresses. Separate constructor/state handling and equality-comparison controls before another combined candidate; no layout-only causal claim.
+
 ## 0801 — replay removed, early map costs exposed
 
 [0801](0801-xml-no-replay-preflight.md) Three-attribute consumption improves 9.179%, while empty tags regress 7.542% and four-to-32-attribute rows regress up to 68.034%. The next design must address both the empty path and earlier ordered-map costs while preserving early duplicate refusal; a one-case fix alone does not establish workflow suitability.

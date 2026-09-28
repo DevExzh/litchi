@@ -1,0 +1,29 @@
+    Checking litchi-ole-common v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0802/test-src/after/crates/litchi-ole-common)
+    Checking litchi-sign v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0802/test-src/after/crates/litchi-sign)
+error: this `let...else` may be rewritten with the `?` operator
+   --> crates/litchi-sign/src/xml_attributes.rs:441:9
+    |
+441 | /         let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start) else {
+442 | |             return None;
+443 | |         };
+    | |__________^ help: replace it with: `let (position, name, has_equals) = key_at(tag.as_ref(), self.next_start)?;`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#question_mark
+    = note: `-D clippy::question-mark` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::question_mark)]`
+
+error: this `let...else` may be rewritten with the `?` operator
+   --> crates/litchi-ole-common/src/xml_attributes.rs:441:9
+    |
+441 | /         let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start) else {
+442 | |             return None;
+443 | |         };
+    | |__________^ help: replace it with: `let (position, name, has_equals) = key_at(tag.as_ref(), self.next_start)?;`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#question_mark
+    = note: `-D clippy::question-mark` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::question_mark)]`
+
+error: could not compile `litchi-ole-common` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-sign` (lib test) due to 1 previous error

@@ -1,0 +1,3 @@
+[workspace]
+resolver="3"
+members=["crates/litchi-opc","crates/litchi-ole-common","crates/litchi-sign","crates/litchi-xldm","crates/xml-minifier"]

@@ -1,0 +1,29 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "86310ab19474945a28f52e1a3d595bd7a1a687f3fc51810fbc6600d01b0d4500",
+    "candidate.patch": "c70930adc46ce5f983759c3ba0594b8a2c0ca3047027dc07688baf30caafcfe3",
+    "capture.py": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d",
+    "custody.py": "fa6f92142af964601ce3415cc6676d492102efc82422fe3a0ab7f360fc61272d",
+    "decision.py": "abf7d3f70372cc3f573453ab6eae55ff393ca3351e694f4943210b84f03982cd",
+    "fixture_check.py": "6aef81d7f9fe32b3b29ddacf598705d036f008a2d4b17cf4a901575ff28dd511",
+    "fixtures.json": "5ced70a2491b0863e2d14c4aa81c38fdfd442be0faecb80c94cbe4d9ffb8f5d7",
+    "host.json": "dba9a649f50301b5bafd3a751164194459619599356ed45f855d64e2270fe8d7",
+    "inheritance.json": "b8572462f4b317315738bc7328b804c3db7c577324692dbed35a6fb8461e2de4",
+    "lock-generation.json": "2f35c681ac6bad430d82350f48c48224f700e6fefa5de1321061eea96a596a97",
+    "lock-generation.log": "80c79ba0b92c0c7696dbee779e03f63558db41c667090bd908f83dbb224990e2",
+    "origin.json": "1b20bcabec14032fe68f85498b5fc44de2079da9d1e6f2eca78e9a35ab9130e9",
+    "plan.json": "b1525e519d5fc78132a4765aa8055c9a18fc99783c136cefc3d8377f3eeb47cc",
+    "quality.py": "2724e9c70753e56b6d2c28232b1bbbe676b17e1943ced7381b68a89bedb57415",
+    "quality/archive-inputs.json": "adc9435211e40cb82964205c6107e2e5597de6d97a6c7821105639685ca651be",
+    "quality/complete.json": "dde9c0c70474a9fd60164769b5d29f6c3d864459daf6932ac9b901fe47498f1e"
+  },
+  "probe": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "src/baseline.rs": "6c7e5aeb66f1ca420f5e11af0bfa307ae1b5fd6aa29b4d3b5af57d6b9ec6fb56",
+    "src/candidate.rs": "41fe4693474583a1197af7d88f2f7ce337ca52db8b9d98d30b08926fa2908a7b",
+    "src/main.rs": "206d6a43e160b715a50aa82254a15ff6b103a4b57dedb13288797ed0856d92a2"
+  }
+}

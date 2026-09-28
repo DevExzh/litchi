@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0802 — bounded-prefix preflight rejected
+
+[0802](0802-xml-bounded-prefix-preflight.md) Fresh helper measurements improve empty/one/two-attribute consumption, but four protected syntax rows regress 7.275–34.707%. All 39 construction rows also regress. Production and public-workflow/resource baselines remain unchanged.
+
 ## 0801 — no-replay direct preflight rejected
 
 [0801](0801-xml-no-replay-preflight.md) Fresh paired helper measurements show one/two/three-attribute consume ratios 0.610504/0.806294/0.908208, but empty consumption regresses 7.542% with CI wholly above 1. No workflow or resource baseline is replaced; production remains unchanged.

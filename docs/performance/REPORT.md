@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0802 — bounded linear stage rejected at syntax boundaries
+
+[0802](0802-xml-bounded-prefix-preflight.md) Four protected consume cases veto advancement despite the required one/two-attribute benefits. All 19 consume and 39 construction regression flags remain visible; the candidate stays archived and unadopted. Production remains the corrected 0800 baseline.
+
 ## 0801 — reject no-replay candidate without changing production
 
 [0801](0801-xml-no-replay-preflight.md) The candidate removes value replay and improves dominant short classes, but the frozen empty-tag regression guard vetoes advancement. The 128-byte iterator replaces a 120-byte baseline only in evidence builds. No speedup or memory claim is adopted; failed attempts, all regressions and cleanup remain retained.
