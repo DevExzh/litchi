@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0810 — direct PPTX event transport retained
+
+[0810](0810-pptx-direct-event-workflow.md) The one-file codec candidate passes all six production quality gates and the frozen workflow policy: four capture benefits of 3.803–4.975%, zero latency vetoes, and equal allocation resource medians. All 310 reports/6,718 samples and four exact scoped profiles pass semantic/custody checks. Independent readers agree; isolated p99 increases and RSS variability remain documented. No public API or dependency change.
+
 ## 0809 — refusal-test quality repair
 
 [0809](0809-pptx-refusal-test-quality-repair.md) Replaces three err().expect expressions with expect_err, preserving all typed error assertions. Formatting, checking, 1,238 tests, warning-denied Clippy/rustdoc, and crate boundaries pass. This removes the 0808 prerequisite failure without a performance claim.

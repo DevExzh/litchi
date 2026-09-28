@@ -1,0 +1,179 @@
+{
+  "schema": "litchi.pptx.public-workflow-probe-0806.v1",
+  "tool": "public-pptx-probe-0806",
+  "mode": "capture",
+  "shape": "vendor",
+  "slides": 12,
+  "shapes_per_slide": 8,
+  "timing_scope": "Package::opened_presentation only",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 42433,
+    "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+  },
+  "fixture": {
+    "injection": "same-length-known-uri-near-misses",
+    "slide_parts": 12,
+    "replaced_text_tags": 96,
+    "namespace_declarations": 6,
+    "namespaced_attributes": 6,
+    "namespace_uris": [
+      "Xttp://schemas.openxmlformats.org/presentationml/2006/main",
+      "Xttp://purl.oclc.org/ooxml/presentationml/main",
+      "Xttp://schemas.openxmlformats.org/drawingml/2006/main",
+      "Xttp://purl.oclc.org/ooxml/drawingml/main",
+      "Xttp://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "Xttp://purl.oclc.org/ooxml/officeDocument/relationships"
+    ],
+    "attribute_names": [
+      "vP:probeP",
+      "vPS:probePS",
+      "vA:probeA",
+      "vAS:probeAS",
+      "vR:probeR",
+      "vRS:probeRS"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 3,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 599443,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 599443,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+      "output": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3157,
+        "deallocation_calls": 1899,
+        "reallocation_calls": 577,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 292567,
+        "deallocated_bytes": 224346,
+        "live_bytes_before": 316661,
+        "live_bytes_after": 384882,
+        "peak_live_bytes_before": 1155372,
+        "peak_live_bytes_after": 1155372,
+        "region_peak_live_bytes": 407061
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42433,
+        "readback_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 583193,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 583193,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+      "output": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3157,
+        "deallocation_calls": 1899,
+        "reallocation_calls": 577,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 292567,
+        "deallocated_bytes": 224346,
+        "live_bytes_before": 317565,
+        "live_bytes_after": 385786,
+        "peak_live_bytes_before": 1155372,
+        "peak_live_bytes_after": 1155372,
+        "region_peak_live_bytes": 407965
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42433,
+        "readback_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 581103,
+      "metrics": {
+        "captured_shapes_per_slide": 8,
+        "captured_slides": 12,
+        "elapsed_ns": 581103,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+      "output": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 3157,
+        "deallocation_calls": 1899,
+        "reallocation_calls": 577,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 292567,
+        "deallocated_bytes": 224346,
+        "live_bytes_before": 318405,
+        "live_bytes_after": 386626,
+        "peak_live_bytes_before": 1155372,
+        "peak_live_bytes_after": 1155372,
+        "region_peak_live_bytes": 408805
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+        "semantic_text_bytes": 5087,
+        "semantic_text_sha256": "069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771",
+        "readback_bytes": 42433,
+        "readback_sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8",
+        "marker_matches": null,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "after-allocation",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "counter_revision": "serialized_region_peak_v3"
+  }
+}

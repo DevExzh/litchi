@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0810 — measured notes transport improvement retained
+
+[0810](0810-pptx-direct-event-workflow.md) The direct Reader/namespace-resolver candidate meets the frozen public workflow benefit gate in four capture cases, with zero latency/resource vetoes and all correctness gates passing. Independent numerical, source, and scoped profile reviews support retention of one codec file. All 35 architecture inputs are unchanged. This is progress toward the active OLE2/OOXML goal; ODF remains deferred and iWork excluded.
+
 ## 0809 — independent quality blocker removed
 
 [0809](0809-pptx-refusal-test-quality-repair.md) The baseline Clippy failures reproduced in 0808 are repaired in test code only. Six package quality gates pass. The event candidate remains unadopted and awaits fresh paired workflow measurements; the broader non-iWork goal remains incomplete.

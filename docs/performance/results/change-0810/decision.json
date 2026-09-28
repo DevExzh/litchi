@@ -1,0 +1,45 @@
+{
+  "adoption_eligible": true,
+  "decided_at": 1790575641.9757786,
+  "diagnostic_limits": [
+    "Three isolated paired-block p99 increases remain in the retained reports; no tail-latency improvement claim.",
+    "Process RSS is diagnostic only; all144 allocation resource comparisons are equal.",
+    "Callgrind is guest instruction attribution, not native phase fraction or speedup evidence.",
+    "Current fixture results do not establish universal document or platform improvement."
+  ],
+  "evidence": {
+    "analysis.json": {
+      "bytes": 3711216,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/analysis.json",
+      "sha256": "36b1340fb89aaefc8e4913d9b96c4e6fc4178982b65f49f019b15c266f60540c"
+    },
+    "profile-analysis.json": {
+      "bytes": 135123,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/profile-analysis.json",
+      "sha256": "cb809bd4d2b0512c223cda2f14742ca2e3d8e3c17e7980b814690c9b5a4a79d8"
+    },
+    "profile-review.md": {
+      "bytes": 2207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/profile-review.md",
+      "sha256": "d47f40b69bb1f20f9fb79f372ea6f34819d43eb573e096bd70bdf7bfdb0a9693"
+    },
+    "quality-summary.json": {
+      "bytes": 26272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-summary.json",
+      "sha256": "163e30567d7d6a70235984e80f0d1f5443b727e24463048f6097ee54740ab218"
+    },
+    "root-audit.json": {
+      "bytes": 60576,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/root-audit.json",
+      "sha256": "6ec5bb8e4215f6b829a09f80cbb041a013767d92361a8d9f8a39880aec9922a3"
+    },
+    "source-review.md": {
+      "bytes": 5738,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/source-review.md",
+      "sha256": "1bc903131010ca366c08003269dd6a65a4672ce921df0552ce77976eb077e09b"
+    }
+  },
+  "production_adoption": true,
+  "reason": "Four capture cases meet the frozen benefit threshold, with no latency veto or resource increase. All quality, semantic, source review, and scoped profile checks pass.",
+  "schema": "litchi.performance.0810.decision.v1"
+}
