@@ -1,0 +1,1047 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 1004922
+cmd:  /home/zhuhe/code/litchi-target-0803/attribute-boundary-probe --leg after --case distinct-4 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0803/profiles/0-distinct-4-consume-after.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 212240
+desc: Trigger: --dump-after=attribute_boundary_probe::after_consume
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 2390 347 21 25 4
+
+
+ob=(6) /home/zhuhe/code/litchi-target-0803/attribute-boundary-probe
+fl=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0803/probe-src/src/main.rs
+fn=(1402) attribute_boundary_probe::after_consume
+902 10
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 13
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+0 1
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2533 3
+fe=(250)
+845 2
+fi=(174)
+2457 4
+fi=(236)
+1916 2
+fi=(254)
+772 1 1 1
+0 2
+fi=(174)
+844 2
+fi=(300) /home/zhuhe/code/litchi/docs/performance/results/change-0803/probe-src/src/candidate.rs
+153 17
+0 4
+fi=(174)
+2533 8
+fe=(250)
+822 4
+fi=(174)
+2533 8
+fe=(250)
+822 12
+-5 8
++1 12
+cfi=(300)
+cfn=(1264) <attribute_boundary_probe::candidate::CheckedAttributes as core::iter::traits::iterator::Iterator>::next
+calls=4 485 
+* 1889 288 11 21 3
+* 3
+cfi=(300)
+cfn=(1264)
+calls=1 485 
+* 278 41 1 4 1
+* 32 9 2
++1 24
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 12
+fi=(299) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs
+350 4
+fi=(306) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs
+207 4
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+805 8 4 4
+fe=(250)
+0 1
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+632 3 1
+fi=(233)
+805 5 2 2
+0 1
+fi=(283)
+491 3
+fe=(250)
+914 8
+
+fn=(864) attribute_boundary_probe::main
+cfn=(1402)
+calls=1 902 
+1031 2390 347 21 25 4
+
+fl=(296) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs
+fn=(1164) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+697 24
++1 16 0 0 4
+cfn=(1166) quick_xml::events::attributes::IterState::next
+calls=121 1222 
+* 600 100 0 4
+* 20 8
++2 24
+fi=(174)
+923 28
+fe=(296)
+-50 12 0 0 4
+fi=(174)
++50 28 12
+fi=(276) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+89 16
+fe=(296)
+700 20
++3 20
+
+fn=(1176) quick_xml::events::attributes::IterState::check_for_duplicates
+1135 28
++5 8 4
++13 12
++1 32
+
+fn=(1166)
+1222 28
++1 12
+1055 12 0 0 4
+0 4
+1055 4
+fi=(276)
+568 8 4
+fi=(180) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+1720 8
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 4 4
+fe=(296)
+1224 4
+fi=(276)
+89 16
+-89 4
+fe=(296)
+1229 8
+fi=(297) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/utils.rs
+322 4 4
+fe=(296)
+1229 8
+fi=(297)
+322 4 4
+0 8 4
+fi=(180)
+1720 12
+fi=(277)
+180 4 4
+fe=(296)
+1360 36
+fi=(277)
+180 32
+0 4
+fi=(180)
+1720 4
+fi=(277)
+180 4 4
+fi=(180)
+1720 4
+fi=(277)
+180 4 4
+fe=(296)
+1242 32 8
+0 36 16
+1287 48
+cfn=(1176)
+calls=112 1135 
+* 80 4
+* 8 4
+fi=(180)
+1720 8
+fi=(277)
+180 4 4
+0 8
+fe=(296)
+1298 8
+fi=(297)
+322 4 4
+0 8 4
+fe=(296)
+0 12 4
+fi=(277)
+180 8
+fi=(180)
+1720 4
+fi=(277)
+180 4 4
+fi=(180)
+1720 4
+fi=(277)
+180 4 4
+fi=(259) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs
+2469 8
+fe=(296)
+1342 8
+fi=(180)
+659 8
+fi=(259)
+2469 8 8
+fe=(296)
+0 12
+1342 8 4
+1212 8
+0 20
+
+fl=(300)
+fn=(1264)
+485 40
++1 15 5 1
+0 10
+486 15 0 0 5 4
+166 1
+fi=(299)
+0 1
+fi=(295) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/mod.rs
+218 1
+fi=(276)
+438 2 1
+fe=(300)
+166 1 1 1
++21 1
+fi=(299)
+0 1
+fi=(295)
+218 1
+fi=(276)
+438 3 1
+0 2
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1 1
+0 1
+fe=(300)
+170 2
+cfi=(296)
+cfn=(1164)
+calls=10 697 
+* 202 30 0 3
++1 4 1
++1 1
+fi=(299)
+0 1
+350 1
+fi=(174)
+2494 2
+2301 1
+fi=(299)
+0 2
+fi=(174)
+2301 3
+923 2 1
+fi=(233)
+805 2 1
+fe=(300)
+173 3
+fi=(277)
++7 1 1
+0 3
+315 2
+fe=(300)
+573 1 1
+fi=(277)
+315 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 9 2
+fi=(174)
+923 1 1
++4 1
+fe=(300)
+569 2
+fi=(174)
+923 3 1
++4 4
+fi=(277)
+180 1 1
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 5 2
+fi=(276)
+219 5 1
+fe=(300)
+560 5 1
+0 3
+fi=(174)
+923 1 1
++4 4
+fe=(300)
+186 2 1
+0 1
+fi=(264) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs
+154 2 0 0 1
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(293) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(1128) __memcmp_avx2_movbe
+calls=10 -81 
+* 22 4
+* 1
+fe=(300)
++36 1 1
+0 1
+196 2
+cfi=(296)
+cfn=(1164)
+calls=10 697 
+* 202 30 0 3
++1 4 1
++1 1
+fi=(299)
+0 1
+350 1
+fi=(174)
+2494 2
+2301 1
+fi=(299)
+0 2
+fi=(174)
+2301 3
+923 2 1
+fi=(233)
+805 2 1
+fe=(300)
+199 3
+0 6
+503 8
+0 6
+503 8
+fi=(277)
+180 1 1
+0 3
+315 2
+fe=(300)
+573 1 1
+fi=(277)
+315 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fe=(300)
+497 12
+cfn=(1278) attribute_boundary_probe::candidate::CheckedAttributes::next_short_two
+calls=10 217 
+* 778 127 3 6
++3 20
+cfn=(1298) attribute_boundary_probe::candidate::CheckedAttributes::next_own
+calls=20 274 
+* 602 85 6 7
+
+fn=(1278)
+217 8
++5 1
+fi=(299)
+0 1
+fi=(295)
+218 1
+fi=(276)
+438 3 1
+0 2
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 9 2
+fi=(174)
+923 1 1
++4 2
+fe=(300)
+569 3
+fi=(174)
+923 4 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fe=(300)
++87 8
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+fi=(276)
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 9 2
+fi=(174)
+923 1 1
+0 1
+927 2
+fe=(300)
+569 2
+fi=(174)
+923 3 1
+0 7
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 4 2
+fi=(276)
+219 5 1
+0 1
+fe=(300)
+560 6 1
+0 2
+fi=(276)
+0 2
+fi=(174)
+923 1 1
+fe=(300)
+229 3 1
+0 6
+fi=(263) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs
+1583 3 1
+fi=(264)
+154 5 0 0 1
+cob=(2)
+cfi=(293)
+cfn=(1128)
+calls=10 -81 
+* 22 4 1
+* 3
+fi=(263)
+1584 1 1
+0 3
+1583 3 1
+fi=(264)
+154 6 0 0 1
+cob=(2)
+cfi=(293)
+cfn=(1128)
+calls=10 -81 
+* 22 4
+* 2
+fi=(263)
+1584 1 1
+0 2
+fe=(300)
+244 4
+cfi=(296)
+cfn=(1164)
+calls=10 697 
+* 202 30 0 3
++1 4 1
+0 1
+245 2 1
+0 1
+246 6
++1 1
+fi=(299)
+350 1
+0 2
+fi=(174)
+2494 3
+2301 5
+fi=(299)
+0 1
+fi=(174)
+923 3 1
+fi=(299)
+350 1
+fi=(295)
+218 1
+fi=(276)
+438 1
+fi=(299)
+-88 2 1
+fi=(277)
+180 1 1
+0 1
+315 2
+fe=(300)
+573 1 1
+fi=(277)
+315 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1 1
+fi=(276)
+438 2 1
+fi=(180)
+1720 5
+fi=(277)
+180 1 1
+fi=(276)
+-91 2
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+fi=(250)
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 10 2
+fi=(174)
+923 1 1
++4 4
+-4 3 1
+0 1
+fi=(180)
+1720 2
+fi=(277)
+180 1 1
+fi=(276)
+-91 2
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(174)
+927 4
+fi=(277)
+180 1 1
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 11 2
+fi=(174)
+923 1 1
+0 1
+fi=(243)
+14 2 0 0 1
+cob=(2)
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(650) malloc
+calls=10 3283 
+* 30 6
+fi=(245) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs
+248 2 1
+fe=(300)
+0 1
+fi=(174)
+927 2
+fi=(276)
+89 1
+fi=(245)
+289 68
+fe=(300)
++27 2
+fi=(233)
+805 2 1
+fe=(300)
+254 4
+0 1
+256 8
+
+fn=(1298)
+274 14
++1 4 2
+0 6
+276 6
+0 2
+326 4 2 2
++31 4
+fi=(174)
+923 6 2
+fi=(180)
+1720 4
+fi=(277)
+180 2 2 2
+fi=(174)
+923 1
+fi=(277)
+0 3
+fi=(276)
+89 3
+-89 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+fi=(277)
+384 2
+fe=(300)
+573 1 1
+0 2 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fe=(300)
+331 10
+fi=(263)
+745 8 2
+fi=(233)
++60 2 1
+0 6
+805 4 1
+fi=(243)
+48 2 0 0 1
+cob=(2)
+cfi=(155)
+cfn=(762) free
+calls=10 3319 
+* 33 6
+* 7
+fe=(300)
+281 1
++2 5
++1 8
+-1 5
++1 8
+fi=(277)
+0 1
+fi=(174)
+927 3
+fi=(277)
+180 1 1
+fe=(300)
+0 6
+fi=(180)
+1720 1
+fi=(277)
+390 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+384 6
+fe=(300)
+557 2 2
+0 4 2
+fi=(276)
+219 6 1
+fe=(300)
+560 5 1
+0 6
+fi=(174)
+923 1 1
+fe=(300)
+360 2 1
+0 1
+393 2
+fi=(174)
+923 1 1
+fe=(300)
+0 1
+360 1
+fi=(259)
+2468 2
+0 1
+fi=(180)
+1720 1
+fi=(277)
+180 1 1
+fi=(180)
+1720 3
+fi=(277)
+180 3 3 1
+fi=(180)
+659 6
+fi=(259)
+2469 6
+fi=(264)
+317 12
++8 9 0 0 3
+cob=(2)
+cfi=(293)
+cfn=(1128)
+calls=30 73 
+* 66 12
+* 3
++1 6
+fi=(259)
+2469 9
+fi=(236)
+443 3
+fi=(259)
+2469 3 3
+fe=(300)
+0 2
+363 1
+cfi=(296)
+cfn=(1164)
+calls=10 697 
+* 202 30 0 3
++1 4 1 1
+0 1
+364 4 1
+0 1
+365 4
+fi=(174)
+2494 2
+2301 6
+fe=(300)
+369 4 1
++1 3
++1 1
++1 1
++1 6
+0 3
+
+ob=(2)
+fl=(165) ./csu/../csu/libc-start.c
+fn=(566) __libc_start_main@@GLIBC_2.34
+cfi=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(588) (below main)
+calls=0 30 
+360 2390 347 21 25 4
+
+fl=(293)
+fn=(1128)
+73 6
++7 6
++1 6 6 1
++75 6
++10 6
++1 6
++1 6
++3 12
+401 6
++1 6 6
++5 6
++1 6
++1 6
++1 6
++1 6 6
++3 6
++1 6
++1 6
++1 6
++3 6
++1 6 6
+
+fl=(155)
+fn=(650)
+3283 1
+1269 2 1
++19 1
+3287 1
+1288 3 1
+3287 2 1
++2 3
++2 2 1
+
+ob=(6)
+fl=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+fn=(598) std::rt::lang_start_internal
+fi=(307) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 2390 347 21 25 4
+fe=(172)
+
+fn=(860)
+cfi=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+cfn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 162 
+206 2390 347 21 25 4
+
+fl=(164) ???
+fn=(564) (below main)
+cob=(2)
+cfi=(165)
+cfn=(566)
+calls=0 242 
+0 2390 347 21 25 4
+
+fn=(596) main
+cfi=(172)
+cfn=(598)
+calls=0 152 
+0 2390 347 21 25 4
+
+fl=(249)
+fn=(862)
+fi=(307)
+cfi=(250)
+cfn=(864)
+calls=0 386 
+250 2390 347 21 25 4
+fe=(249)
+
+ob=(2)
+fl=(155)
+fn=(650)
+3293 6 1
+3030 2 1
++4 4
++4 1
++1 1
+3294 1
+
+fn=(762)
+3319 1
++3 2 1
++15 2 1
+-4 3
++8 3 1
++6 3 1
++6 1
+-3 2
++3 1
+-3 1
++1 2 1
++2 3 1
+3007 1
++8 1
+-12 1
++4 3
++1 1
++7 1
+3354 1
+
+fl=(168)
+fn=(588)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 2390 347 21 25 4
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 2390 347 21 25 4
+
+totals: 2390 347 21 25 4

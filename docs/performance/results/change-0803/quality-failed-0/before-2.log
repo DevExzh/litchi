@@ -1,0 +1,8 @@
+    Checking memchr v2.8.3
+    Checking quick-xml v0.41.0
+    Checking litchi-ole-common v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0803/test-src/before/crates/litchi-ole-common)
+    Checking litchi-opc v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0803/test-src/before/crates/litchi-opc)
+    Checking litchi-sign v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0803/test-src/before/crates/litchi-sign)
+    Checking xml-minifier v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0803/test-src/before/crates/xml-minifier)
+    Checking litchi-xldm v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0803/test-src/before/crates/litchi-xldm)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.85s

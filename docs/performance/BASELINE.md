@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0803 — exact-empty check placement diagnostic
+
+[0803](0803-xml-empty-check-placement.md) Fresh measurements compare the rejected 0802 helper with only its exact-empty check moved to the first request. Construction ratios are 0.296307–0.372513; no diagnostic regression flags occur. Neither leg is production, so public-workflow and resource baselines remain unchanged.
+
 ## 0802 — bounded-prefix preflight rejected
 
 [0802](0802-xml-bounded-prefix-preflight.md) Fresh helper measurements improve empty/one/two-attribute consumption, but four protected syntax rows regress 7.275–34.707%. All 39 construction rows also regress. Production and public-workflow/resource baselines remain unchanged.

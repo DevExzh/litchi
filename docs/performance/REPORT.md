@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0803 — exact-empty check placement diagnostic
+
+[0803](0803-xml-empty-check-placement.md) A controlled relocation of the exact-empty check improves construction and early consumption against rejected 0802, with zero diagnostic regression flags and 73 spread flags retained. Both helper legs pass 100 tests and Clippy; production remains unchanged and no workflow advancement/adoption is authorized.
+
 ## 0802 — bounded linear stage rejected at syntax boundaries
 
 [0802](0802-xml-bounded-prefix-preflight.md) Four protected consume cases veto advancement despite the required one/two-attribute benefits. All 19 consume and 39 construction regression flags remain visible; the candidate stays archived and unadopted. Production remains the corrected 0800 baseline.

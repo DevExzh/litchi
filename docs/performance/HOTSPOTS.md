@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0803 — exact-empty check placement diagnostic
+
+[0803](0803-xml-empty-check-placement.md) Moving the exact-empty decision to the first request reduces opaque construction/drop cost against the rejected 0802 control. Thirty-two-attribute guest work barely changes (35,997→35,978 Ir). Isolate linear comparison cost next; this experiment provides no production comparison or unique native-time cause.
+
 ## 0802 — constructor and syntax costs need isolation
 
 [0802](0802-xml-bounded-prefix-preflight.md) The empty shortcut improves its consume case, while flag/equals syntax after zero or two attributes regresses. Opaque construction ratios are 3.176686–3.406122, and middle-size linear checking still regresses. Separate constructor/state handling and equality-comparison controls before another combined candidate; no layout-only causal claim.
