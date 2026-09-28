@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0808 — baseline qualified; paired experiment not reached
+
+[0808](0808-pptx-direct-event-handling.md) The eighteen before-only workflow reports pass exact sealed source/output/text/extension oracles. Three baseline binaries and the 36-test probe quality lane pass. Candidate production quality stops at three pre-existing Clippy errors; no paired timing or allocation result is available, and production is restored exactly.
+
 ## 0807 — current capture profile and wrapper control
 
 [0807](0807-pptx-current-capture-profile.md) Fresh unchanged-source evidence retains 44 reports/1,286 measured outputs: 36 native controls, six scoped Callgrind runs and two separate frame-pointer profiles. Ordinary tiny/medium/large capture p50 medians are 0.237846/0.465063/19.502579 ms. The large wrapper/control ratio is 0.967152 (bootstrap interval 0.962525–0.972282), a code-generation perturbation rather than an adopted speedup. Exact fixture and semantic checks pass; no historical timing pool or new memory/IO claim.

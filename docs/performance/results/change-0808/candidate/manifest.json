@@ -1,0 +1,73 @@
+{
+  "schema": "litchi.performance.0808.candidate-manifest.v1",
+  "base_commit": "d28e3dc702d84f8752a2e329c2d3fc15f5c94f06",
+  "candidate_name": "direct-reader-namespace-resolver",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "production_path": "crates/litchi-pptx/src/notes/codec.rs",
+  "before": {
+    "path": "candidate/before/codec.rs",
+    "bytes": 47465,
+    "sha256": "8485d43c99f19bda9b3510c8323aa6bc2b117fb7df262372ce82868a5397239c"
+  },
+  "after": {
+    "path": "candidate/after/codec.rs",
+    "bytes": 52375,
+    "sha256": "466e504588843a0b2538fc25ce3378b6fb9bf13aa9b0d74efebcb73ca0ebab5e"
+  },
+  "patch": {
+    "path": "candidate/candidate.patch",
+    "bytes": 9098,
+    "sha256": "e79de6eee5f93e13f021fc81e3911e1ddee24c0f7469102b5b766b72df7e73f2",
+    "scope": "one production path; git apply compatible"
+  },
+  "implementation": {
+    "reader": "quick_xml::Reader<&[u8]>",
+    "resolver": "quick_xml::name::NamespaceResolver",
+    "pending_pop": "pop before read; Empty and End set pending pop",
+    "push_order": "Start and Empty push before depth/node/root/inspection checks",
+    "namespace_error": "NamespaceError -> quick_xml::Error -> xml_error",
+    "inspector": "takes &NamespaceResolver",
+    "buffered_scan_oracle_changed": false,
+    "inspect_element_oracle_changed": false,
+    "unsafe_code": false,
+    "new_dependency": false,
+    "public_api_changed": false,
+    "ambient_state": false
+  },
+  "focused_tests": [
+    "direct_resolver_preserves_nested_empty_rebind_and_scope_pop",
+    "direct_resolver_reports_namespace_error_before_depth_limit",
+    "direct_resolver_preserves_reserved_namespace_and_declaration_cap_order"
+  ],
+  "formatting": {
+    "status": "root-owned-rustfmt-pass",
+    "manifest_hash_refresh_required": false,
+    "owner": "root"
+  },
+  "required_gates": [
+    "byte-identical before source against production base",
+    "buffered oracle and inspect_element_oracle byte identity",
+    "focused and full differential tests",
+    "format and warning-denied quality checks",
+    "fresh native/profile evidence before any adoption decision",
+    "production source restoration audit"
+  ],
+  "workflow_advancement": false,
+  "performance_claim": false,
+  "files": {
+    "notes_codec": {
+      "production_path": "crates/litchi-pptx/src/notes/codec.rs",
+      "before": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/candidate/before/codec.rs",
+        "bytes": 47465,
+        "sha256": "8485d43c99f19bda9b3510c8323aa6bc2b117fb7df262372ce82868a5397239c"
+      },
+      "after": {
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/candidate/after/codec.rs",
+        "bytes": 52375,
+        "sha256": "466e504588843a0b2538fc25ce3378b6fb9bf13aa9b0d74efebcb73ca0ebab5e"
+      }
+    }
+  }
+}

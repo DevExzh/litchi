@@ -1,0 +1,87 @@
+{
+  "candidate_and_failure_retained": true,
+  "probe_quality_before": {
+    "complete": {
+      "bytes": 570,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/probe-quality-before/complete.json",
+      "sha256": "3653b4ee3739aaca6dd6ec5b07ff9d54b8b855bd0ea6fca27ccba2a268f546e9"
+    },
+    "gates": 3,
+    "receipts": {
+      "bytes": 1840,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/probe-quality-before/receipts.json",
+      "sha256": "026d2029748c0d71738acf45124bdb62e5910acf907ffe02ff19d9dfffff0abf"
+    },
+    "tests_passed": 36
+  },
+  "production_quality_after": {
+    "checks": {
+      "bytes": 2018,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/checks.json",
+      "sha256": "c25bb84825c1d7a380bf91eb9f02f6d54d18df902ddcc57811be3b4b72b2c3fd"
+    },
+    "diagnostic": "clippy::err-expect at opened/tests.rs:464, :538, and :557",
+    "failed_gate": 4,
+    "failed_log": {
+      "bytes": 2631,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/03.log",
+      "sha256": "f406576aa16ac27c12a5e077ab2fceeece2bf12407ac8e75983fdab1f65f7808"
+    },
+    "failures": 1,
+    "gates": 4,
+    "passes": 3
+  },
+  "qualification": {
+    "audit": {
+      "bytes": 1209044,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/qualification-audit.json",
+      "sha256": "09ea4424e658df4e0531335bba3e5bee142aeeaf5050d97f56ae60b2724fc758"
+    },
+    "complete": {
+      "bytes": 655,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/qualification/complete.json",
+      "sha256": "02c6b5fb2dc2ad92af17f926eb1e61c5fd2a1ccf66de645421020dada4a0ed33"
+    },
+    "receipts": {
+      "bytes": 31816,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/qualification/receipts.json",
+      "sha256": "04d834e17306e8a8a71815a8e708866d540f1b30cd532b8a2fd676f6fbd2edde"
+    },
+    "reports": 18,
+    "samples": 18
+  },
+  "reason": "after production quality stopped at warning-denied Clippy gate 4",
+  "removed_binaries": [
+    {
+      "bytes": 14431592,
+      "kind": "native",
+      "path": "/home/zhuhe/code/litchi-target-0808/before-native",
+      "sha256": "b1f3372ac0a796a5e86725ea3856c111361fa505bfe6c5cbfdd593ab851f64e6"
+    },
+    {
+      "bytes": 14358152,
+      "kind": "allocation",
+      "path": "/home/zhuhe/code/litchi-target-0808/before-allocation",
+      "sha256": "0cd702b774deb2668b29d3a3f1b406bca96d54fd0ecd26b500b5361acb6deb54"
+    },
+    {
+      "bytes": 14432408,
+      "kind": "profile",
+      "path": "/home/zhuhe/code/litchi-target-0808/before-profile",
+      "sha256": "b8622d3c21080d234e599e3a1c7844e667b7f0ea65e6a691a384af41d79e6d74"
+    }
+  ],
+  "removed_target_bytes": 3332173284,
+  "schema": "litchi.performance.0808.early-stop-cleanup.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/restored-source.json",
+    "sha256": "1d3e7906f1467b460d4110decb365c92faa842e9bf7099336a801af13472dcf3"
+  },
+  "source_restored": true,
+  "status": "stopped-before-after-build",
+  "target": "/home/zhuhe/code/litchi-target-0808",
+  "target_removed": true,
+  "verified_before_removal": true,
+  "workflow_lanes_started": []
+}

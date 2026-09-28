@@ -1,0 +1,48 @@
+{
+  "schema": "litchi.performance.0808.early-stop-plan.v1",
+  "status": "stopped-before-after-build",
+  "reason": "The after production quality run stopped at warning-denied Clippy gate 4 after three passing gates.",
+  "required_before_receipts": {
+    "qualification_reports": 18,
+    "qualification_samples": 18,
+    "probe_quality_gates": 3,
+    "probe_tests_passed": 36
+  },
+  "required_after_receipts": {
+    "production_quality_gates_executed": 4,
+    "production_quality_passes": 3,
+    "production_quality_failures": 1,
+    "failed_gate": 4,
+    "failed_command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "diagnostic": "clippy::err-expect at crates/litchi-pptx/src/opened/tests.rs:464, :538, and :557"
+  },
+  "binary_cleanup": {
+    "target": "/home/zhuhe/code/litchi-target-0808",
+    "before_binaries": [
+      "before-native",
+      "before-allocation",
+      "before-profile"
+    ],
+    "count": 3,
+    "target_removed_after_identity_checks": true
+  },
+  "lanes_not_started": [
+    "build-after",
+    "native",
+    "allocation",
+    "profiles"
+  ],
+  "source_requirement": "root restoration must be complete and current tracked production source must equal build-before/source.json before cleanup"
+}

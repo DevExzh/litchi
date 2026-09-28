@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0808 — direct event handling deferred before performance trials
+
+[0808](0808-pptx-direct-event-handling.md) Baseline qualification passes all 18 outputs, and candidate production tests pass 1,241 tests with three ignored. Warning-denied Clippy fails on three unchanged test expressions outside the candidate file. Production is restored, failure evidence is retained, and all paired measurements are unexecuted. The next step is a separate baseline lint repair before a fresh experiment.
+
 ## 0807 — refreshed CPU attribution after the rejected iterator trial
 
 [0807](0807-pptx-current-capture-profile.md) All 44 reports/1,286 measured outputs pass exact fixture and semantic checks; scoped guest costs and native frame counts replay independently. Notes scanning remains the main observed capture path, with namespace-aware event handling the leading native leaf. The next experiment targets event handoff while preserving parser/namespace behavior; allocation reductions from rejected 0806 do not supply a timing rationale. Three builds and formatting pass, production stays unchanged, and the broad goal remains open.

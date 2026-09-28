@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0808 — semantic candidate tests without capability promotion
+
+[0808](0808-pptx-direct-event-handling.md) The six-shape capture/commit/lifecycle baseline matrix retains 18 reports/18 samples. Candidate PPTX tests pass (1,241 passed, three ignored), including three namespace-order differential tests. Existing Clippy blockers prevent performance trials. This adds no public capability, native Office, cross-format, or comprehensive CRUD coverage.
+
 ## 0807 — capture attribution only, no capability promotion
 
 [0807](0807-pptx-current-capture-profile.md) Reuses the three generated PPTX category-15 capture shapes for 36 native control reports, six scoped guest profiles and two frame-pointer profiles. The 1,286 measured outputs preserve source/output/text identities. This adds current CPU attribution, not notes-present/refusal corpus, cold/range, native Office, concurrency, cross-format or comprehensive CRUD coverage. No production optimization is retained.

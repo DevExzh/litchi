@@ -1,0 +1,43 @@
+{
+  "schema": "litchi.performance.0808.decision.v1",
+  "adoption_eligible": false,
+  "production_adoption": false,
+  "disposition": "deferred-before-performance",
+  "reason": "Candidate production quality stopped at warning-denied Clippy on three pre-existing err_expect sites in opened/tests.rs. No paired workflow or profile trial was run; performance eligibility is unmeasured. Restore the exact baseline and repair the independent baseline blocker before a fresh experiment.",
+  "failure": {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790572106.1121247,
+    "exit_code": 101,
+    "gate": 4,
+    "log": {
+      "bytes": 2631,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/03.log",
+      "sha256": "f406576aa16ac27c12a5e077ab2fceeece2bf12407ac8e75983fdab1f65f7808"
+    },
+    "started": 1790572083.877308
+  },
+  "unchanged_baseline_error_source": {
+    "path": "crates/litchi-pptx/src/opened/tests.rs",
+    "base_commit": "d28e3dc702d84f8752a2e329c2d3fc15f5c94f06",
+    "sha256": "575d4e0737c52e90a8f062f9fb3d064a2ce58551102254005f8fbfdb37a84253"
+  },
+  "completed_reports": 18,
+  "completed_samples": 18,
+  "planned_reports": 310,
+  "planned_samples": 6718,
+  "after_build_started": false,
+  "paired_capture_started": false,
+  "profile_started": false
+}

@@ -1,0 +1,11 @@
+{
+  "production_change_retained": false,
+  "reason": "Candidate production quality stopped at warning-denied Clippy on three pre-existing err_expect sites in opened/tests.rs. No paired workflow or profile trial was run; performance eligibility is unmeasured. Restore the exact baseline and repair the independent baseline blocker before a fresh experiment.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/restored-source.json",
+    "sha256": "1d3e7906f1467b460d4110decb365c92faa842e9bf7099336a801af13472dcf3"
+  },
+  "schema": "litchi.performance.0808.disposition.v1",
+  "status": "rejected"
+}
