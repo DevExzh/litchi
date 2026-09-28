@@ -149,47 +149,6 @@ fn malformed_attributes_around_the_switch_yield_what_quick_xml_yields() {
     }
 }
 
-#[test]
-fn unusual_duplicate_keys_keep_error_precedence_at_the_switch() {
-    // quick-xml's lexer accepts a leading '=' as part of a nonempty key.
-    // The bounded fallback must preserve its duplicate error even when the
-    // repeated key's value is malformed. This does not validate XML Names.
-    for count in [1, 31, 32, 33, 34, 64] {
-        for key in ["=", "=n0", "=long_name", "ordinary", "é"] {
-            for space in [" ", "\t", "\r\n"] {
-                let mut prefix = format!("e{space}{key}=\"first\"");
-                for index in 1..count {
-                    prefix.push_str(&format!("{space}n{index}=\"{index}\""));
-                }
-                for value in ["", "x", "\"open", "'open", "\"closed\"", "  "] {
-                    let content = format!("{prefix}{space}{key}{space}={space}{value}");
-                    let tag = tag(&content);
-                    let expected = quick_xml_until_error(&tag);
-                    assert!(
-                        matches!(expected.last(), Some(Err(AttrError::Duplicated(..)))),
-                        "{content}: {expected:?}"
-                    );
-                    assert_eq!(checked(&tag), expected, "{content}");
-                    let mut attributes = tag.checked_attributes();
-                    for _ in 0..count {
-                        assert!(attributes.next().unwrap().is_ok());
-                    }
-                    let mut cloned = attributes.clone();
-                    assert_eq!(attributes.next().map(owned), cloned.next().map(owned));
-                    assert!(attributes.next().is_none());
-                    assert!(attributes.next().is_none());
-                    assert!(cloned.next().is_none());
-                }
-                // Without a recognized equals sign, lexical refusal wins.
-                assert_same(&format!("{prefix}{space}{key}"));
-                assert_same(&format!("{prefix}{space}{key}{space}next=\"v\""));
-                // A different unusual key must not become a false duplicate.
-                assert_same(&format!("{prefix}{space}=fresh=\"open"));
-            }
-        }
-    }
-}
-
 /// Every sequence of three tail items after 30 to 34 distinct names.
 #[test]
 fn every_short_tail_after_the_switch_yields_what_quick_xml_yields() {
@@ -315,6 +274,88 @@ fn nothing_is_yielded_after_the_first_error() {
     assert_eq!(items.len(), 41);
     assert!(matches!(items[40], Err(AttrError::Duplicated(..))));
     assert!(tag.checked_attributes().nth(41).is_none());
+}
+
+#[test]
+fn third_and_later_boundaries_match_quick_xml_without_replay() {
+    for content in [
+        "e a=\"1\" b=\"2\" c=\"3\" d=\"4\"",
+        "e a=\"1\" b=\"2\" c=unquoted tail=\"ok\"",
+        "e a=\"1\" b=\"2\" a=\"3\" tail=\"ok\"",
+        "e a=\"1\" b=\"2\" c=",
+        "e a=\"1\" b=\"2\" c=\"unterminated",
+        "e a=\"1\" b=\"2\" c=\"3\" a=\"4\"",
+        "e a=\"1\" b=\"2\" c=\"3\" a=unquoted tail=\"ok\"",
+    ] {
+        assert_same(content);
+        let tag = tag(content);
+        let mut attributes = tag.checked_attributes();
+        let expected = quick_xml_until_error(&tag);
+        for item in expected {
+            assert_eq!(attributes.next().map(owned), Some(item), "{content}");
+        }
+        assert!(attributes.next().is_none(), "{content}");
+        assert!(attributes.next().is_none(), "{content}");
+    }
+}
+
+#[test]
+fn third_duplicate_refuses_a_long_value_without_replaying_prior_values() {
+    let first = "x".repeat(16 * 1024);
+    let second = "y".repeat(16 * 1024);
+    let third = "z".repeat(16 * 1024);
+    let content = format!("e first=\"{first}\" second=\"{second}\" first=\"{third}");
+    let tag = tag(&content);
+    let expected = quick_xml_until_error(&tag);
+    assert!(matches!(expected.last(), Some(Err(AttrError::Duplicated(..)))));
+    assert_eq!(checked(&tag), expected);
+}
+
+#[test]
+fn clone_matches_short_and_owned_backend_boundaries() {
+    for content in [
+        "e a=\"1\" b=\"2\" c=\"3\" d=\"4\"",
+        "e a=\"1\" b=\"2\" c=\"3\" a=\"4\"",
+        "e a=\"1\" b=\"2\" c=unquoted tail=\"ok\"",
+    ] {
+        for advance in 0..=4 {
+            let tag = tag(content);
+            let mut left = tag.checked_attributes();
+            for _ in 0..advance {
+                let _ = left.next();
+            }
+            let mut right = left.clone();
+            loop {
+                let left_item = left.next().map(owned);
+                let right_item = right.next().map(owned);
+                assert_eq!(left_item, right_item, "{content}, advance={advance}");
+                if left_item.is_none() {
+                    break;
+                }
+            }
+            assert!(left.next().is_none(), "{content}, advance={advance}");
+            assert!(right.next().is_none(), "{content}, advance={advance}");
+        }
+    }
+}
+
+#[test]
+fn late_backend_duplicate_preflight_preserves_error_precedence() {
+    let mut attributes = vec!["a=\"seed\"".to_owned(), "b=\"seed\"".to_owned()];
+    attributes.push("c=\"seed\"".to_owned());
+    attributes.push(format!("a=\"{}", "x".repeat(16 * 1024)));
+    let content = format!("e {}", attributes.join(" "));
+    assert_same(&content);
+    let tag = tag(&content);
+    assert!(matches!(checked(&tag).last(), Some(Err(AttrError::Duplicated(..)))));
+}
+
+#[test]
+fn late_leading_equals_key_matches_quick_xml() {
+    let mut attributes = vec!["=n0=\"seed\"".to_owned()];
+    attributes.extend(names(32).into_iter().map(|name| name));
+    attributes.push("=n0=\"unterminated".to_owned());
+    assert_same(&format!("e {}", attributes.join(" ")));
 }
 
 #[test]
@@ -460,16 +501,24 @@ fn comparisons_grow_by_about_the_factor_of_names() {
 
 #[test]
 fn quick_xml_checks_the_first_names_and_this_iterator_the_rest() {
-    // Up to 32 names the map is never touched.
-    let (items, comparisons) = comparisons_for(&format!("e {}", names(32).join(" ")));
-    assert_eq!((items, comparisons), (32, 0));
-    // The 33rd name records the first 32 and checks itself against them.
-    let (items, comparisons) = comparisons_for(&format!("e {}", names(33).join(" ")));
-    assert_eq!(items, 33);
+    // The two-item prefix never touches the ordered map.
+    for count in [1, 2] {
+        let (items, comparisons) = comparisons_for(&format!("e {}", names(count).join(" ")));
+        assert_eq!((items, comparisons), (count, 0));
+    }
+    // A final third item needs no map; a following fourth item seeds the map
+    // directly from the three borrowed keys.
+    let (items, comparisons) = comparisons_for(&format!("e {}", names(3).join(" ")));
+    assert_eq!((items, comparisons), (3, 0));
+    let (items, comparisons) = comparisons_for(&format!("e {}", names(4).join(" ")));
+    assert_eq!(items, 4);
     assert!(
-        comparisons > 0 && comparisons <= ordered_bound(33),
+        comparisons > 0 && comparisons <= ordered_bound(3),
         "{comparisons}"
     );
+    let (items, comparisons) = comparisons_for(&format!("e {}", names(32).join(" ")));
+    assert_eq!(items, 32);
+    assert!(comparisons > 0 && comparisons <= ordered_bound(32), "{comparisons}");
     assert_eq!(QUICK_XML_LINEAR_NAMES, 32);
 }
 

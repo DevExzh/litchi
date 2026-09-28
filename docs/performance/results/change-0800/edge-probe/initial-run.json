@@ -1,0 +1,34 @@
+{
+  "baseline": {
+    "bytes": 11417,
+    "path": "docs/performance/results/change-0800/edge-probe/src/baseline.rs",
+    "sha256": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821"
+  },
+  "command": "CARGO_TARGET_DIR=/home/zhuhe/code/litchi-target-0800/edge CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 cargo run --offline --manifest-path docs/performance/results/change-0800/edge-probe/Cargo.toml",
+  "exit_code": 0,
+  "limitation": "Initial exploratory command; final controlled locked build and assertions are recorded separately.",
+  "lock": {
+    "bytes": 616,
+    "path": "docs/performance/results/change-0800/edge-probe/Cargo.lock",
+    "sha256": "c481e8b3e550841e1f7d1e5459e973a335a2efe9e4f59b30c8387a143193a3bf"
+  },
+  "numeric_exit_status_observed": true,
+  "outputs": [
+    {
+      "bytes": 507,
+      "path": "docs/performance/results/change-0800/edge-probe/output.log",
+      "sha256": "9ad56df1541e0b89767cdf9785f145e978a8243357db291d2cd2ce87745619f3"
+    },
+    {
+      "bytes": 404,
+      "path": "docs/performance/results/change-0800/edge-probe/build.log",
+      "sha256": "b9b6c91ff9e773fef7323675bbc96ea4267d3723d7055cb7c853ec0db1e103ea"
+    }
+  ],
+  "source": {
+    "bytes": 703,
+    "path": "docs/performance/results/change-0800/edge-probe/initial-main.rs.txt",
+    "sha256": "f46bb6b35467f5d3845cce88925e705fe9d95f70ba455a17ea88021c400bd4b7"
+  },
+  "timestamps_recorded": false
+}

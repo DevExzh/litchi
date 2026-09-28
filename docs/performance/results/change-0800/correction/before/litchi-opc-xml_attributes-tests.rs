@@ -149,47 +149,6 @@ fn malformed_attributes_around_the_switch_yield_what_quick_xml_yields() {
     }
 }
 
-#[test]
-fn unusual_duplicate_keys_keep_error_precedence_at_the_switch() {
-    // quick-xml's lexer accepts a leading '=' as part of a nonempty key.
-    // The bounded fallback must preserve its duplicate error even when the
-    // repeated key's value is malformed. This does not validate XML Names.
-    for count in [1, 31, 32, 33, 34, 64] {
-        for key in ["=", "=n0", "=long_name", "ordinary", "é"] {
-            for space in [" ", "\t", "\r\n"] {
-                let mut prefix = format!("e{space}{key}=\"first\"");
-                for index in 1..count {
-                    prefix.push_str(&format!("{space}n{index}=\"{index}\""));
-                }
-                for value in ["", "x", "\"open", "'open", "\"closed\"", "  "] {
-                    let content = format!("{prefix}{space}{key}{space}={space}{value}");
-                    let tag = tag(&content);
-                    let expected = quick_xml_until_error(&tag);
-                    assert!(
-                        matches!(expected.last(), Some(Err(AttrError::Duplicated(..)))),
-                        "{content}: {expected:?}"
-                    );
-                    assert_eq!(checked(&tag), expected, "{content}");
-                    let mut attributes = tag.checked_attributes();
-                    for _ in 0..count {
-                        assert!(attributes.next().unwrap().is_ok());
-                    }
-                    let mut cloned = attributes.clone();
-                    assert_eq!(attributes.next().map(owned), cloned.next().map(owned));
-                    assert!(attributes.next().is_none());
-                    assert!(attributes.next().is_none());
-                    assert!(cloned.next().is_none());
-                }
-                // Without a recognized equals sign, lexical refusal wins.
-                assert_same(&format!("{prefix}{space}{key}"));
-                assert_same(&format!("{prefix}{space}{key}{space}next=\"v\""));
-                // A different unusual key must not become a false duplicate.
-                assert_same(&format!("{prefix}{space}=fresh=\"open"));
-            }
-        }
-    }
-}
-
 /// Every sequence of three tail items after 30 to 34 distinct names.
 #[test]
 fn every_short_tail_after_the_switch_yields_what_quick_xml_yields() {

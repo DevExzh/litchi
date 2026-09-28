@@ -1,7 +1,7 @@
 //! Attribute iteration for readers that stop at a start tag's first attribute
 //! error, with a worst case that stays bounded on hostile tags.
 //!
-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for the OLE2 crates,
+//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
 //! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
 //! the two in step: this module compiles the same tests, from
 //! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
@@ -29,7 +29,7 @@ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
 const QUICK_XML_LINEAR_NAMES: usize = 32;
 
 /// Bounded attribute iteration for quick-xml start tags.
-pub trait BytesStartExt {
+pub(crate) trait BytesStartExt {
     /// Iterate the tag's attributes as `BytesStart::attributes` does, up to
     /// and including the first error; nothing is yielded after it.
     ///
@@ -66,7 +66,7 @@ impl BytesStartExt for BytesStart<'_> {
 
 /// The iterator [`BytesStartExt::checked_attributes`] returns.
 #[derive(Clone, Debug)]
-pub struct CheckedAttributes<'a> {
+pub(crate) struct CheckedAttributes<'a> {
     tag: &'a BytesStart<'a>,
     attributes: Attributes<'a>,
     phase: Phase<'a>,
@@ -244,19 +244,17 @@ fn end_of(base: &[u8], attribute: &Attribute<'_>) -> usize {
 }
 
 /// The name of the attribute that starts at or after `from`, read the way
-/// quick-xml reads it: skip whitespace, consume the first byte, then scan
-/// up to `=` or whitespace; return the key and its position.
+/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+/// its position.
 fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
     let rest = tag.get(from..)?;
     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
-    // quick-xml consumes the first non-whitespace byte before looking for
-    // the delimiter. A leading `=` therefore belongs to the key.
-    let after_first = &tag[start + 1..];
-    let length = 1 + after_first
+    let name = &tag[start..];
+    let length = name
         .iter()
         .position(|byte| *byte == b'=' || is_whitespace(*byte))
-        .unwrap_or(after_first.len());
-    Some((start, &tag[start..start + length]))
+        .unwrap_or(name.len());
+    Some((start, &name[..length]))
 }
 
 /// quick-xml's whitespace: space, tab, carriage return and line feed.

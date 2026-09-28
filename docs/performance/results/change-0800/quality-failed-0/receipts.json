@@ -1,0 +1,72 @@
+[
+  {
+    "command": [
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "/home/zhuhe/code/litchi/crates/litchi-ole-common/src/xml_attributes.rs",
+      "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes.rs",
+      "/home/zhuhe/code/litchi/crates/litchi-opc/src/xml_attributes/tests.rs",
+      "/home/zhuhe/code/litchi/crates/litchi-sign/src/xml_attributes.rs",
+      "/home/zhuhe/code/litchi/crates/litchi-xldm/src/xml_attributes.rs",
+      "/home/zhuhe/code/litchi/crates/xml-minifier/src/xml_attributes.rs"
+    ],
+    "ended": 1790554133.7844284,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0800/quality/0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790554133.7578266
+  },
+  {
+    "command": [
+      "cargo",
+      "run",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0800/edge-probe/Cargo.toml"
+    ],
+    "ended": 1790554134.6918309,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1019,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0800/quality/1.log",
+      "sha256": "156c4e5ae8e4bdeb9b95da5c7c7068ec318b116aa45b32830fd5b05b41dc5cb6"
+    },
+    "started": 1790554133.9770622
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-opc",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-sign",
+      "-p",
+      "litchi-xldm",
+      "-p",
+      "xml-minifier",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790554179.19819,
+    "exit_code": 101,
+    "log": {
+      "bytes": 22262,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0800/quality/2.log",
+      "sha256": "b8aa8ab8bc514019cf0e63cc2d740ff26d960024a814c033c4de20c9a1f87ed0"
+    },
+    "started": 1790554134.8848755
+  }
+]

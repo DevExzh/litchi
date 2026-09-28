@@ -1,0 +1,6 @@
+     Locking 2 packages to latest Rust 1.95.0 compatible versions
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling attribute-error-edge-0800 v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0800/edge-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running `/home/zhuhe/code/litchi-target-0800/edge/debug/attribute-error-edge-0800`

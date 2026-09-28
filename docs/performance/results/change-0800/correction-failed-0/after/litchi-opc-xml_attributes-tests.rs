@@ -155,7 +155,7 @@ fn unusual_duplicate_keys_keep_error_precedence_at_the_switch() {
     // The bounded fallback must preserve its duplicate error even when the
     // repeated key's value is malformed. This does not validate XML Names.
     for count in [1, 31, 32, 33, 34, 64] {
-        for key in ["=", "=n0", "=long_name", "ordinary", "é"] {
+        for key in ["=", "=n0", "==n0", "ordinary", "é"] {
             for space in [" ", "\t", "\r\n"] {
                 let mut prefix = format!("e{space}{key}=\"first\"");
                 for index in 1..count {
@@ -165,10 +165,10 @@ fn unusual_duplicate_keys_keep_error_precedence_at_the_switch() {
                     let content = format!("{prefix}{space}{key}{space}={space}{value}");
                     let tag = tag(&content);
                     let expected = quick_xml_until_error(&tag);
-                    assert!(
-                        matches!(expected.last(), Some(Err(AttrError::Duplicated(..)))),
-                        "{content}: {expected:?}"
-                    );
+                    assert!(matches!(
+                        expected.last(),
+                        Some(Err(AttrError::Duplicated(..)))
+                    ));
                     assert_eq!(checked(&tag), expected, "{content}");
                     let mut attributes = tag.checked_attributes();
                     for _ in 0..count {

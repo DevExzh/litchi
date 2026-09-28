@@ -1,20 +1,34 @@
 //! Attribute iteration for readers that stop at a start tag's first attribute
 //! error, with a worst case that stays bounded on hostile tags.
 //!
-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for the OLE2 crates,
-//! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
-//! the two in step: this module compiles the same tests, from
-//! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
-//!
 //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
-//! default: a linear scan of the names before each one while there are at
-//! most 32, then a hash pre-filter whose hasher is not keyed, with a scan of
-//! every earlier name on each pre-filter hit, so its worst case grows with the
-//! square of the tag. [`BytesStartExt::checked_attributes`] yields what
-//! quick-xml's checked iterator yields up to and including its first error,
-//! and nothing after it; quick-xml checks the first 32 names and this module
-//! checks the rest in an ordered map, `O(log n)` comparisons per name and no
-//! hashing.
+//! default. It compares each name with the names before it while it has seen
+//! at most 32; from the 33rd name on it pre-filters with a hash set and, on
+//! every pre-filter hit, scans all the names before it. The pre-filter's
+//! hasher is not keyed (`DefaultHasher::new()`), so a name hashes to the same
+//! value in every process built with the same standard library: whoever writes
+//! the tag chooses how often the pre-filter hits, and each hit costs a scan of
+//! the tag's earlier names. The check's worst case therefore grows with the
+//! square of the tag, and nothing but the tag's size bounds it where no
+//! per-element limit applies.
+//!
+//! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
+//! iterator (`BytesStart::attributes`) yields up to and including its first
+//! error, and nothing after it. quick-xml checks the first 32 names with its
+//! linear scan, exactly as before; from the 33rd on its check is off and this
+//! iterator checks each name itself, in an ordered map: `O(log n)` name
+//! comparisons per attribute and no hashing, so a tag of `n` attributes costs
+//! `O(n log n)` comparisons whatever its names are. The first error is the one
+//! quick-xml reports, at the same attribute, with the same positions, so a
+//! reader that stops at an attribute's error (`?` on each item) behaves as it
+//! did with quick-xml's iterator.
+//!
+//! A reader that skips attribute errors and reads on uses
+//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
+//! and a reader that needs no duplicate check uses
+//! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
+//! disallows quick-xml's checked iteration in the crates that read untrusted
+//! OOXML and OLE2 XML, so a new call site has to choose one of the three.
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -244,19 +258,17 @@ fn end_of(base: &[u8], attribute: &Attribute<'_>) -> usize {
 }
 
 /// The name of the attribute that starts at or after `from`, read the way
-/// quick-xml reads it: skip whitespace, consume the first byte, then scan
-/// up to `=` or whitespace; return the key and its position.
+/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+/// its position.
 fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
     let rest = tag.get(from..)?;
     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
-    // quick-xml consumes the first non-whitespace byte before looking for
-    // the delimiter. A leading `=` therefore belongs to the key.
-    let after_first = &tag[start + 1..];
-    let length = 1 + after_first
+    let name = &tag[start..];
+    let length = name
         .iter()
         .position(|byte| *byte == b'=' || is_whitespace(*byte))
-        .unwrap_or(after_first.len());
-    Some((start, &tag[start..start + length]))
+        .unwrap_or(name.len());
+    Some((start, &name[..length]))
 }
 
 /// quick-xml's whitespace: space, tab, carriage return and line feed.
@@ -291,5 +303,4 @@ impl Ord for Name<'_> {
 }
 
 #[cfg(test)]
-#[path = "../../litchi-opc/src/xml_attributes/tests.rs"]
 mod tests;
