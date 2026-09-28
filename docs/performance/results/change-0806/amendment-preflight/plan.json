@@ -1,0 +1,112 @@
+{
+  "schema": "litchi.performance.0806.amendment-preflight.v1",
+  "purpose": "Fresh protected native micropreflight for the quality amendment; compare original production with the exact constructor-reuse amendment.",
+  "lineage": {
+    "prior_packet": "../change-0805",
+    "prior_seal": "../change-0805/seal.json",
+    "original_candidate_packet": "../candidate",
+    "amendment_handoff": "../candidate-quality-amendment",
+    "original_production_before": "../candidate/before",
+    "amended_candidate_after": "../candidate-quality-amendment/after",
+    "comparison": "source/before versus source/after",
+    "historical_timing_pooling": false
+  },
+  "scope": {
+    "claim": "protected native micro-input timing only",
+    "public_workflow_speedup": false,
+    "resource_claim": false,
+    "production_adoption": false,
+    "profiles": false,
+    "callgrind": false,
+    "allocator_measurement": false,
+    "native_process_elapsed_is_diagnostic": true
+  },
+  "cpu": 12,
+  "legs": ["before", "after"],
+  "modes": ["construct", "consume"],
+  "case_count": 39,
+  "clone_advances": [0, 1, 2, 3, 4, 5, 32, 33],
+  "native": {
+    "blocks": 6,
+    "orders": [
+      ["before", "after"],
+      ["after", "before"],
+      ["before", "after"],
+      ["after", "before"],
+      ["after", "before"],
+      ["before", "after"]
+    ],
+    "samples": 30,
+    "warmup": 3,
+    "iterations": 4096
+  },
+  "analysis": {
+    "bootstrap_seed": 806082,
+    "bootstrap_resamples": 10000,
+    "bootstrap_statistic": "median of six paired process-p50 ratios",
+    "process_p50": "nearest rank ceil(n/2)-1",
+    "zero_based_endpoints": [250, 9749],
+    "diagnostic_ratio_above": 1.05,
+    "diagnostic_ci_low_above": 1.0
+  },
+  "policy": {
+    "benefit_mode": "consume",
+    "benefit_cases": ["distinct-1", "distinct-2"],
+    "benefit_ratio_at_most": 0.97,
+    "benefit_ci_high_below": 1.0,
+    "protected_consume_cases": [
+      "distinct-0",
+      "distinct-1",
+      "distinct-2",
+      "duplicate-valid-after-1",
+      "duplicate-valid-after-2",
+      "duplicate-long-quoted-after-1",
+      "duplicate-long-quoted-after-2",
+      "duplicate-long-quoted-after-33",
+      "duplicate-long-unterminated-after-1",
+      "duplicate-long-unterminated-after-2",
+      "duplicate-long-unterminated-after-33",
+      "duplicate-unquoted-after-1",
+      "syntax-flag-after-0",
+      "syntax-flag-after-2",
+      "syntax-unique-tail-after-0",
+      "syntax-unique-tail-after-2",
+      "syntax-equals-value-after-0",
+      "syntax-equals-value-after-2"
+    ],
+    "protected_ratio_above": 1.05,
+    "failure_action": "retain both archives and reject amendment; do not run public workflow adoption captures",
+    "success_action": "amendment eligible only for root review; this packet never adopts production"
+  },
+  "quality": {
+    "helper_crates": ["litchi-opc", "litchi-ole-common", "litchi-sign", "litchi-xldm", "xml-minifier"],
+    "before_test_count": 70,
+    "after_test_count": 100,
+    "clippy": "offline locked workspace mirror all targets with -D warnings",
+    "format": "cargo fmt --check",
+    "source_paths": [
+      "crates/litchi-ole-common/src/xml_attributes.rs",
+      "crates/litchi-opc/src/xml_attributes.rs",
+      "crates/litchi-opc/src/xml_attributes/tests.rs",
+      "crates/litchi-sign/src/xml_attributes.rs",
+      "crates/litchi-xldm/src/xml_attributes.rs",
+      "crates/xml-minifier/src/xml_attributes.rs"
+    ]
+  },
+  "amendment": {
+    "kind": "mechanical constructor reuse",
+    "changed_helper_count": 5,
+    "required_constructor_expression": "let attributes = tag.unchecked_attributes();",
+    "forbidden_constructor_expression": "attributes.with_checks(false);",
+    "runtime_algorithm_claim": "none; only the existing helper call route is repaired",
+    "source_tests_unchanged_from_0805": true
+  },
+  "source_allowlist": [
+    "crates/litchi-ole-common/src/xml_attributes.rs",
+    "crates/litchi-opc/src/xml_attributes.rs",
+    "crates/litchi-opc/src/xml_attributes/tests.rs",
+    "crates/litchi-sign/src/xml_attributes.rs",
+    "crates/litchi-xldm/src/xml_attributes.rs",
+    "crates/xml-minifier/src/xml_attributes.rs"
+  ]
+}

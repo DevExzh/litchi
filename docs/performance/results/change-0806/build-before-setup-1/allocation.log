@@ -1,0 +1,49 @@
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src)
+warning: struct `Snapshot` is never constructed
+   --> src/allocation_metrics.rs:116:12
+    |
+116 | pub struct Snapshot {
+    |            ^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `snapshot` is never used
+   --> src/allocation_metrics.rs:132:8
+    |
+132 | pub fn snapshot() -> Snapshot {
+    |        ^^^^^^^^
+
+warning: field `segment_before` is never read
+   --> src/allocation_metrics.rs:292:5
+    |
+286 | struct ActiveRegion {
+    |        ------------ field in this struct
+...
+292 |     segment_before: CountersSnapshot,
+    |     ^^^^^^^^^^^^^^
+
+warning: methods `split` and `finish_split` are never used
+   --> src/allocation_metrics.rs:316:19
+    |
+307 | impl Region {
+    | ----------- methods in this implementation
+...
+316 |     pub(crate) fn split(&mut self) -> Option<Sample> {
+    |                   ^^^^^
+...
+352 |     pub(crate) fn finish_split(mut self) -> (Option<Sample>, Option<Sample>) {
+    |                   ^^^^^^^^^^^^
+
+warning: methods `snapshot` and `split_region` are never used
+   --> src/allocation_metrics.rs:515:8
+    |
+514 | impl Counters {
+    | ------------- methods in this implementation
+515 |     fn snapshot(&self) -> CountersSnapshot {
+    |        ^^^^^^^^
+...
+562 |     fn split_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
+    |        ^^^^^^^^^^^^
+
+warning: `mce-capabilities-probe` (bin "namespace-uri-probe") generated 5 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.78s

@@ -1,0 +1,36 @@
+{
+  "capture_children_succeeded": 18,
+  "detected_by": "Root read-only analyze.validate_report replay before qualification freeze",
+  "explanation": "Serde kebab-case derives valid4-attr from Valid4Attr; frozen CLI/plan row and strict reader require valid-4attr. Source/output preservation checks passed, but these qualification reports are not accepted.",
+  "metadata_mismatches": [
+    {
+      "actual_serialized_shape": "valid4-attr",
+      "expected_cli_and_plan_shape": "valid-4attr",
+      "report": {
+        "bytes": 3791,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/qualification/0-valid-4attr-capture-before.json",
+        "sha256": "3852557e322219c1e02d08e378e4d80eb018b2da490adf3ad31e0be55c1ab906"
+      }
+    },
+    {
+      "actual_serialized_shape": "valid4-attr",
+      "expected_cli_and_plan_shape": "valid-4attr",
+      "report": {
+        "bytes": 3756,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/qualification/0-valid-4attr-commit-before.json",
+        "sha256": "bc5440444f2f00d120552ba0dbb15c5e50ecaaa986cc27f83886ce9dad7a5e8c"
+      }
+    },
+    {
+      "actual_serialized_shape": "valid4-attr",
+      "expected_cli_and_plan_shape": "valid-4attr",
+      "report": {
+        "bytes": 3785,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/qualification/0-valid-4attr-lifecycle-before.json",
+        "sha256": "3ce5225535ad4b3af548c5bb672232a6a811c9f9d7a12c04f65da54826d59247"
+      }
+    }
+  ],
+  "passed": false,
+  "schema": "litchi.performance.0806.qualification-schema-mismatch.v1"
+}

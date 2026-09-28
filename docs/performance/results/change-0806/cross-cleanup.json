@@ -1,0 +1,17 @@
+{
+  "binaries_removed": true,
+  "removed_binaries": [
+    {
+      "bytes": 68847776,
+      "path": "/home/zhuhe/code/litchi-target-0806/cross-before",
+      "sha256": "ef7dfe156f58a5dee0443980f97cb48dcbcb1b0229b619b136c80add5351f2f4"
+    },
+    {
+      "bytes": 68976368,
+      "path": "/home/zhuhe/code/litchi-target-0806/cross-after",
+      "sha256": "2c48a25f1924f0a30225041bf5265bed3a995e25489665c0d9f9b4e63d8387c2"
+    }
+  ],
+  "schema": "litchi.performance.0806.cross-cleanup.v1",
+  "target": "/home/zhuhe/code/litchi-target-0806"
+}

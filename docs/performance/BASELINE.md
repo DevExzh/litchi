@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0806 — public workflow qualification rejects the candidate
+
+[0806](0806-xml-workflow-qualification.md) Fresh main/cross/profile evidence covers 323 reports and 9,606 samples (306/6,714 main, 13/2,888 cross, and 4/4 profile). The required public capture/lifecycle benefit is absent: large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. The main latency and allocation-resource guards pass, and official cross analysis and independent replay pass all eight rows with no veto. All six production files are restored exactly. Large-capture allocation calls fall 72,106→10,788 and allocated bytes 4,767,939→853,507; net-live and peak-above-entry are unchanged. These measured allocation reductions do not satisfy the required latency benefit gate. Supplemental 936/28,080 micro samples and 18 unaccepted setup reports remain separate; no baseline or production claim changes.
+
 ## 0805 — combined candidate passes protected preflight
 
 [0805](0805-xml-combined-preflight.md) Fresh production-versus-candidate preflight passes the frozen short-tag benefits and all 18 protected consume checks. One/two-attribute ratios are 0.613544/0.809200; four other consumption cases regress 10.726–28.682%. Production and public-workflow/resource baselines remain unchanged pending qualification.

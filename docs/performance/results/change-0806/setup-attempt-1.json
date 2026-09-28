@@ -1,0 +1,64 @@
+{
+  "archived_at": 1790562292.6888194,
+  "build_archive": "build-before-setup-1",
+  "build_succeeded": true,
+  "cross_lane_affected": false,
+  "first_failed_gate": 2,
+  "main_captures_started": false,
+  "probe_archive": "probe-src-setup-1",
+  "probe_quality_succeeded": false,
+  "production_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/source.json",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+  },
+  "quality_archive": "probe-quality-before-failed-1",
+  "reason": "Format and all 35 tests passed. Warnings-denied Clippy rejected copied allocator support APIs unused by the runtime probe, three doc continuation lines, and items after the main test module. Original receipts retain original paths; archive directories and retained descriptors relocate exact artifacts.",
+  "retained_binaries": [
+    {
+      "kind": "allocation",
+      "original": {
+        "bytes": 14358128,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+        "sha256": "c8dd6ef473af1957400a37ab4584a0a9ee18ce2173df52ed786485611ccf4217"
+      },
+      "retained": {
+        "bytes": 14358128,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-1",
+        "sha256": "c8dd6ef473af1957400a37ab4584a0a9ee18ce2173df52ed786485611ccf4217"
+      }
+    },
+    {
+      "kind": "native",
+      "original": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+        "sha256": "9d3eb2f0bc006f07ad1ac975866d6867a814c09ba7252b2644a483a81af44a07"
+      },
+      "retained": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-1",
+        "sha256": "9d3eb2f0bc006f07ad1ac975866d6867a814c09ba7252b2644a483a81af44a07"
+      }
+    },
+    {
+      "kind": "profile",
+      "original": {
+        "bytes": 14432376,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+        "sha256": "dad5e95418d66e9dd54b0e66cb76732cd50ef1f39ed8d9ddcee1cc718ee2e377"
+      },
+      "retained": {
+        "bytes": 14432376,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-1",
+        "sha256": "dad5e95418d66e9dd54b0e66cb76732cd50ef1f39ed8d9ddcee1cc718ee2e377"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0806.setup-attempt.v1",
+  "tests": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 35
+  }
+}

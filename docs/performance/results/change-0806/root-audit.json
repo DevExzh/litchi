@@ -1,0 +1,1655 @@
+{
+  "allocation": [
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 100675,
+          "before": 117635,
+          "increase": false
+        },
+        "calls": {
+          "after": 918,
+          "before": 1338,
+          "increase": false
+        },
+        "net": {
+          "after": 43477,
+          "before": 43477,
+          "increase": false
+        },
+        "peak": {
+          "after": 62463,
+          "before": 62463,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 100675,
+          "before": 117635,
+          "increase": false
+        },
+        "calls": {
+          "after": 918,
+          "before": 1338,
+          "increase": false
+        },
+        "net": {
+          "after": 43477,
+          "before": 43477,
+          "increase": false
+        },
+        "peak": {
+          "after": 62463,
+          "before": 62463,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 131204,
+          "before": 148164,
+          "increase": false
+        },
+        "calls": {
+          "after": 1443,
+          "before": 1863,
+          "increase": false
+        },
+        "net": {
+          "after": 5947,
+          "before": 5947,
+          "increase": false
+        },
+        "peak": {
+          "after": 67676,
+          "before": 67676,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 131204,
+          "before": 148164,
+          "increase": false
+        },
+        "calls": {
+          "after": 1443,
+          "before": 1863,
+          "increase": false
+        },
+        "net": {
+          "after": 5947,
+          "before": 5947,
+          "increase": false
+        },
+        "peak": {
+          "after": 67676,
+          "before": 67676,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 981634,
+          "before": 1023938,
+          "increase": false
+        },
+        "calls": {
+          "after": 4699,
+          "before": 5670,
+          "increase": false
+        },
+        "net": {
+          "after": 106060,
+          "before": 106060,
+          "increase": false
+        },
+        "peak": {
+          "after": 552012,
+          "before": 552012,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 981634,
+          "before": 1023938,
+          "increase": false
+        },
+        "calls": {
+          "after": 4699,
+          "before": 5670,
+          "increase": false
+        },
+        "net": {
+          "after": 106060,
+          "before": 106060,
+          "increase": false
+        },
+        "peak": {
+          "after": 552012,
+          "before": 552012,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "tiny"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 173655,
+          "before": 228631,
+          "increase": false
+        },
+        "calls": {
+          "after": 1855,
+          "before": 2869,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 173655,
+          "before": 228631,
+          "increase": false
+        },
+        "calls": {
+          "after": 1855,
+          "before": 2869,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 207562,
+          "before": 233162,
+          "increase": false
+        },
+        "calls": {
+          "after": 2506,
+          "before": 3061,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 207562,
+          "before": 233162,
+          "increase": false
+        },
+        "calls": {
+          "after": 2506,
+          "before": 3061,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 1236566,
+          "before": 1331862,
+          "increase": false
+        },
+        "calls": {
+          "after": 7769,
+          "before": 9568,
+          "increase": false
+        },
+        "net": {
+          "after": 135196,
+          "before": 135196,
+          "increase": false
+        },
+        "peak": {
+          "after": 592974,
+          "before": 592974,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 1236566,
+          "before": 1331862,
+          "increase": false
+        },
+        "calls": {
+          "after": 7769,
+          "before": 9568,
+          "increase": false
+        },
+        "net": {
+          "after": 135196,
+          "before": 135196,
+          "increase": false
+        },
+        "peak": {
+          "after": 592974,
+          "before": 592974,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "medium"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 853507,
+          "before": 4767939,
+          "increase": false
+        },
+        "calls": {
+          "after": 10788,
+          "before": 72106,
+          "increase": false
+        },
+        "net": {
+          "after": 278201,
+          "before": 278201,
+          "increase": false
+        },
+        "peak": {
+          "after": 338955,
+          "before": 338955,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 853507,
+          "before": 4767939,
+          "increase": false
+        },
+        "calls": {
+          "after": 10788,
+          "before": 72106,
+          "increase": false
+        },
+        "net": {
+          "after": 278201,
+          "before": 278201,
+          "increase": false
+        },
+        "peak": {
+          "after": 338955,
+          "before": 338955,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 940988,
+          "before": 1111996,
+          "increase": false
+        },
+        "calls": {
+          "after": 12671,
+          "before": 15498,
+          "increase": false
+        },
+        "net": {
+          "after": 17709,
+          "before": 17709,
+          "increase": false
+        },
+        "peak": {
+          "after": 367392,
+          "before": 367392,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 940988,
+          "before": 1111996,
+          "increase": false
+        },
+        "calls": {
+          "after": 12671,
+          "before": 15498,
+          "increase": false
+        },
+        "net": {
+          "after": 17709,
+          "before": 17709,
+          "increase": false
+        },
+        "peak": {
+          "after": 367392,
+          "before": 367392,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 4319903,
+          "before": 8542943,
+          "increase": false
+        },
+        "calls": {
+          "after": 38036,
+          "before": 104331,
+          "increase": false
+        },
+        "net": {
+          "after": 706864,
+          "before": 706864,
+          "increase": false
+        },
+        "peak": {
+          "after": 1290863,
+          "before": 1290863,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 4319903,
+          "before": 8542943,
+          "increase": false
+        },
+        "calls": {
+          "after": 38036,
+          "before": 104331,
+          "increase": false
+        },
+        "net": {
+          "after": 706864,
+          "before": 706864,
+          "increase": false
+        },
+        "peak": {
+          "after": 1290863,
+          "before": 1290863,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "large"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 292567,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3157,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 292567,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3157,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 252173,
+          "before": 269277,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3165,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 252173,
+          "before": 269277,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3165,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 1395380,
+          "before": 1445364,
+          "increase": false
+        },
+        "calls": {
+          "after": 8055,
+          "before": 9998,
+          "increase": false
+        },
+        "net": {
+          "after": 137151,
+          "before": 137151,
+          "increase": false
+        },
+        "peak": {
+          "after": 596387,
+          "before": 596387,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 1395380,
+          "before": 1445364,
+          "increase": false
+        },
+        "calls": {
+          "after": 8055,
+          "before": 9998,
+          "increase": false
+        },
+        "net": {
+          "after": 137151,
+          "before": 137151,
+          "increase": false
+        },
+        "peak": {
+          "after": 596387,
+          "before": 596387,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 292567,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3157,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 292567,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3157,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 252173,
+          "before": 269277,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3165,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 252173,
+          "before": 269277,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3165,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 1395380,
+          "before": 1445364,
+          "increase": false
+        },
+        "calls": {
+          "after": 8055,
+          "before": 9998,
+          "increase": false
+        },
+        "net": {
+          "after": 137151,
+          "before": 137151,
+          "increase": false
+        },
+        "peak": {
+          "after": 596387,
+          "before": 596387,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 1395380,
+          "before": 1445364,
+          "increase": false
+        },
+        "calls": {
+          "after": 8055,
+          "before": 9998,
+          "increase": false
+        },
+        "net": {
+          "after": 137151,
+          "before": 137151,
+          "increase": false
+        },
+        "peak": {
+          "after": 596387,
+          "before": 596387,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 277207,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3049,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 271575,
+          "before": 277207,
+          "increase": false
+        },
+        "calls": {
+          "after": 2035,
+          "before": 3049,
+          "increase": false
+        },
+        "net": {
+          "after": 68221,
+          "before": 68221,
+          "increase": false
+        },
+        "peak": {
+          "after": 90400,
+          "before": 90400,
+          "increase": false
+        }
+      },
+      "mode": "capture",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 251993,
+          "before": 265257,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3138,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 251993,
+          "before": 265257,
+          "increase": false
+        },
+        "calls": {
+          "after": 2583,
+          "before": 3138,
+          "increase": false
+        },
+        "net": {
+          "after": 7666,
+          "before": 7666,
+          "increase": false
+        },
+        "peak": {
+          "after": 98477,
+          "before": 98477,
+          "increase": false
+        }
+      },
+      "mode": "commit",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "block": 0,
+      "metrics": {
+        "bytes": {
+          "after": 1391676,
+          "before": 1421180,
+          "increase": false
+        },
+        "calls": {
+          "after": 8049,
+          "before": 9848,
+          "increase": false
+        },
+        "net": {
+          "after": 136971,
+          "before": 136971,
+          "increase": false
+        },
+        "peak": {
+          "after": 596207,
+          "before": 596207,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "block": 1,
+      "metrics": {
+        "bytes": {
+          "after": 1391676,
+          "before": 1421180,
+          "increase": false
+        },
+        "calls": {
+          "after": 8049,
+          "before": 9848,
+          "increase": false
+        },
+        "net": {
+          "after": 136971,
+          "before": 136971,
+          "increase": false
+        },
+        "peak": {
+          "after": 596207,
+          "before": 596207,
+          "increase": false
+        }
+      },
+      "mode": "lifecycle",
+      "resource_regression": false,
+      "shape": "valid-4attr"
+    }
+  ],
+  "benefits": [],
+  "latency_violations": [],
+  "native": [
+    {
+      "after_p50_ns": 238996.5,
+      "before_p50_ns": 238566.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0049031721672168,
+        "low": 0.996748300475793,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0025165291159488,
+        0.9983167668491219,
+        0.9951798341024641,
+        1.001754305357732,
+        1.0013010941782332,
+        1.0072898152184848
+      ],
+      "ratio": 1.0015276997679825,
+      "regression": false,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 215037.0,
+      "before_p50_ns": 214256.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0083284049464933,
+        "low": 0.9992074112032726,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        1.006057753691735,
+        0.9995797750395712,
+        1.005500555187504,
+        1.0091548535739592,
+        0.998835047366974,
+        1.0075019563190275
+      ],
+      "ratio": 1.0057791544396195,
+      "regression": false,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 1428833.0,
+      "before_p50_ns": 1412377.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0145341845432758,
+        "low": 1.0069533632277965,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.0159206156350102,
+        1.0099123819402083,
+        1.0039943445153845,
+        1.0131477534515414,
+        1.0117507823355325,
+        1.0115517242600374
+      ],
+      "ratio": 1.011651253297785,
+      "regression": false,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 462692.5,
+      "before_p50_ns": 462158.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0044867918921614,
+        "low": 0.9979318807588986,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0046642600531075,
+        0.9984664994935128,
+        0.9981357963942834,
+        0.9977279651235137,
+        1.0040045965804227,
+        1.0043093237312153
+      ],
+      "ratio": 1.0012355480369677,
+      "regression": false,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 299756.5,
+      "before_p50_ns": 298802.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0083328410973866,
+        "low": 0.9979170376161779,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        1.0101947427176818,
+        1.0011662801344732,
+        1.0064709394770917,
+        0.9967996906367615,
+        0.9990343845955942,
+        1.0052285478713778
+      ],
+      "ratio": 1.0031974140029254,
+      "regression": false,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 2037615.5,
+      "before_p50_ns": 2015530.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.014341805085444,
+        "low": 1.004373182740101,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.0148239706377957,
+        1.0097299119202574,
+        1.0035199968403956,
+        1.0052263686398066,
+        1.012187805738067,
+        1.0138596395330925
+      ],
+      "ratio": 1.0109588588291623,
+      "regression": false,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 19097979.5,
+      "before_p50_ns": 18750608.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0209320404110418,
+        "low": 1.0121057474168107,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0186723906322914,
+        1.0183792111612118,
+        1.0217871361307913,
+        1.0200769446912925,
+        1.01386870572247,
+        1.0103427891111514
+      ],
+      "ratio": 1.0185258008967515,
+      "regression": false,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 1290271.5,
+      "before_p50_ns": 1304791.5,
+      "benefit": false,
+      "ci95": {
+        "high": 0.992373037976022,
+        "low": 0.9853534129046697,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9927534503990948,
+        0.9919926255529494,
+        0.9898592296418037,
+        0.9848895194042546,
+        0.9858173064050849,
+        0.9887721136137066
+      ],
+      "ratio": 0.9893156716277551,
+      "regression": false,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 29146145.5,
+      "before_p50_ns": 28303185.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.033024942665562,
+        "low": 1.0247190770236716,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.0308617095086756,
+        1.0232120396334001,
+        1.032647890396426,
+        1.0312382812061125,
+        1.033401994934698,
+        1.0262261144139433
+      ],
+      "ratio": 1.0310499953573942,
+      "regression": false,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 561108.0,
+      "before_p50_ns": 549468.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.022139924251107,
+        "low": 1.0096808689692076,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0213031874735075,
+        1.0182818668884408,
+        1.0175555850981493,
+        1.0229766610287063,
+        1.0210835641055052,
+        1.0018061528402658
+      ],
+      "ratio": 1.019682715496973,
+      "regression": false,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 330721.5,
+      "before_p50_ns": 329601.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0144692283571042,
+        "low": 0.9855275068990899,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        1.0016944939555976,
+        1.0051045971741,
+        1.009682104243989,
+        0.9722698634416017,
+        0.9987851503565781,
+        1.0192563524702194
+      ],
+      "ratio": 1.0033995455648488,
+      "regression": false,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 2212411.5,
+      "before_p50_ns": 2175191.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0200894898597355,
+        "low": 1.012984832206595,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.014121306831966,
+        1.0152051174479297,
+        1.011848357581224,
+        1.0232492670675468,
+        1.0148783216667259,
+        1.0169297126519243
+      ],
+      "ratio": 1.0150417195573278,
+      "regression": false,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 563453.0,
+      "before_p50_ns": 553917.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0253240648887512,
+        "low": 1.013544687884036,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0192787500702116,
+        1.0222812733393227,
+        1.0283668564381798,
+        1.0194756040056874,
+        1.0201819457716739,
+        1.0078106256978605
+      ],
+      "ratio": 1.0198287748886807,
+      "regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 331466.0,
+      "before_p50_ns": 330081.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0074786219495073,
+        "low": 1.0031132158944212,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        1.00911728892416,
+        1.0038364105811857,
+        1.0023900212076566,
+        1.0051350300201756,
+        1.005839954974855,
+        1.0047875741240708
+      ],
+      "ratio": 1.004961302072123,
+      "regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 2216536.0,
+      "before_p50_ns": 2184071.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0162303177911451,
+        "low": 1.0128337885470313,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.0145794635747085,
+        1.0172304258084803,
+        1.0137865344311687,
+        1.011881042662894,
+        1.0152302097738097,
+        1.0144989819133439
+      ],
+      "ratio": 1.0145392227440262,
+      "regression": false,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 538083.0,
+      "before_p50_ns": 528362.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0314183374824744,
+        "low": 1.004563252588242,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        1.0257103451411598,
+        1.025891477611712,
+        1.0008580600753973,
+        1.0369451973532369,
+        1.0180002004223996,
+        1.0082684451010868
+      ],
+      "ratio": 1.0218552727817798,
+      "regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "after_p50_ns": 324786.5,
+      "before_p50_ns": 321926.5,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0171036497948542,
+        "low": 1.0018913494152653,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        1.0154161424140122,
+        1.001363126350376,
+        1.0187911571756962,
+        1.0024195724801548,
+        1.0092560105073263,
+        1.0085117094272076
+      ],
+      "ratio": 1.008883859967267,
+      "regression": false,
+      "shape": "valid-4attr"
+    },
+    {
+      "after_p50_ns": 2176656.0,
+      "before_p50_ns": 2134926.0,
+      "benefit": false,
+      "ci95": {
+        "high": 1.0202251094243813,
+        "low": 1.0173239859026952,
+        "resamples": 10000,
+        "seed": 806080
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        1.0189523814438262,
+        1.0207992171913927,
+        1.0189787874770266,
+        1.0196510016573699,
+        1.0182661542177298,
+        1.0163818175876604
+      ],
+      "ratio": 1.0189655844604264,
+      "regression": false,
+      "shape": "valid-4attr"
+    }
+  ],
+  "production_adoption": false,
+  "qualification": [
+    {
+      "case": "tiny/capture",
+      "output": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      },
+      "report": "qualification/0-tiny-capture-before.json",
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "tiny/commit",
+      "output": {
+        "bytes": 31549,
+        "sha256": "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      },
+      "report": "qualification/0-tiny-commit-before.json",
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "tiny/lifecycle",
+      "output": {
+        "bytes": 31549,
+        "sha256": "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      },
+      "report": "qualification/0-tiny-lifecycle-before.json",
+      "source": {
+        "bytes": 31530,
+        "sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      }
+    },
+    {
+      "case": "medium/capture",
+      "output": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      },
+      "report": "qualification/0-medium-capture-before.json",
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "medium/commit",
+      "output": {
+        "bytes": 40806,
+        "sha256": "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      },
+      "report": "qualification/0-medium-commit-before.json",
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "medium/lifecycle",
+      "output": {
+        "bytes": 40806,
+        "sha256": "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      },
+      "report": "qualification/0-medium-lifecycle-before.json",
+      "source": {
+        "bytes": 40788,
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      }
+    },
+    {
+      "case": "large/capture",
+      "output": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      },
+      "report": "qualification/0-large-capture-before.json",
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    },
+    {
+      "case": "large/commit",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "report": "qualification/0-large-commit-before.json",
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    },
+    {
+      "case": "large/lifecycle",
+      "output": {
+        "bytes": 215240,
+        "sha256": "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      },
+      "report": "qualification/0-large-lifecycle-before.json",
+      "source": {
+        "bytes": 215220,
+        "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      }
+    },
+    {
+      "case": "vendor/capture",
+      "output": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      },
+      "report": "qualification/0-vendor-capture-before.json",
+      "source": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      }
+    },
+    {
+      "case": "vendor/commit",
+      "output": {
+        "bytes": 42450,
+        "sha256": "4ceca02399d8e993511be03046ed0970a23ad0d942ba95925c769eed24fdb4b4"
+      },
+      "report": "qualification/0-vendor-commit-before.json",
+      "source": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      }
+    },
+    {
+      "case": "vendor/lifecycle",
+      "output": {
+        "bytes": 42450,
+        "sha256": "4ceca02399d8e993511be03046ed0970a23ad0d942ba95925c769eed24fdb4b4"
+      },
+      "report": "qualification/0-vendor-lifecycle-before.json",
+      "source": {
+        "bytes": 42433,
+        "sha256": "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      }
+    },
+    {
+      "case": "unicode-vendor/capture",
+      "output": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      },
+      "report": "qualification/0-unicode-vendor-capture-before.json",
+      "source": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      }
+    },
+    {
+      "case": "unicode-vendor/commit",
+      "output": {
+        "bytes": 42386,
+        "sha256": "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8"
+      },
+      "report": "qualification/0-unicode-vendor-commit-before.json",
+      "source": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      }
+    },
+    {
+      "case": "unicode-vendor/lifecycle",
+      "output": {
+        "bytes": 42386,
+        "sha256": "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8"
+      },
+      "report": "qualification/0-unicode-vendor-lifecycle-before.json",
+      "source": {
+        "bytes": 42370,
+        "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      }
+    },
+    {
+      "case": "valid-4attr/capture",
+      "output": {
+        "bytes": 42304,
+        "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+      },
+      "report": "qualification/0-valid-4attr-capture-before.json",
+      "source": {
+        "bytes": 42304,
+        "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+      }
+    },
+    {
+      "case": "valid-4attr/commit",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "report": "qualification/0-valid-4attr-commit-before.json",
+      "source": {
+        "bytes": 42304,
+        "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+      }
+    },
+    {
+      "case": "valid-4attr/lifecycle",
+      "output": {
+        "bytes": 42323,
+        "sha256": "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      },
+      "report": "qualification/0-valid-4attr-lifecycle-before.json",
+      "source": {
+        "bytes": 42304,
+        "sha256": "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+      }
+    }
+  ],
+  "reports": 306,
+  "resource_guard": true,
+  "resource_violations": [],
+  "samples": 6714,
+  "schema": "litchi.performance.0806.root-audit.v1",
+  "scope": "Independent raw numerical audit only; main analyzer checks custody, source identity, and semantic oracles."
+}

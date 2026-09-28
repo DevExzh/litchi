@@ -1,0 +1,132 @@
+{
+  "candidate_transition": {
+    "amended_helper_files": 5,
+    "amended_source": {
+      "files": 9196,
+      "revision": "e3ff267ee3454e71d66f177f54f3cd05e0d9cce5"
+    },
+    "amendment_application": {
+      "bytes": 1202365,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/quality-amendment-application.json",
+      "sha256": "6add4ded6f3da251161bfc9f6d1a531745cc2a599c2b42cd711c88675c76410e"
+    },
+    "amendment_manifest": {
+      "bytes": 6252,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/candidate-quality-amendment/manifest.json",
+      "sha256": "7d293e230728b518b3c6db7f8eb0814aac2b5610b2df39745574bcdbd345175f"
+    },
+    "amendment_patch": {
+      "bytes": 3164,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/candidate-quality-amendment/candidate-quality-amendment.patch",
+      "sha256": "28c24373e633e61b09189837fefa2c7fa465c6a79434686f52535debc6a15c92"
+    },
+    "base_source": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/source.json",
+      "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+    },
+    "final_source": {
+      "files": 9196,
+      "revision": "e3ff267ee3454e71d66f177f54f3cd05e0d9cce5"
+    },
+    "original_application": {
+      "bytes": 1201780,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/application.json",
+      "sha256": "d0522dc201d06558d65defe460e1714a81b27c4d6d8f7573d52327cc00cbb892"
+    },
+    "original_manifest": {
+      "bytes": 4716,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/candidate/manifest.json",
+      "sha256": "2b5233fd4ef3f37e7dee596d8a0af1e8d78ec9cfb5046f699b93ec74c05791ed"
+    },
+    "preflight_decision": {
+      "bytes": 6598,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/amendment-preflight/decision.json",
+      "sha256": "faf2bfd2e4f21184220337ccf59f252340b62ab2215a8878ffbb3ecb81993a9a"
+    },
+    "visibility_application": {
+      "bytes": 1202162,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/visibility-amendment-application.json",
+      "sha256": "182b21f5aff4e2b7c6870b7d7bb5534d74c351c1e7707a6d5d21020bb750009c"
+    },
+    "visibility_files": 1,
+    "visibility_manifest": {
+      "bytes": 4993,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/candidate-visibility-amendment/manifest.json",
+      "sha256": "4765e7b6f6a934cfcda42051c8af1e0a56ffe51ef960b09abc205eb61c6d3aec"
+    },
+    "visibility_patch": {
+      "bytes": 829,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/candidate-visibility-amendment/candidate-visibility-amendment.patch",
+      "sha256": "e40c3fb8881a76788a6ee3cb1aa8bbea0ac4d787701a47231ec3eb6e20e23236"
+    }
+  },
+  "raw_process_rows": 96,
+  "rejected": false,
+  "rows": [
+    {
+      "case": "docx_semantic_full_text",
+      "ci_high": 1.011532805463351,
+      "ci_low": 0.9760705237350307,
+      "ratio": 0.9915001347153398,
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "case": "docx_semantic_full_text",
+      "ci_high": 1.0173295539292213,
+      "ci_low": 1.001958940797274,
+      "ratio": 1.010987485440312,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "docx_semantic_open",
+      "ci_high": 1.009311206740434,
+      "ci_low": 0.9933542337914312,
+      "ratio": 1.0014641002109088,
+      "reject": false,
+      "shape": "large"
+    },
+    {
+      "case": "docx_semantic_open",
+      "ci_high": 1.0223428732199487,
+      "ci_low": 1.0104967741938369,
+      "ratio": 1.0185362519577197,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "ci_high": 0.9567870954635431,
+      "ci_low": 0.921566744662722,
+      "ratio": 0.9302510635551544,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "ci_high": 0.9956381906374221,
+      "ci_low": 0.9820255976691795,
+      "ratio": 0.9885907447082098,
+      "reject": false,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_open_owned",
+      "ci_high": 1.0212267951778058,
+      "ci_low": 1.0048186278751146,
+      "ratio": 1.0119890242379737,
+      "reject": false,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_open_owned",
+      "ci_high": 1.0027179286669936,
+      "ci_low": 0.9623338236733703,
+      "ratio": 0.9982267808420675,
+      "reject": false,
+      "shape": "dense-wide"
+    }
+  ]
+}

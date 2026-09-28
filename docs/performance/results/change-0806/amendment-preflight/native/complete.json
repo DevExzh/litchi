@@ -1,0 +1,19 @@
+{
+  "callgrind": false,
+  "children": 936,
+  "expected_children": 936,
+  "historical_timing_pooling": false,
+  "profiles": false,
+  "receipts": {
+    "bytes": 1647068,
+    "path": "native/receipts.json",
+    "sha256": "45e96af95a9faa313ff6b85ef5e22594bfc3677b8cea0492a430b2715a3c6fa1"
+  },
+  "samples": 28080,
+  "schema": "litchi.performance.0806.amendment-native.v1",
+  "source": {
+    "bytes": 1204690,
+    "path": "native/source.json",
+    "sha256": "f5292d1a6c18e76d316776d7050a076a22fbf1b6c93c7cf755196e815578173a"
+  }
+}

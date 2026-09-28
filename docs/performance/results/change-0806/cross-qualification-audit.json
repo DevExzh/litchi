@@ -1,0 +1,71 @@
+{
+  "build_receipt": {
+    "bytes": 1582,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/cross-build-before/receipt.json",
+    "sha256": "3c583c6dc5a2f55a6b35d72ce057be17d14563bbe956e506b00d88ea9469a1de"
+  },
+  "fixture_identity_matches": [
+    [
+      "docx_semantic_full_text",
+      "large"
+    ],
+    [
+      "docx_semantic_full_text",
+      "tiny"
+    ],
+    [
+      "docx_semantic_open",
+      "large"
+    ],
+    [
+      "docx_semantic_open",
+      "tiny"
+    ],
+    [
+      "xlsx_full_cell_scan",
+      "dense-wide"
+    ],
+    [
+      "xlsx_full_cell_scan",
+      "tiny"
+    ],
+    [
+      "xlsx_open_owned",
+      "dense-wide"
+    ],
+    [
+      "xlsx_open_owned",
+      "tiny"
+    ]
+  ],
+  "historical_fixture_reference": {
+    "bytes": 25331,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/cross-qualification/0-before.json",
+    "sha256": "558a81b9aa8dc1753513625a7fd0e2f5643de7556f5426a5c7104d02cdb9dac3"
+  },
+  "historical_seal": {
+    "bytes": 116356,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0794/seal.json",
+    "sha256": "69584f97d1e63cd072b3e3d7297ce8b0dab615cce0838c74a3c129b5a1f8af8c"
+  },
+  "historical_timings_imported": false,
+  "passed": true,
+  "reader": {
+    "bytes": 2131,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/cross_qualification_audit.py",
+    "sha256": "dbcbcb752c1d7d8eeda8745037f56c824f29d81635133dcd4d052537eecd46fc"
+  },
+  "report": {
+    "bytes": 25331,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/cross-qualification/0-before.json",
+    "sha256": "28795094e56b2a1f51cb555d2de81383c441a19b6192efb7b2a11a2b273a70a1"
+  },
+  "reports": 1,
+  "samples": 8,
+  "schema": "litchi.performance.0806.cross-qualification-audit.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/source.json",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+  }
+}

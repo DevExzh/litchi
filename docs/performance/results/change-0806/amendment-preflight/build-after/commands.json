@@ -1,0 +1,23 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0806/amendment-preflight/probe-src/Cargo.toml",
+      "--bin",
+      "attribute-boundary-probe"
+    ],
+    "ended": 1790564860.6779451,
+    "exit_code": 0,
+    "log": {
+      "bytes": 74,
+      "path": "build-after/native.log",
+      "sha256": "087fcc95dbcd41f42e59840ec46185a7f28ec395743128e64144cd986cd9be16"
+    },
+    "started": 1790564860.6542094
+  }
+]
