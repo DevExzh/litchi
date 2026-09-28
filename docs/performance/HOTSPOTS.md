@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0805 — combined candidate passes protected preflight
+
+[0805](0805-xml-combined-preflight.md) Short tags and the 33-name transition benefit against production, but the first bounded-array stage still costs 22.649% more for four distinct attributes and up to 28.682% more at four-attribute syntax boundaries. The candidate passes protected preflight; measure actual public workflows/resources before judging this tradeoff.
+
 ## 0804 — bounded linear equality diagnostic
 
 [0804](0804-xml-linear-equality-diagnostic.md) Linear byte equality reduces 32-name consumption from 35,978 to 26,130 guest instructions and native p50 by 24.825% against the 0803 control. Short cases show small increases; construction shares one optimized function and remains variable. Next test the combined candidate freshly against production, without multiplying historical ratios.

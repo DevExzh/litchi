@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0805 — combined candidate passes protected preflight
+
+[0805](0805-xml-combined-preflight.md) Fresh production-versus-candidate preflight passes the frozen short-tag benefits and all 18 protected consume checks. One/two-attribute ratios are 0.613544/0.809200; four other consumption cases regress 10.726–28.682%. Production and public-workflow/resource baselines remain unchanged pending qualification.
+
 ## 0804 — bounded linear equality diagnostic
 
 [0804](0804-xml-linear-equality-diagnostic.md) Against the 0803 after-control, byte-slice equality in the bounded linear scan improves 16/32/33-attribute consumption by 15.589%/24.825%/24.259%. No diagnostic regression flag occurs; short-row increases and 75 spread flags remain visible. Neither leg is production, so workflow/resource baselines remain unchanged.

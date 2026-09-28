@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0805 — combined candidate passes protected preflight
+
+[0805](0805-xml-combined-preflight.md) The candidate passes frozen preflight: one/two-attribute consumption improves 38.646%/19.080%, with no protected veto. Four other consume cases regress 10.726–28.682%; all six diagnostic flags and 41 spread flags are retained. Eligible for fresh workflow trials, not production adoption.
+
 ## 0804 — bounded linear equality diagnostic
 
 [0804](0804-xml-linear-equality-diagnostic.md) The isolated bounded-linear equality change improves middle-size consumption against the 0803 control with zero diagnostic regression flags and 75 spread flags retained. Both layouts remain 128 bytes. The profile selector failure is preserved and repaired with an explicit owner map on the same binary. No workflow advancement or production adoption follows.

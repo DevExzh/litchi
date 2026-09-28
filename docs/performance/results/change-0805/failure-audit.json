@@ -1,0 +1,8 @@
+{
+  "failed_attempts": [],
+  "patches": {},
+  "path_policy": "only top-level retained failed-attempt roots are audited; no failed command is rerun; an empty list is the expected clean-run result",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "schema": "litchi.performance.0805.failure-audit.v1"
+}
