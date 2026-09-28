@@ -1,0 +1,10 @@
+{
+  "child_exit_codes": [
+    0
+  ],
+  "driver_exit_code": 1,
+  "original": "profiles",
+  "reason": "First child exited zero but absent before_construct symbol yielded only zero termination dump; driver assertion failed before a positive dump existed.",
+  "repair": "Retain same binary and native lane; explicit resolved profile owner map and a separate capture driver.",
+  "retained": "profiles-failed-0"
+}

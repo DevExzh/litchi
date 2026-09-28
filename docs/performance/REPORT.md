@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0804 — bounded linear equality diagnostic
+
+[0804](0804-xml-linear-equality-diagnostic.md) The isolated bounded-linear equality change improves middle-size consumption against the 0803 control with zero diagnostic regression flags and 75 spread flags retained. Both layouts remain 128 bytes. The profile selector failure is preserved and repaired with an explicit owner map on the same binary. No workflow advancement or production adoption follows.
+
 ## 0803 — exact-empty check placement diagnostic
 
 [0803](0803-xml-empty-check-placement.md) A controlled relocation of the exact-empty check improves construction and early consumption against rejected 0802, with zero diagnostic regression flags and 73 spread flags retained. Both helper legs pass 100 tests and Clippy; production remains unchanged and no workflow advancement/adoption is authorized.

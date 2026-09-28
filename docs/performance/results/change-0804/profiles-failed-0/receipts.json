@@ -1,0 +1,71 @@
+[
+  {
+    "artifacts": {
+      "0-distinct-0-construct-before.callgrind": {
+        "bytes": 538,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.callgrind",
+        "sha256": "88e18226eb8ea9d4441e1e8fb28129c5ec82e559f1337b1d4eee5b7bea0aff3d"
+      },
+      "0-distinct-0-construct-before.json": {
+        "bytes": 4251,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.json",
+        "sha256": "8f48119a49433259ccf50c66e156169b8f16fba5a1dec191b62fbe0c9e6a5f48"
+      },
+      "0-distinct-0-construct-before.log": {
+        "bytes": 864,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.log",
+        "sha256": "895eb1dc6da1b73d0cfcbf3eeb430a5ec8bec54c2c49a04cfd522a94f0ec5bd0"
+      }
+    },
+    "binary": {
+      "bytes": 3121360,
+      "path": "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+      "sha256": "86cb01c00a4756f6493064855f3c8c2bb11ef581935e981fa4e7611555db98dd"
+    },
+    "block": 0,
+    "case": "distinct-0",
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "valgrind",
+      "--tool=callgrind",
+      "--branch-sim=yes",
+      "--collect-atstart=no",
+      "--toggle-collect=attribute_boundary_probe::before_construct",
+      "--zero-before=attribute_boundary_probe::before_construct",
+      "--dump-after=attribute_boundary_probe::before_construct",
+      "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.callgrind",
+      "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+      "--leg",
+      "before",
+      "--case",
+      "distinct-0",
+      "--mode",
+      "construct",
+      "--samples",
+      "1",
+      "--warmup",
+      "0",
+      "--iterations",
+      "1",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.json"
+    ],
+    "ended": 1790558999.8361084,
+    "exit_code": 0,
+    "leg": "before",
+    "log": {
+      "bytes": 864,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.log",
+      "sha256": "895eb1dc6da1b73d0cfcbf3eeb430a5ec8bec54c2c49a04cfd522a94f0ec5bd0"
+    },
+    "mode": "construct",
+    "report": {
+      "bytes": 4251,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.json",
+      "sha256": "8f48119a49433259ccf50c66e156169b8f16fba5a1dec191b62fbe0c9e6a5f48"
+    },
+    "started": 1790558999.6770375
+  }
+]

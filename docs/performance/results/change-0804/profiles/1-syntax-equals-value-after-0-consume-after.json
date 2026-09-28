@@ -1,0 +1,170 @@
+{
+  "schema": "litchi.attribute-boundary-probe.v1",
+  "tool": "attribute-boundary-probe-0804",
+  "binary": "attribute-boundary-probe",
+  "leg": "after",
+  "case": "syntax-equals-value-after-0",
+  "category": "syntax-equals-value",
+  "attribute_count": 0,
+  "mode": "consume",
+  "iterations": 1,
+  "warmup": 0,
+  "samples_requested": 1,
+  "timing_scope": "selected named consumption owner call, including its common call dispatch",
+  "source": {
+    "bytes": 6,
+    "encoding": "utf8",
+    "value": "e =\"1\""
+  },
+  "semantic_oracle": {
+    "quick_xml": {
+      "accepted": 0,
+      "first_error": {
+        "kind": "ExpectedEq",
+        "position": 6
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 4970106024338288496,
+      "items": [
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "ExpectedEq",
+            "position": 6
+          }
+        }
+      ]
+    },
+    "baseline": {
+      "accepted": 0,
+      "first_error": {
+        "kind": "ExpectedEq",
+        "position": 6
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 4970106024338288496,
+      "items": [
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "ExpectedEq",
+            "position": 6
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "accepted": 0,
+      "first_error": {
+        "kind": "ExpectedEq",
+        "position": 6
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 4970106024338288496,
+      "items": [
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "ExpectedEq",
+            "position": 6
+          }
+        }
+      ]
+    },
+    "baseline_matches_quick_xml": true,
+    "candidate_matches_quick_xml": true,
+    "clone_checks": [
+      {
+        "advance": 0,
+        "quick_xml_sequence_hash": 4970106024338288496,
+        "baseline_sequence_hash": 4970106024338288496,
+        "candidate_sequence_hash": 4970106024338288496,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 1,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 2,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 3,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 4,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 5,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 32,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 33,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      }
+    ],
+    "all_checks_passed": true
+  },
+  "iterator_sizes": {
+    "baseline_checked_attributes": 128,
+    "candidate_checked_attributes": 128
+  },
+  "expected_result": {
+    "checksum": 10329777211413734455,
+    "accepted": 0,
+    "error_marker": 11400714819322936341
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 952635,
+      "checksum": 10329777211413734455,
+      "accepted": 0,
+      "error_marker": 11400714819322936341
+    }
+  ]
+}

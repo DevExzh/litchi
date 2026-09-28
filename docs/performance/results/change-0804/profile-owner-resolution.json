@@ -1,0 +1,50 @@
+{
+  "binary": {
+    "bytes": 3121360,
+    "path": "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+    "sha256": "86cb01c00a4756f6493064855f3c8c2bb11ef581935e981fa4e7611555db98dd"
+  },
+  "build_inputs": {
+    "bytes": 2116,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/build/inputs.json",
+    "sha256": "f55e8bd1429343bf1bd772da38eb4dc88ba666500a4c985cc55c61fb7d141516"
+  },
+  "driver": {
+    "bytes": 2816,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/capture_resolved_profiles.py",
+    "sha256": "9cd8a0c5d5e676c204ef1994b229c71958ff4aa520e3040eff86d83370eaaac6"
+  },
+  "native_lane_changed": false,
+  "original_capture": {
+    "bytes": 2517,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/capture.py",
+    "sha256": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d"
+  },
+  "original_plan": {
+    "bytes": 2405,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/plan.json",
+    "sha256": "c6b547fae32b33a074c562f47b2fc2d6d2c0172c3d639cae4c05f43599b01594"
+  },
+  "owners": {
+    "after/construct": "attribute_boundary_probe::after_construct",
+    "after/consume": "attribute_boundary_probe::after_consume",
+    "before/construct": "attribute_boundary_probe::after_construct",
+    "before/consume": "attribute_boundary_probe::before_consume"
+  },
+  "probe_or_binary_changed": false,
+  "reason": "Binary has only after_construct, with distinct before_consume and after_consume; positive profile owner qualification must prove one executed owner call for each selected leg.",
+  "schema": "litchi.performance.0804.profile-owner-resolution.v1",
+  "symbol_command": [
+    "nm",
+    "-C",
+    "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe"
+  ],
+  "symbol_command_ended": 1790559073.2666404,
+  "symbol_command_exit_code": 0,
+  "symbol_command_started": 1790559073.2560322,
+  "symbols": {
+    "bytes": 89953,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profile-owner-symbols.txt",
+    "sha256": "8d5165981c39401daeb1a002082801b2851425aae052e6449fab50e3abd0b6ed"
+  }
+}

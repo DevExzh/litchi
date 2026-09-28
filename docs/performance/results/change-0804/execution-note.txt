@@ -1,0 +1,31 @@
+0804 source-handoff metadata omission
+
+The initial root handoff script copied baseline.rs and candidate.rs successfully,
+then raised FileNotFoundError while attempting to describe:
+/home/zhuhe/code/litchi/docs/performance/results/change-0804/candidate/manifest.json
+
+The file did not yet exist despite the source handoff being described as frozen.
+The following quality command was separated by a newline rather than guarded
+by shell failure handling, so it started after that setup exception. This was
+a root orchestration error. The live quality process was observed to completion,
+not restarted: all six commands exited zero, with 100 tests per leg and Clippy.
+No helper source or shared test changed during those commands.
+
+The quality/archive-inputs.json witness therefore freezes the twelve helper/test
+source archives present then. Candidate manifest/design metadata is completed
+after quality and before build/capture; build inheritance separately freezes it.
+This note records the tool-observed setup failure, not a claimed subprocess
+receipt or a fabricated failed build. There is no failed quality/build binary.
+Dependent root setup/build commands thereafter use fail-closed sequencing.
+
+Profile scope failure and amendment
+
+The original native lane completed all 936 children. The original profile lane
+then stopped after its first child: child exit code 0, driver exit code 1 from
+the required .callgrind.1 assertion. Only a zero termination dump existed.
+The exact optimized binary's nm witness contains after_construct and separate
+before_consume/after_consume symbols, but no before_construct symbol.
+profiles-failed-0 retains that attempt without converting its absence into a
+successful measurement. The frozen resolution map and separate profile driver
+select after_construct for both construction legs and preserve the consumption
+owners. Neither binary nor native samples nor original build inputs change.

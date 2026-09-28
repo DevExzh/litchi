@@ -1,0 +1,115 @@
+--- a/litchi-ole-common-xml_attributes.rs
++++ b/litchi-ole-common-xml_attributes.rs
+@@ -393,7 +393,7 @@
+         self.names[..self.len]
+             .iter()
+             .copied()
+-            .find(|candidate| candidate.cmp(&Name(name)).is_eq())
++            .find(|candidate| linear_name_matches(candidate.0, name))
+             .map(|candidate| offset_in(tag, candidate.0))
+     }
+ 
+@@ -416,4 +416,11 @@
+     }
+ }
+ 
++#[inline]
++fn linear_name_matches(candidate: &[u8], name: &[u8]) -> bool {
++    #[cfg(test)]
++    tests::count_comparison();
++    candidate == name
++}
++
+ impl<'a> OrderedCheck<'a> {
+--- a/litchi-opc-xml_attributes.rs
++++ b/litchi-opc-xml_attributes.rs
+@@ -393,7 +393,7 @@
+         self.names[..self.len]
+             .iter()
+             .copied()
+-            .find(|candidate| candidate.cmp(&Name(name)).is_eq())
++            .find(|candidate| linear_name_matches(candidate.0, name))
+             .map(|candidate| offset_in(tag, candidate.0))
+     }
+ 
+@@ -416,4 +416,11 @@
+     }
+ }
+ 
++#[inline]
++fn linear_name_matches(candidate: &[u8], name: &[u8]) -> bool {
++    #[cfg(test)]
++    tests::count_comparison();
++    candidate == name
++}
++
+ impl<'a> OrderedCheck<'a> {
+--- a/litchi-sign-xml_attributes.rs
++++ b/litchi-sign-xml_attributes.rs
+@@ -393,7 +393,7 @@
+         self.names[..self.len]
+             .iter()
+             .copied()
+-            .find(|candidate| candidate.cmp(&Name(name)).is_eq())
++            .find(|candidate| linear_name_matches(candidate.0, name))
+             .map(|candidate| offset_in(tag, candidate.0))
+     }
+ 
+@@ -416,4 +416,11 @@
+     }
+ }
+ 
++#[inline]
++fn linear_name_matches(candidate: &[u8], name: &[u8]) -> bool {
++    #[cfg(test)]
++    tests::count_comparison();
++    candidate == name
++}
++
+ impl<'a> OrderedCheck<'a> {
+--- a/litchi-xldm-xml_attributes.rs
++++ b/litchi-xldm-xml_attributes.rs
+@@ -393,7 +393,7 @@
+         self.names[..self.len]
+             .iter()
+             .copied()
+-            .find(|candidate| candidate.cmp(&Name(name)).is_eq())
++            .find(|candidate| linear_name_matches(candidate.0, name))
+             .map(|candidate| offset_in(tag, candidate.0))
+     }
+ 
+@@ -416,4 +416,11 @@
+     }
+ }
+ 
++#[inline]
++fn linear_name_matches(candidate: &[u8], name: &[u8]) -> bool {
++    #[cfg(test)]
++    tests::count_comparison();
++    candidate == name
++}
++
+ impl<'a> OrderedCheck<'a> {
+--- a/xml-minifier-xml_attributes.rs
++++ b/xml-minifier-xml_attributes.rs
+@@ -393,7 +393,7 @@
+         self.names[..self.len]
+             .iter()
+             .copied()
+-            .find(|candidate| candidate.cmp(&Name(name)).is_eq())
++            .find(|candidate| linear_name_matches(candidate.0, name))
+             .map(|candidate| offset_in(tag, candidate.0))
+     }
+ 
+@@ -416,4 +416,11 @@
+     }
+ }
+ 
++#[inline]
++fn linear_name_matches(candidate: &[u8], name: &[u8]) -> bool {
++    #[cfg(test)]
++    tests::count_comparison();
++    candidate == name
++}
++
+ impl<'a> OrderedCheck<'a> {
