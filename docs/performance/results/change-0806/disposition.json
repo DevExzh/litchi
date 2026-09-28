@@ -1,0 +1,10 @@
+{
+  "production_change_retained": false,
+  "reason": "No capture or lifecycle row satisfies the frozen 3% latency benefit gate; allocation reductions alone are insufficient.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/restored-source.json",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+  },
+  "status": "rejected"
+}

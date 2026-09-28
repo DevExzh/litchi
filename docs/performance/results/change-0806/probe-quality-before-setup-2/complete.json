@@ -1,0 +1,12 @@
+{
+  "inputs": {
+    "bytes": 1202122,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-quality-before/inputs.json",
+    "sha256": "0796c76c98b6bfc20a19a770f6489106cb096ce5f3438ad0c5624b8de0008677"
+  },
+  "receipts": {
+    "bytes": 1770,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-quality-before/receipts.json",
+    "sha256": "7a7103dfa900c31d06167ab0c2f316b18a1a3400caaadcc9cf9f10f041757b93"
+  }
+}

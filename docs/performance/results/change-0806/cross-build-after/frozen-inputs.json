@@ -1,0 +1,6 @@
+{
+  "cross-Cargo.lock": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b",
+  "cross-plan.json": "1a89dec9a58357f2d8bc37797a7567fa538fd7ac788d91543305156f0d1fc161",
+  "cross_build.py": "da54e7ee87794fb9f3d13625b3f1adb6d9fc08a3619c21149eda22aa5a6181b3",
+  "cross_capture.py": "7361ae3772b82153fdb183220032ce44260bac3ab48735221dba78e11c9cab53"
+}

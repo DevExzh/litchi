@@ -1,0 +1,193 @@
+{
+  "schema": "litchi.performance.0806.cross-format-plan.v1",
+  "production_base": {
+    "commit": "e3ff267ee3454e71d66f177f54f3cd05e0d9cce5",
+    "meaning": "source state bound by the cross driver; the driver itself does not mutate production, while the root coordinator may apply the candidate for the after leg"
+  },
+  "candidate_transition": {
+    "source": "the exact 0805 candidate-after archive, applied temporarily to the 0806 production base by the root coordinator",
+    "candidate_packet": "docs/performance/results/change-0806/candidate/after (copied from the exact 0805 candidate archive)",
+    "production_adoption": false,
+    "workflow_advancement": false,
+    "adoption_condition": "this cross lane alone grants neither production adoption nor workflow advancement; the 0806 main packet owns the global decision after all benefit, resource, correctness, custody, and review gates pass"
+  },
+  "scope": "Fresh DOCX/XLSX regression veto for the shared litchi-opc and litchi-ooxml-common reader graph; no new production cases, no timing pool with 0794 or any earlier packet, and no replacement of the 0806 main benefit/resource policy (0805 supplies only the candidate preflight)",
+  "harness": {
+    "name": "litchi-perf-baseline",
+    "schema_version": 1,
+    "instrumentation": "none",
+    "manifest": "tools/perf-baseline/Cargo.toml",
+    "build_command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "litchi-perf-baseline"
+    ],
+    "lock": "cross-Cargo.lock",
+    "target_root": "/home/zhuhe/code/litchi-target-0806",
+    "binary_names": {
+      "before": "cross-before",
+      "after": "cross-after"
+    },
+    "build_jobs": 2,
+    "incremental": 0,
+    "root_owner": "coordinator only"
+  },
+  "cases": [
+    "docx_semantic_open",
+    "docx_semantic_full_text",
+    "xlsx_open_owned",
+    "xlsx_full_cell_scan"
+  ],
+  "semantic_shapes": [
+    "tiny",
+    "large"
+  ],
+  "xlsx_shapes": [
+    "tiny",
+    "dense-wide"
+  ],
+  "blocks": 6,
+  "orders": [
+    [
+      "before",
+      "after"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "before",
+      "after"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "after",
+      "before"
+    ],
+    [
+      "before",
+      "after"
+    ]
+  ],
+  "samples": 30,
+  "warmup": 3,
+  "qualification_samples": 1,
+  "rows_per_report": 8,
+  "corpus_contract": {
+    "docx_generator": "litchi-docx-semantic-v1",
+    "xlsx_generator": "litchi-xlsx-synthetic-v1",
+    "docx_shapes": {
+      "tiny": "24 paragraphs",
+      "large": "10000 paragraphs"
+    },
+    "xlsx_shapes": {
+      "tiny": "3 sheets x 8 x 8 cells",
+      "dense-wide": "2 sheets x 256 x 256 cells"
+    },
+    "identity": "archive and complete corpus metadata must match between before and after for every case/shape pair"
+  },
+  "cpu": 12,
+  "legs": [
+    "before",
+    "after"
+  ],
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3,
+    "reports": 12,
+    "samples_total": 2880
+  },
+  "qualification": {
+    "leg": "before",
+    "reports": 1,
+    "samples_per_row": 1,
+    "samples_total": 8,
+    "warmup": 0,
+    "purpose": "verify the eight corpus/runtime oracles before the candidate transition; do not pool its timing"
+  },
+  "bootstrap": {
+    "seed": 806081,
+    "resamples": 10000,
+    "statistic": "median of six paired process-p50 ratios",
+    "zero_based_endpoints": [
+      250,
+      9749
+    ],
+    "confidence": 0.95,
+    "process_p50": "nearest-rank ceil(n/2)-1"
+  },
+  "additional_rejection_gate": {
+    "any_case_rejects": true,
+    "paired_process_p50_ratio_above": 1.05,
+    "bootstrap95_low_above": 1.0,
+    "benefit_requirement": "none; this lane is a regression veto only"
+  },
+  "cleanup": {
+    "schema": "litchi.performance.0806.cross-cleanup.v1",
+    "target": "/home/zhuhe/code/litchi-target-0806",
+    "owner": "root coordinator",
+    "binaries": [
+      "/home/zhuhe/code/litchi-target-0806/cross-before",
+      "/home/zhuhe/code/litchi-target-0806/cross-after"
+    ],
+    "required_removed_count": 2,
+    "witness": "cross-cleanup.json records exact path, size, and sha256 for both copied binaries after identity verification"
+  },
+  "custody": {
+    "source": "each build and capture receipt binds a complete source manifest and revision",
+    "tools": "each cross build records every tracked tools/perf-baseline file hash",
+    "binary": "each copied executable and harness report records matching path, byte count, sha256, release profile, and executable identity",
+    "fixture": "each report retains the generated corpus manifest and archive sha256; before/after corpus identity must match",
+    "lock": "tools/perf-baseline/Cargo.lock must match cross-Cargo.lock",
+    "frozen_inputs": "plan, build reader, capture reader, and cross lock are hashed before each build"
+  },
+  "execution_order": [
+    "freeze this plan, cross readers, and cross lock",
+    "root builds before from the e3ff267ee3 production source and verifies source custody",
+    "root runs the before-only qualification and verifies all eight rows",
+    "root temporarily applies and verifies the exact 0805 candidate-after source",
+    "root builds after and runs the six alternating native blocks",
+    "root removes only the two copied cross binaries after recording cross-cleanup.json",
+    "offline readers recompute all sample vectors, corpus identities, and veto ratios"
+  ],
+  "no_new_production_cases": true,
+  "historical_timing_pooling": false,
+  "public_workflow_speedup": false
+}

@@ -1,0 +1,16 @@
+{
+  "advance_to_workflow_trials": true,
+  "analysis": {
+    "bytes": 58877,
+    "path": "analysis.json",
+    "sha256": "aeffff88c1516be3a04da5318fdd61681f08c0937913774053189d569aeb81c1"
+  },
+  "dominant_class_benefits": {
+    "distinct-1": true,
+    "distinct-2": true
+  },
+  "production_adoption": false,
+  "protected_consume_regressions": [],
+  "required_audit": "root-native-audit.json",
+  "schema": "litchi.performance.0806.amendment-decision-pending.v1"
+}

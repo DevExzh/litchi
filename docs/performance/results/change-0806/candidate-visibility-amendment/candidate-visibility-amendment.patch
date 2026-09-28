@@ -1,0 +1,21 @@
+diff --git a/crates/litchi-ole-common/src/xml_attributes.rs b/crates/litchi-ole-common/src/xml_attributes.rs
+--- a/crates/litchi-ole-common/src/xml_attributes.rs
++++ b/crates/litchi-ole-common/src/xml_attributes.rs
+@@ -48,7 +48,7 @@
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+-pub(crate) trait BytesStartExt {
++pub trait BytesStartExt {
+     /// Iterate the tag's attributes as `BytesStart::attributes` does, up to
+     /// and including the first error; nothing is yielded after it.
+     ///
+@@ -86,7 +86,7 @@
+ 
+ /// The iterator [`BytesStartExt::checked_attributes`] returns.
+ #[derive(Clone, Debug)]
+-pub(crate) struct CheckedAttributes<'a> {
++pub struct CheckedAttributes<'a> {
+     tag: &'a BytesStart<'a>,
+     attributes: Attributes<'a>,
+     phase: Phase<'a>,

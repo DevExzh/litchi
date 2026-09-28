@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0806 — public workflow cost remains after the XML boundary trial
+
+[0806](0806-xml-workflow-qualification.md) The candidate's short-input micro benefits do not transfer to the public workflow: large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. Large-capture allocation calls fall from 72,106 to 10,788 and allocated bytes from 4,767,939 to 853,507, while net-live and peak-above-entry remain unchanged. The four qualified profiles and official cross analysis and independent replay with no veto do not overcome the missing timing benefit; the candidate is rejected and no production hotspot optimization is adopted.
+
 ## 0805 — combined candidate passes protected preflight
 
 [0805](0805-xml-combined-preflight.md) Short tags and the 33-name transition benefit against production, but the first bounded-array stage still costs 22.649% more for four distinct attributes and up to 28.682% more at four-attribute syntax boundaries. The candidate passes protected preflight; measure actual public workflows/resources before judging this tradeoff.

@@ -1,0 +1,67 @@
+{
+  "archived_at": 1790562761.136839,
+  "build_archive": "build-before-setup-2",
+  "build_succeeded": true,
+  "cross_lane_affected": false,
+  "main_timed_captures_started": false,
+  "probe_archive": "probe-src-setup-2",
+  "probe_quality_succeeded": true,
+  "production_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/source.json",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+  },
+  "qualification_accepted": false,
+  "qualification_archive": "qualification-setup-2",
+  "qualification_reports": 18,
+  "qualification_samples": 18,
+  "quality_archive": "probe-quality-before-setup-2",
+  "reason": "All18 qualification children exited successfully, but strict offline metadata replay rejected3newshape rows: Serde emitted valid4-attr whereas frozen plan/CLI require valid-4attr. Original15 sealed identities pass; fixture preservation passed. Original receipts retain original paths; named archives and retained descriptors relocate exact artifacts.",
+  "retained_binaries": [
+    {
+      "kind": "allocation",
+      "original": {
+        "bytes": 14358112,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+        "sha256": "74394b3880cc6d23adda32126741e45c251cced3dd1f35ecb0877fb4647a6053"
+      },
+      "retained": {
+        "bytes": 14358112,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-2",
+        "sha256": "74394b3880cc6d23adda32126741e45c251cced3dd1f35ecb0877fb4647a6053"
+      }
+    },
+    {
+      "kind": "native",
+      "original": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+        "sha256": "0d2670d32ee72da7d2acb74e9bbc878f29aa051bdbf1da311edc0c324b75108b"
+      },
+      "retained": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-2",
+        "sha256": "0d2670d32ee72da7d2acb74e9bbc878f29aa051bdbf1da311edc0c324b75108b"
+      }
+    },
+    {
+      "kind": "profile",
+      "original": {
+        "bytes": 14432368,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+        "sha256": "c4e065ac95e0c56f96fbb5726b84eef6a0efaabda8cdc122cf66ecea0914f905"
+      },
+      "retained": {
+        "bytes": 14432368,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-2",
+        "sha256": "c4e065ac95e0c56f96fbb5726b84eef6a0efaabda8cdc122cf66ecea0914f905"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0806.setup-attempt.v1",
+  "tests": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 35
+  }
+}

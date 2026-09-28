@@ -1,0 +1,70 @@
+diff --git a/crates/litchi-ole-common/src/xml_attributes.rs b/crates/litchi-ole-common/src/xml_attributes.rs
+--- a/crates/litchi-ole-common/src/xml_attributes.rs
++++ b/crates/litchi-ole-common/src/xml_attributes.rs
+@@ -145,9 +145,7 @@ impl<'a> CheckedAttributes<'a> {
+     // The short prefix uses quick-xml's parser without duplicate allocation.
+-    #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
+-        let mut attributes = tag.attributes();
+-        attributes.with_checks(false);
++        let attributes = tag.unchecked_attributes();
+         Self {
+             tag,
+             attributes,
+diff --git a/crates/litchi-opc/src/xml_attributes.rs b/crates/litchi-opc/src/xml_attributes.rs
+--- a/crates/litchi-opc/src/xml_attributes.rs
++++ b/crates/litchi-opc/src/xml_attributes.rs
+@@ -145,9 +145,7 @@ impl<'a> CheckedAttributes<'a> {
+     // The short prefix uses quick-xml's parser without duplicate allocation.
+-    #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
+-        let mut attributes = tag.attributes();
+-        attributes.with_checks(false);
++        let attributes = tag.unchecked_attributes();
+         Self {
+             tag,
+             attributes,
+diff --git a/crates/litchi-sign/src/xml_attributes.rs b/crates/litchi-sign/src/xml_attributes.rs
+--- a/crates/litchi-sign/src/xml_attributes.rs
++++ b/crates/litchi-sign/src/xml_attributes.rs
+@@ -145,9 +145,7 @@ impl<'a> CheckedAttributes<'a> {
+     // The short prefix uses quick-xml's parser without duplicate allocation.
+-    #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
+-        let mut attributes = tag.attributes();
+-        attributes.with_checks(false);
++        let attributes = tag.unchecked_attributes();
+         Self {
+             tag,
+             attributes,
+diff --git a/crates/litchi-xldm/src/xml_attributes.rs b/crates/litchi-xldm/src/xml_attributes.rs
+--- a/crates/litchi-xldm/src/xml_attributes.rs
++++ b/crates/litchi-xldm/src/xml_attributes.rs
+@@ -145,9 +145,7 @@ impl<'a> CheckedAttributes<'a> {
+     // The short prefix uses quick-xml's parser without duplicate allocation.
+-    #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
+-        let mut attributes = tag.attributes();
+-        attributes.with_checks(false);
++        let attributes = tag.unchecked_attributes();
+         Self {
+             tag,
+             attributes,
+diff --git a/crates/xml-minifier/src/xml_attributes.rs b/crates/xml-minifier/src/xml_attributes.rs
+--- a/crates/xml-minifier/src/xml_attributes.rs
++++ b/crates/xml-minifier/src/xml_attributes.rs
+@@ -145,9 +145,7 @@ impl<'a> CheckedAttributes<'a> {
+     // The short prefix uses quick-xml's parser without duplicate allocation.
+-    #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
+-        let mut attributes = tag.attributes();
+-        attributes.with_checks(false);
++        let attributes = tag.unchecked_attributes();
+         Self {
+             tag,
+             attributes,

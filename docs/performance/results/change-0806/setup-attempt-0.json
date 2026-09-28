@@ -1,0 +1,64 @@
+{
+  "archived_at": 1790562105.4760199,
+  "build_archive": "build-before-setup-0",
+  "build_succeeded": true,
+  "cross_lane_affected": false,
+  "first_failed_gate": 1,
+  "main_captures_started": false,
+  "probe_archive": "probe-src-setup-0",
+  "probe_quality_succeeded": false,
+  "production_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/source.json",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+  },
+  "quality_archive": "probe-quality-before-failed-0",
+  "reason": "All-feature test binary installed process-global allocator while synthetic counter tests also injected manual callbacks; one peak mismatch followed by six poisoned-lock failures. Original receipts retain their original paths; archive directories and retained binary descriptors relocate those exact artifacts.",
+  "retained_binaries": [
+    {
+      "kind": "allocation",
+      "original": {
+        "bytes": 14358128,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+        "sha256": "a4c6d53b291306d4aa843bb4e4908ee65f8c2599e12ddc427cdfb5d581047fd9"
+      },
+      "retained": {
+        "bytes": 14358128,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-0",
+        "sha256": "a4c6d53b291306d4aa843bb4e4908ee65f8c2599e12ddc427cdfb5d581047fd9"
+      }
+    },
+    {
+      "kind": "native",
+      "original": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+        "sha256": "b56805ab4441da639a3224f81a57c30bae233eb3901c7dee1b2b3294cf2a8fb1"
+      },
+      "retained": {
+        "bytes": 14431552,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-0",
+        "sha256": "b56805ab4441da639a3224f81a57c30bae233eb3901c7dee1b2b3294cf2a8fb1"
+      }
+    },
+    {
+      "kind": "profile",
+      "original": {
+        "bytes": 14432376,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+        "sha256": "e29521cefebad09b71547ec68f3dd73f4ad1162fbc87fb531980a832db19210c"
+      },
+      "retained": {
+        "bytes": 14432376,
+        "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-0",
+        "sha256": "e29521cefebad09b71547ec68f3dd73f4ad1162fbc87fb531980a832db19210c"
+      }
+    }
+  ],
+  "schema": "litchi.performance.0806.setup-attempt.v1",
+  "tests": {
+    "failed": 7,
+    "ignored": 0,
+    "passed": 28
+  }
+}

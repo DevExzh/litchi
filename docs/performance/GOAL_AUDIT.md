@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0806 — public qualification rejects the candidate; the goal remains open
+
+[0806](0806-xml-workflow-qualification.md) The required benefit gate fails: no eligible public capture or lifecycle row improves by at least 3%; large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. Main latency/resource violations are zero, official cross analysis and independent replay pass all eight rows with no veto, and all four profile reports qualify, but allocation or memory reduction alone is insufficient for adoption. The six production files are restored exactly and no candidate change is retained. Setup and quality failures remain archived; constructor reuse and the OLE visibility repair are recorded as execution-chain repairs. iWork remains excluded and the non-iWork goal is incomplete.
+
 ## 0805 — combined candidate passes protected preflight
 
 [0805](0805-xml-combined-preflight.md) The combined no-replay/bounded-equality candidate passes a fresh comparison against production under the unchanged 0802 policy. Four non-protected consume regressions and two construction regressions remain review triggers. Workflow/resource/cross-format qualification is next; no adoption and GOAL remains incomplete.

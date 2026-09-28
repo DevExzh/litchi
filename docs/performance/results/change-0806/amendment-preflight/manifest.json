@@ -1,0 +1,55 @@
+{
+  "schema": "litchi.performance.0806.amendment-preflight-manifest.v1",
+  "packet": "change-0806/amendment-preflight",
+  "source": {
+    "before": "source/before",
+    "after": "source/after",
+    "before_lineage": "../candidate/before",
+    "after_lineage": "../candidate-quality-amendment/after",
+    "handoff_before_is_not_used": "../candidate-quality-amendment/before contains the already-applied 0806 candidate and is excluded from this comparison"
+  },
+  "probe": {
+    "lineage": "../change-0805/probe-src",
+    "case_archive": "../change-0805/cases.json",
+    "fixture_archive": "../change-0805/fixtures.json",
+    "schema": "litchi.attribute-boundary-probe.v1",
+    "tool": "attribute-boundary-probe-0805",
+    "clone_advances": [0, 1, 2, 3, 4, 5, 32, 33]
+  },
+  "amendment": {
+    "source_paths": [
+      "crates/litchi-ole-common/src/xml_attributes.rs",
+      "crates/litchi-opc/src/xml_attributes.rs",
+      "crates/litchi-sign/src/xml_attributes.rs",
+      "crates/litchi-xldm/src/xml_attributes.rs",
+      "crates/xml-minifier/src/xml_attributes.rs"
+    ],
+    "shared_test_path": "crates/litchi-opc/src/xml_attributes/tests.rs",
+    "constructor_rewrite": {
+      "from": "let mut attributes = tag.attributes(); followed by attributes.with_checks(false);",
+      "to": "let attributes = tag.unchecked_attributes();",
+      "algorithm_change": false
+    }
+  },
+  "execution": {
+    "target": "/home/zhuhe/code/litchi-target-0806/amendment-preflight",
+    "cpu": 12,
+    "native_blocks": 6,
+    "native_samples": 30,
+    "native_warmup": 3,
+    "native_iterations": 4096,
+    "bootstrap_seed": 806082,
+    "profiles": false,
+    "callgrind": false,
+    "historical_timing_pooling": false
+  },
+  "decision_contract": {
+    "required_fields": [
+      "advance_to_workflow_trials",
+      "production_adoption",
+      "protected_consume_regressions",
+      "dominant_class_benefits"
+    ],
+    "production_adoption": false
+  }
+}

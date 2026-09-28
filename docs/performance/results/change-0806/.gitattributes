@@ -1,0 +1,8 @@
+* -text
+**/* -text
+*.log -whitespace
+*.txt -whitespace
+profiles/*.callgrind* -whitespace
+profiles-failed-*/*.callgrind* -whitespace
+*.patch -whitespace
+reference/*.html -whitespace

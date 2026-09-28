@@ -1,0 +1,14 @@
+{
+  "bootstrap": {
+    "draw": "Python random.Random.randrange with replacement, six paired process ratios per draw",
+    "resamples": 10000,
+    "seed": 806080,
+    "sorted_zero_based_endpoints": [
+      250,
+      9749
+    ],
+    "statistic": "median"
+  },
+  "process_quantile": "nearest rank ceil(n*p)-1",
+  "resource_guard": "Compare each paired block median; preserve all samples and report spread."
+}

@@ -1,0 +1,59 @@
+{
+  "changes": [
+    "test-only allocator registration isolation",
+    "feature gate on unused fallback sample helper",
+    "seven non-test dead-code allowances on retained support items",
+    "unchanged test module relocated to file end",
+    "explicit valid-4attr serialization name",
+    "six-shape round-trip test with test-only derives",
+    "comments and module documentation whitespace"
+  ],
+  "counter_logic_and_layout_preserved": true,
+  "files": {
+    "allocation_metrics.rs": {
+      "current": {
+        "bytes": 63141,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/src/allocation_metrics.rs",
+        "sha256": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67"
+      },
+      "initial": {
+        "bytes": 62279,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src-setup-0/src/allocation_metrics.rs",
+        "sha256": "76a2afb0405de4810fe8afdc942a27342c220c8d8327da139ae9aa23a647ba33"
+      }
+    },
+    "counting_allocator.rs": {
+      "current": {
+        "bytes": 10770,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/src/counting_allocator.rs",
+        "sha256": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e"
+      },
+      "initial": {
+        "bytes": 10446,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src-setup-0/src/counting_allocator.rs",
+        "sha256": "296170ec958b023208f49dc3639f20acb59b8afdf8547e34e68968266fc55d23"
+      }
+    },
+    "main.rs": {
+      "current": {
+        "bytes": 52806,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/src/main.rs",
+        "sha256": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f"
+      },
+      "initial": {
+        "bytes": 52044,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src-setup-0/src/main.rs",
+        "sha256": "d4db252816071c52eff51a5c013b78e162b1095a751ee69469922f57b8a68bc6"
+      }
+    }
+  },
+  "fixture_logic_and_tests_preserved": true,
+  "new_round_trip_test_sha256": "942595b375a60d421c7638d8c8bbd6e9b8283350d1b7c0727471ffb211f81f98",
+  "passed": true,
+  "reader": {
+    "bytes": 3375,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe_amendment_audit.py",
+    "sha256": "2e738dc10fca30cbd7e3d888f7e4ca284bf9effcfd5e038597d694ce4461fb83"
+  },
+  "schema": "litchi.performance.0806.probe-amendment-audit.v1"
+}

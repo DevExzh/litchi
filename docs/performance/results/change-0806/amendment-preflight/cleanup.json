@@ -1,0 +1,24 @@
+{
+  "native_complete": {
+    "bytes": 526,
+    "path": "native/complete.json",
+    "sha256": "b7d7186e1a78f7e5beedae626ab308ba79580a053dee50acb38bd76b98de9ef3"
+  },
+  "removed_binaries": [
+    {
+      "bytes": 3140240,
+      "path": "/home/zhuhe/code/litchi-target-0806/amendment-preflight/before-native",
+      "sha256": "e0c8bf103dfaf5ce08cbdac677d60e0aab6961c99723285549b77ce621724070"
+    },
+    {
+      "bytes": 3140240,
+      "path": "/home/zhuhe/code/litchi-target-0806/amendment-preflight/after-native",
+      "sha256": "e0c8bf103dfaf5ce08cbdac677d60e0aab6961c99723285549b77ce621724070"
+    }
+  ],
+  "removed_failed_binaries": [],
+  "removed_target_bytes": 175133234,
+  "schema": "litchi.performance.0806.amendment-cleanup.v1",
+  "target": "/home/zhuhe/code/litchi-target-0806/amendment-preflight",
+  "target_removed": true
+}

@@ -1,0 +1,148 @@
+{
+  "allocation": {
+    "blocks": 2,
+    "samples": 3,
+    "warmup": 0
+  },
+  "cases": [
+    {
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    }
+  ],
+  "cpu": 12,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "profile": {
+    "counter_match": "owner allocation flamegraph cost equals allocation_calls alone; reallocation_calls is a subset",
+    "filtered_conservation": "filtered stacks equal exact-owner subset of whole stacks",
+    "limits": [
+      "no profile latency or RSS claim",
+      "nested stack costs overlap",
+      "no owner fractions if qualification fails"
+    ],
+    "mode": "capture",
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "samples": 1,
+    "shape": "large",
+    "warmup": 0,
+    "whole_conservation": "whole flamegraph sum equals print summary equals histogram count"
+  },
+  "schema": "litchi.performance.0806.v1",
+  "scope": "Fresh warm generated public PPTX capture, staged commit and lifecycle, original fifteen rows plus dedicated four-attribute extension fixture. No historical timing pool.",
+  "source_allowlist": [
+    "crates/litchi-ole-common/src/xml_attributes.rs",
+    "crates/litchi-opc/src/xml_attributes.rs",
+    "crates/litchi-opc/src/xml_attributes/tests.rs",
+    "crates/litchi-sign/src/xml_attributes.rs",
+    "crates/litchi-xldm/src/xml_attributes.rs",
+    "crates/xml-minifier/src/xml_attributes.rs"
+  ]
+}

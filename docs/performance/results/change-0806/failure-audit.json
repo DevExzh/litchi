@@ -1,0 +1,819 @@
+{
+  "failed_attempts": [
+    {
+      "failed_indices": [
+        1
+      ],
+      "files": [
+        {
+          "bytes": 0,
+          "path": "probe-quality-before-failed-0/0.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 7188,
+          "path": "probe-quality-before-failed-0/1.log",
+          "sha256": "feac6d9a9b323c6f432cdb69ab53f3c9024d21f30b90ddb4508ba7571a779dc0"
+        },
+        {
+          "bytes": 1202122,
+          "path": "probe-quality-before-failed-0/inputs.json",
+          "sha256": "8dbf33fe7a1d5576d1248bbbb77d08e57088ddd9f7effc1ba19b37de4b3fe373"
+        },
+        {
+          "bytes": 1133,
+          "path": "probe-quality-before-failed-0/receipts.json",
+          "sha256": "5fa91ca9f13316fac388ff9d5deffa38c78220a059cdabea62581fff34aba181"
+        }
+      ],
+      "id": "probe-quality-before-failed-0",
+      "receipts": {
+        "bytes": 1133,
+        "commands": [
+          [
+            "cargo",
+            "fmt",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/Cargo.toml",
+            "--",
+            "--check"
+          ],
+          [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/Cargo.toml",
+            "--all-features",
+            "--",
+            "--test-threads=1"
+          ]
+        ],
+        "exit_codes": [
+          0,
+          101
+        ],
+        "logs": [
+          {
+            "bytes": 0,
+            "path": "probe-quality-before-failed-0/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 7188,
+            "path": "probe-quality-before-failed-0/1.log",
+            "sha256": "feac6d9a9b323c6f432cdb69ab53f3c9024d21f30b90ddb4508ba7571a779dc0"
+          }
+        ],
+        "path": "probe-quality-before-failed-0/receipts.json",
+        "sha256": "5fa91ca9f13316fac388ff9d5deffa38c78220a059cdabea62581fff34aba181"
+      }
+    },
+    {
+      "failed_indices": [
+        2
+      ],
+      "files": [
+        {
+          "bytes": 0,
+          "path": "probe-quality-before-failed-1/0.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 3797,
+          "path": "probe-quality-before-failed-1/1.log",
+          "sha256": "49821a553ef7492ac5714f201d19e738fe0b3e97c18429c82b044774ddff28cd"
+        },
+        {
+          "bytes": 8259,
+          "path": "probe-quality-before-failed-1/2.log",
+          "sha256": "5ea8637b998f457d63732202fc3a726956780966113dd29ac9a1d8abe5767f17"
+        },
+        {
+          "bytes": 1202122,
+          "path": "probe-quality-before-failed-1/inputs.json",
+          "sha256": "dad58d4f8c1cf4a8cba6c0e9d198f5d1bd3a8dc7f55db82d775d3bc59c1c2665"
+        },
+        {
+          "bytes": 1773,
+          "path": "probe-quality-before-failed-1/receipts.json",
+          "sha256": "8cb802e47566956bd4753de02ecde06f7e0378c204401fd039f79052be42ad50"
+        }
+      ],
+      "id": "probe-quality-before-failed-1",
+      "receipts": {
+        "bytes": 1773,
+        "commands": [
+          [
+            "cargo",
+            "fmt",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/Cargo.toml",
+            "--",
+            "--check"
+          ],
+          [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/Cargo.toml",
+            "--all-features",
+            "--",
+            "--test-threads=1"
+          ],
+          [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0806/probe-src/Cargo.toml",
+            "--all-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ]
+        ],
+        "exit_codes": [
+          0,
+          0,
+          101
+        ],
+        "logs": [
+          {
+            "bytes": 0,
+            "path": "probe-quality-before-failed-1/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 3797,
+            "path": "probe-quality-before-failed-1/1.log",
+            "sha256": "49821a553ef7492ac5714f201d19e738fe0b3e97c18429c82b044774ddff28cd"
+          },
+          {
+            "bytes": 8259,
+            "path": "probe-quality-before-failed-1/2.log",
+            "sha256": "5ea8637b998f457d63732202fc3a726956780966113dd29ac9a1d8abe5767f17"
+          }
+        ],
+        "path": "probe-quality-before-failed-1/receipts.json",
+        "sha256": "8cb802e47566956bd4753de02ecde06f7e0378c204401fd039f79052be42ad50"
+      }
+    }
+  ],
+  "patches": {},
+  "path_policy": "top-level failed-attempt roots and numbered setup archives are audited; no failed command is rerun; successful setup builds remain separate from failed quality receipts",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "quality_failure": {
+    "archive": {
+      "files": [
+        {
+          "bytes": 0,
+          "path": "quality-0/00.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 3699,
+          "path": "quality-0/01.log",
+          "sha256": "38431bc27f83f88398e9f2c7233be90c1fe71fc1e9e341ba7a17ed3756bd672d"
+        },
+        {
+          "bytes": 1798,
+          "path": "quality-0/checks.json",
+          "sha256": "0af1da2f5fc8b2144554dd644e1a2a066d48cdac569db8faf47edfbcc4e6d9b1"
+        },
+        {
+          "bytes": 1182921,
+          "path": "quality-0/source.json",
+          "sha256": "c5bdedbdc694e1025235ee771b6074579a2019b5c6170e5c3c720492f9dd9c06"
+        }
+      ],
+      "path": "quality-0"
+    },
+    "diagnostic": "litchi-sign unchecked_attributes unused",
+    "exit_codes": [
+      0,
+      101
+    ],
+    "failed_gate": 1,
+    "id": "quality-0",
+    "source": {
+      "bytes": 1182921,
+      "path": "quality-0/source.json",
+      "sha256": "c5bdedbdc694e1025235ee771b6074579a2019b5c6170e5c3c720492f9dd9c06"
+    }
+  },
+  "quality_failure_one": {
+    "archive": {
+      "files": [
+        {
+          "bytes": 0,
+          "path": "quality-1/00.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bytes": 4208,
+          "path": "quality-1/01.log",
+          "sha256": "b3cf9d0911b307e0d071c5e3b7574b47b8e4825c1f29e4ec409200d4943795ef"
+        },
+        {
+          "bytes": 1801,
+          "path": "quality-1/checks.json",
+          "sha256": "914f2061d785bfa56910a6ff13297729f039786171fd07d681cbe1f55842b199"
+        },
+        {
+          "bytes": 1182921,
+          "path": "quality-1/source.json",
+          "sha256": "2580eb92255318c62bd9fcca4e3b64e44bd0fedbf9e15545b5cd7590c9ba63f0"
+        }
+      ],
+      "path": "quality-1"
+    },
+    "diagnostic": "litchi-crypto OLE visibility E0603/E0599",
+    "exit_codes": [
+      0,
+      101
+    ],
+    "failed_gate": 1,
+    "id": "quality-1",
+    "source": {
+      "bytes": 1182921,
+      "path": "quality-1/source.json",
+      "sha256": "2580eb92255318c62bd9fcca4e3b64e44bd0fedbf9e15545b5cd7590c9ba63f0"
+    }
+  },
+  "schema": "litchi.performance.0806.failure-audit.v1",
+  "setup_attempts": [
+    {
+      "attempt": {
+        "bytes": 2440,
+        "path": "setup-attempt-0.json",
+        "sha256": "a2bc40ed57f644221d0a49ea2b9456a8994ccb27acbec9a011753e6ce9de67f8"
+      },
+      "build": {
+        "files": [
+          {
+            "bytes": 1841,
+            "path": "build-before-setup-0/allocation.log",
+            "sha256": "1b7b0b774af6618983014b8e4d7913a95801e02ac61a57cc8e3ab4f6b3985f7d"
+          },
+          {
+            "bytes": 3578,
+            "path": "build-before-setup-0/build.json",
+            "sha256": "81a7245f9ebaf400a5f089648658faff51f08ec6363d6a8960fae956cfdc0f56"
+          },
+          {
+            "bytes": 1739,
+            "path": "build-before-setup-0/commands.json",
+            "sha256": "9fcfe37feb48c5899b8332dd87080d901ac8c8b0aba300b43dbc2ef879848c53"
+          },
+          {
+            "bytes": 1052,
+            "path": "build-before-setup-0/frozen-inputs.json",
+            "sha256": "c2203477d2dbe3ed591103e34c314f91fd58adc19c18559641db307203f29d1a"
+          },
+          {
+            "bytes": 8304,
+            "path": "build-before-setup-0/native.log",
+            "sha256": "bd2e42464a457aeb126913f942cd7a7cd085bbdd69e5ab121767db1f9f348557"
+          },
+          {
+            "bytes": 419,
+            "path": "build-before-setup-0/probe.json",
+            "sha256": "a0ef3ac45e69fada82439340381b63d2107f20929edcb31b06ffbd95d14af7fe"
+          },
+          {
+            "bytes": 4707,
+            "path": "build-before-setup-0/profile.log",
+            "sha256": "a8e9a28ab8537d5656620eaeef82bb61f27f063d5631279da95ab1d2c3aa3940"
+          },
+          {
+            "bytes": 1182921,
+            "path": "build-before-setup-0/source.json",
+            "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+          }
+        ],
+        "path": "build-before-setup-0"
+      },
+      "first_failed_gate": 1,
+      "id": "setup-attempt-0",
+      "probe": {
+        "files": [
+          {
+            "bytes": 30217,
+            "path": "probe-src-setup-0/Cargo.lock",
+            "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+          },
+          {
+            "bytes": 642,
+            "path": "probe-src-setup-0/Cargo.toml",
+            "sha256": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0"
+          },
+          {
+            "bytes": 624,
+            "path": "probe-src-setup-0/Cargo.toml.template",
+            "sha256": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f"
+          },
+          {
+            "bytes": 62279,
+            "path": "probe-src-setup-0/src/allocation_metrics.rs",
+            "sha256": "76a2afb0405de4810fe8afdc942a27342c220c8d8327da139ae9aa23a647ba33"
+          },
+          {
+            "bytes": 10446,
+            "path": "probe-src-setup-0/src/counting_allocator.rs",
+            "sha256": "296170ec958b023208f49dc3639f20acb59b8afdf8547e34e68968266fc55d23"
+          },
+          {
+            "bytes": 52044,
+            "path": "probe-src-setup-0/src/main.rs",
+            "sha256": "d4db252816071c52eff51a5c013b78e162b1095a751ee69469922f57b8a68bc6"
+          }
+        ],
+        "path": "probe-src-setup-0"
+      },
+      "quality": {
+        "files": [
+          {
+            "bytes": 0,
+            "path": "probe-quality-before-failed-0/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 7188,
+            "path": "probe-quality-before-failed-0/1.log",
+            "sha256": "feac6d9a9b323c6f432cdb69ab53f3c9024d21f30b90ddb4508ba7571a779dc0"
+          },
+          {
+            "bytes": 1202122,
+            "path": "probe-quality-before-failed-0/inputs.json",
+            "sha256": "8dbf33fe7a1d5576d1248bbbb77d08e57088ddd9f7effc1ba19b37de4b3fe373"
+          },
+          {
+            "bytes": 1133,
+            "path": "probe-quality-before-failed-0/receipts.json",
+            "sha256": "5fa91ca9f13316fac388ff9d5deffa38c78220a059cdabea62581fff34aba181"
+          }
+        ],
+        "path": "probe-quality-before-failed-0"
+      },
+      "retained_binaries": [
+        {
+          "kind": "allocation",
+          "original": {
+            "bytes": 14358128,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+            "sha256": "a4c6d53b291306d4aa843bb4e4908ee65f8c2599e12ddc427cdfb5d581047fd9"
+          },
+          "retained": {
+            "bytes": 14358128,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-0",
+            "sha256": "a4c6d53b291306d4aa843bb4e4908ee65f8c2599e12ddc427cdfb5d581047fd9"
+          }
+        },
+        {
+          "kind": "native",
+          "original": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+            "sha256": "b56805ab4441da639a3224f81a57c30bae233eb3901c7dee1b2b3294cf2a8fb1"
+          },
+          "retained": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-0",
+            "sha256": "b56805ab4441da639a3224f81a57c30bae233eb3901c7dee1b2b3294cf2a8fb1"
+          }
+        },
+        {
+          "kind": "profile",
+          "original": {
+            "bytes": 14432376,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+            "sha256": "e29521cefebad09b71547ec68f3dd73f4ad1162fbc87fb531980a832db19210c"
+          },
+          "retained": {
+            "bytes": 14432376,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-0",
+            "sha256": "e29521cefebad09b71547ec68f3dd73f4ad1162fbc87fb531980a832db19210c"
+          }
+        }
+      ],
+      "tests": {
+        "failed": 7,
+        "ignored": 0,
+        "passed": 28
+      }
+    },
+    {
+      "attempt": {
+        "bytes": 2433,
+        "path": "setup-attempt-1.json",
+        "sha256": "a8b42feeef6c5a0843ebae56048ecbbe053b9e3099e0f7bb1fa465a8957c47c9"
+      },
+      "build": {
+        "files": [
+          {
+            "bytes": 1649,
+            "path": "build-before-setup-1/allocation.log",
+            "sha256": "9fa3c631fd7faf9972bcd14a0267be2451a12a241a47a4a3cb0b09220a7a392a"
+          },
+          {
+            "bytes": 3579,
+            "path": "build-before-setup-1/build.json",
+            "sha256": "5753bb91be85d925b76f6a24affffe219ee3ffb3feb89f1d7d534309b67daea7"
+          },
+          {
+            "bytes": 1740,
+            "path": "build-before-setup-1/commands.json",
+            "sha256": "fbfb252e15107393c758be7197a8462c74f8bed2fbcbe0b1aaae426d4a91ca35"
+          },
+          {
+            "bytes": 1052,
+            "path": "build-before-setup-1/frozen-inputs.json",
+            "sha256": "c2203477d2dbe3ed591103e34c314f91fd58adc19c18559641db307203f29d1a"
+          },
+          {
+            "bytes": 4707,
+            "path": "build-before-setup-1/native.log",
+            "sha256": "9f227b9d2af74fb9f1a6006333941e0a160524ce9517403e282d2e2c6fb1791e"
+          },
+          {
+            "bytes": 419,
+            "path": "build-before-setup-1/probe.json",
+            "sha256": "484dcb3968a6ebb270fac554dbf0170a12c177162bee00909b756036479ae0f4"
+          },
+          {
+            "bytes": 4707,
+            "path": "build-before-setup-1/profile.log",
+            "sha256": "faa0d0b3c4aa66efff7cb45c1840964cec16377a1bf000d8a7473923c209c531"
+          },
+          {
+            "bytes": 1182921,
+            "path": "build-before-setup-1/source.json",
+            "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+          }
+        ],
+        "path": "build-before-setup-1"
+      },
+      "first_failed_gate": 2,
+      "id": "setup-attempt-1",
+      "probe": {
+        "files": [
+          {
+            "bytes": 30217,
+            "path": "probe-src-setup-1/Cargo.lock",
+            "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+          },
+          {
+            "bytes": 642,
+            "path": "probe-src-setup-1/Cargo.toml",
+            "sha256": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0"
+          },
+          {
+            "bytes": 624,
+            "path": "probe-src-setup-1/Cargo.toml.template",
+            "sha256": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f"
+          },
+          {
+            "bytes": 62322,
+            "path": "probe-src-setup-1/src/allocation_metrics.rs",
+            "sha256": "7438bba67b0b9363ca921cc6f238e0c9e497c6e6f561170e73ab5392d5d39e63"
+          },
+          {
+            "bytes": 10770,
+            "path": "probe-src-setup-1/src/counting_allocator.rs",
+            "sha256": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e"
+          },
+          {
+            "bytes": 52044,
+            "path": "probe-src-setup-1/src/main.rs",
+            "sha256": "d4db252816071c52eff51a5c013b78e162b1095a751ee69469922f57b8a68bc6"
+          }
+        ],
+        "path": "probe-src-setup-1"
+      },
+      "quality": {
+        "files": [
+          {
+            "bytes": 0,
+            "path": "probe-quality-before-failed-1/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 3797,
+            "path": "probe-quality-before-failed-1/1.log",
+            "sha256": "49821a553ef7492ac5714f201d19e738fe0b3e97c18429c82b044774ddff28cd"
+          },
+          {
+            "bytes": 8259,
+            "path": "probe-quality-before-failed-1/2.log",
+            "sha256": "5ea8637b998f457d63732202fc3a726956780966113dd29ac9a1d8abe5767f17"
+          },
+          {
+            "bytes": 1202122,
+            "path": "probe-quality-before-failed-1/inputs.json",
+            "sha256": "dad58d4f8c1cf4a8cba6c0e9d198f5d1bd3a8dc7f55db82d775d3bc59c1c2665"
+          },
+          {
+            "bytes": 1773,
+            "path": "probe-quality-before-failed-1/receipts.json",
+            "sha256": "8cb802e47566956bd4753de02ecde06f7e0378c204401fd039f79052be42ad50"
+          }
+        ],
+        "path": "probe-quality-before-failed-1"
+      },
+      "retained_binaries": [
+        {
+          "kind": "allocation",
+          "original": {
+            "bytes": 14358128,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+            "sha256": "c8dd6ef473af1957400a37ab4584a0a9ee18ce2173df52ed786485611ccf4217"
+          },
+          "retained": {
+            "bytes": 14358128,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-1",
+            "sha256": "c8dd6ef473af1957400a37ab4584a0a9ee18ce2173df52ed786485611ccf4217"
+          }
+        },
+        {
+          "kind": "native",
+          "original": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+            "sha256": "9d3eb2f0bc006f07ad1ac975866d6867a814c09ba7252b2644a483a81af44a07"
+          },
+          "retained": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-1",
+            "sha256": "9d3eb2f0bc006f07ad1ac975866d6867a814c09ba7252b2644a483a81af44a07"
+          }
+        },
+        {
+          "kind": "profile",
+          "original": {
+            "bytes": 14432376,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+            "sha256": "dad5e95418d66e9dd54b0e66cb76732cd50ef1f39ed8d9ddcee1cc718ee2e377"
+          },
+          "retained": {
+            "bytes": 14432376,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-1",
+            "sha256": "dad5e95418d66e9dd54b0e66cb76732cd50ef1f39ed8d9ddcee1cc718ee2e377"
+          }
+        }
+      ],
+      "tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 35
+      }
+    },
+    {
+      "attempt": {
+        "bytes": 2607,
+        "path": "setup-attempt-2.json",
+        "sha256": "298cfe88dfb2ca9923098802d84125cd411c5e43dd1516e33029f48c3dc362fe"
+      },
+      "build": {
+        "files": [
+          {
+            "bytes": 191,
+            "path": "build-before-setup-2/allocation.log",
+            "sha256": "b26ef2499880fc7626c681ee590459ee2b72bd107f09e5f74ce45877e2c8f4cd"
+          },
+          {
+            "bytes": 3578,
+            "path": "build-before-setup-2/build.json",
+            "sha256": "f742ae5b49442337db473c86ca2159f76287722700993c416267801d3495ed7e"
+          },
+          {
+            "bytes": 1739,
+            "path": "build-before-setup-2/commands.json",
+            "sha256": "aa47d444c5dcdd85cf39c04628bc5425958c8c60bcb1b3b2db55635266ed06be"
+          },
+          {
+            "bytes": 1052,
+            "path": "build-before-setup-2/frozen-inputs.json",
+            "sha256": "c2203477d2dbe3ed591103e34c314f91fd58adc19c18559641db307203f29d1a"
+          },
+          {
+            "bytes": 3594,
+            "path": "build-before-setup-2/native.log",
+            "sha256": "ad14408bfe9c26ba78275f0399e5a39cbd4f55d97ecf2fb12eef53ec7f39ef9d"
+          },
+          {
+            "bytes": 419,
+            "path": "build-before-setup-2/probe.json",
+            "sha256": "59086c5267bac7255bd9ed030b739217cc452b5fd00962b79b55d06c68582ab7"
+          },
+          {
+            "bytes": 3594,
+            "path": "build-before-setup-2/profile.log",
+            "sha256": "6b3640f70ad1c0e38a60c4d51eae7dda632aca4ff86b99936fe613b2a8ec1606"
+          },
+          {
+            "bytes": 1182921,
+            "path": "build-before-setup-2/source.json",
+            "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d"
+          }
+        ],
+        "path": "build-before-setup-2"
+      },
+      "first_failed_gate": null,
+      "id": "setup-attempt-2",
+      "probe": {
+        "files": [
+          {
+            "bytes": 30217,
+            "path": "probe-src-setup-2/Cargo.lock",
+            "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+          },
+          {
+            "bytes": 642,
+            "path": "probe-src-setup-2/Cargo.toml",
+            "sha256": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0"
+          },
+          {
+            "bytes": 624,
+            "path": "probe-src-setup-2/Cargo.toml.template",
+            "sha256": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f"
+          },
+          {
+            "bytes": 63141,
+            "path": "probe-src-setup-2/src/allocation_metrics.rs",
+            "sha256": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67"
+          },
+          {
+            "bytes": 10770,
+            "path": "probe-src-setup-2/src/counting_allocator.rs",
+            "sha256": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e"
+          },
+          {
+            "bytes": 52048,
+            "path": "probe-src-setup-2/src/main.rs",
+            "sha256": "2dc4f7f1cd9b1333a033839255e37df56da4160e9988602fc63b60553a909646"
+          }
+        ],
+        "path": "probe-src-setup-2"
+      },
+      "qualification": {
+        "accepted": false,
+        "metadata_mismatches": 3,
+        "reports": 18,
+        "samples": 18
+      },
+      "qualification_witness": {
+        "bytes": 1606,
+        "path": "qualification-schema-mismatch-0.json",
+        "sha256": "326bad157f1a0bdad6bd15d766741efdd143311fce08590bc3e7ba8ac9483fcd"
+      },
+      "quality": {
+        "files": [
+          {
+            "bytes": 0,
+            "path": "probe-quality-before-setup-2/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "bytes": 3797,
+            "path": "probe-quality-before-setup-2/1.log",
+            "sha256": "dfedc7311d55a6030f943a542f3e9752312bbbefd358234946c5000d11a44e1d"
+          },
+          {
+            "bytes": 190,
+            "path": "probe-quality-before-setup-2/2.log",
+            "sha256": "6df0595c8ed5207ebe89b46fd09249c7638067272879a582590e0430caed9d00"
+          },
+          {
+            "bytes": 466,
+            "path": "probe-quality-before-setup-2/complete.json",
+            "sha256": "493ad1cf28441f88ff33c2f2c82aac88c355f3fc9d0d0d39abb4d1a29831b731"
+          },
+          {
+            "bytes": 1202122,
+            "path": "probe-quality-before-setup-2/inputs.json",
+            "sha256": "0796c76c98b6bfc20a19a770f6489106cb096ce5f3438ad0c5624b8de0008677"
+          },
+          {
+            "bytes": 1770,
+            "path": "probe-quality-before-setup-2/receipts.json",
+            "sha256": "7a7103dfa900c31d06167ab0c2f316b18a1a3400caaadcc9cf9f10f041757b93"
+          }
+        ],
+        "path": "probe-quality-before-setup-2"
+      },
+      "retained_binaries": [
+        {
+          "kind": "allocation",
+          "original": {
+            "bytes": 14358112,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation",
+            "sha256": "74394b3880cc6d23adda32126741e45c251cced3dd1f35ecb0877fb4647a6053"
+          },
+          "retained": {
+            "bytes": 14358112,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-2",
+            "sha256": "74394b3880cc6d23adda32126741e45c251cced3dd1f35ecb0877fb4647a6053"
+          }
+        },
+        {
+          "kind": "native",
+          "original": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native",
+            "sha256": "0d2670d32ee72da7d2acb74e9bbc878f29aa051bdbf1da311edc0c324b75108b"
+          },
+          "retained": {
+            "bytes": 14431552,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-2",
+            "sha256": "0d2670d32ee72da7d2acb74e9bbc878f29aa051bdbf1da311edc0c324b75108b"
+          }
+        },
+        {
+          "kind": "profile",
+          "original": {
+            "bytes": 14432368,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile",
+            "sha256": "c4e065ac95e0c56f96fbb5726b84eef6a0efaabda8cdc122cf66ecea0914f905"
+          },
+          "retained": {
+            "bytes": 14432368,
+            "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-2",
+            "sha256": "c4e065ac95e0c56f96fbb5726b84eef6a0efaabda8cdc122cf66ecea0914f905"
+          }
+        }
+      ],
+      "tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 35
+      }
+    }
+  ],
+  "setup_cleanup": {
+    "bytes": 1943,
+    "path": "setup-cleanup.json",
+    "sha256": "b3d134b5af5087fbca57d21265b7080e59836e52d3484daa5095b004d38f550d",
+    "value": {
+      "removed_binaries": [
+        {
+          "bytes": 14431552,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-0",
+          "sha256": "b56805ab4441da639a3224f81a57c30bae233eb3901c7dee1b2b3294cf2a8fb1"
+        },
+        {
+          "bytes": 14358128,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-0",
+          "sha256": "a4c6d53b291306d4aa843bb4e4908ee65f8c2599e12ddc427cdfb5d581047fd9"
+        },
+        {
+          "bytes": 14432376,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-0",
+          "sha256": "e29521cefebad09b71547ec68f3dd73f4ad1162fbc87fb531980a832db19210c"
+        },
+        {
+          "bytes": 14431552,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-1",
+          "sha256": "9d3eb2f0bc006f07ad1ac975866d6867a814c09ba7252b2644a483a81af44a07"
+        },
+        {
+          "bytes": 14358128,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-1",
+          "sha256": "c8dd6ef473af1957400a37ab4584a0a9ee18ce2173df52ed786485611ccf4217"
+        },
+        {
+          "bytes": 14432376,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-1",
+          "sha256": "dad5e95418d66e9dd54b0e66cb76732cd50ef1f39ed8d9ddcee1cc718ee2e377"
+        },
+        {
+          "bytes": 14431552,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-native-setup-2",
+          "sha256": "0d2670d32ee72da7d2acb74e9bbc878f29aa051bdbf1da311edc0c324b75108b"
+        },
+        {
+          "bytes": 14358112,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-allocation-setup-2",
+          "sha256": "74394b3880cc6d23adda32126741e45c251cced3dd1f35ecb0877fb4647a6053"
+        },
+        {
+          "bytes": 14432368,
+          "path": "/home/zhuhe/code/litchi-target-0806/before-profile-setup-2",
+          "sha256": "c4e065ac95e0c56f96fbb5726b84eef6a0efaabda8cdc122cf66ecea0914f905"
+        }
+      ],
+      "schema": "litchi.performance.0806.setup-cleanup.v1",
+      "target": "/home/zhuhe/code/litchi-target-0806",
+      "target_removed": true
+    }
+  }
+}

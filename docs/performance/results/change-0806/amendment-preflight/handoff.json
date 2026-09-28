@@ -1,0 +1,55 @@
+{
+  "schema": "litchi.performance.0806.amendment-preflight-handoff.v1",
+  "status": "inputs-frozen-execution-pending",
+  "source": {
+    "before": "source/before",
+    "after": "source/after",
+    "files_per_leg": 6,
+    "original_before_lineage": "../candidate/before",
+    "amended_after_lineage": "../candidate-quality-amendment/after"
+  },
+  "probe": {
+    "directory": "probe-src",
+    "cases": "cases.json",
+    "fixtures": "fixtures.json",
+    "source_schema": "litchi.attribute-boundary-probe.v1",
+    "tool": "attribute-boundary-probe-0805",
+    "clone_advances": [0, 1, 2, 3, 4, 5, 32, 33]
+  },
+  "drivers": {
+    "plan": "plan.json",
+    "quality": "quality.py",
+    "build": "build.py",
+    "capture": "capture.py",
+    "reader": "analyze.py",
+    "cleanup": "cleanup.py",
+    "custody": "custody.py",
+    "static_audit": "static_audit.py"
+  },
+  "quality": {
+    "before_tests": 70,
+    "after_tests": 100,
+    "clippy": true,
+    "all_targets": true
+  },
+  "native": {
+    "build_legs": ["before", "after"],
+    "capture_children": 936,
+    "capture_samples": 28080,
+    "cpu": 12,
+    "blocks": 6,
+    "samples": 30,
+    "warmup": 3,
+    "iterations": 4096,
+    "seed": 806082
+  },
+  "exclusions": {
+    "profiles": true,
+    "callgrind": true,
+    "heaptrack": true,
+    "historical_timing_pooling": true,
+    "reader_in_prebuild_frozen_inputs": true
+  },
+  "production_edits": false,
+  "cargo_or_native_execution_by_preparer": false
+}
