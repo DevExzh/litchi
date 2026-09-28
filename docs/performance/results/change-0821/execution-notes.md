@@ -52,3 +52,13 @@ hashes, removed target and scratch (1,808 files / 3,767,474,281 logical bytes),
 and ran `validate.py --final` to exit 0 with cleanup checked. Derived analysis
 bytes remain identical after deletion. Final sealing and exact commit checks
 follow; only the three pre-existing unrelated workspace paths remain excluded.
+
+## Post-commit replay repair
+
+Commit `e540859d7a` recorded the packet, but its HEAD seal check rejected the
+advanced revision despite unchanged source bytes. The reader now requires the
+measured base to remain an ancestor and still checks every source hash. A normal
+follow-up commit preserves this history; the seal checks the exact aggregate
+change set since measured base 8312 for both index and HEAD. The first seal is
+retained in `seal-at-e540859d7a.json` and the failure in
+`postcommit-replay-failure.json`. No frozen driver or measurement changed.

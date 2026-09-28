@@ -169,3 +169,9 @@ python3 -B docs/performance/results/change-0821/analyze.py --check
 python3 -B docs/performance/results/change-0821/validate.py --final
 python3 -B docs/performance/results/change-0821/seal.py --check-head
 ```
+
+The first evidence commit exposed a post-commit reader defect: it required
+HEAD to equal the measured base. The follow-up requires base ancestry while
+retaining exact source-hash checks. The original seal and failed HEAD replay
+are retained; the final seal verifies the aggregate batch changes since the
+measured base across both normal commits. No measurement was rerun or changed.

@@ -1,0 +1,16 @@
+{
+  "schema": "litchi.performance.0821.postcommit-replay-failure.v1",
+  "commit": "e540859d7a",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0821/seal.py",
+    "--check-head"
+  ],
+  "exit_code": 1,
+  "error": "0821 validation failed: production source revision changed",
+  "root_cause": "reader required HEAD equality with the measured base after an evidence-only commit advanced HEAD",
+  "repair": "require base ancestry and retain exact source hashes; seal exact aggregate changes since measured base across normal commits",
+  "original_seal": "seal-at-e540859d7a.json",
+  "raw_measurements_changed": false
+}
