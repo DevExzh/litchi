@@ -1,0 +1,40 @@
+{
+  "build_sha256": "0266b3297ca9edc25db3bc22afa7f90bcf53c2a56771a9eb5fe69954141cd9e0",
+  "command_contract": [
+    "perf",
+    "script",
+    "--no-inline",
+    "--ns"
+  ],
+  "compression": {
+    "bytes": 2653,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/perf/compression.json",
+    "sha256": "289c846c04a366c9a8f64a6d111fa63a2da7fcf35fd5f0e3b9a0acc379e009da"
+  },
+  "frames": 2,
+  "owner": "pptx_edit_profile_0822::edit_region_0822",
+  "owner_counts": {
+    "bytes": 225,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/perf/frame-owner-counts.json",
+    "sha256": "3a4f905bb13e7b70874c3713dea43d3627a0b37c6e394ef64d7e880410716dee"
+  },
+  "plan_sha256": "040cc6f9f94a3827ef0c49752cfa909ee03476c6ade09a6be2d05bf142845a43",
+  "profile_fabricated": false,
+  "raw_and_frames_retained": true,
+  "receipts": {
+    "bytes": 3693,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/perf/decode-receipts.json",
+    "sha256": "dac9ee4c7fadafd1c2b1545bc4e592840952c0aa6754be6a98439ce0caf1b948"
+  },
+  "reports": 2,
+  "retention": "lossless deterministic gzip; original descriptors bind decompressed bytes",
+  "schema": "litchi.performance.0822.decode.complete.v1",
+  "status": "available",
+  "symbol": {
+    "bytes": 4192,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0822/symbols/symbol.json",
+    "sha256": "b27fb39fd3f5375a5f11d5f4af78fbe3894aba039f3190a511736a43f6c16820"
+  },
+  "typed_unavailable": false,
+  "uncompressed_copies_removed": true
+}

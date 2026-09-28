@@ -1,0 +1,1472 @@
+{
+  "repeats": [
+    {
+      "empty_stack_samples": 0,
+      "leaves": [
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 184,
+          "symbol": "quick_xml::events::attributes::IterState::next"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 172,
+          "symbol": "zlib_rs::inflate::inflate_fast_help"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 166,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 136,
+          "symbol": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 129,
+          "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 111,
+          "symbol": "litchi_pptx::shape::reader::Scene::read_with"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 100,
+          "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 98,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 87,
+          "symbol": "core::str::converts::from_utf8"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 82,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 76,
+          "symbol": "litchi_pptx::notes::codec::scan_processed_xml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 75,
+          "symbol": "quick_xml::events::attributes::IterState::check_for_duplicates"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 74,
+          "symbol": "_int_malloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 74,
+          "symbol": "zlib_rs::inflate::inflate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 73,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_start"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 63,
+          "symbol": "litchi_pptx::notes::codec::inspect_element"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 63,
+          "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 63,
+          "symbol": "zlib_rs::inflate::inftrees::inflate_table"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 60,
+          "symbol": "zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 52,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 49,
+          "symbol": "quick_xml::name::NamespaceResolver::push"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 42,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 38,
+          "symbol": "litchi_pptx::tag::shape::codec::raw_shape_span"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 36,
+          "symbol": "quick_xml::name::NamespaceResolver::resolve_prefix"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 34,
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 34,
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 32,
+          "symbol": "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 31,
+          "symbol": "malloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 29,
+          "symbol": "litchi_pptx::opened::xml::write_compact_start"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 28,
+          "symbol": "litchi_pptx::opened::transaction::Transaction::commit"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 28,
+          "symbol": "litchi_pptx::shape::reader::Scanner::start_element"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 26,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 24,
+          "symbol": "quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 23,
+          "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 22,
+          "symbol": "litchi_pptx::opened::xml::element_preserves_space"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 22,
+          "symbol": "litchi_pptx::opened::xml::rewrite_shape_texts"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 22,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 21,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::One::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 20,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 18,
+          "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 17,
+          "symbol": "litchi_pptx::notes::resolved"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 17,
+          "symbol": "litchi_pptx::parts::presentation::PresentationPart::slide_references"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 16,
+          "symbol": "<litchi_opc::rel::Relationships as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 16,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 16,
+          "symbol": "quick_xml::escape::unescape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 14,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_end"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 13,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 13,
+          "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 12,
+          "symbol": "litchi_opc::packuri::PackURI::new"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 12,
+          "symbol": "quick_xml::XmlVersion::normalize_attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 11,
+          "symbol": "std::sync::once::Once::call_once_force::{{closure}}"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 11,
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 10,
+          "symbol": "quick_xml::escape::_escape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "<litchi_opc::part::XmlPart as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "digest::FixedOutput::finalize_fixed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 8,
+          "symbol": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 8,
+          "symbol": "litchi_pptx::opened::model::package_fingerprint_with_memo"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 7,
+          "symbol": "<litchi_opc::package::OpcPackage as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 7,
+          "symbol": "__memset_avx512_unaligned_erms"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 7,
+          "symbol": "_int_free_chunk"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 7,
+          "symbol": "hashbrown::map::HashMap<K,V,S,A>::insert"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "core::ptr::drop_in_place<hashbrown::raw::RawTable<(litchi_opc::packuri::PackURI,alloc::sync::Arc<litchi_opc::package::SourceRelationshipsXml>)>>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::part::XmlPart>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate_avx512"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "litchi_opc::package::OpcPackage::get_part"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "litchi_opc::packuri::PackURI::validate_percent_encoding"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 6,
+          "symbol": "realloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 5,
+          "symbol": "__libc_malloc2"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 5,
+          "symbol": "_int_free_maybe_trim"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 5,
+          "symbol": "_int_realloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "alloc::fmt::format::format_inner"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "core::hash::BuildHasher::hash_one"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "core::iter::traits::iterator::Iterator::try_fold"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "alloc::sync::Arc<T,A>::drop_slow"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "core::slice::sort::shared::smallsort::insertion_sort_shift_left"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_ooxml_common::mce::codec::contains_mce_namespace"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_opc::package::OpcPackage::is_signed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_opc::packuri::PackURI::from_rel_ref"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_pptx::opened::model::capture_internal"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_pptx::opened::model::feed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_pptx::opened::patch::Patch::capture"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_pptx::shape::reader::parse_i64"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<T as litchi_opc::part::PartClone>::clone_part"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::ensure_payload"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::partname"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 3,
+          "symbol": "alloc_perturb"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "core::ptr::drop_in_place<(litchi_opc::packuri::PackURI,litchi_opc::payload::PartPayload)>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "core::ptr::drop_in_place<hashbrown::raw::RawTable<(alloc::string::String,litchi_opc::rel::Relationship)>>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "litchi_opc::package::is_signature_relationship_or_target"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "litchi_pptx::parts::slide::SlidePart::finish_from_processed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<litchi_opc::part::BlobPart as litchi_opc::part::Part>::partname"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::content_type"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<str>::to_ascii_lowercase"
+        },
+        {
+          "dso": "[unknown]",
+          "samples": 2,
+          "symbol": "[unknown]"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::fmt::write"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::error::Error>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_ooxml_common::relationships::codec::attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_pptx::opened::model::PartDigests::insert"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "quick_xml::name::NamespaceResolver::add"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "zlib_rs::inflate::init"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<&T as core::fmt::Display>::fmt"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<alloc::raw_vec::RawVecInner>::finish_grow"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<alloc::string::String as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<alloc::string::String as core::fmt::Write>::write_str"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::rels"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<soapberry_zip::archive::ZipVerifier<Decompressor,Reader> as std::io::Read>::read"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<std::sys::sync::once::futex::Once>::call"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "alloc::vec::Vec<T,A>::push_mut"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<alloc::vec::Vec<litchi_pptx::notes::package::SlideRootEntry>>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::package::OpcPackage>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::notes::codec::XmlScan>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::presentation::model::Presentation>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::slice::sort::shared::smallsort::bidirectional_merge"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::slice::sort::unstable::quicksort::quicksort"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "flate2::deflate::read::DeflateDecoder<R>::new"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "hashbrown::map::HashMap<K,V,S,A>::get"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "hashbrown::raw::RawTable<T,A>::reserve_rehash"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_ooxml_common::mce::codec::process_ooxml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_opc::package::OpcPackage::get_part_mut"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_opc::package::OpcPackage::unsign"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::notes::package::SlideRootMemo::from_records"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::notes::package::resolve_slide_root"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::model::feed_relationships"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::patch::RelationshipState::capture_bounded"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::patch::capture_candidate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::transaction::Transaction::note_scene_read"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::transaction::compaction_scene"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::xml::rewrite_shape_text"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::xml::text_span_bytes"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::parts::slide::root_name_from_xml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::presentation::model::Presentation::catalog"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::Scanner::finish_shape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::is_dml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "soapberry_zip::archive::ZipVerification::valid_with_crc_policy"
+        }
+      ],
+      "outside_owner_samples": 3193,
+      "owner_period": 12918080937,
+      "owner_samples": 2971,
+      "owner_self_leaves": 0,
+      "repeat": 0,
+      "unknown_interior_samples": 2,
+      "unknown_leaf_samples": 2,
+      "whole_samples": 6164
+    },
+    {
+      "empty_stack_samples": 1,
+      "leaves": [
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 200,
+          "symbol": "quick_xml::events::attributes::IterState::next"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 173,
+          "symbol": "sha2::sha256::x86_sha::compress"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 169,
+          "symbol": "zlib_rs::inflate::inflate_fast_help"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 137,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 129,
+          "symbol": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 128,
+          "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 119,
+          "symbol": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 108,
+          "symbol": "core::str::converts::from_utf8"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 108,
+          "symbol": "litchi_pptx::shape::reader::Scene::read_with"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 102,
+          "symbol": "quick_xml::events::attributes::IterState::check_for_duplicates"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 78,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 70,
+          "symbol": "zlib_rs::inflate::inflate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 67,
+          "symbol": "litchi_pptx::notes::codec::scan_processed_xml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 62,
+          "symbol": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 59,
+          "symbol": "litchi_pptx::notes::codec::inspect_element"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 59,
+          "symbol": "zlib_rs::inflate::inftrees::inflate_table"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 59,
+          "symbol": "zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 52,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_start"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 51,
+          "symbol": "_int_malloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 50,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 46,
+          "symbol": "quick_xml::name::NamespaceResolver::push"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 45,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 44,
+          "symbol": "litchi_pptx::tag::shape::codec::raw_shape_span"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 36,
+          "symbol": "quick_xml::name::NamespaceResolver::resolve_prefix"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 34,
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 34,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::One::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 31,
+          "symbol": "litchi_pptx::opened::transaction::Transaction::commit"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 30,
+          "symbol": "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 28,
+          "symbol": "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 28,
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 28,
+          "symbol": "malloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 26,
+          "symbol": "quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 25,
+          "symbol": "litchi_pptx::shape::reader::Scanner::start_element"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 22,
+          "symbol": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 21,
+          "symbol": "litchi_pptx::notes::resolved"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 20,
+          "symbol": "quick_xml::reader::state::ReaderState::emit_end"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 19,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Two::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 18,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::Three::find_raw"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 17,
+          "symbol": "<litchi_opc::rel::Relationships as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 17,
+          "symbol": "litchi_pptx::opened::xml::write_compact_start"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 16,
+          "symbol": "litchi_pptx::opened::xml::rewrite_shape_texts"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 15,
+          "symbol": "litchi_pptx::parts::presentation::PresentationPart::slide_references"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 15,
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 14,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::part::XmlPart>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 14,
+          "symbol": "litchi_pptx::opened::xml::element_preserves_space"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 14,
+          "symbol": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 14,
+          "symbol": "quick_xml::escape::unescape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 13,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 13,
+          "symbol": "quick_xml::XmlVersion::normalize_attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 12,
+          "symbol": "alloc::raw_vec::RawVecInner<A>::finish_grow"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 12,
+          "symbol": "litchi_ooxml_common::xml::unqualified_attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 11,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 10,
+          "symbol": "<litchi_opc::part::XmlPart as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 10,
+          "symbol": "memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 9,
+          "symbol": "__memset_avx512_unaligned_erms"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "core::hash::BuildHasher::hash_one"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "core::iter::traits::iterator::Iterator::try_fold"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "litchi_opc::package::OpcPackage::get_part"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "litchi_opc::packuri::PackURI::validate_percent_encoding"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 9,
+          "symbol": "std::sync::once::Once::call_once_force::{{closure}}"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 8,
+          "symbol": "<litchi_opc::package::OpcPackage as core::clone::Clone>::clone"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 8,
+          "symbol": "hashbrown::map::HashMap<K,V,S,A>::insert"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 7,
+          "symbol": "core::ptr::drop_in_place<(litchi_opc::packuri::PackURI,litchi_opc::payload::PartPayload)>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 7,
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate_avx512"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 7,
+          "symbol": "quick_xml::escape::_escape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "<soapberry_zip::archive::ZipVerifier<Decompressor,Reader> as std::io::Read>::read"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 6,
+          "symbol": "_int_free_maybe_trim"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 6,
+          "symbol": "_int_realloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 6,
+          "symbol": "litchi_opc::packuri::PackURI::new"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 5,
+          "symbol": "__libc_malloc2"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "litchi_opc::packuri::PackURI::from_rel_ref"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "litchi_pptx::opened::model::capture_internal"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "litchi_pptx::opened::model::package_fingerprint_with_memo"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 5,
+          "symbol": "litchi_pptx::opened::patch::Patch::capture"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "alloc::fmt::format::format_inner"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "digest::FixedOutput::finalize_fixed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "hashbrown::raw::RawTable<T,A>::reserve_rehash"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 4,
+          "symbol": "litchi_ooxml_common::relationships::codec::attribute_value"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "<core::hash::sip::Hasher<S> as core::hash::Hasher>::write"
+        },
+        {
+          "dso": "[unknown]",
+          "samples": 3,
+          "symbol": "[unknown]"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 3,
+          "symbol": "_int_free_chunk"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "core::ptr::drop_in_place<hashbrown::raw::RawTable<(litchi_opc::packuri::PackURI,alloc::sync::Arc<litchi_opc::package::SourceRelationshipsXml>)>>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "litchi_opc::package::OpcPackage::is_signed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "litchi_pptx::shape::reader::parse_i64"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 3,
+          "symbol": "realloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 3,
+          "symbol": "zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<alloc::string::String as core::fmt::Write>::write_str"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::ensure_payload"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::partname"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::rels"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "<std::sys::sync::once::futex::Once>::call"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::fmt::write"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::ptr::drop_in_place<hashbrown::raw::RawTable<(alloc::string::String,litchi_opc::rel::Relationship)>>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::slice::sort::shared::smallsort::insertion_sort_shift_left"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::slice::sort::shared::smallsort::small_sort_general"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "core::slice::sort::unstable::quicksort::quicksort"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_opc::package::OpcPackage::unsign"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_pptx::notes::package::load_index_with_slide_root_proofs"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_pptx::opened::model::PartDigests::insert"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_pptx::opened::model::relationships_equal"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "litchi_pptx::tag::shape::codec::raw_candidate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "quick_xml::name::NamespaceResolver::add"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 2,
+          "symbol": "sha2::sha256::compress256"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<core::fmt::Formatter>::pad"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<flate2::mem::Decompress as flate2::zio::Ops>::run"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<litchi_opc::part::BlobPart as litchi_opc::part::Part>::rels"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::content_type"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "<str>::to_ascii_lowercase"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 1,
+          "symbol": "__memset_avx512_unaligned"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "__rustc::__rust_alloc"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "alloc::vec::Vec<T,A>::push_mut"
+        },
+        {
+          "dso": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "samples": 1,
+          "symbol": "alloc_perturb"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_opc::package::OpcPackage>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::error::Error>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::opened::model::PartDigests>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "core::slice::memchr::memrchr"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "crc32fast::specialized::pclmulqdq::calculate"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_opc::package::OpcPackage::main_document_part"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_opc::package::is_signature_relationship_or_target"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_opc::rel::Relationship::target_partname"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::model::PartDigests::with_capacity"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::model::SlideNameIndex::build"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::model::feed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::patch::RelationshipState::capture_bounded"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::opened::transaction::compaction_scene"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::parts::presentation::PresentationPart::from_part"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::parts::slide::SlidePart::finish_from_processed"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::parts::slide::root_name_from_xml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::Scanner::begin_shape"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::Scanner::reject_placeholder_character_data"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::Scanner::retain"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "litchi_pptx::shape::reader::is_dml"
+        },
+        {
+          "dso": "/home/zhuhe/code/litchi-target-0822/fp",
+          "samples": 1,
+          "symbol": "soapberry_zip::office::lookup_member_name"
+        }
+      ],
+      "outside_owner_samples": 3164,
+      "owner_period": 13027190866,
+      "owner_samples": 2996,
+      "owner_self_leaves": 0,
+      "repeat": 1,
+      "unknown_interior_samples": 2,
+      "unknown_leaf_samples": 3,
+      "whole_samples": 6160
+    }
+  ],
+  "schema": "litchi.performance.0822.frame-audit.v1",
+  "status": "available"
+}

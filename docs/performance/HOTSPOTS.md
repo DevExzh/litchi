@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0822 — snapshot materialization and XML work visible in real-file edit
+
+[0822](0822-real-file-pptx-edit-profile.md) Exact edit-owner profiles retain 2,971/2,996 samples. Attribute iteration (184/200 self leaves), inflate_fast (172/169), and SHA-256 compression (166/173) lead. Observed inflate/hash paths pass through snapshot package fingerprinting; shape parsing also appears in commit compaction. Review required versus avoidable materialization and repeated reads before selecting a source candidate; inclusive stacks do not establish phase fractions.
+
 ## 0821 — durability policy materially affects path-save latency
 
 [0821](0821-real-file-save-durability.md) Default/full controls agree within paired 95% intervals; weaker-policy latencies are markedly lower with identical observed median allocation counts, bytes, and peak-above-entry values. This supports synchronization as material on the measured ext4/NVMe host, without assigning individual syscall costs or authorizing default changes. Profile the ordinary PPTX edit/publication CPU path next.

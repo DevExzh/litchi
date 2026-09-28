@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0822 — public real-file PPTX edit CPU attribution
+
+[0822](0822-real-file-pptx-edit-profile.md) One admitted shapes.pptx input now has exact-owner CPU profiles of its public shape-text transaction/commit/apply sequence. Every measured output equals the sealed default-save reference and passes complete-text, target, and slide-count readback. This adds diagnostic attribution, not new CRUD capability, save durability, or broad-producer coverage.
+
 ## 0821 — real-file save durability variants measured
 
 [0821](0821-real-file-save-durability.md) Three admitted real DOCX/XLSX/PPTX files now have lifecycle and path-save measurements under default, full, file-only, and no-sync policies. Native timing, observer diagnostics, and qualification are separate. This adds policy attribution for these inputs, not crash-recovery or broad-producer coverage.

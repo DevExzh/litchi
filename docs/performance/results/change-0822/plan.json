@@ -1,0 +1,160 @@
+{
+  "schema": "litchi.performance.0822.pptx-edit-profile.v1",
+  "purpose": "Bounded native timing and sampled CPU attribution for one public PPTX edit sequence on the unchanged production source.",
+  "scope": "One pinned real PPTX source and 0821 default reference, three probe arms, six deterministic counterbalanced blocks, and optional whole-process perf attribution; evidence only.",
+  "base": "353aa00a7da2795e6b4c28708138a103a143917e",
+  "target": "/home/zhuhe/code/litchi-target-0822",
+  "scratch": null,
+  "cpu": 12,
+  "input": {
+    "selector": "pinnedshapes",
+    "reference_selector": "0821realPPTXdefault",
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "reference_bytes": 68284,
+    "reference_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+    "source_path": "test-data/ooxml/pptx/shapes.pptx",
+    "source_copy_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+    "source_bytes": 68822,
+    "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "probe": {
+    "package": "pptx-edit-profile-0822",
+    "cargo_binary": "pptx-edit-profile-0822",
+    "crate_owner": "pptx_edit_profile_0822",
+    "owner_function": "edit_region_0822",
+    "owner": "pptx_edit_profile_0822::edit_region_0822",
+    "manifest": "docs/performance/results/change-0822/probe-src/Cargo.toml",
+    "source_directory": "docs/performance/results/change-0822/probe-src",
+    "modes": ["direct", "wrapped"],
+    "input_selector": "pinnedshapes",
+    "reference_selector": "0821realPPTXdefault",
+    "input_path": "test-data/ooxml/pptx/shapes.pptx",
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx"
+  },
+  "build": {
+    "codegen_units": 1,
+    "debug": 1,
+    "incremental": false,
+    "jobs": 2,
+    "lto": "thin",
+    "opt_level": 3,
+    "panic": "unwind",
+    "features": [],
+    "ordinary_rustflags": null,
+    "fp_rustflags": "-C force-frame-pointers=yes"
+  },
+  "arms": {
+    "control": {
+      "binary": "ordinary",
+      "mode": "direct",
+      "purpose": "direct public edit sequence without the wrapper"
+    },
+    "wrapped": {
+      "binary": "ordinary",
+      "mode": "wrapped",
+      "purpose": "the same public edit sequence through the named profiling wrapper"
+    },
+    "fp": {
+      "binary": "fp",
+      "mode": "wrapped",
+      "purpose": "wrapped sequence in the frame-pointer build for native stack attribution"
+    }
+  },
+  "qualification": {
+    "blocks": 1,
+    "orders": [["control", "wrapped", "fp"]],
+    "samples": 3,
+    "warmup": 0,
+    "reports": 3,
+    "samples_total": 9,
+    "purpose": "correctness and CLI-shape check before timed native blocks"
+  },
+  "native": {
+    "blocks": 6,
+    "orders": [
+      ["control", "wrapped", "fp"],
+      ["wrapped", "fp", "control"],
+      ["fp", "control", "wrapped"],
+      ["fp", "wrapped", "control"],
+      ["wrapped", "control", "fp"],
+      ["control", "fp", "wrapped"]
+    ],
+    "samples": 30,
+    "warmup": 3,
+    "reports": 18,
+    "samples_total": 540,
+    "rss": "maximum resident set size in KiB from /usr/bin/time"
+  },
+  "perf": {
+    "binary": "fp",
+    "mode": "wrapped",
+    "input_selector": "pinnedshapes",
+    "reference_selector": "0821realPPTXdefault",
+    "input_path": "test-data/ooxml/pptx/shapes.pptx",
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "repeats": 2,
+    "samples": 2000,
+    "warmup": 0,
+    "cpu": 12,
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "call_graph": "fp",
+    "owner": "pptx_edit_profile_0822::edit_region_0822",
+    "reports": 2,
+    "samples_total": 4000,
+    "scope": "Whole-process sampled stacks and exact-owner attribution diagnostics only."
+  },
+  "expected": {
+    "qualification_reports": 3,
+    "qualification_samples": 9,
+    "native_reports": 18,
+    "native_samples": 540,
+    "perf_reports": 2,
+    "perf_samples": 4000,
+    "total_reports": 23,
+    "total_samples": 4549
+  },
+  "quality": {
+    "production_mode": "committed-0821-loader-replay",
+    "production_cargo_commands": false,
+    "production_test_counts": {
+      "passed": 641,
+      "failed": 0,
+      "ignored": 1,
+      "suites": 28
+    },
+    "probe_gates": ["fmt", "check", "tests", "clippy", "doc"],
+    "probe_cargo_commands": true
+  },
+  "statistics": {
+    "native": ["p50", "p95", "p99", "mean", "spread", "rss"],
+    "paired_ratios": ["wrapped/control", "fp/wrapped"],
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 822822,
+      "statistic": "median",
+      "sorted_zero_based_endpoints": [250, 9749]
+    },
+    "claims": [
+      "descriptive native timing and RSS only",
+      "paired wrapped/control and fp/wrapped perturbation ratios",
+      "sampled cycles:u whole-process stack attribution with unresolved and lost-event diagnostics"
+    ],
+    "adoption_threshold": null,
+    "speedup_claim": false
+  },
+  "source": {
+    "production_changed": false,
+    "runtime_harness_changed": false,
+    "tool_changed": false,
+    "production_file_count": 9197,
+    "tool_file_count": 87,
+    "probe_source_is_packet_local": true
+  },
+  "perf_denial": {
+    "status": "typed-unavailable",
+    "must_retain_reason": true,
+    "must_not_fabricate_profile": true
+  }
+}

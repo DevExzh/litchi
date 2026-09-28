@@ -1,0 +1,6 @@
+probe quality fmt PASS
+probe quality check PASS
+probe quality tests PASS
+probe quality clippy PASS
+probe quality doc PASS
+0822 quality PASS: committed production reuse plus five fresh probe gates

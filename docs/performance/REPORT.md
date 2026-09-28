@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0822 — PPTX edit profile completed without source change
+
+[0822](0822-real-file-pptx-edit-profile.md) The wrapper control interval includes 1.0; the frame-pointer control adds about 0.9%. No latency spread or p99/p50 diagnostic exceeds 5%; wrapped and fp whole-process RSS spreads do. Two exact-owner profiles localize XML, decompression, and fingerprint work. No optimization is adopted and durability defaults remain unchanged.
+
 ## 0821 — real-file durability attribution completed
 
 [0821](0821-real-file-save-durability.md) Six native blocks over 24 selectors establish full/default controls and weaker-policy ratios for three small real files. Seventeen cases retain 27 tail/mean spread flags and six retain p99/p50 flags; no p50 spread flag appears. Runtime source is unchanged, full durability remains the default, and no historical speedup is claimed.

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0822 — real-file edit work localized
+
+[0822](0822-real-file-pptx-edit-profile.md) The unchanged production source reuses its committed six-gate result; the new probe passes five fresh gates and three tests. Serial qualification, native controls, two perf recordings, and exact-binary decoding retain 23 reports/4,549 samples. Independent audits account for one empty stack explicitly. The broad non-iWork goal remains active.
+
 ## 0821 — synchronization policy attribution established
 
 [0821](0821-real-file-save-durability.md) Exact source/input verification reuses the committed 0820 six-gate repair quality. Three fresh release builds, six-corpus/thirty-output admission, 24 qualification selectors, 144 native reports, and 48 observer reports pass. Independent raw statistics reproduce all paired intervals. Root admission ordering and two reader-schema failures are retained with bounded recoveries.
