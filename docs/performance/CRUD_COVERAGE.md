@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0815 — borrowed event-arm workflow trial
+
+[0815](0815-pptx-borrowed-event-arms-workflow.md) Six shapes across capture, commit, and lifecycle retain exact source/output/full-semantic oracles for all 6,718 measured outputs. Candidate quality passes 1,241 tests with three ignored; both probes pass 36 tests. The latency policy rejects the candidate, restoring the baseline. No public capability or cross-format coverage is added.
+
 ## 0814 — unchanged capture semantics during fresh attribution
 
 [0814](0814-pptx-current-native-attribution.md) All 1,820 outputs preserve the sealed source/output/full semantic oracles. The fresh probe passes formatting, 36 tests, and Clippy; six production gates are reused by exact 0813-after source identity. No production source, CRUD capability, allocation claim, or cross-format coverage is added.

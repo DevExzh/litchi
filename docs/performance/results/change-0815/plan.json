@@ -1,0 +1,94 @@
+{
+  "schema": "litchi.performance.0815.v1",
+  "purpose": "Fresh public PPTX workflow and resource qualification for one private notes/codec candidate.",
+  "scope": "Current production versus a single candidate limited to notes/codec.rs. No historical timing pool, cross-format lane, heaptrack lane, or perf lane.",
+  "cpu": 12,
+  "source_allowlist": [
+    "crates/litchi-pptx/src/notes/codec.rs"
+  ],
+  "cases": [
+    {"mode": "capture", "shape": "tiny"},
+    {"mode": "commit", "shape": "tiny"},
+    {"mode": "lifecycle", "shape": "tiny"},
+    {"mode": "capture", "shape": "medium"},
+    {"mode": "commit", "shape": "medium"},
+    {"mode": "lifecycle", "shape": "medium"},
+    {"mode": "capture", "shape": "large"},
+    {"mode": "commit", "shape": "large"},
+    {"mode": "lifecycle", "shape": "large"},
+    {"mode": "capture", "shape": "vendor"},
+    {"mode": "commit", "shape": "vendor"},
+    {"mode": "lifecycle", "shape": "vendor"},
+    {"mode": "capture", "shape": "unicode-vendor"},
+    {"mode": "commit", "shape": "unicode-vendor"},
+    {"mode": "lifecycle", "shape": "unicode-vendor"},
+    {"mode": "capture", "shape": "valid-4attr"},
+    {"mode": "commit", "shape": "valid-4attr"},
+    {"mode": "lifecycle", "shape": "valid-4attr"}
+  ],
+  "qualification": {
+    "leg": "before",
+    "blocks": 1,
+    "orders": [["before"]],
+    "samples": 1,
+    "warmup": 0,
+    "reports": 18,
+    "samples_total": 18,
+    "binary": "allocation"
+  },
+  "native": {
+    "blocks": 6,
+    "orders": [
+      ["before", "after"],
+      ["after", "before"],
+      ["before", "after"],
+      ["after", "before"],
+      ["after", "before"],
+      ["before", "after"]
+    ],
+    "samples": 30,
+    "warmup": 3,
+    "reports": 216,
+    "samples_total": 6480
+  },
+  "allocation": {
+    "blocks": 2,
+    "orders": [
+      ["before", "after"],
+      ["after", "before"]
+    ],
+    "samples": 3,
+    "warmup": 0,
+    "reports": 72,
+    "samples_total": 216
+  },
+  "profile": {
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "binary": "profile",
+    "mode": "capture",
+    "shape": "large",
+    "orders": [
+      ["before", "after"],
+      ["after", "before"]
+    ],
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0,
+    "collect_at_start": false,
+    "events": ["Ir"],
+    "expected_numbered_parts": 1,
+    "reports": 4,
+    "samples_total": 4,
+    "scope": "Owner-scoped Callgrind attribution only; no latency, RSS, phase-fraction, or speedup claim."
+  },
+  "totals": {
+    "reports": 310,
+    "samples": 6718
+  },
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 815815,
+    "statistic": "median",
+    "sorted_zero_based_endpoints": [250, 9749]
+  }
+}

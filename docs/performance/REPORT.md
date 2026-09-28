@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0815 — borrowed event-arm candidate rejected
+
+[0815](0815-pptx-borrowed-event-arms-workflow.md) The fresh 310-report/6,718-output trial rejects borrowing the two event payloads: no qualifying benefit and one latency veto (+5.299% large lifecycle). Allocation metrics remain equal. All quality, semantic, assembly, and independent replay checks pass, but production is restored exactly. The packet retains tail/RSS variation and guest-profile limits; the broader goal remains open.
+
 ## 0814 — fresh attribution completes without production change
 
 [0814](0814-pptx-current-native-attribution.md) All 56 reports/1,820 samples, independent timing/frame replay, and exact-binary offset joins pass. Scanner payload moves inside event arms remain a bounded investigation target. The ambiguous inspector selector failure and assembly-only recovery are retained; no workloads rerun. Six tail/RSS spread flags and 2/1 unknown interior frames remain visible; zero lost-event lines. No new speedup is claimed.

@@ -1,0 +1,1049 @@
+{
+  "probe": {
+    "after": {
+      "gates": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "gate": 1,
+          "log": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-after/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "status": "pass"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--all-features",
+            "--",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "gate": 2,
+          "log": {
+            "bytes": 7480,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-after/1.log",
+            "sha256": "ee9ba169130451c07a7f672258e337217152bff51bfb7d44634351343c078a22"
+          },
+          "status": "pass",
+          "tests": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 36
+          }
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--all-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "gate": 3,
+          "log": {
+            "bytes": 3214,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-after/2.log",
+            "sha256": "da78b1772133153e8dff33e01148e13ad9fd5c599cc9400308ab2efe5e5af658"
+          },
+          "status": "pass"
+        }
+      ],
+      "inputs": {
+        "bytes": 1206754,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-after/inputs.json",
+        "sha256": "f9bfb7fde681ef6f17f5156690d1d18a0607c9975a87d9b3ebdf4d8f227e5a9e"
+      },
+      "probe": {
+        "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+        "Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+        "Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+        "src/allocation_metrics.rs": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67",
+        "src/counting_allocator.rs": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e",
+        "src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f"
+      },
+      "receipts": {
+        "bytes": 1837,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-after/receipts.json",
+        "sha256": "cb8af05011414cf490e0ba167e3c41d0e5fbacd6709a7b45308a9ac4de29d25c"
+      },
+      "root_inputs": {
+        "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+        "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+      },
+      "schema": "litchi.performance.0815.probe-quality-after.v1",
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/build-after/source.json",
+        "sha256": "f37607e4492a0c6cb9c0b9fcf879f5b44409ec38d34c5eb33b27cf9bc897891e"
+      },
+      "tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 36,
+        "suites": 1
+      }
+    },
+    "before": {
+      "gates": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--",
+            "--check"
+          ],
+          "exit_code": 0,
+          "gate": 1,
+          "log": {
+            "bytes": 0,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/0.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "status": "pass"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--all-features",
+            "--",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "gate": 2,
+          "log": {
+            "bytes": 7481,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/1.log",
+            "sha256": "4d75b266c6a824f863654a674016f1ac236d00b9c07e4b033f09181712e8a9de"
+          },
+          "status": "pass",
+          "tests": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 36
+          }
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-src/Cargo.toml",
+            "--all-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "gate": 3,
+          "log": {
+            "bytes": 3214,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/2.log",
+            "sha256": "f323118c2b4f273958a483320eee6e7813f4e8033a63e9c752be689d1cad26cd"
+          },
+          "status": "pass"
+        }
+      ],
+      "inputs": {
+        "bytes": 1206754,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/inputs.json",
+        "sha256": "1eeebeb35776da2aa0c32efb482ca13e616ce5946dc2a364c2b0a613e6479d20"
+      },
+      "probe": {
+        "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+        "Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+        "Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+        "src/allocation_metrics.rs": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67",
+        "src/counting_allocator.rs": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e",
+        "src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f"
+      },
+      "receipts": {
+        "bytes": 1840,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/probe-quality-before/receipts.json",
+        "sha256": "c1501f3264ad66a3e7ab3dac1fbdf9da5458f2827a59df3e351321a270fee581"
+      },
+      "root_inputs": {
+        "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+        "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+      },
+      "schema": "litchi.performance.0815.probe-quality-before.v1",
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/build-before/source.json",
+        "sha256": "6b4aa1eed9194edbd32ab7b9a7518cb9e82a61b3573554632555865a10110f4a"
+      },
+      "tests": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 36,
+        "suites": 1
+      }
+    }
+  },
+  "production_after": {
+    "checks": {
+      "bytes": 2938,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/checks.json",
+      "sha256": "c1b3f38c61c746b9cc81fefb2e88ebd8e758e8a562bdd36df9b02455796d8eb0"
+    },
+    "gates": [
+      {
+        "command": [
+          "cargo",
+          "fmt",
+          "-p",
+          "litchi-pptx",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "gate": 1,
+        "log": {
+          "bytes": 0,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/00.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "status": "pass"
+      },
+      {
+        "command": [
+          "cargo",
+          "check",
+          "--offline",
+          "--locked",
+          "-p",
+          "litchi-pptx",
+          "--all-features",
+          "--all-targets"
+        ],
+        "exit_code": 0,
+        "gate": 2,
+        "log": {
+          "bytes": 6244,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/01.log",
+          "sha256": "be44f8e01ac7815e7cd0f46e65e3f5ca9dfcfcfc9ae553ac1b244278088e7c75"
+        },
+        "status": "pass"
+      },
+      {
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "litchi-pptx",
+          "--all-features",
+          "--",
+          "--test-threads=2"
+        ],
+        "exit_code": 0,
+        "gate": 3,
+        "log": {
+          "bytes": 139453,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/02.log",
+          "sha256": "aa56f6f448586ad90d23c5e906eefedaab2823211b03df53df3a215ea70fe71c"
+        },
+        "status": "pass",
+        "tests": {
+          "failed": 0,
+          "ignored": 3,
+          "passed": 1241,
+          "suites": 85
+        }
+      },
+      {
+        "command": [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-p",
+          "litchi-pptx",
+          "--all-features",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "gate": 4,
+        "log": {
+          "bytes": 1207,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/03.log",
+          "sha256": "dd880afbce97a3ba0c1431eeffd21c0a5447bfed6d88dfada78df0158f18d44d"
+        },
+        "status": "pass"
+      },
+      {
+        "command": [
+          "cargo",
+          "doc",
+          "--offline",
+          "--locked",
+          "-p",
+          "litchi-pptx",
+          "--all-features",
+          "--no-deps"
+        ],
+        "exit_code": 0,
+        "gate": 5,
+        "log": {
+          "bytes": 227,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/04.log",
+          "sha256": "925da7d4c5dcc411642d530f1e4236e1c6ae8d6561cf2f6b6d2166b5421c72d2"
+        },
+        "status": "pass"
+      },
+      {
+        "command": [
+          "python3",
+          "-B",
+          "tools/check_crate_boundaries.py"
+        ],
+        "exit_code": 0,
+        "gate": 6,
+        "log": {
+          "bytes": 565,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/05.log",
+          "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+        },
+        "status": "pass"
+      }
+    ],
+    "root_inputs": {
+      "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+      "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+    },
+    "schema": "litchi.performance.0815.quality-after.v1",
+    "source": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/quality-after/source.json",
+      "sha256": "f37607e4492a0c6cb9c0b9fcf879f5b44409ec38d34c5eb33b27cf9bc897891e"
+    },
+    "tests": {
+      "failed": 0,
+      "ignored": 3,
+      "passed": 1241,
+      "results": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "measured": 0,
+          "passed": 826,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 8,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 10,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 34,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 6,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 8,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 10,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 16,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 58,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 30,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 22,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 8,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 13,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 12,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 12,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 2,
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "suites": 85
+    }
+  },
+  "schema": "litchi.performance.0815.quality-summary.v1"
+}

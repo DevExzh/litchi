@@ -1,0 +1,34 @@
+{
+  "advance": true,
+  "after": {
+    "bytes": 4752,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-after/receipt.json",
+    "sha256": "161968fc42686a378d2611abb314340e2d42dcbe405138391993af32abfd0fb2"
+  },
+  "analysis": {
+    "bytes": 35922,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-analysis.json",
+    "sha256": "fde36988312465ee23f713e0a158ad85f37afa930baa5b56bb8f8e7d2e011817"
+  },
+  "before": {
+    "bytes": 4764,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/receipt.json",
+    "sha256": "aa333bb420ebe6cf081dc9dab73b81193c0280d467bd64ac5fd8ea79f4bbe839"
+  },
+  "ended": 1790585381.272,
+  "reason": "Root inspected both post-dispatch Start/Empty paths in exact ordinary and profile assembly. Both before scanners have two 32-byte load/store copy sequences; both after scanners have zero and directly pass the event payload address at rsp+0x78 to resolver push and inspect_element. Symbols shrink from 2320 to 2107 bytes (434 to 393 instructions). Pre-dispatch vector moves remain zero in both legs; no earlier-copy savings are attributed to this candidate. This establishes the static mechanism only, not a timing or adoption result.",
+  "receipts": {
+    "after": {
+      "bytes": 4752,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-after/receipt.json",
+      "sha256": "161968fc42686a378d2611abb314340e2d42dcbe405138391993af32abfd0fb2"
+    },
+    "before": {
+      "bytes": 4764,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/codegen-before/receipt.json",
+      "sha256": "aa333bb420ebe6cf081dc9dab73b81193c0280d467bd64ac5fd8ea79f4bbe839"
+    }
+  },
+  "reviewed_after_code_generation": true,
+  "schema": "litchi.performance.0815.codegen-gate.v1"
+}

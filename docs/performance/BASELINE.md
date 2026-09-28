@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0815 — borrowed event arms rejected
+
+[0815](0815-pptx-borrowed-event-arms-workflow.md) Fresh evidence covers 310 reports/6,718 outputs. Large capture p50 worsens 4.270% (ratio 1.042703, interval 1.037801–1.056069); large lifecycle worsens 5.299% (1.052994, 1.049081–1.057175), triggering the veto. No eligible benefit; all 144 allocation comparisons are equal. Production is restored exactly and the performance baseline does not advance.
+
 ## 0814 — current-source attribution after event-copy removal
 
 [0814](0814-pptx-current-native-attribution.md) Fresh ordinary/wrapper/fp controls and two sampled profiles retain 56 reports/1,820 verified outputs. Ordinary large-capture p50 is 16.0685455 ms; wrapper/control is 1.040429 [1.034036–1.044374], fp/wrapper 1.006262 [0.999645–1.013582]. Six spread flags remain explicit. This is instrumentation diagnosis, not another optimization comparison.

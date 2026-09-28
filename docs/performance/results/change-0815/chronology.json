@@ -1,0 +1,49 @@
+{
+  "captured_at": 1790586100.4797113,
+  "evidence_kind": "post-decision observation of unchanged artifact filesystem mtimes",
+  "files": {
+    "analysis": {
+      "bytes": 3712552,
+      "observed_mtime_ns": 1790585711311495089,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/analysis.json",
+      "sha256": "005712a549f4794d22743cd06059990563caa31c9fbd10bfc13732dcd955aac5"
+    },
+    "application": {
+      "bytes": 2403239,
+      "observed_mtime_ns": 1790584809999798346,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/application.json",
+      "sha256": "b13826b4dd54b2d0982981a464374e6abeb4347e2a704b3f909a2c128d6eed25"
+    },
+    "decision": {
+      "bytes": 3272,
+      "observed_mtime_ns": 1790586100010456448,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/decision.json",
+      "sha256": "3052b28853d3e78fa75eee6b954cea895bd38e04fb0a20e3bb3937c5c5785da4"
+    },
+    "disposition": {
+      "bytes": 808,
+      "observed_mtime_ns": 1790586100449064014,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/disposition.json",
+      "sha256": "57cdd358cc9f273ec35e8a5202d3917ecd988a4889161b8e61d7238acb8b6a5a"
+    },
+    "profile-analysis": {
+      "bytes": 157557,
+      "observed_mtime_ns": 1790585706147471925,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/profile-analysis.json",
+      "sha256": "0ce9156f4a8edd2e842ae04284d85bf874f070db1770558993a45ca560e355bc"
+    },
+    "qualification-audit": {
+      "bytes": 1209044,
+      "observed_mtime_ns": 1790584806176497314,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/qualification-audit.json",
+      "sha256": "470bf878782082b0571b343c508ab5c1cd79286d2360ad6f4faa5856350f0e66"
+    },
+    "root-audit": {
+      "bytes": 56504,
+      "observed_mtime_ns": 1790585715023766740,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0815/root-audit.json",
+      "sha256": "1bf738551ea36a9769984bb972ff236c6d934f11cc37f818d5db74f9aba524d5"
+    }
+  },
+  "schema": "litchi.performance.0815.chronology.v1"
+}
