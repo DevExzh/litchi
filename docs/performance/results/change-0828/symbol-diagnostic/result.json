@@ -1,0 +1,117 @@
+{
+  "binary": {
+    "bytes": 13697584,
+    "path": "/home/zhuhe/code/litchi-target-0828/fp",
+    "sha256": "167fbb38556193835670b798538ad825897a7c1f1797c1eeab4e832876ca8d14"
+  },
+  "build": {
+    "bytes": 12454,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/build.json",
+    "sha256": "80add44b5a6fae2c4d28694f907f1f61f164d4ba8b8c08aeffeda68b027fb062"
+  },
+  "capture_authorized": false,
+  "driver": {
+    "bytes": 3627,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol_diagnostic.py",
+    "sha256": "f9a4a815384a552f45edcd77a9b40081ebcaf63ee0edcaf74ed8531da5bdd995"
+  },
+  "proofs": {
+    "capture": {
+      "assembly": {
+        "bytes": 12523,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/capture.txt",
+        "sha256": "883ce0551caadc6dabeff4cc1ad38fd433f65e41764650259effd4385b48bf27"
+      },
+      "demangled": {
+        "address": 1568336,
+        "size": 666,
+        "symbol": "pptx_edit_profile_0828::phase_opened_presentation_transaction_0828",
+        "type": "t"
+      },
+      "frame_pointer_and_call_verified": true,
+      "instruction_count": 134,
+      "owner": "pptx_edit_profile_0828::phase_opened_presentation_transaction_0828",
+      "raw": {
+        "address": 1568336,
+        "size": 666,
+        "symbol": "_ZN22pptx_edit_profile_082842phase_opened_presentation_transaction_082817h7400bea4033c517fE",
+        "type": "t"
+      }
+    },
+    "edit_region": {
+      "assembly": {
+        "bytes": 5656,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/edit_region.txt",
+        "sha256": "1828a12dddca111c778616fada09bcfe17559c391876ccdb4e728aa0ce844dd1"
+      },
+      "demangled": {
+        "address": 1564048,
+        "size": 276,
+        "symbol": "pptx_edit_profile_0828::edit_region_0828",
+        "type": "t"
+      },
+      "frame_pointer_and_call_verified": true,
+      "instruction_count": 63,
+      "owner": "pptx_edit_profile_0828::edit_region_0828",
+      "raw": {
+        "address": 1564048,
+        "size": 276,
+        "symbol": "_ZN22pptx_edit_profile_082816edit_region_082817h6c394cb362579069E",
+        "type": "t"
+      }
+    },
+    "publish": {
+      "assembly": {
+        "bytes": 20037,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/publish.txt",
+        "sha256": "bef69a4ea633812802d57b2d03ce24e94ae0593b2649892aa7b6d68746cc9a47"
+      },
+      "demangled": {
+        "address": 1583520,
+        "size": 1090,
+        "symbol": "pptx_edit_profile_0828::phase_commit_apply_opened_presentation_commit_0828",
+        "type": "t"
+      },
+      "frame_pointer_and_call_verified": true,
+      "instruction_count": 207,
+      "owner": "pptx_edit_profile_0828::phase_commit_apply_opened_presentation_commit_0828",
+      "raw": {
+        "address": 1583520,
+        "size": 1090,
+        "symbol": "_ZN22pptx_edit_profile_082850phase_commit_apply_opened_presentation_commit_082817hf6d9efdae1a46b7fE",
+        "type": "t"
+      }
+    },
+    "set_text": {
+      "assembly": {
+        "bytes": 9571,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/set_text.txt",
+        "sha256": "8f9801825407f6ec1086aa008c840fc229df1cca5d2b50a0cf8a15c9b25d67e1"
+      },
+      "demangled": {
+        "address": 1567920,
+        "size": 406,
+        "symbol": "pptx_edit_profile_0828::phase_set_shape_text_0828",
+        "type": "t"
+      },
+      "frame_pointer_and_call_verified": true,
+      "instruction_count": 94,
+      "owner": "pptx_edit_profile_0828::phase_set_shape_text_0828",
+      "raw": {
+        "address": 1567920,
+        "size": 406,
+        "symbol": "_ZN22pptx_edit_profile_082825phase_set_shape_text_082817h76ed6e899827ba12E",
+        "type": "t"
+      }
+    }
+  },
+  "receipts": {
+    "bytes": 4724,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/receipts.json",
+    "sha256": "00a5ddfc08c590ae55e74d18383e9a42e54751ce84a7ab1943398616eee07572"
+  },
+  "schema": "litchi.performance.0828.symbol-diagnostic.v1",
+  "scope": "post-abort static diagnostic only; not the frozen symbol admission gate",
+  "status": "pass",
+  "workload_executed": false
+}

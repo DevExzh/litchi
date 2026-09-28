@@ -1,0 +1,29 @@
+{
+  "edit": "One deterministic public PPTX edit region is exercised in direct and named-wrapper modes; probe output validation remains separate from native timing.",
+  "input_selector": "pinnedshapes",
+  "producer_claim": "No Microsoft producer application is inferred.",
+  "quality_reuse": "docs/performance/results/change-0827/quality.json",
+  "reference_archive": {
+    "bytes": 68284,
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "reference_report": {
+    "bytes": 26085,
+    "path": "docs/performance/results/change-0821/native/00-pptx_real_file_ordinary_save_lifecycle__default.json",
+    "sha256": "707ef512f90eefc7fccd7e2f0058f151437f2eabd6ada18565d40bf9d44c001d"
+  },
+  "reference_selector": "0821realPPTXdefault",
+  "schema": "litchi.performance.0828.provenance.v1",
+  "scope": "Fresh 0828 bounded PPTX public-edit profile on unchanged production and tool source; the canonical input is checked in and the reference output is a pinned 0821 artifact.",
+  "source_archive": {
+    "bytes": 68822,
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "source_copy": {
+    "bytes": 68822,
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  }
+}

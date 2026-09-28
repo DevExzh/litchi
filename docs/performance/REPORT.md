@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0828 — phase profile stopped before capture
+
+[0828](0828-pptx-edit-phase-profile.md) The planned phase profile yields no measurements after a frozen objdump selector failure. Five probe gates and two builds pass; a separate static diagnostic verifies all four wrappers. Production is unchanged, 0827 remains authoritative, and fresh capture requires a corrected frozen driver.
+
 ## 0827 — matched ordinary-save effect measured
 
 [0827](0827-ordinary-save-compaction-effect.md) The already-shipped compaction proof yields a scoped 2.494% PPTX lifecycle p50 improvement, paired ratio 0.975058 [0.973040–0.982246], and an 11.524% edit improvement. All twelve scenarios and 216 reports / 4,488 samples replay independently. No frozen p50/allocation/RSS threshold is triggered; 30 native and 16 observer spread flags limit tail claims. This is measurement evidence, with no new adoption decision.

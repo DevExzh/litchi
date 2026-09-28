@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0828/decode.py", line 376, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0828/decode.py", line 242, in main
+    static = static_owner_evidence()
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0828/decode.py", line 130, in static_owner_evidence
+    assert matched["symbol"] in assembly_text
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

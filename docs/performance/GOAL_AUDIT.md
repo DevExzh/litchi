@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0828 — phase profile stopped before capture
+
+[0828](0828-pptx-edit-phase-profile.md) The frozen symbol gate rejects empty disassembly before any workload capture. Failure evidence, unchanged drivers, fresh probe quality and a separate successful static diagnosis are retained. The owned target is removed; the broader performance goal and phase measurement remain open.
+
 ## 0827 — matched ordinary-save effect measured
 
 [0827](0827-ordinary-save-compaction-effect.md) Fresh harness quality passes (641 tests passed / zero failed / one ignored), with exact-source historical PPTX quality reuse explicitly distinguished. Independent replay accepts 216 reports / 4,488 samples after seven retained preflight/reader failures. All captures passed; production is restored and both owned temporary roots are removed. The scoped PPTX lifecycle improvement is 2.494%; the broader goal remains open.

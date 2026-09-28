@@ -1,0 +1,6 @@
+0828 probe quality fmt PASS
+0828 probe quality check PASS
+0828 probe quality tests PASS
+0828 probe quality clippy PASS
+0828 probe quality doc PASS
+0828 quality PASS: exact 0827 production reuse plus five fresh probe gates

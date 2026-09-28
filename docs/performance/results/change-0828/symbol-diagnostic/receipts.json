@@ -1,0 +1,151 @@
+[
+  {
+    "command": [
+      "nm",
+      "-S",
+      "--defined-only",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.3986418,
+    "exit_code": 0,
+    "label": "nm-raw",
+    "started": 1790627012.38765,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/nm-raw.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 420859,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/nm-raw.txt",
+      "sha256": "238290920fd07ca0b49e7314c0fcabd3e38a242e369f9fe47df98d50eef58992"
+    }
+  },
+  {
+    "command": [
+      "nm",
+      "-C",
+      "-S",
+      "--defined-only",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.4143057,
+    "exit_code": 0,
+    "label": "nm-demangled",
+    "started": 1790627012.4010258,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/nm-demangled.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 336476,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/nm-demangled.txt",
+      "sha256": "8aae533404234b0065394ce3563a3425816dd857561281efe2edd2406c6ed74a"
+    }
+  },
+  {
+    "command": [
+      "objdump",
+      "--demangle=rust",
+      "--wide",
+      "--line-numbers",
+      "-d",
+      "--start-address=1564048",
+      "--stop-address=1564324",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.4985912,
+    "exit_code": 0,
+    "label": "edit_region",
+    "started": 1790627012.4168308,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/edit_region.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 5656,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/edit_region.txt",
+      "sha256": "1828a12dddca111c778616fada09bcfe17559c391876ccdb4e728aa0ce844dd1"
+    }
+  },
+  {
+    "command": [
+      "objdump",
+      "--demangle=rust",
+      "--wide",
+      "--line-numbers",
+      "-d",
+      "--start-address=1568336",
+      "--stop-address=1569002",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.5814576,
+    "exit_code": 0,
+    "label": "capture",
+    "started": 1790627012.499743,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/capture.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 12523,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/capture.txt",
+      "sha256": "883ce0551caadc6dabeff4cc1ad38fd433f65e41764650259effd4385b48bf27"
+    }
+  },
+  {
+    "command": [
+      "objdump",
+      "--demangle=rust",
+      "--wide",
+      "--line-numbers",
+      "-d",
+      "--start-address=1583520",
+      "--stop-address=1584610",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.6612802,
+    "exit_code": 0,
+    "label": "publish",
+    "started": 1790627012.5822206,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/publish.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 20037,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/publish.txt",
+      "sha256": "bef69a4ea633812802d57b2d03ce24e94ae0593b2649892aa7b6d68746cc9a47"
+    }
+  },
+  {
+    "command": [
+      "objdump",
+      "--demangle=rust",
+      "--wide",
+      "--line-numbers",
+      "-d",
+      "--start-address=1567920",
+      "--stop-address=1568326",
+      "/home/zhuhe/code/litchi-target-0828/fp"
+    ],
+    "ended": 1790627012.743391,
+    "exit_code": 0,
+    "label": "set_text",
+    "started": 1790627012.6623483,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/set_text.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 9571,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/set_text.txt",
+      "sha256": "8f9801825407f6ec1086aa008c840fc229df1cca5d2b50a0cf8a15c9b25d67e1"
+    }
+  }
+]

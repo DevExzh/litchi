@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0828 — phase profile stopped before capture
+
+[0828](0828-pptx-edit-phase-profile.md) The proposed current-source shape-text phase profile stops before qualification: zero measurement reports and samples. Exact direct/wrapped parity passes as a unit test; no measured CRUD or producer coverage is added.
+
 ## 0827 — matched ordinary-save effect measured
 
 [0827](0827-ordinary-save-compaction-effect.md) Both source legs pass six-corpus/five-policy artifact admission and twelve ordinary-save qualification selectors. Fresh DOCX/XLSX/PPTX lifecycle, edit, atomic-publication, and counting-publication measurements complete. PPTX full lifecycle improves 2.494% for this file; external resaves, cold cache, broad producer coverage, remote I/O, and concurrency remain outside scope.

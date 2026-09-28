@@ -1,0 +1,94 @@
+
+/home/zhuhe/code/litchi-target-0828/fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000017dd90 <pptx_edit_profile_0828::edit_region_0828>:
+pptx_edit_profile_0828::edit_region_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:296
+  17dd90:	55                   	push   %rbp
+  17dd91:	48 89 e5             	mov    %rsp,%rbp
+  17dd94:	41 57                	push   %r15
+  17dd96:	41 56                	push   %r14
+  17dd98:	41 54                	push   %r12
+  17dd9a:	53                   	push   %rbx
+  17dd9b:	48 81 ec 60 08 00 00 	sub    $0x860,%rsp
+  17dda2:	48 89 fb             	mov    %rdi,%rbx
+  17dda5:	48 8d bd 80 f7 ff ff 	lea    -0x880(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:297
+  17ddac:	48 89 de             	mov    %rbx,%rsi
+  17ddaf:	e8 9c 10 00 00       	call   17ee50 <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17ddb4:	4c 8b a5 80 f7 ff ff 	mov    -0x880(%rbp),%r12
+  17ddbb:	4c 8b b5 88 f7 ff ff 	mov    -0x878(%rbp),%r14
+  17ddc2:	4c 89 e0             	mov    %r12,%rax
+  17ddc5:	48 f7 d8             	neg    %rax
+  17ddc8:	4c 8b bd 90 f7 ff ff 	mov    -0x870(%rbp),%r15
+  17ddcf:	0f 80 9c 00 00 00    	jo     17de71 <pptx_edit_profile_0828::edit_region_0828+0xe1>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17ddd5:	48 8d b5 98 f7 ff ff 	lea    -0x868(%rbp),%rsi
+pptx_edit_profile_0828::edit_region_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:297
+  17dddc:	48 8d bd c0 fb ff ff 	lea    -0x440(%rbp),%rdi
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17dde3:	ba 10 04 00 00       	mov    $0x410,%edx
+  17dde8:	ff 15 0a 37 0a 00    	call   *0xa370a(%rip)        # 2214f8 <memcpy@GLIBC_2.14>
+pptx_edit_profile_0828::edit_region_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:297
+  17ddee:	4c 89 a5 a8 fb ff ff 	mov    %r12,-0x458(%rbp)
+  17ddf5:	4c 89 b5 b0 fb ff ff 	mov    %r14,-0x450(%rbp)
+  17ddfc:	4c 89 bd b8 fb ff ff 	mov    %r15,-0x448(%rbp)
+  17de03:	48 8d bd a8 fb ff ff 	lea    -0x458(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:298
+  17de0a:	e8 a1 0e 00 00       	call   17ecb0 <pptx_edit_profile_0828::phase_set_shape_text_0828>
+  17de0f:	49 89 c6             	mov    %rax,%r14
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17de12:	48 85 c0             	test   %rax,%rax
+  17de15:	74 11                	je     17de28 <pptx_edit_profile_0828::edit_region_0828+0x98>
+pptx_edit_profile_0828::edit_region_0828:
+  17de17:	49 89 d7             	mov    %rdx,%r15
+  17de1a:	48 8d bd a8 fb ff ff 	lea    -0x458(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:302
+  17de21:	e8 ca bc 00 00       	call   189af0 <core::ptr::drop_in_place<litchi_pptx::opened::transaction::Transaction>>
+  17de26:	eb 49                	jmp    17de71 <pptx_edit_profile_0828::edit_region_0828+0xe1>
+  17de28:	4c 8d b5 80 f7 ff ff 	lea    -0x880(%rbp),%r14
+  17de2f:	48 8d b5 a8 fb ff ff 	lea    -0x458(%rbp),%rsi
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:299
+  17de36:	ba 28 04 00 00       	mov    $0x428,%edx
+  17de3b:	4c 89 f7             	mov    %r14,%rdi
+  17de3e:	ff 15 b4 36 0a 00    	call   *0xa36b4(%rip)        # 2214f8 <memcpy@GLIBC_2.14>
+  17de44:	48 89 df             	mov    %rbx,%rdi
+  17de47:	4c 89 f6             	mov    %r14,%rsi
+  17de4a:	e8 51 4b 00 00       	call   1829a0 <pptx_edit_profile_0828::phase_commit_apply_opened_presentation_commit_0828>
+  17de4f:	48 89 45 d0          	mov    %rax,-0x30(%rbp)
+  17de53:	48 89 55 d8          	mov    %rdx,-0x28(%rbp)
+  17de57:	48 8d 45 d0          	lea    -0x30(%rbp),%rax
+core::hint::black_box:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  17de5b:	48 89 85 80 f7 ff ff 	mov    %rax,-0x880(%rbp)
+  17de62:	48 8d 85 80 f7 ff ff 	lea    -0x880(%rbp),%rax
+pptx_edit_profile_0828::edit_region_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:301
+  17de69:	4c 8b 75 d0          	mov    -0x30(%rbp),%r14
+  17de6d:	4c 8b 7d d8          	mov    -0x28(%rbp),%r15
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:302
+  17de71:	4c 89 f0             	mov    %r14,%rax
+  17de74:	4c 89 fa             	mov    %r15,%rdx
+  17de77:	48 81 c4 60 08 00 00 	add    $0x860,%rsp
+  17de7e:	5b                   	pop    %rbx
+  17de7f:	41 5c                	pop    %r12
+  17de81:	41 5e                	pop    %r14
+  17de83:	41 5f                	pop    %r15
+  17de85:	5d                   	pop    %rbp
+  17de86:	c3                   	ret
+  17de87:	48 89 c3             	mov    %rax,%rbx
+  17de8a:	48 8d bd a8 fb ff ff 	lea    -0x458(%rbp),%rdi
+  17de91:	e8 5a bc 00 00       	call   189af0 <core::ptr::drop_in_place<litchi_pptx::opened::transaction::Transaction>>
+  17de96:	48 89 df             	mov    %rbx,%rdi
+  17de99:	e8 22 91 09 00       	call   216fc0 <_Unwind_Resume@plt>
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:296
+  17de9e:	ff 15 94 38 0a 00    	call   *0xa3894(%rip)        # 221738 <_DYNAMIC+0x458>

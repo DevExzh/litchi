@@ -1,0 +1,69 @@
+{
+  "build": {
+    "bytes": 12454,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/build.json",
+    "sha256": "80add44b5a6fae2c4d28694f907f1f61f164d4ba8b8c08aeffeda68b027fb062"
+  },
+  "console": {
+    "bytes": 519,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbols-console.log",
+    "sha256": "3465073871d185f1266284107e5f17890445f48697c3f18bc7a0b6139c4c9096"
+  },
+  "diagnostic": {
+    "bytes": 4291,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbol-diagnostic/result.json",
+    "sha256": "2d9e823e2bd28f80a5f2fed8f4262e9257d2b72cc3727707355eb472f8c10559"
+  },
+  "diagnostic_replaces_admission": false,
+  "exit_code": 1,
+  "failed_command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0828/decode.py",
+    "--symbols"
+  ],
+  "failed_driver": {
+    "bytes": 15285,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/decode.py",
+    "sha256": "6bff894a8a6ad85b6c13ce2b691cc55dae7e1f24e7feb885cda0c1bf6d5dab01"
+  },
+  "frozen_drivers_changed": false,
+  "frozen_inputs": {
+    "bytes": 1223599,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/build-0/frozen-inputs.json",
+    "sha256": "da3125f82c19d068dee3133785d74c783fffad5c1c943d446b69d9e9cf268f1e"
+  },
+  "partial_symbol_artifacts": [
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbols/edit_region-assembly.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 194,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbols/edit_region-assembly.txt",
+      "sha256": "3ae732efe2b36f8aa7b6e89225164fb6dba966ec90c7ca203fed25566430e71c"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbols/nm-defined.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/symbols/nm-demangled.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "production_changed": false,
+  "quality": {
+    "bytes": 1256764,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/quality.json",
+    "sha256": "8f72041df04b2766deedfacf0e8c16308cf29cce97019aa1f6a4e4352e1236cc"
+  },
+  "reason": "Frozen symbol admission combined demangled objdump lookup with a mangled symbol; output had no function body.",
+  "reports": 0,
+  "samples": 0,
+  "schema": "litchi.performance.0828.abort.v1",
+  "status": "aborted-before-workload"
+}
