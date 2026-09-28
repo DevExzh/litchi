@@ -1,0 +1,71 @@
+{
+  "captured_utc": "2026-09-28T04:21:58Z",
+  "cpu_affinity": {
+    "command": [
+      "taskset",
+      "-pc",
+      "$$"
+    ],
+    "exit_code": 0,
+    "stdout": "pid 1231902's current affinity list: 0-31\n"
+  },
+  "commands": {
+    "cargo_version": {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+    },
+    "getconf_page_size": {
+      "command": [
+        "getconf",
+        "PAGE_SIZE"
+      ],
+      "exit_code": 0,
+      "stdout": "4096\n"
+    },
+    "nproc": {
+      "command": [
+        "nproc"
+      ],
+      "exit_code": 0,
+      "stdout": "32\n"
+    },
+    "perf_version": {
+      "command": [
+        "perf",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "perf version 7.0.14\n"
+    },
+    "rustc_version": {
+      "command": [
+        "rustc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\n"
+    },
+    "uname": {
+      "command": [
+        "uname",
+        "-a"
+      ],
+      "exit_code": 0,
+      "stdout": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux\n"
+    },
+    "valgrind_version": {
+      "command": [
+        "valgrind",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "valgrind-3.26.0\n"
+    }
+  },
+  "cpu_count": 32,
+  "purpose": "Fresh lightweight tool and host command receipts captured before the 0807 evidence build; no workload was run."
+}

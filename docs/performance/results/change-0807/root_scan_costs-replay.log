@@ -1,0 +1,323 @@
+{
+  "profile": "0-large.callgrind.1",
+  "summary_ir": 549233425,
+  "self_sum": 549233425,
+  "selected_functions": {
+    "scan_processed_xml": [
+      {
+        "name": "litchi_pptx::notes::codec::scan_processed_xml",
+        "self_ir": 22308021,
+        "child_ir": 309394713,
+        "incoming_calls": 104,
+        "direct_children": []
+      }
+    ],
+    "inspect_element": [
+      {
+        "name": "litchi_pptx::notes::codec::inspect_element",
+        "self_ir": 29165311,
+        "child_ir": 129442197,
+        "incoming_calls": 181678,
+        "direct_children": [
+          {
+            "caller_id": 5572,
+            "callee_id": 2286,
+            "calls": 181678,
+            "inclusive_ir": 7448478,
+            "line": 16028,
+            "position": "*",
+            "callee_name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 4178,
+            "calls": 181678,
+            "inclusive_ir": 20607335,
+            "line": 16040,
+            "position": "*",
+            "callee_name": "quick_xml::name::NamespaceResolver::resolve_prefix"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5584,
+            "calls": 181678,
+            "inclusive_ir": 10647946,
+            "line": 16047,
+            "position": "*",
+            "callee_name": "litchi_pptx::notes::resolved"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 2286,
+            "calls": 181678,
+            "inclusive_ir": 7448478,
+            "line": 16057,
+            "position": "*",
+            "callee_name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 2224,
+            "calls": 181678,
+            "inclusive_ir": 12708960,
+            "line": 16072,
+            "position": "*",
+            "callee_name": "core::str::converts::from_utf8"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1082,
+            "calls": 104,
+            "inclusive_ir": 1768,
+            "line": 16096,
+            "position": "*",
+            "callee_name": "__memcmp_avx2_movbe"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1082,
+            "calls": 104,
+            "inclusive_ir": 2200,
+            "line": 16107,
+            "position": "*",
+            "callee_name": "__memcmp_avx2_movbe"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5324,
+            "calls": 311,
+            "inclusive_ir": 158175,
+            "line": 16127,
+            "position": "*",
+            "callee_name": "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5324,
+            "calls": 152099,
+            "inclusive_ir": 37018181,
+            "line": 16132,
+            "position": "*",
+            "callee_name": "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 2286,
+            "calls": 91274,
+            "inclusive_ir": 4375684,
+            "line": 16169,
+            "position": "*",
+            "callee_name": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 4178,
+            "calls": 91070,
+            "inclusive_ir": 2458890,
+            "line": 16182,
+            "position": "*",
+            "callee_name": "quick_xml::name::NamespaceResolver::resolve_prefix"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 4178,
+            "calls": 204,
+            "inclusive_ir": 21828,
+            "line": 16186,
+            "position": "*",
+            "callee_name": "quick_xml::name::NamespaceResolver::resolve_prefix"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5584,
+            "calls": 91274,
+            "inclusive_ir": 2200164,
+            "line": 16192,
+            "position": "*",
+            "callee_name": "litchi_pptx::notes::resolved"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 2224,
+            "calls": 91274,
+            "inclusive_ir": 5156216,
+            "line": 16201,
+            "position": "*",
+            "callee_name": "core::str::converts::from_utf8"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 2224,
+            "calls": 91274,
+            "inclusive_ir": 5642707,
+            "line": 16210,
+            "position": "*",
+            "callee_name": "core::str::converts::from_utf8"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5610,
+            "calls": 91274,
+            "inclusive_ir": 10399163,
+            "line": 16219,
+            "position": "*",
+            "callee_name": "quick_xml::escape::unescape"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1082,
+            "calls": 204,
+            "inclusive_ir": 5916,
+            "line": 16241,
+            "position": "*",
+            "callee_name": "__memcmp_avx2_movbe"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1762,
+            "calls": 204,
+            "inclusive_ir": 36558,
+            "line": 16259,
+            "position": "*",
+            "callee_name": "__rustc::__rust_alloc"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 720,
+            "calls": 204,
+            "inclusive_ir": 3056,
+            "line": 16269,
+            "position": "*",
+            "callee_name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5694,
+            "calls": 12,
+            "inclusive_ir": 4204,
+            "line": 16280,
+            "position": "*",
+            "callee_name": "<alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1518,
+            "calls": 2,
+            "inclusive_ir": 293,
+            "line": 16311,
+            "position": "*",
+            "callee_name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 720,
+            "calls": 2,
+            "inclusive_ir": 26,
+            "line": 16325,
+            "position": "*",
+            "callee_name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5434,
+            "calls": 2,
+            "inclusive_ir": 254,
+            "line": 16333,
+            "position": "*",
+            "callee_name": "alloc::vec::Vec<T,A>::push_mut"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 1518,
+            "calls": 200,
+            "inclusive_ir": 41711,
+            "line": 16344,
+            "position": "*",
+            "callee_name": "alloc::raw_vec::RawVecInner<A>::try_allocate_in"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 720,
+            "calls": 200,
+            "inclusive_ir": 3000,
+            "line": 16358,
+            "position": "*",
+            "callee_name": "__memcpy_avx_unaligned_erms"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5434,
+            "calls": 200,
+            "inclusive_ir": 9624,
+            "line": 16366,
+            "position": "*",
+            "callee_name": "alloc::vec::Vec<T,A>::push_mut"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 762,
+            "calls": 60825,
+            "inclusive_ir": 2007357,
+            "line": 16378,
+            "position": "*",
+            "callee_name": "free"
+          },
+          {
+            "caller_id": 5572,
+            "callee_id": 5328,
+            "calls": 60825,
+            "inclusive_ir": 1034025,
+            "line": 16383,
+            "position": "*",
+            "callee_name": "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>"
+          }
+        ]
+      }
+    ],
+    "IterState::next": [
+      {
+        "name": "quick_xml::events::attributes::IterState::next",
+        "self_ir": 35114190,
+        "child_ir": 14102788,
+        "incoming_calls": 430252,
+        "direct_children": []
+      }
+    ],
+    "CheckedAttributes as": [
+      {
+        "name": "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+        "self_ir": 8660171,
+        "child_ir": 28516369,
+        "incoming_calls": 152412,
+        "direct_children": []
+      }
+    ],
+    "notes::resolved": [
+      {
+        "name": "litchi_pptx::notes::resolved",
+        "self_ir": 9753543,
+        "child_ir": 3094567,
+        "incoming_calls": 272952,
+        "direct_children": []
+      }
+    ],
+    "from_utf8": [
+      {
+        "name": "core::str::converts::from_utf8",
+        "self_ir": 23550533,
+        "child_ir": 0,
+        "incoming_calls": 365769,
+        "direct_children": []
+      }
+    ],
+    "load_index_with_slide_root_proofs": [
+      {
+        "name": "litchi_pptx::notes::package::load_index_with_slide_root_proofs",
+        "self_ir": 22505,
+        "child_ir": 3005494,
+        "incoming_calls": 1,
+        "direct_children": []
+      }
+    ]
+  }
+}

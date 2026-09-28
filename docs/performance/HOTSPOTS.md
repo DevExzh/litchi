@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0807 — namespace-aware event handoff is a measured investigation target
+
+[0807](0807-pptx-current-capture-profile.md) Current exact-owner native stacks include notes scanning 896/898 times out of 1,036/1,033. NsReader event processing is the leading sampled leaf (189/190); retained disassembly and exploratory sampled offsets show event payload movement around that boundary. Test direct scanner event consumption with the same namespace owner and validation order before another workflow trial. Sampling skid and one unresolved frame per repeat prevent causal cost or phase-fraction claims. The presentation notes loader has only 10/10 nested samples; no candidate is adopted.
+
 ## 0806 — public workflow cost remains after the XML boundary trial
 
 [0806](0806-xml-workflow-qualification.md) The candidate's short-input micro benefits do not transfer to the public workflow: large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. Large-capture allocation calls fall from 72,106 to 10,788 and allocated bytes from 4,767,939 to 853,507, while net-live and peak-above-entry remain unchanged. The four qualified profiles and official cross analysis and independent replay with no veto do not overcome the missing timing benefit; the candidate is rejected and no production hotspot optimization is adopted.

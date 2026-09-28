@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0807 — current capture profile and wrapper control
+
+[0807](0807-pptx-current-capture-profile.md) Fresh unchanged-source evidence retains 44 reports/1,286 measured outputs: 36 native controls, six scoped Callgrind runs and two separate frame-pointer profiles. Ordinary tiny/medium/large capture p50 medians are 0.237846/0.465063/19.502579 ms. The large wrapper/control ratio is 0.967152 (bootstrap interval 0.962525–0.972282), a code-generation perturbation rather than an adopted speedup. Exact fixture and semantic checks pass; no historical timing pool or new memory/IO claim.
+
 ## 0806 — public workflow qualification rejects the candidate
 
 [0806](0806-xml-workflow-qualification.md) Fresh main/cross/profile evidence covers 323 reports and 9,606 samples (306/6,714 main, 13/2,888 cross, and 4/4 profile). The required public capture/lifecycle benefit is absent: large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. The main latency and allocation-resource guards pass, and official cross analysis and independent replay pass all eight rows with no veto. All six production files are restored exactly. Large-capture allocation calls fall 72,106→10,788 and allocated bytes 4,767,939→853,507; net-live and peak-above-entry are unchanged. These measured allocation reductions do not satisfy the required latency benefit gate. Supplemental 936/28,080 micro samples and 18 unaccepted setup reports remain separate; no baseline or production claim changes.

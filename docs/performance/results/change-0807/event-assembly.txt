@@ -1,0 +1,157 @@
+
+/home/zhuhe/code/litchi-target-0807/profile-fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000180700 <quick_xml::reader::ns_reader::NsReader<R>::process_event>:
+  180700:	push   %rbp
+  180701:	mov    %rsp,%rbp
+  180704:	push   %r15
+  180706:	push   %r14
+  180708:	push   %r13
+  18070a:	push   %r12
+  18070c:	push   %rbx
+  18070d:	sub    $0x48,%rsp
+  180711:	movabs $0x800000000000000f,%r15
+  18071b:	cmp    %r15,(%rdx)
+  18071e:	jne    18078d <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x8d>
+  180720:	lea    -0x48(%rbp),%r12
+  180724:	mov    0x8(%rdx),%rax
+  180728:	cmp    $0x2,%rax
+  18072c:	je     180811 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x111>
+  180732:	cmp    $0x1,%eax
+  180735:	je     1807b2 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xb2>
+  180737:	test   %rax,%rax
+  18073a:	jne    18078d <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x8d>
+  18073c:	mov    %rdi,%r14
+  18073f:	movups 0x10(%rdx),%xmm0
+  180743:	mov    %rdx,%rbx
+  180746:	movups 0x20(%rdx),%xmm1
+  18074a:	movaps %xmm1,-0x40(%rbp)
+  18074e:	movaps %xmm0,-0x50(%rbp)
+  180752:	add    $0x60,%rsi
+  180756:	lea    -0x70(%rbp),%rdi
+  18075a:	lea    -0x50(%rbp),%rdx
+  18075e:	call   *0xb033c(%rip)        # 230aa0 <_DYNAMIC+0xf40>
+  180764:	cmpl   $0x6,-0x70(%rbp)
+  180768:	jne    180880 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x180>
+  18076e:	movaps -0x50(%rbp),%xmm0
+  180772:	movaps -0x40(%rbp),%xmm1
+  180776:	movups %xmm1,0x20(%r14)
+  18077b:	movups %xmm0,0x10(%r14)
+  180780:	movq   $0x0,0x8(%r14)
+  180788:	jmp    180864 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x164>
+  18078d:	movups (%rdx),%xmm0
+  180790:	movups 0x10(%rdx),%xmm1
+  180794:	movups 0x20(%rdx),%xmm2
+  180798:	movups %xmm2,0x20(%rdi)
+  18079c:	movups %xmm1,0x10(%rdi)
+  1807a0:	movups %xmm0,(%rdi)
+  1807a3:	add    $0x48,%rsp
+  1807a7:	pop    %rbx
+  1807a8:	pop    %r12
+  1807aa:	pop    %r13
+  1807ac:	pop    %r14
+  1807ae:	pop    %r15
+  1807b0:	pop    %rbp
+  1807b1:	ret
+  1807b2:	mov    0x20(%rdx),%rax
+  1807b6:	mov    %rax,0x20(%rdi)
+  1807ba:	movups 0x10(%rdx),%xmm0
+  1807be:	movups %xmm0,0x10(%rdi)
+  1807c2:	movb   $0x1,0xa0(%rsi)
+  1807c9:	movq   $0x1,0x8(%rdi)
+  1807d1:	mov    %r15,(%rdi)
+  1807d4:	cmp    %r15,(%rdx)
+  1807d7:	jne    180873 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x173>
+  1807dd:	mov    0x8(%rdx),%rax
+  1807e1:	cmp    $0x3,%rax
+  1807e5:	jb     1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1807e7:	add    $0xfffffffffffffffd,%rax
+  1807eb:	cmp    $0x6,%rax
+  1807ef:	ja     1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1807f1:	lea    -0x15becc(%rip),%rcx        # 2492c <anon.bc3d94ef2394061926bee58178356194.284.llvm.4292028869470691777+0x49a4>
+  1807f8:	movslq (%rcx,%rax,4),%rax
+  1807fc:	add    %rcx,%rax
+  1807ff:	jmp    *%rax
+  180801:	cmpq   $0x0,0x10(%rdx)
+  180806:	jle    1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  180808:	mov    0x18(%rdx),%rdi
+  18080c:	jmp    1808ea <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x1ea>
+  180811:	mov    %rdi,%r14
+  180814:	movups 0x10(%rdx),%xmm0
+  180818:	mov    %rdx,%rbx
+  18081b:	movups 0x20(%rdx),%xmm1
+  18081f:	movaps %xmm1,-0x40(%rbp)
+  180823:	movaps %xmm0,-0x50(%rbp)
+  180827:	mov    %rsi,%r13
+  18082a:	add    $0x60,%rsi
+  18082e:	lea    -0x70(%rbp),%rdi
+  180832:	lea    -0x50(%rbp),%rdx
+  180836:	call   *0xb0264(%rip)        # 230aa0 <_DYNAMIC+0xf40>
+  18083c:	cmpl   $0x6,-0x70(%rbp)
+  180840:	jne    180880 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x180>
+  180842:	movb   $0x1,0xa0(%r13)
+  18084a:	movaps -0x50(%rbp),%xmm0
+  18084e:	movaps -0x40(%rbp),%xmm1
+  180852:	movups %xmm1,0x20(%r14)
+  180857:	movups %xmm0,0x10(%r14)
+  18085c:	movq   $0x2,0x8(%r14)
+  180864:	mov    %r15,(%r14)
+  180867:	mov    %rbx,%rdx
+  18086a:	cmp    %r15,(%rdx)
+  18086d:	je     1807dd <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xdd>
+  180873:	mov    %rdx,%rdi
+  180876:	call   166030 <core::ptr::drop_in_place<core::result::Result<quick_xml::events::Event,quick_xml::errors::Error>>>
+  18087b:	jmp    1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  180880:	movups -0x70(%rbp),%xmm0
+  180884:	movups -0x60(%rbp),%xmm1
+  180888:	movups %xmm1,0x18(%r14)
+  18088d:	movups %xmm0,0x8(%r14)
+  180892:	lea    -0x1(%r15),%rax
+  180896:	mov    %rax,(%r14)
+  180899:	cmpq   $0x0,-0x50(%rbp)
+  18089e:	jle    1808aa <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x1aa>
+  1808a0:	mov    -0x48(%rbp),%rdi
+  1808a4:	call   *0xaf4e6(%rip)        # 22fd90 <free@GLIBC_2.2.5>
+  1808aa:	cmp    %r15,(%rbx)
+  1808ad:	jne    1808f5 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x1f5>
+  1808af:	mov    0x8(%rbx),%rax
+  1808b3:	cmp    $0x3,%rax
+  1808b7:	jb     1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1808bd:	add    $0xfffffffffffffffd,%rax
+  1808c1:	cmp    $0x6,%rax
+  1808c5:	ja     1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1808cb:	lea    -0x15bfc2(%rip),%rcx        # 24910 <anon.bc3d94ef2394061926bee58178356194.284.llvm.4292028869470691777+0x4988>
+  1808d2:	movslq (%rcx,%rax,4),%rax
+  1808d6:	add    %rcx,%rax
+  1808d9:	jmp    *%rax
+  1808db:	cmpq   $0x0,0x10(%rbx)
+  1808e0:	jle    1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1808e6:	mov    0x18(%rbx),%rdi
+  1808ea:	call   *0xaf4a0(%rip)        # 22fd90 <free@GLIBC_2.2.5>
+  1808f0:	jmp    1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  1808f5:	mov    %rbx,%rdi
+  1808f8:	call   166030 <core::ptr::drop_in_place<core::result::Result<quick_xml::events::Event,quick_xml::errors::Error>>>
+  1808fd:	jmp    1807a3 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0xa3>
+  180902:	jmp    180904 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x204>
+  180904:	mov    %rax,%r14
+  180907:	cmpq   $0x0,-0x50(%rbp)
+  18090c:	jle    180918 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x218>
+  18090e:	mov    (%r12),%rdi
+  180912:	call   *0xaf478(%rip)        # 22fd90 <free@GLIBC_2.2.5>
+  180918:	cmp    %r15,(%rbx)
+  18091b:	jne    180937 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x237>
+  18091d:	cmpl   $0x3,0x8(%rbx)
+  180921:	jb     18093f <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x23f>
+  180923:	add    $0x8,%rbx
+  180927:	mov    %rbx,%rdi
+  18092a:	call   167450 <core::ptr::drop_in_place<quick_xml::events::Event>>
+  18092f:	mov    %r14,%rdi
+  180932:	call   2257f0 <_Unwind_Resume@plt>
+  180937:	mov    %rbx,%rdi
+  18093a:	call   166030 <core::ptr::drop_in_place<core::result::Result<quick_xml::events::Event,quick_xml::errors::Error>>>
+  18093f:	mov    %r14,%rdi
+  180942:	call   2257f0 <_Unwind_Resume@plt>
+  180947:	call   *0xaf66b(%rip)        # 22ffb8 <_DYNAMIC+0x458>

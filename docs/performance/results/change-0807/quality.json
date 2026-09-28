@@ -1,0 +1,34 @@
+{
+  "format": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0807/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790569705.0457182,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790569704.9991648
+  },
+  "probe": {
+    "probe-src/Cargo.lock": "41a6bc5edd9bd648754239cd99bfdb4ea4b23fc04b05ddf33968f71464775139",
+    "probe-src/Cargo.toml": "fa0db28e35b6025f1ce50a531c1b306b1be0f595b858da180327e10ec43696ab",
+    "probe-src/Cargo.toml.template": "367996e1bf644ac977e4f94593b4ec8f89c8a0a2e5099bb92e8b13570d2476d0",
+    "probe-src/src/allocation_metrics.rs": "a3f985831592ec8d1b547aed829fe00fe893a7c16020fd6e1b7ffd75a13a34a9",
+    "probe-src/src/counting_allocator.rs": "0c0391fd9d3197554b011ecdb762aa571b36584323ce7b89f005048e2439f48a",
+    "probe-src/src/main.rs": "9252c5f3d76582a73991326e733706dd7924a794868a3325cf4d70f46c7875d8"
+  },
+  "scope": "Exact inherited Rust probe; fresh formatting and release builds. No production source change or fresh production test-suite claim.",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/build/source.json",
+    "sha256": "7e97fcfca7c31bf6188846482d9d5ba12cd907eebad1937087dc2ae7ea39b3a6"
+  }
+}

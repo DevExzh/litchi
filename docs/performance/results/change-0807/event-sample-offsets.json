@@ -1,0 +1,173 @@
+{
+  "binary": {
+    "bytes": 13700104,
+    "path": "/home/zhuhe/code/litchi-target-0807/profile-fp",
+    "sha256": "0a507869726279b04235a770a9efbaf67d7ba3dfcc012400651834775179d354"
+  },
+  "rows": [
+    {
+      "leaf_samples": 189,
+      "offsets": [
+        {
+          "instruction": "mov    %rsp,%rbp",
+          "offset_hex": "0x1",
+          "samples": 3
+        },
+        {
+          "instruction": "push   %r14",
+          "offset_hex": "0x6",
+          "samples": 4
+        },
+        {
+          "instruction": "push   %rbx",
+          "offset_hex": "0xc",
+          "samples": 1
+        },
+        {
+          "instruction": "sub    $0x48,%rsp",
+          "offset_hex": "0xd",
+          "samples": 1
+        },
+        {
+          "instruction": "movabs $0x800000000000000f,%r15",
+          "offset_hex": "0x11",
+          "samples": 1
+        },
+        {
+          "instruction": "jne    18078d <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x8d>",
+          "offset_hex": "0x1e",
+          "samples": 1
+        },
+        {
+          "instruction": "mov    %rdx,%rbx",
+          "offset_hex": "0x43",
+          "samples": 54
+        },
+        {
+          "instruction": "jne    180880 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x180>",
+          "offset_hex": "0x68",
+          "samples": 1
+        },
+        {
+          "instruction": "movups 0x10(%rdx),%xmm1",
+          "offset_hex": "0x90",
+          "samples": 6
+        },
+        {
+          "instruction": "pop    %rbx",
+          "offset_hex": "0xa7",
+          "samples": 1
+        },
+        {
+          "instruction": "pop    %r14",
+          "offset_hex": "0xac",
+          "samples": 1
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rdi)",
+          "offset_hex": "0xbe",
+          "samples": 67
+        },
+        {
+          "instruction": "mov    %rdx,%rbx",
+          "offset_hex": "0x118",
+          "samples": 45
+        },
+        {
+          "instruction": "jne    180880 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x180>",
+          "offset_hex": "0x140",
+          "samples": 2
+        },
+        {
+          "instruction": "cmp    %r15,(%rdx)",
+          "offset_hex": "0x16a",
+          "samples": 1
+        }
+      ],
+      "repeat": 0
+    },
+    {
+      "leaf_samples": 190,
+      "offsets": [
+        {
+          "instruction": "mov    %rsp,%rbp",
+          "offset_hex": "0x1",
+          "samples": 2
+        },
+        {
+          "instruction": "push   %r14",
+          "offset_hex": "0x6",
+          "samples": 1
+        },
+        {
+          "instruction": "push   %rbx",
+          "offset_hex": "0xc",
+          "samples": 1
+        },
+        {
+          "instruction": "cmp    %r15,(%rdx)",
+          "offset_hex": "0x1b",
+          "samples": 1
+        },
+        {
+          "instruction": "jne    18078d <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x8d>",
+          "offset_hex": "0x1e",
+          "samples": 7
+        },
+        {
+          "instruction": "mov    0x8(%rdx),%rax",
+          "offset_hex": "0x24",
+          "samples": 2
+        },
+        {
+          "instruction": "cmp    $0x2,%rax",
+          "offset_hex": "0x28",
+          "samples": 1
+        },
+        {
+          "instruction": "mov    %rdx,%rbx",
+          "offset_hex": "0x43",
+          "samples": 47
+        },
+        {
+          "instruction": "movups 0x10(%rdx),%xmm1",
+          "offset_hex": "0x90",
+          "samples": 10
+        },
+        {
+          "instruction": "pop    %rbx",
+          "offset_hex": "0xa7",
+          "samples": 1
+        },
+        {
+          "instruction": "movups %xmm0,0x10(%rdi)",
+          "offset_hex": "0xbe",
+          "samples": 55
+        },
+        {
+          "instruction": "mov    %rdx,%rbx",
+          "offset_hex": "0x118",
+          "samples": 59
+        },
+        {
+          "instruction": "jne    180880 <quick_xml::reader::ns_reader::NsReader<R>::process_event+0x180>",
+          "offset_hex": "0x140",
+          "samples": 1
+        },
+        {
+          "instruction": "movq   $0x2,0x8(%r14)",
+          "offset_hex": "0x15c",
+          "samples": 1
+        },
+        {
+          "instruction": "cmp    %r15,(%rdx)",
+          "offset_hex": "0x16a",
+          "samples": 1
+        }
+      ],
+      "repeat": 1
+    }
+  ],
+  "scope": "Exploratory post-capture sampled leaf IP offsets for one exact frame-pointer binary, including warmups. Sampling skid, attribution and code-generation limits apply; no instruction cost fractions or causal speedup claim.",
+  "symbol": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+}

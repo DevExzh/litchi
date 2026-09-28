@@ -1,0 +1,72 @@
+{
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 807080
+  },
+  "cpu": 12,
+  "native": {
+    "orders": [
+      [
+        "control",
+        "profile"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "control",
+        "profile"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "profile",
+        "control"
+      ],
+      [
+        "control",
+        "profile"
+      ]
+    ],
+    "samples": 30,
+    "shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "warmup": 3
+  },
+  "owner": "pptx_capture_probe::capture_region_0784",
+  "profile": {
+    "collect_at_start": false,
+    "events": [
+      "Ir"
+    ],
+    "expected_numbered_parts": 1,
+    "orders": [
+      [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      [
+        "large",
+        "medium",
+        "tiny"
+      ]
+    ],
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0
+  },
+  "purpose": "Fresh post-0792/0800 CPU attribution after the 0806 candidate rejection; no speedup, adoption, or historical timing pool.",
+  "schema": "litchi.performance.0807.v1",
+  "scope": "Evidence-only current-source PPTX capture attribution. The native controls, scoped Callgrind runs, and frame-pointer sampled diagnostic share the exact 0791 probe and operation boundary. They retain CPU and call-path evidence only; they establish no production optimization, latency benefit, allocation benefit, CRUD coverage, or adoption decision.",
+  "owner_marker": {
+    "marker": "litchi-perf-0780-static-mce-capabilities",
+    "owner": "pptx_capture_probe::capture_region_0784"
+  }
+}

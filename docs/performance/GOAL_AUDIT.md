@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0807 — current CPU evidence narrows the next experiment
+
+[0807](0807-pptx-current-capture-profile.md) The fresh three-lane diagnostic completes 44 reports/1,286 measured outputs with source custody and independent replay. The current notes scan remains necessary; removing only its optional proof moves work to fallback. Event handoff is a new measured investigation target, but wrapper perturbation and unresolved frames limit interpretation. Production, public capabilities and the rejected 0806 disposition stay unchanged. Full non-iWork performance requirements remain incomplete; iWork is excluded.
+
 ## 0806 — public qualification rejects the candidate; the goal remains open
 
 [0806](0806-xml-workflow-qualification.md) The required benefit gate fails: no eligible public capture or lifecycle row improves by at least 3%; large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. Main latency/resource violations are zero, official cross analysis and independent replay pass all eight rows with no veto, and all four profile reports qualify, but allocation or memory reduction alone is insufficient for adoption. The six production files are restored exactly and no candidate change is retained. Setup and quality failures remain archived; constructor reuse and the OLE visibility repair are recorded as execution-chain repairs. iWork remains excluded and the non-iWork goal is incomplete.

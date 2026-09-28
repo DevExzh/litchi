@@ -1,0 +1,57 @@
+{
+  "architecture_reference": {
+    "packet": "../change-0806",
+    "sha256": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10"
+  },
+  "production_reference": {
+    "bytes": 1182921,
+    "path": "../change-0806/build-before/source.json",
+    "revision": "e3ff267ee3454e71d66f177f54f3cd05e0d9cce5",
+    "sha256": "fbbead35ddcc01aae68676d9f47b8f7bf1d94108ffa56825979e8340fe25fc0d",
+    "comparison": "files-only; current 0807 origin revision is recorded separately"
+  },
+  "probe_reference": {
+    "packet": "../change-0791",
+    "files": {
+      "Cargo.lock": "41a6bc5edd9bd648754239cd99bfdb4ea4b23fc04b05ddf33968f71464775139",
+      "Cargo.toml.template": "367996e1bf644ac977e4f94593b4ec8f89c8a0a2e5099bb92e8b13570d2476d0",
+      "src/allocation_metrics.rs": "a3f985831592ec8d1b547aed829fe00fe893a7c16020fd6e1b7ffd75a13a34a9",
+      "src/counting_allocator.rs": "0c0391fd9d3197554b011ecdb762aa571b36584323ce7b89f005048e2439f48a",
+      "src/main.rs": "9252c5f3d76582a73991326e733706dd7924a794868a3325cf4d70f46c7875d8"
+    },
+    "copy_policy": "Exact 0791 probe source, Cargo template, and lockfile; Cargo.toml is materialized by the build driver."
+  },
+  "references": {
+    "native_analysis.py": {
+      "bytes": 5285,
+      "path": "../change-0784/native_analysis.py",
+      "sha256": "7b38d91c082b8d60a6829bdbae203bdd750c6bf5e307c8927463a2d46a2490cd"
+    },
+    "perf_analysis.py": {
+      "bytes": 6145,
+      "path": "../change-0784/perf_analysis.py",
+      "sha256": "9e21daf25eb64ed52dd4644e48761bd38a7590ba2f9bba7e768aa66a6058f2de"
+    },
+    "probe-src/Cargo.lock": {
+      "bytes": 30241,
+      "path": "../change-0784/probe-src/Cargo.lock",
+      "sha256": "41a6bc5edd9bd648754239cd99bfdb4ea4b23fc04b05ddf33968f71464775139"
+    },
+    "probe-src/src/allocation_metrics.rs": {
+      "bytes": 62273,
+      "path": "../change-0784/probe-src/src/allocation_metrics.rs",
+      "sha256": "a3f985831592ec8d1b547aed829fe00fe893a7c16020fd6e1b7ffd75a13a34a9"
+    },
+    "probe-src/src/main.rs": {
+      "bytes": 25079,
+      "path": "../change-0784/probe-src/src/main.rs",
+      "sha256": "9252c5f3d76582a73991326e733706dd7924a794868a3325cf4d70f46c7875d8"
+    },
+    "profile_analysis.py": {
+      "bytes": 42781,
+      "path": "../change-0784/profile_analysis.py",
+      "sha256": "70b0bb3fc665860a9aa586725d72ced75e41de06f95e3b1c5408c70998e926b6"
+    }
+  },
+  "purpose": "Carry forward the 0791 exact probe and hash-bound 0784 Callgrind/perf readers while comparing current 0807 production file bytes with the 0806 build-before manifest."
+}
