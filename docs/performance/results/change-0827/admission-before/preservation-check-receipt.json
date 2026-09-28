@@ -1,0 +1,32 @@
+{
+  "action": "check",
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0827/preservation.py",
+    "--leg",
+    "before",
+    "--check"
+  ],
+  "ended": 1790623591.0717611,
+  "error": null,
+  "exit_code": 0,
+  "leg": "before",
+  "log": {
+    "bytes": 36,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/preservation-check.log",
+    "sha256": "edcaa8886d5992cc329e94cb15f8c4ab720398d5762470e025687b18f7755098"
+  },
+  "report": {
+    "bytes": 847433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/zip-preservation-before.json",
+    "sha256": "55bec463d28176070406358374a5d90d60bdccca076d710bdfb2e7b1a9654c80"
+  },
+  "schema": "litchi.performance.0827.preservation-attempt.v1",
+  "script": {
+    "bytes": 21533,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/preservation.py",
+    "sha256": "6a22da9c22f7940f45da35c2fb215d1921655a2f96cb712aaa1ad5b2e0487479"
+  },
+  "started": 1790623590.8720174
+}

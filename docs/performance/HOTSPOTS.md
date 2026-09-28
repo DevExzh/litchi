@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0827 — matched ordinary-save effect measured
+
+[0827](0827-ordinary-save-compaction-effect.md) The shipped compaction proof carries through to a 2.494% paired full-lifecycle p50 improvement on the admitted PPTX file, versus 11.524% for edit alone. Both save 298 allocation calls / 21,688 allocated bytes; net-live and peak-above-entry medians are unchanged. Publication-only intervals include 1.0. Full-durability publication remains material; phase medians are not additive.
+
 ## 0826 — allocation schema preflight repaired
 
 [0826](0826-allocation-schema-preflight.md) A reusable vector validator passes 30 regression tests in normal and optimized Python and checks 325 pinned historical reports. The original 0825 checker failure is reproduced and corrected without changing Rust or collecting new timings. Full ordinary-save comparison remains the next measurement.

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0827 — matched ordinary-save effect measured
+
+[0827](0827-ordinary-save-compaction-effect.md) Both source legs pass six-corpus/five-policy artifact admission and twelve ordinary-save qualification selectors. Fresh DOCX/XLSX/PPTX lifecycle, edit, atomic-publication, and counting-publication measurements complete. PPTX full lifecycle improves 2.494% for this file; external resaves, cold cache, broad producer coverage, remote I/O, and concurrency remain outside scope.
+
 ## 0826 — allocation schema preflight repaired
 
 [0826](0826-allocation-schema-preflight.md) A reusable vector validator passes 30 regression tests in normal and optimized Python and checks 325 pinned historical reports. The original 0825 checker failure is reproduced and corrected without changing Rust or collecting new timings. Full ordinary-save comparison remains the next measurement.

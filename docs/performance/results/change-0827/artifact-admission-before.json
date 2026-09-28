@@ -1,0 +1,427 @@
+{
+  "accepted": true,
+  "artifact_complete": {
+    "bytes": 1309,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-before.complete.json",
+    "sha256": "b44d7d2e2b28f83c6f3d28874b771730bc6cc05603e9160b90acc0a7ef9c616b"
+  },
+  "audit": {
+    "bytes": 2604166,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/artifact-audit.json",
+    "sha256": "4cc7d44b7f6ab0537111e55a8dc86610852daf3216319ccd026a2be50cc9c688"
+  },
+  "auditor": {
+    "bytes": 61571,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifact_audit.py",
+    "sha256": "1ccf8a340901be705ee5345b43be42123494f6895f8e5877cc9082fbd6c1a5e7"
+  },
+  "checks": {
+    "chosen_edit_closures_exact": true,
+    "five_policy_outputs_per_case": true,
+    "fresh_all_files_bound": true,
+    "fresh_manifest_identity": true,
+    "historical_0819_0821_byte_identity": true,
+    "independent_xml_zip_audit": true,
+    "independent_zip_preservation": true,
+    "qualification_not_started": true,
+    "source_inputs_exact": true
+  },
+  "ended": 1790623591.0813062,
+  "fresh_bound": {
+    "artifact_files": [
+      {
+        "bytes": 9070,
+        "path": "generated-docx-medium/default.docx",
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      {
+        "bytes": 9070,
+        "path": "generated-docx-medium/file-only.docx",
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      {
+        "bytes": 9070,
+        "path": "generated-docx-medium/full.docx",
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      {
+        "bytes": 9070,
+        "path": "generated-docx-medium/no-sync.docx",
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      {
+        "bytes": 9051,
+        "path": "generated-docx-medium/source.docx",
+        "sha256": "2004b8046b78320f2d05f27bce1ef293c1783912e2f27c83674e8f7d4c9431d9"
+      },
+      {
+        "bytes": 9070,
+        "path": "generated-docx-medium/stream.docx",
+        "sha256": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      {
+        "bytes": 40802,
+        "path": "generated-pptx-medium/default.pptx",
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      {
+        "bytes": 40802,
+        "path": "generated-pptx-medium/file-only.pptx",
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      {
+        "bytes": 40802,
+        "path": "generated-pptx-medium/full.pptx",
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      {
+        "bytes": 40802,
+        "path": "generated-pptx-medium/no-sync.pptx",
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      {
+        "bytes": 40788,
+        "path": "generated-pptx-medium/source.pptx",
+        "sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      },
+      {
+        "bytes": 40802,
+        "path": "generated-pptx-medium/stream.pptx",
+        "sha256": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      {
+        "bytes": 4226568,
+        "path": "generated-xlsx-medium/default.xlsx",
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      {
+        "bytes": 4226568,
+        "path": "generated-xlsx-medium/file-only.xlsx",
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      {
+        "bytes": 4226568,
+        "path": "generated-xlsx-medium/full.xlsx",
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      {
+        "bytes": 4226568,
+        "path": "generated-xlsx-medium/no-sync.xlsx",
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      {
+        "bytes": 4226429,
+        "path": "generated-xlsx-medium/source.xlsx",
+        "sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      {
+        "bytes": 4226568,
+        "path": "generated-xlsx-medium/stream.xlsx",
+        "sha256": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      {
+        "bytes": 27843,
+        "path": "manifest.json",
+        "sha256": "3104b0f16f2a443c31da76ebcb75975b2881d14518bc245f403dd3c5f523373a"
+      },
+      {
+        "bytes": 23535,
+        "path": "real-000-docx/default.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      {
+        "bytes": 23535,
+        "path": "real-000-docx/file-only.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      {
+        "bytes": 23535,
+        "path": "real-000-docx/full.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      {
+        "bytes": 23535,
+        "path": "real-000-docx/no-sync.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      {
+        "bytes": 23503,
+        "path": "real-000-docx/source.docx",
+        "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+      },
+      {
+        "bytes": 23535,
+        "path": "real-000-docx/stream.docx",
+        "sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774"
+      },
+      {
+        "bytes": 8521,
+        "path": "real-001-xlsx/default.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      {
+        "bytes": 8521,
+        "path": "real-001-xlsx/file-only.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      {
+        "bytes": 8521,
+        "path": "real-001-xlsx/full.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      {
+        "bytes": 8521,
+        "path": "real-001-xlsx/no-sync.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      {
+        "bytes": 8435,
+        "path": "real-001-xlsx/source.xlsx",
+        "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+      },
+      {
+        "bytes": 8521,
+        "path": "real-001-xlsx/stream.xlsx",
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      {
+        "bytes": 68284,
+        "path": "real-002-pptx/default.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      {
+        "bytes": 68284,
+        "path": "real-002-pptx/file-only.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      {
+        "bytes": 68284,
+        "path": "real-002-pptx/full.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      {
+        "bytes": 68284,
+        "path": "real-002-pptx/no-sync.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      {
+        "bytes": 68822,
+        "path": "real-002-pptx/source.pptx",
+        "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+      },
+      {
+        "bytes": 68284,
+        "path": "real-002-pptx/stream.pptx",
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      }
+    ],
+    "attempt_files": {
+      "admission-before/artifact-audit-receipt.json": {
+        "bytes": 1331,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/artifact-audit-receipt.json",
+        "sha256": "aadb3af5bd0abe912d0210f92a0286e67484472222281d77d33989e4c38d917a"
+      },
+      "admission-before/artifact-audit.json": {
+        "bytes": 2604166,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/artifact-audit.json",
+        "sha256": "4cc7d44b7f6ab0537111e55a8dc86610852daf3216319ccd026a2be50cc9c688"
+      },
+      "admission-before/artifact-audit.log": {
+        "bytes": 33,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/artifact-audit.log",
+        "sha256": "9bf5d597ef1cce6c355e1727229cc29f9433e59b89ec5ce3fdd64387b7217581"
+      },
+      "admission-before/preservation-check-receipt.json": {
+        "bytes": 1052,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/preservation-check-receipt.json",
+        "sha256": "e5820c3925e2cd63b901cb4e2d207405bcbb4df651e0c94e5f34564728c3ff23"
+      },
+      "admission-before/preservation-check.log": {
+        "bytes": 36,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/preservation-check.log",
+        "sha256": "edcaa8886d5992cc329e94cb15f8c4ab720398d5762470e025687b18f7755098"
+      },
+      "admission-before/preservation-write-receipt.json": {
+        "bytes": 1051,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/preservation-write-receipt.json",
+        "sha256": "10b5286503b5c3ce314435fca2e73d632286fd2257e5abf84294c157f6400131"
+      },
+      "admission-before/preservation-write.log": {
+        "bytes": 36,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/preservation-write.log",
+        "sha256": "f14d49fb211d1bea6eed6345bc8178162494da6e055fec056b6cf2881a6b7eac"
+      }
+    },
+    "audit": {
+      "bytes": 2604166,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/admission-before/artifact-audit.json",
+      "sha256": "4cc7d44b7f6ab0537111e55a8dc86610852daf3216319ccd026a2be50cc9c688"
+    },
+    "complete": {
+      "bytes": 1309,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-before.complete.json",
+      "sha256": "b44d7d2e2b28f83c6f3d28874b771730bc6cc05603e9160b90acc0a7ef9c616b"
+    },
+    "manifest": {
+      "bytes": 27843,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-before/manifest.json",
+      "sha256": "3104b0f16f2a443c31da76ebcb75975b2881d14518bc245f403dd3c5f523373a"
+    },
+    "preservation": {
+      "bytes": 847433,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/zip-preservation-before.json",
+      "sha256": "55bec463d28176070406358374a5d90d60bdccca076d710bdfb2e7b1a9654c80"
+    }
+  },
+  "historical_reference": {
+    "identity": "exact bytes and SHA-256 for all six default outputs; no timing reuse",
+    "source": "docs/performance/results/change-0819/artifacts and change-0821/artifacts"
+  },
+  "leg": "before",
+  "manifest": {
+    "bytes": 27843,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-before/manifest.json",
+    "sha256": "3104b0f16f2a443c31da76ebcb75975b2881d14518bc245f403dd3c5f523373a"
+  },
+  "plan_sha256": "294bab05eca55631041a4569068d71f0e342d844024e8800b57508611f24ff07",
+  "schema": "litchi.performance.0827.artifact-admission.v1",
+  "selectors": [
+    {
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "published_bytes": 23535,
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_edit",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "edit",
+      "published_bytes": 23535,
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "published_bytes": 23535,
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "docx_real_file_ordinary_save_counting_publish",
+      "edit_outcome": "admitted",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "counting_publish",
+      "published_bytes": 23535,
+      "published_sha256": "de9e163ac26e170ee3881c7d7e53ac29836efd6caea6f72db7ebd2cd31d6c774",
+      "source_bytes": 23503,
+      "source_sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "published_bytes": 8521,
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "edit",
+      "published_bytes": 8521,
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "published_bytes": 8521,
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_counting_publish",
+      "edit_outcome": "admitted",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "counting_publish",
+      "published_bytes": 8521,
+      "published_sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+      "source_bytes": 8435,
+      "source_sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "published_bytes": 68284,
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_edit",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "edit",
+      "published_bytes": 68284,
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "published_bytes": 68284,
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    {
+      "case": "pptx_real_file_ordinary_save_counting_publish",
+      "edit_outcome": "admitted",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "counting_publish",
+      "published_bytes": 68284,
+      "published_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+      "source_bytes": 68822,
+      "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    }
+  ],
+  "zip_preservation": {
+    "bytes": 847433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/zip-preservation-before.json",
+    "sha256": "55bec463d28176070406358374a5d90d60bdccca076d710bdfb2e7b1a9654c80"
+  }
+}

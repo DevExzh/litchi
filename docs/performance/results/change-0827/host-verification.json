@@ -1,0 +1,7 @@
+{
+  "architecture": "x86_64",
+  "cpu_model": "AMD EPYC 9R45",
+  "frozen_values_match_live": true,
+  "logical_cpu_count": 32,
+  "schema": "litchi.performance.0827.host-verification.v1"
+}

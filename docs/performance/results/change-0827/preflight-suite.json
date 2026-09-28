@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "admission_preflight.py": {
+      "bytes": 11046,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/reader-attempts/2/receipt.json",
+      "sha256": "f5a1bac2046d62526c0062c757c035482e8dd3d156c7b624c445624eccae84b5"
+    },
+    "driver_preflight.py": {
+      "bytes": 11042,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/reader-attempts/1/receipt.json",
+      "sha256": "d5d8a281b67bd1068ad6cb0697b9fa9f60e899d1ed1b1e8952b951124f725849"
+    },
+    "reader_preflight.py": {
+      "bytes": 11043,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/reader-attempts/4/receipt.json",
+      "sha256": "56e8de13c326827f2d12810256517ff51ed461f52b9673a664b8bf987e493939"
+    }
+  },
+  "schema": "litchi.performance.0827.preflight-suite.v1"
+}

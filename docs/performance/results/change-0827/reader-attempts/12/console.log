@@ -1,0 +1,2 @@
+0827 custody audit PASS: frozen full source, exact commands, six binaries, and serial capture order
+{"final": false, "reports": 216, "samples": 4488, "status": "accepted"}

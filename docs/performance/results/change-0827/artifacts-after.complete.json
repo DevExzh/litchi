@@ -1,0 +1,35 @@
+{
+  "build": {
+    "bytes": 12566,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/build-after/build.json",
+    "sha256": "9d22cd8c6841b06b5099a01a2981791fab99113aeda08a068b5ab9da5c84225e"
+  },
+  "cases": 6,
+  "children": 1,
+  "leg": "after",
+  "manifest": {
+    "bytes": 27842,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-after/manifest.json",
+    "sha256": "ca7630b444c562308f625264bc9e50c75157f6f0b338c34d212a79b122e1b5d6"
+  },
+  "plan": {
+    "bytes": 9867,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/plan.json",
+    "sha256": "294bab05eca55631041a4569068d71f0e342d844024e8800b57508611f24ff07"
+  },
+  "policy_outputs_per_case": 5,
+  "receipt": {
+    "bytes": 2951,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-after-receipt.json",
+    "sha256": "a532a6836bdf336cbc02c23a8bd6b28da416c5b0ae9c6eb9449c747de20df56f"
+  },
+  "reports": 0,
+  "samples": 0,
+  "schema": "litchi.performance.0827.artifacts-after.complete.v1",
+  "source": {
+    "bytes": 1183047,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0827/artifacts-after-source.json",
+    "sha256": "4936ca7cd4f60fb108eef4855859ed430c6d18a981f38b11e2acbd91c4efebf0"
+  },
+  "status": "pass"
+}
