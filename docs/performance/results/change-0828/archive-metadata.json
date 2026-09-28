@@ -1,0 +1,350 @@
+{
+  "compressed_payload_bytes": 60368,
+  "declared_logical_bytes": 154250,
+  "member_count": 48,
+  "members": [
+    {
+      "compressed_bytes": 489,
+      "crc32": 3850264562,
+      "logical_bytes": 3843,
+      "member": "[Content_Types].xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 261,
+      "crc32": 2708797544,
+      "logical_bytes": 738,
+      "member": "_rels/.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 218,
+      "crc32": 228386815,
+      "logical_bytes": 446,
+      "member": "ppt/slides/_rels/slide1.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 193,
+      "crc32": 3022216291,
+      "logical_bytes": 311,
+      "member": "ppt/slides/_rels/slide2.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 193,
+      "crc32": 69078579,
+      "logical_bytes": 311,
+      "member": "ppt/slides/_rels/slide3.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 193,
+      "crc32": 69078579,
+      "logical_bytes": 311,
+      "member": "ppt/slides/_rels/slide4.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 287,
+      "crc32": 3981595445,
+      "logical_bytes": 787,
+      "member": "ppt/slides/_rels/slide5.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 193,
+      "crc32": 69078579,
+      "logical_bytes": 311,
+      "member": "ppt/slides/_rels/slide6.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 319,
+      "crc32": 2000378802,
+      "logical_bytes": 1643,
+      "member": "ppt/_rels/presentation.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 621,
+      "crc32": 86993446,
+      "logical_bytes": 3383,
+      "member": "ppt/presentation.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1104,
+      "crc32": 138905805,
+      "logical_bytes": 4084,
+      "member": "ppt/slides/slide5.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1045,
+      "crc32": 506732092,
+      "logical_bytes": 5024,
+      "member": "ppt/slides/slide4.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 856,
+      "crc32": 2030479186,
+      "logical_bytes": 3001,
+      "member": "ppt/slides/slide3.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 745,
+      "crc32": 726200894,
+      "logical_bytes": 2052,
+      "member": "ppt/slides/slide2.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 4756,
+      "crc32": 2080266285,
+      "logical_bytes": 20740,
+      "member": "ppt/slides/slide1.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 906,
+      "crc32": 3758048473,
+      "logical_bytes": 5199,
+      "member": "ppt/slides/slide6.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 286,
+      "crc32": 559915625,
+      "logical_bytes": 1991,
+      "member": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1044,
+      "crc32": 1456929325,
+      "logical_bytes": 4548,
+      "member": "ppt/slideLayouts/slideLayout4.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1161,
+      "crc32": 832514745,
+      "logical_bytes": 4277,
+      "member": "ppt/slideLayouts/slideLayout3.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 845,
+      "crc32": 198656750,
+      "logical_bytes": 2802,
+      "member": "ppt/slideLayouts/slideLayout2.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1081,
+      "crc32": 3578436639,
+      "logical_bytes": 4193,
+      "member": "ppt/slideLayouts/slideLayout1.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1950,
+      "crc32": 2412677536,
+      "logical_bytes": 12083,
+      "member": "ppt/slideMasters/slideMaster1.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1394,
+      "crc32": 2172057684,
+      "logical_bytes": 7059,
+      "member": "ppt/slideLayouts/slideLayout5.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 728,
+      "crc32": 2373478913,
+      "logical_bytes": 2069,
+      "member": "ppt/slideLayouts/slideLayout6.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 681,
+      "crc32": 203694033,
+      "logical_bytes": 1731,
+      "member": "ppt/slideLayouts/slideLayout7.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 947,
+      "crc32": 20627261,
+      "logical_bytes": 3081,
+      "member": "ppt/slideLayouts/slideLayout11.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 868,
+      "crc32": 3718294122,
+      "logical_bytes": 2857,
+      "member": "ppt/slideLayouts/slideLayout10.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1198,
+      "crc32": 2942303050,
+      "logical_bytes": 4493,
+      "member": "ppt/slideLayouts/slideLayout9.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1263,
+      "crc32": 726738534,
+      "logical_bytes": 4638,
+      "member": "ppt/slideLayouts/slideLayout8.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 190,
+      "crc32": 4052931029,
+      "logical_bytes": 311,
+      "member": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 1667,
+      "crc32": 956944377,
+      "logical_bytes": 7004,
+      "member": "ppt/theme/theme1.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 11988,
+      "crc32": 2685422043,
+      "logical_bytes": 11988,
+      "member": "ppt/media/image1.jpg",
+      "method": 0
+    },
+    {
+      "compressed_bytes": 16384,
+      "crc32": 1172769044,
+      "logical_bytes": 16384,
+      "member": "docProps/thumbnail.jpeg",
+      "method": 0
+    },
+    {
+      "compressed_bytes": 337,
+      "crc32": 2930715919,
+      "logical_bytes": 651,
+      "member": "ppt/presProps.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 747,
+      "crc32": 3400298667,
+      "logical_bytes": 3803,
+      "member": "ppt/tableStyles.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 431,
+      "crc32": 3049588464,
+      "logical_bytes": 1008,
+      "member": "ppt/viewProps.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 529,
+      "crc32": 3955404958,
+      "logical_bytes": 1302,
+      "member": "docProps/app.xml",
+      "method": 8
+    },
+    {
+      "compressed_bytes": 370,
+      "crc32": 714211326,
+      "logical_bytes": 683,
+      "member": "docProps/core.xml",
+      "method": 8
+    }
+  ],
+  "schema": "litchi.performance.0828.archive-metadata.v1",
+  "scope": "ZIP central-directory metadata only; declared bytes are not runtime decode/copy/read counters",
+  "source": {
+    "bytes": 68822,
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  }
+}

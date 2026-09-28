@@ -1,0 +1,199 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader_preflight.py",
+    "--write"
+  ],
+  "ended": 1790626604.8083677,
+  "exit_code": 0,
+  "log": {
+    "bytes": 99,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/console.log",
+    "sha256": "1bd12eaa0178530315ff7044ba94e91f0b5063643935f4c134bee5edb339753e"
+  },
+  "schema": "litchi.performance.0828.reader-attempt.v1",
+  "sources": [
+    {
+      "original": {
+        "bytes": 109093,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/analysis.py",
+        "sha256": "a4b6f3a463e67618bb9ea2449f54d05a261bfef8b7027cdcdce1e2fd4d1e164e"
+      },
+      "snapshot": {
+        "bytes": 109093,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/analysis.py",
+        "sha256": "a4b6f3a463e67618bb9ea2449f54d05a261bfef8b7027cdcdce1e2fd4d1e164e"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5596,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/build.py",
+        "sha256": "e50443648ba83a68c053401d8032a4598e7d55fc23c4af26bde5f9e85f7f7eba"
+      },
+      "snapshot": {
+        "bytes": 5596,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/build.py",
+        "sha256": "e50443648ba83a68c053401d8032a4598e7d55fc23c4af26bde5f9e85f7f7eba"
+      }
+    },
+    {
+      "original": {
+        "bytes": 17654,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/capture.py",
+        "sha256": "0e2e7df9b75e32e8c9c0a6f17441e9ee5fc5368286d8f79ed798a95ba067fafb"
+      },
+      "snapshot": {
+        "bytes": 17654,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/capture.py",
+        "sha256": "0e2e7df9b75e32e8c9c0a6f17441e9ee5fc5368286d8f79ed798a95ba067fafb"
+      }
+    },
+    {
+      "original": {
+        "bytes": 1813,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/cleanup.py",
+        "sha256": "2d43eea2d0039955887a5f6b05a4a3b08744eb1685e68980f062b9a43917c512"
+      },
+      "snapshot": {
+        "bytes": 1813,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/cleanup.py",
+        "sha256": "2d43eea2d0039955887a5f6b05a4a3b08744eb1685e68980f062b9a43917c512"
+      }
+    },
+    {
+      "original": {
+        "bytes": 17057,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/custody.py",
+        "sha256": "4f9c514d71a39266901e33f77e05a51f3f66ace8808dbe83e692c188e28163bc"
+      },
+      "snapshot": {
+        "bytes": 17057,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/custody.py",
+        "sha256": "4f9c514d71a39266901e33f77e05a51f3f66ace8808dbe83e692c188e28163bc"
+      }
+    },
+    {
+      "original": {
+        "bytes": 15285,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/decode.py",
+        "sha256": "6bff894a8a6ad85b6c13ce2b691cc55dae7e1f24e7feb885cda0c1bf6d5dab01"
+      },
+      "snapshot": {
+        "bytes": 15285,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/decode.py",
+        "sha256": "6bff894a8a6ad85b6c13ce2b691cc55dae7e1f24e7feb885cda0c1bf6d5dab01"
+      }
+    },
+    {
+      "original": {
+        "bytes": 12206,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/frame_audit.py",
+        "sha256": "5a0461358dbd5758f3e667fcd02a09265f7c4f895695525ce676ea89ad9f0573"
+      },
+      "snapshot": {
+        "bytes": 12206,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/frame_audit.py",
+        "sha256": "5a0461358dbd5758f3e667fcd02a09265f7c4f895695525ce676ea89ad9f0573"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5988,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/prepare.py",
+        "sha256": "5d076d57587261a904e8a6782360a2c148764b8395e357a0cf014b9d1a3c1863"
+      },
+      "snapshot": {
+        "bytes": 5988,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/prepare.py",
+        "sha256": "5d076d57587261a904e8a6782360a2c148764b8395e357a0cf014b9d1a3c1863"
+      }
+    },
+    {
+      "original": {
+        "bytes": 14364,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/quality.py",
+        "sha256": "1cbf67df3d7dd2a1373d07c89518dcd88fd55bd5af7ba9059d0eb227d5a29c0d"
+      },
+      "snapshot": {
+        "bytes": 14364,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/quality.py",
+        "sha256": "1cbf67df3d7dd2a1373d07c89518dcd88fd55bd5af7ba9059d0eb227d5a29c0d"
+      }
+    },
+    {
+      "original": {
+        "bytes": 7969,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader_preflight.py",
+        "sha256": "f0ee5deaa51ea06bc2557363c2c16c3510b85b8df78332505ca32f03eedd5006"
+      },
+      "snapshot": {
+        "bytes": 7969,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/reader_preflight.py",
+        "sha256": "f0ee5deaa51ea06bc2557363c2c16c3510b85b8df78332505ca32f03eedd5006"
+      }
+    },
+    {
+      "original": {
+        "bytes": 4050,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/root_audit.py",
+        "sha256": "7461a3eaba0ed6fad41fc13c9ff197125bd21602582a160315bf57ed8fcc1e8e"
+      },
+      "snapshot": {
+        "bytes": 4050,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/root_audit.py",
+        "sha256": "7461a3eaba0ed6fad41fc13c9ff197125bd21602582a160315bf57ed8fcc1e8e"
+      }
+    },
+    {
+      "original": {
+        "bytes": 1939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/run_reader.py",
+        "sha256": "50a4ab093cb6092b2b5051db4f78bc647066c71292342eb77ef7052bfcb59dd9"
+      },
+      "snapshot": {
+        "bytes": 1939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/run_reader.py",
+        "sha256": "50a4ab093cb6092b2b5051db4f78bc647066c71292342eb77ef7052bfcb59dd9"
+      }
+    },
+    {
+      "original": {
+        "bytes": 2322,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/seal.py",
+        "sha256": "b939e82fb842d21d55deae1c2507df5777b8b89515d89b51762400df3734cab1"
+      },
+      "snapshot": {
+        "bytes": 2322,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/seal.py",
+        "sha256": "b939e82fb842d21d55deae1c2507df5777b8b89515d89b51762400df3734cab1"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5282,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/stack_diagnostics.py",
+        "sha256": "c8af8d110a4ad3f5d43cebeec807c5b69fb92210766218969a43c7426395f8da"
+      },
+      "snapshot": {
+        "bytes": 5282,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/stack_diagnostics.py",
+        "sha256": "c8af8d110a4ad3f5d43cebeec807c5b69fb92210766218969a43c7426395f8da"
+      }
+    },
+    {
+      "original": {
+        "bytes": 15520,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/validate.py",
+        "sha256": "5016db6dc83f88f677579189cca81eae6e9eab8d9f24aa3ec39c0b7cd51f48c2"
+      },
+      "snapshot": {
+        "bytes": 15520,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0828/reader-attempts/0/sources/validate.py",
+        "sha256": "5016db6dc83f88f677579189cca81eae6e9eab8d9f24aa3ec39c0b7cd51f48c2"
+      }
+    }
+  ],
+  "started": 1790626597.1597383
+}

@@ -1,0 +1,197 @@
+
+/home/zhuhe/code/litchi-target-0828/fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000017ee50 <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828>:
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:308
+  17ee50:	55                   	push   %rbp
+  17ee51:	48 89 e5             	mov    %rsp,%rbp
+  17ee54:	41 57                	push   %r15
+  17ee56:	41 56                	push   %r14
+  17ee58:	41 54                	push   %r12
+  17ee5a:	53                   	push   %rbx
+  17ee5b:	48 81 ec 90 09 00 00 	sub    $0x990,%rsp
+  17ee62:	48 89 fb             	mov    %rdi,%rbx
+  17ee65:	49 be 00 00 00 00 00 00 00 80 	movabs $0x8000000000000000,%r14
+litchi_pptx::package::model::Package::opened_presentation:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:234
+  17ee6f:	48 8d 15 42 8d ea ff 	lea    -0x1572be(%rip),%rdx        # 27bb8 <anon.7d1f7c43824a99e7625b6b83caf5366f.7352.llvm.1147792908330267282>
+  17ee76:	48 8d bd 80 fa ff ff 	lea    -0x580(%rbp),%rdi
+  17ee7d:	ff 15 b5 35 0a 00    	call   *0xa35b5(%rip)        # 222438 <_DYNAMIC+0x1158>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17ee83:	4c 8b bd 80 fa ff ff 	mov    -0x580(%rbp),%r15
+  17ee8a:	4c 89 f8             	mov    %r15,%rax
+  17ee8d:	48 f7 d8             	neg    %rax
+  17ee90:	0f 10 85 88 fa ff ff 	movups -0x578(%rbp),%xmm0
+  17ee97:	0f 29 45 90          	movaps %xmm0,-0x70(%rbp)
+  17ee9b:	0f 10 85 98 fa ff ff 	movups -0x568(%rbp),%xmm0
+  17eea2:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  17eea6:	0f 10 85 a8 fa ff ff 	movups -0x558(%rbp),%xmm0
+  17eead:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  17eeb1:	0f 10 85 b8 fa ff ff 	movups -0x548(%rbp),%xmm0
+  17eeb8:	0f 29 45 c0          	movaps %xmm0,-0x40(%rbp)
+  17eebc:	48 8b 85 c8 fa ff ff 	mov    -0x538(%rbp),%rax
+  17eec3:	48 89 45 d0          	mov    %rax,-0x30(%rbp)
+  17eec7:	71 43                	jno    17ef0c <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0xbc>
+litchi_pptx::package::model::Package::opened_presentation_transaction:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17eec9:	0f 28 45 90          	movaps -0x70(%rbp),%xmm0
+  17eecd:	0f 28 4d a0          	movaps -0x60(%rbp),%xmm1
+  17eed1:	0f 28 55 b0          	movaps -0x50(%rbp),%xmm2
+  17eed5:	0f 28 5d c0          	movaps -0x40(%rbp),%xmm3
+  17eed9:	0f 11 85 60 f6 ff ff 	movups %xmm0,-0x9a0(%rbp)
+  17eee0:	0f 11 8d 70 f6 ff ff 	movups %xmm1,-0x990(%rbp)
+  17eee7:	0f 11 95 80 f6 ff ff 	movups %xmm2,-0x980(%rbp)
+  17eeee:	0f 11 9d 90 f6 ff ff 	movups %xmm3,-0x970(%rbp)
+  17eef5:	48 8b 45 d0          	mov    -0x30(%rbp),%rax
+  17eef9:	48 89 85 a0 f6 ff ff 	mov    %rax,-0x960(%rbp)
+<core::result::Result<T,F> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible,E>>>::from_residual:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2189
+  17ef00:	4c 89 b5 58 f6 ff ff 	mov    %r14,-0x9a8(%rbp)
+litchi_pptx::package::model::Package::opened_presentation_transaction:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:278
+  17ef07:	e9 90 00 00 00       	jmp    17ef9c <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0x14c>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17ef0c:	48 8d b5 d0 fa ff ff 	lea    -0x530(%rbp),%rsi
+litchi_pptx::package::model::Package::opened_presentation_transaction:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17ef13:	48 8d bd f8 fe ff ff 	lea    -0x108(%rbp),%rdi
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17ef1a:	ba 98 00 00 00       	mov    $0x98,%edx
+  17ef1f:	ff 15 d3 25 0a 00    	call   *0xa25d3(%rip)        # 2214f8 <memcpy@GLIBC_2.14>
+litchi_pptx::package::model::Package::opened_presentation_transaction:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17ef25:	0f 28 45 90          	movaps -0x70(%rbp),%xmm0
+  17ef29:	0f 28 4d a0          	movaps -0x60(%rbp),%xmm1
+  17ef2d:	0f 28 55 b0          	movaps -0x50(%rbp),%xmm2
+  17ef31:	0f 28 5d c0          	movaps -0x40(%rbp),%xmm3
+  17ef35:	0f 11 85 b0 fe ff ff 	movups %xmm0,-0x150(%rbp)
+  17ef3c:	0f 11 8d c0 fe ff ff 	movups %xmm1,-0x140(%rbp)
+  17ef43:	0f 11 95 d0 fe ff ff 	movups %xmm2,-0x130(%rbp)
+  17ef4a:	0f 11 9d e0 fe ff ff 	movups %xmm3,-0x120(%rbp)
+  17ef51:	48 8b 45 d0          	mov    -0x30(%rbp),%rax
+  17ef55:	48 89 85 f0 fe ff ff 	mov    %rax,-0x110(%rbp)
+  17ef5c:	4c 89 bd a8 fe ff ff 	mov    %r15,-0x158(%rbp)
+  17ef63:	48 8d bd 80 fa ff ff 	lea    -0x580(%rbp),%rdi
+  17ef6a:	48 8d b5 a8 fe ff ff 	lea    -0x158(%rbp),%rsi
+  17ef71:	ff 15 61 34 0a 00    	call   *0xa3461(%rip)        # 2223d8 <_DYNAMIC+0x10f8>
+  17ef77:	48 8d bd 58 f6 ff ff 	lea    -0x9a8(%rbp),%rdi
+  17ef7e:	48 8d b5 80 fa ff ff 	lea    -0x580(%rbp),%rsi
+  17ef85:	ba 28 04 00 00       	mov    $0x428,%edx
+  17ef8a:	ff 15 68 25 0a 00    	call   *0xa2568(%rip)        # 2214f8 <memcpy@GLIBC_2.14>
+  17ef90:	48 8d bd a8 fe ff ff 	lea    -0x158(%rbp),%rdi
+  17ef97:	e8 84 b1 fd ff       	call   15a120 <core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>>
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+  17ef9c:	4c 8d bd 58 f6 ff ff 	lea    -0x9a8(%rbp),%r15
+core::hint::black_box:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  17efa3:	4c 89 bd 80 fa ff ff 	mov    %r15,-0x580(%rbp)
+  17efaa:	48 8d 85 80 fa ff ff 	lea    -0x580(%rbp),%rax
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17efb1:	4c 8b a5 58 f6 ff ff 	mov    -0x9a8(%rbp),%r12
+  17efb8:	4d 39 f4             	cmp    %r14,%r12
+  17efbb:	0f 85 8e 00 00 00    	jne    17f04f <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0x1ff>
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:313
+  17efc1:	49 8b 47 48          	mov    0x48(%r15),%rax
+  17efc5:	48 89 85 c0 fa ff ff 	mov    %rax,-0x540(%rbp)
+  17efcc:	41 0f 10 47 08       	movups 0x8(%r15),%xmm0
+  17efd1:	41 0f 10 4f 18       	movups 0x18(%r15),%xmm1
+  17efd6:	41 0f 10 57 28       	movups 0x28(%r15),%xmm2
+  17efdb:	41 0f 10 5f 38       	movups 0x38(%r15),%xmm3
+  17efe0:	0f 29 9d b0 fa ff ff 	movaps %xmm3,-0x550(%rbp)
+  17efe7:	0f 29 95 a0 fa ff ff 	movaps %xmm2,-0x560(%rbp)
+  17efee:	0f 29 8d 90 fa ff ff 	movaps %xmm1,-0x570(%rbp)
+  17eff5:	0f 29 85 80 fa ff ff 	movaps %xmm0,-0x580(%rbp)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17effc:	bf 48 00 00 00       	mov    $0x48,%edi
+  17f001:	ff 15 29 25 0a 00    	call   *0xa2529(%rip)        # 221530 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17f007:	48 85 c0             	test   %rax,%rax
+  17f00a:	0f 84 94 00 00 00    	je     17f0a4 <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0x254>
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17f010:	49 8b 4f 48          	mov    0x48(%r15),%rcx
+  17f014:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  17f018:	41 0f 10 47 08       	movups 0x8(%r15),%xmm0
+  17f01d:	41 0f 10 4f 18       	movups 0x18(%r15),%xmm1
+  17f022:	41 0f 10 57 28       	movups 0x28(%r15),%xmm2
+  17f027:	41 0f 10 5f 38       	movups 0x38(%r15),%xmm3
+  17f02c:	0f 11 58 30          	movups %xmm3,0x30(%rax)
+  17f030:	0f 11 50 20          	movups %xmm2,0x20(%rax)
+  17f034:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+  17f038:	0f 11 00             	movups %xmm0,(%rax)
+<core::result::Result<T,F> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible,E>>>::from_residual:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2189
+  17f03b:	48 89 43 08          	mov    %rax,0x8(%rbx)
+  17f03f:	48 8d 05 32 c7 09 00 	lea    0x9c732(%rip),%rax        # 21b778 <anon.36ed52a356df1d485c12dcce85027138.3.llvm.13583809507907854616+0x610>
+  17f046:	48 89 43 10          	mov    %rax,0x10(%rbx)
+  17f04a:	4c 89 33             	mov    %r14,(%rbx)
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:314
+  17f04d:	eb 45                	jmp    17f094 <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0x244>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17f04f:	48 8d b5 a8 f6 ff ff 	lea    -0x958(%rbp),%rsi
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:313
+  17f056:	48 8d 7b 50          	lea    0x50(%rbx),%rdi
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  17f05a:	ba d8 03 00 00       	mov    $0x3d8,%edx
+  17f05f:	ff 15 93 24 0a 00    	call   *0xa2493(%rip)        # 2214f8 <memcpy@GLIBC_2.14>
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:313
+  17f065:	41 0f 10 47 08       	movups 0x8(%r15),%xmm0
+  17f06a:	41 0f 10 4f 18       	movups 0x18(%r15),%xmm1
+  17f06f:	41 0f 10 57 28       	movups 0x28(%r15),%xmm2
+  17f074:	41 0f 10 5f 38       	movups 0x38(%r15),%xmm3
+  17f079:	0f 11 43 08          	movups %xmm0,0x8(%rbx)
+  17f07d:	0f 11 4b 18          	movups %xmm1,0x18(%rbx)
+  17f081:	0f 11 53 28          	movups %xmm2,0x28(%rbx)
+  17f085:	0f 11 5b 38          	movups %xmm3,0x38(%rbx)
+  17f089:	49 8b 47 48          	mov    0x48(%r15),%rax
+  17f08d:	48 89 43 48          	mov    %rax,0x48(%rbx)
+  17f091:	4c 89 23             	mov    %r12,(%rbx)
+/home/zhuhe/code/litchi/docs/performance/results/change-0828/probe-src/src/main.rs:314
+  17f094:	48 81 c4 90 09 00 00 	add    $0x990,%rsp
+  17f09b:	5b                   	pop    %rbx
+  17f09c:	41 5c                	pop    %r12
+  17f09e:	41 5e                	pop    %r14
+  17f0a0:	41 5f                	pop    %r15
+  17f0a2:	5d                   	pop    %rbp
+  17f0a3:	c3                   	ret
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:250
+  17f0a4:	bf 08 00 00 00       	mov    $0x8,%edi
+  17f0a9:	be 48 00 00 00       	mov    $0x48,%esi
+  17f0ae:	ff 15 ac 24 0a 00    	call   *0xa24ac(%rip)        # 221560 <_DYNAMIC+0x280>
+  17f0b4:	0f 0b                	ud2
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+  17f0b6:	48 89 c3             	mov    %rax,%rbx
+  17f0b9:	48 8d bd a8 fe ff ff 	lea    -0x158(%rbp),%rdi
+litchi_pptx::package::model::Package::opened_presentation_transaction:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:277
+  17f0c0:	e8 5b b0 fd ff       	call   15a120 <core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>>
+  17f0c5:	eb 15                	jmp    17f0dc <pptx_edit_profile_0828::phase_opened_presentation_transaction_0828+0x28c>
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/package/model.rs:276
+  17f0c7:	ff 15 6b 26 0a 00    	call   *0xa266b(%rip)        # 221738 <_DYNAMIC+0x458>
+pptx_edit_profile_0828::phase_opened_presentation_transaction_0828:
+  17f0cd:	48 89 c3             	mov    %rax,%rbx
+  17f0d0:	48 8d bd 80 fa ff ff 	lea    -0x580(%rbp),%rdi
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17f0d7:	e8 e4 8b 00 00       	call   187cc0 <core::ptr::drop_in_place<litchi_pptx::error::Error>>
+  17f0dc:	48 89 df             	mov    %rbx,%rdi
+  17f0df:	e8 dc 7e 09 00       	call   216fc0 <_Unwind_Resume@plt>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17f0e4:	ff 15 4e 26 0a 00    	call   *0xa264e(%rip)        # 221738 <_DYNAMIC+0x458>
