@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0818 — unnecessary relationship regeneration removed
+
+[0818](0818-docx-relationship-preservation.md) The DOCX main-Part replacement discarded unchanged relationship provenance. Updating the existing Part preserves original relationship XML and avoids that regeneration when its binding is unchanged. This is a preservation repair supported by exact output checks, not a measured performance optimization. Fresh ordinary-save timing is next.
+
 ## 0817 — preservation admission precedes hotspot timing
 
 [0817](0817-real-file-ordinary-save.md) No new hotspot is claimed: the real-file timing matrix was withheld after artifact admission failed. Resolve the DOCX relationship-order preservation question and correct generated-metadata/calculation-closure auditing before fresh measurement; do not infer performance from deterministic publication alone.

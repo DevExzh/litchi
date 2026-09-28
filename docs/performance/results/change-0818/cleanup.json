@@ -1,0 +1,23 @@
+{
+  "binary": {
+    "bytes": 638691704,
+    "path": "/home/zhuhe/code/litchi-target-0818/debug/ordinary_save_artifacts",
+    "sha256": "212eb2ec13c7cbcbe96f0dcbc2d7b31bf948cddecddb7596fd96f1671468fd74"
+  },
+  "binary_verified_before_removal": true,
+  "ended": 1790595745.2803566,
+  "removed": [
+    {
+      "files": 8893,
+      "logical_bytes": 21390560296,
+      "path": "/home/zhuhe/code/litchi-target-0818"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 41,
+      "path": "/home/zhuhe/code/litchi-fs-0818"
+    }
+  ],
+  "schema": "litchi.performance.0818.cleanup.v1",
+  "started": 1790595743.2102945
+}

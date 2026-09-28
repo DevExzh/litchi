@@ -1,0 +1,68 @@
+{
+  "admission_receipt": {
+    "bytes": 1115,
+    "path": "admission-0/receipt.json",
+    "sha256": "56b891928521cdf0c261fd461db26b1f052a33eee1ee9e4df12f3a359f62af15"
+  },
+  "artifact_cases": 6,
+  "artifact_policy_outputs": 30,
+  "audit": {
+    "bytes": 2603942,
+    "path": "admission-0/artifact-audit.json",
+    "sha256": "84174f8c8201257888220d3a8e1ed6cb9a77f2d7eed6fd2f129f3c81c156c799"
+  },
+  "auditor_sha256": "f3fbb57f7a8e10aa1b45a18874d49003cd5b033c62548265b134f8338b049026",
+  "baseline_regression_exit_code": 101,
+  "binary": {
+    "bytes": 638691704,
+    "path": "/home/zhuhe/code/litchi-target-0818/debug/ordinary_save_artifacts",
+    "sha256": "212eb2ec13c7cbcbe96f0dcbc2d7b31bf948cddecddb7596fd96f1671468fd74"
+  },
+  "export_profile": {
+    "binary": "ordinary_save_artifacts",
+    "cargo_profile": "dev",
+    "features": [],
+    "locked": true,
+    "manifest": "tools/perf-baseline/Cargo.toml",
+    "offline": true,
+    "performance_timing": false,
+    "purpose": "untimed preservation and semantic artifact validation",
+    "reason": "This batch establishes correctness and admission only. Native timing requires its own release-build protocol."
+  },
+  "manifest": {
+    "bytes": 27908,
+    "path": "artifacts/manifest.json",
+    "sha256": "31a1186d465fca5706e5d3b32faa902d32c90b1d6c34b1782b9977c196ad66ba"
+  },
+  "schema": "litchi.performance.0818.outcome.v1",
+  "source_allowlist": [
+    "crates/litchi-docx/src/package/codec.rs",
+    "crates/litchi-docx/tests/real_file_preservation.rs"
+  ],
+  "status": "preservation_repaired_and_artifacts_admitted",
+  "successful_commands": [
+    "fmt",
+    "check",
+    "tests",
+    "clippy",
+    "rustdoc",
+    "boundaries",
+    "build-exporter",
+    "export-artifacts"
+  ],
+  "tests": {
+    "failed": 0,
+    "ignored": 32,
+    "includes_new_regressions": 2,
+    "passed": 1938,
+    "scope": "litchi-docx all-features tests and doctests",
+    "suite_summaries": 66
+  },
+  "timing_reports": 0,
+  "timing_samples": 0,
+  "zip_preservation": {
+    "bytes": 48411,
+    "path": "zip-preservation.json",
+    "sha256": "2b76170da7fd7e78a93338ac4658b5ad7e93895884a24ee16a58089ce07012ee"
+  }
+}

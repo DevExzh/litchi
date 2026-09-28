@@ -1,0 +1,8 @@
+{
+  "failed": 0,
+  "ignored": 32,
+  "includes_new_regressions": 2,
+  "passed": 1938,
+  "scope": "litchi-docx all-features tests and doctests",
+  "suite_summaries": 66
+}

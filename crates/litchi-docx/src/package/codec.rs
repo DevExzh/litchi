@@ -1226,7 +1226,26 @@ impl Package {
                     )));
                 }
                 temp_part.set_blob(xml.into_bytes());
-                self.opc.add_part(Box::new(temp_part));
+                // Replace an existing main part in place so the OPC package
+                // keeps its package-level relationship provenance. `add_part`
+                // intentionally drops that provenance because it represents
+                // an arbitrary part replacement; an ordinary document edit
+                // may rebuild the relationship map while leaving its
+                // semantic binding unchanged, in which case the writer must
+                // still publish the producer's exact relationship bytes and
+                // order.  If no main part exists, retain the original add
+                // path there.
+                let replacement_blob = temp_part.blob_arc();
+                match self.opc.get_part_mut(&doc_uri) {
+                    Ok(existing_part) => {
+                        existing_part.set_blob_shared(replacement_blob);
+                        std::mem::swap(existing_part.rels_mut(), temp_part.rels_mut());
+                    },
+                    Err(OpcError::PartNotFound(_)) => {
+                        self.opc.add_part(Box::new(temp_part));
+                    },
+                    Err(error) => return Err(error.into()),
+                }
 
                 // Note: Footnotes and endnotes are already handled above (before document XML generation)
                 // so they appear in sectPr with proper relationship IDs

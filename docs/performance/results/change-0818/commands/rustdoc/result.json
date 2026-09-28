@@ -1,0 +1,33 @@
+{
+  "command": [
+    "cargo",
+    "rustdoc",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--all-features",
+    "--lib",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "f82bed8f77654b7fee0523440c7393cf7a7661721d4e610561681e9bc5296575",
+  "ended": 1790595100.8706117,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0818"
+  },
+  "exit_code": 0,
+  "label": "rustdoc",
+  "log_sha256": "0e52d628b59cf907503b175e5404e0b8ac31158fe9c9665013197194473910f9",
+  "plan_sha256": "a08cc71f6a575edd6c75d3fcaaa7d8fba9397e42b773fc7df9da58758ce7dff3",
+  "schema": "litchi.performance.0818.command.v1",
+  "source": {
+    "path": "sources/f0a28fdf19eb2f64bd98dad3fe4b796d61a0fd1b0baeef8593d937f7d029ca5b.json",
+    "sha256": "f0a28fdf19eb2f64bd98dad3fe4b796d61a0fd1b0baeef8593d937f7d029ca5b"
+  },
+  "started": 1790595096.6775923
+}
