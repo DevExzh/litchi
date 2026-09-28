@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0811 — current capture diagnostic preserves all measured outputs
+
+[0811](0811-pptx-current-native-attribution.md) All 56 reports/1,820 outputs match the sealed public capture oracles on unchanged production. The fresh probe passes 36 tests and formatting/Clippy; exact source identity supports reuse of six 0810 production gates. This adds diagnostic coverage for tiny, medium, and large capture, with no new CRUD capability.
+
 ## 0810 — notes scanner transport preserves workflow contracts
 
 [0810](0810-pptx-direct-event-workflow.md) The retained private codec transport passes 1,241 production tests (zero failures, three ignored), both 36-test probe lanes, and exact source/output/full semantic checks across the eighteen-row public PPTX matrix. The unchanged buffered oracles and three new differential tests protect namespace transitions and refusal ordering. No new CRUD capability, API, or format coverage is claimed.

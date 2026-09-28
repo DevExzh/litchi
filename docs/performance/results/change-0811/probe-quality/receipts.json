@@ -1,0 +1,75 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790577472.3075778,
+    "exit_code": 0,
+    "gate": 1,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-quality/0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790577472.2543573
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+      "--all-features",
+      "--",
+      "--test-threads=1"
+    ],
+    "ended": 1790577563.1006076,
+    "exit_code": 0,
+    "gate": 2,
+    "log": {
+      "bytes": 7474,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-quality/1.log",
+      "sha256": "b76c0ef8700cec2984352a204fd849e753eee5531f6009cb2573482d43a12cbc"
+    },
+    "started": 1790577472.50922,
+    "test_counts": [
+      [
+        36,
+        0
+      ]
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790577583.9618468,
+    "exit_code": 0,
+    "gate": 3,
+    "log": {
+      "bytes": 3214,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-quality/2.log",
+      "sha256": "2e825a74271b5aee3c1483d06b8bea66e048e8080c7286645d44e407bed68c1a"
+    },
+    "started": 1790577563.302366
+  }
+]

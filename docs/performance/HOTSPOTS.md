@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0811 — scanner remains the leading native leaf
+
+[0811](0811-pptx-current-native-attribution.md) Current native profiles contain 960/957 exact-owner samples; scanner self leaves account for 217/254 samples, hardware SHA for 89/90. Reader, inspector, UTF-8, and attribute checks remain visible. Large frame-pointer overhead is 6.925%; nested counts overlap. Isolate scanner/event and namespace/attribute work before a new candidate; software-SHA guest cost and short root/name projections do not establish native savings.
+
 ## 0810 — scanner event wrapper removed after workflow qualification
 
 [0810](0810-pptx-direct-event-workflow.md) The retained scanner removes its direct NsReader::process_event edge while preserving 282,612 Reader::read_event_impl calls and namespace push self Ir of 13,019,166 in each scoped profile. Large-capture p50 improves 4.975% (paired ratio 0.950252, interval 0.943695–0.953076). Other NsReader callers remain. Guest instruction attribution supports the transport mechanism without a native phase-fraction or universal speedup claim.

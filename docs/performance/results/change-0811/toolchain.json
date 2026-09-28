@@ -1,0 +1,53 @@
+{
+  "schema": "litchi.performance.0811.toolchain.v1",
+  "capture_phase": "root must verify this metadata before the first 0811 build and before any workload measurement",
+  "commands": [
+    {
+      "command": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "valgrind",
+        "--version"
+      ],
+      "stdout": "valgrind-3.26.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "perf",
+        "--version"
+      ],
+      "stdout": "perf version 7.0.14\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ],
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "inherited_compiler_environment": {
+    "RUSTUP_TOOLCHAIN": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_BUILD_RUSTFLAGS": null,
+    "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null
+  }
+}

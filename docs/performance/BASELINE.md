@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0811 — current native capture baseline
+
+[0811](0811-pptx-current-native-attribution.md) Fresh current-source controls cover 54 reports/1,620 samples plus two native profiles/200 samples. Ordinary tiny/medium/large median process p50 is 0.230741/0.441233/17.753220 ms. Large wrapper/control is 1.002151; frame-pointer/profile is 1.069250, with interval [1.061059, 1.078472]. Instrumentation perturbation limits profile interpretation; no production speedup is claimed.
+
 ## 0810 — direct event handling retained
 
 [0810](0810-pptx-direct-event-workflow.md) Fresh paired measurements retain the single-codec direct Reader/namespace-resolver transport. Capture p50 improves 4.975% large, 4.073% vendor, 3.803% unicode-vendor, and 4.129% valid-4attr, each meeting the frozen confidence gate. No latency veto; all 144 allocation comparisons are equal. Evidence covers 310 reports/6,718 samples, with exact semantic checks and no historical timing pool. Three isolated p99 increases and RSS variation remain explicit limits.

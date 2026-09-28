@@ -1,0 +1,23 @@
+{
+  "build_sha256": "2bc3ce8ae9c74de69547cdb9c19b7b5ebb99c826d891c9ca22408cc2619f89b2",
+  "call_graph": "fp",
+  "event": "cycles:u",
+  "frequency_hz": 499,
+  "owner": "namespace_uri_probe::capture_region_0793",
+  "plan_sha256": "ed637c30cec9d65d1e1c81e72adeb8f8e22c4fd46b45f6355494c3a04c34e71d",
+  "processes": 2,
+  "receipts": {
+    "bytes": 14309,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/receipts.json",
+    "sha256": "0df71336387357f9d5bfaf0eab59ecd62ef49892e5e3f6dce4d8a0d479282c22"
+  },
+  "repeats": 2,
+  "reports": 2,
+  "samples": 200,
+  "schema": "litchi.performance.0811.perf.complete.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/build/source.json",
+    "sha256": "f3e5e972b1311dd40a5d6788665372669629da8c8d6b24de5740f92dd278a395"
+  }
+}

@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0811 — current-source native attribution completed
+
+[0811](0811-pptx-current-native-attribution.md) The evidence-only batch retains 56 reports/1,820 verified outputs, two decoded native profiles, and independent numerical replay. Scanner work leads sampled self leaves; frame pointers add 6.925% to large-capture p50. Tail/RSS variability and unresolved frames are explicit. Production stays unchanged, fresh probe gates pass, and the six production gates are reused by exact source identity.
+
 ## 0810 — direct PPTX event transport retained
 
 [0810](0810-pptx-direct-event-workflow.md) The one-file codec candidate passes all six production quality gates and the frozen workflow policy: four capture benefits of 3.803–4.975%, zero latency vetoes, and equal allocation resource medians. All 310 reports/6,718 samples and four exact scoped profiles pass semantic/custody checks. Independent readers agree; isolated p99 increases and RSS variability remain documented. No public API or dependency change.
