@@ -1,0 +1,20 @@
+qualification 0-before-synthetic-tiny-capture PASS
+qualification 0-before-synthetic-tiny-commit PASS
+qualification 0-before-synthetic-tiny-lifecycle PASS
+qualification 0-before-synthetic-medium-capture PASS
+qualification 0-before-synthetic-medium-commit PASS
+qualification 0-before-synthetic-medium-lifecycle PASS
+qualification 0-before-synthetic-large-capture PASS
+qualification 0-before-synthetic-large-commit PASS
+qualification 0-before-synthetic-large-lifecycle PASS
+qualification 0-before-synthetic-vendor-capture PASS
+qualification 0-before-synthetic-vendor-commit PASS
+qualification 0-before-synthetic-vendor-lifecycle PASS
+qualification 0-before-synthetic-unicode-vendor-capture PASS
+qualification 0-before-synthetic-unicode-vendor-commit PASS
+qualification 0-before-synthetic-unicode-vendor-lifecycle PASS
+qualification 0-before-synthetic-valid-4attr-capture PASS
+qualification 0-before-synthetic-valid-4attr-commit PASS
+qualification 0-before-synthetic-valid-4attr-lifecycle PASS
+qualification 0-before-real-direct PASS
+0824 qualification PASS: 19 reports/19 samples

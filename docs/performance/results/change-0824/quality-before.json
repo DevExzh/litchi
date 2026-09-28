@@ -1,0 +1,122 @@
+{
+  "driver_sha256": "b43815d82bad94b902cb05d2aa1d17008a96f6cb3c0f99ace73b544aac14de7c",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0824/quality",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "leg": "before",
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "ended": 1790613889.8292675,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/00.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": 1790613888.7190812
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--all-targets"
+      ],
+      "ended": 1790613919.238297,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/01.log",
+      "log_bytes": 6244,
+      "log_sha256": "b555570c3950ef7e5599187f5a0d5a9f9e3da1801b0ce68b0f68d2e659e0675d",
+      "started": 1790613890.0461905
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790614041.6703796,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/02.log",
+      "log_bytes": 138955,
+      "log_sha256": "5ffab612ea985ee2cd8975e825f7f60c582a5d4fa0e70b960fa37db6035ea3c4",
+      "started": 1790613919.4551444
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790614065.1395907,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/03.log",
+      "log_bytes": 1207,
+      "log_sha256": "8cfa221c534f806183580dedb70ae43739fcc94910801b1b4f9003657c01a03a",
+      "started": 1790614041.887544
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--no-deps"
+      ],
+      "ended": 1790614068.627298,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/04.log",
+      "log_bytes": 221,
+      "log_sha256": "4f1551696cd0df03d81d9d139eb1fb395b36992dbdb216538ecd9572299ec762",
+      "started": 1790614065.3561447
+    },
+    {
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "ended": 1790614334.6561503,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-before-0/05.log",
+      "log_bytes": 565,
+      "log_sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1",
+      "started": 1790614068.8428082
+    }
+  ],
+  "schema": "litchi.performance.0824.quality.v1",
+  "source": "docs/performance/results/change-0824/quality-before-0/source.json",
+  "status": "pass"
+}

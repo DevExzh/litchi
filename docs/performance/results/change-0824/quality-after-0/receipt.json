@@ -1,0 +1,70 @@
+{
+  "driver_sha256": "b43815d82bad94b902cb05d2aa1d17008a96f6cb3c0f99ace73b544aac14de7c",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0824/quality",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "leg": "after",
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "ended": 1790615601.6799686,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-after-0/00.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": 1790615600.567747
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--all-targets"
+      ],
+      "ended": 1790615611.431378,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0824/quality-after-0/01.log",
+      "log_bytes": 137,
+      "log_sha256": "0cc633be59506d71af9ccdf68087f08fb633fee82135cf1f359041f170a5e37a",
+      "started": 1790615601.8972344
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790615688.3544736,
+      "exit_code": 101,
+      "log": "docs/performance/results/change-0824/quality-after-0/02.log",
+      "log_bytes": 84235,
+      "log_sha256": "3a648a6846e8159b405376fc60ff561e8fdeb847d52ba31fd86c447b9b8b12a1",
+      "started": 1790615611.648154
+    }
+  ],
+  "schema": "litchi.performance.0824.quality.v1",
+  "source": "docs/performance/results/change-0824/quality-after-0/source.json",
+  "status": "failed"
+}

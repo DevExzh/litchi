@@ -18,14 +18,24 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 
+/// The compacted bytes and the conservative witness that the document root
+/// survived byte-for-byte. The witness is transient and is not retained in a
+/// transaction or snapshot.
+#[derive(Debug)]
+pub(crate) struct CompactedSlide {
+    pub(crate) xml: Vec<u8>,
+    pub(crate) root_unchanged: bool,
+}
+
 /// Re-emit a changed slide without inter-element formatting.
 ///
 /// A leading UTF-8 byte-order mark, which the reader consumes before its
 /// first event, is carried to the output unchanged: it is a byte the producer
 /// wrote, not formatting.
-pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<CompactedSlide> {
     let mut reader = Reader::from_reader(source);
     reader.config_mut().trim_text(false);
+    let origin = ReaderOrigin::of(source);
     let mut output = Vec::new();
     output
         .try_reserve_exact(source.len())
@@ -38,17 +48,27 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
     let mut pending_whitespace = Vec::new();
     let mut text_run_has_content = false;
     let mut roots = 0usize;
+    let mut source_root_start = None;
+    let mut source_root_end = None;
+    let mut output_root_start = None;
+    let mut output_root_end = None;
+    let mut outside_non_text_exact = true;
     loop {
-        match reader
+        let source_event_start = origin.offset(reader.buffer_position());
+        let event = reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
-        {
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let source_event_end = origin.offset(reader.buffer_position());
+        match event {
             Event::Start(element) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
-                if preserve_space.is_empty() {
+                let is_root = preserve_space.is_empty();
+                if is_root {
                     roots = roots
                         .checked_add(1)
                         .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                    source_root_start = source_event_start;
+                    output_root_start = Some(output.len());
                 }
                 let inherited = preserve_space.last().copied().unwrap_or(false);
                 preserve_space.push(element_preserves_space(
@@ -60,23 +80,35 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
             },
             Event::Empty(element) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
-                if preserve_space.is_empty() {
+                let is_root = preserve_space.is_empty();
+                if is_root {
                     roots = roots
                         .checked_add(1)
                         .ok_or_else(|| invalid("opened-presentation slide root count overflow"))?;
+                    source_root_start = source_event_start;
+                    output_root_start = Some(output.len());
                 }
                 let inherited = preserve_space.last().copied().unwrap_or(false);
                 let _preserve = element_preserves_space(&element, reader.decoder(), inherited)?;
                 write_compact_start(&mut output, &element, reader.decoder(), true)?;
+                if is_root {
+                    source_root_end = origin.offset(reader.buffer_position());
+                    output_root_end = Some(output.len());
+                }
             },
             Event::End(element) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let is_root = preserve_space.len() == 1;
                 preserve_space.pop().ok_or_else(|| {
                     invalid("opened-presentation slide has an unexpected end element")
                 })?;
                 output.extend_from_slice(b"</");
                 output.extend_from_slice(element.name().as_ref());
                 output.push(b'>');
+                if is_root {
+                    source_root_end = origin.offset(reader.buffer_position());
+                    output_root_end = Some(output.len());
+                }
             },
             Event::Text(text) => {
                 let bytes = text.as_ref();
@@ -131,21 +163,54 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
             },
             Event::Decl(declaration) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
                 output.extend_from_slice(b"<?");
                 output.extend_from_slice(declaration.as_ref());
                 output.extend_from_slice(b"?>");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
             },
             Event::PI(instruction) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
                 output.extend_from_slice(b"<?");
                 output.extend_from_slice(instruction.as_ref());
                 output.extend_from_slice(b"?>");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
             },
             Event::Comment(comment) => {
                 finish_compact_text_run(&mut pending_whitespace, &mut text_run_has_content);
+                let output_event_start = output.len();
                 output.extend_from_slice(b"<!--");
                 output.extend_from_slice(comment.as_ref());
                 output.extend_from_slice(b"-->");
+                if preserve_space.is_empty() {
+                    outside_non_text_exact &= exact_event_bytes(
+                        source,
+                        &output,
+                        source_event_start,
+                        source_event_end,
+                        output_event_start,
+                        output.len(),
+                    );
+                }
             },
             Event::DocType(_) => {
                 return Err(invalid(
@@ -163,7 +228,39 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
             "opened-presentation slide must contain exactly one closed root",
         ));
     }
-    Ok(output)
+    let root_unchanged = match (
+        source_root_start,
+        source_root_end,
+        output_root_start,
+        output_root_end,
+    ) {
+        (Some(source_start), Some(source_end), Some(output_start), Some(output_end)) => source
+            .get(source_start..source_end)
+            .zip(output.get(output_start..output_end))
+            .is_some_and(|(source_root, output_root)| source_root == output_root),
+        _ => false,
+    };
+    Ok(CompactedSlide {
+        xml: output,
+        root_unchanged: root_unchanged && outside_non_text_exact,
+    })
+}
+
+fn exact_event_bytes(
+    source: &[u8],
+    output: &[u8],
+    source_start: Option<usize>,
+    source_end: Option<usize>,
+    output_start: usize,
+    output_end: usize,
+) -> bool {
+    let (Some(source_start), Some(source_end)) = (source_start, source_end) else {
+        return false;
+    };
+    source
+        .get(source_start..source_end)
+        .zip(output.get(output_start..output_end))
+        .is_some_and(|(source_event, output_event)| source_event == output_event)
 }
 
 fn finish_compact_text_run(pending_whitespace: &mut Vec<u8>, has_content: &mut bool) {
@@ -1824,4 +1921,79 @@ fn bump(nodes: &mut usize) -> Result<()> {
 fn is_xml_char(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
         || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x1_0000..=0x10_FFFF)
+}
+
+#[cfg(test)]
+mod compaction_tests {
+    use super::compact_changed_slide_xml;
+    use crate::Result;
+
+    fn assert_compacted(source: &[u8], expected: &[u8], root_unchanged: bool) -> Result<()> {
+        let compacted = compact_changed_slide_xml(source)?;
+        assert_eq!(compacted.xml, expected);
+        assert_eq!(compacted.root_unchanged, root_unchanged);
+        Ok(())
+    }
+
+    #[test]
+    fn outer_declaration_whitespace_keeps_the_root_witness() -> Result<()> {
+        let source = b"<?xml version=\"1.0\"?>\r\n<p:sld xmlns:p=\"urn:p\"/>\r\n";
+        let expected = b"<?xml version=\"1.0\"?><p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn bom_and_empty_root_are_included_in_the_exact_byte_contract() -> Result<()> {
+        let source = b"\xEF\xBB\xBF\n<p:sld xmlns:p=\"urn:p\"/>\n";
+        let expected = b"\xEF\xBB\xBF<p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn outside_processing_instruction_is_copied_before_root_comparison() -> Result<()> {
+        let source = b"<?litchi mode=\"x\"?>\n<p:sld xmlns:p=\"urn:p\"/>";
+        let expected = b"<?litchi mode=\"x\"?><p:sld xmlns:p=\"urn:p\"/>";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn outside_comment_is_copied_before_root_comparison() -> Result<()> {
+        let source = b"<!--before-->\n<p:sld xmlns:p=\"urn:p\"/>\n<!--after-->";
+        let expected = b"<!--before--><p:sld xmlns:p=\"urn:p\"/><!--after-->";
+        assert_compacted(source, expected, true)
+    }
+
+    #[test]
+    fn unknown_markup_inside_the_root_is_preserved_by_the_witness() -> Result<()> {
+        let source = b"<p:sld xmlns:p=\"urn:p\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:x=\"urn:x\" mc:Ignorable=\"x\"><x:future/></p:sld>";
+        assert_compacted(source, source, true)
+    }
+
+    #[test]
+    fn root_content_whitespace_and_attribute_quote_changes_fall_back() -> Result<()> {
+        let whitespace = b"<p:sld xmlns:p=\"urn:p\"> \n <p:child/> </p:sld>";
+        assert_compacted(
+            whitespace,
+            b"<p:sld xmlns:p=\"urn:p\"><p:child/></p:sld>",
+            false,
+        )?;
+
+        let quote = b"<p:sld xmlns:p='urn:p'/>";
+        assert_compacted(quote, b"<p:sld xmlns:p=\"urn:p\"/>", false)
+    }
+
+    #[test]
+    fn entity_and_invalid_outside_markup_keep_the_existing_refusals() -> Result<()> {
+        let entity = b"<p:sld xmlns:p=\"urn:p\">&amp;</p:sld>";
+        assert_compacted(entity, entity, true)?;
+        assert!(compact_changed_slide_xml(b"<p:sld xmlns:p=\"urn:p\"/>text").is_err());
+        assert!(compact_changed_slide_xml(b"<!DOCTYPE p:sld><p:sld/>").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_root_shape_does_not_create_a_witness() {
+        assert!(compact_changed_slide_xml(b"<p:sld/> <p:sld/>").is_err());
+        assert!(compact_changed_slide_xml(b"<p:sld>").is_err());
+    }
 }

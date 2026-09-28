@@ -1,0 +1,10 @@
+{
+  "files": {
+    "quality-after-0/00.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "quality-after-0/01.log": "0cc633be59506d71af9ccdf68087f08fb633fee82135cf1f359041f170a5e37a",
+    "quality-after-0/02.log": "3a648a6846e8159b405376fc60ff561e8fdeb847d52ba31fd86c447b9b8b12a1",
+    "quality-after-0/receipt.json": "1624dc3e25d5e7dffa64a24ea847ca3880f054ff9ee496c94c1d0d6563c72501",
+    "quality-after-0/source.json": "89b418a1e2e016a86ac06322d238b09e3d545cfef977087f97024953ff5fc6c3"
+  },
+  "original_manifest_sha256": "2512492d3fe9b9a460e03af5ff86c8fe30815670d9f11abee1321f789810b79a"
+}

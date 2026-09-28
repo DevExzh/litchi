@@ -1384,22 +1384,49 @@ fn compact_changed_slides(
         } else {
             Some(compaction_scene(after.blob())?)
         };
-        let compact = super::xml::compact_changed_slide_xml(after.blob())?;
-        // Compaction that reproduces the staged bytes exactly reads back as
-        // the scene read from those bytes; only different bytes are read
-        // again and compared.
-        if compact.as_slice() != after_blob {
-            let expected = match expected {
-                Some(expected) => expected,
-                None => compaction_scene(after.blob())?,
-            };
-            if compaction_scene(&compact)? != expected {
-                return Err(invalid(
-                    "opened-presentation slide compaction changed shape semantics",
-                ));
+        let compacted = super::xml::compact_changed_slide_xml(after.blob())?;
+        // Compaction that reproduces the staged bytes exactly needs no read
+        // back. For a different payload, an exact root witness can prove the
+        // same semantic scene; all other payloads use the original comparison.
+        if compacted.xml.as_slice() != after_blob {
+            if compacted.root_unchanged {
+                // An exact root-byte witness leaves only the already-ignored
+                // outer ASCII whitespace changed. Keep a debug differential
+                // oracle for both the staged-read and cold paths; direct
+                // `shape_semantics` calls are deliberately outside the read
+                // counter used to measure this production shortcut.
+                #[cfg(debug_assertions)]
+                if let Some(expected) = expected.as_ref() {
+                    debug_assert!(
+                        shape_semantics(&compacted.xml)
+                            .as_ref()
+                            .is_ok_and(|actual| actual == expected),
+                        "root-byte proof changed staged shape semantics",
+                    );
+                } else {
+                    debug_assert!(
+                        matches!(
+                            (shape_semantics(&compacted.xml), shape_semantics(after.blob())),
+                            (Ok(compacted), Ok(staged)) if compacted == staged
+                        ),
+                        "root-byte proof changed read-back shape semantics",
+                    );
+                }
+            } else {
+                let expected = match expected {
+                    Some(expected) => expected,
+                    None => compaction_scene(after.blob())?,
+                };
+                if compaction_scene(&compacted.xml)? != expected {
+                    return Err(invalid(
+                        "opened-presentation slide compaction changed shape semantics",
+                    ));
+                }
             }
         }
-        working.get_part_mut(&slide.part_name)?.set_blob(compact);
+        working
+            .get_part_mut(&slide.part_name)?
+            .set_blob(compacted.xml);
     }
     Ok(())
 }
@@ -2072,6 +2099,28 @@ mod compaction_tests {
         Package::from_vec(package.to_bytes()?)?.opened_presentation()
     }
 
+    fn three_slide_snapshot_with_outer_crlf() -> Result<super::Snapshot> {
+        let mut package = Package::new()?;
+        for index in 0..3 {
+            let slide = package.presentation_mut()?.add_slide()?;
+            slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
+        }
+        let mut package = Package::from_vec(package.to_bytes()?)?;
+        let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        let original = package.opc.get_part(&part_name)?.blob().to_vec();
+        let declaration_end = original
+            .windows(2)
+            .position(|bytes| bytes == b"?>")
+            .expect("writer emits an XML declaration")
+            + 2;
+        let mut changed = Vec::with_capacity(original.len() + 2);
+        changed.extend_from_slice(&original[..declaration_end]);
+        changed.extend_from_slice(b"\r\n");
+        changed.extend_from_slice(&original[declaration_end..]);
+        package.opc.get_part_mut(&part_name)?.set_blob(changed);
+        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+    }
+
     fn blob(package: &litchi_opc::OpcPackage, slide: &super::Slide) -> Arc<Vec<u8>> {
         package.get_part(&slide.part_name).unwrap().blob_arc()
     }
@@ -2079,6 +2128,7 @@ mod compaction_tests {
     #[test]
     fn untouched_slides_keep_their_allocation_and_a_reproduced_compaction_keeps_its_bytes()
     -> Result<()> {
+        take_scene_reads();
         let snapshot = three_slide_snapshot()?;
         let mut working = snapshot.package.as_ref().clone();
         let edited = &snapshot.slides[1];
@@ -2094,6 +2144,11 @@ mod compaction_tests {
             &snapshot.slides,
             &std::collections::HashMap::new(),
         )?;
+        assert_eq!(
+            take_scene_reads(),
+            1,
+            "cold byte-identical compaction keeps its initial validation read"
+        );
         for untouched in [&snapshot.slides[0], &snapshot.slides[2]] {
             assert!(Arc::ptr_eq(
                 &blob(&working, untouched),
@@ -2106,6 +2161,7 @@ mod compaction_tests {
 
     #[test]
     fn a_compaction_that_changes_bytes_is_read_back_and_compared() -> Result<()> {
+        take_scene_reads();
         let snapshot = three_slide_snapshot()?;
         let mut working = snapshot.package.as_ref().clone();
         let edited = &snapshot.slides[0];
@@ -2122,6 +2178,11 @@ mod compaction_tests {
             &snapshot.slides,
             &std::collections::HashMap::new(),
         )?;
+        assert_eq!(
+            take_scene_reads(),
+            2,
+            "root-different compaction keeps both reads"
+        );
         let compacted = blob(&working, edited);
         assert_ne!(compacted.as_slice(), staged.as_bytes());
         assert_eq!(
@@ -2186,6 +2247,101 @@ mod compaction_tests {
         .text()
         .map(str::to_owned);
         assert_eq!(text.as_deref(), Some("read once"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_staged_read_with_outer_crlf_uses_the_root_witness() -> Result<()> {
+        let snapshot = three_slide_snapshot_with_outer_crlf()?;
+        let mut edit = snapshot.edit();
+        assert!(edit.set_shape_text(0, 0, "read once")?);
+        take_scene_reads();
+        let commit = edit.commit()?;
+        assert_eq!(
+            take_scene_reads(),
+            0,
+            "the staged read and unchanged root prove compaction"
+        );
+        let blob = commit
+            .snapshot()
+            .package
+            .get_part(&snapshot.slides[0].part_name)?
+            .blob();
+        assert!(!blob.windows(2).any(|bytes| bytes == b"\r\n"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_cold_outer_crlf_compaction_keeps_the_initial_read_only() -> Result<()> {
+        let snapshot = three_slide_snapshot_with_outer_crlf()?;
+        let mut working = snapshot.package.as_ref().clone();
+        let edited = &snapshot.slides[0];
+        let staged = String::from_utf8(blob(&working, edited).to_vec())
+            .unwrap()
+            .replace("compaction 0", "compaction zero");
+        working
+            .get_part_mut(&edited.part_name)?
+            .set_blob(staged.into_bytes());
+        take_scene_reads();
+        compact_changed_slides(
+            &mut working,
+            snapshot.package.as_ref(),
+            &snapshot.slides,
+            &std::collections::HashMap::new(),
+        )?;
+        assert_eq!(
+            take_scene_reads(),
+            1,
+            "the staged validation remains; compacted root needs no second read"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_real_fixture_root_witness_has_a_scene_differential_oracle() -> Result<()> {
+        let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
+        let package = Package::from_vec(bytes)?;
+        let snapshot = package.opened_presentation()?;
+        let mut witnessed = 0usize;
+        for slide in &snapshot.slides {
+            let xml = snapshot.package.get_part(&slide.part_name)?.blob();
+            let compacted = super::super::xml::compact_changed_slide_xml(xml)?;
+            if compacted.root_unchanged {
+                let original = super::shape_semantics(xml)?;
+                let compacted_semantics = super::shape_semantics(&compacted.xml)?;
+                assert_eq!(compacted_semantics, original, "{}", slide.part_name);
+                witnessed += 1;
+            }
+        }
+        assert!(witnessed > 0, "the admitted fixture had no root witness");
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_real_fixture_crlf_after_declaration_skips_two_readbacks() -> Result<()> {
+        let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
+        let package = Package::from_vec(bytes)?;
+        let snapshot = package.opened_presentation()?;
+        let source = snapshot
+            .package
+            .get_part(&snapshot.slides[0].part_name)?
+            .blob();
+        assert!(source.windows(10).any(|bytes| bytes == b"?>\r\n<p:sld"));
+        let mut edit = snapshot.edit();
+        assert!(edit.set_shape_text(0, 0, "root-witness")?);
+        take_scene_reads();
+        let commit = edit.commit()?;
+        assert_eq!(
+            take_scene_reads(),
+            0,
+            "the real fixture's staged read and exact root skip both readbacks"
+        );
+        let output = commit
+            .snapshot()
+            .package
+            .get_part(&snapshot.slides[0].part_name)?
+            .blob();
+        assert!(!output.windows(10).any(|bytes| bytes == b"?>\r\n<p:sld"));
         Ok(())
     }
 

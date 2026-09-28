@@ -1,0 +1,58 @@
+{
+  "affinity_available": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "affinity_selected": [
+    12
+  ],
+  "architecture": "x86_64",
+  "cgroup": {
+    "/sys/fs/cgroup/cpuset.cpus.effective": "0-31"
+  },
+  "cpu_model": "AMD EPYC 9R45",
+  "filesystem": "ext4",
+  "logical_cpu_count": 32,
+  "mem_total": "MemTotal:       129447068 kB",
+  "mount": "/dev/nvme0n1p1 ext4 rw,relatime,discard,errors=remount-ro,commit=30",
+  "platform": "Linux",
+  "schema": "litchi.performance.0824.host.v1",
+  "scratch": null,
+  "selection_check": "taskset -c 12 true",
+  "target": "/home/zhuhe/code/litchi-target-0824",
+  "target_preexisting_children_before_freeze": [
+    "quality"
+  ],
+  "target_release_artifacts_must_be_absent_before_build": true,
+  "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux"
+}

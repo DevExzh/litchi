@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0824 — whitespace-only PPTX compaction avoids duplicate reads
+
+[0824](0824-pptx-outer-whitespace-compaction.md) One admitted real-file public shape-text edit and eighteen synthetic capture/commit/lifecycle rows pass exact output qualification. The adopted proof preserves initial validation, final capture, unknown root bytes, and fallback comparisons. Coverage remains scoped to these inputs; path-save/fsync, cold cache, and broad producers are outside the trial.
+
 ## 0823 — Scene candidate covers nineteen PPTX workflows
 
 [0823](0823-pptx-scene-reader-workflow.md) Six synthetic fixtures × capture/commit/lifecycle plus one admitted real-file public edit pass output/semantic qualification on both legs. Full paired timing and allocation evidence rejects the candidate at its benefit gate. Coverage excludes real path-save/fsync and cold cache.
