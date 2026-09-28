@@ -1,0 +1,40 @@
+{
+  "address": 1574656,
+  "assembly": {
+    "bytes": 6950,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/event-assembly.txt",
+    "sha256": "73287c7b214e885e4d991ce7a22dd860b41fdf8b3788cc96333d2ac3abbce502"
+  },
+  "binary": {
+    "bytes": 13700104,
+    "path": "/home/zhuhe/code/litchi-target-0807/profile-fp",
+    "sha256": "0a507869726279b04235a770a9efbaf67d7ba3dfcc012400651834775179d354"
+  },
+  "ended": 1790569956.4866285,
+  "nm_command": [
+    "nm",
+    "-S",
+    "--defined-only",
+    "/home/zhuhe/code/litchi-target-0807/profile-fp"
+  ],
+  "nm_exit_code": 0,
+  "objdump_command": [
+    "objdump",
+    "-d",
+    "--demangle",
+    "--no-show-raw-insn",
+    "--start-address=1574656",
+    "--stop-address=1575245",
+    "/home/zhuhe/code/litchi-target-0807/profile-fp"
+  ],
+  "objdump_exit_code": 0,
+  "scope": "Post-capture exploratory assembly only; no instruction frequency, causal latency fraction or optimization claim.",
+  "size": 589,
+  "started": 1790569956.4712567,
+  "symbol": "_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17h4883015485a1526bE",
+  "symbols": {
+    "bytes": 411037,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/event-symbols.txt",
+    "sha256": "2407d9f424c8999c6b31f9755c433991e332eb0d188b9c5767ed120cc6eef720"
+  }
+}

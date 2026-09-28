@@ -1,0 +1,20 @@
+{
+  "nm": {
+    "command": [
+      "nm",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+  },
+  "objdump": {
+    "command": [
+      "objdump",
+      "--version"
+    ],
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+  }
+}

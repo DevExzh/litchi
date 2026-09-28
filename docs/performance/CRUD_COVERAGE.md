@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0807 — capture attribution only, no capability promotion
+
+[0807](0807-pptx-current-capture-profile.md) Reuses the three generated PPTX category-15 capture shapes for 36 native control reports, six scoped guest profiles and two frame-pointer profiles. The 1,286 measured outputs preserve source/output/text identities. This adds current CPU attribution, not notes-present/refusal corpus, cold/range, native Office, concurrency, cross-format or comprehensive CRUD coverage. No production optimization is retained.
+
 ## 0806 — workflow qualification adds valid-4attr coverage, no CRUD promotion
 
 [0806](0806-xml-workflow-qualification.md) The six-shape main matrix covers capture, commit, and lifecycle for 306 reports/6,714 samples, including three new `valid-4attr` rows in the eighteen-row matrix for a 12-slide, 96-text-tag extension-preservation fixture. The cross lane adds 13 reports/2,888 samples; official analysis and independent replay pass all eight rows with no veto. The candidate fails the required public 3% capture/lifecycle benefit, so no public CRUD capability or workflow speedup is adopted. The 936/28,080 protected micro samples and 18 unaccepted setup reports remain separate.

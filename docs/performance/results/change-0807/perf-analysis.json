@@ -1,0 +1,669 @@
+{
+  "binary": {
+    "bytes": 13700104,
+    "path": "/home/zhuhe/code/litchi-target-0807/profile-fp",
+    "sha256": "0a507869726279b04235a770a9efbaf67d7ba3dfcc012400651834775179d354"
+  },
+  "captures": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "perf",
+        "record",
+        "-e",
+        "cycles:u",
+        "-F",
+        "499",
+        "--call-graph",
+        "fp",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.data",
+        "--",
+        "/home/zhuhe/code/litchi-target-0807/profile-fp",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "100",
+        "--warmup",
+        "3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.json"
+      ],
+      "compressed_frames": {
+        "bytes": 215312,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.frames.gz",
+        "sha256": "b8bc9ae7bac7f88d07285a21c73871b58c62674b6e7489c464c08596604197a0"
+      },
+      "decoded": {
+        "bytes": 12298926,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.decoded",
+        "sha256": "bd61d02d92b930cafe19b6dfaaf2691352572293f07327c2e527148decb0333e"
+      },
+      "diagnostic_symbols": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": {
+          "period": 945331901,
+          "samples": 107
+        },
+        "litchi_pptx::notes::codec::inspect_element": {
+          "period": 1970235147,
+          "samples": 223
+        },
+        "litchi_pptx::notes::codec::scan_processed_xml": {
+          "period": 7915526421,
+          "samples": 896
+        },
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": {
+          "period": 88368482,
+          "samples": 10
+        },
+        "litchi_pptx::notes::resolved": {
+          "period": 150285779,
+          "samples": 17
+        },
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": {
+          "period": 839980414,
+          "samples": 95
+        },
+        "quick_xml::events::attributes::IterState::check_for_duplicates": {
+          "period": 441793129,
+          "samples": 50
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "period": 954295592,
+          "samples": 108
+        },
+        "sha2::sha256::x86_sha::compress": {
+          "period": 804621255,
+          "samples": 91
+        }
+      },
+      "exclusive_partition_period": {
+        "fingerprint": 839980414,
+        "notes_scan": 7915526421,
+        "other_capture": 397767971
+      },
+      "exclusive_partition_samples": {
+        "fingerprint": 95,
+        "notes_scan": 896,
+        "other_capture": 45
+      },
+      "frames": {
+        "bytes": 4999367,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.frames",
+        "sha256": "9483176079513a119e307f057372dc6616ab313e934df5fc05ba10d0dc36d046"
+      },
+      "nested_inclusive_period": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 945331901,
+        "litchi_pptx::notes::codec::inspect_element": 1970235147,
+        "litchi_pptx::notes::codec::scan_processed_xml": 7915526421,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 88368482,
+        "litchi_pptx::notes::resolved": 150285779,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 839980414,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 441793129,
+        "quick_xml::events::attributes::IterState::next": 954295592,
+        "sha2::sha256::x86_sha::compress": 804621255
+      },
+      "nested_inclusive_samples": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 107,
+        "litchi_pptx::notes::codec::inspect_element": 223,
+        "litchi_pptx::notes::codec::scan_processed_xml": 896,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 10,
+        "litchi_pptx::notes::resolved": 17,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 95,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 50,
+        "quick_xml::events::attributes::IterState::next": 108,
+        "sha2::sha256::x86_sha::compress": 91
+      },
+      "owner_qualified_period": 9153274806,
+      "owner_qualified_samples": 1036,
+      "qualified_stacks_with_unknown_interior": 1,
+      "raw": {
+        "bytes": 584744,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/0.data",
+        "sha256": "2d5072f3d3279e9b24c9a77a29e0ad1fc29e4713538df6f43aa9dc7927c1e3aa"
+      },
+      "repeat": 0,
+      "report": "perf-fp/0.json",
+      "report_identity": {
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3"
+        }
+      },
+      "report_sha256": "d696979008bdf3fbe82ed18254a39b53127d7cb601fc75427941cec79c01ae39",
+      "top_sampled_leaf_period": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          1670077367
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          1386551288
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          804621255
+        ],
+        [
+          "core::str::converts::from_utf8",
+          565129321
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          494782480
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          406542903
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          406381865
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          362282309
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          353226929
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          326855435
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          282702926
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          167886765
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          167826257
+        ],
+        [
+          "__memcmp_evex_movbe",
+          158920928
+        ],
+        [
+          "litchi_pptx::notes::resolved",
+          150285779
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::resolve_prefix",
+          123749181
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          114786746
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_end",
+          106069833
+        ],
+        [
+          "quick_xml::escape::unescape",
+          97225372
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+          97206991
+        ]
+      ],
+      "top_sampled_leaf_symbols": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          189
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          157
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          91
+        ],
+        [
+          "core::str::converts::from_utf8",
+          64
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          56
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          46
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          46
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          41
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          40
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          37
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          32
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          19
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          19
+        ],
+        [
+          "__memcmp_evex_movbe",
+          18
+        ],
+        [
+          "litchi_pptx::notes::resolved",
+          17
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::resolve_prefix",
+          14
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          13
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_end",
+          12
+        ],
+        [
+          "alloc::raw_vec::RawVec<T,A>::grow_one",
+          11
+        ],
+        [
+          "quick_xml::escape::unescape",
+          11
+        ]
+      ],
+      "unqualified_samples": 2128,
+      "whole_process_period": 27873735820,
+      "whole_process_samples": 3164
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "perf",
+        "record",
+        "-e",
+        "cycles:u",
+        "-F",
+        "499",
+        "--call-graph",
+        "fp",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.data",
+        "--",
+        "/home/zhuhe/code/litchi-target-0807/profile-fp",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "100",
+        "--warmup",
+        "3",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.json"
+      ],
+      "compressed_frames": {
+        "bytes": 216451,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.frames.gz",
+        "sha256": "6e12837f17707ad3d5e38c91bcdd3037267786af86c9d6cf1f5bf1f7a11317e9"
+      },
+      "decoded": {
+        "bytes": 12315248,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.decoded",
+        "sha256": "01c8e377bb2bea84309e101125956a7e7391e0f9aa7d3b34055778439b6175a5"
+      },
+      "diagnostic_symbols": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": {
+          "period": 875368556,
+          "samples": 99
+        },
+        "litchi_pptx::notes::codec::inspect_element": {
+          "period": 2157165016,
+          "samples": 244
+        },
+        "litchi_pptx::notes::codec::scan_processed_xml": {
+          "period": 7939271160,
+          "samples": 898
+        },
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": {
+          "period": 88493603,
+          "samples": 10
+        },
+        "litchi_pptx::notes::resolved": {
+          "period": 150192578,
+          "samples": 17
+        },
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": {
+          "period": 849448631,
+          "samples": 96
+        },
+        "quick_xml::events::attributes::IterState::check_for_duplicates": {
+          "period": 345013394,
+          "samples": 39
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "period": 1043484249,
+          "samples": 118
+        },
+        "sha2::sha256::x86_sha::compress": {
+          "period": 822888749,
+          "samples": 93
+        }
+      },
+      "exclusive_partition_period": {
+        "fingerprint": 849448631,
+        "notes_scan": 7939271160,
+        "other_capture": 344953414
+      },
+      "exclusive_partition_samples": {
+        "fingerprint": 96,
+        "notes_scan": 898,
+        "other_capture": 39
+      },
+      "frames": {
+        "bytes": 4997058,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.frames",
+        "sha256": "ccb41212bfec9f492e61bdca1f06c4be0dc73b04b4ff4ac491ac872a6b87a318"
+      },
+      "nested_inclusive_period": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 875368556,
+        "litchi_pptx::notes::codec::inspect_element": 2157165016,
+        "litchi_pptx::notes::codec::scan_processed_xml": 7939271160,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 88493603,
+        "litchi_pptx::notes::resolved": 150192578,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 849448631,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 345013394,
+        "quick_xml::events::attributes::IterState::next": 1043484249,
+        "sha2::sha256::x86_sha::compress": 822888749
+      },
+      "nested_inclusive_samples": {
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 99,
+        "litchi_pptx::notes::codec::inspect_element": 244,
+        "litchi_pptx::notes::codec::scan_processed_xml": 898,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 10,
+        "litchi_pptx::notes::resolved": 17,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 96,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 39,
+        "quick_xml::events::attributes::IterState::next": 118,
+        "sha2::sha256::x86_sha::compress": 93
+      },
+      "owner_qualified_period": 9133673205,
+      "owner_qualified_samples": 1033,
+      "qualified_stacks_with_unknown_interior": 1,
+      "raw": {
+        "bytes": 584824,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0807/perf-fp/1.data",
+        "sha256": "cc493ffcaafbf8ad01bae48f98e12788ed8452bf920766b42294e38dc748549e"
+      },
+      "repeat": 1,
+      "report": "perf-fp/1.json",
+      "report_identity": {
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3"
+        }
+      },
+      "report_sha256": "48eb16e4263eee99209c733d4bd957f78d946473cd1135a55549c48e3cd5f555",
+      "top_sampled_leaf_period": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          1680046978
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          1202370496
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          822888749
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          610023101
+        ],
+        [
+          "core::str::converts::from_utf8",
+          592424427
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          565980193
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          415432837
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          327119090
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          282955275
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          274257042
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          265130135
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          194471762
+        ],
+        [
+          "__memcmp_evex_movbe",
+          168017741
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          159153262
+        ],
+        [
+          "litchi_pptx::notes::resolved",
+          150192578
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::resolve_prefix",
+          150136957
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+          123807896
+        ],
+        [
+          "quick_xml::escape::unescape",
+          123696584
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          114844112
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_end",
+          106028778
+        ]
+      ],
+      "top_sampled_leaf_symbols": [
+        [
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+          190
+        ],
+        [
+          "litchi_pptx::notes::codec::scan_processed_xml",
+          136
+        ],
+        [
+          "sha2::sha256::x86_sha::compress",
+          93
+        ],
+        [
+          "quick_xml::events::attributes::IterState::next",
+          69
+        ],
+        [
+          "core::str::converts::from_utf8",
+          67
+        ],
+        [
+          "litchi_pptx::notes::codec::inspect_element",
+          64
+        ],
+        [
+          "quick_xml::reader::Reader<R>::read_event_impl",
+          47
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2",
+          37
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+          32
+        ],
+        [
+          "quick_xml::events::attributes::IterState::check_for_duplicates",
+          31
+        ],
+        [
+          "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2",
+          30
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_start",
+          22
+        ],
+        [
+          "__memcmp_evex_movbe",
+          19
+        ],
+        [
+          "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next",
+          18
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::resolve_prefix",
+          17
+        ],
+        [
+          "litchi_pptx::notes::resolved",
+          17
+        ],
+        [
+          "quick_xml::escape::unescape",
+          14
+        ],
+        [
+          "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+          14
+        ],
+        [
+          "quick_xml::name::NamespaceResolver::push",
+          13
+        ],
+        [
+          "quick_xml::reader::state::ReaderState::emit_end",
+          12
+        ]
+      ],
+      "unqualified_samples": 2136,
+      "whole_process_period": 27934581456,
+      "whole_process_samples": 3169
+    }
+  ],
+  "claims": [
+    "Only samples containing the exact capture owner are included in owner and nested counts.",
+    "Flat notes-scan, fingerprint, and other-capture categories are disjoint; nested symbol counts are inclusive diagnostics and are not additive.",
+    "Compressed raw perf data, decoded output, and canonical no-inline frame output are identity-checked before parsing."
+  ],
+  "fraction_refusal_reason": "The frozen diagnostic forbids native phase fractions when exact owner qualification is empty or any qualified interior contains unresolved frames; this report retains observed owner, flat-category, nested-symbol, and period counts only.",
+  "packet": "change-0807",
+  "phase_fraction_claim_authorized": false,
+  "plan": {
+    "call_graph": "fp",
+    "cpu": 12,
+    "event": "cycles:u",
+    "frequency": 499,
+    "owner": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+    "path": "perf-fp-plan.json",
+    "sha256": "7f44f88948065ca05dae9afdc704a6c3fd502c7055077d004dc9d17c89870192"
+  },
+  "schema": "litchi-0807-native-perf-analysis-v1",
+  "scope": "Frame-pointer sampled native diagnostics over the large capture probe; no phase fraction, native speedup, or production attribution claim.",
+  "source": {
+    "file_count": 9196,
+    "file_manifest_sha256": "2135f96ba6890bba225cff9c2f5de2425886b830913e16b2edf159db3a29b3cd",
+    "path": "build/source.json",
+    "revision": "3624e73236721ebc4a4845bfb87107d7d93f3cef",
+    "sha256": "7e97fcfca7c31bf6188846482d9d5ba12cd907eebad1937087dc2ae7ea39b3a6"
+  },
+  "summary": {
+    "exact_owner_counts_available": true,
+    "owner_qualified_period": 18286948011,
+    "owner_qualified_samples": 2069,
+    "qualified_stacks_with_unknown_interior": 2,
+    "repeats": 2,
+    "whole_process_samples": 6333
+  }
+}

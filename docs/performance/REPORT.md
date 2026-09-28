@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0807 — refreshed CPU attribution after the rejected iterator trial
+
+[0807](0807-pptx-current-capture-profile.md) All 44 reports/1,286 measured outputs pass exact fixture and semantic checks; scoped guest costs and native frame counts replay independently. Notes scanning remains the main observed capture path, with namespace-aware event handling the leading native leaf. The next experiment targets event handoff while preserving parser/namespace behavior; allocation reductions from rejected 0806 do not supply a timing rationale. Three builds and formatting pass, production stays unchanged, and the broad goal remains open.
+
 ## 0806 — fresh public workflow qualification rejects the candidate
 
 [0806](0806-xml-workflow-qualification.md) Main, cross, and profile lanes retain 323 reports/9,606 samples; the supplemental protected preflight retains 936/28,080 micro samples separately. Six production quality gates pass with 12,885 tests (89 ignored), and each probe leg passes 36 tests. The required ≥3% capture/lifecycle benefit is absent: large capture is +1.853% (bootstrap interval 1.012106–1.020932), large lifecycle is +3.105%, and `valid-4attr` capture is +2.186%. Main latency/resource violations are zero, official cross analysis and independent replay pass all eight rows with no veto, and all four profiles qualify, but allocation or memory reduction alone is insufficient. The six production files are restored exactly, so there is no adoption; setup and quality failures plus the constructor and OLE visibility repairs remain retained evidence. iWork is excluded and the goal remains open.

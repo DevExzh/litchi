@@ -1,0 +1,14 @@
+==1241359== Callgrind, a call-graph generating cache profiler
+==1241359== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1241359== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1241359== Command: /home/zhuhe/code/litchi-target-0807/profile --mode capture --shape large --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0807/profiles/1-large.json
+==1241359== 
+==1241359== For interactive control, run 'callgrind_control -h'.
+==1241359== brk segment overflow in thread #1: can't grow to 0x4a9c000
+==1241359== (see section Limitations in user manual)
+==1241359== NOTE: further instances of this message will not be shown
+==1241359== 
+==1241359== Events    : Ir
+==1241359== Collected : 549297169
+==1241359== 
+==1241359== I   refs:      549,297,169
