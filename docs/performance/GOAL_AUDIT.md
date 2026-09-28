@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0820 — quality failure retained and test invariant repaired
+
+[0820](0820-allocator-test-quality-repair.md) The original full-test failure is retained with immutable source and input witnesses. The repair changes only allocator test assertions; runtime and production bytes remain unchanged. Fresh verification and a separate repair origin preserve the failed attempt; durability attribution remains queued.
+
 ## 0819 — real-file baseline admitted after preservation repair
 
 [0819](0819-real-file-ordinary-save-baseline.md) Fresh quality passes 641 tests with one ignored and all six gates. Independent semantic and ZIP preservation checks admit six corpora/thirty outputs before 108 reports/2,244 samples. Eight cases retain fourteen tail/mean spread flags and four cases retain p99/p50 flags. No production change, historical pooling, or optimization claim; profile and controlled durability attribution are next.

@@ -69,32 +69,8 @@ mod tests {
 
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    fn assert_live_bytes_conservation(
-        before: allocation_metrics::Snapshot,
-        after: allocation_metrics::Snapshot,
-    ) {
-        let live_delta = i128::from(after.live_bytes) - i128::from(before.live_bytes);
-        let allocated_delta =
-            i128::from(after.allocated_bytes) - i128::from(before.allocated_bytes);
-        let deallocated_delta =
-            i128::from(after.deallocated_bytes) - i128::from(before.deallocated_bytes);
-        assert_eq!(
-            live_delta,
-            allocated_delta - deallocated_delta,
-            "process live bytes must conserve every observed allocation and deallocation"
-        );
-        assert!(
-            after.peak_live_bytes >= before.peak_live_bytes,
-            "process high-water live bytes must be monotonic"
-        );
-        assert!(
-            after.peak_live_bytes >= after.live_bytes,
-            "process high-water live bytes must cover current live bytes"
-        );
-    }
-
     #[test]
-    fn global_allocator_records_successful_alloc_and_dealloc_with_process_live_accounting() {
+    fn global_allocator_records_successful_alloc_and_dealloc_with_live_peak() {
         let _lock = TEST_LOCK.lock().unwrap();
         allocation_metrics::enable();
         let before = allocation_metrics::snapshot();
@@ -109,12 +85,7 @@ mod tests {
             "successful alloc must increment allocation calls"
         );
         assert!(during.allocated_bytes >= before.allocated_bytes + 256);
-        // `live_bytes` is a process-wide net counter. The global allocator
-        // also observes callbacks from the test harness and other threads,
-        // so a foreign deallocation may occur between these snapshots. Check
-        // conservation and the monotonic high-water mark instead of assuming
-        // that this test owns the whole process delta.
-        assert_live_bytes_conservation(before, during);
+        assert!(during.live_bytes >= before.live_bytes + 256);
         // SAFETY: `pointer` came from `GLOBAL_ALLOCATOR.alloc(layout)` and
         // has not been freed or otherwise used since that call.
         unsafe { GLOBAL_ALLOCATOR.dealloc(pointer, layout) };
@@ -124,7 +95,6 @@ mod tests {
             "successful dealloc must increment deallocation calls"
         );
         assert!(after.deallocated_bytes >= before.deallocated_bytes + layout.size() as u64);
-        assert_live_bytes_conservation(before, after);
         assert!(after.peak_live_bytes >= during.peak_live_bytes);
     }
 

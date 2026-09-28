@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0820 — durability attribution deferred at quality gate
+
+[0820](0820-allocator-test-quality-repair.md) The planned default/full/file-only/no-sync comparison produced no measurements because the original quality gate exposed an invalid process-global live-byte assertion. The test-only repair supports resuming attribution from a fresh base; no hotspot or speedup claim changes.
+
 ## 0819 — full-save and edit attribution queued
 
 [0819](0819-real-file-ordinary-save-baseline.md) Real-file full-save p50 is 5.021311/4.930676/5.620500 ms for DOCX/XLSX/PPTX. Independently prepared counting phases are shorter, motivating explicit-policy durability attribution without subtracting medians or weakening defaults. PPTX edit is 1.407427 ms with 7,682 observed allocation calls; profile this path before proposing an optimization.

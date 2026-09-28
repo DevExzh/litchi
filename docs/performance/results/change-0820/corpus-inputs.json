@@ -1,0 +1,14 @@
+{
+  "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx": {
+    "bytes": 8435,
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+  },
+  "test-data/ooxml/docx/documentProperties.docx": {
+    "bytes": 23503,
+    "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+  },
+  "test-data/ooxml/pptx/shapes.pptx": {
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "command": [
+    "cargo",
+    "doc",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--no-deps"
+  ],
+  "ended": 1790602889.8270583,
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0820/quality-1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "exit_code": 0,
+  "inputs": {
+    "bytes": 1170,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/inputs.json",
+    "sha256": "bbca356d96d5def4ae1eed52ce0fad1b03a14d6ec825bac43b129c27e556fcd4"
+  },
+  "log": {
+    "bytes": 262,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/rustdoc/output.log",
+    "sha256": "bd5ffcad0850cd942c1c770d883c7bd5b231011a87b326fa13dfbf9196fbefdd"
+  },
+  "name": "rustdoc",
+  "schema": "litchi.performance.0820.repair-command.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/source.json",
+    "sha256": "644e41148584b9ddd1518bb6c5af5bf8ed0a0de8a0af8aff61c70ecb3bc16a5a"
+  },
+  "started": 1790602875.3467655
+}

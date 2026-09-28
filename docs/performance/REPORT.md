@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0820 — process-wide allocator test accounting repaired
+
+[0820](0820-allocator-test-quality-repair.md) The allocator test now checks signed byte conservation and monotonic high-water accounting while retaining successful allocation/deallocation checks. Original failure evidence remains intact. Production and benchmark runtime are unchanged; there are zero new exports or timing samples.
+
 ## 0819 — preservation-admitted ordinary-save baseline
 
 [0819](0819-real-file-ordinary-save-baseline.md) Current DOCX/XLSX/PPTX lifecycle medians are 5.220218/5.419553/7.422314 ms for three small checked-in files. Fresh admission, six quality gates, 108 reports/2,244 samples, independent replay, and separate resource diagnostics support the baseline. No production optimization or before/after speedup is claimed.

@@ -1,0 +1,13 @@
+{
+  "base": "096b810f23cc66fe01ec8c96c74f36888f954eff",
+  "before_sha256": "c498a1e0cd3984551bc09f4f4bbe0885104deb7428c79bd249250f9b1b4e5cd5",
+  "production_changed": false,
+  "runtime_harness_changed": false,
+  "runtime_prefix_sha256": "4370340dfef6c2c9b1cb6c0a586a06484126254433e5fd133361eaeddcce6d0b",
+  "schema": "litchi.performance.0820.repair-origin.v1",
+  "scope": "cfg(test) allocator wrapper assertions only; original quality failure retained; no durability timing or release build admitted",
+  "target": "/home/zhuhe/code/litchi-target-0820/quality-1",
+  "tool_allowlist": [
+    "tools/perf-baseline/src/bin/support/counting_allocator.rs"
+  ]
+}

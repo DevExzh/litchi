@@ -1,0 +1,28 @@
+{
+  "before": {
+    "bytes": 10143,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/before-counting_allocator.rs",
+    "sha256": "c498a1e0cd3984551bc09f4f4bbe0885104deb7428c79bd249250f9b1b4e5cd5"
+  },
+  "origin": {
+    "bytes": 655,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/origin.json",
+    "sha256": "357937196475e152529c2d196ec657674737345209fd1c4a2169543d2f939d9e"
+  },
+  "original_frozen_inputs": {
+    "bytes": 8487,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/quality-0/frozen-inputs.json",
+    "sha256": "5a450d918817920bf269760b08ecf74eff6b658d4e405d729e4e6fcdd31c6567"
+  },
+  "runner": {
+    "bytes": 4868,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/run.py",
+    "sha256": "c382bad70286a342df4fb10b343d1e90932ed3c6c1e2614835e17f19b1038094"
+  },
+  "schema": "litchi.performance.0820.repair-inputs.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/source.json",
+    "sha256": "644e41148584b9ddd1518bb6c5af5bf8ed0a0de8a0af8aff61c70ecb3bc16a5a"
+  }
+}

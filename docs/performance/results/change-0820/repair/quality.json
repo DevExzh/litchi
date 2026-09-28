@@ -1,0 +1,52 @@
+{
+  "focused": {
+    "bytes": 1348,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/focused/result.json",
+    "sha256": "2c7600055e2a68e78e3d5eab6dcfd904981ea71aea0175d8721ac21c59656de5"
+  },
+  "gate_count": 6,
+  "gates": [
+    {
+      "bytes": 1225,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/fmt/result.json",
+      "sha256": "24328758c18cba44daa6f83a9e808394c9e5f30824973794e3e481ef209e7863"
+    },
+    {
+      "bytes": 1284,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/check/result.json",
+      "sha256": "b46f918e5db96cfb123d20a4f80542d020dd8ff7a64a06268369224acb776950"
+    },
+    {
+      "bytes": 1297,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/tests/result.json",
+      "sha256": "cf90c18b581f7dc5c94acee9b8948e6fec883f27e86d4c86b8cdfbe5071b3f53"
+    },
+    {
+      "bytes": 1323,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/clippy/result.json",
+      "sha256": "55f2f4fb4e49f2f8837830453c4db0f23b2d08de5d12d5cbbc2dccb4a03065e8"
+    },
+    {
+      "bytes": 1282,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/rustdoc/result.json",
+      "sha256": "e53c54310dabdea2bf5f27db2ccb12f651948ee261a1c9f6c10295c24c548a5e"
+    },
+    {
+      "bytes": 1171,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/boundaries/result.json",
+      "sha256": "b190497d355af57ec7f7a4b9070f42e3dbf9475487f77ab71edd6acf74f2070c"
+    }
+  ],
+  "inputs": {
+    "bytes": 1170,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/inputs.json",
+    "sha256": "bbca356d96d5def4ae1eed52ce0fad1b03a14d6ec825bac43b129c27e556fcd4"
+  },
+  "schema": "litchi.performance.0820.repair-quality.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/source.json",
+    "sha256": "644e41148584b9ddd1518bb6c5af5bf8ed0a0de8a0af8aff61c70ecb3bc16a5a"
+  },
+  "status": "pass"
+}

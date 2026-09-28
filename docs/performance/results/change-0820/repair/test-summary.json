@@ -1,0 +1,13 @@
+{
+  "failed": 0,
+  "ignored": 1,
+  "log": {
+    "bytes": 65399,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0820/repair/commands/tests/output.log",
+    "sha256": "cc09bad9b853333337c8374050f400cfaa2a983e9f04082d9ebd2192e96e4bca"
+  },
+  "passed": 641,
+  "schema": "litchi.performance.0820.repair-tests.v1",
+  "scope": "full perf-baseline all-features tests including doctest invocation",
+  "suites": 28
+}
