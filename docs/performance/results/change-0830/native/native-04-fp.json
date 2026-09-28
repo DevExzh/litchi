@@ -1,0 +1,763 @@
+{
+  "schema": "litchi.performance.0830.xlsx-edit-profile.v1",
+  "tool": "xlsx-edit-profile-0830",
+  "base_revision": "87eb57182be1622385dc3b28dfc3c7be868dca32",
+  "mode": "wrapped",
+  "timing_scope": "Workbook::open is outside the clock; Workbook::edit, sheet(\"Munka1\"), set(\"A1\", marker), commit, patch non-empty check, commit.into_workbook adoption, and the old Workbook drop at assignment are inside the clock; serialization, owner drop, hashing, and complete stored-cell semantic readback are outside the clock",
+  "input": {
+    "path": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "bytes": 8435,
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+  },
+  "reference": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-001-xlsx/default.xlsx",
+    "bytes": 8521,
+    "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+  },
+  "output": {
+    "bytes": 8521,
+    "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+  },
+  "marker": "litchi-perf-0638-ordinary-save",
+  "target": {
+    "sheet": "Munka1",
+    "address": "A1"
+  },
+  "target_value": "litchi-perf-0638-ordinary-save",
+  "worksheet_count": 1,
+  "stored_cell_count": 8,
+  "semantic_sha256": "9c5bd593d7f62d01dda3c67ea7613a15f03d4b0135d03bfd1f61de6ed729f367",
+  "warmup": 3,
+  "samples_requested": 30,
+  "warmup_verified": true,
+  "all_verified": true,
+  "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+      294371,
+      287852,
+      310151,
+      283201,
+      283041,
+      354602,
+      277781,
+      277161,
+      302491,
+      272151,
+      274981,
+      293991,
+      274841,
+      275231,
+      300642,
+      274042,
+      278781,
+      297971,
+      272431,
+      272541,
+      296551,
+      271371,
+      273301,
+      293851,
+      271261,
+      273821,
+      297911,
+      270122,
+      273142,
+      293252
+    ],
+    "sample_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ]
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 294371,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 287852,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 310151,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 283201,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 283041,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 354602,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 277781,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 277161,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 302491,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 272151,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 274981,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 293991,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 274841,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 275231,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 300642,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 274042,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 278781,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 297971,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 272431,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 272541,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 296551,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 271371,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 273301,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 293851,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 271261,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 273821,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 297911,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 270122,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 273142,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 293252,
+      "output": {
+        "bytes": 8521,
+        "sha256": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "semantic_sha256_verified": true,
+        "worksheet_count_verified": true,
+        "stored_cell_count_verified": true
+      }
+    }
+  ]
+}

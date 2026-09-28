@@ -1,0 +1,434 @@
+
+/home/zhuhe/code/litchi-target-0830/ordinary/release/xlsx-edit-profile-0830:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000005a9ed0 <xlsx_edit_profile_0830::edit_region_0830>:
+  5a9ed0:	41 57                	push   %r15
+  5a9ed2:	41 56                	push   %r14
+  5a9ed4:	41 54                	push   %r12
+  5a9ed6:	53                   	push   %rbx
+  5a9ed7:	48 81 ec 08 0a 00 00 	sub    $0xa08,%rsp
+  5a9ede:	4c 8b 37             	mov    (%rdi),%r14
+  5a9ee1:	f0 49 ff 06          	lock incq (%r14)
+  5a9ee5:	0f 8e 5a 06 00 00    	jle    5aa545 <xlsx_edit_profile_0830::edit_region_0830+0x675>
+  5a9eeb:	48 89 fb             	mov    %rdi,%rbx
+  5a9eee:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5a9ef3:	4c 89 f6             	mov    %r14,%rsi
+  5a9ef6:	e8 45 84 ec ff       	call   472340 <litchi_xlsx::workbook::edit::semantic::transaction::Edit::new>
+  5a9efb:	4c 8b 7c 24 60       	mov    0x60(%rsp),%r15
+  5a9f00:	0f 10 44 24 68       	movups 0x68(%rsp),%xmm0
+  5a9f05:	0f 29 84 24 c0 03 00 	movaps %xmm0,0x3c0(%rsp)
+  5a9f0c:	00 
+  5a9f0d:	0f 10 44 24 78       	movups 0x78(%rsp),%xmm0
+  5a9f12:	0f 29 84 24 d0 03 00 	movaps %xmm0,0x3d0(%rsp)
+  5a9f19:	00 
+  5a9f1a:	0f 10 84 24 88 00 00 	movups 0x88(%rsp),%xmm0
+  5a9f21:	00 
+  5a9f22:	0f 29 84 24 e0 03 00 	movaps %xmm0,0x3e0(%rsp)
+  5a9f29:	00 
+  5a9f2a:	0f 10 84 24 98 00 00 	movups 0x98(%rsp),%xmm0
+  5a9f31:	00 
+  5a9f32:	0f 29 84 24 f0 03 00 	movaps %xmm0,0x3f0(%rsp)
+  5a9f39:	00 
+  5a9f3a:	48 8b 84 24 a8 00 00 	mov    0xa8(%rsp),%rax
+  5a9f41:	00 
+  5a9f42:	48 89 84 24 00 04 00 	mov    %rax,0x400(%rsp)
+  5a9f49:	00 
+  5a9f4a:	49 83 ff 02          	cmp    $0x2,%r15
+  5a9f4e:	0f 85 a8 00 00 00    	jne    5a9ffc <xlsx_edit_profile_0830::edit_region_0830+0x12c>
+  5a9f54:	48 8b 84 24 00 04 00 	mov    0x400(%rsp),%rax
+  5a9f5b:	00 
+  5a9f5c:	48 89 84 24 a0 00 00 	mov    %rax,0xa0(%rsp)
+  5a9f63:	00 
+  5a9f64:	0f 28 84 24 c0 03 00 	movaps 0x3c0(%rsp),%xmm0
+  5a9f6b:	00 
+  5a9f6c:	0f 28 8c 24 d0 03 00 	movaps 0x3d0(%rsp),%xmm1
+  5a9f73:	00 
+  5a9f74:	0f 28 94 24 e0 03 00 	movaps 0x3e0(%rsp),%xmm2
+  5a9f7b:	00 
+  5a9f7c:	0f 28 9c 24 f0 03 00 	movaps 0x3f0(%rsp),%xmm3
+  5a9f83:	00 
+  5a9f84:	0f 29 9c 24 90 00 00 	movaps %xmm3,0x90(%rsp)
+  5a9f8b:	00 
+  5a9f8c:	0f 29 94 24 80 00 00 	movaps %xmm2,0x80(%rsp)
+  5a9f93:	00 
+  5a9f94:	0f 29 4c 24 70       	movaps %xmm1,0x70(%rsp)
+  5a9f99:	0f 29 44 24 60       	movaps %xmm0,0x60(%rsp)
+  5a9f9e:	bf 48 00 00 00       	mov    $0x48,%edi
+  5a9fa3:	ff 15 97 70 04 00    	call   *0x47097(%rip)        # 5f1040 <malloc@GLIBC_2.2.5>
+  5a9fa9:	48 85 c0             	test   %rax,%rax
+  5a9fac:	0f 84 4d 05 00 00    	je     5aa4ff <xlsx_edit_profile_0830::edit_region_0830+0x62f>
+  5a9fb2:	48 89 c3             	mov    %rax,%rbx
+  5a9fb5:	48 8b 84 24 00 04 00 	mov    0x400(%rsp),%rax
+  5a9fbc:	00 
+  5a9fbd:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  5a9fc1:	0f 28 84 24 c0 03 00 	movaps 0x3c0(%rsp),%xmm0
+  5a9fc8:	00 
+  5a9fc9:	0f 28 8c 24 d0 03 00 	movaps 0x3d0(%rsp),%xmm1
+  5a9fd0:	00 
+  5a9fd1:	0f 28 94 24 e0 03 00 	movaps 0x3e0(%rsp),%xmm2
+  5a9fd8:	00 
+  5a9fd9:	0f 28 9c 24 f0 03 00 	movaps 0x3f0(%rsp),%xmm3
+  5a9fe0:	00 
+  5a9fe1:	0f 11 5b 30          	movups %xmm3,0x30(%rbx)
+  5a9fe5:	0f 11 53 20          	movups %xmm2,0x20(%rbx)
+  5a9fe9:	0f 11 4b 10          	movups %xmm1,0x10(%rbx)
+  5a9fed:	0f 11 03             	movups %xmm0,(%rbx)
+  5a9ff0:	4c 8d 35 99 39 04 00 	lea    0x43999(%rip),%r14        # 5ed990 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.17163015202072518928+0x740>
+  5a9ff7:	e9 8f 03 00 00       	jmp    5aa38b <xlsx_edit_profile_0830::edit_region_0830+0x4bb>
+  5a9ffc:	48 8d b4 24 b0 00 00 	lea    0xb0(%rsp),%rsi
+  5aa003:	00 
+  5aa004:	48 8d bc 24 78 07 00 	lea    0x778(%rsp),%rdi
+  5aa00b:	00 
+  5aa00c:	ba 20 01 00 00       	mov    $0x120,%edx
+  5aa011:	ff 15 f1 6f 04 00    	call   *0x46ff1(%rip)        # 5f1008 <memcpy@GLIBC_2.14>
+  5aa017:	0f 28 84 24 c0 03 00 	movaps 0x3c0(%rsp),%xmm0
+  5aa01e:	00 
+  5aa01f:	0f 28 8c 24 d0 03 00 	movaps 0x3d0(%rsp),%xmm1
+  5aa026:	00 
+  5aa027:	0f 28 94 24 e0 03 00 	movaps 0x3e0(%rsp),%xmm2
+  5aa02e:	00 
+  5aa02f:	0f 28 9c 24 f0 03 00 	movaps 0x3f0(%rsp),%xmm3
+  5aa036:	00 
+  5aa037:	0f 11 84 24 30 07 00 	movups %xmm0,0x730(%rsp)
+  5aa03e:	00 
+  5aa03f:	0f 11 8c 24 40 07 00 	movups %xmm1,0x740(%rsp)
+  5aa046:	00 
+  5aa047:	0f 11 94 24 50 07 00 	movups %xmm2,0x750(%rsp)
+  5aa04e:	00 
+  5aa04f:	0f 11 9c 24 60 07 00 	movups %xmm3,0x760(%rsp)
+  5aa056:	00 
+  5aa057:	48 8b 84 24 00 04 00 	mov    0x400(%rsp),%rax
+  5aa05e:	00 
+  5aa05f:	48 89 84 24 70 07 00 	mov    %rax,0x770(%rsp)
+  5aa066:	00 
+  5aa067:	4c 89 bc 24 28 07 00 	mov    %r15,0x728(%rsp)
+  5aa06e:	00 
+  5aa06f:	48 8d bc 24 c0 03 00 	lea    0x3c0(%rsp),%rdi
+  5aa076:	00 
+  5aa077:	48 8d b4 24 28 07 00 	lea    0x728(%rsp),%rsi
+  5aa07e:	00 
+  5aa07f:	e8 dc 91 ff ff       	call   5a3260 <litchi_xlsx::workbook::edit::semantic::transaction::Edit::sheet>
+  5aa084:	0f b6 84 24 c0 03 00 	movzbl 0x3c0(%rsp),%eax
+  5aa08b:	00 
+  5aa08c:	3c 25                	cmp    $0x25,%al
+  5aa08e:	0f 85 41 01 00 00    	jne    5aa1d5 <xlsx_edit_profile_0830::edit_region_0830+0x305>
+  5aa094:	48 8b 84 24 c8 03 00 	mov    0x3c8(%rsp),%rax
+  5aa09b:	00 
+  5aa09c:	48 85 c0             	test   %rax,%rax
+  5aa09f:	0f 84 ad 01 00 00    	je     5aa252 <xlsx_edit_profile_0830::edit_region_0830+0x382>
+  5aa0a5:	48 8b 8c 24 d0 03 00 	mov    0x3d0(%rsp),%rcx
+  5aa0ac:	00 
+  5aa0ad:	48 89 84 24 98 08 00 	mov    %rax,0x898(%rsp)
+  5aa0b4:	00 
+  5aa0b5:	48 89 8c 24 a0 08 00 	mov    %rcx,0x8a0(%rsp)
+  5aa0bc:	00 
+  5aa0bd:	48 8d bc 24 c0 03 00 	lea    0x3c0(%rsp),%rdi
+  5aa0c4:	00 
+  5aa0c5:	48 8d b4 24 98 08 00 	lea    0x898(%rsp),%rsi
+  5aa0cc:	00 
+  5aa0cd:	e8 4e 94 ff ff       	call   5a3520 <litchi_xlsx::workbook::edit::semantic::worksheet::WorksheetEdit::set>
+  5aa0d2:	0f b6 84 24 c0 03 00 	movzbl 0x3c0(%rsp),%eax
+  5aa0d9:	00 
+  5aa0da:	3c 25                	cmp    $0x25,%al
+  5aa0dc:	0f 85 e5 01 00 00    	jne    5aa2c7 <xlsx_edit_profile_0830::edit_region_0830+0x3f7>
+  5aa0e2:	49 bc 01 00 00 00 00 	movabs $0x8000000000000001,%r12
+  5aa0e9:	00 00 80 
+  5aa0ec:	4c 8d bc 24 98 08 00 	lea    0x898(%rsp),%r15
+  5aa0f3:	00 
+  5aa0f4:	48 8d b4 24 28 07 00 	lea    0x728(%rsp),%rsi
+  5aa0fb:	00 
+  5aa0fc:	ba 70 01 00 00       	mov    $0x170,%edx
+  5aa101:	4c 89 ff             	mov    %r15,%rdi
+  5aa104:	ff 15 fe 6e 04 00    	call   *0x46efe(%rip)        # 5f1008 <memcpy@GLIBC_2.14>
+  5aa10a:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa10f:	4c 89 fe             	mov    %r15,%rsi
+  5aa112:	ff 15 90 89 04 00    	call   *0x48990(%rip)        # 5f2aa8 <_DYNAMIC+0x1cc8>
+  5aa118:	4c 8b 7c 24 60       	mov    0x60(%rsp),%r15
+  5aa11d:	0f 10 44 24 68       	movups 0x68(%rsp),%xmm0
+  5aa122:	0f 29 44 24 10       	movaps %xmm0,0x10(%rsp)
+  5aa127:	0f 10 44 24 78       	movups 0x78(%rsp),%xmm0
+  5aa12c:	0f 29 44 24 20       	movaps %xmm0,0x20(%rsp)
+  5aa131:	0f 10 84 24 88 00 00 	movups 0x88(%rsp),%xmm0
+  5aa138:	00 
+  5aa139:	0f 29 44 24 30       	movaps %xmm0,0x30(%rsp)
+  5aa13e:	0f 10 84 24 98 00 00 	movups 0x98(%rsp),%xmm0
+  5aa145:	00 
+  5aa146:	0f 29 44 24 40       	movaps %xmm0,0x40(%rsp)
+  5aa14b:	48 8b 84 24 a8 00 00 	mov    0xa8(%rsp),%rax
+  5aa152:	00 
+  5aa153:	48 89 44 24 50       	mov    %rax,0x50(%rsp)
+  5aa158:	4d 39 e7             	cmp    %r12,%r15
+  5aa15b:	0f 85 58 02 00 00    	jne    5aa3b9 <xlsx_edit_profile_0830::edit_region_0830+0x4e9>
+  5aa161:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+  5aa166:	48 89 84 24 a0 00 00 	mov    %rax,0xa0(%rsp)
+  5aa16d:	00 
+  5aa16e:	0f 28 44 24 10       	movaps 0x10(%rsp),%xmm0
+  5aa173:	0f 28 4c 24 20       	movaps 0x20(%rsp),%xmm1
+  5aa178:	0f 28 54 24 30       	movaps 0x30(%rsp),%xmm2
+  5aa17d:	0f 28 5c 24 40       	movaps 0x40(%rsp),%xmm3
+  5aa182:	0f 29 9c 24 90 00 00 	movaps %xmm3,0x90(%rsp)
+  5aa189:	00 
+  5aa18a:	0f 29 94 24 80 00 00 	movaps %xmm2,0x80(%rsp)
+  5aa191:	00 
+  5aa192:	0f 29 4c 24 70       	movaps %xmm1,0x70(%rsp)
+  5aa197:	0f 29 44 24 60       	movaps %xmm0,0x60(%rsp)
+  5aa19c:	bf 48 00 00 00       	mov    $0x48,%edi
+  5aa1a1:	ff 15 99 6e 04 00    	call   *0x46e99(%rip)        # 5f1040 <malloc@GLIBC_2.2.5>
+  5aa1a7:	48 85 c0             	test   %rax,%rax
+  5aa1aa:	0f 84 85 03 00 00    	je     5aa535 <xlsx_edit_profile_0830::edit_region_0830+0x665>
+  5aa1b0:	48 89 c3             	mov    %rax,%rbx
+  5aa1b3:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+  5aa1b8:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  5aa1bc:	0f 28 44 24 10       	movaps 0x10(%rsp),%xmm0
+  5aa1c1:	0f 28 4c 24 20       	movaps 0x20(%rsp),%xmm1
+  5aa1c6:	0f 28 54 24 30       	movaps 0x30(%rsp),%xmm2
+  5aa1cb:	0f 28 5c 24 40       	movaps 0x40(%rsp),%xmm3
+  5aa1d0:	e9 0c fe ff ff       	jmp    5a9fe1 <xlsx_edit_profile_0830::edit_region_0830+0x111>
+  5aa1d5:	8b 8c 24 c1 03 00 00 	mov    0x3c1(%rsp),%ecx
+  5aa1dc:	8b 94 24 c4 03 00 00 	mov    0x3c4(%rsp),%edx
+  5aa1e3:	89 54 24 64          	mov    %edx,0x64(%rsp)
+  5aa1e7:	89 4c 24 61          	mov    %ecx,0x61(%rsp)
+  5aa1eb:	0f 10 84 24 c8 03 00 	movups 0x3c8(%rsp),%xmm0
+  5aa1f2:	00 
+  5aa1f3:	0f 10 8c 24 d8 03 00 	movups 0x3d8(%rsp),%xmm1
+  5aa1fa:	00 
+  5aa1fb:	0f 11 4c 24 78       	movups %xmm1,0x78(%rsp)
+  5aa200:	0f 10 8c 24 e8 03 00 	movups 0x3e8(%rsp),%xmm1
+  5aa207:	00 
+  5aa208:	0f 11 8c 24 88 00 00 	movups %xmm1,0x88(%rsp)
+  5aa20f:	00 
+  5aa210:	0f 10 8c 24 f8 03 00 	movups 0x3f8(%rsp),%xmm1
+  5aa217:	00 
+  5aa218:	0f 11 8c 24 98 00 00 	movups %xmm1,0x98(%rsp)
+  5aa21f:	00 
+  5aa220:	88 44 24 60          	mov    %al,0x60(%rsp)
+  5aa224:	0f 11 44 24 68       	movups %xmm0,0x68(%rsp)
+  5aa229:	bf 48 00 00 00       	mov    $0x48,%edi
+  5aa22e:	ff 15 0c 6e 04 00    	call   *0x46e0c(%rip)        # 5f1040 <malloc@GLIBC_2.2.5>
+  5aa234:	48 85 c0             	test   %rax,%rax
+  5aa237:	0f 85 02 01 00 00    	jne    5aa33f <xlsx_edit_profile_0830::edit_region_0830+0x46f>
+  5aa23d:	bf 08 00 00 00       	mov    $0x8,%edi
+  5aa242:	be 48 00 00 00       	mov    $0x48,%esi
+  5aa247:	ff 15 23 6e 04 00    	call   *0x46e23(%rip)        # 5f1070 <_DYNAMIC+0x290>
+  5aa24d:	e9 f3 02 00 00       	jmp    5aa545 <xlsx_edit_profile_0830::edit_region_0830+0x675>
+  5aa252:	48 8d 05 8f 37 04 00 	lea    0x4378f(%rip),%rax        # 5ed9e8 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.17163015202072518928+0x798>
+  5aa259:	48 89 84 24 c0 03 00 	mov    %rax,0x3c0(%rsp)
+  5aa260:	00 
+  5aa261:	48 8d 05 d8 9d 00 00 	lea    0x9dd8(%rip),%rax        # 5b4040 <<&T as core::fmt::Debug>::fmt>
+  5aa268:	48 89 84 24 c8 03 00 	mov    %rax,0x3c8(%rsp)
+  5aa26f:	00 
+  5aa270:	48 8d 35 f0 f8 a6 ff 	lea    -0x590710(%rip),%rsi        # 19b67 <anon.ffd5d0e83a3b19fdbe6e6746df1065cb.49.llvm.5803749531507233356+0x47d>
+  5aa277:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa27c:	48 8d 94 24 c0 03 00 	lea    0x3c0(%rsp),%rdx
+  5aa283:	00 
+  5aa284:	ff 15 1e 6e 04 00    	call   *0x46e1e(%rip)        # 5f10a8 <_DYNAMIC+0x2c8>
+  5aa28a:	4c 8b 64 24 60       	mov    0x60(%rsp),%r12
+  5aa28f:	4c 8b 7c 24 68       	mov    0x68(%rsp),%r15
+  5aa294:	4c 8b 74 24 70       	mov    0x70(%rsp),%r14
+  5aa299:	bf 18 00 00 00       	mov    $0x18,%edi
+  5aa29e:	ff 15 9c 6d 04 00    	call   *0x46d9c(%rip)        # 5f1040 <malloc@GLIBC_2.2.5>
+  5aa2a4:	48 85 c0             	test   %rax,%rax
+  5aa2a7:	0f 84 64 02 00 00    	je     5aa511 <xlsx_edit_profile_0830::edit_region_0830+0x641>
+  5aa2ad:	48 89 c3             	mov    %rax,%rbx
+  5aa2b0:	4c 89 20             	mov    %r12,(%rax)
+  5aa2b3:	4c 89 78 08          	mov    %r15,0x8(%rax)
+  5aa2b7:	4c 89 70 10          	mov    %r14,0x10(%rax)
+  5aa2bb:	4c 8d 35 a6 76 03 00 	lea    0x376a6(%rip),%r14        # 5e1968 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+  5aa2c2:	e9 b7 00 00 00       	jmp    5aa37e <xlsx_edit_profile_0830::edit_region_0830+0x4ae>
+  5aa2c7:	8b 8c 24 c1 03 00 00 	mov    0x3c1(%rsp),%ecx
+  5aa2ce:	8b 94 24 c4 03 00 00 	mov    0x3c4(%rsp),%edx
+  5aa2d5:	89 54 24 64          	mov    %edx,0x64(%rsp)
+  5aa2d9:	89 4c 24 61          	mov    %ecx,0x61(%rsp)
+  5aa2dd:	48 8b 8c 24 c8 03 00 	mov    0x3c8(%rsp),%rcx
+  5aa2e4:	00 
+  5aa2e5:	0f 10 84 24 d0 03 00 	movups 0x3d0(%rsp),%xmm0
+  5aa2ec:	00 
+  5aa2ed:	0f 11 44 24 70       	movups %xmm0,0x70(%rsp)
+  5aa2f2:	0f 10 84 24 e0 03 00 	movups 0x3e0(%rsp),%xmm0
+  5aa2f9:	00 
+  5aa2fa:	0f 11 84 24 80 00 00 	movups %xmm0,0x80(%rsp)
+  5aa301:	00 
+  5aa302:	0f 10 84 24 f0 03 00 	movups 0x3f0(%rsp),%xmm0
+  5aa309:	00 
+  5aa30a:	0f 11 84 24 90 00 00 	movups %xmm0,0x90(%rsp)
+  5aa311:	00 
+  5aa312:	48 8b 94 24 00 04 00 	mov    0x400(%rsp),%rdx
+  5aa319:	00 
+  5aa31a:	48 89 94 24 a0 00 00 	mov    %rdx,0xa0(%rsp)
+  5aa321:	00 
+  5aa322:	88 44 24 60          	mov    %al,0x60(%rsp)
+  5aa326:	48 89 4c 24 68       	mov    %rcx,0x68(%rsp)
+  5aa32b:	bf 48 00 00 00       	mov    $0x48,%edi
+  5aa330:	ff 15 0a 6d 04 00    	call   *0x46d0a(%rip)        # 5f1040 <malloc@GLIBC_2.2.5>
+  5aa336:	48 85 c0             	test   %rax,%rax
+  5aa339:	0f 84 e4 01 00 00    	je     5aa523 <xlsx_edit_profile_0830::edit_region_0830+0x653>
+  5aa33f:	48 89 c3             	mov    %rax,%rbx
+  5aa342:	48 8b 84 24 a0 00 00 	mov    0xa0(%rsp),%rax
+  5aa349:	00 
+  5aa34a:	48 89 43 40          	mov    %rax,0x40(%rbx)
+  5aa34e:	0f 10 44 24 60       	movups 0x60(%rsp),%xmm0
+  5aa353:	0f 10 4c 24 70       	movups 0x70(%rsp),%xmm1
+  5aa358:	0f 10 94 24 80 00 00 	movups 0x80(%rsp),%xmm2
+  5aa35f:	00 
+  5aa360:	0f 10 9c 24 90 00 00 	movups 0x90(%rsp),%xmm3
+  5aa367:	00 
+  5aa368:	0f 11 5b 30          	movups %xmm3,0x30(%rbx)
+  5aa36c:	0f 11 53 20          	movups %xmm2,0x20(%rbx)
+  5aa370:	0f 11 4b 10          	movups %xmm1,0x10(%rbx)
+  5aa374:	0f 11 03             	movups %xmm0,(%rbx)
+  5aa377:	4c 8d 35 12 36 04 00 	lea    0x43612(%rip),%r14        # 5ed990 <anon.e8285145bd8bb80e4b2a17fbc08aacfc.16.llvm.17163015202072518928+0x740>
+  5aa37e:	48 8d bc 24 28 07 00 	lea    0x728(%rsp),%rdi
+  5aa385:	00 
+  5aa386:	e8 d5 1c 01 00       	call   5bc060 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::semantic::transaction::Edit>>
+  5aa38b:	48 89 1c 24          	mov    %rbx,(%rsp)
+  5aa38f:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+  5aa394:	48 89 e0             	mov    %rsp,%rax
+  5aa397:	48 89 44 24 60       	mov    %rax,0x60(%rsp)
+  5aa39c:	48 8d 44 24 60       	lea    0x60(%rsp),%rax
+  5aa3a1:	48 8b 04 24          	mov    (%rsp),%rax
+  5aa3a5:	48 8b 54 24 08       	mov    0x8(%rsp),%rdx
+  5aa3aa:	48 81 c4 08 0a 00 00 	add    $0xa08,%rsp
+  5aa3b1:	5b                   	pop    %rbx
+  5aa3b2:	41 5c                	pop    %r12
+  5aa3b4:	41 5e                	pop    %r14
+  5aa3b6:	41 5f                	pop    %r15
+  5aa3b8:	c3                   	ret
+  5aa3b9:	48 8d b4 24 b0 00 00 	lea    0xb0(%rsp),%rsi
+  5aa3c0:	00 
+  5aa3c1:	48 8d bc 24 10 04 00 	lea    0x410(%rsp),%rdi
+  5aa3c8:	00 
+  5aa3c9:	ba 10 03 00 00       	mov    $0x310,%edx
+  5aa3ce:	ff 15 34 6c 04 00    	call   *0x46c34(%rip)        # 5f1008 <memcpy@GLIBC_2.14>
+  5aa3d4:	0f 28 44 24 10       	movaps 0x10(%rsp),%xmm0
+  5aa3d9:	0f 28 4c 24 20       	movaps 0x20(%rsp),%xmm1
+  5aa3de:	0f 28 54 24 30       	movaps 0x30(%rsp),%xmm2
+  5aa3e3:	0f 28 5c 24 40       	movaps 0x40(%rsp),%xmm3
+  5aa3e8:	0f 11 84 24 c8 03 00 	movups %xmm0,0x3c8(%rsp)
+  5aa3ef:	00 
+  5aa3f0:	0f 11 8c 24 d8 03 00 	movups %xmm1,0x3d8(%rsp)
+  5aa3f7:	00 
+  5aa3f8:	0f 11 94 24 e8 03 00 	movups %xmm2,0x3e8(%rsp)
+  5aa3ff:	00 
+  5aa400:	0f 11 9c 24 f8 03 00 	movups %xmm3,0x3f8(%rsp)
+  5aa407:	00 
+  5aa408:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+  5aa40d:	48 89 84 24 08 04 00 	mov    %rax,0x408(%rsp)
+  5aa414:	00 
+  5aa415:	4c 89 bc 24 c0 03 00 	mov    %r15,0x3c0(%rsp)
+  5aa41c:	00 
+  5aa41d:	49 8d 44 24 ff       	lea    -0x1(%r12),%rax
+  5aa422:	49 39 c7             	cmp    %rax,%r15
+  5aa425:	0f 85 90 00 00 00    	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa42b:	48 83 bc 24 80 06 00 	cmpq   $0x0,0x680(%rsp)
+  5aa432:	00 00 
+  5aa434:	0f 85 81 00 00 00    	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa43a:	48 83 bc 24 90 06 00 	cmpq   $0x0,0x690(%rsp)
+  5aa441:	00 00 
+  5aa443:	75 76                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa445:	48 83 bc 24 a0 06 00 	cmpq   $0x0,0x6a0(%rsp)
+  5aa44c:	00 00 
+  5aa44e:	75 6b                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa450:	48 83 bc 24 b0 06 00 	cmpq   $0x0,0x6b0(%rsp)
+  5aa457:	00 00 
+  5aa459:	75 60                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa45b:	48 83 bc 24 c0 06 00 	cmpq   $0x0,0x6c0(%rsp)
+  5aa462:	00 00 
+  5aa464:	75 55                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa466:	48 83 bc 24 d0 06 00 	cmpq   $0x0,0x6d0(%rsp)
+  5aa46d:	00 00 
+  5aa46f:	75 4a                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa471:	4c 39 a4 24 60 04 00 	cmp    %r12,0x460(%rsp)
+  5aa478:	00 
+  5aa479:	75 40                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa47b:	48 83 bc 24 e0 06 00 	cmpq   $0x0,0x6e0(%rsp)
+  5aa482:	00 00 
+  5aa484:	75 35                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa486:	48 83 bc 24 f0 06 00 	cmpq   $0x0,0x6f0(%rsp)
+  5aa48d:	00 00 
+  5aa48f:	75 2a                	jne    5aa4bb <xlsx_edit_profile_0830::edit_region_0830+0x5eb>
+  5aa491:	48 8d 3d 98 32 a8 ff 	lea    -0x57cd68(%rip),%rdi        # 2d730 <anon.58baeeae7d5fe476157d296c9f08f803.400.llvm.5844774155465566772+0x4ab>
+  5aa498:	be 20 00 00 00       	mov    $0x20,%esi
+  5aa49d:	ff 15 75 6c 04 00    	call   *0x46c75(%rip)        # 5f1118 <_DYNAMIC+0x338>
+  5aa4a3:	48 89 c3             	mov    %rax,%rbx
+  5aa4a6:	49 89 d6             	mov    %rdx,%r14
+  5aa4a9:	48 8d bc 24 c0 03 00 	lea    0x3c0(%rsp),%rdi
+  5aa4b0:	00 
+  5aa4b1:	e8 7a 03 01 00       	call   5ba830 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Commit>>
+  5aa4b6:	e9 d0 fe ff ff       	jmp    5aa38b <xlsx_edit_profile_0830::edit_region_0830+0x4bb>
+  5aa4bb:	4c 8d 7c 24 60       	lea    0x60(%rsp),%r15
+  5aa4c0:	48 8d b4 24 c0 03 00 	lea    0x3c0(%rsp),%rsi
+  5aa4c7:	00 
+  5aa4c8:	ba 60 03 00 00       	mov    $0x360,%edx
+  5aa4cd:	4c 89 ff             	mov    %r15,%rdi
+  5aa4d0:	ff 15 32 6b 04 00    	call   *0x46b32(%rip)        # 5f1008 <memcpy@GLIBC_2.14>
+  5aa4d6:	4c 8b a4 24 b8 03 00 	mov    0x3b8(%rsp),%r12
+  5aa4dd:	00 
+  5aa4de:	4c 89 ff             	mov    %r15,%rdi
+  5aa4e1:	e8 4a f9 f0 ff       	call   4b9e30 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Patch>>
+  5aa4e6:	f0 49 ff 0e          	lock decq (%r14)
+  5aa4ea:	75 09                	jne    5aa4f5 <xlsx_edit_profile_0830::edit_region_0830+0x625>
+  5aa4ec:	48 89 df             	mov    %rbx,%rdi
+  5aa4ef:	ff 15 63 85 04 00    	call   *0x48563(%rip)        # 5f2a58 <_DYNAMIC+0x1c78>
+  5aa4f5:	4c 89 23             	mov    %r12,(%rbx)
+  5aa4f8:	31 db                	xor    %ebx,%ebx
+  5aa4fa:	e9 8c fe ff ff       	jmp    5aa38b <xlsx_edit_profile_0830::edit_region_0830+0x4bb>
+  5aa4ff:	bf 08 00 00 00       	mov    $0x8,%edi
+  5aa504:	be 48 00 00 00       	mov    $0x48,%esi
+  5aa509:	ff 15 61 6b 04 00    	call   *0x46b61(%rip)        # 5f1070 <_DYNAMIC+0x290>
+  5aa50f:	eb 34                	jmp    5aa545 <xlsx_edit_profile_0830::edit_region_0830+0x675>
+  5aa511:	bf 08 00 00 00       	mov    $0x8,%edi
+  5aa516:	be 18 00 00 00       	mov    $0x18,%esi
+  5aa51b:	ff 15 4f 6b 04 00    	call   *0x46b4f(%rip)        # 5f1070 <_DYNAMIC+0x290>
+  5aa521:	eb 22                	jmp    5aa545 <xlsx_edit_profile_0830::edit_region_0830+0x675>
+  5aa523:	bf 08 00 00 00       	mov    $0x8,%edi
+  5aa528:	be 48 00 00 00       	mov    $0x48,%esi
+  5aa52d:	ff 15 3d 6b 04 00    	call   *0x46b3d(%rip)        # 5f1070 <_DYNAMIC+0x290>
+  5aa533:	eb 10                	jmp    5aa545 <xlsx_edit_profile_0830::edit_region_0830+0x675>
+  5aa535:	bf 08 00 00 00       	mov    $0x8,%edi
+  5aa53a:	be 48 00 00 00       	mov    $0x48,%esi
+  5aa53f:	ff 15 2b 6b 04 00    	call   *0x46b2b(%rip)        # 5f1070 <_DYNAMIC+0x290>
+  5aa545:	0f 0b                	ud2
+  5aa547:	4c 89 23             	mov    %r12,(%rbx)
+  5aa54a:	48 89 c7             	mov    %rax,%rdi
+  5aa54d:	e8 ae 62 03 00       	call   5e0800 <_Unwind_Resume@plt>
+  5aa552:	49 89 c6             	mov    %rax,%r14
+  5aa555:	48 8d bc 24 c0 03 00 	lea    0x3c0(%rsp),%rdi
+  5aa55c:	00 
+  5aa55d:	e8 ce 02 01 00       	call   5ba830 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Commit>>
+  5aa562:	eb 77                	jmp    5aa5db <xlsx_edit_profile_0830::edit_region_0830+0x70b>
+  5aa564:	49 89 c6             	mov    %rax,%r14
+  5aa567:	eb 4a                	jmp    5aa5b3 <xlsx_edit_profile_0830::edit_region_0830+0x6e3>
+  5aa569:	49 89 c6             	mov    %rax,%r14
+  5aa56c:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa571:	e8 7a e9 00 00       	call   5b8ef0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  5aa576:	eb 63                	jmp    5aa5db <xlsx_edit_profile_0830::edit_region_0830+0x70b>
+  5aa578:	ff 15 22 6e 04 00    	call   *0x46e22(%rip)        # 5f13a0 <_DYNAMIC+0x5c0>
+  5aa57e:	49 89 c6             	mov    %rax,%r14
+  5aa581:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa586:	e8 65 e9 00 00       	call   5b8ef0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  5aa58b:	eb 26                	jmp    5aa5b3 <xlsx_edit_profile_0830::edit_region_0830+0x6e3>
+  5aa58d:	ff 15 0d 6e 04 00    	call   *0x46e0d(%rip)        # 5f13a0 <_DYNAMIC+0x5c0>
+  5aa593:	49 89 c6             	mov    %rax,%r14
+  5aa596:	4d 85 e4             	test   %r12,%r12
+  5aa599:	74 18                	je     5aa5b3 <xlsx_edit_profile_0830::edit_region_0830+0x6e3>
+  5aa59b:	4c 89 ff             	mov    %r15,%rdi
+  5aa59e:	ff 15 7c 6a 04 00    	call   *0x46a7c(%rip)        # 5f1020 <free@GLIBC_2.2.5>
+  5aa5a4:	eb 0d                	jmp    5aa5b3 <xlsx_edit_profile_0830::edit_region_0830+0x6e3>
+  5aa5a6:	49 89 c6             	mov    %rax,%r14
+  5aa5a9:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa5ae:	e8 3d e9 00 00       	call   5b8ef0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  5aa5b3:	48 8d bc 24 28 07 00 	lea    0x728(%rsp),%rdi
+  5aa5ba:	00 
+  5aa5bb:	e8 a0 1a 01 00       	call   5bc060 <core::ptr::drop_in_place<litchi_xlsx::workbook::edit::semantic::transaction::Edit>>
+  5aa5c0:	eb 19                	jmp    5aa5db <xlsx_edit_profile_0830::edit_region_0830+0x70b>
+  5aa5c2:	ff 15 d8 6d 04 00    	call   *0x46dd8(%rip)        # 5f13a0 <_DYNAMIC+0x5c0>
+  5aa5c8:	ff 15 d2 6d 04 00    	call   *0x46dd2(%rip)        # 5f13a0 <_DYNAMIC+0x5c0>
+  5aa5ce:	49 89 c6             	mov    %rax,%r14
+  5aa5d1:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+  5aa5d6:	e8 15 e9 00 00       	call   5b8ef0 <core::ptr::drop_in_place<litchi_xlsx::error::Error>>
+  5aa5db:	4c 89 f7             	mov    %r14,%rdi
+  5aa5de:	e8 1d 62 03 00       	call   5e0800 <_Unwind_Resume@plt>
+  5aa5e3:	ff 15 b7 6d 04 00    	call   *0x46db7(%rip)        # 5f13a0 <_DYNAMIC+0x5c0>

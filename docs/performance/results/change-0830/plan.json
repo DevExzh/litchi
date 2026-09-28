@@ -1,0 +1,77 @@
+{
+  "base": "87eb57182be1622385dc3b28dfc3c7be868dca32",
+  "cpu": 12,
+  "expected_measured_samples": 559,
+  "expected_reports": 23,
+  "heaptrack": {
+    "arm": "fp",
+    "profiled_latency_claim": false,
+    "repeats": 2,
+    "requested_bytes_only": true,
+    "samples": 5,
+    "warmup": 0
+  },
+  "input": "/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+  "limitations": "Single real workbook; heaptrack malloc interposition differs from Rust allocator counters. No per-edit peak/live or physical-copy claim.",
+  "native": {
+    "blocks": 6,
+    "order": [
+      [
+        "direct",
+        "wrapped",
+        "fp"
+      ],
+      [
+        "direct",
+        "fp",
+        "wrapped"
+      ],
+      [
+        "wrapped",
+        "direct",
+        "fp"
+      ],
+      [
+        "wrapped",
+        "fp",
+        "direct"
+      ],
+      [
+        "fp",
+        "direct",
+        "wrapped"
+      ],
+      [
+        "fp",
+        "wrapped",
+        "direct"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "owner": "xlsx_edit_profile_0830::edit_region_0830",
+  "qualification": {
+    "arms": [
+      "direct",
+      "wrapped",
+      "fp"
+    ],
+    "samples": 3,
+    "warmup": 0
+  },
+  "quality_scope": "Fresh isolated probe fmt/check/test/clippy/doc; no claim of fresh full production test suite.",
+  "reference": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-001-xlsx/default.xlsx",
+  "schema": "litchi.performance.0830.plan.v1",
+  "scope": "Public one-cell edit including old Workbook replacement/drop; fresh open, save and readback outside timer.",
+  "statistics": {
+    "across_process": "midpoint median",
+    "bootstrap_resamples": 10000,
+    "endpoints": [
+      250,
+      9749
+    ],
+    "seed": 830830,
+    "within_process": "nearest-rank"
+  }
+}

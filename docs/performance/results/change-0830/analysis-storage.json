@@ -1,0 +1,10 @@
+{
+  "action": "Lossless compression of initial analysis before current reader gains gzip output",
+  "original_path": "analysis.json",
+  "retained_path": "analysis-attempt03.json.gz",
+  "uncompressed_bytes": 96004671,
+  "uncompressed_sha256": "ad8b8cec2febcfd09e4d2090b23db9e4e7106ddba9e7df0d50f2b27b24e38a8a",
+  "compressed_bytes": 2240471,
+  "compressed_sha256": "b717b4c921e89e17274b476c46b6bcb45e76137daa8aea707c2958afe9739cfd",
+  "roundtrip_verified": true
+}

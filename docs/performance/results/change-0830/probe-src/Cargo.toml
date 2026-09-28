@@ -1,0 +1,26 @@
+[package]
+name = "xlsx-edit-profile-0830"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "xlsx-edit-profile-0830"
+path = "src/main.rs"
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi/crates/litchi-xlsx" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+# This is an independent evidence project. The build driver invokes Cargo
+# with this manifest explicitly and never adds the probe to the workspace.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

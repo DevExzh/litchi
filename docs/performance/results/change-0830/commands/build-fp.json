@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0830/probe-src/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0830/fp",
+    "LC_ALL": "C",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790629729.646413,
+  "input_inventory_sha256": "0897f89abb56551a2bc45cc4d84739d3f53571886d0dd2c557ec1112c94408fb",
+  "log_sha256": "96f2ad885a169597fde7938f0432be8984f88c2337a0e2296ce6757dd4076967",
+  "started_unix": 1790629583.2010367
+}

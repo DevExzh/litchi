@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "root_lock_sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+  "probe_lock_sha256": "c53cc5e2ad4eeec9bd08a9d7434a9261b31a6cfad4824cb89d6954ac04482283",
+  "external_probe_packages": 143,
+  "mismatches": [],
+  "method": "Seed probe Cargo.lock from root Cargo.lock; cargo metadata --offline --format-version 1 --manifest-path docs/performance/results/change-0830/probe-src/Cargo.toml resolves only the isolated package graph. Initial unseeded generated lock was discarded before builds."
+}

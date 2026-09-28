@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0830/heaptrack_preflight.py", line 222, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0830/heaptrack_preflight.py", line 216, in main
+    receipt = run_preflight()
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0830/heaptrack_preflight.py", line 130, in run_preflight
+    raise AssertionError("UTF-8 sized string was not decoded")
+AssertionError: UTF-8 sized string was not decoded

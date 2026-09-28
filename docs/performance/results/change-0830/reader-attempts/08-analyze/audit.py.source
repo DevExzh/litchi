@@ -1,0 +1,103 @@
+"""Independent arithmetic/custody audit; no probe or profiler execution."""
+import hashlib
+import gzip
+import json
+from pathlib import Path
+import statistics
+import subprocess
+
+import driver as d
+
+
+def main():
+    a = json.loads(gzip.decompress((d.P / "analysis.json.gz").read_bytes()))
+    storage = d.read(d.P / "analysis-storage.json")
+    retained = d.P / storage["retained_path"]
+    assert d.sha(retained) == storage["compressed_sha256"]
+    initial_analysis = gzip.decompress(retained.read_bytes())
+    assert len(initial_analysis) == storage["uncompressed_bytes"]
+    assert hashlib.sha256(initial_analysis).hexdigest() == storage["uncompressed_sha256"]
+    initial = json.loads(initial_analysis)
+    assert initial["native"] == a["native"] and initial["heaptrack"] == a["heaptrack"]
+    summary = d.read(d.P / "summary.json")
+    assert summary["analysis_sha256"] == d.sha(d.P / "analysis.json.gz")
+    assert a["status"] == "pass"
+    assert d.inventory() == d.read(d.P / "inputs.json")
+    prepared = d.read(d.P / "prepare.json")
+    for name in ("inputs", "plan", "host"):
+        assert d.sha(d.P / (name + ".json")) == prepared[name + "_sha256"]
+    assert all(d.sha(d.ROOT / name) == digest for name, digest in d.UNRELATED.items())
+    assert a["counts"]["reports"] == 23 and a["counts"]["samples"] == 559
+    count = 0
+    for path in list((d.P / "qualification").glob("*.json")) + list((d.P / "native").glob("*.json")) + list(d.P.glob("heaptrack-*/report.json")):
+        report = d.read(path)
+        assert all(v is True for s in report["samples"] for v in s["verification"].values())
+        count += len(report["samples"])
+    assert count == 559
+    medians = {}
+    for arm in ("direct", "wrapped", "fp"):
+        expected = {key: [] for key in ("p50", "p95", "p99", "mean", "rss_kib")}
+        for block in range(6):
+            path = d.P / "native" / f"native-{block:02}-{arm}.json"
+            raw = d.read(path)["elapsed_ns"]["samples"]
+            values = sorted(raw)
+            assert len(values) == 30
+            for key, index in (("p50", 14), ("p95", 28), ("p99", 29)):
+                expected[key].append(values[index])
+            expected["mean"].append(sum(values) / 30)
+            expected["rss_kib"].append(int(path.with_suffix(".rss").read_text()))
+        medians[arm] = {key: statistics.median(values) for key, values in expected.items()}
+        assert summary["native_medians"][arm] == medians[arm]
+        for key, values in expected.items():
+            found = a["native"]["arms"][arm]["metrics"][key]
+            assert found["values"] == values
+            assert found["midpoint_median"] == medians[arm][key]
+    independent_totals = []
+    for repeat in range(2):
+        folder = d.P / f"heaptrack-{repeat}"
+        data = (folder / "trace.txt").read_bytes()
+        # Independent decompression confirms that the interpreted text actually
+        # belongs to the retained raw capture, without trusting the decode log.
+        decoded = subprocess.check_output(["zstd", "-dc", str(folder / "trace.zst")])
+        assert hashlib.sha256(data).digest() == hashlib.sha256(decoded).digest()
+        sizes = []
+        calls = requested = 0
+        for line in data.splitlines():
+            if line.startswith(b"a "):
+                sizes.append(int(line.split()[1], 16))
+            elif line.startswith(b"+ "):
+                calls += 1
+                requested += sizes[int(line.split()[1], 16)]
+        parsed = a["heaptrack"]["repeats"][repeat]
+        assert parsed["metrics"]["whole"] == {"calls": calls, "requested_bytes": requested}
+        assert parsed["official_whole_allocation_calls"] == calls
+        owner = parsed["metrics"]["owner"]
+        assert summary["heaptrack"][repeat]["owner"] == owner
+        assert owner["calls"] > 0 and owner["requested_bytes"] > 0
+        for field in ("by_allocation_size", "leaf", "full_leaf"):
+            rows = list(parsed["parser"][field].values()) if field == "by_allocation_size" else parsed["parser"][field]["rows"]
+            empty = parsed["parser"]["diagnostics"]["unknown_frames"]["empty_trace"]
+            unassigned_calls = empty["allocation_calls"] if field == "leaf" else 0
+            unassigned_bytes = empty["requested_bytes"] if field == "leaf" else 0
+            assert sum(row["calls"] for row in rows) + unassigned_calls == calls, field
+            assert sum(row["requested_bytes"] for row in rows) + unassigned_bytes == requested, field
+            assert sum(row["owner_calls"] for row in rows) == owner["calls"], field
+            assert sum(row["owner_requested_bytes"] for row in rows) == owner["requested_bytes"], field
+        independent_totals.append({"calls": calls, "requested_bytes": requested})
+    for receipt in (d.P / "commands").glob("*.json"):
+        if receipt.name.endswith(".started.json"):
+            continue
+        row = d.read(receipt)
+        assert d.sha(receipt.with_suffix(".log")) == row["log_sha256"]
+        initial = d.read(receipt.with_name(receipt.stem + ".started.json"))
+        assert all(row[key] == value for key, value in initial.items())
+        assert row["finished_unix"] >= row["started_unix"]
+    for path in (d.P / "reader-attempts").glob("*/sources.json"):
+        sources = d.read(path)
+        assert all(d.sha(path.parent / (name + ".source")) == digest for name, digest in sources.items())
+    print(json.dumps({"status": "pass", "reports": 23, "samples": 559,
+                      "native_medians": medians, "independent_whole_allocations": independent_totals}, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

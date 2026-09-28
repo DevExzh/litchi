@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0830 — XLSX edit allocation maps localized
+
+[0830](0830-xlsx-edit-allocation-profile.md) Three dense column-assignment buffers account for 90.45% of exact-owner requested allocation bytes: two parser maps of 1 MiB and an empty column-action validator map of 512 KiB per edit on average. Test the empty-action fast path first (18.09% of measured requested bytes); preserve the parser maps’ bounded overlap behavior and both required parses.
+
 ## 0829 — current PPTX edit phases measured
 
 [0829](0829-pptx-edit-phase-profile.md) Exact-owner CPU samples partition into capture 1,196/1,193, set-text 607/612, commit/application 867/879 and unclassified 0/1. All observed owner zlib self leaves occur in initial capture; XML work remains in all phases. Required fingerprinting and validation stay intact. Counts do not predict wall-clock savings; XLSX allocation/readback localization remains a separate next investigation.
