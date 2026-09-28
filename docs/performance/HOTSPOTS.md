@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0819 — full-save and edit attribution queued
+
+[0819](0819-real-file-ordinary-save-baseline.md) Real-file full-save p50 is 5.021311/4.930676/5.620500 ms for DOCX/XLSX/PPTX. Independently prepared counting phases are shorter, motivating explicit-policy durability attribution without subtracting medians or weakening defaults. PPTX edit is 1.407427 ms with 7,682 observed allocation calls; profile this path before proposing an optimization.
+
 ## 0818 — unnecessary relationship regeneration removed
 
 [0818](0818-docx-relationship-preservation.md) The DOCX main-Part replacement discarded unchanged relationship provenance. Updating the existing Part preserves original relationship XML and avoids that regeneration when its binding is unchanged. This is a preservation repair supported by exact output checks, not a measured performance optimization. Fresh ordinary-save timing is next.

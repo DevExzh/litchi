@@ -1,0 +1,7 @@
+{
+  "failed": 0,
+  "ignored": 1,
+  "passed": 641,
+  "scope": "full perf-baseline cargo test --all-features, including doctest invocation",
+  "suites": 28
+}
