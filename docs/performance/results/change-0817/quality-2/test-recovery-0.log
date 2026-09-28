@@ -1,0 +1,9 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 0.18s
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/code/litchi-target-0817/quality-1/debug/deps/xlsx_planning_allocations-8a39f86b9a806538)
+
+running 1 test
+test xlsx_source_cell_values_planning_allocations_are_scoped_and_aligned ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.18s
+

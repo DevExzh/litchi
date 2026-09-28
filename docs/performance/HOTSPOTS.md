@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0817 — preservation admission precedes hotspot timing
+
+[0817](0817-real-file-ordinary-save.md) No new hotspot is claimed: the real-file timing matrix was withheld after artifact admission failed. Resolve the DOCX relationship-order preservation question and correct generated-metadata/calculation-closure auditing before fresh measurement; do not infer performance from deterministic publication alone.
+
 ## 0816 — source latency changes useful concurrency
 
 [0816](0816-delayed-source-budget-scaling.md) Delayed large CFB/Part reads show 7.364×/5.674× width-eight speedup, while mixed requests observe a maximum of one simultaneous read and stay near 1× under the 64 KiB task floor. Primed Parts have zero timed reads and severe requested-width overhead. CFB capping raises large calls 32→128; the selected compressed Parts remain below the cap. These are scoped measurements of current behavior, not native CPU phase attribution.

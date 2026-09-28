@@ -1,0 +1,329 @@
+{
+  "cases": [
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "generated-docx-medium",
+      "changed_members": {
+        "default": [
+          "word/document.xml"
+        ],
+        "file-only": [
+          "word/document.xml"
+        ],
+        "full": [
+          "word/document.xml"
+        ],
+        "no-sync": [
+          "word/document.xml"
+        ],
+        "stream": [
+          "word/document.xml"
+        ]
+      },
+      "generated_declared_vs_physical": {
+        "archive_member_count": {
+          "declared": 12,
+          "physical_members": 12
+        },
+        "entry_count": {
+          "declared": 200,
+          "physical_members": 12
+        },
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "uncompressed_payload_bytes": {
+          "declared": 10000,
+          "physical_bytes": 51896
+        }
+      },
+      "output_hashes": {
+        "default": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "file-only": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "full": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "no-sync": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775",
+        "stream": "6e2a7afe4d670787c7d428032a8fc82ca866ab9e17ba50523ad108c366bf3775"
+      },
+      "source_decompressed_bytes": 51896,
+      "source_members": 12
+    },
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "generated-xlsx-medium",
+      "changed_members": {
+        "default": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "file-only": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "full": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "no-sync": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "stream": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ]
+      },
+      "generated_declared_vs_physical": {
+        "archive_member_count": {
+          "declared": 17,
+          "physical_members": 17
+        },
+        "entry_count": {
+          "declared": 9216,
+          "physical_members": 17
+        },
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "uncompressed_payload_bytes": {
+          "declared": 4231168,
+          "physical_bytes": 4466367
+        }
+      },
+      "output_hashes": {
+        "default": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+        "file-only": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+        "full": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+        "no-sync": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687",
+        "stream": "20335c4480405e051be2f4fea0e2a5aa8c5912b729cb1df980112ea7c5056687"
+      },
+      "source_decompressed_bytes": 4466367,
+      "source_members": 17,
+      "workbook_diagnosis": {
+        "canonical_equal": false,
+        "namespace_census_equal": true,
+        "output_bytes": 527,
+        "output_calcPr": {
+          "calcCompleted": "false",
+          "calcId": "0",
+          "calcOnSave": "true",
+          "forceFullCalc": "true",
+          "fullCalcOnLoad": "true"
+        },
+        "raw_equal": false,
+        "source_bytes": 424,
+        "source_calcPr": null,
+        "structure_without_calcPr_equal": true
+      }
+    },
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "generated-pptx-medium",
+      "changed_members": {
+        "default": [
+          "ppt/slides/slide1.xml"
+        ],
+        "file-only": [
+          "ppt/slides/slide1.xml"
+        ],
+        "full": [
+          "ppt/slides/slide1.xml"
+        ],
+        "no-sync": [
+          "ppt/slides/slide1.xml"
+        ],
+        "stream": [
+          "ppt/slides/slide1.xml"
+        ]
+      },
+      "generated_declared_vs_physical": {
+        "archive_member_count": {
+          "declared": 61,
+          "physical_members": 61
+        },
+        "entry_count": {
+          "declared": 96,
+          "physical_members": 61
+        },
+        "target_entry": "slide:0/shape:0",
+        "target_payload_bytes": 52,
+        "uncompressed_payload_bytes": {
+          "declared": 4992,
+          "physical_bytes": 141726
+        }
+      },
+      "output_hashes": {
+        "default": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+        "file-only": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+        "full": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+        "no-sync": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd",
+        "stream": "95efb7b3b4f621b68961bb3db87618cbe59065650a11b64ead3debc8e598d2cd"
+      },
+      "source_decompressed_bytes": 141726,
+      "source_members": 61
+    },
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "real-000-docx",
+      "changed_members": {
+        "default": [
+          "word/_rels/document.xml.rels",
+          "word/document.xml"
+        ],
+        "file-only": [
+          "word/_rels/document.xml.rels",
+          "word/document.xml"
+        ],
+        "full": [
+          "word/_rels/document.xml.rels",
+          "word/document.xml"
+        ],
+        "no-sync": [
+          "word/_rels/document.xml.rels",
+          "word/document.xml"
+        ],
+        "stream": [
+          "word/_rels/document.xml.rels",
+          "word/document.xml"
+        ]
+      },
+      "output_hashes": {
+        "default": "9b36ea76d4bed6dca0d1b567923673d071ca3c2def46a8d0581e7f2d58031e1c",
+        "file-only": "9b36ea76d4bed6dca0d1b567923673d071ca3c2def46a8d0581e7f2d58031e1c",
+        "full": "9b36ea76d4bed6dca0d1b567923673d071ca3c2def46a8d0581e7f2d58031e1c",
+        "no-sync": "9b36ea76d4bed6dca0d1b567923673d071ca3c2def46a8d0581e7f2d58031e1c",
+        "stream": "9b36ea76d4bed6dca0d1b567923673d071ca3c2def46a8d0581e7f2d58031e1c"
+      },
+      "relationship_diagnosis": {
+        "canonical_equal": false,
+        "edge_set_equal": true,
+        "namespace_census_equal": true,
+        "output_bytes": 815,
+        "output_order": [
+          "rId1",
+          "rId2",
+          "rId3",
+          "rId4",
+          "rId5"
+        ],
+        "raw_equal": false,
+        "source_bytes": 817,
+        "source_order": [
+          "rId4",
+          "rId1",
+          "rId2",
+          "rId3",
+          "rId5"
+        ]
+      },
+      "source_decompressed_bytes": 44910,
+      "source_members": 12
+    },
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "real-001-xlsx",
+      "changed_members": {
+        "default": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "file-only": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "full": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "no-sync": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "stream": [
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ]
+      },
+      "output_hashes": {
+        "default": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+        "file-only": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+        "full": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+        "no-sync": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68",
+        "stream": "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+      },
+      "source_decompressed_bytes": 15304,
+      "source_members": 10,
+      "workbook_diagnosis": {
+        "canonical_equal": false,
+        "namespace_census_equal": true,
+        "output_bytes": 1351,
+        "output_calcPr": {
+          "calcCompleted": "false",
+          "calcId": "0",
+          "calcOnSave": "true",
+          "forceFullCalc": "true",
+          "fullCalcOnLoad": "true"
+        },
+        "raw_equal": false,
+        "source_bytes": 1275,
+        "source_calcPr": {
+          "calcId": "152511"
+        },
+        "structure_without_calcPr_equal": true
+      }
+    },
+    {
+      "all_policy_outputs_equal": true,
+      "case_id": "real-002-pptx",
+      "changed_members": {
+        "default": [
+          "ppt/slides/slide1.xml"
+        ],
+        "file-only": [
+          "ppt/slides/slide1.xml"
+        ],
+        "full": [
+          "ppt/slides/slide1.xml"
+        ],
+        "no-sync": [
+          "ppt/slides/slide1.xml"
+        ],
+        "stream": [
+          "ppt/slides/slide1.xml"
+        ]
+      },
+      "output_hashes": {
+        "default": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+        "file-only": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+        "full": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+        "no-sync": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+        "stream": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "source_decompressed_bytes": 154250,
+      "source_members": 48
+    }
+  ],
+  "report_error_count": 22,
+  "report_errors": [
+    "generated-docx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-docx-medium: corpus target_entry is not 'word/document.xml'",
+    "generated-docx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-docx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-docx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-xlsx-medium: corpus target_entry is not 'xl/workbook.xml'",
+    "generated-xlsx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-xlsx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-xlsx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: decompressed member changed outside target: xl/workbook.xml",
+    "generated-xlsx-medium: canonical XML changed outside target: xl/workbook.xml",
+    "generated-pptx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-pptx-medium: corpus target_entry is not 'ppt/presentation.xml'",
+    "generated-pptx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-pptx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-pptx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "real-000-docx: OPC relationship graph changed outside the edit closure",
+    "real-000-docx: decompressed member changed outside target: word/_rels/document.xml.rels",
+    "real-000-docx: canonical XML changed outside target: word/_rels/document.xml.rels",
+    "real-001-xlsx: decompressed member changed outside target: xl/workbook.xml",
+    "real-001-xlsx: canonical XML changed outside target: xl/workbook.xml"
+  ],
+  "report_ok": false
+}

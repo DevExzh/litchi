@@ -1,0 +1,27 @@
+{
+  "ok": false,
+  "errors": [
+    "generated-docx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-docx-medium: corpus target_entry is not 'word/document.xml'",
+    "generated-docx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-docx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-docx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-xlsx-medium: corpus target_entry is not 'xl/workbook.xml'",
+    "generated-xlsx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-xlsx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-xlsx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: decompressed member changed outside target: xl/workbook.xml",
+    "generated-xlsx-medium: canonical XML changed outside target: xl/workbook.xml",
+    "generated-pptx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-pptx-medium: corpus target_entry is not 'ppt/presentation.xml'",
+    "generated-pptx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-pptx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-pptx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "real-000-docx: OPC relationship graph changed outside the edit closure",
+    "real-000-docx: decompressed member changed outside target: word/_rels/document.xml.rels",
+    "real-000-docx: canonical XML changed outside target: word/_rels/document.xml.rels",
+    "real-001-xlsx: decompressed member changed outside target: xl/workbook.xml",
+    "real-001-xlsx: canonical XML changed outside target: xl/workbook.xml"
+  ]
+}

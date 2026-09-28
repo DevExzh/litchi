@@ -1,0 +1,160 @@
+{
+  "accepted": false,
+  "artifact_admission_file": null,
+  "attempt": "admission-0",
+  "audit": {
+    "bytes": 2612791,
+    "path": "admission-0/artifact-audit.json",
+    "sha256": "01da3f5b2768ad5ad2a74b4b3b3204f6f72bfadb02e05830e51705dc2d84aa82"
+  },
+  "audit_error_count": 22,
+  "audit_errors": [
+    "generated-docx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-docx-medium: corpus target_entry is not 'word/document.xml'",
+    "generated-docx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-docx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-docx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-xlsx-medium: corpus target_entry is not 'xl/workbook.xml'",
+    "generated-xlsx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-xlsx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-xlsx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "generated-xlsx-medium: decompressed member changed outside target: xl/workbook.xml",
+    "generated-xlsx-medium: canonical XML changed outside target: xl/workbook.xml",
+    "generated-pptx-medium: corpus member counts disagree with ZIP inventory",
+    "generated-pptx-medium: corpus target_entry is not 'ppt/presentation.xml'",
+    "generated-pptx-medium: target_payload_bytes disagrees with decompressed member",
+    "generated-pptx-medium: target_payload_sha256 disagrees with decompressed member",
+    "generated-pptx-medium: uncompressed_payload_bytes disagrees with member inventory",
+    "real-000-docx: OPC relationship graph changed outside the edit closure",
+    "real-000-docx: decompressed member changed outside target: word/_rels/document.xml.rels",
+    "real-000-docx: canonical XML changed outside target: word/_rels/document.xml.rels",
+    "real-001-xlsx: decompressed member changed outside target: xl/workbook.xml",
+    "real-001-xlsx: canonical XML changed outside target: xl/workbook.xml"
+  ],
+  "audit_ok": false,
+  "case_count": 6,
+  "cases": [
+    {
+      "case_id": "generated-docx-medium",
+      "changed_members": [
+        "word/document.xml"
+      ],
+      "errors": [
+        "generated-docx-medium: corpus member counts disagree with ZIP inventory",
+        "generated-docx-medium: corpus target_entry is not 'word/document.xml'",
+        "generated-docx-medium: target_payload_bytes disagrees with decompressed member",
+        "generated-docx-medium: target_payload_sha256 disagrees with decompressed member",
+        "generated-docx-medium: uncompressed_payload_bytes disagrees with member inventory"
+      ],
+      "format": "DOCX",
+      "ok": false,
+      "origin": "generated-harness-corpus",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    },
+    {
+      "case_id": "generated-xlsx-medium",
+      "changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml"
+      ],
+      "errors": [
+        "generated-xlsx-medium: corpus member counts disagree with ZIP inventory",
+        "generated-xlsx-medium: corpus target_entry is not 'xl/workbook.xml'",
+        "generated-xlsx-medium: target_payload_bytes disagrees with decompressed member",
+        "generated-xlsx-medium: target_payload_sha256 disagrees with decompressed member",
+        "generated-xlsx-medium: uncompressed_payload_bytes disagrees with member inventory",
+        "generated-xlsx-medium: decompressed member changed outside target: xl/workbook.xml",
+        "generated-xlsx-medium: canonical XML changed outside target: xl/workbook.xml"
+      ],
+      "format": "XLSX",
+      "ok": false,
+      "origin": "generated-harness-corpus",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    },
+    {
+      "case_id": "generated-pptx-medium",
+      "changed_members": [
+        "ppt/slides/slide1.xml"
+      ],
+      "errors": [
+        "generated-pptx-medium: corpus member counts disagree with ZIP inventory",
+        "generated-pptx-medium: corpus target_entry is not 'ppt/presentation.xml'",
+        "generated-pptx-medium: target_payload_bytes disagrees with decompressed member",
+        "generated-pptx-medium: target_payload_sha256 disagrees with decompressed member",
+        "generated-pptx-medium: uncompressed_payload_bytes disagrees with member inventory"
+      ],
+      "format": "PPTX",
+      "ok": false,
+      "origin": "generated-harness-corpus",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    },
+    {
+      "case_id": "real-000-docx",
+      "changed_members": [
+        "word/_rels/document.xml.rels",
+        "word/document.xml"
+      ],
+      "errors": [
+        "real-000-docx: OPC relationship graph changed outside the edit closure",
+        "real-000-docx: decompressed member changed outside target: word/_rels/document.xml.rels",
+        "real-000-docx: canonical XML changed outside target: word/_rels/document.xml.rels"
+      ],
+      "format": "DOCX",
+      "ok": false,
+      "origin": "caller-named-real-file",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    },
+    {
+      "case_id": "real-001-xlsx",
+      "changed_members": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml"
+      ],
+      "errors": [
+        "real-001-xlsx: decompressed member changed outside target: xl/workbook.xml",
+        "real-001-xlsx: canonical XML changed outside target: xl/workbook.xml"
+      ],
+      "format": "XLSX",
+      "ok": false,
+      "origin": "caller-named-real-file",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    },
+    {
+      "case_id": "real-002-pptx",
+      "changed_members": [
+        "ppt/slides/slide1.xml"
+      ],
+      "errors": [],
+      "format": "PPTX",
+      "ok": true,
+      "origin": "caller-named-real-file",
+      "policy_outputs": 5,
+      "source_equals_output": false
+    }
+  ],
+  "exit_code": 1,
+  "policy_output_count": 30,
+  "qualification_admission_file": null,
+  "reason": "independent artifact audit failed before qualification or timing admission; no timing lane was run",
+  "receipt": {
+    "bytes": 1378,
+    "path": "admission-0/receipt.json",
+    "sha256": "d742dbd8de0b09a1f1b97be5142c2397fe6bee243d6da896960bee94a58d7b90"
+  },
+  "schema": "litchi.performance.0817.admission-summary.v1",
+  "stage": "artifacts",
+  "timing": {
+    "native_reports": 0,
+    "native_samples": 0,
+    "observer_reports": 0,
+    "observer_samples": 0,
+    "qualification_reports": 0,
+    "qualification_samples": 0
+  }
+}

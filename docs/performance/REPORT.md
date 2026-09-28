@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0817 — real-file timing withheld
+
+[0817](0817-real-file-ordinary-save.md) Artifact export succeeded for six corpora across five policies, then the frozen independent audit rejected admission. No benchmark report was collected. The record distinguishes relationship reordering, expected calculation invalidation, and reader mistakes; retains failures and outputs; and fixes only a feature-dependent test expectation.
+
 ## 0816 — delayed-source finite-budget scaling
 
 [0816](0816-delayed-source-budget-scaling.md) Added bounded caller-source simulation to the reusable harness and completed 648 reports/13,320 outputs. All six quality gates and seven harness tests pass. Results distinguish useful delayed-read concurrency from mixed-floor serialization and zero-read cache overhead. Production is unchanged; no physical-network, cold-cache, allocation-saving or universal-scaling claim follows.

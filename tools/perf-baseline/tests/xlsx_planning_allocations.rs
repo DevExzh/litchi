@@ -12,6 +12,17 @@ const SAMPLE_COUNT: usize = 2;
 const WARMUP_COUNT: usize = 1;
 const ALLOCATION_SCOPE: &str = "operation_global_system_allocator";
 
+#[cfg(feature = "ordinary-save-process-metrics")]
+const NORMAL_INSTRUMENTATION: &str = "ordinary_save_procfs_operation_scoped";
+#[cfg(not(feature = "ordinary-save-process-metrics"))]
+const NORMAL_INSTRUMENTATION: &str = "none";
+
+#[cfg(feature = "ordinary-save-process-metrics")]
+const ALLOCATOR_INSTRUMENTATION: &str =
+    "ordinary_save_procfs_and_system_allocator_operation_scoped";
+#[cfg(not(feature = "ordinary-save-process-metrics"))]
+const ALLOCATOR_INSTRUMENTATION: &str = "system_allocator_operation_scoped";
+
 fn temporary_report_directory() -> PathBuf {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -255,11 +266,11 @@ fn xlsx_source_cell_values_planning_allocations_are_scoped_and_aligned() {
     let allocator_source = xlsx_cell_values_source(allocator_result);
 
     assert_eq!(normal["tool"]["binary"], "litchi-perf-baseline");
-    assert_eq!(normal["tool"]["instrumentation"], "none");
+    assert_eq!(normal["tool"]["instrumentation"], NORMAL_INSTRUMENTATION);
     assert_eq!(allocator["tool"]["binary"], "litchi-perf-baseline-alloc");
     assert_eq!(
         allocator["tool"]["instrumentation"],
-        "system_allocator_operation_scoped"
+        ALLOCATOR_INSTRUMENTATION
     );
     for report in [&normal, &allocator] {
         assert_eq!(report["configuration"]["samples_per_case"], SAMPLE_COUNT);

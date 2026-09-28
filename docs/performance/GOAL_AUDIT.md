@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0817 — failed admission retained
+
+[0817](0817-real-file-ordinary-save.md) The batch retains six corpora and thirty outputs with zero measured timing samples. The audit’s 22 errors include fifteen generated-metadata assumptions; exact diagnosis separates DOCX ordering from XLSX recalculation behavior. A stale feature-label test is fixed and all six quality gates pass through an explicit checked recovery. Production remains unchanged.
+
 ## 0816 — bounded source and execution evidence added
 
 [0816](0816-delayed-source-budget-scaling.md) The reusable execution harness gains opt-in bounded short reads and per-call delay. The 72-case matrix closes this current CFB/Part finite-budget/cache-state source-model gap, with separate timing and source-observer builds. Mixed-floor serialization and primed-Part overhead remain explicit. This does not complete the broader goal; tracked Office ordinary-save inputs are the next queued corpus step, and iWork stays excluded.
