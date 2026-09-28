@@ -1,0 +1,4 @@
+000000000017dd90 0000000000000114 t pptx_edit_profile_0829::edit_region_0829
+# phase capture: pptx_edit_profile_0829::phase_opened_presentation_transaction_0829
+# phase publish: pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829
+# phase set_text: pptx_edit_profile_0829::phase_set_shape_text_0829

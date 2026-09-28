@@ -1,0 +1,112 @@
+{
+  "schema": "litchi.performance.0829.pptx-edit-profile.v1",
+  "tool": "pptx-edit-profile-0829",
+  "base_revision": "90b9466b99639d411f9b0a89208aad21525e0006",
+  "mode": "wrapped",
+  "timing_scope": "opened_presentation_transaction set_shape_text(0, 0), commit, and apply_opened_presentation_commit; Package::open, Package owner drop, serialization, hashing, and semantic readback are outside the clock; the returned commit Snapshot is dropped inside the helper",
+  "input": {
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "reference": {
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "output": {
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "marker": "litchi-perf-0638-ordinary-save",
+  "target": {
+    "slide": 0,
+    "shape": 0
+  },
+  "target_text": "litchi-perf-0638-ordinary-save",
+  "full_text_sha256": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "full_text_digest": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "slide_count": 6,
+  "warmup": 0,
+  "samples_requested": 3,
+  "warmup_verified": true,
+  "all_verified": true,
+  "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+      1390497,
+      1308817,
+      1297386
+    ],
+    "sample_order": [
+      0,
+      1,
+      2
+    ]
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1390497,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1308817,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1297386,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    }
+  ]
+}

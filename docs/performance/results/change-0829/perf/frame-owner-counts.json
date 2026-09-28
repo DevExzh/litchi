@@ -1,0 +1,26 @@
+[
+  {
+    "frames_bytes": 10295607,
+    "owner_present": true,
+    "owner_text_hits": 2670,
+    "phase_owner_text_hits": {
+      "capture": 1196,
+      "publish": 867,
+      "set_text": 607
+    },
+    "phase_owners_present": true,
+    "repeat": 0
+  },
+  {
+    "frames_bytes": 10344273,
+    "owner_present": true,
+    "owner_text_hits": 2685,
+    "phase_owner_text_hits": {
+      "capture": 1193,
+      "publish": 879,
+      "set_text": 612
+    },
+    "phase_owners_present": true,
+    "repeat": 1
+  }
+]

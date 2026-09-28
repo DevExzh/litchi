@@ -1,0 +1,78 @@
+[
+  {
+    "cargo_binary": "pptx-edit-profile-0829",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+      "--bin",
+      "pptx-edit-profile-0829"
+    ],
+    "ended": 1790627815.3784325,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "thin",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTFLAGS": null
+    },
+    "exit_code": 0,
+    "features": [],
+    "log": {
+      "bytes": 3788,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/ordinary.log",
+      "sha256": "741d6b3c6f266d9a4e7f12ce0d41dcddcaa31ba16c2e46870f8f6524ea5929bc"
+    },
+    "rustflags": null,
+    "started": 1790627722.4422853,
+    "variant": "ordinary"
+  },
+  {
+    "cargo_binary": "pptx-edit-profile-0829",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+      "--bin",
+      "pptx-edit-profile-0829"
+    ],
+    "ended": 1790627908.9232402,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "1",
+      "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+      "CARGO_PROFILE_RELEASE_LTO": "thin",
+      "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+      "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "RUSTFLAGS": "-C force-frame-pointers=yes"
+    },
+    "exit_code": 0,
+    "features": [],
+    "log": {
+      "bytes": 3788,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/fp.log",
+      "sha256": "0f39098e44736f990f96a371ccf1c1bde4cdac040f0839fbb67f4ec312e28f13"
+    },
+    "rustflags": "-C force-frame-pointers=yes",
+    "started": 1790627815.6284027,
+    "variant": "fp"
+  }
+]

@@ -1,0 +1,733 @@
+{
+  "schema": "litchi.performance.0829.pptx-edit-profile.v1",
+  "tool": "pptx-edit-profile-0829",
+  "base_revision": "90b9466b99639d411f9b0a89208aad21525e0006",
+  "mode": "direct",
+  "timing_scope": "opened_presentation_transaction set_shape_text(0, 0), commit, and apply_opened_presentation_commit; Package::open, Package owner drop, serialization, hashing, and semantic readback are outside the clock; the returned commit Snapshot is dropped inside the helper",
+  "input": {
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "bytes": 68822,
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "reference": {
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "output": {
+    "bytes": 68284,
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "marker": "litchi-perf-0638-ordinary-save",
+  "target": {
+    "slide": 0,
+    "shape": 0
+  },
+  "target_text": "litchi-perf-0638-ordinary-save",
+  "full_text_sha256": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "full_text_digest": "5e9363235c4a1b158819a66be5aa46bf34d71b7da24592d855aad3ca90ce8b82",
+  "slide_count": 6,
+  "warmup": 3,
+  "samples_requested": 30,
+  "warmup_verified": true,
+  "all_verified": true,
+  "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+      1270357,
+      1267867,
+      1272647,
+      1280507,
+      1273337,
+      1272837,
+      1288166,
+      1272806,
+      1278326,
+      1270136,
+      1272816,
+      1300496,
+      1273376,
+      1288206,
+      1277686,
+      1272116,
+      1276697,
+      1264377,
+      1271417,
+      1290847,
+      1280007,
+      1271496,
+      1274876,
+      1276487,
+      1284796,
+      1276486,
+      1278046,
+      1273916,
+      1276556,
+      1293876
+    ],
+    "sample_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ]
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 1270357,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 1267867,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 1272647,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 1280507,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 1273337,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 1272837,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 1288166,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 1272806,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 1278326,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 1270136,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 1272816,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 1300496,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 1273376,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 1288206,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 1277686,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 1272116,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 1276697,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 1264377,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 1271417,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 1290847,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 1280007,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 1271496,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 1274876,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 1276487,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 1284796,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 1276486,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 1278046,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 1273916,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 1276556,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 1293876,
+      "output": {
+        "bytes": 68284,
+        "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+      },
+      "verification": {
+        "all_verified": true,
+        "input_hash_verified": true,
+        "reference_hash_verified": true,
+        "output_hash_verified": true,
+        "output_size_verified": true,
+        "output_bytes_verified": true,
+        "reopened": true,
+        "marker_verified": true,
+        "target_verified": true,
+        "full_text_digest_verified": true,
+        "slide_count_verified": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "build_sha256": "748b39306bab8e40f38c7ff6d6f093515aa431bb71e6c55ce7608970b69fc080",
+  "command_contract": [
+    "perf",
+    "script",
+    "--no-inline",
+    "--ns"
+  ],
+  "compression": {
+    "bytes": 2653,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/compression.json",
+    "sha256": "30224f5ba7c81e0ca5c6f4c08f1f344491e6075275234c2747b96a9a4c12605a"
+  },
+  "frames": 2,
+  "owner": "pptx_edit_profile_0829::edit_region_0829",
+  "owner_counts": {
+    "bytes": 503,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/frame-owner-counts.json",
+    "sha256": "20d78c56e708c1e01943ad098de8d26f56a77ca345dfd4b674f9e7a1086cda0b"
+  },
+  "phase_owners": {
+    "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+    "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+    "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+  },
+  "plan_sha256": "20a102524436bdb9bee6cf4a757b8b38b0f86871d6a8ab5e929e294a6dc76691",
+  "profile_fabricated": false,
+  "raw_and_frames_retained": true,
+  "receipts": {
+    "bytes": 3691,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/decode-receipts.json",
+    "sha256": "a07b79345c884789b5ef7ea914bffc2d2d00ff85f5c40dbd89d3b4985701ea9f"
+  },
+  "reports": 2,
+  "retention": "lossless deterministic gzip; original descriptors bind decompressed bytes",
+  "schema": "litchi.performance.0829.decode.complete.v1",
+  "status": "available",
+  "symbol": {
+    "bytes": 9601,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/symbols/symbol.json",
+    "sha256": "d771330cdb66ad321d6a2ca3ec1a3238cb55e5b50a92b71c0d1bc60d0d2bde3c"
+  },
+  "typed_unavailable": false,
+  "uncompressed_copies_removed": true
+}

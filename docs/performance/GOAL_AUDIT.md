@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0829 — current PPTX edit phases measured
+
+[0829](0829-pptx-edit-phase-profile.md) Corrected address-bounded symbol admission and independent preflight resolve the 0828 capture blocker. Five fresh probe gates, both builds, all captures and independent numerical/frame replay pass. Phase costs remain descriptive samples; no optimization is adopted and the broader performance objective remains open.
+
 ## 0828 — phase profile stopped before capture
 
 [0828](0828-pptx-edit-phase-profile.md) The frozen symbol gate rejects empty disassembly before any workload capture. Failure evidence, unchanged drivers, fresh probe quality and a separate successful static diagnosis are retained. The owned target is removed; the broader performance goal and phase measurement remain open.

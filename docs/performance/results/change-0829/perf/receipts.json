@@ -1,0 +1,182 @@
+[
+  {
+    "binary": {
+      "bytes": 13697616,
+      "path": "/home/zhuhe/code/litchi-target-0829/fp",
+      "sha256": "d0b55d4fb73ae0b13e9c8298c5ac092ab8282d34e9ab21670f1b6ed22788daf6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "fp",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/0.data",
+      "--",
+      "/home/zhuhe/code/litchi-target-0829/fp",
+      "--mode",
+      "wrapped",
+      "--input",
+      "test-data/ooxml/pptx/shapes.pptx",
+      "--reference",
+      "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "--samples",
+      "2000",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/0.json"
+    ],
+    "cpu": 12,
+    "ended": 1790627960.8132806,
+    "exit_code": 0,
+    "input": {
+      "bytes": 68822,
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/pptx/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    "log": {
+      "bytes": 166,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/0.log",
+      "sha256": "7941a9476cd0c57c9cef5b6ce8b358e059f94aa03fa5f136b510a04b1f5ad0d6"
+    },
+    "phase_owners": {
+      "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+      "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+      "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+    },
+    "probe": {
+      "bytes": 256,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/probe.json",
+      "sha256": "c03d228deee8bcde59ff7fbb644c8349184ac1853013bcba79ce321a19a9e61a"
+    },
+    "raw": {
+      "bytes": 1149864,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/0.data",
+      "sha256": "5c3e17ed3c00107f2be89cdfeb270c722baf8d5ef31e6694532c4b995d00e2d0"
+    },
+    "reference": {
+      "bytes": 68284,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    },
+    "repeat": 0,
+    "report": {
+      "bytes": 1305296,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/0.json",
+      "sha256": "d3280f74d89dee0c75f688fc1e3f6b36e937cb3cfcd1342ff974b2a53b153d35"
+    },
+    "samples": 2000,
+    "schema": "litchi.performance.0829.perf-receipt.v1",
+    "source": {
+      "bytes": 1212380,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/source.json",
+      "sha256": "f38b5676cc0c46126c427c50f6f161b0b809068ea5d25f6952c3320013f3180c"
+    },
+    "started": 1790627954.8757837,
+    "symbol": {
+      "bytes": 9601,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/symbols/symbol.json",
+      "sha256": "d771330cdb66ad321d6a2ca3ec1a3238cb55e5b50a92b71c0d1bc60d0d2bde3c"
+    },
+    "warmup": 0
+  },
+  {
+    "binary": {
+      "bytes": 13697616,
+      "path": "/home/zhuhe/code/litchi-target-0829/fp",
+      "sha256": "d0b55d4fb73ae0b13e9c8298c5ac092ab8282d34e9ab21670f1b6ed22788daf6"
+    },
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-e",
+      "cycles:u",
+      "-F",
+      "997",
+      "--call-graph",
+      "fp",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/1.data",
+      "--",
+      "/home/zhuhe/code/litchi-target-0829/fp",
+      "--mode",
+      "wrapped",
+      "--input",
+      "test-data/ooxml/pptx/shapes.pptx",
+      "--reference",
+      "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "--samples",
+      "2000",
+      "--warmup",
+      "0",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/1.json"
+    ],
+    "cpu": 12,
+    "ended": 1790627966.9867914,
+    "exit_code": 0,
+    "input": {
+      "bytes": 68822,
+      "path": "/home/zhuhe/code/litchi/test-data/ooxml/pptx/shapes.pptx",
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    "log": {
+      "bytes": 166,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/1.log",
+      "sha256": "c643a5ab176b69c7f2b220f1ce164db2e8c0d3b43405517e8e7446122ca9d68f"
+    },
+    "phase_owners": {
+      "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+      "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+      "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+    },
+    "probe": {
+      "bytes": 256,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/probe.json",
+      "sha256": "c03d228deee8bcde59ff7fbb644c8349184ac1853013bcba79ce321a19a9e61a"
+    },
+    "raw": {
+      "bytes": 1153392,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/1.data",
+      "sha256": "8602b08f6047179b46c5aa464eb160022011c010fe470c2c2079d4801046d403"
+    },
+    "reference": {
+      "bytes": 68284,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    },
+    "repeat": 1,
+    "report": {
+      "bytes": 1305296,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/1.json",
+      "sha256": "15cfaf07d36e7d0ecd80a67138858878e4d075e26c8856b563b27c67917d51b6"
+    },
+    "samples": 2000,
+    "schema": "litchi.performance.0829.perf-receipt.v1",
+    "source": {
+      "bytes": 1212380,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build-0/source.json",
+      "sha256": "f38b5676cc0c46126c427c50f6f161b0b809068ea5d25f6952c3320013f3180c"
+    },
+    "started": 1790627961.0855117,
+    "symbol": {
+      "bytes": 9601,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/symbols/symbol.json",
+      "sha256": "d771330cdb66ad321d6a2ca3ec1a3238cb55e5b50a92b71c0d1bc60d0d2bde3c"
+    },
+    "warmup": 0
+  }
+]

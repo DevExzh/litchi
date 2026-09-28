@@ -1,0 +1,222 @@
+{
+  "arms": {
+    "control": {
+      "binary": "ordinary",
+      "mode": "direct",
+      "purpose": "direct public edit sequence without the wrapper"
+    },
+    "fp": {
+      "binary": "fp",
+      "mode": "wrapped",
+      "purpose": "wrapped sequence in the frame-pointer build for native stack attribution"
+    },
+    "wrapped": {
+      "binary": "ordinary",
+      "mode": "wrapped",
+      "purpose": "the same public edit sequence through the named profiling wrapper"
+    }
+  },
+  "base": "90b9466b99639d411f9b0a89208aad21525e0006",
+  "build": {
+    "codegen_units": 1,
+    "debug": 1,
+    "features": [],
+    "fp_rustflags": "-C force-frame-pointers=yes",
+    "incremental": false,
+    "jobs": 2,
+    "lto": "thin",
+    "opt_level": 3,
+    "ordinary_rustflags": null,
+    "panic": "unwind"
+  },
+  "cpu": 12,
+  "expected": {
+    "native_reports": 18,
+    "native_samples": 540,
+    "perf_reports": 2,
+    "perf_samples": 4000,
+    "qualification_reports": 3,
+    "qualification_samples": 9,
+    "total_reports": 23,
+    "total_samples": 4549
+  },
+  "input": {
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "reference_bytes": 68284,
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "reference_selector": "0821realPPTXdefault",
+    "reference_sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf",
+    "selector": "pinnedshapes",
+    "source_bytes": 68822,
+    "source_copy_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+    "source_path": "test-data/ooxml/pptx/shapes.pptx",
+    "source_sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "control",
+        "wrapped",
+        "fp"
+      ],
+      [
+        "wrapped",
+        "fp",
+        "control"
+      ],
+      [
+        "fp",
+        "control",
+        "wrapped"
+      ],
+      [
+        "fp",
+        "wrapped",
+        "control"
+      ],
+      [
+        "wrapped",
+        "control",
+        "fp"
+      ],
+      [
+        "control",
+        "fp",
+        "wrapped"
+      ]
+    ],
+    "reports": 18,
+    "rss": "maximum resident set size in KiB from /usr/bin/time",
+    "samples": 30,
+    "samples_total": 540,
+    "warmup": 3
+  },
+  "perf": {
+    "binary": "fp",
+    "call_graph": "fp",
+    "cpu": 12,
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "input_path": "test-data/ooxml/pptx/shapes.pptx",
+    "input_selector": "pinnedshapes",
+    "mode": "wrapped",
+    "owner": "pptx_edit_profile_0829::edit_region_0829",
+    "phase_owners": {
+      "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+      "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+      "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+    },
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "reference_selector": "0821realPPTXdefault",
+    "repeats": 2,
+    "reports": 2,
+    "samples": 2000,
+    "samples_total": 4000,
+    "scope": "Whole-process sampled stacks and exact-owner attribution diagnostics only.",
+    "warmup": 0
+  },
+  "perf_denial": {
+    "must_not_fabricate_profile": true,
+    "must_retain_reason": true,
+    "status": "typed-unavailable"
+  },
+  "probe": {
+    "cargo_binary": "pptx-edit-profile-0829",
+    "crate_owner": "pptx_edit_profile_0829",
+    "input_path": "test-data/ooxml/pptx/shapes.pptx",
+    "input_selector": "pinnedshapes",
+    "manifest": "docs/performance/results/change-0829/probe-src/Cargo.toml",
+    "modes": [
+      "direct",
+      "wrapped"
+    ],
+    "owner": "pptx_edit_profile_0829::edit_region_0829",
+    "owner_function": "edit_region_0829",
+    "package": "pptx-edit-profile-0829",
+    "phase_owners": {
+      "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+      "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+      "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+    },
+    "reference_path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "reference_selector": "0821realPPTXdefault",
+    "source_directory": "docs/performance/results/change-0829/probe-src"
+  },
+  "purpose": "Fresh sampled phase ownership for the current real-file PPTX public edit, with direct/wrapped/frame-pointer controls.",
+  "qualification": {
+    "blocks": 1,
+    "orders": [
+      [
+        "control",
+        "wrapped",
+        "fp"
+      ]
+    ],
+    "purpose": "correctness and CLI-shape check before timed native blocks",
+    "reports": 3,
+    "samples": 3,
+    "samples_total": 9,
+    "warmup": 0
+  },
+  "quality": {
+    "probe_cargo_commands": true,
+    "probe_gates": [
+      "fmt",
+      "check",
+      "tests",
+      "clippy",
+      "doc"
+    ],
+    "production_cargo_commands": false,
+    "production_mode": "exact-source-0827-quality-receipts",
+    "production_test_counts": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 641,
+      "suites": 28
+    }
+  },
+  "schema": "litchi.performance.0829.pptx-edit-profile.v1",
+  "scope": "One pinned real PPTX source and 0821 default reference, three probe arms, six deterministic counterbalanced blocks, and optional whole-process perf attribution; evidence only.",
+  "scratch": null,
+  "source": {
+    "probe_source_is_packet_local": true,
+    "production_changed": false,
+    "production_file_count": 9197,
+    "runtime_harness_changed": false,
+    "tool_changed": false,
+    "tool_file_count": 87
+  },
+  "statistics": {
+    "adoption_threshold": null,
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 829829,
+      "sorted_zero_based_endpoints": [
+        250,
+        9749
+      ],
+      "statistic": "median"
+    },
+    "claims": [
+      "descriptive native timing and RSS only",
+      "paired wrapped/control and fp/wrapped perturbation ratios",
+      "sampled cycles:u whole-process stack attribution with unresolved and lost-event diagnostics"
+    ],
+    "native": [
+      "p50",
+      "p95",
+      "p99",
+      "mean",
+      "spread",
+      "rss"
+    ],
+    "paired_ratios": [
+      "wrapped/control",
+      "fp/wrapped"
+    ],
+    "speedup_claim": false
+  },
+  "target": "/home/zhuhe/code/litchi-target-0829"
+}
