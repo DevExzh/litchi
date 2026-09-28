@@ -65,6 +65,9 @@ pub(super) fn validate_column_actions(
             reason: ColumnEditBlock::ProtectedSheet,
         });
     }
+    if actions.is_empty() {
+        return Ok(());
+    }
     let mut owners = Assignments::new()?;
     if let Some(stored) = &layout.columns {
         for (index, column) in stored.columns.iter().enumerate() {

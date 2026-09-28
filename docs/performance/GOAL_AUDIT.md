@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0831 — unused XLSX column-action map removed
+
+[0831](0831-xlsx-empty-column-actions.md) Both eight-gate quality sequences, four builds, 180 reports/20,304 samples and independent numerical/command audits pass. The three-line guard meets the frozen allocation benefit rule with no regression trigger. Original supervisor/reader failures remain retained; the owned target and scratch are cleaned and replayed before commit. The broader non-iWork goal remains open.
+
 ## 0830 — XLSX edit allocation maps localized
 
 [0830](0830-xlsx-edit-allocation-profile.md) Five fresh probe gates, both builds, all captures and independent allocation/native arithmetic audits pass. The measured next candidate is an unused 512 KiB column-action map; production remains unchanged. Reader failures and retries remain retained, the owned target is cleaned, and the broader non-iWork goal remains open.

@@ -1,0 +1,6 @@
+{
+  "after": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5",
+  "before": "87c95be7f6730acd24ba86a349c990e3cb9e7a888b863107c85cf4577cba70ee",
+  "source": "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+  "status": "pass"
+}

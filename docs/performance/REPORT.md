@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0831 — unused XLSX column-action map removed
+
+[0831](0831-xlsx-empty-column-actions.md) Adopted the three-line empty-action return after matched measurement: real-edit allocations fall 2,510→2,509 and requested bytes 2,898,254→2,373,966. Paired p50 ratio is 0.980416 [0.975937–0.983917]. No frozen regression guard is triggered; 20 spread and 10 tail diagnostics remain explicit, and the lifecycle interval includes 1.0.
+
 ## 0830 — XLSX edit allocation maps localized
 
 [0830](0830-xlsx-edit-allocation-profile.md) Exact-owner Heaptrack attribution localizes 90.45% of the real XLSX edit’s requested bytes to three dense column-assignment maps. The empty-action validator map alone contributes 18.09%. This is a diagnostic result on one fixture, with no speedup, peak-memory or production change claim; matched candidate measurement is next.

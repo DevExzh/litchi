@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0831 — unused XLSX column-action map removed
+
+[0831](0831-xlsx-empty-column-actions.md) The unused validator map is eliminated for empty column actions, reducing real-edit requested bytes by 524,288 (18.09%) with a 1.96% paired p50 reduction on the pinned fixture. The two bounded parser maps remain; this result authorizes no parser bypass, unbounded overlap scan or general full-save speedup.
+
 ## 0830 — XLSX edit allocation maps localized
 
 [0830](0830-xlsx-edit-allocation-profile.md) Three dense column-assignment buffers account for 90.45% of exact-owner requested allocation bytes: two parser maps of 1 MiB and an empty column-action validator map of 512 KiB per edit on average. Test the empty-action fast path first (18.09% of measured requested bytes); preserve the parser maps’ bounded overlap behavior and both required parses.

@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+    "--lib",
+    "--features",
+    "allocator-metrics,ordinary-save-process-metrics",
+    "--",
+    "--test-threads=2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0831/quality",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790634288.6653564,
+  "input_inventory_sha256": "a36cf8f3b1f8fafd83cc6ed80ceceb4aca37810bb82d115a89f22860e7a66459",
+  "log_sha256": "e501762948aa66096641d791d1135dfa9c38a432e9c52e0862a8c910af3bb1e8",
+  "source_leg": "after",
+  "source_sha256": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5",
+  "started_unix": 1790633443.241054
+}

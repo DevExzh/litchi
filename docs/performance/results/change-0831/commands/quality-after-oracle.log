@@ -1,0 +1,12 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling xlsx-edit-profile-0830 v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0830/probe-src)
+    Finished `test` profile [unoptimized] target(s) in 17.37s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0831/quality/debug/deps/xlsx_edit_profile_0830-451a3683d44fa3a5)
+
+running 3 tests
+test tests::cli_rejects_unknown_and_out_of_bounds_values ... ok
+test tests::wrong_source_or_reference_identity_is_rejected ... ok
+test tests::direct_and_wrapped_match_the_pinned_real_file_bytes_and_semantics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

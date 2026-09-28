@@ -1,0 +1,395 @@
+{
+  "adopt": true,
+  "analysis_sha256": "aaffb3db12a945e24202a38f6edc643e459b5641a7b0e66fa76cc888278d5a58",
+  "audit_sha256": "888b3fa361d9f3ed414f3a416b76b045ed80be6538337a311d1a8a53177d68a9",
+  "descriptive_spread_flags": {
+    "noop-medium": [
+      "before.p99_ns",
+      "before.mean_ns",
+      "after.p50_ns",
+      "after.p95_ns",
+      "after.p99_ns",
+      "after.mean_ns"
+    ],
+    "one-cell-dense-wide": [],
+    "one-cell-medium": [],
+    "one-cell-tiny": [
+      "before.p95_ns",
+      "before.p99_ns",
+      "after.p95_ns",
+      "after.p99_ns"
+    ],
+    "one-percent-dense-wide": [],
+    "one-percent-medium": [
+      "before.p99_ns"
+    ],
+    "one-percent-tiny": [
+      "before.p99_ns",
+      "after.p99_ns"
+    ],
+    "real-edit": [
+      "before.p95_ns",
+      "before.p99_ns",
+      "before.mean_ns",
+      "after.p95_ns",
+      "after.mean_ns"
+    ],
+    "real-lifecycle": [
+      "before.p99_ns",
+      "after.p99_ns"
+    ]
+  },
+  "descriptive_tail_flags": {
+    "noop-medium": [
+      "before",
+      "after"
+    ],
+    "one-cell-dense-wide": [],
+    "one-cell-medium": [],
+    "one-cell-tiny": [
+      "before",
+      "after"
+    ],
+    "one-percent-dense-wide": [],
+    "one-percent-medium": [],
+    "one-percent-tiny": [
+      "before",
+      "after"
+    ],
+    "real-edit": [
+      "before",
+      "after"
+    ],
+    "real-lifecycle": [
+      "before",
+      "after"
+    ]
+  },
+  "limits": [
+    "One small real XLSX fixture and fixed synthetic cases; no cross-format speedup claim.",
+    "Real lifecycle confidence interval includes 1.0; no full-save speedup claim.",
+    "Real-edit peak above entry is unchanged; no real peak-memory or process-RSS reduction claim.",
+    "Twenty native spread flags and ten p99/p50 diagnostics limit tail claims.",
+    "Observer elapsed times are excluded from latency claims."
+  ],
+  "peak_diagnostic": {
+    "cases": {
+      "noop-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 280608,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "4bba5b4c119684d85b93fcd2acf40e2ba538beb2d3dd18dbd6323f770d67e92f"
+            },
+            {
+              "entry_live_bytes": 280608,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "5f44bed883b141d6e247fa443dd319614b0e7710443ce080c90fbe99b4775382"
+            }
+          ],
+          "entry_live_bytes": 280608.0,
+          "peak_above_entry_bytes": 0.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 280611,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "0f731cdd63a5dd27c71cf35897895f5c9c55c194837758416e846f3d172bab67"
+            },
+            {
+              "entry_live_bytes": 280611,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "9f0c7284c8e890d227ec959684a7a3f3e759d2b2228a974d95ce2a8837f71c43"
+            }
+          ],
+          "entry_live_bytes": 280611.0,
+          "peak_above_entry_bytes": 0.0
+        }
+      },
+      "one-cell-dense-wide": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6276212,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "d4818d061b89fad4505417ccb243f72169cfdac27261f185eb093e4f1604c472"
+            },
+            {
+              "entry_live_bytes": 6276212,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "e885e9e3e313b4446f53903a43fc797742d60df65d3678d57f54a7c26a9f502e"
+            }
+          ],
+          "entry_live_bytes": 6276212.0,
+          "peak_above_entry_bytes": 21210673.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6276215,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "ee45b8b127454878702a682aa6d8ef07c86d239a16f81153498effacd0d43d0e"
+            },
+            {
+              "entry_live_bytes": 6276215,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "a87fdbebb1bfe60d94833279a12c2508ce656ea7e86757db5b2cf12e7e5a525a"
+            }
+          ],
+          "entry_live_bytes": 6276215.0,
+          "peak_above_entry_bytes": 21210673.0
+        }
+      },
+      "one-cell-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 309715,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "f195882bb1854132bbc0a93e24b2ad48825a02cf4e98281ecc3fa99996f48eb9"
+            },
+            {
+              "entry_live_bytes": 309715,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "f87f2705b38587174864b1d627d5aa82a89aca695d58340274d9f66369ec580f"
+            }
+          ],
+          "entry_live_bytes": 309715.0,
+          "peak_above_entry_bytes": 941014.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 309718,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "c0a9727e734dbbb2402aebd254112ec4780d7a8b81088a2a0188717c7c52f5b1"
+            },
+            {
+              "entry_live_bytes": 309718,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "db9acaff45b8b860a49d56c817a7fa07fb1ff8d7234f540b17055cf1037cbd5a"
+            }
+          ],
+          "entry_live_bytes": 309718.0,
+          "peak_above_entry_bytes": 941014.0
+        }
+      },
+      "one-cell-tiny": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 125437,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "edc718337d9ea444de501d51c4de1462a796c96dda66d1247755a9287d1168d9"
+            },
+            {
+              "entry_live_bytes": 125437,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "b7d177b16ad7a6c221ce7da050b8e7ee89139ee49964a8e2db714b2ef1a3e6c8"
+            }
+          ],
+          "entry_live_bytes": 125437.0,
+          "peak_above_entry_bytes": 518759.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 125440,
+              "peak_above_entry_bytes": 545845,
+              "report_sha256": "6ac9f567041aa479a30ceeccca6448c6f4f02fe7ce6dcac751d2eaa8ae3762af"
+            },
+            {
+              "entry_live_bytes": 125440,
+              "peak_above_entry_bytes": 545845,
+              "report_sha256": "4b452e5b1360dfa8abc95b079e381225a392dc40cbd2b15c55afa28ffbe13977"
+            }
+          ],
+          "entry_live_bytes": 125440.0,
+          "peak_above_entry_bytes": 545845.0
+        }
+      },
+      "one-percent-dense-wide": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6566743,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "1f6b2633e1831977915de9fc3191fcc2e7d9af1e7a498d58ade207eeccd1f423"
+            },
+            {
+              "entry_live_bytes": 6566743,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "155cd7e0e7a7733a48b5aa8a7a40c3a60d3743f6ad5527859278103f48f349f9"
+            }
+          ],
+          "entry_live_bytes": 6566743.0,
+          "peak_above_entry_bytes": 36443008.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6566746,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "075a6684550d6b32e2ec33d6d390ae2e08309abbbad247e8636160ce8b9e0507"
+            },
+            {
+              "entry_live_bytes": 6566746,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "580b898cf04030267e8fa3e39d59a0eceb653c7becd5cfe4c5e45898877bf6af"
+            }
+          ],
+          "entry_live_bytes": 6566746.0,
+          "peak_above_entry_bytes": 36443008.0
+        }
+      },
+      "one-percent-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 314015,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "395235ae4026d56e431293c67f1efeee4ed7bbbdc4eee00d683818cad4729893"
+            },
+            {
+              "entry_live_bytes": 314015,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "738ad6f757f463b498f99b16fc4516643453c8c561f78b9a7cb7b8f0c225332c"
+            }
+          ],
+          "entry_live_bytes": 314015.0,
+          "peak_above_entry_bytes": 2340425.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 314018,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "d0f923729d9cc23e993d6dda08b4a1e6c47bf458b39c790e42b99715d1600d28"
+            },
+            {
+              "entry_live_bytes": 314018,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "348be914ae9d5ff45e70d9e54f421786354ac7b5cc6f1f12e312565fdcec0371"
+            }
+          ],
+          "entry_live_bytes": 314018.0,
+          "peak_above_entry_bytes": 2340425.0
+        }
+      },
+      "one-percent-tiny": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 126707,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "8b7a36b9e95a8f988863481d5202d01bb64fe000f4f122b13d2df444014a03cf"
+            },
+            {
+              "entry_live_bytes": 126707,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "1f4278b3f53c6df4a0f90aa03337ea6fa736f928c8b1b59e470eb784ffa044e5"
+            }
+          ],
+          "entry_live_bytes": 126707.0,
+          "peak_above_entry_bytes": 552204.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 126710,
+              "peak_above_entry_bytes": 573530,
+              "report_sha256": "66e7ef102ccec9d3252a12a13d1effde8a050cc0e2d423f8b461fcc900f35ecb"
+            },
+            {
+              "entry_live_bytes": 126710,
+              "peak_above_entry_bytes": 573530,
+              "report_sha256": "e5acd76cf3cf775a7f20f57f8a0c0bb554c31d78783c759e72f6f49eedbe7e6b"
+            }
+          ],
+          "entry_live_bytes": 126710.0,
+          "peak_above_entry_bytes": 573530.0
+        }
+      },
+      "real-edit": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 63261,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "fafdbbeec2532252d93f8ccfd5e8383505ac7bc105cc49b89e2b83bbc1283a67"
+            },
+            {
+              "entry_live_bytes": 63261,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "660e9d6d0a67961d22daf05d4446ffa019964acc23ffc270f72a72d4116f3061"
+            }
+          ],
+          "entry_live_bytes": 63261.0,
+          "peak_above_entry_bytes": 1066957.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 63264,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "15478d1b386a07b9760ef2e62add15ed462269ac402f2a11dffcd0f5c24fba2d"
+            },
+            {
+              "entry_live_bytes": 63264,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "edd7381dcb26180b79a2a60f7b12a1c6e34009fda79968f909ed8d3ad52df8bf"
+            }
+          ],
+          "entry_live_bytes": 63264.0,
+          "peak_above_entry_bytes": 1066957.0
+        }
+      },
+      "real-lifecycle": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 27193,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "03136f13ac96816dcb02e374d26c7b59ee10e248796be9380bc37954f1d0db09"
+            },
+            {
+              "entry_live_bytes": 27193,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "db718d9f13f9d9928b3ddbc7bfb1fa970a3c201717a0460ce28a6be47a281e27"
+            }
+          ],
+          "entry_live_bytes": 27193.0,
+          "peak_above_entry_bytes": 1103104.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 27196,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "04fa753e24f5fce8c7dbac97e12c7cc0e2f5eb07069c109cdc996000cb9cc2c6"
+            },
+            {
+              "entry_live_bytes": 27196,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "39b58ebd48c5dd3dd61197370ce0941fb3afd6cb2ae66cf4add260f6f08ea5d6"
+            }
+          ],
+          "entry_live_bytes": 27196.0,
+          "peak_above_entry_bytes": 1103104.0
+        }
+      }
+    },
+    "derivation": "Within each observer process, median of region_peak_live_bytes minus live_bytes_before; midpoint median across two processes."
+  },
+  "real_edit_requested_bytes": {
+    "after": 2373966.0,
+    "before": 2898254.0,
+    "reduction_bytes": 524288.0,
+    "reduction_fraction": 0.18089787851582367
+  },
+  "reason": "Remove the unused empty-column-action map: the frozen requested-byte benefit gate passes with preserved output and no frozen regression flag.",
+  "regression_flags": [],
+  "schema": "litchi.performance.0831.root-decision.v1"
+}

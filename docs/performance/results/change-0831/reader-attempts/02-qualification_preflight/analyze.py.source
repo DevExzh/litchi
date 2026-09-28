@@ -1,0 +1,869 @@
+#!/usr/bin/env python3
+"""Fail-closed, offline replay for the 0831 XLSX allocation packet.
+
+The root driver owns compilation and capture.  This module only reads the
+retained receipts, reports, RSS files, and the frozen input files.  It derives
+all timing quantiles and paired statistics from the sorted sample vectors; it
+does not copy complete reports into ``analysis.json`` and it never launches a
+workload or a build.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import random
+import statistics
+import sys
+from pathlib import Path
+from typing import Any, Iterable
+
+import driver
+
+ROOT = Path(driver.ROOT).resolve()
+PACKET = Path(driver.P).resolve()
+BASE = driver.BASE
+INPUT = Path(driver.INPUT).resolve()
+REFERENCE = Path(driver.REFERENCE).resolve()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+PLAN_SCHEMA = "litchi.performance.0831.plan.v1"
+ANALYSIS_SCHEMA = "litchi.performance.0831.allocation-analysis.v1"
+REPORT_SCHEMA_VERSION = 1
+BOOTSTRAP_RESAMPLES = 10_000
+BOOTSTRAP_SEED = 831831
+BOOTSTRAP_LOW_RANK = 250
+BOOTSTRAP_HIGH_RANK = 9749
+REPORTS_EXPECTED = 180
+SAMPLES_EXPECTED = 20_304
+REAL_INPUT_BYTES = 8_435
+REAL_INPUT_SHA256 = "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+REAL_OUTPUT_BYTES = 8_521
+REAL_OUTPUT_SHA256 = "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+EDIT_OUTCOME_SHA256 = hashlib.sha256(b"admitted").hexdigest()
+EXPECTED_NATIVE_ORDERS = [
+    ["before", "after"], ["after", "before"],
+    ["before", "after"], ["after", "before"],
+    ["before", "after"], ["after", "before"],
+]
+EXPECTED_OBSERVER_ORDERS = [["before", "after"], ["after", "before"]]
+EXPECTED_CASES = [
+    {"id": "real-edit", "case": "xlsx_real_file_ordinary_save_edit",
+     "shape": None, "native_samples": 500},
+    {"id": "real-lifecycle", "case": "xlsx_real_file_ordinary_save_lifecycle",
+     "shape": None, "native_samples": 500},
+    {"id": "one-cell-tiny", "case": "xlsx_one_cell_commit_save",
+     "shape": "tiny", "native_samples": 30},
+    {"id": "one-cell-medium", "case": "xlsx_one_cell_commit_save",
+     "shape": "medium", "native_samples": 30},
+    {"id": "one-cell-dense-wide", "case": "xlsx_one_cell_commit_save",
+     "shape": "dense-wide", "native_samples": 30},
+    {"id": "one-percent-tiny", "case": "xlsx_one_percent_commit_save",
+     "shape": "tiny", "native_samples": 30},
+    {"id": "one-percent-medium", "case": "xlsx_one_percent_commit_save",
+     "shape": "medium", "native_samples": 30},
+    {"id": "one-percent-dense-wide", "case": "xlsx_one_percent_commit_save",
+     "shape": "dense-wide", "native_samples": 30},
+    {"id": "noop-medium", "case": "xlsx_noop_commit_save",
+     "shape": "medium", "native_samples": 500},
+]
+CASE_BY_ID = {row["id"]: row for row in EXPECTED_CASES}
+ALLOCATION_FIELDS = (
+    "allocation_calls", "deallocation_calls", "reallocation_calls",
+    "failed_allocation_calls", "allocated_bytes", "deallocated_bytes",
+    "live_bytes_before", "live_bytes_after", "peak_live_bytes_before",
+    "peak_live_bytes_after", "region_peak_live_bytes",
+)
+OBSERVER_SUMMARY_FIELDS = (
+    "allocation_calls", "allocated_bytes", "region_peak_live_bytes",
+    "peak_live_bytes_after", "net_live_bytes",
+)
+HEX_RE = r"[0-9a-f]{64}"
+
+
+class ReplayError(RuntimeError):
+    """The retained packet is absent, stale, or internally contradictory."""
+
+
+def fail(message: str) -> None:
+    raise ReplayError(message)
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        fail(message)
+
+
+def read_json(path: Path) -> Any:
+    require(path.is_file() and not path.is_symlink(), f"missing JSON evidence: {path}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        fail(f"invalid JSON evidence {path}: {error}")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(block)
+    except OSError as error:
+        fail(f"cannot hash {path}: {error}")
+    return digest.hexdigest()
+
+
+def valid_sha(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
+def positive_int(value: Any, label: str) -> None:
+    require(type(value) is int and value > 0, f"{label} is not a positive integer")
+
+
+def nonnegative_int(value: Any, label: str) -> None:
+    require(type(value) is int and value >= 0, f"{label} is not a non-negative integer")
+
+
+def finite_positive(value: Any, label: str) -> None:
+    require(isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(float(value)) and float(value) > 0,
+            f"{label} is not finite and positive")
+
+
+def relative(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(PACKET))
+    except ValueError:
+        return str(path)
+
+
+def descriptor(path: Path, label: str, *, packet_bound: bool = False,
+               allow_missing: bool = False) -> dict[str, Any]:
+    path = path.resolve(strict=False)
+    if packet_bound:
+        require(path.is_relative_to(PACKET), f"{label} escaped packet: {path}")
+    require(not path.is_symlink(), f"{label} is a symlink: {path}")
+    if not path.is_file():
+        require(allow_missing, f"missing {label}: {path}")
+        return {"path": relative(path), "bytes": None, "sha256": None,
+                "missing": True}
+    return {"path": relative(path), "bytes": path.stat().st_size,
+            "sha256": sha256(path)}
+
+
+def descriptor_from_value(value: Any, label: str, *, allow_missing: bool = False,
+                          packet_bound: bool = False) -> dict[str, Any]:
+    require(isinstance(value, dict), f"{label} descriptor is malformed")
+    raw = value.get("path")
+    require(isinstance(raw, str) and raw, f"{label} descriptor path is missing")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = PACKET / path
+    path = path.resolve(strict=False)
+    if packet_bound:
+        require(path.is_relative_to(PACKET), f"{label} descriptor escaped packet")
+    require(type(value.get("bytes")) is int and value["bytes"] > 0,
+            f"{label} descriptor bytes are invalid")
+    require(valid_sha(value.get("sha256")), f"{label} descriptor hash is invalid")
+    if path.is_file() and not path.is_symlink():
+        require(path.stat().st_size == value["bytes"], f"{label} bytes changed")
+        require(sha256(path) == value["sha256"], f"{label} hash changed")
+    else:
+        require(allow_missing, f"missing {label}: {path}")
+        cleanup = PACKET / "cleanup.json"
+        require(cleanup.is_file(), f"missing {label} without cleanup witness")
+        witness = read_json(cleanup)
+        require(witness.get("status") == "pass", "cleanup witness is not terminal pass")
+        require(contains_descriptor(witness, value),
+                f"cleanup witness does not retain removed {label}")
+    return {"path": str(raw), "bytes": value["bytes"], "sha256": value["sha256"]}
+
+
+def contains_descriptor(value: Any, expected: dict[str, Any]) -> bool:
+    if isinstance(value, dict):
+        if (value.get("path") == expected.get("path")
+                and value.get("bytes") == expected.get("bytes")
+                and value.get("sha256") == expected.get("sha256")):
+            return True
+        return any(contains_descriptor(item, expected) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_descriptor(item, expected) for item in value)
+    return False
+
+
+def require_stage(name: str) -> dict[str, Any]:
+    path = PACKET / f"{name}.json"
+    value = read_json(path)
+    require(isinstance(value, dict), f"{name} receipt is malformed")
+    require(value.get("status") == "pass", f"{name} receipt is not terminal pass")
+    if "terminal" in value:
+        require(value["terminal"] in (True, "pass"), f"{name} terminal status changed")
+    inputs_hash = value.get("inputs_sha256")
+    if inputs_hash is not None:
+        require(inputs_hash == sha256(PACKET / "inputs.json"), f"{name} input custody changed")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path),
+            "status": "pass"}
+
+
+def require_plan() -> dict[str, Any]:
+    plan = read_json(PACKET / "plan.json")
+    require(plan.get("schema") == PLAN_SCHEMA, "plan schema changed")
+    require(plan.get("base") == BASE and plan.get("cpu") == 12, "plan identity changed")
+    require(plan.get("source") == driver.SOURCE, "plan source changed")
+    cases = plan.get("cases")
+    require(isinstance(cases, list) and len(cases) == len(EXPECTED_CASES),
+            "plan case cardinality changed")
+    for expected, observed in zip(EXPECTED_CASES, cases):
+        require(isinstance(observed, dict), "plan case row is malformed")
+        for key, value in expected.items():
+            require(observed.get(key) == value, f"plan case {expected['id']} {key} changed")
+    require(plan.get("qualification") == {"samples": 1, "warmup": 0, "reports": 36},
+            "qualification plan changed")
+    require(plan.get("native", {}).get("blocks") == 6
+            and plan["native"].get("warmup") == 3
+            and plan["native"].get("orders") == EXPECTED_NATIVE_ORDERS,
+            "native plan changed")
+    require(plan.get("observer", {}).get("blocks") == 2
+            and plan["observer"].get("samples") == 3
+            and plan["observer"].get("warmup") == 0
+            and plan["observer"].get("orders") == EXPECTED_OBSERVER_ORDERS,
+            "observer plan changed")
+    require(plan.get("expected_reports") == REPORTS_EXPECTED
+            and plan.get("expected_samples") == SAMPLES_EXPECTED,
+            "planned cardinality changed")
+    require(plan.get("statistics") == {
+        "within_process": "nearest-rank",
+        "across_process": "midpoint median",
+        "bootstrap_resamples": BOOTSTRAP_RESAMPLES,
+        "seed": BOOTSTRAP_SEED,
+        "endpoints": [BOOTSTRAP_LOW_RANK, BOOTSTRAP_HIGH_RANK],
+    }, "statistics plan changed")
+    return plan
+
+
+def require_inputs() -> dict[str, Any]:
+    path = PACKET / "inputs.json"
+    value = read_json(path)
+    require(isinstance(value, dict), "inputs manifest is malformed")
+    require(value.get("test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx")
+            == REAL_INPUT_SHA256, "real input custody changed")
+    require(sha256(INPUT) == REAL_INPUT_SHA256 and INPUT.stat().st_size == REAL_INPUT_BYTES,
+            "real input file changed")
+    require(sha256(REFERENCE) == REAL_OUTPUT_SHA256 and REFERENCE.stat().st_size == REAL_OUTPUT_BYTES,
+            "pinned ordinary-save output changed")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path)}
+
+
+def require_install() -> dict[str, Any]:
+    path = PACKET / "install.json"
+    if not path.is_file():
+        return {"status": "not-retained"}
+    value = read_json(path)
+    require(value.get("status") == "pass" and value.get("source") == driver.SOURCE,
+            "source install receipt changed")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path),
+            "status": "pass"}
+
+
+def load_build(leg: str) -> dict[str, Any]:
+    path = PACKET / f"build-{leg}.json"
+    value = read_json(path)
+    require(value.get("status") == "pass", f"build-{leg} is not terminal pass")
+    binaries = value.get("binaries")
+    require(isinstance(binaries, dict) and set(binaries) == {"native", "observer"},
+            f"build-{leg} binary receipt changed")
+    result: dict[str, Any] = {"path": relative(path), "bytes": path.stat().st_size,
+                              "sha256": sha256(path), "status": "pass", "binaries": {}}
+    expected_source = sha256(PACKET / "candidate" / f"{leg}-validation.rs")
+    if value.get("source_sha256") is not None:
+        require(value["source_sha256"] == expected_source, f"build-{leg} source changed")
+    for logical in ("native", "observer"):
+        result["binaries"][logical] = descriptor_from_value(
+            binaries[logical], f"build-{leg}/{logical} binary", allow_missing=True)
+    return result
+
+
+def report_binary_identity(report: dict[str, Any], binary: dict[str, Any], label: str) -> None:
+    identity = report.get("binary_identity")
+    require(isinstance(identity, dict), f"{label} binary identity is missing")
+    require(identity.get("binary_sha256") == binary["sha256"]
+            and identity.get("binary_bytes") == binary["bytes"],
+            f"{label} binary identity changed")
+    require(identity.get("executable") is True and identity.get("profile") == "release",
+            f"{label} binary profile changed")
+
+
+def validate_rss(path: Path, label: str) -> int:
+    require(path.is_file() and not path.is_symlink(), f"missing {label} RSS: {path}")
+    text = path.read_text(encoding="utf-8")
+    require(text.strip().isdigit() and int(text.strip()) > 0,
+            f"{label} RSS is invalid")
+    return int(text.strip())
+
+
+def midpoint(left: int | float, right: int | float) -> int | float:
+    if isinstance(left, int) and isinstance(right, int):
+        return (left + right) // 2
+    return (left + right) / 2.0
+
+
+def nearest_rank(values: Iterable[int | float], quantile: float) -> int | float:
+    ordered = sorted(values)
+    require(ordered and 0 < quantile <= 1, "invalid quantile request")
+    return ordered[max(1, math.ceil(len(ordered) * quantile)) - 1]
+
+
+def timing_stats(values: list[int]) -> dict[str, Any]:
+    require(values and all(type(value) is int and value > 0 for value in values),
+            "timing vector is invalid")
+    harness_p50 = midpoint(values[(len(values) - 1) // 2], values[len(values) // 2])
+    harness_p95 = nearest_rank(values, .95)
+    harness_p99 = nearest_rank(values, .99)
+    return {
+        "count": len(values),
+        # The frozen 0831 protocol names nearest-rank as the analysis
+        # statistic.  The baseline binary serializes its even-sample p50 as
+        # the midpoint of the two central values; retain that independent
+        # harness convention below instead of silently treating it as the
+        # packet's p50.
+        "p50_ns": nearest_rank(values, .50),
+        "p95_ns": harness_p95, "p99_ns": harness_p99,
+        "mean_ns": statistics.fmean(values), "min_ns": values[0], "max_ns": values[-1],
+        "harness_reported": {"p50_ns": harness_p50, "p95_ns": harness_p95,
+                              "p99_ns": harness_p99},
+        "quantile_definition": "nearest-rank p50/p95/p99 within each process",
+    }
+
+
+def validate_verification_states(value: Any, label: str, path: str = "") -> None:
+    """Reject explicit failed verification gates without interpreting ordinary booleans."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            current = f"{path}.{key}" if path else key
+            if (key == "all_verified" or key == "warmup_verified"
+                    or key.endswith("_verified")
+                    or key in {"publications_identical", "edit_outcomes_identical"}):
+                require(item is True, f"{label} {current} is not true")
+            validate_verification_states(item, label, current)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            validate_verification_states(item, label, f"{path}[{index}]")
+
+
+def validate_metrics(result: dict[str, Any], count: int, logical: str, label: str) -> dict[str, Any]:
+    metrics = result.get("operation_metrics")
+    require(isinstance(metrics, dict), f"{label} operation metrics are missing")
+    elapsed = result.get("elapsed_ns")
+    order = elapsed.get("sample_order") if isinstance(elapsed, dict) else None
+    require(metrics.get("sample_count") == count
+            and metrics.get("sample_indices") == order
+            and metrics.get("alignment") == "elapsed_ns.samples_by_elapsed_then_sample_index",
+            f"{label} operation metric alignment changed")
+    expected_claim = ("comparable_timed_operation" if logical == "native"
+                      else "allocator_instrumented_elapsed_not_latency_claim")
+    require(metrics.get("latency_claim") == expected_claim, f"{label} latency claim changed")
+    allocation = metrics.get("allocation")
+    require(isinstance(allocation, dict), f"{label} allocation metrics are missing")
+    # The shared schema checks every vector, conservation equation, and the
+    # signed live-byte fields.  Native rows deliberately pass measured=False.
+    try:
+        from tools.perf_allocation_schema import validate_allocation
+    except ImportError as error:
+        fail(f"cannot import tools/perf_allocation_schema.py: {error}")
+    try:
+        validate_allocation(allocation,
+                            samples=count, measured=(logical == "observer"))
+    except (AssertionError, TypeError, ValueError) as error:
+        fail(f"{label} allocation schema rejected: {error}")
+    if logical == "native":
+        require(allocation.get("status") == "unavailable", f"{label} native allocation was measured")
+    else:
+        require(allocation.get("status") == "measured", f"{label} observer allocation unavailable")
+        for name in ALLOCATION_FIELDS:
+            metric = allocation[name]
+            require(metric.get("status") == "measured"
+                    and isinstance(metric.get("values"), list)
+                    and len(metric["values"]) == count,
+                    f"{label} allocation vector {name} changed")
+    return {"sample_count": count, "latency_claim": metrics["latency_claim"],
+            "allocation_status": allocation["status"]}
+
+
+def corpus_identity(result: dict[str, Any], expected: dict[str, Any], label: str) -> dict[str, Any]:
+    corpus = result.get("corpus")
+    require(isinstance(corpus, dict), f"{label} corpus manifest is missing")
+    require(corpus.get("shape") == ("real-file" if expected["shape"] is None else expected["shape"]),
+            f"{label} corpus shape changed")
+    require(valid_sha(corpus.get("archive_sha256")), f"{label} corpus hash is malformed")
+    positive_int(corpus.get("archive_bytes"), f"{label} corpus archive bytes")
+    if expected["shape"] is None:
+        require(corpus["archive_bytes"] == REAL_INPUT_BYTES
+                and corpus["archive_sha256"] == REAL_INPUT_SHA256,
+                f"{label} real corpus identity changed")
+    else:
+        require(corpus.get("package_format") == "XLSX/OPC/ZIP",
+                f"{label} synthetic package format changed")
+        xlsx = corpus.get("xlsx")
+        require(isinstance(xlsx, dict), f"{label} synthetic XLSX manifest is missing")
+    # A corpus manifest is a compact, deterministic oracle.  Retaining the
+    # complete manifest is safe and much smaller than retaining the report.
+    return json.loads(json.dumps(corpus, sort_keys=True))
+
+
+def validate_real_oracle(report: dict[str, Any], result: dict[str, Any], expected: dict[str, Any],
+                         count: int, label: str) -> dict[str, Any] | None:
+    if expected["shape"] is not None:
+        # Generated commit/save reports intentionally expose the generated
+        # corpus manifest rather than ordinary-save evidence.
+        require(result.get("source") in (None, {}), f"{label} synthetic source oracle changed")
+        return None
+    source = result.get("source")
+    require(isinstance(source, dict) and isinstance(source.get("ordinary_save"), dict),
+            f"{label} ordinary-save oracle is missing")
+    ordinary = source["ordinary_save"]
+    require(ordinary.get("format") == "XLSX"
+            and ordinary.get("origin") == "caller-named-real-file",
+            f"{label} ordinary-save identity changed")
+    require(ordinary.get("phase") == ("edit" if expected["id"] == "real-edit" else "open+edit+save"),
+            f"{label} ordinary-save phase changed")
+    evidence = ordinary.get("corpus")
+    require(isinstance(evidence, dict), f"{label} ordinary-save corpus oracle is missing")
+    real_file = evidence.get("real_file")
+    require(isinstance(real_file, dict)
+            and Path(real_file.get("path", "")).resolve() == INPUT
+            and real_file.get("bytes") == REAL_INPUT_BYTES
+            and real_file.get("sha256") == REAL_INPUT_SHA256,
+            f"{label} ordinary-save input oracle changed")
+    require(evidence.get("source_archive_bytes") == REAL_INPUT_BYTES
+            and evidence.get("source_archive_sha256") == REAL_INPUT_SHA256
+            and evidence.get("published_bytes") == REAL_OUTPUT_BYTES
+            and evidence.get("published_sha256") == REAL_OUTPUT_SHA256
+            and evidence.get("edit_admitted") is True
+            and evidence.get("edit_outcome") == "admitted"
+            and evidence.get("repeated_cycles_identical") is True
+            and evidence.get("repeated_saves_identical") is True
+            and evidence.get("repeated_cycle_sha256") == REAL_OUTPUT_SHA256
+            and evidence.get("repeated_save_sha256") == REAL_OUTPUT_SHA256,
+            f"{label} ordinary-save output oracle changed")
+    require(ordinary.get("publications_identical") is True
+            and ordinary.get("edit_outcomes_identical") is True,
+            f"{label} ordinary-save verification changed")
+    outcomes = ordinary.get("edit_outcome_sha256")
+    require(isinstance(outcomes, list) and len(outcomes) == count
+            and all(item == EDIT_OUTCOME_SHA256 for item in outcomes),
+            f"{label} edit outcome vector changed")
+    published = ordinary.get("published_sha256")
+    if expected["id"] == "real-lifecycle":
+        require(isinstance(published, list) and len(published) == count
+                and all(item == REAL_OUTPUT_SHA256 for item in published),
+                f"{label} publication vector changed")
+    else:
+        require(published == [], f"{label} edit publication vector changed")
+    output = result.get("output_sha256")
+    if output is not None:
+        require(output == REAL_OUTPUT_SHA256, f"{label} top-level output hash changed")
+    return {"source_bytes": REAL_INPUT_BYTES, "source_sha256": REAL_INPUT_SHA256,
+            "output_bytes": REAL_OUTPUT_BYTES, "output_sha256": REAL_OUTPUT_SHA256,
+            "edit_outcome": "admitted"}
+
+
+def validate_report(path: Path, expected: dict[str, Any], logical: str, count: int,
+                    warmup: int, binary: dict[str, Any], label: str) -> dict[str, Any]:
+    report = read_json(path)
+    require(report.get("schema_version") == REPORT_SCHEMA_VERSION,
+            f"{label} report schema changed")
+    require(report.get("tool", {}).get("name") == "litchi-perf-baseline",
+            f"{label} tool changed")
+    require(report["tool"].get("binary") == (
+        "litchi-perf-baseline" if logical == "native" else "litchi-perf-baseline-alloc"),
+            f"{label} binary tool changed")
+    if logical == "native":
+        require(report["tool"].get("instrumentation") == "none",
+                f"{label} instrumentation changed")
+    else:
+        # The observer's optional ordinary-save process feature can decorate
+        # the global identity even for a synthetic case.  Both identities
+        # describe the same allocator counter contract; process counters are
+        # never interpreted by this reader.
+        require(report["tool"].get("instrumentation") in {
+            "system_allocator_operation_scoped",
+            "ordinary_save_procfs_and_system_allocator_operation_scoped",
+        }, f"{label} instrumentation changed")
+    report_binary_identity(report, binary, label)
+    environment = report.get("environment")
+    if isinstance(environment, dict) and environment.get("git_revision") is not None:
+        require(environment["git_revision"] == BASE, f"{label} git revision changed")
+    configuration = report.get("configuration")
+    require(isinstance(configuration, dict)
+            and configuration.get("samples_per_case") == count
+            and configuration.get("warmup_iterations_per_case") == warmup
+            and configuration.get("cases") == [expected["case"]],
+            f"{label} configuration changed")
+    if expected["shape"] is not None:
+        shapes = configuration.get("xlsx_shapes")
+        require(isinstance(shapes, list) and expected["shape"] in shapes,
+                f"{label} XLSX shape configuration changed")
+    results = report.get("results")
+    require(isinstance(results, list) and len(results) == 1, f"{label} result cardinality changed")
+    result = results[0]
+    require(isinstance(result, dict) and result.get("case") == expected["case"],
+            f"{label} result case changed")
+    elapsed = result.get("elapsed_ns")
+    require(isinstance(elapsed, dict) and elapsed.get("unit") == "ns",
+            f"{label} elapsed schema changed")
+    samples = elapsed.get("samples")
+    order = elapsed.get("sample_order")
+    require(isinstance(samples, list) and len(samples) == count
+            and samples == sorted(samples)
+            and all(type(item) is int and item > 0 for item in samples),
+            f"{label} elapsed samples are not sorted valid integers")
+    require(isinstance(order, list) and len(order) == count
+            and sorted(order) == list(range(count)),
+            f"{label} sample order is not a permutation")
+    require(all(samples[index] != samples[index + 1] or order[index] < order[index + 1]
+                for index in range(count - 1)),
+            f"{label} tied sample order changed")
+    derived = timing_stats(samples)
+    harness = derived["harness_reported"]
+    for key, value in (("min", derived["min_ns"]), ("p50", harness["p50_ns"]),
+                       ("p95", harness["p95_ns"]), ("p99", harness["p99_ns"]),
+                       ("max", derived["max_ns"])):
+        if key in elapsed:
+            require(elapsed[key] == value, f"{label} reported {key} is stale")
+    if "mean" in elapsed:
+        require(math.isclose(float(elapsed["mean"]), float(derived["mean_ns"]),
+                             rel_tol=0.0, abs_tol=1e-6), f"{label} reported mean is stale")
+    metrics = validate_metrics(result, count, logical, label)
+    corpus = corpus_identity(result, expected, label)
+    oracle = validate_real_oracle(report, result, expected, count, label)
+    validate_verification_states(report, label)
+    # Optional top-level result oracles are retained only as identities.  If
+    # present, all legs and logical lanes must agree; no output is inferred
+    # for generated commit/save rows that do not expose one.
+    optional_oracle = {}
+    for key in ("output_sha256", "output_bytes", "oracle", "output_oracle"):
+        if key in result and result[key] is not None:
+            optional_oracle[key] = json.loads(json.dumps(result[key], sort_keys=True))
+    return {
+        "label": label, "path": relative(path), "bytes": path.stat().st_size,
+        "sha256": sha256(path), "leg": label.split("/")[0], "logical": logical,
+        "id": expected["id"], "case": expected["case"], "shape": expected["shape"],
+        "samples": count, "warmup": warmup, "timing": derived,
+        "rss_kib": None, "corpus": corpus, "oracle": oracle,
+        "optional_oracle": optional_oracle, "metrics": metrics,
+    }
+
+
+def load_report(path: Path, expected: dict[str, Any], logical: str, count: int,
+                warmup: int, binary: dict[str, Any], label: str,
+                require_rss: bool = True) -> dict[str, Any]:
+    row = validate_report(path, expected, logical, count, warmup, binary, label)
+    rss_path = path.with_suffix(".rss")
+    if require_rss:
+        row["rss_kib"] = validate_rss(rss_path, label)
+        row["rss_artifact"] = {"path": relative(rss_path), "bytes": rss_path.stat().st_size,
+                                "sha256": sha256(rss_path)}
+    return row
+
+
+def oracle_key(row: dict[str, Any]) -> str:
+    return json.dumps({"corpus": row["corpus"], "oracle": row["oracle"],
+                       "optional_oracle": row["optional_oracle"]}, sort_keys=True,
+                      separators=(",", ":"))
+
+
+def load_qualification(builds: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    rows: list[dict[str, Any]] = []
+    identities: dict[str, str] = {}
+    for leg in ("before", "after"):
+        receipt = require_stage(f"qualification-{leg}")
+        value = read_json(PACKET / f"qualification-{leg}.json")
+        require(value.get("status") == "pass" and value.get("reports") == 18
+                and value.get("samples") == 18,
+                f"qualification-{leg} receipt cardinality changed")
+        for logical in ("native", "observer"):
+            for expected in EXPECTED_CASES:
+                path = PACKET / "qualification" / f"{leg}-{logical}-{expected['id']}.json"
+                row = load_report(path, expected, logical, 1, 0,
+                                  builds[leg]["binaries"][logical],
+                                  f"qualification/{leg}/{logical}/{expected['id']}")
+                rows.append(row)
+                key = expected["id"]
+                signature = oracle_key(row)
+                if key not in identities:
+                    identities[key] = signature
+                else:
+                    require(identities[key] == signature,
+                            f"qualification oracle differs for {key}")
+    require(len(rows) == 36 and sum(row["samples"] for row in rows) == 36,
+            "qualification cardinality changed")
+    # The before qualification is consumed before any after report.  This
+    # binds the candidate leg to the already admitted fixture/oracle shape.
+    before = {row["id"]: row for row in rows if row["label"].startswith("qualification/before/")}
+    for expected in EXPECTED_CASES:
+        require(before[expected["id"]]["case"] == expected["case"],
+                f"qualification before case changed: {expected['id']}")
+    return {"reports": len(rows), "samples": len(rows),
+            "rows": [{k: row[k] for k in ("label", "path", "bytes", "sha256", "id", "logical", "rss_kib")}
+                     for row in rows],
+            "oracle_checked": True, "before_admitted_before_candidate": True}, identities
+
+
+def parse_allocation_values(row: dict[str, Any], report_path: Path) -> dict[str, list[int]]:
+    report = read_json(report_path)
+    result = report["results"][0]
+    allocation = result["operation_metrics"]["allocation"]
+    return {name: list(allocation[name]["values"]) for name in ALLOCATION_FIELDS}
+
+
+def observer_metrics(row: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    vectors = parse_allocation_values(row, report_path)
+    values: dict[str, int] = {}
+    for name in ALLOCATION_FIELDS:
+        values[name] = int(statistics.median(vectors[name]))
+    net = [after - before for after, before in zip(vectors["live_bytes_after"], vectors["live_bytes_before"])]
+    values["net_live_bytes"] = int(statistics.median(net))
+    values["net_live_block_values"] = net
+    values["samples"] = len(net)
+    return values
+
+
+def spread(values: Iterable[int | float]) -> float:
+    vector = list(values)
+    require(vector and all(math.isfinite(float(item)) and float(item) > 0 for item in vector),
+            "spread vector is invalid")
+    return max(vector) / min(vector)
+
+
+def paired_bootstrap(values: list[float]) -> dict[str, Any]:
+    require(len(values) == 6 and all(math.isfinite(value) and value > 0 for value in values),
+            "paired bootstrap vector is invalid")
+    rng = random.Random(BOOTSTRAP_SEED)
+    draws = sorted(statistics.median(rng.choice(values) for _ in values)
+                   for _ in range(BOOTSTRAP_RESAMPLES))
+    return {"estimate": statistics.median(values), "ci_low": draws[BOOTSTRAP_LOW_RANK],
+            "ci_high": draws[BOOTSTRAP_HIGH_RANK], "seed": BOOTSTRAP_SEED,
+            "resamples": BOOTSTRAP_RESAMPLES, "low_rank": BOOTSTRAP_LOW_RANK,
+            "high_rank": BOOTSTRAP_HIGH_RANK, "statistic": "median of six paired block ratios"}
+
+
+def native_summary(rows: list[dict[str, Any]], expected: dict[str, Any]) -> dict[str, Any]:
+    selected = {(row["block"], row["leg"]): row for row in rows if row["id"] == expected["id"]}
+    require(len(selected) == 12, f"native {expected['id']} block/leg coverage changed")
+    by_leg: dict[str, Any] = {}
+    for leg in ("before", "after"):
+        leg_rows = [selected[(block, leg)] for block in range(6)]
+        metrics: dict[str, Any] = {}
+        for name in ("p50_ns", "p95_ns", "p99_ns", "mean_ns"):
+            values = [row["timing"][name] for row in leg_rows]
+            metrics[name] = {"block_values": values, "midpoint_median": statistics.median(values),
+                             "spread_ratio": spread(values), "spread_flag": spread(values) > 1.05}
+        rss_values = [row["rss_kib"] for row in leg_rows]
+        metrics["rss_kib"] = {"block_values": rss_values,
+                               "midpoint_median": statistics.median(rss_values),
+                               "spread_ratio": spread(rss_values),
+                               "spread_flag": spread(rss_values) > 1.05}
+        by_leg[leg] = metrics
+    ratios: dict[str, Any] = {}
+    for metric in ("p50_ns", "p95_ns", "p99_ns", "mean_ns", "rss_kib"):
+        before = [by_leg["before"][metric]["block_values"][block] for block in range(6)]
+        after = [by_leg["after"][metric]["block_values"][block] for block in range(6)]
+        values = [float(right) / float(left) for left, right in zip(before, after)]
+        interval = paired_bootstrap(values)
+        ratios[metric] = {"block_values": values, "bootstrap": interval,
+                          "increase_over_5pct": interval["estimate"] > 1.05,
+                          "lower_ci_over_5pct": interval["ci_low"] > 1.05}
+    spread_flags = [f"{leg}.{metric}" for leg, metrics in by_leg.items()
+                    for metric, value in metrics.items() if value["spread_flag"]]
+    tail_flags = [leg for leg in ("before", "after")
+                  if by_leg[leg]["p99_ns"]["midpoint_median"]
+                  / by_leg[leg]["p50_ns"]["midpoint_median"] > 1.05]
+    return {"id": expected["id"], "case": expected["case"], "shape": expected["shape"],
+            "blocks": 6, "samples_per_report": expected["native_samples"],
+            "legs": by_leg, "paired_after_over_before": ratios,
+            "spread_flags": spread_flags, "tail_flags": tail_flags,
+            "timing_claim": "descriptive native process timing and RSS only",
+            "quantile_definition": "midpoint p50 and nearest-rank p95/p99 within each process; midpoint median over six blocks"}
+
+
+def load_native(builds: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    rows: list[dict[str, Any]] = []
+    plan = read_json(PACKET / "plan.json")
+    for block, order in enumerate(plan["native"]["orders"]):
+        for leg in order:
+            for expected in EXPECTED_CASES:
+                path = PACKET / "native" / f"{block:02d}-{leg}-{expected['id']}.json"
+                row = load_report(path, expected, "native", expected["native_samples"], 3,
+                                  builds[leg]["binaries"]["native"],
+                                  f"native/{block:02d}/{leg}/{expected['id']}")
+                row["block"] = block
+                rows.append(row)
+    require(len(rows) == 108 and sum(row["samples"] for row in rows) == 20_160,
+            "native cardinality changed")
+    summaries = [native_summary(rows, expected) for expected in EXPECTED_CASES]
+    return {"reports": len(rows), "samples": sum(row["samples"] for row in rows),
+            "cases": summaries, "timing_claim": "descriptive native process timing and RSS only"}, rows
+
+
+def observer_summary(rows: list[dict[str, Any]], expected: dict[str, Any]) -> dict[str, Any]:
+    selected = {(row["block"], row["leg"]): row for row in rows if row["id"] == expected["id"]}
+    require(len(selected) == 4, f"observer {expected['id']} block/leg coverage changed")
+    metrics_by_leg: dict[str, Any] = {}
+    for leg in ("before", "after"):
+        leg_rows = [selected[(block, leg)] for block in range(2)]
+        metric_rows = []
+        for row in leg_rows:
+            values = observer_metrics(row, PACKET / row["path"])
+            metric_rows.append({name: values[name] for name in OBSERVER_SUMMARY_FIELDS})
+        medians = {name: statistics.median([item[name] for item in metric_rows])
+                   for name in OBSERVER_SUMMARY_FIELDS}
+        metrics_by_leg[leg] = {"block_values": metric_rows, "midpoint_medians": medians,
+                               "rss_kib": [row["rss_kib"] for row in leg_rows]}
+    deltas: dict[str, Any] = {}
+    for name in OBSERVER_SUMMARY_FIELDS:
+        before = [metrics_by_leg["before"]["block_values"][block][name] for block in range(2)]
+        after = [metrics_by_leg["after"]["block_values"][block][name] for block in range(2)]
+        deltas[name] = {"block_values": [right - left for left, right in zip(before, after)],
+                        "median_delta": statistics.median(right - left for left, right in zip(before, after))}
+    return {"id": expected["id"], "case": expected["case"], "shape": expected["shape"],
+            "blocks": 2, "samples_per_report": 3, "legs": metrics_by_leg,
+            "after_minus_before": deltas,
+            "timing_claim": "allocation and signed live-byte evidence only; no observer latency claim"}
+
+
+def load_observer(builds: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    rows: list[dict[str, Any]] = []
+    plan = read_json(PACKET / "plan.json")
+    for block, order in enumerate(plan["observer"]["orders"]):
+        for leg in order:
+            for expected in EXPECTED_CASES:
+                path = PACKET / "observer" / f"{block:02d}-{leg}-{expected['id']}.json"
+                row = load_report(path, expected, "observer", 3, 0,
+                                  builds[leg]["binaries"]["observer"],
+                                  f"observer/{block:02d}/{leg}/{expected['id']}")
+                row["block"] = block
+                rows.append(row)
+    require(len(rows) == 36 and sum(row["samples"] for row in rows) == 108,
+            "observer cardinality changed")
+    return {"reports": len(rows), "samples": sum(row["samples"] for row in rows),
+            "cases": [observer_summary(rows, expected) for expected in EXPECTED_CASES],
+            "timing_claim": "allocation and signed live-byte evidence only; no observer latency claim"}, rows
+
+
+def decision_input(observer: dict[str, Any]) -> dict[str, Any]:
+    row = next(item for item in observer["cases"] if item["id"] == "real-edit")
+    return {
+        "case": "real-edit",
+        "expected_after_minus_before": {"allocation_calls": -1, "allocated_bytes": -524288},
+        "observed_after_minus_before": {
+            name: row["after_minus_before"][name]["block_values"]
+            for name in ("allocation_calls", "allocated_bytes")
+        },
+        "interpretation": "review input only; no automatic adoption or rejection decision",
+    }
+
+
+def build_analysis() -> dict[str, Any]:
+    plan = require_plan()
+    inputs = require_inputs()
+    stages = {name: require_stage(name) for name in (
+        "prepare", "quality-before", "build-before", "qualification-before",
+        "quality-after", "build-after", "qualification-after", "capture",
+    )}
+    for leg in ("before", "after"):
+        quality = read_json(PACKET / f"quality-{leg}.json")
+        require(quality.get("source_sha256") ==
+                sha256(PACKET / "candidate" / f"{leg}-validation.rs"),
+                f"quality-{leg} source receipt changed")
+    install = require_install()
+    builds = {leg: load_build(leg) for leg in ("before", "after")}
+    qualification, qualification_oracles = load_qualification(builds)
+    native, native_rows = load_native(builds)
+    observer, observer_rows = load_observer(builds)
+    require(native["reports"] + observer["reports"] + qualification["reports"] == REPORTS_EXPECTED,
+            "total report count changed")
+    require(native["samples"] + observer["samples"] + qualification["samples"] == SAMPLES_EXPECTED,
+            "total sample count changed")
+    # Every fixture and every result oracle is checked against the before
+    # qualification and then against the candidate leg.  This is intentionally
+    # separate from timing comparison: a timing pair with changed corpus bytes
+    # is not evidence for a code change.
+    all_rows = native_rows + observer_rows
+    for expected in EXPECTED_CASES:
+        signatures = {oracle_key(row) for row in all_rows if row["id"] == expected["id"]}
+        require(signatures == {qualification_oracles[expected["id"]]},
+                f"fixture/result oracle differs across legs: {expected['id']}")
+    capture = read_json(PACKET / "capture.json")
+    require(capture.get("status") == "pass" and capture.get("reports") == REPORTS_EXPECTED
+            and capture.get("samples") == SAMPLES_EXPECTED,
+            "capture receipt cardinality changed")
+    source_before = descriptor(PACKET / "candidate/before-validation.rs", "before candidate",
+                               packet_bound=True)
+    source_after = descriptor(PACKET / "candidate/after-validation.rs", "after candidate",
+                              packet_bound=True)
+    return {
+        "schema": ANALYSIS_SCHEMA, "status": "pass", "base": BASE,
+        "plan": {"path": relative(PACKET / "plan.json"), "bytes": (PACKET / "plan.json").stat().st_size,
+                  "sha256": sha256(PACKET / "plan.json"), "schema": plan["schema"]},
+        "inputs": inputs, "candidate": {"before": source_before, "after": source_after},
+        "stages": stages, "install": install, "builds": builds,
+        "counts": {"qualification_reports": qualification["reports"],
+                   "qualification_samples": qualification["samples"],
+                   "native_reports": native["reports"], "native_samples": native["samples"],
+                   "observer_reports": observer["reports"], "observer_samples": observer["samples"],
+                   "reports": REPORTS_EXPECTED, "samples": SAMPLES_EXPECTED},
+        "qualification": qualification, "native": native, "observer": observer,
+        "decision_input": decision_input(observer),
+        "claims": {
+            "native": "descriptive paired process timing and RSS only",
+            "observer": "allocation calls, requested bytes, peak and signed live-byte deltas only",
+            "observer_latency": False, "pooled_latency": False,
+            "automatic_adoption_decision": False, "historical_comparison": False,
+            "full_report_payloads_retained": False,
+        },
+    }
+
+
+def encoded(value: dict[str, Any]) -> str:
+    text = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    require(len(text.encode("utf-8")) < 5 * 1024 * 1024,
+            "analysis output is unexpectedly large; full reports must not be embedded")
+    return text
+
+
+def write_or_check(value: dict[str, Any], check: bool) -> None:
+    path = PACKET / "analysis.json"
+    text = encoded(value).encode("utf-8")
+    if check:
+        require(path.is_file() and not path.is_symlink(), "analysis.json is missing")
+        require(path.read_bytes() == text, "analysis.json does not replay deterministically")
+        return
+    try:
+        with path.open("xb") as stream:
+            stream.write(text)
+    except FileExistsError:
+        fail("refusing to overwrite retained analysis.json")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true",
+                        help="replay and compare the retained analysis.json")
+    args = parser.parse_args(argv)
+    try:
+        write_or_check(build_analysis(), args.check)
+    except (ReplayError, AssertionError, OSError, UnicodeError, ValueError,
+            KeyError, TypeError, IndexError) as error:
+        print(f"0831 analysis failed: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps({"status": "pass", "reports": REPORTS_EXPECTED,
+                      "samples": SAMPLES_EXPECTED}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

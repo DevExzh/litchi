@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0831 — unused XLSX column-action map removed
+
+[0831](0831-xlsx-empty-column-actions.md) A matched 180-report/20,304-sample XLSX experiment removes one unused 512 KiB column-action map from the real edit: requested bytes fall 18.09%, and paired native p50 ratio is 0.980416 [0.975937–0.983917]. All nine cases remain visible; lifecycle confidence includes 1.0, and real peak-above-entry/RSS reductions are not claimed.
+
 ## 0830 — XLSX edit allocation maps localized
 
 [0830](0830-xlsx-edit-allocation-profile.md) Fresh controls complete 23 reports / 559 measured samples. Ordinary/direct edit p50 is 0.284002 ms. Both instrumentation p50 intervals include 1.0; ten spread flags and three tail flags remain visible. Two Heaptrack captures each attribute 12,550 calls / 14,491,270 requested bytes to five public edits. No production improvement is claimed.

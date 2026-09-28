@@ -1,0 +1,6 @@
+{
+  "status": "failed-before-freeze",
+  "reason": "Authoring assertion incorrectly required existing standalone harness lock to equal root lock. Both are independently pinned and unchanged since0830; compare and retain differences instead. No build or workload started.",
+  "log": "prepare-console.log",
+  "driver": "prepare-attempt0-driver.py.source"
+}
