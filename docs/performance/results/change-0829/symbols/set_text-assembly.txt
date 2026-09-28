@@ -1,0 +1,149 @@
+
+/home/zhuhe/code/litchi-target-0829/fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000017ecb0 <pptx_edit_profile_0829::phase_set_shape_text_0829>:
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:318
+  17ecb0:	55                   	push   %rbp
+  17ecb1:	48 89 e5             	mov    %rsp,%rbp
+  17ecb4:	41 56                	push   %r14
+  17ecb6:	53                   	push   %rbx
+  17ecb7:	48 81 ec 90 00 00 00 	sub    $0x90,%rsp
+  17ecbe:	48 89 fe             	mov    %rdi,%rsi
+  17ecc1:	48 8d 9d 60 ff ff ff 	lea    -0xa0(%rbp),%rbx
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:319
+  17ecc8:	48 89 df             	mov    %rbx,%rdi
+  17eccb:	e8 00 92 ff ff       	call   177ed0 <litchi_pptx::opened::transaction::Transaction::set_shape_text>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  17ecd0:	0f b6 8d 60 ff ff ff 	movzbl -0xa0(%rbp),%ecx
+  17ecd7:	0f b6 85 61 ff ff ff 	movzbl -0x9f(%rbp),%eax
+  17ecde:	80 f9 27             	cmp    $0x27,%cl
+  17ece1:	75 19                	jne    17ecfc <pptx_edit_profile_0829::phase_set_shape_text_0829+0x4c>
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:319
+  17ece3:	88 85 60 ff ff ff    	mov    %al,-0xa0(%rbp)
+core::hint::black_box:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  17ece9:	48 89 5d a8          	mov    %rbx,-0x58(%rbp)
+  17eced:	48 8d 4d a8          	lea    -0x58(%rbp),%rcx
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:321
+  17ecf1:	a8 01                	test   $0x1,%al
+  17ecf3:	74 7f                	je     17ed74 <pptx_edit_profile_0829::phase_set_shape_text_0829+0xc4>
+  17ecf5:	31 c0                	xor    %eax,%eax
+  17ecf7:	e9 dc 00 00 00       	jmp    17edd8 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x128>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2175
+  17ecfc:	48 8b 55 a0          	mov    -0x60(%rbp),%rdx
+  17ed00:	48 89 55 e8          	mov    %rdx,-0x18(%rbp)
+  17ed04:	0f 10 85 62 ff ff ff 	movups -0x9e(%rbp),%xmm0
+  17ed0b:	0f 10 8d 72 ff ff ff 	movups -0x8e(%rbp),%xmm1
+  17ed12:	0f 10 55 82          	movups -0x7e(%rbp),%xmm2
+  17ed16:	0f 10 5d 92          	movups -0x6e(%rbp),%xmm3
+  17ed1a:	0f 11 5d da          	movups %xmm3,-0x26(%rbp)
+  17ed1e:	0f 11 55 ca          	movups %xmm2,-0x36(%rbp)
+  17ed22:	0f 11 4d ba          	movups %xmm1,-0x46(%rbp)
+  17ed26:	0f 11 45 aa          	movups %xmm0,-0x56(%rbp)
+<core::result::Result<T,F> as core::ops::try_trait::FromResidual<core::result::Result<core::convert::Infallible,E>>>::from_residual:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2189
+  17ed2a:	88 4d a8             	mov    %cl,-0x58(%rbp)
+  17ed2d:	88 45 a9             	mov    %al,-0x57(%rbp)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17ed30:	bf 48 00 00 00       	mov    $0x48,%edi
+  17ed35:	ff 15 8d 27 0a 00    	call   *0xa278d(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17ed3b:	48 85 c0             	test   %rax,%rax
+  17ed3e:	0f 84 a0 00 00 00    	je     17ede4 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x134>
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17ed44:	48 8b 4d e8          	mov    -0x18(%rbp),%rcx
+  17ed48:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  17ed4c:	0f 10 45 a8          	movups -0x58(%rbp),%xmm0
+  17ed50:	0f 10 4d b8          	movups -0x48(%rbp),%xmm1
+  17ed54:	0f 10 55 c8          	movups -0x38(%rbp),%xmm2
+  17ed58:	0f 10 5d d8          	movups -0x28(%rbp),%xmm3
+  17ed5c:	0f 11 58 30          	movups %xmm3,0x30(%rax)
+  17ed60:	0f 11 50 20          	movups %xmm2,0x20(%rax)
+  17ed64:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+  17ed68:	0f 11 00             	movups %xmm0,(%rax)
+  17ed6b:	48 8d 15 06 ca 09 00 	lea    0x9ca06(%rip),%rdx        # 21b778 <anon.36ed52a356df1d485c12dcce85027138.3.llvm.13583809507907854616+0x610>
+  17ed72:	eb 64                	jmp    17edd8 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x128>
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17ed74:	bf 27 00 00 00       	mov    $0x27,%edi
+  17ed79:	ff 15 49 27 0a 00    	call   *0xa2749(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+<alloc::raw_vec::RawVecInner>::try_allocate_in:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:468
+  17ed7f:	48 85 c0             	test   %rax,%rax
+  17ed82:	0f 84 80 00 00 00    	je     17ee08 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x158>
+<u8 as <[_]>::to_vec_in::ConvertVec>::to_vec::<alloc::alloc::Global>:
+  17ed88:	48 89 c3             	mov    %rax,%rbx
+core::ptr::copy_nonoverlapping::<u8>:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:547
+  17ed8b:	0f 10 05 02 c0 ea ff 	movups -0x153ffe(%rip),%xmm0        # 2ad94 <panic_unwind::imp::CANARY+0xe91>
+  17ed92:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  17ed96:	0f 10 05 e7 bf ea ff 	movups -0x154019(%rip),%xmm0        # 2ad84 <panic_unwind::imp::CANARY+0xe81>
+  17ed9d:	0f 11 00             	movups %xmm0,(%rax)
+  17eda0:	48 b8 6f 20 63 68 61 6e 67 65 	movabs $0x65676e616863206f,%rax
+  17edaa:	48 89 43 1f          	mov    %rax,0x1f(%rbx)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  17edae:	bf 18 00 00 00       	mov    $0x18,%edi
+  17edb3:	ff 15 0f 27 0a 00    	call   *0xa270f(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  17edb9:	48 85 c0             	test   %rax,%rax
+  17edbc:	74 38                	je     17edf6 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x146>
+<alloc::boxed::Box<<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError>>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  17edbe:	48 c7 00 27 00 00 00 	movq   $0x27,(%rax)
+  17edc5:	48 89 58 08          	mov    %rbx,0x8(%rax)
+  17edc9:	48 c7 40 10 27 00 00 00 	movq   $0x27,0x10(%rax)
+  17edd1:	48 8d 15 18 93 09 00 	lea    0x99318(%rip),%rdx        # 2180f0 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:325
+  17edd8:	48 81 c4 90 00 00 00 	add    $0x90,%rsp
+  17eddf:	5b                   	pop    %rbx
+  17ede0:	41 5e                	pop    %r14
+  17ede2:	5d                   	pop    %rbp
+  17ede3:	c3                   	ret
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:250
+  17ede4:	bf 08 00 00 00       	mov    $0x8,%edi
+  17ede9:	be 48 00 00 00       	mov    $0x48,%esi
+  17edee:	ff 15 84 27 0a 00    	call   *0xa2784(%rip)        # 221578 <_DYNAMIC+0x298>
+  17edf4:	eb 10                	jmp    17ee06 <pptx_edit_profile_0829::phase_set_shape_text_0829+0x156>
+  17edf6:	bf 08 00 00 00       	mov    $0x8,%edi
+  17edfb:	be 18 00 00 00       	mov    $0x18,%esi
+  17ee00:	ff 15 72 27 0a 00    	call   *0xa2772(%rip)        # 221578 <_DYNAMIC+0x298>
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+  17ee06:	0f 0b                	ud2
+<alloc::raw_vec::RawVecInner>::with_capacity_in:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:441
+  17ee08:	bf 01 00 00 00       	mov    $0x1,%edi
+  17ee0d:	be 27 00 00 00       	mov    $0x27,%esi
+  17ee12:	ff 15 f8 26 0a 00    	call   *0xa26f8(%rip)        # 221510 <_DYNAMIC+0x230>
+<alloc::boxed::Box<dyn core::error::Error> as core::convert::From<&str>>::from:
+  17ee18:	49 89 c6             	mov    %rax,%r14
+<std::alloc::System as core::alloc::global::GlobalAlloc>::dealloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:48
+  17ee1b:	48 89 df             	mov    %rbx,%rdi
+  17ee1e:	ff 15 b4 26 0a 00    	call   *0xa26b4(%rip)        # 2214d8 <free@GLIBC_2.2.5>
+  17ee24:	4c 89 f7             	mov    %r14,%rdi
+  17ee27:	e8 94 81 09 00       	call   216fc0 <_Unwind_Resume@plt>
+pptx_edit_profile_0829::phase_set_shape_text_0829:
+  17ee2c:	49 89 c6             	mov    %rax,%r14
+  17ee2f:	48 8d 7d a8          	lea    -0x58(%rbp),%rdi
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  17ee33:	e8 88 8e 00 00       	call   187cc0 <core::ptr::drop_in_place<litchi_pptx::error::Error>>
+  17ee38:	4c 89 f7             	mov    %r14,%rdi
+  17ee3b:	e8 80 81 09 00       	call   216fc0 <_Unwind_Resume@plt>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  17ee40:	ff 15 f2 28 0a 00    	call   *0xa28f2(%rip)        # 221738 <_DYNAMIC+0x458>

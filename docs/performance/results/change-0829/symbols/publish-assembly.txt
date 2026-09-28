@@ -1,0 +1,300 @@
+
+/home/zhuhe/code/litchi-target-0829/fp:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000001829a0 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829>:
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:331
+  1829a0:	55                   	push   %rbp
+  1829a1:	48 89 e5             	mov    %rsp,%rbp
+  1829a4:	41 57                	push   %r15
+  1829a6:	41 56                	push   %r14
+  1829a8:	53                   	push   %rbx
+  1829a9:	48 81 ec 28 05 00 00 	sub    $0x528,%rsp
+  1829b0:	48 89 fb             	mov    %rdi,%rbx
+  1829b3:	48 8d bd 30 fd ff ff 	lea    -0x2d0(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:335
+  1829ba:	ff 15 a8 f9 09 00    	call   *0x9f9a8(%rip)        # 222368 <_DYNAMIC+0x1088>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  1829c0:	4c 8b b5 30 fd ff ff 	mov    -0x2d0(%rbp),%r14
+  1829c7:	4c 89 f0             	mov    %r14,%rax
+  1829ca:	48 f7 d8             	neg    %rax
+  1829cd:	0f 10 85 38 fd ff ff 	movups -0x2c8(%rbp),%xmm0
+  1829d4:	0f 29 85 b0 fe ff ff 	movaps %xmm0,-0x150(%rbp)
+  1829db:	0f 10 85 48 fd ff ff 	movups -0x2b8(%rbp),%xmm0
+  1829e2:	0f 29 85 c0 fe ff ff 	movaps %xmm0,-0x140(%rbp)
+  1829e9:	0f 10 85 58 fd ff ff 	movups -0x2a8(%rbp),%xmm0
+  1829f0:	0f 29 85 d0 fe ff ff 	movaps %xmm0,-0x130(%rbp)
+  1829f7:	0f 10 85 68 fd ff ff 	movups -0x298(%rbp),%xmm0
+  1829fe:	0f 29 85 e0 fe ff ff 	movaps %xmm0,-0x120(%rbp)
+  182a05:	48 8b 85 78 fd ff ff 	mov    -0x288(%rbp),%rax
+  182a0c:	48 89 85 f0 fe ff ff 	mov    %rax,-0x110(%rbp)
+  182a13:	0f 81 9c 00 00 00    	jno    182ab5 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x115>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:335
+  182a19:	48 8b 85 f0 fe ff ff 	mov    -0x110(%rbp),%rax
+  182a20:	48 89 85 70 fd ff ff 	mov    %rax,-0x290(%rbp)
+  182a27:	0f 28 85 b0 fe ff ff 	movaps -0x150(%rbp),%xmm0
+  182a2e:	0f 28 8d c0 fe ff ff 	movaps -0x140(%rbp),%xmm1
+  182a35:	0f 28 95 d0 fe ff ff 	movaps -0x130(%rbp),%xmm2
+  182a3c:	0f 28 9d e0 fe ff ff 	movaps -0x120(%rbp),%xmm3
+  182a43:	0f 29 9d 60 fd ff ff 	movaps %xmm3,-0x2a0(%rbp)
+  182a4a:	0f 29 95 50 fd ff ff 	movaps %xmm2,-0x2b0(%rbp)
+  182a51:	0f 29 8d 40 fd ff ff 	movaps %xmm1,-0x2c0(%rbp)
+  182a58:	0f 29 85 30 fd ff ff 	movaps %xmm0,-0x2d0(%rbp)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  182a5f:	bf 48 00 00 00       	mov    $0x48,%edi
+  182a64:	ff 15 5e ea 09 00    	call   *0x9ea5e(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  182a6a:	48 85 c0             	test   %rax,%rax
+  182a6d:	0f 84 ce 02 00 00    	je     182d41 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3a1>
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  182a73:	48 8b 8d f0 fe ff ff 	mov    -0x110(%rbp),%rcx
+  182a7a:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  182a7e:	0f 28 85 b0 fe ff ff 	movaps -0x150(%rbp),%xmm0
+  182a85:	0f 28 8d c0 fe ff ff 	movaps -0x140(%rbp),%xmm1
+  182a8c:	0f 28 95 d0 fe ff ff 	movaps -0x130(%rbp),%xmm2
+  182a93:	0f 28 9d e0 fe ff ff 	movaps -0x120(%rbp),%xmm3
+  182a9a:	0f 11 58 30          	movups %xmm3,0x30(%rax)
+  182a9e:	0f 11 50 20          	movups %xmm2,0x20(%rax)
+  182aa2:	0f 11 48 10          	movups %xmm1,0x10(%rax)
+  182aa6:	0f 11 00             	movups %xmm0,(%rax)
+  182aa9:	48 8d 15 c8 8c 09 00 	lea    0x98cc8(%rip),%rdx        # 21b778 <anon.36ed52a356df1d485c12dcce85027138.3.llvm.13583809507907854616+0x610>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:344
+  182ab0:	e9 7e 02 00 00       	jmp    182d33 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x393>
+  182ab5:	49 bf 00 00 00 00 00 00 00 80 	movabs $0x8000000000000000,%r15
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  182abf:	48 8d b5 80 fd ff ff 	lea    -0x280(%rbp),%rsi
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:335
+  182ac6:	48 8d bd 18 fb ff ff 	lea    -0x4e8(%rbp),%rdi
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  182acd:	ba 30 01 00 00       	mov    $0x130,%edx
+  182ad2:	ff 15 10 ea 09 00    	call   *0x9ea10(%rip)        # 2214e8 <memcpy@GLIBC_2.14>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:335
+  182ad8:	0f 28 85 b0 fe ff ff 	movaps -0x150(%rbp),%xmm0
+  182adf:	0f 28 8d c0 fe ff ff 	movaps -0x140(%rbp),%xmm1
+  182ae6:	0f 28 95 d0 fe ff ff 	movaps -0x130(%rbp),%xmm2
+  182aed:	0f 28 9d e0 fe ff ff 	movaps -0x120(%rbp),%xmm3
+  182af4:	0f 11 85 d0 fa ff ff 	movups %xmm0,-0x530(%rbp)
+  182afb:	0f 11 8d e0 fa ff ff 	movups %xmm1,-0x520(%rbp)
+  182b02:	0f 11 95 f0 fa ff ff 	movups %xmm2,-0x510(%rbp)
+  182b09:	0f 11 9d 00 fb ff ff 	movups %xmm3,-0x500(%rbp)
+  182b10:	48 8b 85 f0 fe ff ff 	mov    -0x110(%rbp),%rax
+  182b17:	48 89 85 10 fb ff ff 	mov    %rax,-0x4f0(%rbp)
+  182b1e:	4c 89 b5 c8 fa ff ff 	mov    %r14,-0x538(%rbp)
+  182b25:	48 8d 85 c8 fa ff ff 	lea    -0x538(%rbp),%rax
+core::hint::black_box:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  182b2c:	48 89 85 30 fd ff ff 	mov    %rax,-0x2d0(%rbp)
+  182b33:	48 8d 85 30 fd ff ff 	lea    -0x2d0(%rbp),%rax
+litchi_pptx::opened::patch::Patch::is_empty:
+/home/zhuhe/code/litchi/crates/litchi-pptx/src/opened/patch.rs:308
+  182b3a:	48 83 bd d8 fb ff ff 00 	cmpq   $0x0,-0x428(%rbp)
+  182b42:	0f 85 85 00 00 00    	jne    182bcd <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x22d>
+  182b48:	4c 39 bd e0 fb ff ff 	cmp    %r15,-0x420(%rbp)
+  182b4f:	75 7c                	jne    182bcd <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x22d>
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  182b51:	bf 2d 00 00 00       	mov    $0x2d,%edi
+  182b56:	ff 15 6c e9 09 00    	call   *0x9e96c(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+<alloc::raw_vec::RawVecInner>::try_allocate_in:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:468
+  182b5c:	48 85 c0             	test   %rax,%rax
+  182b5f:	0f 84 12 02 00 00    	je     182d77 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3d7>
+<u8 as <[_]>::to_vec_in::ConvertVec>::to_vec::<alloc::alloc::Global>:
+  182b65:	49 89 c6             	mov    %rax,%r14
+core::ptr::copy_nonoverlapping::<u8>:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:547
+  182b68:	0f 10 05 59 82 ea ff 	movups -0x157da7(%rip),%xmm0        # 2adc8 <panic_unwind::imp::CANARY+0xec5>
+  182b6f:	0f 11 40 1d          	movups %xmm0,0x1d(%rax)
+  182b73:	0f 10 05 41 82 ea ff 	movups -0x157dbf(%rip),%xmm0        # 2adbb <panic_unwind::imp::CANARY+0xeb8>
+  182b7a:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  182b7e:	0f 10 05 26 82 ea ff 	movups -0x157dda(%rip),%xmm0        # 2adab <panic_unwind::imp::CANARY+0xea8>
+  182b85:	0f 11 00             	movups %xmm0,(%rax)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  182b88:	bf 18 00 00 00       	mov    $0x18,%edi
+  182b8d:	ff 15 35 e9 09 00    	call   *0x9e935(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  182b93:	48 85 c0             	test   %rax,%rax
+  182b96:	0f 84 b7 01 00 00    	je     182d53 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3b3>
+<alloc::boxed::Box<<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError>>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  182b9c:	48 c7 00 2d 00 00 00 	movq   $0x2d,(%rax)
+  182ba3:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  182ba7:	48 c7 40 10 2d 00 00 00 	movq   $0x2d,0x10(%rax)
+  182baf:	48 8d bd c8 fa ff ff 	lea    -0x538(%rbp),%rdi
+  182bb6:	48 89 c3             	mov    %rax,%rbx
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:344
+  182bb9:	e8 d2 68 00 00       	call   189490 <core::ptr::drop_in_place<litchi_pptx::opened::transaction::Commit>>
+  182bbe:	48 89 d8             	mov    %rbx,%rax
+  182bc1:	48 8d 15 28 55 09 00 	lea    0x95528(%rip),%rdx        # 2180f0 <anon.3b8318f7dfe3dcd00c7681abddb39c6c.52.llvm.1524389613005862818>
+  182bc8:	e9 66 01 00 00       	jmp    182d33 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x393>
+  182bcd:	4c 8d b5 30 fd ff ff 	lea    -0x2d0(%rbp),%r14
+  182bd4:	48 8d b5 c8 fa ff ff 	lea    -0x538(%rbp),%rsi
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:340
+  182bdb:	ba 80 01 00 00       	mov    $0x180,%edx
+  182be0:	4c 89 f7             	mov    %r14,%rdi
+  182be3:	ff 15 ff e8 09 00    	call   *0x9e8ff(%rip)        # 2214e8 <memcpy@GLIBC_2.14>
+  182be9:	48 8d bd b0 fe ff ff 	lea    -0x150(%rbp),%rdi
+  182bf0:	48 89 de             	mov    %rbx,%rsi
+  182bf3:	4c 89 f2             	mov    %r14,%rdx
+  182bf6:	ff 15 44 f8 09 00    	call   *0x9f844(%rip)        # 222440 <_DYNAMIC+0x1160>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+  182bfc:	48 8b 85 f8 fe ff ff 	mov    -0x108(%rbp),%rax
+  182c03:	48 89 45 e0          	mov    %rax,-0x20(%rbp)
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2173
+  182c07:	48 8b 9d b0 fe ff ff 	mov    -0x150(%rbp),%rbx
+  182c0e:	0f 10 85 b8 fe ff ff 	movups -0x148(%rbp),%xmm0
+  182c15:	0f 29 45 a0          	movaps %xmm0,-0x60(%rbp)
+  182c19:	0f 10 85 c8 fe ff ff 	movups -0x138(%rbp),%xmm0
+  182c20:	0f 29 45 b0          	movaps %xmm0,-0x50(%rbp)
+  182c24:	0f 10 85 d8 fe ff ff 	movups -0x128(%rbp),%xmm0
+  182c2b:	0f 29 45 c0          	movaps %xmm0,-0x40(%rbp)
+  182c2f:	0f 10 85 e8 fe ff ff 	movups -0x118(%rbp),%xmm0
+  182c36:	0f 29 45 d0          	movaps %xmm0,-0x30(%rbp)
+  182c3a:	4c 39 fb             	cmp    %r15,%rbx
+  182c3d:	75 68                	jne    182ca7 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x307>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:340
+  182c3f:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  182c43:	48 89 85 70 fd ff ff 	mov    %rax,-0x290(%rbp)
+  182c4a:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  182c4e:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  182c52:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  182c56:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  182c5a:	0f 29 9d 60 fd ff ff 	movaps %xmm3,-0x2a0(%rbp)
+  182c61:	0f 29 95 50 fd ff ff 	movaps %xmm2,-0x2b0(%rbp)
+  182c68:	0f 29 8d 40 fd ff ff 	movaps %xmm1,-0x2c0(%rbp)
+  182c6f:	0f 29 85 30 fd ff ff 	movaps %xmm0,-0x2d0(%rbp)
+<std::alloc::System as core::alloc::global::GlobalAlloc>::alloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:14
+  182c76:	bf 48 00 00 00       	mov    $0x48,%edi
+  182c7b:	ff 15 47 e8 09 00    	call   *0x9e847(%rip)        # 2214c8 <malloc@GLIBC_2.2.5>
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:248
+  182c81:	48 85 c0             	test   %rax,%rax
+  182c84:	0f 84 db 00 00 00    	je     182d65 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3c5>
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:289
+  182c8a:	48 8b 4d e0          	mov    -0x20(%rbp),%rcx
+  182c8e:	48 89 48 40          	mov    %rcx,0x40(%rax)
+  182c92:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  182c96:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  182c9a:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  182c9e:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  182ca2:	e9 f3 fd ff ff       	jmp    182a9a <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0xfa>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  182ca7:	48 8d b5 00 ff ff ff 	lea    -0x100(%rbp),%rsi
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:340
+  182cae:	48 8d bd 98 fc ff ff 	lea    -0x368(%rbp),%rdi
+  182cb5:	4c 8b 35 2c e8 09 00 	mov    0x9e82c(%rip),%r14        # 2214e8 <memcpy@GLIBC_2.14>
+<core::result::Result<T,E> as core::ops::try_trait::Try>::branch:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:2174
+  182cbc:	ba 98 00 00 00       	mov    $0x98,%edx
+  182cc1:	41 ff d6             	call   *%r14
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:340
+  182cc4:	0f 28 45 a0          	movaps -0x60(%rbp),%xmm0
+  182cc8:	0f 28 4d b0          	movaps -0x50(%rbp),%xmm1
+  182ccc:	0f 28 55 c0          	movaps -0x40(%rbp),%xmm2
+  182cd0:	0f 28 5d d0          	movaps -0x30(%rbp),%xmm3
+  182cd4:	0f 11 85 50 fc ff ff 	movups %xmm0,-0x3b0(%rbp)
+  182cdb:	0f 11 8d 60 fc ff ff 	movups %xmm1,-0x3a0(%rbp)
+  182ce2:	0f 11 95 70 fc ff ff 	movups %xmm2,-0x390(%rbp)
+  182ce9:	0f 11 9d 80 fc ff ff 	movups %xmm3,-0x380(%rbp)
+  182cf0:	48 8b 45 e0          	mov    -0x20(%rbp),%rax
+  182cf4:	48 89 85 90 fc ff ff 	mov    %rax,-0x370(%rbp)
+  182cfb:	48 89 9d 48 fc ff ff 	mov    %rbx,-0x3b8(%rbp)
+  182d02:	48 8d b5 48 fc ff ff 	lea    -0x3b8(%rbp),%rsi
+core::hint::black_box:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs:491
+  182d09:	48 89 b5 30 fd ff ff 	mov    %rsi,-0x2d0(%rbp)
+  182d10:	48 8d 85 30 fd ff ff 	lea    -0x2d0(%rbp),%rax
+  182d17:	48 8d 9d 30 fd ff ff 	lea    -0x2d0(%rbp),%rbx
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:342
+  182d1e:	ba e8 00 00 00       	mov    $0xe8,%edx
+  182d23:	48 89 df             	mov    %rbx,%rdi
+  182d26:	41 ff d6             	call   *%r14
+core::mem::drop:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/mod.rs:975
+  182d29:	48 89 df             	mov    %rbx,%rdi
+  182d2c:	e8 af 62 00 00       	call   188fe0 <core::ptr::drop_in_place<litchi_pptx::opened::model::Snapshot>>
+  182d31:	31 c0                	xor    %eax,%eax
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:344
+  182d33:	48 81 c4 28 05 00 00 	add    $0x528,%rsp
+  182d3a:	5b                   	pop    %rbx
+  182d3b:	41 5e                	pop    %r14
+  182d3d:	41 5f                	pop    %r15
+  182d3f:	5d                   	pop    %rbp
+  182d40:	c3                   	ret
+alloc::boxed::box_new_uninit:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:250
+  182d41:	bf 08 00 00 00       	mov    $0x8,%edi
+  182d46:	be 48 00 00 00       	mov    $0x48,%esi
+  182d4b:	ff 15 27 e8 09 00    	call   *0x9e827(%rip)        # 221578 <_DYNAMIC+0x298>
+  182d51:	eb 34                	jmp    182d87 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3e7>
+  182d53:	bf 08 00 00 00       	mov    $0x8,%edi
+  182d58:	be 18 00 00 00       	mov    $0x18,%esi
+  182d5d:	ff 15 15 e8 09 00    	call   *0x9e815(%rip)        # 221578 <_DYNAMIC+0x298>
+  182d63:	eb 22                	jmp    182d87 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3e7>
+  182d65:	bf 08 00 00 00       	mov    $0x8,%edi
+  182d6a:	be 48 00 00 00       	mov    $0x48,%esi
+  182d6f:	ff 15 03 e8 09 00    	call   *0x9e803(%rip)        # 221578 <_DYNAMIC+0x298>
+  182d75:	eb 10                	jmp    182d87 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x3e7>
+<alloc::raw_vec::RawVecInner>::with_capacity_in:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:441
+  182d77:	bf 01 00 00 00       	mov    $0x1,%edi
+  182d7c:	be 2d 00 00 00       	mov    $0x2d,%esi
+  182d81:	ff 15 89 e7 09 00    	call   *0x9e789(%rip)        # 221510 <_DYNAMIC+0x230>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+  182d87:	0f 0b                	ud2
+  182d89:	48 89 c3             	mov    %rax,%rbx
+  182d8c:	eb 23                	jmp    182db1 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x411>
+  182d8e:	48 89 c3             	mov    %rax,%rbx
+  182d91:	48 8d bd 30 fd ff ff 	lea    -0x2d0(%rbp),%rdi
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  182d98:	e8 23 4f 00 00       	call   187cc0 <core::ptr::drop_in_place<litchi_pptx::error::Error>>
+  182d9d:	eb 35                	jmp    182dd4 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x434>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  182d9f:	ff 15 93 e9 09 00    	call   *0x9e993(%rip)        # 221738 <_DYNAMIC+0x458>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+  182da5:	48 89 c3             	mov    %rax,%rbx
+<std::alloc::System as core::alloc::global::GlobalAlloc>::dealloc:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:48
+  182da8:	4c 89 f7             	mov    %r14,%rdi
+  182dab:	ff 15 27 e7 09 00    	call   *0x9e727(%rip)        # 2214d8 <free@GLIBC_2.2.5>
+pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829:
+  182db1:	48 8d bd c8 fa ff ff 	lea    -0x538(%rbp),%rdi
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:344
+  182db8:	e8 d3 66 00 00       	call   189490 <core::ptr::drop_in_place<litchi_pptx::opened::transaction::Commit>>
+  182dbd:	eb 15                	jmp    182dd4 <pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829+0x434>
+/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/src/main.rs:331
+  182dbf:	ff 15 73 e9 09 00    	call   *0x9e973(%rip)        # 221738 <_DYNAMIC+0x458>
+  182dc5:	48 89 c3             	mov    %rax,%rbx
+  182dc8:	48 8d bd 30 fd ff ff 	lea    -0x2d0(%rbp),%rdi
+alloc::boxed::Box<T>::new:
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:292
+  182dcf:	e8 ec 4e 00 00       	call   187cc0 <core::ptr::drop_in_place<litchi_pptx::error::Error>>
+  182dd4:	48 89 df             	mov    %rbx,%rdi
+  182dd7:	e8 e4 41 09 00       	call   216fc0 <_Unwind_Resume@plt>
+/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs:284
+  182ddc:	ff 15 56 e9 09 00    	call   *0x9e956(%rip)        # 221738 <_DYNAMIC+0x458>

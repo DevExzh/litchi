@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0829 — current PPTX edit phases measured
+
+[0829](0829-pptx-edit-phase-profile.md) One admitted real PPTX public shape-text edit now has fresh capture/set-text/commit-application CPU attribution with complete byte and semantic verification on every sample. All 23 reports / 4,549 samples pass. No new CRUD capability, broader producer coverage, durability variant or cold-cache/concurrency coverage is claimed.
+
 ## 0828 — phase profile stopped before capture
 
 [0828](0828-pptx-edit-phase-profile.md) The proposed current-source shape-text phase profile stops before qualification: zero measurement reports and samples. Exact direct/wrapped parity passes as a unit test; no measured CRUD or producer coverage is added.

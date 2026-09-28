@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0829 — current PPTX edit phases measured
+
+[0829](0829-pptx-edit-phase-profile.md) Fresh current-source controls complete 23 reports / 4,549 samples. Ordinary/direct edit p50 is 1.270951 ms; wrapped/direct ratio is 1.000715 [0.996008–1.003981], and frame-pointer/wrapped is 1.023752 [1.020221–1.027284]. Independent replay passes. These are instrumentation controls, with no production speedup claim.
+
 ## 0828 — phase profile stopped before capture
 
 [0828](0828-pptx-edit-phase-profile.md) Five fresh probe gates and both builds pass, but compiled-symbol admission fails before qualification. Zero reports/samples are collected. A separate address-bounded static diagnostic verifies four wrappers; no timing baseline advances.

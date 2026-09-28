@@ -1,0 +1,20 @@
+{
+  "input_selector": "pinnedshapes",
+  "reference": {
+    "bytes": 68284,
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+    "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+  },
+  "reference_selector": "0821realPPTXdefault",
+  "schema": "litchi.performance.0829.corpus-inputs.v1",
+  "source": {
+    "bytes": 68822,
+    "path": "test-data/ooxml/pptx/shapes.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  },
+  "source_copy": {
+    "bytes": 68822,
+    "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/source.pptx",
+    "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0829/validate.py"
+  ],
+  "ended": 1790628016.506169,
+  "exit_code": 0,
+  "log": {
+    "bytes": 193,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/console.log",
+    "sha256": "50e231cb345547c8cdb774956014fee9aa72547e987f2643ebf70e047523bd24"
+  },
+  "schema": "litchi.performance.0829.reader-attempt.v1",
+  "sources": [
+    {
+      "original": {
+        "bytes": 110911,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/analysis.py",
+        "sha256": "06dfe07db119bb096e70a1aac9690b56fae907103bece652b2c6c13ba625d97a"
+      },
+      "snapshot": {
+        "bytes": 110911,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/analysis.py",
+        "sha256": "06dfe07db119bb096e70a1aac9690b56fae907103bece652b2c6c13ba625d97a"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5592,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/build.py",
+        "sha256": "ae23b09004f093a186a981129e020a6826c4bc609423e7560badf2c8ae0aea8f"
+      },
+      "snapshot": {
+        "bytes": 5592,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/build.py",
+        "sha256": "ae23b09004f093a186a981129e020a6826c4bc609423e7560badf2c8ae0aea8f"
+      }
+    },
+    {
+      "original": {
+        "bytes": 17654,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/capture.py",
+        "sha256": "f54b5ce501daafbc3f7296736c0a36c6eb744ec1f2d719afae942dfd1d72bf9d"
+      },
+      "snapshot": {
+        "bytes": 17654,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/capture.py",
+        "sha256": "f54b5ce501daafbc3f7296736c0a36c6eb744ec1f2d719afae942dfd1d72bf9d"
+      }
+    },
+    {
+      "original": {
+        "bytes": 1813,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/cleanup.py",
+        "sha256": "b3e16b79e6c2c6be0c65a753fe0462f2061a171db801a06fff52896082a2016e"
+      },
+      "snapshot": {
+        "bytes": 1813,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/cleanup.py",
+        "sha256": "b3e16b79e6c2c6be0c65a753fe0462f2061a171db801a06fff52896082a2016e"
+      }
+    },
+    {
+      "original": {
+        "bytes": 17102,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/custody.py",
+        "sha256": "26360f7f52440eaab70e97e6956b2605dba3fdfbf43b3403ca2e99847e2ca353"
+      },
+      "snapshot": {
+        "bytes": 17102,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/custody.py",
+        "sha256": "26360f7f52440eaab70e97e6956b2605dba3fdfbf43b3403ca2e99847e2ca353"
+      }
+    },
+    {
+      "original": {
+        "bytes": 17969,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/decode.py",
+        "sha256": "ab37075737722f0a3c3cc7e693a073bed281ab65fb145933d9e303991a87a81b"
+      },
+      "snapshot": {
+        "bytes": 17969,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/decode.py",
+        "sha256": "ab37075737722f0a3c3cc7e693a073bed281ab65fb145933d9e303991a87a81b"
+      }
+    },
+    {
+      "original": {
+        "bytes": 12206,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/frame_audit.py",
+        "sha256": "8ab5e4dbb3ac24d00b916d050613ffd180a7e7f2f4a25f485616b68c36868283"
+      },
+      "snapshot": {
+        "bytes": 12206,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/frame_audit.py",
+        "sha256": "8ab5e4dbb3ac24d00b916d050613ffd180a7e7f2f4a25f485616b68c36868283"
+      }
+    },
+    {
+      "original": {
+        "bytes": 6026,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/prepare.py",
+        "sha256": "a9d52284697c74aaad774cd191037cd0717d2a528be4a5b0ef237c4f666008bf"
+      },
+      "snapshot": {
+        "bytes": 6026,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/prepare.py",
+        "sha256": "a9d52284697c74aaad774cd191037cd0717d2a528be4a5b0ef237c4f666008bf"
+      }
+    },
+    {
+      "original": {
+        "bytes": 14360,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality.py",
+        "sha256": "1b2c73c3a7a921b80a826d1ce5fa85c633ccd76bf89b1a4a1fb4764413e3f1fe"
+      },
+      "snapshot": {
+        "bytes": 14360,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/quality.py",
+        "sha256": "1b2c73c3a7a921b80a826d1ce5fa85c633ccd76bf89b1a4a1fb4764413e3f1fe"
+      }
+    },
+    {
+      "original": {
+        "bytes": 9127,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader_preflight.py",
+        "sha256": "4eff55393e5f5d6822ca2f1e24fbdc3cf04d10eb3d95e9efbdb2ac49066de904"
+      },
+      "snapshot": {
+        "bytes": 9127,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/reader_preflight.py",
+        "sha256": "4eff55393e5f5d6822ca2f1e24fbdc3cf04d10eb3d95e9efbdb2ac49066de904"
+      }
+    },
+    {
+      "original": {
+        "bytes": 4050,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/root_audit.py",
+        "sha256": "d2a32334b9104d1b2cb16c2e81a5b555f191b8d4894dffdfd2a8d85eb9cea88b"
+      },
+      "snapshot": {
+        "bytes": 4050,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/root_audit.py",
+        "sha256": "d2a32334b9104d1b2cb16c2e81a5b555f191b8d4894dffdfd2a8d85eb9cea88b"
+      }
+    },
+    {
+      "original": {
+        "bytes": 1939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/run_reader.py",
+        "sha256": "e96bdb80f9e522dfeef66390b4e7288437e79b3e85557c0d375624fe76922d41"
+      },
+      "snapshot": {
+        "bytes": 1939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/run_reader.py",
+        "sha256": "e96bdb80f9e522dfeef66390b4e7288437e79b3e85557c0d375624fe76922d41"
+      }
+    },
+    {
+      "original": {
+        "bytes": 2322,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/seal.py",
+        "sha256": "806a05f3595220d313a23f4ca87d36aadffe95167d6a0d442640256d5819bec4"
+      },
+      "snapshot": {
+        "bytes": 2322,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/seal.py",
+        "sha256": "806a05f3595220d313a23f4ca87d36aadffe95167d6a0d442640256d5819bec4"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5328,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/stack_diagnostics.py",
+        "sha256": "09c13e997427fa192dd3974a78ab56d36b3987b903f8a6b3ee0e5ec580c6dec4"
+      },
+      "snapshot": {
+        "bytes": 5328,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/stack_diagnostics.py",
+        "sha256": "09c13e997427fa192dd3974a78ab56d36b3987b903f8a6b3ee0e5ec580c6dec4"
+      }
+    },
+    {
+      "original": {
+        "bytes": 15780,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/validate.py",
+        "sha256": "680c1412e173c9b66f0ec5af36b4365e1a43b5850ba83c05674ac4cdb986b345"
+      },
+      "snapshot": {
+        "bytes": 15780,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/reader-attempts/6/sources/validate.py",
+        "sha256": "680c1412e173c9b66f0ec5af36b4365e1a43b5850ba83c05674ac4cdb986b345"
+      }
+    }
+  ],
+  "started": 1790628010.8653133
+}

@@ -1,0 +1,200 @@
+{
+  "frozen_inputs": {
+    "bytes": 1223599,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/frozen-inputs.json",
+    "sha256": "6fcd42d477b100950bb6757708cb120c7c3081561cd4dbd600134d61148434bc"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "ended": 1790627602.4697514,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829/quality",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit_code": 0,
+      "gate": 1,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/01-fmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "name": "fmt",
+      "started": 1790627602.4318457
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml"
+      ],
+      "ended": 1790627626.7654476,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829/quality",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit_code": 0,
+      "gate": 2,
+      "log": {
+        "bytes": 3788,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/02-check.log",
+        "sha256": "e36188d7a761412bc635b7503e8d898531bf0547992d6f1f3fddabdcec8d5c77"
+      },
+      "name": "check",
+      "started": 1790627602.701526
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+        "--all-features",
+        "--",
+        "--test-threads=1"
+      ],
+      "ended": 1790627716.585238,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829/quality",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit_code": 0,
+      "gate": 3,
+      "log": {
+        "bytes": 3676,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/03-tests.log",
+        "sha256": "f03cb2b3ef61c0a6a0bc8440a91713e51c43bcd3e700ad749a6c3ca17255b5ad"
+      },
+      "name": "tests",
+      "started": 1790627627.007616,
+      "test_counts": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 3
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790627717.0534964,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829/quality",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit_code": 0,
+      "gate": 4,
+      "log": {
+        "bytes": 190,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/04-clippy.log",
+        "sha256": "e8d81d79401cddfaefc8cd92d168f3eefddebbf8322d103a7e7a288577024e19"
+      },
+      "name": "clippy",
+      "started": 1790627716.828354
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0829/probe-src/Cargo.toml",
+        "--no-deps"
+      ],
+      "ended": 1790627717.8946664,
+      "environment": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+        "CARGO_PROFILE_RELEASE_LTO": "thin",
+        "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+        "CARGO_PROFILE_RELEASE_PANIC": "unwind",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0829/quality",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "RUSTDOCFLAGS": "-Dwarnings"
+      },
+      "exit_code": 0,
+      "gate": 5,
+      "log": {
+        "bytes": 285,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/05-doc.log",
+        "sha256": "4d97d61c2d2d8197d5ce424be2bcb763f6f28d84633cc9285b8daf47f4326379"
+      },
+      "name": "doc",
+      "started": 1790627717.2899046
+    }
+  ],
+  "schema": "litchi.performance.0829.probe-quality-checks.v1",
+  "source": {
+    "bytes": 1212380,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/quality-0/source.json",
+    "sha256": "f38b5676cc0c46126c427c50f6f161b0b809068ea5d25f6952c3320013f3180c"
+  }
+}

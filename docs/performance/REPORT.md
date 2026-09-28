@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0829 — current PPTX edit phases measured
+
+[0829](0829-pptx-edit-phase-profile.md) Fresh phase profiling completes without production changes: exact edit-owner samples total 2,670/2,685, with capture the largest bucket. The wrapper interval includes 1.0; frame pointers add about 2.375%. Four spread flags and one unclassified owner sample remain explicit. No wall-clock phase fraction, Amdahl estimate or new full-save speedup is claimed.
+
 ## 0828 — phase profile stopped before capture
 
 [0828](0828-pptx-edit-phase-profile.md) The planned phase profile yields no measurements after a frozen objdump selector failure. Five probe gates and two builds pass; a separate static diagnostic verifies all four wrappers. Production is unchanged, 0827 remains authoritative, and fresh capture requires a corrected frozen driver.

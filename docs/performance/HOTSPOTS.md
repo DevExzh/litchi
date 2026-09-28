@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0829 — current PPTX edit phases measured
+
+[0829](0829-pptx-edit-phase-profile.md) Exact-owner CPU samples partition into capture 1,196/1,193, set-text 607/612, commit/application 867/879 and unclassified 0/1. All observed owner zlib self leaves occur in initial capture; XML work remains in all phases. Required fingerprinting and validation stay intact. Counts do not predict wall-clock savings; XLSX allocation/readback localization remains a separate next investigation.
+
 ## 0828 — phase profile stopped before capture
 
 [0828](0828-pptx-edit-phase-profile.md) Current PPTX capture/set-text/publication CPU attribution remains unmeasured because symbol admission fails before capture. The failure is localized to objdump symbol selection; address-bounded diagnosis verifies the wrappers without measuring phase costs. Catalog and raw-span ideas remain hypotheses.

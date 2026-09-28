@@ -1,0 +1,31 @@
+{
+  "build_sha256": "748b39306bab8e40f38c7ff6d6f093515aa431bb71e6c55ce7608970b69fc080",
+  "call_graph": "fp",
+  "event": "cycles:u",
+  "expected_reports": 2,
+  "expected_samples": 4000,
+  "frequency_hz": 997,
+  "owner": "pptx_edit_profile_0829::edit_region_0829",
+  "phase_owners": {
+    "capture": "pptx_edit_profile_0829::phase_opened_presentation_transaction_0829",
+    "publish": "pptx_edit_profile_0829::phase_commit_apply_opened_presentation_commit_0829",
+    "set_text": "pptx_edit_profile_0829::phase_set_shape_text_0829"
+  },
+  "plan_sha256": "20a102524436bdb9bee6cf4a757b8b38b0f86871d6a8ab5e929e294a6dc76691",
+  "preflight": {
+    "bytes": 378,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/preflight.json",
+    "sha256": "ce51e4b3a2e92f91f9b05b1357286af00629933f3126adf9d76811fc3dc57077"
+  },
+  "profile_fabricated": false,
+  "receipts": {
+    "bytes": 6373,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0829/perf/receipts.json",
+    "sha256": "46d6e626a69c00f89ac1043f0b3fd237b08e06f1b3390e3c11d996f4ab156d03"
+  },
+  "reports": 2,
+  "samples": 4000,
+  "schema": "litchi.performance.0829.perf.complete.v1",
+  "status": "available",
+  "typed_unavailable": false
+}
