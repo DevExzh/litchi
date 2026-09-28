@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0814 — fresh attribution completes without production change
+
+[0814](0814-pptx-current-native-attribution.md) All 56 reports/1,820 samples, independent timing/frame replay, and exact-binary offset joins pass. Scanner payload moves inside event arms remain a bounded investigation target. The ambiguous inspector selector failure and assembly-only recovery are retained; no workloads rerun. Six tail/RSS spread flags and 2/1 unknown interior frames remain visible; zero lost-event lines. No new speedup is claimed.
+
 ## 0813 — direct PPTX event-result matching retained
 
 [0813](0813-pptx-direct-result-workflow.md) The one-file change passes six production quality gates and the frozen public workflow policy: six benefits of 3.120–10.544%, zero latency vetoes, and all 144 allocation comparisons equal. The packet contains 310 reports/6,718 verified outputs with independent replay. Four isolated block p99 increases, five paired RSS increases above 5%, and all spread diagnostics remain explicit. No public API or dependency changes.

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0814 — next bounded scanner experiment localized
+
+[0814](0814-pptx-current-native-attribution.md) Exact current binaries place 125/150 and 114/142 scanner self samples at Start/Empty arm-local payload moves, distinct from the pre-dispatch copies removed in 0813. Borrowed arm bindings are a conditional next trial; broader native-producer, I/O, cold-cache, and scaling evidence remains open. The broad non-iWork goal stays active.
+
 ## 0813 — measured event copies removed and candidate retained
 
 [0813](0813-pptx-direct-result-workflow.md) Direct Result<Event> matching removes three pre-dispatch payload copies in both ordinary/profile assembly. Six useful workflow benefits pass the frozen bootstrap policy with no latency/resource veto; independent readers and source/profile reviews agree. The broader goal remains active, and the next optimization requires refreshed current-source attribution.

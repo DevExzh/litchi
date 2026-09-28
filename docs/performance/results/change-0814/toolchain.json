@@ -1,0 +1,62 @@
+{
+  "observed_before_build": true,
+  "rows": [
+    {
+      "command": [
+        "rustc",
+        "--version",
+        "--verbose"
+      ],
+      "ended": 1790582299.2157865,
+      "exit_code": 0,
+      "started": 1790582299.197273,
+      "stderr": "",
+      "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+    },
+    {
+      "command": [
+        "cargo",
+        "--version"
+      ],
+      "ended": 1790582299.2305486,
+      "exit_code": 0,
+      "started": 1790582299.21579,
+      "stderr": "",
+      "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+    },
+    {
+      "command": [
+        "perf",
+        "--version"
+      ],
+      "ended": 1790582299.2425454,
+      "exit_code": 0,
+      "started": 1790582299.2305515,
+      "stderr": "",
+      "stdout": "perf version 7.0.14\n"
+    },
+    {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "ended": 1790582299.243444,
+      "exit_code": 0,
+      "started": 1790582299.2425487,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "ended": 1790582299.244537,
+      "exit_code": 0,
+      "started": 1790582299.2434473,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    }
+  ],
+  "schema": "litchi.performance.0814.toolchain.v1"
+}

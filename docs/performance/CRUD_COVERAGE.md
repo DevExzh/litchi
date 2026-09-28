@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0814 — unchanged capture semantics during fresh attribution
+
+[0814](0814-pptx-current-native-attribution.md) All 1,820 outputs preserve the sealed source/output/full semantic oracles. The fresh probe passes formatting, 36 tests, and Clippy; six production gates are reused by exact 0813-after source identity. No production source, CRUD capability, allocation claim, or cross-format coverage is added.
+
 ## 0813 — capture, commit, and lifecycle qualify direct matching
 
 [0813](0813-pptx-direct-result-workflow.md) Six shapes across all three public workflows preserve source/output/full semantic oracles. Six candidate quality gates pass (1,241 tests, three ignored), both probes pass 36 tests, and all 144 resource comparisons are equal. The private codec change adds no public capability; iWork and other formats are outside this trial.

@@ -1,0 +1,344 @@
+{
+  "rows": [
+    {
+      "address": 1255824,
+      "binary": {
+        "bytes": 14430760,
+        "path": "/home/zhuhe/code/litchi-target-0814/control",
+        "sha256": "7102e332762133e2c19f35c3fe70feae05ad0f28255c79b361bd98cb4264ae47"
+      },
+      "name": "scanner",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/control"
+        ],
+        "ended": 1790583056.1058507,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.0947447,
+        "symbols": {
+          "bytes": 105,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/control.scanner.symbol.txt",
+          "sha256": "ac7aa90918327cf696791978eb55a2a2564302cc69646e37a23bf31b21704f11"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 19410,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/control.scanner.assembly.txt",
+          "sha256": "f56da3dbb608bc96a9116f0389a6f169d51c119df8da44812b0e87561d56b139"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x132990",
+          "--stop-address=0x1332a0",
+          "/home/zhuhe/code/litchi-target-0814/control"
+        ],
+        "ended": 1790583056.1094787,
+        "exit_code": 0,
+        "started": 1790583056.1065097
+      },
+      "size": 2320,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+      "variant": "control"
+    },
+    {
+      "address": 1249440,
+      "binary": {
+        "bytes": 14430760,
+        "path": "/home/zhuhe/code/litchi-target-0814/control",
+        "sha256": "7102e332762133e2c19f35c3fe70feae05ad0f28255c79b361bd98cb4264ae47"
+      },
+      "name": "inspector",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/control"
+        ],
+        "ended": 1790583056.1058507,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.0947447,
+        "symbols": {
+          "bytes": 102,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/control.inspector.symbol.txt",
+          "sha256": "9af7dbfbc74f423181b4d4a5c55ed35f203ee56dccfe381ed942b7d270ddb15e"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 31928,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/control.inspector.assembly.txt",
+          "sha256": "066528e8ea6e37935bb0238013a3db52e3333ef6a5b54429e98199f8f9196b84"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x1310a0",
+          "--stop-address=0x131fb4",
+          "/home/zhuhe/code/litchi-target-0814/control"
+        ],
+        "ended": 1790583056.1129482,
+        "exit_code": 0,
+        "started": 1790583056.109987
+      },
+      "size": 3860,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec15inspect_element17h8fca18dbf48f8207E",
+      "variant": "control"
+    },
+    {
+      "address": 1255872,
+      "binary": {
+        "bytes": 14431608,
+        "path": "/home/zhuhe/code/litchi-target-0814/profile",
+        "sha256": "c70d656fc44ddd3a66f3f6671d93dfedb26196c1284599db9e0dde4d13fd5da1"
+      },
+      "name": "scanner",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/profile"
+        ],
+        "ended": 1790583056.336985,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.3261456,
+        "symbols": {
+          "bytes": 105,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/profile.scanner.symbol.txt",
+          "sha256": "a437e11ecdd07bde06a68cf549c4df11e6ee25db59a20ef8f3e7d894d5bcd0ef"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 19410,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/profile.scanner.assembly.txt",
+          "sha256": "2a8b8d1da75a06f6d8f736c81f2254426032f64683098c55177103f2d51faa34"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x1329c0",
+          "--stop-address=0x1332d0",
+          "/home/zhuhe/code/litchi-target-0814/profile"
+        ],
+        "ended": 1790583056.3404598,
+        "exit_code": 0,
+        "started": 1790583056.337627
+      },
+      "size": 2320,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+      "variant": "profile"
+    },
+    {
+      "address": 1249488,
+      "binary": {
+        "bytes": 14431608,
+        "path": "/home/zhuhe/code/litchi-target-0814/profile",
+        "sha256": "c70d656fc44ddd3a66f3f6671d93dfedb26196c1284599db9e0dde4d13fd5da1"
+      },
+      "name": "inspector",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/profile"
+        ],
+        "ended": 1790583056.336985,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.3261456,
+        "symbols": {
+          "bytes": 102,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/profile.inspector.symbol.txt",
+          "sha256": "abbb69407aa0c2a33008c63564fb7b98be92e1c3842998aa480ef3519557a572"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 31928,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/profile.inspector.assembly.txt",
+          "sha256": "be3a3f1e845b15ded8b5233368c0f8315472fcb7c68fcc1bd86277019ff755cd"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x1310d0",
+          "--stop-address=0x131fe4",
+          "/home/zhuhe/code/litchi-target-0814/profile"
+        ],
+        "ended": 1790583056.3437912,
+        "exit_code": 0,
+        "started": 1790583056.340951
+      },
+      "size": 3860,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec15inspect_element17h8fca18dbf48f8207E",
+      "variant": "profile"
+    },
+    {
+      "address": 1221312,
+      "binary": {
+        "bytes": 14385576,
+        "path": "/home/zhuhe/code/litchi-target-0814/fp",
+        "sha256": "e587ce6bf052f35cfa9f9c817e172296e1e940e72ea9c1818aa687e5aca4c157"
+      },
+      "name": "scanner",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/fp"
+        ],
+        "ended": 1790583056.5636382,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.5555913,
+        "symbols": {
+          "bytes": 105,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/fp.scanner.symbol.txt",
+          "sha256": "a836ff19a1939535f7420f900998e9bc7769829af4764cca4660caa6af419ca5"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 19621,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/fp.scanner.assembly.txt",
+          "sha256": "3c6260ddf06f1b7e2fdded2a263a8df32bb0b311bb8df19920085d0fe77d380f"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x12a2c0",
+          "--stop-address=0x12ab86",
+          "/home/zhuhe/code/litchi-target-0814/fp"
+        ],
+        "ended": 1790583056.566981,
+        "exit_code": 0,
+        "started": 1790583056.5642402
+      },
+      "size": 2246,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec18scan_processed_xml17hb7ed65b605767ccbE",
+      "variant": "fp"
+    },
+    {
+      "address": 1215040,
+      "binary": {
+        "bytes": 14385576,
+        "path": "/home/zhuhe/code/litchi-target-0814/fp",
+        "sha256": "e587ce6bf052f35cfa9f9c817e172296e1e940e72ea9c1818aa687e5aca4c157"
+      },
+      "name": "inspector",
+      "nm": {
+        "command": [
+          "nm",
+          "-S",
+          "--defined-only",
+          "/home/zhuhe/code/litchi-target-0814/fp"
+        ],
+        "ended": 1790583056.5636382,
+        "exit_code": 0,
+        "matched_count": 1,
+        "started": 1790583056.5555913,
+        "symbols": {
+          "bytes": 102,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/fp.inspector.symbol.txt",
+          "sha256": "ed36b5dc7fd26282da3438d17223b27e9b4cff01976b1b4c54b6aa4c2c1df5a4"
+        }
+      },
+      "objdump": {
+        "assembly": {
+          "bytes": 32486,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/fp.inspector.assembly.txt",
+          "sha256": "caf8556eab447d82e632f0d2c075dfed0830acfadbba3297d8265431ab970e8b"
+        },
+        "command": [
+          "objdump",
+          "-d",
+          "--demangle",
+          "--no-show-raw-insn",
+          "--start-address=0x128a40",
+          "--stop-address=0x129916",
+          "/home/zhuhe/code/litchi-target-0814/fp"
+        ],
+        "ended": 1790583056.5707612,
+        "exit_code": 0,
+        "started": 1790583056.5674772
+      },
+      "size": 3798,
+      "source": {
+        "bytes": 1182921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/build/source.json",
+        "sha256": "48132f03190d3de376f1031a183954288939f238fb2864a5c94b25baba106ed6"
+      },
+      "symbol": "_ZN11litchi_pptx5notes5codec15inspect_element17h8fca18dbf48f8207E",
+      "variant": "fp"
+    }
+  ],
+  "schema": "litchi.performance.0814.codegen.v1",
+  "scope": "Exact current control/profile/fp scanner/inspector assembly; no causal cycle share or adoption claim.",
+  "tools": {
+    "nm": {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "objdump": {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    }
+  }
+}

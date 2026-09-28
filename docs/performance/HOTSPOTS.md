@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0814 — post-dispatch event payload moves remain visible
+
+[0814](0814-pptx-current-native-attribution.md) Scanner self leaves lead at 150/142 of 851/853 exact-owner samples. Offsets 0x25b and 0x33b map to arm-local payload loads in the exact fp binary; ordinary/wrapper assembly contains equivalent moves. Test borrowing Start/Empty payloads without changing event bodies or error/namespace ordering. Wrapper perturbation, unresolved interiors, and sampling skid prevent causal phase-cost estimates.
+
 ## 0813 — event-result copy chain removed
 
 [0813](0813-pptx-direct-result-workflow.md) Both scanner symbols shrink from 2,616 to 2,320 bytes and the pre-dispatch vector moves fall from twelve to zero. Large-capture p50 improves 10.544%; scanner self guest Ir falls from 22,295,758 to 16,724,054 while Reader calls and namespace push cost stay unchanged. Guest counts do not establish native phase fractions; namespace/attribute fusion remains deferred for ordering risk.
