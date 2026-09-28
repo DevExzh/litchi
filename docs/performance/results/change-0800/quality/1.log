@@ -1,0 +1,7 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running `/home/zhuhe/code/litchi-target-0800/full/debug/attribute-error-edge-0800`
+accepted_prefix=1 baseline=Some(Duplicated(10, 2)) quick_xml=Some(Duplicated(10, 2)) equal=true corrected=Some(Duplicated(10, 2))
+accepted_prefix=31 baseline=Some(Duplicated(292, 2)) quick_xml=Some(Duplicated(292, 2)) equal=true corrected=Some(Duplicated(292, 2))
+accepted_prefix=32 baseline=Some(ExpectedQuote(319, 34)) quick_xml=Some(Duplicated(302, 2)) equal=false corrected=Some(Duplicated(302, 2))
+accepted_prefix=33 baseline=Some(ExpectedQuote(329, 34)) quick_xml=Some(Duplicated(312, 2)) equal=false corrected=Some(Duplicated(312, 2))
+accepted_prefix=34 baseline=Some(ExpectedQuote(339, 34)) quick_xml=Some(Duplicated(322, 2)) equal=false corrected=Some(Duplicated(322, 2))

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0800 — malformed-input parity regression coverage
+
+[0800](0800-xml-duplicate-error-parity.md) A new differential matrix covers 540 duplicate cases and 270 lexical/nonduplicate controls per helper copy. Full affected-crate tests pass; this adds no document producer, CRUD, cold/range, or concurrency coverage.
+
 ## 0799 — direct helper preflight, no coverage promotion
 
 [0799](0799-xml-two-attribute-preflight.md) Thirty-nine hot inputs test the two-to-three transition with exact errors, clones, and bounded fallback. Isolated helper and direct-probe checks do not establish public-workflow or producer coverage. No coverage is promoted.

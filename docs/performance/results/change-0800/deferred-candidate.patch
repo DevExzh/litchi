@@ -1,0 +1,2340 @@
+--- a/crates/litchi-opc/src/xml_attributes.rs
++++ b/crates/litchi-opc/src/xml_attributes.rs
+@@ -1,6 +1,14 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
+ //!
++//! This source-only 0800 candidate reads the first two attributes with
++//! quick-xml's duplicate check disabled. After the second item, a third-key
++//! preflight compares only the raw key prefixes already addressed by the
++//! iterator; it never reparses either earlier value. A successful third item
++//! seeds an ordered map from the raw key slices and continues with the same
++//! bounded `O(n log n)` check. No transition reconstructs a quick-xml iterator
++//! or replays an already yielded item.
++//!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+ //! default. It compares each name with the names before it while it has seen
+ //! at most 32; from the 33rd name on it pre-filters with a hash set and, on
+@@ -14,14 +22,12 @@
+ //!
+ //! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
+ //! iterator (`BytesStart::attributes`) yields up to and including its first
+-//! error, and nothing after it. quick-xml checks the first 32 names with its
+-//! linear scan, exactly as before; from the 33rd on its check is off and this
+-//! iterator checks each name itself, in an ordered map: `O(log n)` name
+-//! comparisons per attribute and no hashing, so a tag of `n` attributes costs
+-//! `O(n log n)` comparisons whatever its names are. The first error is the one
+-//! quick-xml reports, at the same attribute, with the same positions, so a
+-//! reader that stops at an attribute's error (`?` on each item) behaves as it
+-//! did with quick-xml's iterator.
++//! error, and nothing after it. The candidate checks the first two names with
++//! raw key prefixes and starts its ordered map at the third successful item:
++//! `O(log n)` name comparisons for each later one; no name is hashed. The
++//! first error is the one quick-xml reports, at the same attribute, with the
++//! same positions, so a reader that stops at an attribute's error (`?` on each
++//! item) behaves as it did with quick-xml's iterator.
+ //!
+ //! A reader that skips attribute errors and reads on uses
+ //! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
+@@ -37,9 +43,8 @@
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
+ 
+-/// Names quick-xml checks with a linear scan of the names before them. From
+-/// the next name on it would hash names with its unkeyed hasher, so this
+-/// module turns its check off there and checks the names itself.
++/// Kept for the shared bounded-cost test's historical comparison point.
++#[cfg(test)]
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+@@ -51,8 +56,9 @@
+     /// including `AttrError::Duplicated(position, first_position)` at the
+     /// first repeated name, and a repeated name whose value is malformed is
+     /// reported as a duplicate, as quick-xml checks a name before reading its
+-    /// value. The cost is quick-xml's linear check for the first 32 names and
+-    /// `O(log n)` name comparisons for each later one; no name is hashed.
++    /// value. The first two names use raw key-prefix checks; after a third
++    /// successful item the candidate uses `O(log n)` ordered-map comparisons
++    /// per attribute and no name hashing.
+     fn checked_attributes(&self) -> CheckedAttributes<'_>;
+ 
+     /// Iterate the tag's attributes without any duplicate check: quick-xml's
+@@ -88,18 +94,29 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
+-    /// quick-xml checks the names; this many have been yielded.
+-    QuickXml(usize),
+-    /// quick-xml's check is off; this iterator checks the names.
++    /// No attribute has been requested yet.
++    First,
++    /// The first attribute was yielded unchecked; this is its next raw offset.
++    Second(usize),
++    /// The first two attributes were yielded unchecked and a third may follow.
++    /// `first_end` reconstructs the second key; `next_start` addresses the
++    /// third key. Neither offset points into an earlier value for reparsing.
++    ShortTwo {
++        first_end: usize,
++        next_start: usize,
++    },
++    /// The first three names have been seeded from raw key slices and this
++    /// iterator checks every subsequent name without replay.
+     Own(Box<OwnCheck<'a>>),
+     /// An error or the end has been yielded.
+     Done,
+ }
+ 
+-/// This iterator's check of the names, from the 33rd on.
++/// This iterator's bounded duplicate check after the short prefix.
+ #[derive(Clone, Debug)]
+ struct OwnCheck<'a> {
+-    /// Every name yielded so far, with its position.
++    /// Every name yielded so far, with its position. The map is allocated only
++    /// after a third successful item may be followed by another item.
+     names: BTreeMap<Name<'a>, usize>,
+     /// Where quick-xml starts to look for the next attribute: just after the
+     /// last one yielded.
+@@ -107,84 +124,192 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The short prefix uses quick-xml's parser without duplicate allocation.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
++            attributes,
++            phase: Phase::First,
++        }
++    }
++
++    /// Yield the first item. No earlier name exists, so its lexical result is
++    /// already the checked result.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::Second(end_of(self.tag, attribute));
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the second key before asking quick-xml to scan its value. A
++    /// repeated key without an equals sign remains quick-xml's `ExpectedEq`.
++    #[inline]
++    fn next_second(&mut self, next_start: usize) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let (Some((first_position, first_name, _)), Some((position, name, has_equals))) = (
++            key_at(self.tag.as_ref(), self.tag.name().as_ref().len()),
++            key_at(self.tag.as_ref(), next_start),
++        ) && has_equals
++            && name == first_name
++        {
++            self.phase = Phase::Done;
++            return Some(Err(AttrError::Duplicated(position, first_position)));
++        }
++
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ShortTwo {
++                    first_end: next_start,
++                    next_start: end_of(self.tag, attribute),
++                };
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
+         }
++        item
+     }
+ 
+-    /// Everything after quick-xml's 32 names: the switch to this iterator's
+-    /// own check, its check of each later name, and the end.
++    /// Check the third key before parsing its value, then seed the ordered map
++    /// from the three raw key slices. The first and second values are never
++    /// parsed again; an error or end before a third successful item allocates
++    /// no map.
+     #[cold]
+     #[inline(never)]
+-    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+-        match self.phase {
+-            Phase::Done => return None,
+-            // quick-xml would hash the next name: turn its check off first.
+-            Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
+-        }
+-        let Some(item) = self.attributes.next() else {
++    fn next_short_two(
++        &mut self,
++        first_end: usize,
++        next_start: usize,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        let first = key_at(self.tag.as_ref(), self.tag.name().as_ref().len());
++        let second = key_at(self.tag.as_ref(), first_end);
++        let third = key_at(self.tag.as_ref(), next_start);
++        let Some((position, name, has_equals)) = third else {
+             self.phase = Phase::Done;
+             return None;
+         };
+-        let checked = if let Phase::Own(check) = &mut self.phase {
+-            check.check(self.tag, item)
++        if has_equals {
++            if let Some((first_position, _, _)) =
++                first.filter(|(_, first_name, _)| *first_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, first_position)));
++            }
++            if let Some((second_position, _, _)) =
++                second.filter(|(_, second_name, _)| *second_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, second_position)));
++            }
++        }
++
++        let item = self.attributes.next();
++        match item {
++            Some(Ok(attribute)) => {
++                let third_end = end_of(self.tag, &attribute);
++                if trailing_whitespace(self.tag, third_end) {
++                    self.phase = Phase::Done;
++                } else {
++                    let mut check = OwnCheck::from_prefix(
++                        self.tag,
++                        first_end,
++                        next_start,
++                        &attribute,
++                    );
++                    debug_assert_eq!(check.names.len(), 3);
++                    check.next_start = third_end;
++                    self.phase = Phase::Own(Box::new(check));
++                }
++                Some(Ok(attribute))
++            },
++            Some(Err(error)) => {
++                self.phase = Phase::Done;
++                Some(Err(error))
++            },
++            None => {
++                self.phase = Phase::Done;
++                None
++            },
++        }
++    }
++
++    /// Continue the ordered-map backend. Its raw-key preflight preserves
++    /// quick-xml's duplicate-before-value boundary even though the underlying
++    /// parser has duplicate checking disabled.
++    #[cold]
++    #[inline(never)]
++    fn next_own(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = if let Phase::Own(check) = &mut self.phase {
++            check.next(self.tag, &mut self.attributes)
+         } else {
+-            let mut check = OwnCheck::after_quick_xml(self.tag);
+-            let checked = check.check(self.tag, item);
+-            self.phase = Phase::Own(Box::new(check));
+-            checked
++            unreachable!("ordered backend is called only from the Own phase")
+         };
+-        if checked.is_err() {
++        if item.as_ref().map_or(true, Result::is_err) {
+             self.phase = Phase::Done;
+         }
+-        Some(checked)
+-    }
+-
+-    // Turning quick-xml's check off before its hashed check can run.
+-    #[allow(clippy::disallowed_methods)]
+-    fn take_over(&mut self) {
+-        self.attributes.with_checks(false);
++        item
+     }
+ }
+ 
+ impl<'a> OwnCheck<'a> {
+-    /// The 32 names quick-xml has checked, with their positions, and where
+-    /// the attribute after them starts. Reading them again without the check
+-    /// yields the same attributes: the check never changes what is read.
+-    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+-        let mut check = Self {
+-            names: BTreeMap::new(),
+-            next_start: 0,
+-        };
+-        for attribute in tag
+-            .unchecked_attributes()
+-            .take(QUICK_XML_LINEAR_NAMES)
+-            .flatten()
++    /// Seed the backend from raw key prefixes and the third borrowed key. No
++    /// earlier attribute value is decoded or reparsed.
++    fn from_prefix(
++        tag: &'a BytesStart<'a>,
++        first_end: usize,
++        second_end: usize,
++        third: &Attribute<'a>,
++    ) -> Self {
++        let mut names = BTreeMap::new();
++        let (first_position, first_name, _) =
++            key_at(tag.as_ref(), tag.name().as_ref().len()).expect("first prefix");
++        let (second_position, second_name, _) =
++            key_at(tag.as_ref(), first_end).expect("second prefix");
++        names.insert(Name(first_name), first_position);
++        names.insert(Name(second_name), second_position);
++        let third_name = third.key.into_inner();
++        names.insert(Name(third_name), offset_in(tag, third_name));
++        Self {
++            names,
++            next_start: second_end,
++        }
++    }
++
++    fn next(
++        &mut self,
++        tag: &'a BytesStart<'a>,
++        attributes: &mut Attributes<'a>,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start)
++            && has_equals
++            && let Some(first) = self.names.get(&Name(name))
+         {
+-            let name = attribute.key.into_inner();
+-            check.names.insert(Name(name), offset_in(tag, name));
+-            check.next_start = end_of(tag, &attribute);
++            return Some(Err(AttrError::Duplicated(position, *first)));
+         }
+-        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+-        check
++        let item = attributes.next()?;
++        Some(match item {
++            Ok(attribute) => self.check_attribute(tag, attribute),
++            Err(error) => Err(self.duplicate_before_value(tag, error)),
++        })
+     }
+ 
+-    fn check(
++    fn check_attribute(
+         &mut self,
+         tag: &'a BytesStart<'a>,
+-        item: Result<Attribute<'a>, AttrError>,
++        attribute: Attribute<'a>,
+     ) -> Result<Attribute<'a>, AttrError> {
+-        let attribute = match item {
+-            Ok(attribute) => attribute,
+-            Err(error) => return Err(self.duplicate_before_value(tag, error)),
+-        };
+         let name = attribute.key.into_inner();
+         let position = offset_in(tag, name);
+         match self.names.entry(Name(name)) {
+@@ -222,21 +347,27 @@
+ impl<'a> Iterator for CheckedAttributes<'a> {
+     type Item = Result<Attribute<'a>, AttrError>;
+ 
+-    /// The first 32 names are quick-xml's checked iterator plus a counter.
++    /// The first two names use the unchecked parser and later names use the
++    /// lazily allocated ordered-map backend.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
+-        if let Phase::QuickXml(yielded) = &mut self.phase
+-            && *yielded < QUICK_XML_LINEAR_NAMES
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
++        if let Phase::Second(next_start) = &self.phase {
++            return self.next_second(*next_start);
++        }
++        if let Phase::ShortTwo {
++            first_end,
++            next_start,
++        } = &self.phase
+         {
+-            let item = self.attributes.next();
+-            if matches!(item, Some(Ok(_))) {
+-                *yielded += 1;
+-            } else {
+-                self.phase = Phase::Done;
+-            }
+-            return item;
++            return self.next_short_two(*first_end, *next_start);
+         }
+-        self.next_after_quick_xml()
++        if matches!(self.phase, Phase::Own(_)) {
++            return self.next_own();
++        }
++        None
+     }
+ }
+ 
+@@ -257,6 +388,14 @@
+         .saturating_add(1)
+ }
+ 
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately enters the third-item path,
++/// including a malformed tail or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
++}
++
+ /// The name of the attribute that starts at or after `from`, read the way
+ /// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+ /// its position.
+@@ -271,6 +410,30 @@
+     Some((start, &name[..length]))
+ }
+ 
++/// The key prefix quick-xml has parsed at `from`, together with whether the
++/// prefix was followed by the `=` that makes duplicate checking precede value
++/// parsing. This consumes the first key byte exactly as quick-xml does, so a
++/// key beginning with `=` is retained rather than treated as an empty name.
++fn key_at(tag: &[u8], from: usize) -> Option<(usize, &[u8], bool)> {
++    let rest = tag.get(from..)?;
++    let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
++    let after_first = tag.get(start + 1..)?;
++    let length = after_first
++        .iter()
++        .position(|byte| *byte == b'=' || is_whitespace(*byte))
++        .map_or(tag.len() - (start + 1), |length| length);
++    let end = start + 1 + length;
++    let has_equals = match tag.get(end) {
++        Some(b'=') => true,
++        Some(_) => tag[end..]
++            .iter()
++            .find(|byte| !is_whitespace(**byte))
++            .is_some_and(|byte| *byte == b'='),
++        None => false,
++    };
++    Some((start, &tag[start..end], has_equals))
++}
++
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+ fn is_whitespace(byte: u8) -> bool {
+     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+--- a/crates/litchi-ole-common/src/xml_attributes.rs
++++ b/crates/litchi-ole-common/src/xml_attributes.rs
+@@ -1,20 +1,40 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
+ //!
+-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for the OLE2 crates,
+-//! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+-//! the two in step: this module compiles the same tests, from
+-//! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
++//! This source-only 0800 candidate reads the first two attributes with
++//! quick-xml's duplicate check disabled. After the second item, a third-key
++//! preflight compares only the raw key prefixes already addressed by the
++//! iterator; it never reparses either earlier value. A successful third item
++//! seeds an ordered map from the raw key slices and continues with the same
++//! bounded `O(n log n)` check. No transition reconstructs a quick-xml iterator
++//! or replays an already yielded item.
+ //!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+-//! default: a linear scan of the names before each one while there are at
+-//! most 32, then a hash pre-filter whose hasher is not keyed, with a scan of
+-//! every earlier name on each pre-filter hit, so its worst case grows with the
+-//! square of the tag. [`BytesStartExt::checked_attributes`] yields what
+-//! quick-xml's checked iterator yields up to and including its first error,
+-//! and nothing after it; quick-xml checks the first 32 names and this module
+-//! checks the rest in an ordered map, `O(log n)` comparisons per name and no
+-//! hashing.
++//! default. It compares each name with the names before it while it has seen
++//! at most 32; from the 33rd name on it pre-filters with a hash set and, on
++//! every pre-filter hit, scans all the names before it. The pre-filter's
++//! hasher is not keyed (`DefaultHasher::new()`), so a name hashes to the same
++//! value in every process built with the same standard library: whoever writes
++//! the tag chooses how often the pre-filter hits, and each hit costs a scan of
++//! the tag's earlier names. The check's worst case therefore grows with the
++//! square of the tag, and nothing but the tag's size bounds it where no
++//! per-element limit applies.
++//!
++//! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
++//! iterator (`BytesStart::attributes`) yields up to and including its first
++//! error, and nothing after it. The candidate checks the first two names with
++//! raw key prefixes and starts its ordered map at the third successful item:
++//! `O(log n)` name comparisons for each later one; no name is hashed. The
++//! first error is the one quick-xml reports, at the same attribute, with the
++//! same positions, so a reader that stops at an attribute's error (`?` on each
++//! item) behaves as it did with quick-xml's iterator.
++//!
++//! A reader that skips attribute errors and reads on uses
++//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
++//! and a reader that needs no duplicate check uses
++//! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
++//! disallows quick-xml's checked iteration in the crates that read untrusted
++//! OOXML and OLE2 XML, so a new call site has to choose one of the three.
+ 
+ use std::borrow::Cow;
+ use std::collections::BTreeMap;
+@@ -23,9 +43,8 @@
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
+ 
+-/// Names quick-xml checks with a linear scan of the names before them. From
+-/// the next name on it would hash names with its unkeyed hasher, so this
+-/// module turns its check off there and checks the names itself.
++/// Kept for the shared bounded-cost test's historical comparison point.
++#[cfg(test)]
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+@@ -37,8 +56,9 @@
+     /// including `AttrError::Duplicated(position, first_position)` at the
+     /// first repeated name, and a repeated name whose value is malformed is
+     /// reported as a duplicate, as quick-xml checks a name before reading its
+-    /// value. The cost is quick-xml's linear check for the first 32 names and
+-    /// `O(log n)` name comparisons for each later one; no name is hashed.
++    /// value. The first two names use raw key-prefix checks; after a third
++    /// successful item the candidate uses `O(log n)` ordered-map comparisons
++    /// per attribute and no name hashing.
+     fn checked_attributes(&self) -> CheckedAttributes<'_>;
+ 
+     /// Iterate the tag's attributes without any duplicate check: quick-xml's
+@@ -74,18 +94,29 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
+-    /// quick-xml checks the names; this many have been yielded.
+-    QuickXml(usize),
+-    /// quick-xml's check is off; this iterator checks the names.
++    /// No attribute has been requested yet.
++    First,
++    /// The first attribute was yielded unchecked; this is its next raw offset.
++    Second(usize),
++    /// The first two attributes were yielded unchecked and a third may follow.
++    /// `first_end` reconstructs the second key; `next_start` addresses the
++    /// third key. Neither offset points into an earlier value for reparsing.
++    ShortTwo {
++        first_end: usize,
++        next_start: usize,
++    },
++    /// The first three names have been seeded from raw key slices and this
++    /// iterator checks every subsequent name without replay.
+     Own(Box<OwnCheck<'a>>),
+     /// An error or the end has been yielded.
+     Done,
+ }
+ 
+-/// This iterator's check of the names, from the 33rd on.
++/// This iterator's bounded duplicate check after the short prefix.
+ #[derive(Clone, Debug)]
+ struct OwnCheck<'a> {
+-    /// Every name yielded so far, with its position.
++    /// Every name yielded so far, with its position. The map is allocated only
++    /// after a third successful item may be followed by another item.
+     names: BTreeMap<Name<'a>, usize>,
+     /// Where quick-xml starts to look for the next attribute: just after the
+     /// last one yielded.
+@@ -93,84 +124,192 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The short prefix uses quick-xml's parser without duplicate allocation.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
++            attributes,
++            phase: Phase::First,
+         }
+     }
+ 
+-    /// Everything after quick-xml's 32 names: the switch to this iterator's
+-    /// own check, its check of each later name, and the end.
++    /// Yield the first item. No earlier name exists, so its lexical result is
++    /// already the checked result.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::Second(end_of(self.tag, attribute));
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the second key before asking quick-xml to scan its value. A
++    /// repeated key without an equals sign remains quick-xml's `ExpectedEq`.
++    #[inline]
++    fn next_second(&mut self, next_start: usize) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let (Some((first_position, first_name, _)), Some((position, name, has_equals))) = (
++            key_at(self.tag.as_ref(), self.tag.name().as_ref().len()),
++            key_at(self.tag.as_ref(), next_start),
++        ) && has_equals
++            && name == first_name
++        {
++            self.phase = Phase::Done;
++            return Some(Err(AttrError::Duplicated(position, first_position)));
++        }
++
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ShortTwo {
++                    first_end: next_start,
++                    next_start: end_of(self.tag, attribute),
++                };
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the third key before parsing its value, then seed the ordered map
++    /// from the three raw key slices. The first and second values are never
++    /// parsed again; an error or end before a third successful item allocates
++    /// no map.
+     #[cold]
+     #[inline(never)]
+-    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+-        match self.phase {
+-            Phase::Done => return None,
+-            // quick-xml would hash the next name: turn its check off first.
+-            Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
+-        }
+-        let Some(item) = self.attributes.next() else {
++    fn next_short_two(
++        &mut self,
++        first_end: usize,
++        next_start: usize,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        let first = key_at(self.tag.as_ref(), self.tag.name().as_ref().len());
++        let second = key_at(self.tag.as_ref(), first_end);
++        let third = key_at(self.tag.as_ref(), next_start);
++        let Some((position, name, has_equals)) = third else {
+             self.phase = Phase::Done;
+             return None;
+         };
+-        let checked = if let Phase::Own(check) = &mut self.phase {
+-            check.check(self.tag, item)
++        if has_equals {
++            if let Some((first_position, _, _)) =
++                first.filter(|(_, first_name, _)| *first_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, first_position)));
++            }
++            if let Some((second_position, _, _)) =
++                second.filter(|(_, second_name, _)| *second_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, second_position)));
++            }
++        }
++
++        let item = self.attributes.next();
++        match item {
++            Some(Ok(attribute)) => {
++                let third_end = end_of(self.tag, &attribute);
++                if trailing_whitespace(self.tag, third_end) {
++                    self.phase = Phase::Done;
++                } else {
++                    let mut check = OwnCheck::from_prefix(
++                        self.tag,
++                        first_end,
++                        next_start,
++                        &attribute,
++                    );
++                    debug_assert_eq!(check.names.len(), 3);
++                    check.next_start = third_end;
++                    self.phase = Phase::Own(Box::new(check));
++                }
++                Some(Ok(attribute))
++            },
++            Some(Err(error)) => {
++                self.phase = Phase::Done;
++                Some(Err(error))
++            },
++            None => {
++                self.phase = Phase::Done;
++                None
++            },
++        }
++    }
++
++    /// Continue the ordered-map backend. Its raw-key preflight preserves
++    /// quick-xml's duplicate-before-value boundary even though the underlying
++    /// parser has duplicate checking disabled.
++    #[cold]
++    #[inline(never)]
++    fn next_own(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = if let Phase::Own(check) = &mut self.phase {
++            check.next(self.tag, &mut self.attributes)
+         } else {
+-            let mut check = OwnCheck::after_quick_xml(self.tag);
+-            let checked = check.check(self.tag, item);
+-            self.phase = Phase::Own(Box::new(check));
+-            checked
++            unreachable!("ordered backend is called only from the Own phase")
+         };
+-        if checked.is_err() {
++        if item.as_ref().map_or(true, Result::is_err) {
+             self.phase = Phase::Done;
+         }
+-        Some(checked)
+-    }
+-
+-    // Turning quick-xml's check off before its hashed check can run.
+-    #[allow(clippy::disallowed_methods)]
+-    fn take_over(&mut self) {
+-        self.attributes.with_checks(false);
++        item
+     }
+ }
+ 
+ impl<'a> OwnCheck<'a> {
+-    /// The 32 names quick-xml has checked, with their positions, and where
+-    /// the attribute after them starts. Reading them again without the check
+-    /// yields the same attributes: the check never changes what is read.
+-    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+-        let mut check = Self {
+-            names: BTreeMap::new(),
+-            next_start: 0,
+-        };
+-        for attribute in tag
+-            .unchecked_attributes()
+-            .take(QUICK_XML_LINEAR_NAMES)
+-            .flatten()
++    /// Seed the backend from raw key prefixes and the third borrowed key. No
++    /// earlier attribute value is decoded or reparsed.
++    fn from_prefix(
++        tag: &'a BytesStart<'a>,
++        first_end: usize,
++        second_end: usize,
++        third: &Attribute<'a>,
++    ) -> Self {
++        let mut names = BTreeMap::new();
++        let (first_position, first_name, _) =
++            key_at(tag.as_ref(), tag.name().as_ref().len()).expect("first prefix");
++        let (second_position, second_name, _) =
++            key_at(tag.as_ref(), first_end).expect("second prefix");
++        names.insert(Name(first_name), first_position);
++        names.insert(Name(second_name), second_position);
++        let third_name = third.key.into_inner();
++        names.insert(Name(third_name), offset_in(tag, third_name));
++        Self {
++            names,
++            next_start: second_end,
++        }
++    }
++
++    fn next(
++        &mut self,
++        tag: &'a BytesStart<'a>,
++        attributes: &mut Attributes<'a>,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start)
++            && has_equals
++            && let Some(first) = self.names.get(&Name(name))
+         {
+-            let name = attribute.key.into_inner();
+-            check.names.insert(Name(name), offset_in(tag, name));
+-            check.next_start = end_of(tag, &attribute);
++            return Some(Err(AttrError::Duplicated(position, *first)));
+         }
+-        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+-        check
++        let item = attributes.next()?;
++        Some(match item {
++            Ok(attribute) => self.check_attribute(tag, attribute),
++            Err(error) => Err(self.duplicate_before_value(tag, error)),
++        })
+     }
+ 
+-    fn check(
++    fn check_attribute(
+         &mut self,
+         tag: &'a BytesStart<'a>,
+-        item: Result<Attribute<'a>, AttrError>,
++        attribute: Attribute<'a>,
+     ) -> Result<Attribute<'a>, AttrError> {
+-        let attribute = match item {
+-            Ok(attribute) => attribute,
+-            Err(error) => return Err(self.duplicate_before_value(tag, error)),
+-        };
+         let name = attribute.key.into_inner();
+         let position = offset_in(tag, name);
+         match self.names.entry(Name(name)) {
+@@ -208,21 +347,27 @@
+ impl<'a> Iterator for CheckedAttributes<'a> {
+     type Item = Result<Attribute<'a>, AttrError>;
+ 
+-    /// The first 32 names are quick-xml's checked iterator plus a counter.
++    /// The first two names use the unchecked parser and later names use the
++    /// lazily allocated ordered-map backend.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
+-        if let Phase::QuickXml(yielded) = &mut self.phase
+-            && *yielded < QUICK_XML_LINEAR_NAMES
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
++        if let Phase::Second(next_start) = &self.phase {
++            return self.next_second(*next_start);
++        }
++        if let Phase::ShortTwo {
++            first_end,
++            next_start,
++        } = &self.phase
+         {
+-            let item = self.attributes.next();
+-            if matches!(item, Some(Ok(_))) {
+-                *yielded += 1;
+-            } else {
+-                self.phase = Phase::Done;
+-            }
+-            return item;
++            return self.next_short_two(*first_end, *next_start);
++        }
++        if matches!(self.phase, Phase::Own(_)) {
++            return self.next_own();
+         }
+-        self.next_after_quick_xml()
++        None
+     }
+ }
+ 
+@@ -243,6 +388,14 @@
+         .saturating_add(1)
+ }
+ 
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately enters the third-item path,
++/// including a malformed tail or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
++}
++
+ /// The name of the attribute that starts at or after `from`, read the way
+ /// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+ /// its position.
+@@ -257,6 +410,30 @@
+     Some((start, &name[..length]))
+ }
+ 
++/// The key prefix quick-xml has parsed at `from`, together with whether the
++/// prefix was followed by the `=` that makes duplicate checking precede value
++/// parsing. This consumes the first key byte exactly as quick-xml does, so a
++/// key beginning with `=` is retained rather than treated as an empty name.
++fn key_at(tag: &[u8], from: usize) -> Option<(usize, &[u8], bool)> {
++    let rest = tag.get(from..)?;
++    let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
++    let after_first = tag.get(start + 1..)?;
++    let length = after_first
++        .iter()
++        .position(|byte| *byte == b'=' || is_whitespace(*byte))
++        .map_or(tag.len() - (start + 1), |length| length);
++    let end = start + 1 + length;
++    let has_equals = match tag.get(end) {
++        Some(b'=') => true,
++        Some(_) => tag[end..]
++            .iter()
++            .find(|byte| !is_whitespace(**byte))
++            .is_some_and(|byte| *byte == b'='),
++        None => false,
++    };
++    Some((start, &tag[start..end], has_equals))
++}
++
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+ fn is_whitespace(byte: u8) -> bool {
+     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+@@ -289,5 +466,4 @@
+ }
+ 
+ #[cfg(test)]
+-#[path = "../../litchi-opc/src/xml_attributes/tests.rs"]
+ mod tests;
+--- a/crates/litchi-sign/src/xml_attributes.rs
++++ b/crates/litchi-sign/src/xml_attributes.rs
+@@ -1,20 +1,40 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
+ //!
+-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+-//! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+-//! the two in step: this module compiles the same tests, from
+-//! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
++//! This source-only 0800 candidate reads the first two attributes with
++//! quick-xml's duplicate check disabled. After the second item, a third-key
++//! preflight compares only the raw key prefixes already addressed by the
++//! iterator; it never reparses either earlier value. A successful third item
++//! seeds an ordered map from the raw key slices and continues with the same
++//! bounded `O(n log n)` check. No transition reconstructs a quick-xml iterator
++//! or replays an already yielded item.
+ //!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+-//! default: a linear scan of the names before each one while there are at
+-//! most 32, then a hash pre-filter whose hasher is not keyed, with a scan of
+-//! every earlier name on each pre-filter hit, so its worst case grows with the
+-//! square of the tag. [`BytesStartExt::checked_attributes`] yields what
+-//! quick-xml's checked iterator yields up to and including its first error,
+-//! and nothing after it; quick-xml checks the first 32 names and this module
+-//! checks the rest in an ordered map, `O(log n)` comparisons per name and no
+-//! hashing.
++//! default. It compares each name with the names before it while it has seen
++//! at most 32; from the 33rd name on it pre-filters with a hash set and, on
++//! every pre-filter hit, scans all the names before it. The pre-filter's
++//! hasher is not keyed (`DefaultHasher::new()`), so a name hashes to the same
++//! value in every process built with the same standard library: whoever writes
++//! the tag chooses how often the pre-filter hits, and each hit costs a scan of
++//! the tag's earlier names. The check's worst case therefore grows with the
++//! square of the tag, and nothing but the tag's size bounds it where no
++//! per-element limit applies.
++//!
++//! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
++//! iterator (`BytesStart::attributes`) yields up to and including its first
++//! error, and nothing after it. The candidate checks the first two names with
++//! raw key prefixes and starts its ordered map at the third successful item:
++//! `O(log n)` name comparisons for each later one; no name is hashed. The
++//! first error is the one quick-xml reports, at the same attribute, with the
++//! same positions, so a reader that stops at an attribute's error (`?` on each
++//! item) behaves as it did with quick-xml's iterator.
++//!
++//! A reader that skips attribute errors and reads on uses
++//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
++//! and a reader that needs no duplicate check uses
++//! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
++//! disallows quick-xml's checked iteration in the crates that read untrusted
++//! OOXML and OLE2 XML, so a new call site has to choose one of the three.
+ 
+ use std::borrow::Cow;
+ use std::collections::BTreeMap;
+@@ -23,9 +43,8 @@
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
+ 
+-/// Names quick-xml checks with a linear scan of the names before them. From
+-/// the next name on it would hash names with its unkeyed hasher, so this
+-/// module turns its check off there and checks the names itself.
++/// Kept for the shared bounded-cost test's historical comparison point.
++#[cfg(test)]
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+@@ -37,8 +56,9 @@
+     /// including `AttrError::Duplicated(position, first_position)` at the
+     /// first repeated name, and a repeated name whose value is malformed is
+     /// reported as a duplicate, as quick-xml checks a name before reading its
+-    /// value. The cost is quick-xml's linear check for the first 32 names and
+-    /// `O(log n)` name comparisons for each later one; no name is hashed.
++    /// value. The first two names use raw key-prefix checks; after a third
++    /// successful item the candidate uses `O(log n)` ordered-map comparisons
++    /// per attribute and no name hashing.
+     fn checked_attributes(&self) -> CheckedAttributes<'_>;
+ 
+     /// Iterate the tag's attributes without any duplicate check: quick-xml's
+@@ -74,18 +94,29 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
+-    /// quick-xml checks the names; this many have been yielded.
+-    QuickXml(usize),
+-    /// quick-xml's check is off; this iterator checks the names.
++    /// No attribute has been requested yet.
++    First,
++    /// The first attribute was yielded unchecked; this is its next raw offset.
++    Second(usize),
++    /// The first two attributes were yielded unchecked and a third may follow.
++    /// `first_end` reconstructs the second key; `next_start` addresses the
++    /// third key. Neither offset points into an earlier value for reparsing.
++    ShortTwo {
++        first_end: usize,
++        next_start: usize,
++    },
++    /// The first three names have been seeded from raw key slices and this
++    /// iterator checks every subsequent name without replay.
+     Own(Box<OwnCheck<'a>>),
+     /// An error or the end has been yielded.
+     Done,
+ }
+ 
+-/// This iterator's check of the names, from the 33rd on.
++/// This iterator's bounded duplicate check after the short prefix.
+ #[derive(Clone, Debug)]
+ struct OwnCheck<'a> {
+-    /// Every name yielded so far, with its position.
++    /// Every name yielded so far, with its position. The map is allocated only
++    /// after a third successful item may be followed by another item.
+     names: BTreeMap<Name<'a>, usize>,
+     /// Where quick-xml starts to look for the next attribute: just after the
+     /// last one yielded.
+@@ -93,84 +124,192 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The short prefix uses quick-xml's parser without duplicate allocation.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
++            attributes,
++            phase: Phase::First,
+         }
+     }
+ 
+-    /// Everything after quick-xml's 32 names: the switch to this iterator's
+-    /// own check, its check of each later name, and the end.
++    /// Yield the first item. No earlier name exists, so its lexical result is
++    /// already the checked result.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::Second(end_of(self.tag, attribute));
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the second key before asking quick-xml to scan its value. A
++    /// repeated key without an equals sign remains quick-xml's `ExpectedEq`.
++    #[inline]
++    fn next_second(&mut self, next_start: usize) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let (Some((first_position, first_name, _)), Some((position, name, has_equals))) = (
++            key_at(self.tag.as_ref(), self.tag.name().as_ref().len()),
++            key_at(self.tag.as_ref(), next_start),
++        ) && has_equals
++            && name == first_name
++        {
++            self.phase = Phase::Done;
++            return Some(Err(AttrError::Duplicated(position, first_position)));
++        }
++
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ShortTwo {
++                    first_end: next_start,
++                    next_start: end_of(self.tag, attribute),
++                };
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the third key before parsing its value, then seed the ordered map
++    /// from the three raw key slices. The first and second values are never
++    /// parsed again; an error or end before a third successful item allocates
++    /// no map.
+     #[cold]
+     #[inline(never)]
+-    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+-        match self.phase {
+-            Phase::Done => return None,
+-            // quick-xml would hash the next name: turn its check off first.
+-            Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
+-        }
+-        let Some(item) = self.attributes.next() else {
++    fn next_short_two(
++        &mut self,
++        first_end: usize,
++        next_start: usize,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        let first = key_at(self.tag.as_ref(), self.tag.name().as_ref().len());
++        let second = key_at(self.tag.as_ref(), first_end);
++        let third = key_at(self.tag.as_ref(), next_start);
++        let Some((position, name, has_equals)) = third else {
+             self.phase = Phase::Done;
+             return None;
+         };
+-        let checked = if let Phase::Own(check) = &mut self.phase {
+-            check.check(self.tag, item)
++        if has_equals {
++            if let Some((first_position, _, _)) =
++                first.filter(|(_, first_name, _)| *first_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, first_position)));
++            }
++            if let Some((second_position, _, _)) =
++                second.filter(|(_, second_name, _)| *second_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, second_position)));
++            }
++        }
++
++        let item = self.attributes.next();
++        match item {
++            Some(Ok(attribute)) => {
++                let third_end = end_of(self.tag, &attribute);
++                if trailing_whitespace(self.tag, third_end) {
++                    self.phase = Phase::Done;
++                } else {
++                    let mut check = OwnCheck::from_prefix(
++                        self.tag,
++                        first_end,
++                        next_start,
++                        &attribute,
++                    );
++                    debug_assert_eq!(check.names.len(), 3);
++                    check.next_start = third_end;
++                    self.phase = Phase::Own(Box::new(check));
++                }
++                Some(Ok(attribute))
++            },
++            Some(Err(error)) => {
++                self.phase = Phase::Done;
++                Some(Err(error))
++            },
++            None => {
++                self.phase = Phase::Done;
++                None
++            },
++        }
++    }
++
++    /// Continue the ordered-map backend. Its raw-key preflight preserves
++    /// quick-xml's duplicate-before-value boundary even though the underlying
++    /// parser has duplicate checking disabled.
++    #[cold]
++    #[inline(never)]
++    fn next_own(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = if let Phase::Own(check) = &mut self.phase {
++            check.next(self.tag, &mut self.attributes)
+         } else {
+-            let mut check = OwnCheck::after_quick_xml(self.tag);
+-            let checked = check.check(self.tag, item);
+-            self.phase = Phase::Own(Box::new(check));
+-            checked
++            unreachable!("ordered backend is called only from the Own phase")
+         };
+-        if checked.is_err() {
++        if item.as_ref().map_or(true, Result::is_err) {
+             self.phase = Phase::Done;
+         }
+-        Some(checked)
+-    }
+-
+-    // Turning quick-xml's check off before its hashed check can run.
+-    #[allow(clippy::disallowed_methods)]
+-    fn take_over(&mut self) {
+-        self.attributes.with_checks(false);
++        item
+     }
+ }
+ 
+ impl<'a> OwnCheck<'a> {
+-    /// The 32 names quick-xml has checked, with their positions, and where
+-    /// the attribute after them starts. Reading them again without the check
+-    /// yields the same attributes: the check never changes what is read.
+-    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+-        let mut check = Self {
+-            names: BTreeMap::new(),
+-            next_start: 0,
+-        };
+-        for attribute in tag
+-            .unchecked_attributes()
+-            .take(QUICK_XML_LINEAR_NAMES)
+-            .flatten()
++    /// Seed the backend from raw key prefixes and the third borrowed key. No
++    /// earlier attribute value is decoded or reparsed.
++    fn from_prefix(
++        tag: &'a BytesStart<'a>,
++        first_end: usize,
++        second_end: usize,
++        third: &Attribute<'a>,
++    ) -> Self {
++        let mut names = BTreeMap::new();
++        let (first_position, first_name, _) =
++            key_at(tag.as_ref(), tag.name().as_ref().len()).expect("first prefix");
++        let (second_position, second_name, _) =
++            key_at(tag.as_ref(), first_end).expect("second prefix");
++        names.insert(Name(first_name), first_position);
++        names.insert(Name(second_name), second_position);
++        let third_name = third.key.into_inner();
++        names.insert(Name(third_name), offset_in(tag, third_name));
++        Self {
++            names,
++            next_start: second_end,
++        }
++    }
++
++    fn next(
++        &mut self,
++        tag: &'a BytesStart<'a>,
++        attributes: &mut Attributes<'a>,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start)
++            && has_equals
++            && let Some(first) = self.names.get(&Name(name))
+         {
+-            let name = attribute.key.into_inner();
+-            check.names.insert(Name(name), offset_in(tag, name));
+-            check.next_start = end_of(tag, &attribute);
++            return Some(Err(AttrError::Duplicated(position, *first)));
+         }
+-        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+-        check
++        let item = attributes.next()?;
++        Some(match item {
++            Ok(attribute) => self.check_attribute(tag, attribute),
++            Err(error) => Err(self.duplicate_before_value(tag, error)),
++        })
+     }
+ 
+-    fn check(
++    fn check_attribute(
+         &mut self,
+         tag: &'a BytesStart<'a>,
+-        item: Result<Attribute<'a>, AttrError>,
++        attribute: Attribute<'a>,
+     ) -> Result<Attribute<'a>, AttrError> {
+-        let attribute = match item {
+-            Ok(attribute) => attribute,
+-            Err(error) => return Err(self.duplicate_before_value(tag, error)),
+-        };
+         let name = attribute.key.into_inner();
+         let position = offset_in(tag, name);
+         match self.names.entry(Name(name)) {
+@@ -208,21 +347,27 @@
+ impl<'a> Iterator for CheckedAttributes<'a> {
+     type Item = Result<Attribute<'a>, AttrError>;
+ 
+-    /// The first 32 names are quick-xml's checked iterator plus a counter.
++    /// The first two names use the unchecked parser and later names use the
++    /// lazily allocated ordered-map backend.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
+-        if let Phase::QuickXml(yielded) = &mut self.phase
+-            && *yielded < QUICK_XML_LINEAR_NAMES
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
++        if let Phase::Second(next_start) = &self.phase {
++            return self.next_second(*next_start);
++        }
++        if let Phase::ShortTwo {
++            first_end,
++            next_start,
++        } = &self.phase
+         {
+-            let item = self.attributes.next();
+-            if matches!(item, Some(Ok(_))) {
+-                *yielded += 1;
+-            } else {
+-                self.phase = Phase::Done;
+-            }
+-            return item;
++            return self.next_short_two(*first_end, *next_start);
++        }
++        if matches!(self.phase, Phase::Own(_)) {
++            return self.next_own();
+         }
+-        self.next_after_quick_xml()
++        None
+     }
+ }
+ 
+@@ -243,6 +388,14 @@
+         .saturating_add(1)
+ }
+ 
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately enters the third-item path,
++/// including a malformed tail or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
++}
++
+ /// The name of the attribute that starts at or after `from`, read the way
+ /// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+ /// its position.
+@@ -257,6 +410,30 @@
+     Some((start, &name[..length]))
+ }
+ 
++/// The key prefix quick-xml has parsed at `from`, together with whether the
++/// prefix was followed by the `=` that makes duplicate checking precede value
++/// parsing. This consumes the first key byte exactly as quick-xml does, so a
++/// key beginning with `=` is retained rather than treated as an empty name.
++fn key_at(tag: &[u8], from: usize) -> Option<(usize, &[u8], bool)> {
++    let rest = tag.get(from..)?;
++    let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
++    let after_first = tag.get(start + 1..)?;
++    let length = after_first
++        .iter()
++        .position(|byte| *byte == b'=' || is_whitespace(*byte))
++        .map_or(tag.len() - (start + 1), |length| length);
++    let end = start + 1 + length;
++    let has_equals = match tag.get(end) {
++        Some(b'=') => true,
++        Some(_) => tag[end..]
++            .iter()
++            .find(|byte| !is_whitespace(**byte))
++            .is_some_and(|byte| *byte == b'='),
++        None => false,
++    };
++    Some((start, &tag[start..end], has_equals))
++}
++
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+ fn is_whitespace(byte: u8) -> bool {
+     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+@@ -289,5 +466,4 @@
+ }
+ 
+ #[cfg(test)]
+-#[path = "../../litchi-opc/src/xml_attributes/tests.rs"]
+ mod tests;
+--- a/crates/litchi-xldm/src/xml_attributes.rs
++++ b/crates/litchi-xldm/src/xml_attributes.rs
+@@ -1,20 +1,40 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
+ //!
+-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+-//! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+-//! the two in step: this module compiles the same tests, from
+-//! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
++//! This source-only 0800 candidate reads the first two attributes with
++//! quick-xml's duplicate check disabled. After the second item, a third-key
++//! preflight compares only the raw key prefixes already addressed by the
++//! iterator; it never reparses either earlier value. A successful third item
++//! seeds an ordered map from the raw key slices and continues with the same
++//! bounded `O(n log n)` check. No transition reconstructs a quick-xml iterator
++//! or replays an already yielded item.
+ //!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+-//! default: a linear scan of the names before each one while there are at
+-//! most 32, then a hash pre-filter whose hasher is not keyed, with a scan of
+-//! every earlier name on each pre-filter hit, so its worst case grows with the
+-//! square of the tag. [`BytesStartExt::checked_attributes`] yields what
+-//! quick-xml's checked iterator yields up to and including its first error,
+-//! and nothing after it; quick-xml checks the first 32 names and this module
+-//! checks the rest in an ordered map, `O(log n)` comparisons per name and no
+-//! hashing.
++//! default. It compares each name with the names before it while it has seen
++//! at most 32; from the 33rd name on it pre-filters with a hash set and, on
++//! every pre-filter hit, scans all the names before it. The pre-filter's
++//! hasher is not keyed (`DefaultHasher::new()`), so a name hashes to the same
++//! value in every process built with the same standard library: whoever writes
++//! the tag chooses how often the pre-filter hits, and each hit costs a scan of
++//! the tag's earlier names. The check's worst case therefore grows with the
++//! square of the tag, and nothing but the tag's size bounds it where no
++//! per-element limit applies.
++//!
++//! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
++//! iterator (`BytesStart::attributes`) yields up to and including its first
++//! error, and nothing after it. The candidate checks the first two names with
++//! raw key prefixes and starts its ordered map at the third successful item:
++//! `O(log n)` name comparisons for each later one; no name is hashed. The
++//! first error is the one quick-xml reports, at the same attribute, with the
++//! same positions, so a reader that stops at an attribute's error (`?` on each
++//! item) behaves as it did with quick-xml's iterator.
++//!
++//! A reader that skips attribute errors and reads on uses
++//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
++//! and a reader that needs no duplicate check uses
++//! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
++//! disallows quick-xml's checked iteration in the crates that read untrusted
++//! OOXML and OLE2 XML, so a new call site has to choose one of the three.
+ 
+ use std::borrow::Cow;
+ use std::collections::BTreeMap;
+@@ -23,9 +43,8 @@
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
+ 
+-/// Names quick-xml checks with a linear scan of the names before them. From
+-/// the next name on it would hash names with its unkeyed hasher, so this
+-/// module turns its check off there and checks the names itself.
++/// Kept for the shared bounded-cost test's historical comparison point.
++#[cfg(test)]
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+@@ -37,8 +56,9 @@
+     /// including `AttrError::Duplicated(position, first_position)` at the
+     /// first repeated name, and a repeated name whose value is malformed is
+     /// reported as a duplicate, as quick-xml checks a name before reading its
+-    /// value. The cost is quick-xml's linear check for the first 32 names and
+-    /// `O(log n)` name comparisons for each later one; no name is hashed.
++    /// value. The first two names use raw key-prefix checks; after a third
++    /// successful item the candidate uses `O(log n)` ordered-map comparisons
++    /// per attribute and no name hashing.
+     fn checked_attributes(&self) -> CheckedAttributes<'_>;
+ 
+     /// Iterate the tag's attributes without any duplicate check: quick-xml's
+@@ -74,18 +94,29 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
+-    /// quick-xml checks the names; this many have been yielded.
+-    QuickXml(usize),
+-    /// quick-xml's check is off; this iterator checks the names.
++    /// No attribute has been requested yet.
++    First,
++    /// The first attribute was yielded unchecked; this is its next raw offset.
++    Second(usize),
++    /// The first two attributes were yielded unchecked and a third may follow.
++    /// `first_end` reconstructs the second key; `next_start` addresses the
++    /// third key. Neither offset points into an earlier value for reparsing.
++    ShortTwo {
++        first_end: usize,
++        next_start: usize,
++    },
++    /// The first three names have been seeded from raw key slices and this
++    /// iterator checks every subsequent name without replay.
+     Own(Box<OwnCheck<'a>>),
+     /// An error or the end has been yielded.
+     Done,
+ }
+ 
+-/// This iterator's check of the names, from the 33rd on.
++/// This iterator's bounded duplicate check after the short prefix.
+ #[derive(Clone, Debug)]
+ struct OwnCheck<'a> {
+-    /// Every name yielded so far, with its position.
++    /// Every name yielded so far, with its position. The map is allocated only
++    /// after a third successful item may be followed by another item.
+     names: BTreeMap<Name<'a>, usize>,
+     /// Where quick-xml starts to look for the next attribute: just after the
+     /// last one yielded.
+@@ -93,84 +124,192 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The short prefix uses quick-xml's parser without duplicate allocation.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
++            attributes,
++            phase: Phase::First,
+         }
+     }
+ 
+-    /// Everything after quick-xml's 32 names: the switch to this iterator's
+-    /// own check, its check of each later name, and the end.
++    /// Yield the first item. No earlier name exists, so its lexical result is
++    /// already the checked result.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::Second(end_of(self.tag, attribute));
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the second key before asking quick-xml to scan its value. A
++    /// repeated key without an equals sign remains quick-xml's `ExpectedEq`.
++    #[inline]
++    fn next_second(&mut self, next_start: usize) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let (Some((first_position, first_name, _)), Some((position, name, has_equals))) = (
++            key_at(self.tag.as_ref(), self.tag.name().as_ref().len()),
++            key_at(self.tag.as_ref(), next_start),
++        ) && has_equals
++            && name == first_name
++        {
++            self.phase = Phase::Done;
++            return Some(Err(AttrError::Duplicated(position, first_position)));
++        }
++
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ShortTwo {
++                    first_end: next_start,
++                    next_start: end_of(self.tag, attribute),
++                };
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the third key before parsing its value, then seed the ordered map
++    /// from the three raw key slices. The first and second values are never
++    /// parsed again; an error or end before a third successful item allocates
++    /// no map.
+     #[cold]
+     #[inline(never)]
+-    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+-        match self.phase {
+-            Phase::Done => return None,
+-            // quick-xml would hash the next name: turn its check off first.
+-            Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
+-        }
+-        let Some(item) = self.attributes.next() else {
++    fn next_short_two(
++        &mut self,
++        first_end: usize,
++        next_start: usize,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        let first = key_at(self.tag.as_ref(), self.tag.name().as_ref().len());
++        let second = key_at(self.tag.as_ref(), first_end);
++        let third = key_at(self.tag.as_ref(), next_start);
++        let Some((position, name, has_equals)) = third else {
+             self.phase = Phase::Done;
+             return None;
+         };
+-        let checked = if let Phase::Own(check) = &mut self.phase {
+-            check.check(self.tag, item)
++        if has_equals {
++            if let Some((first_position, _, _)) =
++                first.filter(|(_, first_name, _)| *first_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, first_position)));
++            }
++            if let Some((second_position, _, _)) =
++                second.filter(|(_, second_name, _)| *second_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, second_position)));
++            }
++        }
++
++        let item = self.attributes.next();
++        match item {
++            Some(Ok(attribute)) => {
++                let third_end = end_of(self.tag, &attribute);
++                if trailing_whitespace(self.tag, third_end) {
++                    self.phase = Phase::Done;
++                } else {
++                    let mut check = OwnCheck::from_prefix(
++                        self.tag,
++                        first_end,
++                        next_start,
++                        &attribute,
++                    );
++                    debug_assert_eq!(check.names.len(), 3);
++                    check.next_start = third_end;
++                    self.phase = Phase::Own(Box::new(check));
++                }
++                Some(Ok(attribute))
++            },
++            Some(Err(error)) => {
++                self.phase = Phase::Done;
++                Some(Err(error))
++            },
++            None => {
++                self.phase = Phase::Done;
++                None
++            },
++        }
++    }
++
++    /// Continue the ordered-map backend. Its raw-key preflight preserves
++    /// quick-xml's duplicate-before-value boundary even though the underlying
++    /// parser has duplicate checking disabled.
++    #[cold]
++    #[inline(never)]
++    fn next_own(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = if let Phase::Own(check) = &mut self.phase {
++            check.next(self.tag, &mut self.attributes)
+         } else {
+-            let mut check = OwnCheck::after_quick_xml(self.tag);
+-            let checked = check.check(self.tag, item);
+-            self.phase = Phase::Own(Box::new(check));
+-            checked
++            unreachable!("ordered backend is called only from the Own phase")
+         };
+-        if checked.is_err() {
++        if item.as_ref().map_or(true, Result::is_err) {
+             self.phase = Phase::Done;
+         }
+-        Some(checked)
+-    }
+-
+-    // Turning quick-xml's check off before its hashed check can run.
+-    #[allow(clippy::disallowed_methods)]
+-    fn take_over(&mut self) {
+-        self.attributes.with_checks(false);
++        item
+     }
+ }
+ 
+ impl<'a> OwnCheck<'a> {
+-    /// The 32 names quick-xml has checked, with their positions, and where
+-    /// the attribute after them starts. Reading them again without the check
+-    /// yields the same attributes: the check never changes what is read.
+-    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+-        let mut check = Self {
+-            names: BTreeMap::new(),
+-            next_start: 0,
+-        };
+-        for attribute in tag
+-            .unchecked_attributes()
+-            .take(QUICK_XML_LINEAR_NAMES)
+-            .flatten()
++    /// Seed the backend from raw key prefixes and the third borrowed key. No
++    /// earlier attribute value is decoded or reparsed.
++    fn from_prefix(
++        tag: &'a BytesStart<'a>,
++        first_end: usize,
++        second_end: usize,
++        third: &Attribute<'a>,
++    ) -> Self {
++        let mut names = BTreeMap::new();
++        let (first_position, first_name, _) =
++            key_at(tag.as_ref(), tag.name().as_ref().len()).expect("first prefix");
++        let (second_position, second_name, _) =
++            key_at(tag.as_ref(), first_end).expect("second prefix");
++        names.insert(Name(first_name), first_position);
++        names.insert(Name(second_name), second_position);
++        let third_name = third.key.into_inner();
++        names.insert(Name(third_name), offset_in(tag, third_name));
++        Self {
++            names,
++            next_start: second_end,
++        }
++    }
++
++    fn next(
++        &mut self,
++        tag: &'a BytesStart<'a>,
++        attributes: &mut Attributes<'a>,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start)
++            && has_equals
++            && let Some(first) = self.names.get(&Name(name))
+         {
+-            let name = attribute.key.into_inner();
+-            check.names.insert(Name(name), offset_in(tag, name));
+-            check.next_start = end_of(tag, &attribute);
++            return Some(Err(AttrError::Duplicated(position, *first)));
+         }
+-        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+-        check
++        let item = attributes.next()?;
++        Some(match item {
++            Ok(attribute) => self.check_attribute(tag, attribute),
++            Err(error) => Err(self.duplicate_before_value(tag, error)),
++        })
+     }
+ 
+-    fn check(
++    fn check_attribute(
+         &mut self,
+         tag: &'a BytesStart<'a>,
+-        item: Result<Attribute<'a>, AttrError>,
++        attribute: Attribute<'a>,
+     ) -> Result<Attribute<'a>, AttrError> {
+-        let attribute = match item {
+-            Ok(attribute) => attribute,
+-            Err(error) => return Err(self.duplicate_before_value(tag, error)),
+-        };
+         let name = attribute.key.into_inner();
+         let position = offset_in(tag, name);
+         match self.names.entry(Name(name)) {
+@@ -208,21 +347,27 @@
+ impl<'a> Iterator for CheckedAttributes<'a> {
+     type Item = Result<Attribute<'a>, AttrError>;
+ 
+-    /// The first 32 names are quick-xml's checked iterator plus a counter.
++    /// The first two names use the unchecked parser and later names use the
++    /// lazily allocated ordered-map backend.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
+-        if let Phase::QuickXml(yielded) = &mut self.phase
+-            && *yielded < QUICK_XML_LINEAR_NAMES
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
++        if let Phase::Second(next_start) = &self.phase {
++            return self.next_second(*next_start);
++        }
++        if let Phase::ShortTwo {
++            first_end,
++            next_start,
++        } = &self.phase
+         {
+-            let item = self.attributes.next();
+-            if matches!(item, Some(Ok(_))) {
+-                *yielded += 1;
+-            } else {
+-                self.phase = Phase::Done;
+-            }
+-            return item;
++            return self.next_short_two(*first_end, *next_start);
++        }
++        if matches!(self.phase, Phase::Own(_)) {
++            return self.next_own();
+         }
+-        self.next_after_quick_xml()
++        None
+     }
+ }
+ 
+@@ -243,6 +388,14 @@
+         .saturating_add(1)
+ }
+ 
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately enters the third-item path,
++/// including a malformed tail or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
++}
++
+ /// The name of the attribute that starts at or after `from`, read the way
+ /// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+ /// its position.
+@@ -257,6 +410,30 @@
+     Some((start, &name[..length]))
+ }
+ 
++/// The key prefix quick-xml has parsed at `from`, together with whether the
++/// prefix was followed by the `=` that makes duplicate checking precede value
++/// parsing. This consumes the first key byte exactly as quick-xml does, so a
++/// key beginning with `=` is retained rather than treated as an empty name.
++fn key_at(tag: &[u8], from: usize) -> Option<(usize, &[u8], bool)> {
++    let rest = tag.get(from..)?;
++    let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
++    let after_first = tag.get(start + 1..)?;
++    let length = after_first
++        .iter()
++        .position(|byte| *byte == b'=' || is_whitespace(*byte))
++        .map_or(tag.len() - (start + 1), |length| length);
++    let end = start + 1 + length;
++    let has_equals = match tag.get(end) {
++        Some(b'=') => true,
++        Some(_) => tag[end..]
++            .iter()
++            .find(|byte| !is_whitespace(**byte))
++            .is_some_and(|byte| *byte == b'='),
++        None => false,
++    };
++    Some((start, &tag[start..end], has_equals))
++}
++
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+ fn is_whitespace(byte: u8) -> bool {
+     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+@@ -289,5 +466,4 @@
+ }
+ 
+ #[cfg(test)]
+-#[path = "../../litchi-opc/src/xml_attributes/tests.rs"]
+ mod tests;
+--- a/crates/xml-minifier/src/xml_attributes.rs
++++ b/crates/xml-minifier/src/xml_attributes.rs
+@@ -1,20 +1,40 @@
+ //! Attribute iteration for readers that stop at a start tag's first attribute
+ //! error, with a worst case that stays bounded on hostile tags.
+ //!
+-//! This is a copy of `litchi_opc::xml_attributes` (record 0770) for this crate,
+-//! which may not depend on `litchi-opc` (`tools/crate_boundaries.json`). Keep
+-//! the two in step: this module compiles the same tests, from
+-//! `litchi-opc/src/xml_attributes/tests.rs`, against its own code.
++//! This source-only 0800 candidate reads the first two attributes with
++//! quick-xml's duplicate check disabled. After the second item, a third-key
++//! preflight compares only the raw key prefixes already addressed by the
++//! iterator; it never reparses either earlier value. A successful third item
++//! seeds an ordered map from the raw key slices and continues with the same
++//! bounded `O(n log n)` check. No transition reconstructs a quick-xml iterator
++//! or replays an already yielded item.
+ //!
+ //! quick-xml 0.41 checks a start tag's attribute names for duplicates by
+-//! default: a linear scan of the names before each one while there are at
+-//! most 32, then a hash pre-filter whose hasher is not keyed, with a scan of
+-//! every earlier name on each pre-filter hit, so its worst case grows with the
+-//! square of the tag. [`BytesStartExt::checked_attributes`] yields what
+-//! quick-xml's checked iterator yields up to and including its first error,
+-//! and nothing after it; quick-xml checks the first 32 names and this module
+-//! checks the rest in an ordered map, `O(log n)` comparisons per name and no
+-//! hashing.
++//! default. It compares each name with the names before it while it has seen
++//! at most 32; from the 33rd name on it pre-filters with a hash set and, on
++//! every pre-filter hit, scans all the names before it. The pre-filter's
++//! hasher is not keyed (`DefaultHasher::new()`), so a name hashes to the same
++//! value in every process built with the same standard library: whoever writes
++//! the tag chooses how often the pre-filter hits, and each hit costs a scan of
++//! the tag's earlier names. The check's worst case therefore grows with the
++//! square of the tag, and nothing but the tag's size bounds it where no
++//! per-element limit applies.
++//!
++//! [`BytesStartExt::checked_attributes`] yields what quick-xml's checked
++//! iterator (`BytesStart::attributes`) yields up to and including its first
++//! error, and nothing after it. The candidate checks the first two names with
++//! raw key prefixes and starts its ordered map at the third successful item:
++//! `O(log n)` name comparisons for each later one; no name is hashed. The
++//! first error is the one quick-xml reports, at the same attribute, with the
++//! same positions, so a reader that stops at an attribute's error (`?` on each
++//! item) behaves as it did with quick-xml's iterator.
++//!
++//! A reader that skips attribute errors and reads on uses
++//! `litchi_ooxml_common::xml::attributes::first_wins` instead (record 0764),
++//! and a reader that needs no duplicate check uses
++//! [`BytesStartExt::unchecked_attributes`]. The workspace's `clippy.toml`
++//! disallows quick-xml's checked iteration in the crates that read untrusted
++//! OOXML and OLE2 XML, so a new call site has to choose one of the three.
+ 
+ use std::borrow::Cow;
+ use std::collections::BTreeMap;
+@@ -23,9 +43,8 @@
+ use quick_xml::events::BytesStart;
+ use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
+ 
+-/// Names quick-xml checks with a linear scan of the names before them. From
+-/// the next name on it would hash names with its unkeyed hasher, so this
+-/// module turns its check off there and checks the names itself.
++/// Kept for the shared bounded-cost test's historical comparison point.
++#[cfg(test)]
+ const QUICK_XML_LINEAR_NAMES: usize = 32;
+ 
+ /// Bounded attribute iteration for quick-xml start tags.
+@@ -37,8 +56,9 @@
+     /// including `AttrError::Duplicated(position, first_position)` at the
+     /// first repeated name, and a repeated name whose value is malformed is
+     /// reported as a duplicate, as quick-xml checks a name before reading its
+-    /// value. The cost is quick-xml's linear check for the first 32 names and
+-    /// `O(log n)` name comparisons for each later one; no name is hashed.
++    /// value. The first two names use raw key-prefix checks; after a third
++    /// successful item the candidate uses `O(log n)` ordered-map comparisons
++    /// per attribute and no name hashing.
+     fn checked_attributes(&self) -> CheckedAttributes<'_>;
+ 
+     /// Iterate the tag's attributes without any duplicate check: quick-xml's
+@@ -74,18 +94,29 @@
+ 
+ #[derive(Clone, Debug)]
+ enum Phase<'a> {
+-    /// quick-xml checks the names; this many have been yielded.
+-    QuickXml(usize),
+-    /// quick-xml's check is off; this iterator checks the names.
++    /// No attribute has been requested yet.
++    First,
++    /// The first attribute was yielded unchecked; this is its next raw offset.
++    Second(usize),
++    /// The first two attributes were yielded unchecked and a third may follow.
++    /// `first_end` reconstructs the second key; `next_start` addresses the
++    /// third key. Neither offset points into an earlier value for reparsing.
++    ShortTwo {
++        first_end: usize,
++        next_start: usize,
++    },
++    /// The first three names have been seeded from raw key slices and this
++    /// iterator checks every subsequent name without replay.
+     Own(Box<OwnCheck<'a>>),
+     /// An error or the end has been yielded.
+     Done,
+ }
+ 
+-/// This iterator's check of the names, from the 33rd on.
++/// This iterator's bounded duplicate check after the short prefix.
+ #[derive(Clone, Debug)]
+ struct OwnCheck<'a> {
+-    /// Every name yielded so far, with its position.
++    /// Every name yielded so far, with its position. The map is allocated only
++    /// after a third successful item may be followed by another item.
+     names: BTreeMap<Name<'a>, usize>,
+     /// Where quick-xml starts to look for the next attribute: just after the
+     /// last one yielded.
+@@ -93,84 +124,192 @@
+ }
+ 
+ impl<'a> CheckedAttributes<'a> {
+-    // quick-xml's checked iterator, used for the first 32 names only.
++    // The short prefix uses quick-xml's parser without duplicate allocation.
+     #[allow(clippy::disallowed_methods)]
+     #[inline]
+     fn new(tag: &'a BytesStart<'a>) -> Self {
++        let mut attributes = tag.attributes();
++        attributes.with_checks(false);
+         Self {
+             tag,
+-            attributes: tag.attributes(),
+-            phase: Phase::QuickXml(0),
++            attributes,
++            phase: Phase::First,
+         }
+     }
+ 
+-    /// Everything after quick-xml's 32 names: the switch to this iterator's
+-    /// own check, its check of each later name, and the end.
++    /// Yield the first item. No earlier name exists, so its lexical result is
++    /// already the checked result.
++    #[inline]
++    fn next_first(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::Second(end_of(self.tag, attribute));
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the second key before asking quick-xml to scan its value. A
++    /// repeated key without an equals sign remains quick-xml's `ExpectedEq`.
++    #[inline]
++    fn next_second(&mut self, next_start: usize) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let (Some((first_position, first_name, _)), Some((position, name, has_equals))) = (
++            key_at(self.tag.as_ref(), self.tag.name().as_ref().len()),
++            key_at(self.tag.as_ref(), next_start),
++        ) && has_equals
++            && name == first_name
++        {
++            self.phase = Phase::Done;
++            return Some(Err(AttrError::Duplicated(position, first_position)));
++        }
++
++        let item = self.attributes.next();
++        match &item {
++            Some(Ok(attribute)) if !trailing_whitespace(self.tag, end_of(self.tag, attribute)) => {
++                self.phase = Phase::ShortTwo {
++                    first_end: next_start,
++                    next_start: end_of(self.tag, attribute),
++                };
++            },
++            Some(Ok(_)) | Some(Err(_)) | None => {
++                self.phase = Phase::Done;
++            },
++        }
++        item
++    }
++
++    /// Check the third key before parsing its value, then seed the ordered map
++    /// from the three raw key slices. The first and second values are never
++    /// parsed again; an error or end before a third successful item allocates
++    /// no map.
+     #[cold]
+     #[inline(never)]
+-    fn next_after_quick_xml(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
+-        match self.phase {
+-            Phase::Done => return None,
+-            // quick-xml would hash the next name: turn its check off first.
+-            Phase::QuickXml(_) => self.take_over(),
+-            Phase::Own(_) => {},
+-        }
+-        let Some(item) = self.attributes.next() else {
++    fn next_short_two(
++        &mut self,
++        first_end: usize,
++        next_start: usize,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        let first = key_at(self.tag.as_ref(), self.tag.name().as_ref().len());
++        let second = key_at(self.tag.as_ref(), first_end);
++        let third = key_at(self.tag.as_ref(), next_start);
++        let Some((position, name, has_equals)) = third else {
+             self.phase = Phase::Done;
+             return None;
+         };
+-        let checked = if let Phase::Own(check) = &mut self.phase {
+-            check.check(self.tag, item)
++        if has_equals {
++            if let Some((first_position, _, _)) =
++                first.filter(|(_, first_name, _)| *first_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, first_position)));
++            }
++            if let Some((second_position, _, _)) =
++                second.filter(|(_, second_name, _)| *second_name == name)
++            {
++                self.phase = Phase::Done;
++                return Some(Err(AttrError::Duplicated(position, second_position)));
++            }
++        }
++
++        let item = self.attributes.next();
++        match item {
++            Some(Ok(attribute)) => {
++                let third_end = end_of(self.tag, &attribute);
++                if trailing_whitespace(self.tag, third_end) {
++                    self.phase = Phase::Done;
++                } else {
++                    let mut check = OwnCheck::from_prefix(
++                        self.tag,
++                        first_end,
++                        next_start,
++                        &attribute,
++                    );
++                    debug_assert_eq!(check.names.len(), 3);
++                    check.next_start = third_end;
++                    self.phase = Phase::Own(Box::new(check));
++                }
++                Some(Ok(attribute))
++            },
++            Some(Err(error)) => {
++                self.phase = Phase::Done;
++                Some(Err(error))
++            },
++            None => {
++                self.phase = Phase::Done;
++                None
++            },
++        }
++    }
++
++    /// Continue the ordered-map backend. Its raw-key preflight preserves
++    /// quick-xml's duplicate-before-value boundary even though the underlying
++    /// parser has duplicate checking disabled.
++    #[cold]
++    #[inline(never)]
++    fn next_own(&mut self) -> Option<Result<Attribute<'a>, AttrError>> {
++        let item = if let Phase::Own(check) = &mut self.phase {
++            check.next(self.tag, &mut self.attributes)
+         } else {
+-            let mut check = OwnCheck::after_quick_xml(self.tag);
+-            let checked = check.check(self.tag, item);
+-            self.phase = Phase::Own(Box::new(check));
+-            checked
++            unreachable!("ordered backend is called only from the Own phase")
+         };
+-        if checked.is_err() {
++        if item.as_ref().map_or(true, Result::is_err) {
+             self.phase = Phase::Done;
+         }
+-        Some(checked)
+-    }
+-
+-    // Turning quick-xml's check off before its hashed check can run.
+-    #[allow(clippy::disallowed_methods)]
+-    fn take_over(&mut self) {
+-        self.attributes.with_checks(false);
++        item
+     }
+ }
+ 
+ impl<'a> OwnCheck<'a> {
+-    /// The 32 names quick-xml has checked, with their positions, and where
+-    /// the attribute after them starts. Reading them again without the check
+-    /// yields the same attributes: the check never changes what is read.
+-    fn after_quick_xml(tag: &'a BytesStart<'a>) -> Self {
+-        let mut check = Self {
+-            names: BTreeMap::new(),
+-            next_start: 0,
+-        };
+-        for attribute in tag
+-            .unchecked_attributes()
+-            .take(QUICK_XML_LINEAR_NAMES)
+-            .flatten()
++    /// Seed the backend from raw key prefixes and the third borrowed key. No
++    /// earlier attribute value is decoded or reparsed.
++    fn from_prefix(
++        tag: &'a BytesStart<'a>,
++        first_end: usize,
++        second_end: usize,
++        third: &Attribute<'a>,
++    ) -> Self {
++        let mut names = BTreeMap::new();
++        let (first_position, first_name, _) =
++            key_at(tag.as_ref(), tag.name().as_ref().len()).expect("first prefix");
++        let (second_position, second_name, _) =
++            key_at(tag.as_ref(), first_end).expect("second prefix");
++        names.insert(Name(first_name), first_position);
++        names.insert(Name(second_name), second_position);
++        let third_name = third.key.into_inner();
++        names.insert(Name(third_name), offset_in(tag, third_name));
++        Self {
++            names,
++            next_start: second_end,
++        }
++    }
++
++    fn next(
++        &mut self,
++        tag: &'a BytesStart<'a>,
++        attributes: &mut Attributes<'a>,
++    ) -> Option<Result<Attribute<'a>, AttrError>> {
++        if let Some((position, name, has_equals)) = key_at(tag.as_ref(), self.next_start)
++            && has_equals
++            && let Some(first) = self.names.get(&Name(name))
+         {
+-            let name = attribute.key.into_inner();
+-            check.names.insert(Name(name), offset_in(tag, name));
+-            check.next_start = end_of(tag, &attribute);
++            return Some(Err(AttrError::Duplicated(position, *first)));
+         }
+-        debug_assert_eq!(check.names.len(), QUICK_XML_LINEAR_NAMES);
+-        check
++        let item = attributes.next()?;
++        Some(match item {
++            Ok(attribute) => self.check_attribute(tag, attribute),
++            Err(error) => Err(self.duplicate_before_value(tag, error)),
++        })
+     }
+ 
+-    fn check(
++    fn check_attribute(
+         &mut self,
+         tag: &'a BytesStart<'a>,
+-        item: Result<Attribute<'a>, AttrError>,
++        attribute: Attribute<'a>,
+     ) -> Result<Attribute<'a>, AttrError> {
+-        let attribute = match item {
+-            Ok(attribute) => attribute,
+-            Err(error) => return Err(self.duplicate_before_value(tag, error)),
+-        };
+         let name = attribute.key.into_inner();
+         let position = offset_in(tag, name);
+         match self.names.entry(Name(name)) {
+@@ -208,21 +347,27 @@
+ impl<'a> Iterator for CheckedAttributes<'a> {
+     type Item = Result<Attribute<'a>, AttrError>;
+ 
+-    /// The first 32 names are quick-xml's checked iterator plus a counter.
++    /// The first two names use the unchecked parser and later names use the
++    /// lazily allocated ordered-map backend.
+     #[inline]
+     fn next(&mut self) -> Option<Self::Item> {
+-        if let Phase::QuickXml(yielded) = &mut self.phase
+-            && *yielded < QUICK_XML_LINEAR_NAMES
++        if matches!(self.phase, Phase::First) {
++            return self.next_first();
++        }
++        if let Phase::Second(next_start) = &self.phase {
++            return self.next_second(*next_start);
++        }
++        if let Phase::ShortTwo {
++            first_end,
++            next_start,
++        } = &self.phase
+         {
+-            let item = self.attributes.next();
+-            if matches!(item, Some(Ok(_))) {
+-                *yielded += 1;
+-            } else {
+-                self.phase = Phase::Done;
+-            }
+-            return item;
++            return self.next_short_two(*first_end, *next_start);
++        }
++        if matches!(self.phase, Phase::Own(_)) {
++            return self.next_own();
+         }
+-        self.next_after_quick_xml()
++        None
+     }
+ }
+ 
+@@ -243,6 +388,14 @@
+         .saturating_add(1)
+ }
+ 
++/// Whether the bytes after a successfully decoded attribute contain no next
++/// attribute. A non-whitespace byte deliberately enters the third-item path,
++/// including a malformed tail or a missing separator.
++fn trailing_whitespace(base: &[u8], from: usize) -> bool {
++    base.get(from..)
++        .is_some_and(|rest| rest.iter().all(|byte| is_whitespace(*byte)))
++}
++
+ /// The name of the attribute that starts at or after `from`, read the way
+ /// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+ /// its position.
+@@ -257,6 +410,30 @@
+     Some((start, &name[..length]))
+ }
+ 
++/// The key prefix quick-xml has parsed at `from`, together with whether the
++/// prefix was followed by the `=` that makes duplicate checking precede value
++/// parsing. This consumes the first key byte exactly as quick-xml does, so a
++/// key beginning with `=` is retained rather than treated as an empty name.
++fn key_at(tag: &[u8], from: usize) -> Option<(usize, &[u8], bool)> {
++    let rest = tag.get(from..)?;
++    let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
++    let after_first = tag.get(start + 1..)?;
++    let length = after_first
++        .iter()
++        .position(|byte| *byte == b'=' || is_whitespace(*byte))
++        .map_or(tag.len() - (start + 1), |length| length);
++    let end = start + 1 + length;
++    let has_equals = match tag.get(end) {
++        Some(b'=') => true,
++        Some(_) => tag[end..]
++            .iter()
++            .find(|byte| !is_whitespace(**byte))
++            .is_some_and(|byte| *byte == b'='),
++        None => false,
++    };
++    Some((start, &tag[start..end], has_equals))
++}
++
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+ fn is_whitespace(byte: u8) -> bool {
+     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+@@ -289,5 +466,4 @@
+ }
+ 
+ #[cfg(test)]
+-#[path = "../../litchi-opc/src/xml_attributes/tests.rs"]
+ mod tests;
+--- a/crates/litchi-opc/src/xml_attributes/tests.rs
++++ b/crates/litchi-opc/src/xml_attributes/tests.rs
+@@ -277,6 +277,88 @@
+ }
+ 
+ #[test]
++fn third_and_later_boundaries_match_quick_xml_without_replay() {
++    for content in [
++        "e a=\"1\" b=\"2\" c=\"3\" d=\"4\"",
++        "e a=\"1\" b=\"2\" c=unquoted tail=\"ok\"",
++        "e a=\"1\" b=\"2\" a=\"3\" tail=\"ok\"",
++        "e a=\"1\" b=\"2\" c=",
++        "e a=\"1\" b=\"2\" c=\"unterminated",
++        "e a=\"1\" b=\"2\" c=\"3\" a=\"4\"",
++        "e a=\"1\" b=\"2\" c=\"3\" a=unquoted tail=\"ok\"",
++    ] {
++        assert_same(content);
++        let tag = tag(content);
++        let mut attributes = tag.checked_attributes();
++        let expected = quick_xml_until_error(&tag);
++        for item in expected {
++            assert_eq!(attributes.next().map(owned), Some(item), "{content}");
++        }
++        assert!(attributes.next().is_none(), "{content}");
++        assert!(attributes.next().is_none(), "{content}");
++    }
++}
++
++#[test]
++fn third_duplicate_refuses_a_long_value_without_replaying_prior_values() {
++    let first = "x".repeat(16 * 1024);
++    let second = "y".repeat(16 * 1024);
++    let third = "z".repeat(16 * 1024);
++    let content = format!("e first=\"{first}\" second=\"{second}\" first=\"{third}");
++    let tag = tag(&content);
++    let expected = quick_xml_until_error(&tag);
++    assert!(matches!(expected.last(), Some(Err(AttrError::Duplicated(..)))));
++    assert_eq!(checked(&tag), expected);
++}
++
++#[test]
++fn clone_matches_short_and_owned_backend_boundaries() {
++    for content in [
++        "e a=\"1\" b=\"2\" c=\"3\" d=\"4\"",
++        "e a=\"1\" b=\"2\" c=\"3\" a=\"4\"",
++        "e a=\"1\" b=\"2\" c=unquoted tail=\"ok\"",
++    ] {
++        for advance in 0..=4 {
++            let tag = tag(content);
++            let mut left = tag.checked_attributes();
++            for _ in 0..advance {
++                let _ = left.next();
++            }
++            let mut right = left.clone();
++            loop {
++                let left_item = left.next().map(owned);
++                let right_item = right.next().map(owned);
++                assert_eq!(left_item, right_item, "{content}, advance={advance}");
++                if left_item.is_none() {
++                    break;
++                }
++            }
++            assert!(left.next().is_none(), "{content}, advance={advance}");
++            assert!(right.next().is_none(), "{content}, advance={advance}");
++        }
++    }
++}
++
++#[test]
++fn late_backend_duplicate_preflight_preserves_error_precedence() {
++    let mut attributes = vec!["a=\"seed\"".to_owned(), "b=\"seed\"".to_owned()];
++    attributes.push("c=\"seed\"".to_owned());
++    attributes.push(format!("a=\"{}", "x".repeat(16 * 1024)));
++    let content = format!("e {}", attributes.join(" "));
++    assert_same(&content);
++    let tag = tag(&content);
++    assert!(matches!(checked(&tag).last(), Some(Err(AttrError::Duplicated(..)))));
++}
++
++#[test]
++fn late_leading_equals_key_matches_quick_xml() {
++    let mut attributes = vec!["=n0=\"seed\"".to_owned()];
++    attributes.extend(names(32).into_iter().map(|name| name));
++    attributes.push("=n0=\"unterminated".to_owned());
++    assert_same(&format!("e {}", attributes.join(" ")));
++}
++
++#[test]
+ #[allow(clippy::disallowed_methods)]
+ fn unchecked_attributes_are_quick_xml_without_its_check() {
+     let tag = tag("e a=\"1\" a=\"2\" b=x c=\"3\" d");
+@@ -419,16 +501,24 @@
+ 
+ #[test]
+ fn quick_xml_checks_the_first_names_and_this_iterator_the_rest() {
+-    // Up to 32 names the map is never touched.
+-    let (items, comparisons) = comparisons_for(&format!("e {}", names(32).join(" ")));
+-    assert_eq!((items, comparisons), (32, 0));
+-    // The 33rd name records the first 32 and checks itself against them.
+-    let (items, comparisons) = comparisons_for(&format!("e {}", names(33).join(" ")));
+-    assert_eq!(items, 33);
++    // The two-item prefix never touches the ordered map.
++    for count in [1, 2] {
++        let (items, comparisons) = comparisons_for(&format!("e {}", names(count).join(" ")));
++        assert_eq!((items, comparisons), (count, 0));
++    }
++    // A final third item needs no map; a following fourth item seeds the map
++    // directly from the three borrowed keys.
++    let (items, comparisons) = comparisons_for(&format!("e {}", names(3).join(" ")));
++    assert_eq!((items, comparisons), (3, 0));
++    let (items, comparisons) = comparisons_for(&format!("e {}", names(4).join(" ")));
++    assert_eq!(items, 4);
+     assert!(
+-        comparisons > 0 && comparisons <= ordered_bound(33),
++        comparisons > 0 && comparisons <= ordered_bound(3),
+         "{comparisons}"
+     );
++    let (items, comparisons) = comparisons_for(&format!("e {}", names(32).join(" ")));
++    assert_eq!(items, 32);
++    assert!(comparisons > 0 && comparisons <= ordered_bound(32), "{comparisons}");
+     assert_eq!(QUICK_XML_LINEAR_NAMES, 32);
+ }
+ 

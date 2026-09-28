@@ -1,0 +1,14 @@
+{
+  "failed": 0,
+  "filtered": 0,
+  "ignored": 3,
+  "measured": 0,
+  "passed": 1538,
+  "scope": "Full default-feature tests for five affected production crates, including integration and doctest suites",
+  "source": {
+    "bytes": 149440,
+    "path": "docs/performance/results/change-0800/quality/2.log",
+    "sha256": "aaafa5ce077032bf9ab8f9b637e47287489168a60fef2f640c22fb4ae6604195"
+  },
+  "suites": 67
+}

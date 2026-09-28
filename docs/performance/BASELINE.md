@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0800 — correct duplicate-error parity before further performance work
+
+[0800](0800-xml-duplicate-error-parity.md) The bounded XML fallback now preserves quick-xml’s duplicate error for leading-equals keys with malformed values after 32 attributes. Five helper copies and the shared test are corrected; no performance improvement is claimed.
+
 ## 0799 — two-attribute candidate stopped at preflight
 
 [0799](0799-xml-two-attribute-preflight.md) One/two-attribute consumption improves 34.898%/16.716%, but six protected error-boundary regressions veto advancement. All 1,248 reports and 28,392 samples validate. Production remains unchanged.

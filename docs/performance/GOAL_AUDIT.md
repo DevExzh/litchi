@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0800 — repair a confirmed baseline contract defect
+
+[0800](0800-xml-duplicate-error-parity.md) The controlled probe reproduces three late duplicate-error mismatches and verifies corrected parity. All 1,538 affected-crate tests pass, with three existing ignores, plus Clippy. The untested no-replay performance candidate is deferred pending rebase.
+
 ## 0799 — retain the frozen error-boundary veto
 
 [0799](0799-xml-two-attribute-preflight.md) Both dominant-class benefits qualify, but six protected consume rows regress approximately 50–56%. All 312 counter owners qualify and all 78 native rows match independent replay. The candidate is archived without workflow advancement.

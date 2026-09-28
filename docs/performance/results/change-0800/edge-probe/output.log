@@ -1,0 +1,5 @@
+accepted_prefix=1 baseline=Some(Duplicated(10, 2)) quick_xml=Some(Duplicated(10, 2)) equal=true
+accepted_prefix=31 baseline=Some(Duplicated(292, 2)) quick_xml=Some(Duplicated(292, 2)) equal=true
+accepted_prefix=32 baseline=Some(ExpectedQuote(319, 34)) quick_xml=Some(Duplicated(302, 2)) equal=false
+accepted_prefix=33 baseline=Some(ExpectedQuote(329, 34)) quick_xml=Some(Duplicated(312, 2)) equal=false
+accepted_prefix=34 baseline=Some(ExpectedQuote(339, 34)) quick_xml=Some(Duplicated(322, 2)) equal=false

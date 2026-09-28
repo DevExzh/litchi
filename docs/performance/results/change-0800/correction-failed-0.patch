@@ -1,0 +1,190 @@
+--- a/crates/litchi-opc/src/xml_attributes.rs
++++ b/crates/litchi-opc/src/xml_attributes.rs
+@@ -258,17 +258,19 @@
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+-/// its position.
++/// quick-xml reads it: skip whitespace, consume the first byte, then scan
++/// up to `=` or whitespace; return the key and its position.
+ fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
+     let rest = tag.get(from..)?;
+     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
+-    let name = &tag[start..];
+-    let length = name
++    // quick-xml consumes the first non-whitespace byte before looking for
++    // the delimiter. A leading `=` therefore belongs to the key.
++    let after_first = &tag[start + 1..];
++    let length = 1 + after_first
+         .iter()
+         .position(|byte| *byte == b'=' || is_whitespace(*byte))
+-        .unwrap_or(name.len());
+-    Some((start, &name[..length]))
++        .unwrap_or(after_first.len());
++    Some((start, &tag[start..start + length]))
+ }
+ 
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+--- a/crates/litchi-ole-common/src/xml_attributes.rs
++++ b/crates/litchi-ole-common/src/xml_attributes.rs
+@@ -244,17 +244,19 @@
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+-/// its position.
++/// quick-xml reads it: skip whitespace, consume the first byte, then scan
++/// up to `=` or whitespace; return the key and its position.
+ fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
+     let rest = tag.get(from..)?;
+     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
+-    let name = &tag[start..];
+-    let length = name
++    // quick-xml consumes the first non-whitespace byte before looking for
++    // the delimiter. A leading `=` therefore belongs to the key.
++    let after_first = &tag[start + 1..];
++    let length = 1 + after_first
+         .iter()
+         .position(|byte| *byte == b'=' || is_whitespace(*byte))
+-        .unwrap_or(name.len());
+-    Some((start, &name[..length]))
++        .unwrap_or(after_first.len());
++    Some((start, &tag[start..start + length]))
+ }
+ 
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+--- a/crates/litchi-sign/src/xml_attributes.rs
++++ b/crates/litchi-sign/src/xml_attributes.rs
+@@ -244,17 +244,19 @@
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+-/// its position.
++/// quick-xml reads it: skip whitespace, consume the first byte, then scan
++/// up to `=` or whitespace; return the key and its position.
+ fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
+     let rest = tag.get(from..)?;
+     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
+-    let name = &tag[start..];
+-    let length = name
++    // quick-xml consumes the first non-whitespace byte before looking for
++    // the delimiter. A leading `=` therefore belongs to the key.
++    let after_first = &tag[start + 1..];
++    let length = 1 + after_first
+         .iter()
+         .position(|byte| *byte == b'=' || is_whitespace(*byte))
+-        .unwrap_or(name.len());
+-    Some((start, &name[..length]))
++        .unwrap_or(after_first.len());
++    Some((start, &tag[start..start + length]))
+ }
+ 
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+--- a/crates/litchi-xldm/src/xml_attributes.rs
++++ b/crates/litchi-xldm/src/xml_attributes.rs
+@@ -244,17 +244,19 @@
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+-/// its position.
++/// quick-xml reads it: skip whitespace, consume the first byte, then scan
++/// up to `=` or whitespace; return the key and its position.
+ fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
+     let rest = tag.get(from..)?;
+     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
+-    let name = &tag[start..];
+-    let length = name
++    // quick-xml consumes the first non-whitespace byte before looking for
++    // the delimiter. A leading `=` therefore belongs to the key.
++    let after_first = &tag[start + 1..];
++    let length = 1 + after_first
+         .iter()
+         .position(|byte| *byte == b'=' || is_whitespace(*byte))
+-        .unwrap_or(name.len());
+-    Some((start, &name[..length]))
++        .unwrap_or(after_first.len());
++    Some((start, &tag[start..start + length]))
+ }
+ 
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+--- a/crates/xml-minifier/src/xml_attributes.rs
++++ b/crates/xml-minifier/src/xml_attributes.rs
+@@ -244,17 +244,19 @@
+ }
+ 
+ /// The name of the attribute that starts at or after `from`, read the way
+-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
+-/// its position.
++/// quick-xml reads it: skip whitespace, consume the first byte, then scan
++/// up to `=` or whitespace; return the key and its position.
+ fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
+     let rest = tag.get(from..)?;
+     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
+-    let name = &tag[start..];
+-    let length = name
++    // quick-xml consumes the first non-whitespace byte before looking for
++    // the delimiter. A leading `=` therefore belongs to the key.
++    let after_first = &tag[start + 1..];
++    let length = 1 + after_first
+         .iter()
+         .position(|byte| *byte == b'=' || is_whitespace(*byte))
+-        .unwrap_or(name.len());
+-    Some((start, &name[..length]))
++        .unwrap_or(after_first.len());
++    Some((start, &tag[start..start + length]))
+ }
+ 
+ /// quick-xml's whitespace: space, tab, carriage return and line feed.
+--- a/crates/litchi-opc/src/xml_attributes/tests.rs
++++ b/crates/litchi-opc/src/xml_attributes/tests.rs
+@@ -145,6 +145,47 @@
+         for tail in tails {
+             assert_same(&format!("e {} {tail}", names(count).join(" ")));
+             assert_same(&format!("e {} {tail} tail=\"t\"", names(count).join(" ")));
++        }
++    }
++}
++
++#[test]
++fn unusual_duplicate_keys_keep_error_precedence_at_the_switch() {
++    // quick-xml's lexer accepts a leading '=' as part of a nonempty key.
++    // The bounded fallback must preserve its duplicate error even when the
++    // repeated key's value is malformed. This does not validate XML Names.
++    for count in [1, 31, 32, 33, 34, 64] {
++        for key in ["=", "=n0", "==n0", "ordinary", "é"] {
++            for space in [" ", "\t", "\r\n"] {
++                let mut prefix = format!("e{space}{key}=\"first\"");
++                for index in 1..count {
++                    prefix.push_str(&format!("{space}n{index}=\"{index}\""));
++                }
++                for value in ["", "x", "\"open", "'open", "\"closed\"", "  "] {
++                    let content = format!("{prefix}{space}{key}{space}={space}{value}");
++                    let tag = tag(&content);
++                    let expected = quick_xml_until_error(&tag);
++                    assert!(matches!(
++                        expected.last(),
++                        Some(Err(AttrError::Duplicated(..)))
++                    ));
++                    assert_eq!(checked(&tag), expected, "{content}");
++                    let mut attributes = tag.checked_attributes();
++                    for _ in 0..count {
++                        assert!(attributes.next().unwrap().is_ok());
++                    }
++                    let mut cloned = attributes.clone();
++                    assert_eq!(attributes.next().map(owned), cloned.next().map(owned));
++                    assert!(attributes.next().is_none());
++                    assert!(attributes.next().is_none());
++                    assert!(cloned.next().is_none());
++                }
++                // Without a recognized equals sign, lexical refusal wins.
++                assert_same(&format!("{prefix}{space}{key}"));
++                assert_same(&format!("{prefix}{space}{key}{space}next=\"v\""));
++                // A different unusual key must not become a false duplicate.
++                assert_same(&format!("{prefix}{space}=fresh=\"open"));
++            }
+         }
+     }
+ }

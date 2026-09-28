@@ -244,17 +244,19 @@ fn end_of(base: &[u8], attribute: &Attribute<'_>) -> usize {
 }
 
 /// The name of the attribute that starts at or after `from`, read the way
-/// quick-xml reads it: after any whitespace, up to `=` or whitespace; with
-/// its position.
+/// quick-xml reads it: skip whitespace, consume the first byte, then scan
+/// up to `=` or whitespace; return the key and its position.
 fn name_at(tag: &[u8], from: usize) -> Option<(usize, &[u8])> {
     let rest = tag.get(from..)?;
     let start = from + rest.iter().position(|byte| !is_whitespace(*byte))?;
-    let name = &tag[start..];
-    let length = name
+    // quick-xml consumes the first non-whitespace byte before looking for
+    // the delimiter. A leading `=` therefore belongs to the key.
+    let after_first = &tag[start + 1..];
+    let length = 1 + after_first
         .iter()
         .position(|byte| *byte == b'=' || is_whitespace(*byte))
-        .unwrap_or(name.len());
-    Some((start, &name[..length]))
+        .unwrap_or(after_first.len());
+    Some((start, &tag[start..start + length]))
 }
 
 /// quick-xml's whitespace: space, tab, carriage return and line feed.

@@ -1,0 +1,7 @@
+{
+  "correction": "correction-failed-0",
+  "correction.patch": "correction-failed-0.patch",
+  "fix": "Use =long_name as valid unusual-key case; retain failure evidence.",
+  "quality": "quality-failed-0",
+  "reason": "New test incorrectly assumed ==n0 is a complete accepted key; quick-xml treats second equals asdelimiter and rejectsfirstvalue. Production fix unchanged."
+}

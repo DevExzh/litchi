@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0800 — restore the checked iterator’s first-error contract
+
+[0800](0800-xml-duplicate-error-parity.md) The five canonical helpers now return the required duplicate error and positions at the bounded handoff for unusual raw keys. Six production files change. Correctness gates pass; no candidate performance trial or adoption occurs.
+
 ## 0799 — two-attribute preflight rejected despite short-tag gains
 
 [0799](0799-xml-two-attribute-preflight.md) All semantic and measurement audits pass, but six frozen protected-boundary failures stop workflow trials. Both iterators remain 120 bytes. Nineteen consume regression flags and 23 spread flags remain visible; production is unchanged.

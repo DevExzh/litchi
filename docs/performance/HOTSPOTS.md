@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0800 — correctness gate before no-replay optimization
+
+[0800](0800-xml-duplicate-error-parity.md) Key recovery incorrectly treated leading = as a delimiter where quick-xml had consumed it as part of the key. The minimal repair changes error priority only; it does not remove the existing late value scan or establish a speedup.
+
 ## 0799 — replay cost moves to the third item
 
 [0799](0799-xml-two-attribute-preflight.md) Avoiding duplicate state for two items improves both observed dominant classes, but the next-item replay raises three-attribute consumption by 55.276%. The next design must avoid rebuilding prior state instead of merely moving the replay boundary.

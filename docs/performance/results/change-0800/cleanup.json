@@ -1,0 +1,17 @@
+{
+  "removed_binaries": [
+    {
+      "bytes": 6102904,
+      "path": "/home/zhuhe/code/litchi-target-0800/edge/debug/attribute-error-edge-0800",
+      "sha256": "cf99fd8782ff0a7f88673675e7f6f94e2f64c20df2253b472bd1aea486f2d34d"
+    },
+    {
+      "bytes": 6414928,
+      "path": "/home/zhuhe/code/litchi-target-0800/full/debug/attribute-error-edge-0800",
+      "sha256": "76eb4f395351711c1f1ceb9d9d005427a973b9489de03e32a3c8a0ebf6061ba9"
+    }
+  ],
+  "removed_target_bytes": 3711347610,
+  "target": "/home/zhuhe/code/litchi-target-0800",
+  "target_removed": true
+}
