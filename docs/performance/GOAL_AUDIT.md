@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0813 — measured event copies removed and candidate retained
+
+[0813](0813-pptx-direct-result-workflow.md) Direct Result<Event> matching removes three pre-dispatch payload copies in both ordinary/profile assembly. Six useful workflow benefits pass the frozen bootstrap policy with no latency/resource veto; independent readers and source/profile reviews agree. The broader goal remains active, and the next optimization requires refreshed current-source attribution.
+
 ## 0812 — next scanner candidate narrowed by exact-binary evidence
 
 [0812](0812-pptx-scanner-instruction-localization.md) A guarded historical reconstruction fails full binary identity, so fresh samples are captured and decoded against the actual executable. Their instruction/DWARF evidence supports testing explicit event success/error matching. Production remains unchanged; adoption still requires fresh workflow benefit and full semantic/resource qualification. The broad goal remains active.

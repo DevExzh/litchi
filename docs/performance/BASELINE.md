@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0813 — direct event-result workflow baseline
+
+[0813](0813-pptx-direct-result-workflow.md) Fresh qualification, six paired native blocks, two allocation blocks, and four scoped profiles retain 310 reports/6,718 verified outputs. Large-capture p50 falls from 17.926675 to 16.045099 ms (paired ratio 0.894556, interval 0.882107–0.899554); large lifecycle improves 7.269%. All eighteen rows, tail/RSS flags, and unchanged allocation medians are reported.
+
 ## 0812 — fresh scanner instruction localization
 
 [0812](0812-pptx-scanner-instruction-localization.md) Two new profiles verify 200 capture outputs on unchanged source. An attempted exact 0811 binary reconstruction fails SHA equality, so old offsets remain unmapped. Fresh scanner leaves total 231/227; offset 0x24d accounts for 193/178 and maps to event-result payload copying. No latency or resource comparison is claimed.

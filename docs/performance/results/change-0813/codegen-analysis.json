@@ -1,0 +1,422 @@
+{
+  "rows": [
+    {
+      "binary": {
+        "bytes": 14432352,
+        "path": "/home/zhuhe/code/litchi-target-0813/before-native",
+        "sha256": "2ee9b24e15d65b83d68eef9783782906d52105cab8e10a8d82c2b16063b00bb6"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 487,
+      "leg": "before",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b6d0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 559
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 564
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 574
+        },
+        {
+          "instruction": "cmp    %rax,0x60(%rsp)",
+          "offset": 577
+        },
+        {
+          "instruction": "jne    132e72 <litchi_pptx::notes::codec::scan_processed_xml+0x4d2>",
+          "offset": 582
+        },
+        {
+          "instruction": "lea    0x68(%rsp),%rcx",
+          "offset": 588
+        },
+        {
+          "instruction": "mov    0x20(%rcx),%rax",
+          "offset": 593
+        },
+        {
+          "instruction": "mov    %rax,0x20(%r14)",
+          "offset": 597
+        },
+        {
+          "instruction": "movups (%rcx),%xmm0",
+          "offset": 601
+        },
+        {
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": 604
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r14)",
+          "offset": 608
+        },
+        {
+          "instruction": "movups %xmm0,(%r14)",
+          "offset": 613
+        },
+        {
+          "instruction": "mov    0x20(%r14),%rax",
+          "offset": 617
+        },
+        {
+          "instruction": "mov    %rax,0x20(%r13)",
+          "offset": 621
+        },
+        {
+          "instruction": "movups (%r14),%xmm0",
+          "offset": 625
+        },
+        {
+          "instruction": "movups 0x10(%r14),%xmm1",
+          "offset": 629
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r13)",
+          "offset": 634
+        },
+        {
+          "instruction": "movups %xmm0,0x0(%r13)",
+          "offset": 639
+        },
+        {
+          "instruction": "movups 0x0(%r13),%xmm0",
+          "offset": 644
+        },
+        {
+          "instruction": "movups 0x10(%r13),%xmm1",
+          "offset": 649
+        },
+        {
+          "instruction": "movaps %xmm0,0x90(%rsp)",
+          "offset": 654
+        },
+        {
+          "instruction": "movaps %xmm1,0xa0(%rsp)",
+          "offset": 662
+        },
+        {
+          "instruction": "mov    0x20(%r13),%rax",
+          "offset": 670
+        },
+        {
+          "instruction": "mov    %rax,0xb0(%rsp)",
+          "offset": 674
+        },
+        {
+          "instruction": "mov    0x90(%rsp),%rax",
+          "offset": 682
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 690
+        },
+        {
+          "instruction": "ja     132e10 <litchi_pptx::notes::codec::scan_processed_xml+0x470>",
+          "offset": 694
+        },
+        {
+          "instruction": "lea    -0x10e0c7(%rip),%rdx        # 24b9c <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x3ed4>",
+          "offset": 700
+        },
+        {
+          "instruction": "movslq (%rdx,%rax,4),%rcx",
+          "offset": 707
+        },
+        {
+          "instruction": "add    %rdx,%rcx",
+          "offset": 711
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 714
+        }
+      ],
+      "receipt": {
+        "bytes": 4764,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-before/receipt.json",
+        "sha256": "0aee36660617395fdc9c4fa3c9953be8c50b5b68903de4464875808bc9fbf23a"
+      },
+      "symbol_bytes": 2616,
+      "variant": "native",
+      "vector_moves_in_window": 12
+    },
+    {
+      "binary": {
+        "bytes": 14433184,
+        "path": "/home/zhuhe/code/litchi-target-0813/before-profile",
+        "sha256": "18b18523b28f39cfd0bb13516bf96fe0705e34b8b811f3ca53e35a71c54185bc"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 487,
+      "leg": "before",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b6f0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 559
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 564
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 574
+        },
+        {
+          "instruction": "cmp    %rax,0x60(%rsp)",
+          "offset": 577
+        },
+        {
+          "instruction": "jne    132e92 <litchi_pptx::notes::codec::scan_processed_xml+0x4d2>",
+          "offset": 582
+        },
+        {
+          "instruction": "lea    0x68(%rsp),%rcx",
+          "offset": 588
+        },
+        {
+          "instruction": "mov    0x20(%rcx),%rax",
+          "offset": 593
+        },
+        {
+          "instruction": "mov    %rax,0x20(%r14)",
+          "offset": 597
+        },
+        {
+          "instruction": "movups (%rcx),%xmm0",
+          "offset": 601
+        },
+        {
+          "instruction": "movups 0x10(%rcx),%xmm1",
+          "offset": 604
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r14)",
+          "offset": 608
+        },
+        {
+          "instruction": "movups %xmm0,(%r14)",
+          "offset": 613
+        },
+        {
+          "instruction": "mov    0x20(%r14),%rax",
+          "offset": 617
+        },
+        {
+          "instruction": "mov    %rax,0x20(%r13)",
+          "offset": 621
+        },
+        {
+          "instruction": "movups (%r14),%xmm0",
+          "offset": 625
+        },
+        {
+          "instruction": "movups 0x10(%r14),%xmm1",
+          "offset": 629
+        },
+        {
+          "instruction": "movups %xmm1,0x10(%r13)",
+          "offset": 634
+        },
+        {
+          "instruction": "movups %xmm0,0x0(%r13)",
+          "offset": 639
+        },
+        {
+          "instruction": "movups 0x0(%r13),%xmm0",
+          "offset": 644
+        },
+        {
+          "instruction": "movups 0x10(%r13),%xmm1",
+          "offset": 649
+        },
+        {
+          "instruction": "movaps %xmm0,0x90(%rsp)",
+          "offset": 654
+        },
+        {
+          "instruction": "movaps %xmm1,0xa0(%rsp)",
+          "offset": 662
+        },
+        {
+          "instruction": "mov    0x20(%r13),%rax",
+          "offset": 670
+        },
+        {
+          "instruction": "mov    %rax,0xb0(%rsp)",
+          "offset": 674
+        },
+        {
+          "instruction": "mov    0x90(%rsp),%rax",
+          "offset": 682
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 690
+        },
+        {
+          "instruction": "ja     132e30 <litchi_pptx::notes::codec::scan_processed_xml+0x470>",
+          "offset": 694
+        },
+        {
+          "instruction": "lea    -0x10e0e7(%rip),%rdx        # 24b9c <anon.bc3d94ef2394061926bee58178356194.284.llvm.5373085861489949100+0x3ed4>",
+          "offset": 700
+        },
+        {
+          "instruction": "movslq (%rdx,%rax,4),%rcx",
+          "offset": 707
+        },
+        {
+          "instruction": "add    %rdx,%rcx",
+          "offset": 711
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 714
+        }
+      ],
+      "receipt": {
+        "bytes": 4764,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-before/receipt.json",
+        "sha256": "0aee36660617395fdc9c4fa3c9953be8c50b5b68903de4464875808bc9fbf23a"
+      },
+      "symbol_bytes": 2616,
+      "variant": "profile",
+      "vector_moves_in_window": 12
+    },
+    {
+      "binary": {
+        "bytes": 14430760,
+        "path": "/home/zhuhe/code/litchi-target-0813/after-native",
+        "sha256": "e2ae857291a6ed96400522f821d7f6d406d57a27bd55cbf62127fc6487550c58"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 434,
+      "leg": "after",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b590 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 561
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 566
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 576
+        },
+        {
+          "instruction": "cmp    %rax,0x78(%rsp)",
+          "offset": 579
+        },
+        {
+          "instruction": "jne    132e23 <litchi_pptx::notes::codec::scan_processed_xml+0x493>",
+          "offset": 584
+        },
+        {
+          "instruction": "mov    0x80(%rsp),%rax",
+          "offset": 590
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 598
+        },
+        {
+          "instruction": "ja     132dc0 <litchi_pptx::notes::codec::scan_processed_xml+0x430>",
+          "offset": 602
+        },
+        {
+          "instruction": "movslq (%r12,%rax,4),%rcx",
+          "offset": 608
+        },
+        {
+          "instruction": "add    %r12,%rcx",
+          "offset": 612
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 615
+        }
+      ],
+      "receipt": {
+        "bytes": 4751,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-after/receipt.json",
+        "sha256": "2c1e37820da04d246c7e6645f6a701554955b028270472fa0631ea767b2aedef"
+      },
+      "symbol_bytes": 2320,
+      "variant": "native",
+      "vector_moves_in_window": 0
+    },
+    {
+      "binary": {
+        "bytes": 14431608,
+        "path": "/home/zhuhe/code/litchi-target-0813/after-profile",
+        "sha256": "8b2fa9c6677382a4991ac8d91d15300bc0bb361806cee844e7f04487749ff1fa"
+      },
+      "indirect_dispatch_found": true,
+      "instructions": 434,
+      "leg": "after",
+      "reader_to_indirect_dispatch": [
+        {
+          "instruction": "call   18b5c0 <quick_xml::reader::Reader<R>::read_event_impl>",
+          "offset": 561
+        },
+        {
+          "instruction": "movabs $0x800000000000000e,%rax",
+          "offset": 566
+        },
+        {
+          "instruction": "inc    %rax",
+          "offset": 576
+        },
+        {
+          "instruction": "cmp    %rax,0x78(%rsp)",
+          "offset": 579
+        },
+        {
+          "instruction": "jne    132e53 <litchi_pptx::notes::codec::scan_processed_xml+0x493>",
+          "offset": 584
+        },
+        {
+          "instruction": "mov    0x80(%rsp),%rax",
+          "offset": 590
+        },
+        {
+          "instruction": "cmp    $0xa,%rax",
+          "offset": 598
+        },
+        {
+          "instruction": "ja     132df0 <litchi_pptx::notes::codec::scan_processed_xml+0x430>",
+          "offset": 602
+        },
+        {
+          "instruction": "movslq (%r12,%rax,4),%rcx",
+          "offset": 608
+        },
+        {
+          "instruction": "add    %r12,%rcx",
+          "offset": 612
+        },
+        {
+          "instruction": "jmp    *%rcx",
+          "offset": 615
+        }
+      ],
+      "receipt": {
+        "bytes": 4751,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/codegen-after/receipt.json",
+        "sha256": "2c1e37820da04d246c7e6645f6a701554955b028270472fa0631ea767b2aedef"
+      },
+      "symbol_bytes": 2320,
+      "variant": "profile",
+      "vector_moves_in_window": 0
+    }
+  ],
+  "schema": "litchi.performance.0813.codegen-analysis.v1",
+  "scope": "Static exact-binary instruction windows. Counts are not runtime frequency, causal savings, or adoption evidence."
+}

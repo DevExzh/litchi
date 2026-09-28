@@ -1,0 +1,4241 @@
+{
+  "build": {
+    "after": {
+      "binaries": {
+        "allocation": {
+          "bytes": 14357784,
+          "path": "/home/zhuhe/code/litchi-target-0813/after-allocation",
+          "sha256": "2d56cd53e4106d3f039eafd84b8430cdf8ffd38b49b012c743b5a47c33d210eb"
+        },
+        "native": {
+          "bytes": 14430760,
+          "path": "/home/zhuhe/code/litchi-target-0813/after-native",
+          "sha256": "e2ae857291a6ed96400522f821d7f6d406d57a27bd55cbf62127fc6487550c58"
+        },
+        "profile": {
+          "bytes": 14431608,
+          "path": "/home/zhuhe/code/litchi-target-0813/after-profile",
+          "sha256": "8b2fa9c6677382a4991ac8d91d15300bc0bb361806cee844e7f04487749ff1fa"
+        }
+      },
+      "path": "build-after/build.json",
+      "sha256": "71267db806de7d1d58f76f8b47d7f21ca025320d26501ed1836a19b12c30c337",
+      "source_sha256": "aeeb978188ea98d15e120fe1645d4fcba77f2d5995e2405eaff1633b6b17836c"
+    },
+    "before": {
+      "binaries": {
+        "allocation": {
+          "bytes": 14359008,
+          "path": "/home/zhuhe/code/litchi-target-0813/before-allocation",
+          "sha256": "5e00d62a16ccb0de846b633a2762055554cecf4ceb2fd0d725e09231e55370f4"
+        },
+        "native": {
+          "bytes": 14432352,
+          "path": "/home/zhuhe/code/litchi-target-0813/before-native",
+          "sha256": "2ee9b24e15d65b83d68eef9783782906d52105cab8e10a8d82c2b16063b00bb6"
+        },
+        "profile": {
+          "bytes": 14433184,
+          "path": "/home/zhuhe/code/litchi-target-0813/before-profile",
+          "sha256": "18b18523b28f39cfd0bb13516bf96fe0705e34b8b811f3ca53e35a71c54185bc"
+        }
+      },
+      "path": "build-before/build.json",
+      "sha256": "16aa8095b492cfa5dd1ef7ce7871b9a10bb612e3e62cc1574b008ff8c559ffad",
+      "source_sha256": "b96e6e4299ec7b9442b2aba79c51495109b3c83dac3c8a69e8d45d3457afad0e"
+    },
+    "binary_custody_verified": true,
+    "cleanup_contract": {
+      "binary_count": 6,
+      "binary_names": [
+        "before-native",
+        "before-allocation",
+        "before-profile",
+        "after-native",
+        "after-allocation",
+        "after-profile"
+      ],
+      "path": "cleanup.json",
+      "target": "/home/zhuhe/code/litchi-target-0813"
+    },
+    "source_chain": {
+      "after_file_count": 9196,
+      "before_file_count": 9196,
+      "changed_files": [
+        "crates/litchi-pptx/src/notes/codec.rs"
+      ]
+    }
+  },
+  "claims": [
+    "The exact owner has one incoming call and its self Ir plus immediate-child inclusive Ir reconstructs the owner summary.",
+    "Whole-function self Ir reconstructs each positive publication; nested inclusive rows are retained as diagnostics and are not added.",
+    "The scanner-to-NsReader::process_event edge is absent in both retained profiles; this reader makes no before/after savings claim.",
+    "Guest-Ir differences do not add an adoption threshold or imply a latency, RSS, cycle, or phase-fraction gain.",
+    "Report source, output, and full semantic verification are bound to the sealed 0806 fixture."
+  ],
+  "fixture_oracle": {
+    "packet": "change-0806",
+    "path": "qualification/0-large-capture-before.json",
+    "seal_sha256": "02a9cebc9325fbcbb2df56b8ad7dded163658cfe2a6b465d74c171547ed7d2ba",
+    "sha256": "024860dd2c8a7ee639c422df21294eb0f82b79b903ecaaaf67fc04442d7153c3"
+  },
+  "mechanism": {
+    "namespace_push_costs_retained_before_after": true,
+    "other_nsreader_callers_are_not_a_global_zero_call_gate": true,
+    "pairs": [
+      {
+        "after_namespace_resolver_push_self_ir": 13019166,
+        "after_scanner_metrics": {
+          "call_counts": [
+            {
+              "callee": "litchi_pptx::notes::codec::inspect_element",
+              "calls": 181678
+            },
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "calls": 282612
+            },
+            {
+              "callee": "quick_xml::name::NamespaceResolver::push",
+              "calls": 181678
+            },
+            {
+              "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+              "calls": 104
+            }
+          ],
+          "direct_children_ir": 297291933,
+          "inclusive_ir": 314015987,
+          "outgoing_call_count": 646384,
+          "records": 1,
+          "self_ir": 16724054
+        },
+        "after_scanner_to_process_event": [],
+        "after_scanner_to_read_event_impl": [
+          {
+            "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+            "callee_id": 5130,
+            "calls": 282612,
+            "edge_count": 2,
+            "inclusive_ir": 104478576
+          }
+        ],
+        "before_namespace_resolver_push_self_ir": 13019166,
+        "before_scanner_metrics": {
+          "call_counts": [
+            {
+              "callee": "litchi_pptx::notes::codec::inspect_element",
+              "calls": 181678
+            },
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "calls": 282612
+            },
+            {
+              "callee": "quick_xml::name::NamespaceResolver::push",
+              "calls": 181678
+            },
+            {
+              "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+              "calls": 104
+            }
+          ],
+          "direct_children_ir": 297241641,
+          "inclusive_ir": 319537399,
+          "outgoing_call_count": 646384,
+          "records": 1,
+          "self_ir": 22295758
+        },
+        "before_scanner_to_process_event": [],
+        "before_scanner_to_read_event_impl": [
+          {
+            "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+            "callee_id": 5130,
+            "calls": 282612,
+            "edge_count": 2,
+            "inclusive_ir": 104437752
+          }
+        ],
+        "global_process_event_incoming_after": [
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+            "caller_id": 5424,
+            "calls": 400,
+            "inclusive_ir": 387556,
+            "line": 15454,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+            "caller_id": 5892,
+            "calls": 300,
+            "inclusive_ir": 425070,
+            "line": 15701,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+            "caller_id": 5192,
+            "calls": 345,
+            "inclusive_ir": 122733,
+            "line": 28911,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+            "caller_id": 5094,
+            "calls": 8,
+            "inclusive_ir": 5179,
+            "line": 29395,
+            "position": "*"
+          }
+        ],
+        "global_process_event_incoming_before": [
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+            "caller_id": 5882,
+            "calls": 300,
+            "inclusive_ir": 422329,
+            "line": 10210,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+            "caller_id": 5422,
+            "calls": 400,
+            "inclusive_ir": 383215,
+            "line": 10418,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+            "caller_id": 5192,
+            "calls": 345,
+            "inclusive_ir": 124131,
+            "line": 16497,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+            "caller_id": 5094,
+            "calls": 8,
+            "inclusive_ir": 3685,
+            "line": 16981,
+            "position": "*"
+          }
+        ],
+        "global_zero_call_check": false,
+        "repeat": 0
+      },
+      {
+        "after_namespace_resolver_push_self_ir": 13019166,
+        "after_scanner_metrics": {
+          "call_counts": [
+            {
+              "callee": "litchi_pptx::notes::codec::inspect_element",
+              "calls": 181678
+            },
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "calls": 282612
+            },
+            {
+              "callee": "quick_xml::name::NamespaceResolver::push",
+              "calls": 181678
+            },
+            {
+              "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+              "calls": 104
+            }
+          ],
+          "direct_children_ir": 297265522,
+          "inclusive_ir": 313989576,
+          "outgoing_call_count": 646384,
+          "records": 1,
+          "self_ir": 16724054
+        },
+        "after_scanner_to_process_event": [],
+        "after_scanner_to_read_event_impl": [
+          {
+            "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+            "callee_id": 5134,
+            "calls": 282612,
+            "edge_count": 2,
+            "inclusive_ir": 104478401
+          }
+        ],
+        "before_namespace_resolver_push_self_ir": 13019166,
+        "before_scanner_metrics": {
+          "call_counts": [
+            {
+              "callee": "litchi_pptx::notes::codec::inspect_element",
+              "calls": 181678
+            },
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "calls": 282612
+            },
+            {
+              "callee": "quick_xml::name::NamespaceResolver::push",
+              "calls": 181678
+            },
+            {
+              "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+              "calls": 104
+            },
+            {
+              "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+              "calls": 104
+            }
+          ],
+          "direct_children_ir": 297241146,
+          "inclusive_ir": 319536904,
+          "outgoing_call_count": 646384,
+          "records": 1,
+          "self_ir": 22295758
+        },
+        "before_scanner_to_process_event": [],
+        "before_scanner_to_read_event_impl": [
+          {
+            "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+            "callee_id": 5130,
+            "calls": 282612,
+            "edge_count": 2,
+            "inclusive_ir": 104437941
+          }
+        ],
+        "global_process_event_incoming_after": [
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5146,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+            "caller_id": 5096,
+            "calls": 8,
+            "inclusive_ir": 4111,
+            "line": 15175,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5146,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+            "caller_id": 5196,
+            "calls": 345,
+            "inclusive_ir": 122552,
+            "line": 15427,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5146,
+            "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+            "caller_id": 5890,
+            "calls": 300,
+            "inclusive_ir": 399032,
+            "line": 18829,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5146,
+            "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+            "caller_id": 5424,
+            "calls": 400,
+            "inclusive_ir": 362327,
+            "line": 19037,
+            "position": "*"
+          }
+        ],
+        "global_process_event_incoming_before": [
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+            "caller_id": 5192,
+            "calls": 345,
+            "inclusive_ir": 122222,
+            "line": 6429,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+            "caller_id": 5092,
+            "calls": 8,
+            "inclusive_ir": 3781,
+            "line": 7141,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+            "caller_id": 5888,
+            "calls": 300,
+            "inclusive_ir": 425113,
+            "line": 16109,
+            "position": "*"
+          },
+          {
+            "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "callee_id": 5142,
+            "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+            "caller_id": 5422,
+            "calls": 400,
+            "inclusive_ir": 387541,
+            "line": 16317,
+            "position": "*"
+          }
+        ],
+        "global_zero_call_check": false,
+        "repeat": 1
+      }
+    ],
+    "scanner_call_metrics_recorded_without_savings_claim": true,
+    "scanner_to_process_event_absent_in_both_profiles": true
+  },
+  "packet": "change-0813",
+  "plan": {
+    "cpu": 12,
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "path": "plan.json",
+    "schema": "litchi.performance.0813.v1",
+    "sha256": "5c1e339481befb55d9d2a00366f979b0458d0564fa913f68ab2facbba7080782"
+  },
+  "profiles": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "valgrind",
+        "--tool=callgrind",
+        "--collect-atstart=no",
+        "--toggle-collect=namespace_uri_probe::capture_region_0793",
+        "--zero-before=namespace_uri_probe::capture_region_0793",
+        "--dump-after=namespace_uri_probe::capture_region_0793",
+        "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/0-before.callgrind",
+        "/home/zhuhe/code/litchi-target-0813/before-profile",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/0-before.json"
+      ],
+      "leg": "before",
+      "log": "profiles/0-before.log",
+      "raw": {
+        "all_function_self_ir": 537151032,
+        "bytes": 282553,
+        "file": "profiles/0-before.callgrind.1",
+        "mechanism": {
+          "global_process_event_incoming_edges": [
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+              "caller_id": 5882,
+              "calls": 300,
+              "inclusive_ir": 422329,
+              "line": 10210,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+              "caller_id": 5422,
+              "calls": 400,
+              "inclusive_ir": 383215,
+              "line": 10418,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+              "caller_id": 5192,
+              "calls": 345,
+              "inclusive_ir": 124131,
+              "line": 16497,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+              "caller_id": 5094,
+              "calls": 8,
+              "inclusive_ir": 3685,
+              "line": 16981,
+              "position": "*"
+            }
+          ],
+          "global_process_event_zero_not_required": true,
+          "namespace_resolver_push_direct_children_ir": 22054207,
+          "namespace_resolver_push_self_ir": 13019166,
+          "scanner_metrics": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children_ir": 297241641,
+            "inclusive_ir": 319537399,
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 22295758
+          },
+          "scanner_to_process_event_edges": [],
+          "scanner_to_read_event_impl_edges": [
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "callee_id": 5130,
+              "calls": 282612,
+              "edge_count": 2,
+              "inclusive_ir": 104437752
+            }
+          ]
+        },
+        "mechanism_functions": {
+          "namespace_resolver_push": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "calls": 550297
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "calls": 1764
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2434,
+                "calls": 550297,
+                "edge_count": 2,
+                "inclusive_ir": 21471516
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4080,
+                "calls": 1764,
+                "edge_count": 1,
+                "inclusive_ir": 582691
+              }
+            ],
+            "direct_children_ir": 22054207,
+            "edges": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2434,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4070,
+                "calls": 364351,
+                "inclusive_ir": 14020736,
+                "line": 28052,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2434,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4070,
+                "calls": 185946,
+                "inclusive_ir": 7450780,
+                "line": 28056,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4080,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4070,
+                "calls": 1764,
+                "inclusive_ir": 582691,
+                "line": 28092,
+                "position": "*"
+              }
+            ],
+            "id": 4070,
+            "inclusive_ir": 35073373,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 797843,
+                "line": 2149,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 2168,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90719,
+                "inclusive_ir": 10261542,
+                "line": 11246,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 11273,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::name::NamespaceResolver::push",
+            "outgoing_call_count": 552061,
+            "records": 1,
+            "self_ir": 13019166
+          },
+          "owner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "calls": 1
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5846,
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 537151022
+              }
+            ],
+            "direct_children_ir": 537151022,
+            "edges": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5846,
+                "caller": "namespace_uri_probe::capture_region_0793",
+                "caller_id": 5844,
+                "calls": 1,
+                "inclusive_ir": 537151022,
+                "line": 3238,
+                "position": "*"
+              }
+            ],
+            "id": 5844,
+            "inclusive_ir": 537151032,
+            "incoming_edges": [
+              {
+                "callee": "namespace_uri_probe::capture_region_0793",
+                "callee_id": 5844,
+                "caller": "namespace_uri_probe::run_one",
+                "caller_id": 5832,
+                "calls": 1,
+                "inclusive_ir": 537151032,
+                "line": 3252,
+                "position": "411"
+              }
+            ],
+            "name": "namespace_uri_probe::capture_region_0793",
+            "outgoing_call_count": 1,
+            "records": 1,
+            "self_ir": 10
+          },
+          "process_event": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181731
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "calls": 181731,
+                "edge_count": 2,
+                "inclusive_ir": 902137
+              }
+            ],
+            "direct_children_ir": 902137,
+            "edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 797843,
+                "line": 2149,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 2168,
+                "position": "*"
+              }
+            ],
+            "id": 5142,
+            "inclusive_ir": 933360,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5882,
+                "calls": 300,
+                "inclusive_ir": 422329,
+                "line": 10210,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5422,
+                "calls": 400,
+                "inclusive_ir": 383215,
+                "line": 10418,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 345,
+                "inclusive_ir": 124131,
+                "line": 16497,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5094,
+                "calls": 8,
+                "inclusive_ir": 3685,
+                "line": 16981,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "outgoing_call_count": 181731,
+            "records": 1,
+            "self_ir": 31223
+          },
+          "reader_read_event_impl": {
+            "call_counts": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "calls": 912300
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "calls": 363409
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "calls": 545358
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "calls": 181231
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "calls": 511
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "calls": 511
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2356,
+                "calls": 912300,
+                "edge_count": 4,
+                "inclusive_ir": 27541232
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2372,
+                "calls": 363409,
+                "edge_count": 1,
+                "inclusive_ir": 19051409
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2262,
+                "calls": 545358,
+                "edge_count": 1,
+                "inclusive_ir": 14251671
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2488,
+                "calls": 181231,
+                "edge_count": 1,
+                "inclusive_ir": 9297328
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2282,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 23030
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2296,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 9210
+              }
+            ],
+            "direct_children_ir": 70173880,
+            "edges": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2262,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 545358,
+                "inclusive_ir": 14251671,
+                "line": 2902,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2282,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 23030,
+                "line": 2931,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2296,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 9210,
+                "line": 2955,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2356,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 5449755,
+                "line": 2985,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2356,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 10931820,
+                "line": 3004,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2356,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5562600,
+                "line": 3015,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2356,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5597057,
+                "line": 3024,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2488,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 9297328,
+                "line": 3066,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2372,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 19051409,
+                "line": 3082,
+                "position": "*"
+              }
+            ],
+            "id": 5130,
+            "inclusive_ir": 104940167,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5882,
+                "calls": 300,
+                "inclusive_ir": 207500,
+                "line": 10206,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5422,
+                "calls": 400,
+                "inclusive_ir": 147726,
+                "line": 10414,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 11226,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 282507,
+                "inclusive_ir": 104429110,
+                "line": 11231,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 3,
+                "inclusive_ir": 160,
+                "line": 16482,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 324,
+                "inclusive_ir": 137312,
+                "line": 16488,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 18,
+                "inclusive_ir": 8218,
+                "line": 16493,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5094,
+                "calls": 8,
+                "inclusive_ir": 1499,
+                "line": 16977,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "outgoing_call_count": 2003320,
+            "records": 1,
+            "self_ir": 34766287
+          },
+          "scanner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5920,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 158428970
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "calls": 282612,
+                "edge_count": 2,
+                "inclusive_ir": 104437752
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 34171236
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4032,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 136194
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2508,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 35656
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5972,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 31417
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2506,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 416
+              }
+            ],
+            "direct_children_ir": 297241641,
+            "edges": [
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4032,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 104,
+                "inclusive_ir": 136194,
+                "line": 11178,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 11226,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 282507,
+                "inclusive_ir": 104429110,
+                "line": 11231,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90719,
+                "inclusive_ir": 10261542,
+                "line": 11246,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5920,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90719,
+                "inclusive_ir": 47581562,
+                "line": 11258,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4070,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 11273,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5920,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 90959,
+                "inclusive_ir": 110847408,
+                "line": 11284,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2506,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 104,
+                "inclusive_ir": 416,
+                "line": 11312,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5972,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 104,
+                "inclusive_ir": 31417,
+                "line": 11320,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2508,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5910,
+                "calls": 104,
+                "inclusive_ir": 35656,
+                "line": 11325,
+                "position": "*"
+              }
+            ],
+            "id": 5910,
+            "inclusive_ir": 319537399,
+            "incoming_edges": [
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5910,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5882,
+                "calls": 100,
+                "inclusive_ir": 317363150,
+                "line": 10360,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5910,
+                "caller": "litchi_pptx::notes::codec::scan_xml",
+                "caller_id": 6022,
+                "calls": 4,
+                "inclusive_ir": 2174249,
+                "line": 10750,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_pptx::notes::codec::scan_processed_xml",
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 22295758
+          }
+        },
+        "owner": {
+          "direct_children": [
+            {
+              "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+              "callee_id": 5846,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 537151022
+            }
+          ],
+          "direct_children_ir": 537151022,
+          "id": 5844,
+          "incoming": {
+            "callee": "namespace_uri_probe::capture_region_0793",
+            "callee_id": 5844,
+            "caller": "namespace_uri_probe::run_one",
+            "caller_id": 5832,
+            "calls": 1,
+            "inclusive_ir": 537151032,
+            "line": 3252,
+            "position": "411"
+          },
+          "name": "namespace_uri_probe::capture_region_0793",
+          "nested_inclusive_rows_excluded": true,
+          "partition_disjoint": true,
+          "partition_equation": "owner self Ir + immediate-child inclusive Ir = owner inclusive Ir",
+          "self_ir": 10
+        },
+        "parser": {
+          "call_edge_records": 1181,
+          "compressed_name_declarations": 186,
+          "cost_records": 16466,
+          "function_records": 186,
+          "position_kinds": {
+            "absolute": 11155,
+            "relative": 3625,
+            "wildcard": 1686
+          },
+          "unique_functions": 186
+        },
+        "sha256": "0379d1a427283ca7112980fedcc298f6289e12c841189149d414264bc3aedb32",
+        "summary_ir": 537151032,
+        "termination": {
+          "bytes": 470,
+          "file": "profiles/0-before.callgrind",
+          "sha256": "da5efd0dc1e6a843d7340114b7ef0a904816e96c31b7048bd4d773cbc2e9aa74",
+          "summary_ir": 0
+        },
+        "validation": {
+          "compressed_names_resolved": true,
+          "exact_trigger": true,
+          "exactly_one_positive_owner_call": true,
+          "owner_inclusive_matches_summary": true,
+          "owner_self_plus_immediate_children_equals_summary": true,
+          "relative_or_wildcard_positions_parsed": true,
+          "summary_nonzero": true,
+          "termination_zero_ir": true,
+          "whole_function_self_ir_equals_summary": true
+        }
+      },
+      "repeat": 0,
+      "report": {
+        "bytes": 1960,
+        "fixture": {
+          "attribute_names": [],
+          "injection": "none",
+          "namespace_declarations": 0,
+          "namespace_uris": [],
+          "namespaced_attributes": 0,
+          "replaced_text_tags": 0,
+          "slide_parts": 0
+        },
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "path": "profiles/0-before.json",
+        "sha256": "db9e20f2294cbcd37c641855459bd11eb8ba17b863cf1997c52666b86d07bd73",
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3",
+          "unknown_namespace_check": null,
+          "unknown_namespace_occurrences": null
+        }
+      },
+      "timestamps": {
+        "ended": 1790581556.5488482,
+        "started": 1790581547.6835418
+      }
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "valgrind",
+        "--tool=callgrind",
+        "--collect-atstart=no",
+        "--toggle-collect=namespace_uri_probe::capture_region_0793",
+        "--zero-before=namespace_uri_probe::capture_region_0793",
+        "--dump-after=namespace_uri_probe::capture_region_0793",
+        "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/0-after.callgrind",
+        "/home/zhuhe/code/litchi-target-0813/after-profile",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/0-after.json"
+      ],
+      "leg": "after",
+      "log": "profiles/0-after.log",
+      "raw": {
+        "all_function_self_ir": 531661794,
+        "bytes": 282907,
+        "file": "profiles/0-after.callgrind.1",
+        "mechanism": {
+          "global_process_event_incoming_edges": [
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+              "caller_id": 5424,
+              "calls": 400,
+              "inclusive_ir": 387556,
+              "line": 15454,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+              "caller_id": 5892,
+              "calls": 300,
+              "inclusive_ir": 425070,
+              "line": 15701,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+              "caller_id": 5192,
+              "calls": 345,
+              "inclusive_ir": 122733,
+              "line": 28911,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+              "caller_id": 5094,
+              "calls": 8,
+              "inclusive_ir": 5179,
+              "line": 29395,
+              "position": "*"
+            }
+          ],
+          "global_process_event_zero_not_required": true,
+          "namespace_resolver_push_direct_children_ir": 22064586,
+          "namespace_resolver_push_self_ir": 13019166,
+          "scanner_metrics": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children_ir": 297291933,
+            "inclusive_ir": 314015987,
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 16724054
+          },
+          "scanner_to_process_event_edges": [],
+          "scanner_to_read_event_impl_edges": [
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "callee_id": 5130,
+              "calls": 282612,
+              "edge_count": 2,
+              "inclusive_ir": 104478576
+            }
+          ]
+        },
+        "mechanism_functions": {
+          "namespace_resolver_push": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "calls": 550297
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "calls": 1764
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "calls": 550297,
+                "edge_count": 2,
+                "inclusive_ir": 21471516
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "calls": 1764,
+                "edge_count": 1,
+                "inclusive_ir": 593070
+              }
+            ],
+            "direct_children_ir": 22064586,
+            "edges": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 364351,
+                "inclusive_ir": 14020736,
+                "line": 14409,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 185946,
+                "inclusive_ir": 7450780,
+                "line": 14413,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 1764,
+                "inclusive_ir": 593070,
+                "line": 14449,
+                "position": "*"
+              }
+            ],
+            "id": 4072,
+            "inclusive_ir": 35083752,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90719,
+                "inclusive_ir": 10264743,
+                "line": 2101,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 2129,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 805021,
+                "line": 3161,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 3180,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::name::NamespaceResolver::push",
+            "outgoing_call_count": 552061,
+            "records": 1,
+            "self_ir": 13019166
+          },
+          "owner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "calls": 1
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5856,
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 531661784
+              }
+            ],
+            "direct_children_ir": 531661784,
+            "edges": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5856,
+                "caller": "namespace_uri_probe::capture_region_0793",
+                "caller_id": 5854,
+                "calls": 1,
+                "inclusive_ir": 531661784,
+                "line": 1936,
+                "position": "*"
+              }
+            ],
+            "id": 5854,
+            "inclusive_ir": 531661794,
+            "incoming_edges": [
+              {
+                "callee": "namespace_uri_probe::capture_region_0793",
+                "callee_id": 5854,
+                "caller": "namespace_uri_probe::run_one",
+                "caller_id": 5836,
+                "calls": 1,
+                "inclusive_ir": 531661794,
+                "line": 1928,
+                "position": "411"
+              }
+            ],
+            "name": "namespace_uri_probe::capture_region_0793",
+            "outgoing_call_count": 1,
+            "records": 2,
+            "self_ir": 10
+          },
+          "process_event": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181731
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181731,
+                "edge_count": 2,
+                "inclusive_ir": 909315
+              }
+            ],
+            "direct_children_ir": 909315,
+            "edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 805021,
+                "line": 3161,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 3180,
+                "position": "*"
+              }
+            ],
+            "id": 5142,
+            "inclusive_ir": 940538,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5424,
+                "calls": 400,
+                "inclusive_ir": 387556,
+                "line": 15454,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5892,
+                "calls": 300,
+                "inclusive_ir": 425070,
+                "line": 15701,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 345,
+                "inclusive_ir": 122733,
+                "line": 28911,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5094,
+                "calls": 8,
+                "inclusive_ir": 5179,
+                "line": 29395,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "outgoing_call_count": 181731,
+            "records": 1,
+            "self_ir": 31223
+          },
+          "reader_read_event_impl": {
+            "call_counts": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "calls": 912300
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "calls": 363409
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "calls": 545358
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "calls": 181231
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "calls": 511
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "calls": 511
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "calls": 912300,
+                "edge_count": 4,
+                "inclusive_ir": 27541227
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2374,
+                "calls": 363409,
+                "edge_count": 1,
+                "inclusive_ir": 19068246
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2264,
+                "calls": 545358,
+                "edge_count": 1,
+                "inclusive_ir": 14251671
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2490,
+                "calls": 181231,
+                "edge_count": 1,
+                "inclusive_ir": 9324190
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2284,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 23028
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2298,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 9210
+              }
+            ],
+            "direct_children_ir": 70217572,
+            "edges": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2264,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 545358,
+                "inclusive_ir": 14251671,
+                "line": 19011,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2284,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 23028,
+                "line": 19040,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2298,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 9210,
+                "line": 19064,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 5449755,
+                "line": 19094,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 10931820,
+                "line": 19113,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5562600,
+                "line": 19124,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5597052,
+                "line": 19133,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2490,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 9324190,
+                "line": 19175,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2374,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 19068246,
+                "line": 19191,
+                "position": "*"
+              }
+            ],
+            "id": 5130,
+            "inclusive_ir": 104983859,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 2087,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 282507,
+                "inclusive_ir": 104469934,
+                "line": 2092,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5424,
+                "calls": 400,
+                "inclusive_ir": 147382,
+                "line": 15450,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5892,
+                "calls": 300,
+                "inclusive_ir": 210682,
+                "line": 15697,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 3,
+                "inclusive_ir": 160,
+                "line": 28896,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 324,
+                "inclusive_ir": 137247,
+                "line": 28902,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 18,
+                "inclusive_ir": 8313,
+                "line": 28907,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5094,
+                "calls": 8,
+                "inclusive_ir": 1499,
+                "line": 29391,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "outgoing_call_count": 2003320,
+            "records": 1,
+            "self_ir": 34766287
+          },
+          "scanner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5930,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 158428774
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "calls": 282612,
+                "edge_count": 2,
+                "inclusive_ir": 104478576
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 34174437
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 142842
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5982,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 33948
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2510,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 32940
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2508,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 416
+              }
+            ],
+            "direct_children_ir": 297291933,
+            "edges": [
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 104,
+                "inclusive_ir": 142842,
+                "line": 2038,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 2087,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 282507,
+                "inclusive_ir": 104469934,
+                "line": 2092,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90719,
+                "inclusive_ir": 10264743,
+                "line": 2101,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5930,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90719,
+                "inclusive_ir": 47581410,
+                "line": 2113,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 2129,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5930,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 90959,
+                "inclusive_ir": 110847364,
+                "line": 2140,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2508,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 104,
+                "inclusive_ir": 416,
+                "line": 2167,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5982,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 104,
+                "inclusive_ir": 33948,
+                "line": 2175,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2510,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5920,
+                "calls": 104,
+                "inclusive_ir": 32940,
+                "line": 2180,
+                "position": "*"
+              }
+            ],
+            "id": 5920,
+            "inclusive_ir": 314015987,
+            "incoming_edges": [
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5920,
+                "caller": "litchi_pptx::notes::codec::scan_xml",
+                "caller_id": 6032,
+                "calls": 4,
+                "inclusive_ir": 2155655,
+                "line": 2604,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5920,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5892,
+                "calls": 100,
+                "inclusive_ir": 311860332,
+                "line": 15851,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_pptx::notes::codec::scan_processed_xml",
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 16724054
+          }
+        },
+        "owner": {
+          "direct_children": [
+            {
+              "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+              "callee_id": 5856,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 531661784
+            }
+          ],
+          "direct_children_ir": 531661784,
+          "id": 5854,
+          "incoming": {
+            "callee": "namespace_uri_probe::capture_region_0793",
+            "callee_id": 5854,
+            "caller": "namespace_uri_probe::run_one",
+            "caller_id": 5836,
+            "calls": 1,
+            "inclusive_ir": 531661794,
+            "line": 1928,
+            "position": "411"
+          },
+          "name": "namespace_uri_probe::capture_region_0793",
+          "nested_inclusive_rows_excluded": true,
+          "partition_disjoint": true,
+          "partition_equation": "owner self Ir + immediate-child inclusive Ir = owner inclusive Ir",
+          "self_ir": 10
+        },
+        "parser": {
+          "call_edge_records": 1174,
+          "compressed_name_declarations": 186,
+          "cost_records": 16494,
+          "function_records": 187,
+          "position_kinds": {
+            "absolute": 11203,
+            "relative": 3617,
+            "wildcard": 1674
+          },
+          "unique_functions": 186
+        },
+        "sha256": "49140269ef8ed85da2691057bb8700c7a8732dd4aba6e630006119d3ebb452e6",
+        "summary_ir": 531661794,
+        "termination": {
+          "bytes": 468,
+          "file": "profiles/0-after.callgrind",
+          "sha256": "3669822ecf4257789131775fd43efbc4fe7b446615637d85b89b37fe5c110d8f",
+          "summary_ir": 0
+        },
+        "validation": {
+          "compressed_names_resolved": true,
+          "exact_trigger": true,
+          "exactly_one_positive_owner_call": true,
+          "owner_inclusive_matches_summary": true,
+          "owner_self_plus_immediate_children_equals_summary": true,
+          "relative_or_wildcard_positions_parsed": true,
+          "summary_nonzero": true,
+          "termination_zero_ir": true,
+          "whole_function_self_ir_equals_summary": true
+        }
+      },
+      "repeat": 0,
+      "report": {
+        "bytes": 1959,
+        "fixture": {
+          "attribute_names": [],
+          "injection": "none",
+          "namespace_declarations": 0,
+          "namespace_uris": [],
+          "namespaced_attributes": 0,
+          "replaced_text_tags": 0,
+          "slide_parts": 0
+        },
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "path": "profiles/0-after.json",
+        "sha256": "3d52fbc1f9c1cc7b5a2dc31772de6a2bc62fb19eef0e4bc03c73094edef29d4d",
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3",
+          "unknown_namespace_check": null,
+          "unknown_namespace_occurrences": null
+        }
+      },
+      "timestamps": {
+        "ended": 1790581565.543758,
+        "started": 1790581556.7528753
+      }
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "valgrind",
+        "--tool=callgrind",
+        "--collect-atstart=no",
+        "--toggle-collect=namespace_uri_probe::capture_region_0793",
+        "--zero-before=namespace_uri_probe::capture_region_0793",
+        "--dump-after=namespace_uri_probe::capture_region_0793",
+        "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/1-after.callgrind",
+        "/home/zhuhe/code/litchi-target-0813/after-profile",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/1-after.json"
+      ],
+      "leg": "after",
+      "log": "profiles/1-after.log",
+      "raw": {
+        "all_function_self_ir": 531570923,
+        "bytes": 279464,
+        "file": "profiles/1-after.callgrind.1",
+        "mechanism": {
+          "global_process_event_incoming_edges": [
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5146,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+              "caller_id": 5096,
+              "calls": 8,
+              "inclusive_ir": 4111,
+              "line": 15175,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5146,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+              "caller_id": 5196,
+              "calls": 345,
+              "inclusive_ir": 122552,
+              "line": 15427,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5146,
+              "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+              "caller_id": 5890,
+              "calls": 300,
+              "inclusive_ir": 399032,
+              "line": 18829,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5146,
+              "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+              "caller_id": 5424,
+              "calls": 400,
+              "inclusive_ir": 362327,
+              "line": 19037,
+              "position": "*"
+            }
+          ],
+          "global_process_event_zero_not_required": true,
+          "namespace_resolver_push_direct_children_ir": 21987274,
+          "namespace_resolver_push_self_ir": 13019166,
+          "scanner_metrics": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children_ir": 297265522,
+            "inclusive_ir": 313989576,
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 16724054
+          },
+          "scanner_to_process_event_edges": [],
+          "scanner_to_read_event_impl_edges": [
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "callee_id": 5134,
+              "calls": 282612,
+              "edge_count": 2,
+              "inclusive_ir": 104478401
+            }
+          ]
+        },
+        "mechanism_functions": {
+          "namespace_resolver_push": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "calls": 550297
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "calls": 1764
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "calls": 550297,
+                "edge_count": 2,
+                "inclusive_ir": 21471516
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "calls": 1764,
+                "edge_count": 1,
+                "inclusive_ir": 515758
+              }
+            ],
+            "direct_children_ir": 21987274,
+            "edges": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 364351,
+                "inclusive_ir": 14020736,
+                "line": 13856,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2436,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 185946,
+                "inclusive_ir": 7450780,
+                "line": 13860,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 1764,
+                "inclusive_ir": 515758,
+                "line": 13896,
+                "position": "*"
+              }
+            ],
+            "id": 4072,
+            "inclusive_ir": 35006440,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5146,
+                "calls": 90916,
+                "inclusive_ir": 752505,
+                "line": 1282,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5146,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 1301,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90719,
+                "inclusive_ir": 10239947,
+                "line": 17648,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 17676,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::name::NamespaceResolver::push",
+            "outgoing_call_count": 552061,
+            "records": 1,
+            "self_ir": 13019166
+          },
+          "owner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "calls": 1
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5854,
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 531570913
+              }
+            ],
+            "direct_children_ir": 531570913,
+            "edges": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5854,
+                "caller": "namespace_uri_probe::capture_region_0793",
+                "caller_id": 5852,
+                "calls": 1,
+                "inclusive_ir": 531570913,
+                "line": 6263,
+                "position": "*"
+              }
+            ],
+            "id": 5852,
+            "inclusive_ir": 531570923,
+            "incoming_edges": [
+              {
+                "callee": "namespace_uri_probe::capture_region_0793",
+                "callee_id": 5852,
+                "caller": "namespace_uri_probe::run_one",
+                "caller_id": 5834,
+                "calls": 1,
+                "inclusive_ir": 531570923,
+                "line": 6272,
+                "position": "411"
+              }
+            ],
+            "name": "namespace_uri_probe::capture_region_0793",
+            "outgoing_call_count": 1,
+            "records": 1,
+            "self_ir": 10
+          },
+          "process_event": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181731
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181731,
+                "edge_count": 2,
+                "inclusive_ir": 856799
+              }
+            ],
+            "direct_children_ir": 856799,
+            "edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5146,
+                "calls": 90916,
+                "inclusive_ir": 752505,
+                "line": 1282,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5146,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 1301,
+                "position": "*"
+              }
+            ],
+            "id": 5146,
+            "inclusive_ir": 888022,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5146,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5096,
+                "calls": 8,
+                "inclusive_ir": 4111,
+                "line": 15175,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5146,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5196,
+                "calls": 345,
+                "inclusive_ir": 122552,
+                "line": 15427,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5146,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5890,
+                "calls": 300,
+                "inclusive_ir": 399032,
+                "line": 18829,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5146,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5424,
+                "calls": 400,
+                "inclusive_ir": 362327,
+                "line": 19037,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "outgoing_call_count": 181731,
+            "records": 1,
+            "self_ir": 31223
+          },
+          "reader_read_event_impl": {
+            "call_counts": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "calls": 912300
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "calls": 363409
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "calls": 545358
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "calls": 181231
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "calls": 511
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "calls": 511
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "calls": 912300,
+                "edge_count": 4,
+                "inclusive_ir": 27541232
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2374,
+                "calls": 363409,
+                "edge_count": 1,
+                "inclusive_ir": 19048550
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2264,
+                "calls": 545358,
+                "edge_count": 1,
+                "inclusive_ir": 14251679
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2490,
+                "calls": 181231,
+                "edge_count": 1,
+                "inclusive_ir": 9341746
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2284,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 23042
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2298,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 9210
+              }
+            ],
+            "direct_children_ir": 70215459,
+            "edges": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2264,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 545358,
+                "inclusive_ir": 14251679,
+                "line": 18163,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2284,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 511,
+                "inclusive_ir": 23042,
+                "line": 18192,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2298,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 511,
+                "inclusive_ir": 9210,
+                "line": 18216,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 181231,
+                "inclusive_ir": 5449755,
+                "line": 18246,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 363409,
+                "inclusive_ir": 10931820,
+                "line": 18265,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 183830,
+                "inclusive_ir": 5562600,
+                "line": 18276,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2358,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 183830,
+                "inclusive_ir": 5597057,
+                "line": 18285,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2490,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 181231,
+                "inclusive_ir": 9341746,
+                "line": 18327,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2374,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5134,
+                "calls": 363409,
+                "inclusive_ir": 19048550,
+                "line": 18343,
+                "position": "*"
+              }
+            ],
+            "id": 5134,
+            "inclusive_ir": 104981746,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5096,
+                "calls": 8,
+                "inclusive_ir": 1499,
+                "line": 15171,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5196,
+                "calls": 3,
+                "inclusive_ir": 160,
+                "line": 15412,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5196,
+                "calls": 324,
+                "inclusive_ir": 137632,
+                "line": 15418,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5196,
+                "calls": 18,
+                "inclusive_ir": 8218,
+                "line": 15423,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 17634,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 282507,
+                "inclusive_ir": 104469759,
+                "line": 17639,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5890,
+                "calls": 300,
+                "inclusive_ir": 207504,
+                "line": 18825,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5424,
+                "calls": 400,
+                "inclusive_ir": 148332,
+                "line": 19033,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "outgoing_call_count": 2003320,
+            "records": 1,
+            "self_ir": 34766287
+          },
+          "scanner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5928,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 158429804
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "calls": 282612,
+                "edge_count": 2,
+                "inclusive_ir": 104478401
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 34149641
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 139594
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5980,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 36170
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2510,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 31496
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2508,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 416
+              }
+            ],
+            "direct_children_ir": 297265522,
+            "edges": [
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 104,
+                "inclusive_ir": 139594,
+                "line": 17585,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 17634,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5134,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 282507,
+                "inclusive_ir": 104469759,
+                "line": 17639,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90719,
+                "inclusive_ir": 10239947,
+                "line": 17648,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5928,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90719,
+                "inclusive_ir": 47581533,
+                "line": 17660,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90959,
+                "inclusive_ir": 23909694,
+                "line": 17676,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5928,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 90959,
+                "inclusive_ir": 110848271,
+                "line": 17687,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2508,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 104,
+                "inclusive_ir": 416,
+                "line": 17714,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5980,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 104,
+                "inclusive_ir": 36170,
+                "line": 17722,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2510,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5918,
+                "calls": 104,
+                "inclusive_ir": 31496,
+                "line": 17727,
+                "position": "*"
+              }
+            ],
+            "id": 5918,
+            "inclusive_ir": 313989576,
+            "incoming_edges": [
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5918,
+                "caller": "litchi_pptx::notes::codec::scan_xml",
+                "caller_id": 6032,
+                "calls": 4,
+                "inclusive_ir": 2157811,
+                "line": 17545,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5918,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5890,
+                "calls": 100,
+                "inclusive_ir": 311831765,
+                "line": 18979,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_pptx::notes::codec::scan_processed_xml",
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 16724054
+          }
+        },
+        "owner": {
+          "direct_children": [
+            {
+              "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+              "callee_id": 5854,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 531570913
+            }
+          ],
+          "direct_children_ir": 531570913,
+          "id": 5852,
+          "incoming": {
+            "callee": "namespace_uri_probe::capture_region_0793",
+            "callee_id": 5852,
+            "caller": "namespace_uri_probe::run_one",
+            "caller_id": 5834,
+            "calls": 1,
+            "inclusive_ir": 531570923,
+            "line": 6272,
+            "position": "411"
+          },
+          "name": "namespace_uri_probe::capture_region_0793",
+          "nested_inclusive_rows_excluded": true,
+          "partition_disjoint": true,
+          "partition_equation": "owner self Ir + immediate-child inclusive Ir = owner inclusive Ir",
+          "self_ir": 10
+        },
+        "parser": {
+          "call_edge_records": 1166,
+          "compressed_name_declarations": 186,
+          "cost_records": 16244,
+          "function_records": 186,
+          "position_kinds": {
+            "absolute": 11040,
+            "relative": 3552,
+            "wildcard": 1652
+          },
+          "unique_functions": 186
+        },
+        "sha256": "7b3cd977f5ea3528f88489d716e8365b548c49512c382925057910d3d448ba25",
+        "summary_ir": 531570923,
+        "termination": {
+          "bytes": 468,
+          "file": "profiles/1-after.callgrind",
+          "sha256": "74f7433b5435d883074226100f62d561deef18d50fa4c56377e4989c2b5e9b24",
+          "summary_ir": 0
+        },
+        "validation": {
+          "compressed_names_resolved": true,
+          "exact_trigger": true,
+          "exactly_one_positive_owner_call": true,
+          "owner_inclusive_matches_summary": true,
+          "owner_self_plus_immediate_children_equals_summary": true,
+          "relative_or_wildcard_positions_parsed": true,
+          "summary_nonzero": true,
+          "termination_zero_ir": true,
+          "whole_function_self_ir_equals_summary": true
+        }
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 1959,
+        "fixture": {
+          "attribute_names": [],
+          "injection": "none",
+          "namespace_declarations": 0,
+          "namespace_uris": [],
+          "namespaced_attributes": 0,
+          "replaced_text_tags": 0,
+          "slide_parts": 0
+        },
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "path": "profiles/1-after.json",
+        "sha256": "424d9b1e0a3aaea0ae7fed893afdffb6b58bfc0a9fe523dc1a7ae96d901b1971",
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3",
+          "unknown_namespace_check": null,
+          "unknown_namespace_occurrences": null
+        }
+      },
+      "timestamps": {
+        "ended": 1790581574.5081832,
+        "started": 1790581565.7469153
+      }
+    },
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "12",
+        "valgrind",
+        "--tool=callgrind",
+        "--collect-atstart=no",
+        "--toggle-collect=namespace_uri_probe::capture_region_0793",
+        "--zero-before=namespace_uri_probe::capture_region_0793",
+        "--dump-after=namespace_uri_probe::capture_region_0793",
+        "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/1-before.callgrind",
+        "/home/zhuhe/code/litchi-target-0813/before-profile",
+        "--mode",
+        "capture",
+        "--shape",
+        "large",
+        "--samples",
+        "1",
+        "--warmup",
+        "0",
+        "--output",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0813/profiles/1-before.json"
+      ],
+      "leg": "before",
+      "log": "profiles/1-before.log",
+      "raw": {
+        "all_function_self_ir": 537174712,
+        "bytes": 280176,
+        "file": "profiles/1-before.callgrind.1",
+        "mechanism": {
+          "global_process_event_incoming_edges": [
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+              "caller_id": 5192,
+              "calls": 345,
+              "inclusive_ir": 122222,
+              "line": 6429,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+              "caller_id": 5092,
+              "calls": 8,
+              "inclusive_ir": 3781,
+              "line": 7141,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+              "caller_id": 5888,
+              "calls": 300,
+              "inclusive_ir": 425113,
+              "line": 16109,
+              "position": "*"
+            },
+            {
+              "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+              "callee_id": 5142,
+              "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+              "caller_id": 5422,
+              "calls": 400,
+              "inclusive_ir": 387541,
+              "line": 16317,
+              "position": "*"
+            }
+          ],
+          "global_process_event_zero_not_required": true,
+          "namespace_resolver_push_direct_children_ir": 22063009,
+          "namespace_resolver_push_self_ir": 13019166,
+          "scanner_metrics": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children_ir": 297241146,
+            "inclusive_ir": 319536904,
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 22295758
+          },
+          "scanner_to_process_event_edges": [],
+          "scanner_to_read_event_impl_edges": [
+            {
+              "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+              "callee_id": 5130,
+              "calls": 282612,
+              "edge_count": 2,
+              "inclusive_ir": 104437941
+            }
+          ]
+        },
+        "mechanism_functions": {
+          "namespace_resolver_push": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "calls": 550297
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "calls": 1764
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2440,
+                "calls": 550297,
+                "edge_count": 2,
+                "inclusive_ir": 21471516
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "calls": 1764,
+                "edge_count": 1,
+                "inclusive_ir": 591493
+              }
+            ],
+            "direct_children_ir": 22063009,
+            "edges": [
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2440,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 364351,
+                "inclusive_ir": 14020736,
+                "line": 17124,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::events::attributes::IterState::next",
+                "callee_id": 2440,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 185946,
+                "inclusive_ir": 7450780,
+                "line": 17128,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::add",
+                "callee_id": 4082,
+                "caller": "quick_xml::name::NamespaceResolver::push",
+                "caller_id": 4072,
+                "calls": 1764,
+                "inclusive_ir": 591493,
+                "line": 17164,
+                "position": "*"
+              }
+            ],
+            "id": 4072,
+            "inclusive_ir": 35082175,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90719,
+                "inclusive_ir": 10265075,
+                "line": 13355,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90959,
+                "inclusive_ir": 23909666,
+                "line": 13382,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 803140,
+                "line": 13592,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 13611,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::name::NamespaceResolver::push",
+            "outgoing_call_count": 552061,
+            "records": 1,
+            "self_ir": 13019166
+          },
+          "owner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "calls": 1
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5852,
+                "calls": 1,
+                "edge_count": 1,
+                "inclusive_ir": 537174702
+              }
+            ],
+            "direct_children_ir": 537174702,
+            "edges": [
+              {
+                "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+                "callee_id": 5852,
+                "caller": "namespace_uri_probe::capture_region_0793",
+                "caller_id": 5850,
+                "calls": 1,
+                "inclusive_ir": 537174702,
+                "line": 11546,
+                "position": "*"
+              }
+            ],
+            "id": 5850,
+            "inclusive_ir": 537174712,
+            "incoming_edges": [
+              {
+                "callee": "namespace_uri_probe::capture_region_0793",
+                "callee_id": 5850,
+                "caller": "namespace_uri_probe::run_one",
+                "caller_id": 5836,
+                "calls": 1,
+                "inclusive_ir": 537174712,
+                "line": 11555,
+                "position": "411"
+              }
+            ],
+            "name": "namespace_uri_probe::capture_region_0793",
+            "outgoing_call_count": 1,
+            "records": 1,
+            "self_ir": 10
+          },
+          "process_event": {
+            "call_counts": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181731
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181731,
+                "edge_count": 2,
+                "inclusive_ir": 907434
+              }
+            ],
+            "direct_children_ir": 907434,
+            "edges": [
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90916,
+                "inclusive_ir": 803140,
+                "line": 13592,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "caller_id": 5142,
+                "calls": 90815,
+                "inclusive_ir": 104294,
+                "line": 13611,
+                "position": "*"
+              }
+            ],
+            "id": 5142,
+            "inclusive_ir": 938657,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 345,
+                "inclusive_ir": 122222,
+                "line": 6429,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5092,
+                "calls": 8,
+                "inclusive_ir": 3781,
+                "line": 7141,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5888,
+                "calls": 300,
+                "inclusive_ir": 425113,
+                "line": 16109,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                "callee_id": 5142,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5422,
+                "calls": 400,
+                "inclusive_ir": 387541,
+                "line": 16317,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+            "outgoing_call_count": 181731,
+            "records": 1,
+            "self_ir": 31223
+          },
+          "reader_read_event_impl": {
+            "call_counts": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "calls": 912300
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "calls": 363409
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "calls": 545358
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "calls": 181231
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "calls": 511
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "calls": 511
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2362,
+                "calls": 912300,
+                "edge_count": 4,
+                "inclusive_ir": 27541227
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2378,
+                "calls": 363409,
+                "edge_count": 1,
+                "inclusive_ir": 19050758
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2266,
+                "calls": 545358,
+                "edge_count": 1,
+                "inclusive_ir": 14251679
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2496,
+                "calls": 181231,
+                "edge_count": 1,
+                "inclusive_ir": 9302156
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2286,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 23044
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2302,
+                "calls": 511,
+                "edge_count": 1,
+                "inclusive_ir": 9210
+              }
+            ],
+            "direct_children_ir": 70178074,
+            "edges": [
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2",
+                "callee_id": 2266,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 545358,
+                "inclusive_ir": 14251679,
+                "line": 18084,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                "callee_id": 2286,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 23044,
+                "line": 18113,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_question_mark",
+                "callee_id": 2302,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 511,
+                "inclusive_ir": 9210,
+                "line": 18137,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2362,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 5449755,
+                "line": 18167,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2362,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 10931820,
+                "line": 18186,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2362,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5562600,
+                "line": 18197,
+                "position": "*"
+              },
+              {
+                "callee": "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2",
+                "callee_id": 2362,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 183830,
+                "inclusive_ir": 5597052,
+                "line": 18206,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_end",
+                "callee_id": 2496,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 181231,
+                "inclusive_ir": 9302156,
+                "line": 18248,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::state::ReaderState::emit_start",
+                "callee_id": 2378,
+                "caller": "quick_xml::reader::Reader<R>::read_event_impl",
+                "caller_id": 5130,
+                "calls": 363409,
+                "inclusive_ir": 19050758,
+                "line": 18264,
+                "position": "*"
+              }
+            ],
+            "id": 5130,
+            "inclusive_ir": 104944361,
+            "incoming_edges": [
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 3,
+                "inclusive_ir": 160,
+                "line": 6414,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 324,
+                "inclusive_ir": 137118,
+                "line": 6420,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::slide_references",
+                "caller_id": 5192,
+                "calls": 18,
+                "inclusive_ir": 8109,
+                "line": 6425,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::presentation::PresentationPart::from_part",
+                "caller_id": 5092,
+                "calls": 8,
+                "inclusive_ir": 1499,
+                "line": 7137,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 13335,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 282507,
+                "inclusive_ir": 104429299,
+                "line": 13340,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5888,
+                "calls": 300,
+                "inclusive_ir": 211374,
+                "line": 16105,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::parts::slide::root_name_from_xml",
+                "caller_id": 5422,
+                "calls": 400,
+                "inclusive_ir": 148160,
+                "line": 16313,
+                "position": "*"
+              }
+            ],
+            "name": "quick_xml::reader::Reader<R>::read_event_impl",
+            "outgoing_call_count": 2003320,
+            "records": 1,
+            "self_ir": 34766287
+          },
+          "scanner": {
+            "call_counts": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "calls": 181678
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "calls": 282612
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "calls": 181678
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "calls": 104
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "calls": 104
+              }
+            ],
+            "direct_children": [
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5926,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 158429217
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "calls": 282612,
+                "edge_count": 2,
+                "inclusive_ir": 104437941
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "calls": 181678,
+                "edge_count": 2,
+                "inclusive_ir": 34174741
+              },
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 134458
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5978,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 32805
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2516,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 31568
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2514,
+                "calls": 104,
+                "edge_count": 1,
+                "inclusive_ir": 416
+              }
+            ],
+            "direct_children_ir": 297241146,
+            "edges": [
+              {
+                "callee": "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                "callee_id": 4034,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 104,
+                "inclusive_ir": 134458,
+                "line": 13287,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 105,
+                "inclusive_ir": 8642,
+                "line": 13335,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::reader::Reader<R>::read_event_impl",
+                "callee_id": 5130,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 282507,
+                "inclusive_ir": 104429299,
+                "line": 13340,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90719,
+                "inclusive_ir": 10265075,
+                "line": 13355,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5926,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90719,
+                "inclusive_ir": 47581790,
+                "line": 13367,
+                "position": "*"
+              },
+              {
+                "callee": "quick_xml::name::NamespaceResolver::push",
+                "callee_id": 4072,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90959,
+                "inclusive_ir": 23909666,
+                "line": 13382,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::inspect_element",
+                "callee_id": 5926,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 90959,
+                "inclusive_ir": 110847427,
+                "line": 13393,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::events::Event>",
+                "callee_id": 2514,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 104,
+                "inclusive_ir": 416,
+                "line": 13421,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>",
+                "callee_id": 5978,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 104,
+                "inclusive_ir": 32805,
+                "line": 13429,
+                "position": "*"
+              },
+              {
+                "callee": "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>",
+                "callee_id": 2516,
+                "caller": "litchi_pptx::notes::codec::scan_processed_xml",
+                "caller_id": 5916,
+                "calls": 104,
+                "inclusive_ir": 31568,
+                "line": 13434,
+                "position": "*"
+              }
+            ],
+            "id": 5916,
+            "inclusive_ir": 319536904,
+            "incoming_edges": [
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5916,
+                "caller": "litchi_pptx::notes::codec::scan_xml",
+                "caller_id": 6030,
+                "calls": 4,
+                "inclusive_ir": 2175251,
+                "line": 13267,
+                "position": "*"
+              },
+              {
+                "callee": "litchi_pptx::notes::codec::scan_processed_xml",
+                "callee_id": 5916,
+                "caller": "litchi_pptx::parts::slide::SlidePart::finish_from_processed",
+                "caller_id": 5888,
+                "calls": 100,
+                "inclusive_ir": 317361653,
+                "line": 16259,
+                "position": "*"
+              }
+            ],
+            "name": "litchi_pptx::notes::codec::scan_processed_xml",
+            "outgoing_call_count": 646384,
+            "records": 1,
+            "self_ir": 22295758
+          }
+        },
+        "owner": {
+          "direct_children": [
+            {
+              "callee": "litchi_pptx::package::model::Package::opened_presentation_with_limits",
+              "callee_id": 5852,
+              "calls": 1,
+              "edge_count": 1,
+              "inclusive_ir": 537174702
+            }
+          ],
+          "direct_children_ir": 537174702,
+          "id": 5850,
+          "incoming": {
+            "callee": "namespace_uri_probe::capture_region_0793",
+            "callee_id": 5850,
+            "caller": "namespace_uri_probe::run_one",
+            "caller_id": 5836,
+            "calls": 1,
+            "inclusive_ir": 537174712,
+            "line": 11555,
+            "position": "411"
+          },
+          "name": "namespace_uri_probe::capture_region_0793",
+          "nested_inclusive_rows_excluded": true,
+          "partition_disjoint": true,
+          "partition_equation": "owner self Ir + immediate-child inclusive Ir = owner inclusive Ir",
+          "self_ir": 10
+        },
+        "parser": {
+          "call_edge_records": 1167,
+          "compressed_name_declarations": 186,
+          "cost_records": 16294,
+          "function_records": 186,
+          "position_kinds": {
+            "absolute": 11078,
+            "relative": 3559,
+            "wildcard": 1657
+          },
+          "unique_functions": 186
+        },
+        "sha256": "6ef3e2fee4dd3f99969ad728853b275e323b404d75d94c18caafb2c139fba6dd",
+        "summary_ir": 537174712,
+        "termination": {
+          "bytes": 470,
+          "file": "profiles/1-before.callgrind",
+          "sha256": "b16b34576c55e7dfe40f9d60d636392a031016e1d4cee5a2edfcc6454a34de87",
+          "summary_ir": 0
+        },
+        "validation": {
+          "compressed_names_resolved": true,
+          "exact_trigger": true,
+          "exactly_one_positive_owner_call": true,
+          "owner_inclusive_matches_summary": true,
+          "owner_self_plus_immediate_children_equals_summary": true,
+          "relative_or_wildcard_positions_parsed": true,
+          "summary_nonzero": true,
+          "termination_zero_ir": true,
+          "whole_function_self_ir_equals_summary": true
+        }
+      },
+      "repeat": 1,
+      "report": {
+        "bytes": 1960,
+        "fixture": {
+          "attribute_names": [],
+          "injection": "none",
+          "namespace_declarations": 0,
+          "namespace_uris": [],
+          "namespaced_attributes": 0,
+          "replaced_text_tags": 0,
+          "slide_parts": 0
+        },
+        "output": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "path": "profiles/1-before.json",
+        "sha256": "87a0da0058f26a5daf1bd488ab298f2193e9eb5df9fabc185fb24fb6093581a6",
+        "source": {
+          "bytes": 215220,
+          "sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+        },
+        "verification": {
+          "actual_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "expected_text": "litchi-perf-baseline-pptx-semantic-v1-source-000-000",
+          "marker_matches": null,
+          "readback_bytes": 215220,
+          "readback_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "reopened": true,
+          "semantic_check": true,
+          "semantic_text_bytes": 529999,
+          "semantic_text_sha256": "69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3",
+          "unknown_namespace_check": null,
+          "unknown_namespace_occurrences": null
+        }
+      },
+      "timestamps": {
+        "ended": 1790581583.4692583,
+        "started": 1790581574.7131567
+      }
+    }
+  ],
+  "schema": "litchi-0813-callgrind-profile-analysis-v1",
+  "scope": "Callgrind Ir is guest-instruction attribution for the exact capture wrapper; it is not native latency, RSS, a CPU fraction, a phase fraction, or a production speedup.",
+  "summary": {
+    "all_exact_scope_checks_pass": true,
+    "all_four_profiles_complete": true,
+    "all_output_fixture_checks_pass": true,
+    "inclusive_ir_max": 537174712,
+    "inclusive_ir_min": 531570923,
+    "owner_self_ir_values": [
+      10,
+      10,
+      10,
+      10
+    ],
+    "positive_ir_profiles": 4,
+    "profile_count": 4
+  }
+}

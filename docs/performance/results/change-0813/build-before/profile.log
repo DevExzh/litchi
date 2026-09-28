@@ -1,0 +1,112 @@
+   Compiling mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0813/probe-src)
+warning: function `enable` is never used
+  --> src/allocation_metrics.rs:89:8
+   |
+89 | pub fn enable() {
+   |        ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `record_allocation` is never used
+  --> src/allocation_metrics.rs:94:8
+   |
+94 | pub fn record_allocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: function `record_deallocation` is never used
+  --> src/allocation_metrics.rs:99:8
+   |
+99 | pub fn record_deallocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_reallocation` is never used
+   --> src/allocation_metrics.rs:104:8
+    |
+104 | pub fn record_reallocation(old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `record_failed_allocation` is never used
+   --> src/allocation_metrics.rs:109:8
+    |
+109 | pub fn record_failed_allocation() {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:203:15
+    |
+203 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+
+warning: struct `CallbackEntryGuard` is never constructed
+   --> src/allocation_metrics.rs:499:8
+    |
+499 | struct CallbackEntryGuard;
+    |        ^^^^^^^^^^^^^^^^^^
+
+warning: associated function `enter` is never used
+   --> src/allocation_metrics.rs:502:8
+    |
+501 | impl CallbackEntryGuard {
+    | ----------------------- associated function in this implementation
+502 |     fn enter(observer_invalid: &AtomicBool) -> Option<Self> {
+    |        ^^^^^
+
+warning: multiple methods are never used
+   --> src/allocation_metrics.rs:634:8
+    |
+525 | impl Counters {
+    | ------------- methods in this implementation
+...
+634 |     fn update_region_peak(&self, observer: &mut ObserverState, live: u64) {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+642 |     fn enter_callback(&self) -> Option<CallbackEntryGuard> {
+    |        ^^^^^^^^^^^^^^
+...
+646 |     fn add(&self, counter: &AtomicU64, value: u64) {
+    |        ^^^
+...
+652 |     fn live_add(&self, value: u64) -> Option<u64> {
+    |        ^^^^^^^^
+...
+662 |     fn live_sub(&self, value: u64) {
+    |        ^^^^^^^^
+...
+668 |     fn update_peak(&self, live: u64) {
+    |        ^^^^^^^^^^^
+...
+683 |     fn allocation(&self, size: usize) {
+    |        ^^^^^^^^^^
+...
+691 |     fn allocation_locked(&self, size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^
+...
+703 |     fn deallocation(&self, size: usize) {
+    |        ^^^^^^^^^^^^
+...
+711 |     fn deallocation_locked(&self, size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+721 |     fn reallocation(&self, old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^
+...
+729 |     fn reallocation_locked(&self, old_size: usize, new_size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+749 |     fn failed_allocation(&self) {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: function `checked_add` is never used
+   --> src/allocation_metrics.rs:758:4
+    |
+758 | fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+warning: function `checked_sub` is never used
+   --> src/allocation_metrics.rs:765:4
+    |
+765 | fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+warning: `mce-capabilities-probe` (bin "namespace-uri-probe") generated 11 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.82s

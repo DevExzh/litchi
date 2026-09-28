@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0813 — event-result copy chain removed
+
+[0813](0813-pptx-direct-result-workflow.md) Both scanner symbols shrink from 2,616 to 2,320 bytes and the pre-dispatch vector moves fall from twelve to zero. Large-capture p50 improves 10.544%; scanner self guest Ir falls from 22,295,758 to 16,724,054 while Reader calls and namespace push cost stay unchanged. Guest counts do not establish native phase fractions; namespace/attribute fusion remains deferred for ordering risk.
+
 ## 0812 — event-result copying localized in the scanner
 
 [0812](0812-pptx-scanner-instruction-localization.md) Fresh exact-owner scanner leaves concentrate at offset 0x24d (193/231 and 178/227). Disassembly shows successive 40-byte payload copies after Reader::read_event_impl; DWARF attributes the sampled instruction to Result::map_err at codec.rs:389. Test an explicit success/error match before the unchanged event dispatch. Sampling skid and frame-pointer perturbation preclude causal savings estimates; simple namespace/attribute fusion is deferred for ordering risk.

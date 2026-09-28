@@ -1,0 +1,16 @@
+{
+  "decision": {
+    "bytes": 3050,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/decision.json",
+    "sha256": "810d7355670eb3d2355b65dd09062ffbae4d9325ccb2fee181a70d876dddbba0"
+  },
+  "production_change_retained": true,
+  "reason": "Candidate passes frozen policy, semantic and quality gates, and independent source/numerical/profile reviews.",
+  "schema": "litchi.performance.0813.disposition.v1",
+  "source_manifest": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0813/build-after/source.json",
+    "sha256": "aeeb978188ea98d15e120fe1645d4fcba77f2d5995e2405eaff1633b6b17836c"
+  },
+  "status": "retained"
+}
