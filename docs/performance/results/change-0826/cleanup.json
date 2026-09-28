@@ -1,0 +1,12 @@
+{
+  "absent_roots": [
+    "/home/zhuhe/code/litchi-target-0826",
+    "/home/zhuhe/code/litchi-fs-0826"
+  ],
+  "build_or_scratch_roots_created": false,
+  "cli_test_temporaries": "TemporaryDirectory contexts close before each test returns",
+  "kind": "offline-only-no-build-or-workload",
+  "python_bytecode_disabled": true,
+  "schema": "litchi.performance.0826.cleanup.v1",
+  "verified": true
+}

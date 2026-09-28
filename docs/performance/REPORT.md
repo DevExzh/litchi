@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0826 — allocation schema preflight repaired
+
+[0826](0826-allocation-schema-preflight.md) A reusable vector validator passes 30 regression tests in normal and optimized Python and checks 325 pinned historical reports. The original 0825 checker failure is reproduced and corrected without changing Rust or collecting new timings. Full ordinary-save comparison remains the next measurement.
+
 ## 0825 — ordinary-save qualification checker failed
 
 [0825](0825-ordinary-save-qualification-failure.md) Fresh quality and baseline artifact admission passed, but the frozen checker rejected per-sample allocation arrays on the first qualification report. No comparative captures or performance claims follow. Committed production is restored, failure evidence is retained, and both owned temporary roots are removed. The complete-save effect of 0824 remains open.

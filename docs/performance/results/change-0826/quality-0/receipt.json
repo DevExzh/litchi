@@ -1,0 +1,105 @@
+{
+  "rows": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "tools.test_perf_allocation_schema",
+        "-v"
+      ],
+      "ended": 1790620825.4442933,
+      "exit_code": 0,
+      "log": {
+        "bytes": 5252,
+        "path": "docs/performance/results/change-0826/quality-0/0.log",
+        "sha256": "c449b69296f645caa136d50ddbc36fb18d1cc014baab6b63dd4a0b5b743d5894"
+      },
+      "started": 1790620825.40032
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-O",
+        "-m",
+        "unittest",
+        "tools.test_perf_allocation_schema",
+        "-v"
+      ],
+      "ended": 1790620825.676185,
+      "exit_code": 0,
+      "log": {
+        "bytes": 5252,
+        "path": "docs/performance/results/change-0826/quality-0/1.log",
+        "sha256": "c449b69296f645caa136d50ddbc36fb18d1cc014baab6b63dd4a0b5b743d5894"
+      },
+      "started": 1790620825.4446297
+    }
+  ],
+  "schema": "litchi.performance.0826.quality.v1",
+  "sources": [
+    {
+      "original": {
+        "bytes": 10254,
+        "path": "tools/perf_allocation_schema.py",
+        "sha256": "baf82d34b3dfa39be592d3ac6c48da0efc66edc95a2b39a74d43d423534df97a"
+      },
+      "snapshot": {
+        "bytes": 10254,
+        "path": "docs/performance/results/change-0826/quality-0/perf_allocation_schema.py",
+        "sha256": "baf82d34b3dfa39be592d3ac6c48da0efc66edc95a2b39a74d43d423534df97a"
+      }
+    },
+    {
+      "original": {
+        "bytes": 19331,
+        "path": "tools/test_perf_allocation_schema.py",
+        "sha256": "785b2f526a51b8562b3616a532600cc0cdee6f4e180dbdc5fc7ae86901bf30b1"
+      },
+      "snapshot": {
+        "bytes": 19331,
+        "path": "docs/performance/results/change-0826/quality-0/test_perf_allocation_schema.py",
+        "sha256": "785b2f526a51b8562b3616a532600cc0cdee6f4e180dbdc5fc7ae86901bf30b1"
+      }
+    },
+    {
+      "original": {
+        "bytes": 4035,
+        "path": "docs/performance/results/change-0826/preflight.py",
+        "sha256": "5acf9eaab6226a2cc0ea5f4f4ff05942dfd08ca3c38cedef68d347a89f3adb4d"
+      },
+      "snapshot": {
+        "bytes": 4035,
+        "path": "docs/performance/results/change-0826/quality-0/preflight.py",
+        "sha256": "5acf9eaab6226a2cc0ea5f4f4ff05942dfd08ca3c38cedef68d347a89f3adb4d"
+      }
+    },
+    {
+      "original": {
+        "bytes": 132140,
+        "path": "docs/performance/results/change-0826/fixtures.json",
+        "sha256": "b8a075de51441265a7a94055f944911f71830da2cfac57d7d38df440ce0e159e"
+      },
+      "snapshot": {
+        "bytes": 132140,
+        "path": "docs/performance/results/change-0826/quality-0/fixtures.json",
+        "sha256": "b8a075de51441265a7a94055f944911f71830da2cfac57d7d38df440ce0e159e"
+      }
+    },
+    {
+      "original": {
+        "bytes": 2465,
+        "path": "docs/performance/results/change-0826/quality.py",
+        "sha256": "6656b3dd0f72f769227d5f95a513c9a316d471874a3286625d5a6a0579209157"
+      },
+      "snapshot": {
+        "bytes": 2465,
+        "path": "docs/performance/results/change-0826/quality-0/quality.py",
+        "sha256": "6656b3dd0f72f769227d5f95a513c9a316d471874a3286625d5a6a0579209157"
+      }
+    }
+  ],
+  "status": "pass"
+}
