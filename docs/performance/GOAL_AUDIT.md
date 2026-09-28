@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0819 — real-file baseline admitted after preservation repair
+
+[0819](0819-real-file-ordinary-save-baseline.md) Fresh quality passes 641 tests with one ignored and all six gates. Independent semantic and ZIP preservation checks admit six corpora/thirty outputs before 108 reports/2,244 samples. Eight cases retain fourteen tail/mean spread flags and four cases retain p99/p50 flags. No production change, historical pooling, or optimization claim; profile and controlled durability attribution are next.
+
 ## 0818 — failed admission resolved with a bounded repair
 
 [0818](0818-docx-relationship-preservation.md) DOCX publication updates the existing main Part in place, preserving package-level relationship provenance while OPC checks exact semantic binding. The corrected independent audit distinguishes generated workload accounting and the exact XLSX calculation closure without relaxing DOCX ordering. All six quality gates and fresh artifact admission pass; 1,938 tests pass with 32 ignored.

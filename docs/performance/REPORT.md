@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0819 — preservation-admitted ordinary-save baseline
+
+[0819](0819-real-file-ordinary-save-baseline.md) Current DOCX/XLSX/PPTX lifecycle medians are 5.220218/5.419553/7.422314 ms for three small checked-in files. Fresh admission, six quality gates, 108 reports/2,244 samples, independent replay, and separate resource diagnostics support the baseline. No production optimization or before/after speedup is claimed.
+
 ## 0818 — untouched DOCX relationship bytes preserved
 
 [0818](0818-docx-relationship-preservation.md) The real-file regression fails before the fix and passes after it; changed hyperlink graphs remain publishable. Six quality gates pass, including 1,938 tests with 32 ignored. Independent fresh admission covers six corpora/thirty outputs plus untouched ZIP metadata and compressed payloads. No performance measurement is claimed.

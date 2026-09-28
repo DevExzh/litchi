@@ -1,0 +1,34 @@
+{
+  "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx": {
+    "compressed_member_bytes": 5461,
+    "compression_methods": [
+      8
+    ],
+    "decoded_member_bytes": 15304,
+    "encrypted_members": 0,
+    "members": 10,
+    "names_unique": true
+  },
+  "test-data/ooxml/docx/documentProperties.docx": {
+    "compressed_member_bytes": 20293,
+    "compression_methods": [
+      0,
+      8
+    ],
+    "decoded_member_bytes": 44910,
+    "encrypted_members": 0,
+    "members": 12,
+    "names_unique": true
+  },
+  "test-data/ooxml/pptx/shapes.pptx": {
+    "compressed_member_bytes": 60368,
+    "compression_methods": [
+      0,
+      8
+    ],
+    "decoded_member_bytes": 154250,
+    "encrypted_members": 0,
+    "members": 48,
+    "names_unique": true
+  }
+}

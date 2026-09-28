@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0819 — admitted real-file ordinary-save baseline
+
+[0819](0819-real-file-ordinary-save-baseline.md) Fresh DOCX/XLSX/PPTX lifecycle p50 medians are 5.220218/5.419553/7.422314 ms with default full durability. Twelve cases retain 108 reports and 2,244 samples, with native timing separate from allocator/procfs observations. Six corpora and thirty policy outputs pass fresh preservation admission. Production is unchanged; no historical speedup is claimed.
+
 ## 0818 — preservation repaired; native timing remains queued
 
 [0818](0818-docx-relationship-preservation.md) Untimed fresh admission passes for six corpora and thirty outputs after repairing DOCX main-part relationship provenance. The byte-preservation regression fails on base and passes after the fix; five nonaffected corpus output hashes match 0817. No timing baseline or speedup is claimed.

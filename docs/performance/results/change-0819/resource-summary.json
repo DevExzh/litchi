@@ -1,0 +1,606 @@
+{
+  "rows": [
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 1258172,
+          "median": 1258172.0,
+          "minimum": 1258172
+        },
+        "allocation_calls": {
+          "maximum": 2617,
+          "median": 2617.0,
+          "minimum": 2617
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 634214,
+          "median": 634214.0,
+          "minimum": 634214
+        },
+        "reallocation_calls": {
+          "maximum": 268,
+          "median": 268.0,
+          "minimum": 268
+        }
+      },
+      "case": "docx_real_file_ordinary_save_lifecycle",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "lifecycle",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          1
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          24576
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136112,
+        136108
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 121273,
+          "median": 121273.0,
+          "minimum": 121273
+        },
+        "allocation_calls": {
+          "maximum": 1375,
+          "median": 1375.0,
+          "minimum": 1375
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 10337,
+          "median": 10337.0,
+          "minimum": 10337
+        },
+        "reallocation_calls": {
+          "maximum": 144,
+          "median": 144.0,
+          "minimum": 144
+        }
+      },
+      "case": "docx_real_file_ordinary_save_edit",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "edit",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136068,
+        135896
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 590203,
+          "median": 590203.0,
+          "minimum": 590203
+        },
+        "allocation_calls": {
+          "maximum": 380,
+          "median": 380.0,
+          "minimum": 380
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 568921,
+          "median": 568921.0,
+          "minimum": 568921
+        },
+        "reallocation_calls": {
+          "maximum": 38,
+          "median": 38.0,
+          "minimum": 38
+        }
+      },
+      "case": "docx_real_file_ordinary_save_atomic_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "atomic_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          1
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          24576
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136036,
+        136028
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 524290,
+          "median": 524290.0,
+          "minimum": 524290
+        },
+        "allocation_calls": {
+          "maximum": 375,
+          "median": 375.0,
+          "minimum": 375
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 503281,
+          "median": 503281.0,
+          "minimum": 503281
+        },
+        "reallocation_calls": {
+          "maximum": 36,
+          "median": 36.0,
+          "minimum": 36
+        }
+      },
+      "case": "docx_real_file_ordinary_save_counting_publish",
+      "format": "docx",
+      "input": "test-data/ooxml/docx/documentProperties.docx",
+      "phase": "counting_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136004,
+        136012
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 4561313,
+          "median": 4561313.0,
+          "minimum": 4561313
+        },
+        "allocation_calls": {
+          "maximum": 3542,
+          "median": 3542.0,
+          "minimum": 3542
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 1103104,
+          "median": 1103104.0,
+          "minimum": 1103104
+        },
+        "reallocation_calls": {
+          "maximum": 451,
+          "median": 451.0,
+          "minimum": 451
+        }
+      },
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "lifecycle",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          1
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          12288
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136012,
+        136124
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 2898254,
+          "median": 2898254.0,
+          "minimum": 2898254
+        },
+        "allocation_calls": {
+          "maximum": 2510,
+          "median": 2510.0,
+          "minimum": 2510
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 1066957,
+          "median": 1066957.0,
+          "minimum": 1066957
+        },
+        "reallocation_calls": {
+          "maximum": 345,
+          "median": 345.0,
+          "minimum": 345
+        }
+      },
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "edit",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        135856,
+        135900
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 983559,
+          "median": 983559.0,
+          "minimum": 983559
+        },
+        "allocation_calls": {
+          "maximum": 126,
+          "median": 126.0,
+          "minimum": 126
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 561522,
+          "median": 561522.0,
+          "minimum": 561522
+        },
+        "reallocation_calls": {
+          "maximum": 20,
+          "median": 20.0,
+          "minimum": 20
+        }
+      },
+      "case": "xlsx_real_file_ordinary_save_atomic_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "atomic_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          1
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          12288
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        135924,
+        136128
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 917646,
+          "median": 917646.0,
+          "minimum": 917646
+        },
+        "allocation_calls": {
+          "maximum": 121,
+          "median": 121.0,
+          "minimum": 121
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 495882,
+          "median": 495882.0,
+          "minimum": 495882
+        },
+        "reallocation_calls": {
+          "maximum": 18,
+          "median": 18.0,
+          "minimum": 18
+        }
+      },
+      "case": "xlsx_real_file_ordinary_save_counting_publish",
+      "format": "xlsx",
+      "input": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "phase": "counting_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136032,
+        135972
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 5814055,
+          "median": 5814055.0,
+          "minimum": 5814055
+        },
+        "allocation_calls": {
+          "maximum": 11402,
+          "median": 11402.0,
+          "minimum": 11402
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 939897,
+          "median": 939897.0,
+          "minimum": 939897
+        },
+        "reallocation_calls": {
+          "maximum": 987,
+          "median": 987.0,
+          "minimum": 987
+        }
+      },
+      "case": "pptx_real_file_ordinary_save_lifecycle",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "lifecycle",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          2
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          69632
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136092,
+        136032
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 2719494,
+          "median": 2719494.0,
+          "minimum": 2719494
+        },
+        "allocation_calls": {
+          "maximum": 7682,
+          "median": 7682.0,
+          "minimum": 7682
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 305970,
+          "median": 305970.0,
+          "minimum": 305970
+        },
+        "reallocation_calls": {
+          "maximum": 599,
+          "median": 599.0,
+          "minimum": 599
+        }
+      },
+      "case": "pptx_real_file_ordinary_save_edit",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "edit",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136028,
+        136052
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 641339,
+          "median": 641339.0,
+          "minimum": 641339
+        },
+        "allocation_calls": {
+          "maximum": 674,
+          "median": 674.0,
+          "minimum": 674
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 597823,
+          "median": 597823.0,
+          "minimum": 597823
+        },
+        "reallocation_calls": {
+          "maximum": 71,
+          "median": 71.0,
+          "minimum": 71
+        }
+      },
+      "case": "pptx_real_file_ordinary_save_atomic_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "atomic_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          2
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          69632
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        135856,
+        136124
+      ]
+    },
+    {
+      "allocation": {
+        "allocated_bytes": {
+          "maximum": 845216,
+          "median": 845216.0,
+          "minimum": 845216
+        },
+        "allocation_calls": {
+          "maximum": 677,
+          "median": 677.0,
+          "minimum": 677
+        },
+        "peak_live_bytes_above_entry": {
+          "maximum": 532183,
+          "median": 532183.0,
+          "minimum": 532183
+        },
+        "reallocation_calls": {
+          "maximum": 76,
+          "median": 76.0,
+          "minimum": 76
+        }
+      },
+      "case": "pptx_real_file_ordinary_save_counting_publish",
+      "format": "pptx",
+      "input": "test-data/ooxml/pptx/shapes.pptx",
+      "phase": "counting_publish",
+      "process_distinct_values": {
+        "read_bytes": [
+          0
+        ],
+        "syscw": [
+          0
+        ],
+        "system_cpu_ticks": [
+          0
+        ],
+        "user_cpu_ticks": [
+          0
+        ],
+        "write_bytes": [
+          0
+        ]
+      },
+      "samples": 6,
+      "whole_child_rss_kib": [
+        136052,
+        136040
+      ]
+    }
+  ],
+  "schema": "litchi.performance.0819.resource-summary.v1",
+  "scope": "two observer processes, three samples each; medians descriptive only; no subtraction; qualification excluded; RSS includes all setup; process counters are not physical I/O attribution"
+}

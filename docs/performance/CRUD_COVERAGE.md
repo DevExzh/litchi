@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0819 — twelve ordinary real-file save cases measured
+
+[0819](0819-real-file-ordinary-save-baseline.md) Three checked-in DOCX/XLSX/PPTX inputs now have admitted open/edit/save, edit, full-durability path-save, and counting-sink measurements: 72 native, 24 observer, and 12 qualification reports. Edit publishes nothing; PPTX counting materializes to_bytes and is not streaming evidence. Broader corpus, external resave, and physical cold/network coverage remain open.
+
 ## 0818 — ordinary DOCX edit/save relationship preservation
 
 [0818](0818-docx-relationship-preservation.md) A paragraph append now retains untouched relationship XML bytes, order, compressed payload, and ZIP metadata. A changed external hyperlink still serializes and reopens with its typed edge. Fresh six-case/thirty-output audit passes; native measurements remain a separate queued step.
