@@ -1,0 +1,8 @@
+{
+  "candidate": "candidate-failed-0",
+  "candidate.patch": "candidate-failed-0.patch",
+  "fix": "Use Option::is_none_or in the five next_own methods and remove the shared test identity map; no parser strategy change",
+  "quality": "quality-failed-0",
+  "reason": "Candidate Clippy rejected unnecessary_map_or and map_identity after both test legs passed",
+  "test-src": "test-src-failed-0"
+}

@@ -1,0 +1,29 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "86310ab19474945a28f52e1a3d595bd7a1a687f3fc51810fbc6600d01b0d4500",
+    "candidate.patch": "b16495239f7f087c6249fa1a914bc8a6b65ede2c229086497565f18342de9d0a",
+    "capture.py": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d",
+    "custody.py": "3443a1afc00c2024b490a341c390b8194b373d47c2898529672b9cb6978372e1",
+    "decision.py": "10ebc5ac90200cc6ce2067cf34b4d866b0fee0ca3dcbd16d58eff553ff48f2af",
+    "fixture_check.py": "6aef81d7f9fe32b3b29ddacf598705d036f008a2d4b17cf4a901575ff28dd511",
+    "fixtures.json": "5ced70a2491b0863e2d14c4aa81c38fdfd442be0faecb80c94cbe4d9ffb8f5d7",
+    "host.json": "bce2c65290b1346d98e4515b5f008d7aa5c00a437c9348f695cd8a42418cde36",
+    "inheritance.json": "496d568f785ba4b315d2154d16515089d1675b40daa0d93b93686dfea797d9e4",
+    "lock-generation.json": "63887798c935aa2dbdf024e1c81001fbe96cb0646c8b87ac1265043e60d8bfdd",
+    "lock-generation.log": "80c79ba0b92c0c7696dbee779e03f63558db41c667090bd908f83dbb224990e2",
+    "origin.json": "f5d226ef11f25fa0b7d63a87e4a4d9af2fbf7e806604c3215d40897de1fa2143",
+    "plan.json": "f797e36e792918eb302c226ee1d0ec34a7e9ccf69f0a45539de78fb77d256f08",
+    "quality.py": "2724e9c70753e56b6d2c28232b1bbbe676b17e1943ced7381b68a89bedb57415",
+    "quality/archive-inputs.json": "675e01b3b8dd67465495f391928c5f2bce86ef006fae7ab545769343d653828e",
+    "quality/complete.json": "8be0100588f76b333959ffbf0034c815be812e75cc12ec9437b6589b2792795d"
+  },
+  "probe": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "src/baseline.rs": "6c7e5aeb66f1ca420f5e11af0bfa307ae1b5fd6aa29b4d3b5af57d6b9ec6fb56",
+    "src/candidate.rs": "4241b6ba61e25be3a96272979a683f90b61ce0af1a2657e918333aef3f69f62a",
+    "src/main.rs": "ce1bb1461de15aa1234fe22523923364840c8272b1a46361adc0ecb937aef8d3"
+  }
+}

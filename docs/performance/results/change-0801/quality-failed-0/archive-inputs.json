@@ -1,0 +1,16 @@
+{
+  "after/litchi-ole-common-xml_attributes.rs": "caacff0b05a69f72909128d5c88d4ba0bc463a4fa6c6976c22c09d87fed1077c",
+  "after/litchi-opc-xml_attributes-tests.rs": "bf72e9f7805932a0ebd5a745453fa5ade6cee95595ab550dd1b952d826effd58",
+  "after/litchi-opc-xml_attributes.rs": "40c780357c3697eae54fb2bf27ded12254bed31e279637dbfffa48de0ac4ab01",
+  "after/litchi-sign-xml_attributes.rs": "6e0f34f39b6e3caba137e65a9009777136bc9851acdd558226018d76621827e7",
+  "after/litchi-xldm-xml_attributes.rs": "6e0f34f39b6e3caba137e65a9009777136bc9851acdd558226018d76621827e7",
+  "after/xml-minifier-xml_attributes.rs": "6e0f34f39b6e3caba137e65a9009777136bc9851acdd558226018d76621827e7",
+  "before/litchi-ole-common-xml_attributes.rs": "067bdb3d1b7b8023742bef74f84cd121c2bcfc33cba4dbb61f47f7c953536d64",
+  "before/litchi-opc-xml_attributes-tests.rs": "6c7d024783556aab85af7c142953fe0a09a848e9f6afde814f0f83523b29f098",
+  "before/litchi-opc-xml_attributes.rs": "6c7e5aeb66f1ca420f5e11af0bfa307ae1b5fd6aa29b4d3b5af57d6b9ec6fb56",
+  "before/litchi-sign-xml_attributes.rs": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de",
+  "before/litchi-xldm-xml_attributes.rs": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de",
+  "before/xml-minifier-xml_attributes.rs": "7e389b5a474c1856673a98fb7954cebd84685d691390dbfd7d3dbafde28a42de",
+  "design.md": "0e6c42aec69dd31c2b89c32999e114259d8df2ce5201e4505884fc60e4f749b4",
+  "manifest.json": "e9049415fcfeb33bc71ee180499a4db3d11c4c522e2a6b301b02d0fd807f2145"
+}

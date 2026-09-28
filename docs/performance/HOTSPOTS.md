@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0801 — replay removed, early map costs exposed
+
+[0801](0801-xml-no-replay-preflight.md) Three-attribute consumption improves 9.179%, while empty tags regress 7.542% and four-to-32-attribute rows regress up to 68.034%. The next design must address both the empty path and earlier ordered-map costs while preserving early duplicate refusal; a one-case fix alone does not establish workflow suitability.
+
 ## 0800 — correctness gate before no-replay optimization
 
 [0800](0800-xml-duplicate-error-parity.md) Key recovery incorrectly treated leading = as a delimiter where quick-xml had consumed it as part of the key. The minimal repair changes error priority only; it does not remove the existing late value scan or establish a speedup.

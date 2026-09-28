@@ -1,0 +1,16 @@
+{
+  "binary": {
+    "bytes": 3090512,
+    "path": "/home/zhuhe/code/litchi-target-0801/failed-build-0/attribute-boundary-probe",
+    "sha256": "701adf451692bd7c269e47da9ed04a57af9ac4f681a6d7900f19dce58897c066"
+  },
+  "build": "build-failed-0",
+  "fix": "Narrow allow(dead_code) on the standalone probe candidate module; exact helper source and production untouched",
+  "original_binary": {
+    "bytes": 3090512,
+    "path": "/home/zhuhe/code/litchi-target-0801/release/attribute-boundary-probe",
+    "sha256": "701adf451692bd7c269e47da9ed04a57af9ac4f681a6d7900f19dce58897c066"
+  },
+  "probe-src": "probe-src-failed-0",
+  "reason": "Build and check succeeded; probe Clippy found unused candidate unchecked_attributes API"
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "command": [
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/src/main.rs"
+    ],
+    "ended": 1790555534.6263092,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/build/0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790555534.6032102
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/Cargo.toml",
+      "--bin",
+      "attribute-boundary-probe"
+    ],
+    "ended": 1790555540.3944676,
+    "exit_code": 0,
+    "log": {
+      "bytes": 983,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/build/1.log",
+      "sha256": "1af1f970b62e80bf31d2ffef91b4093441dde4f46cd6db4187850de68bb59198"
+    },
+    "started": 1790555534.6265042
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/Cargo.toml",
+      "--bin",
+      "attribute-boundary-probe"
+    ],
+    "ended": 1790555541.4730296,
+    "exit_code": 0,
+    "log": {
+      "bytes": 828,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/build/2.log",
+      "sha256": "cc597969e803f9079a2c39bbf5850af655694550491a88a14c67cbbafb657410"
+    },
+    "started": 1790555540.3948936
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/Cargo.toml",
+      "--bin",
+      "attribute-boundary-probe",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790555541.6865294,
+    "exit_code": 101,
+    "log": {
+      "bytes": 634,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0801/build/3.log",
+      "sha256": "469c1a928dbc849700df54f9539c060502ee1b7a950f05cd54dc32a36870139d"
+    },
+    "started": 1790555541.4734197
+  }
+]

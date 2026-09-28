@@ -1,0 +1,181 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 965483
+cmd:  /home/zhuhe/code/litchi-target-0801/attribute-boundary-probe --leg after --case distinct-0 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0801/profiles/1-distinct-0-consume-after.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 195807
+desc: Trigger: --dump-after=attribute_boundary_probe::after_consume
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 184 13 4 3
+
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6) /home/zhuhe/code/litchi-target-0801/attribute-boundary-probe
+cfi=(164) ???
+cfn=(564) (below main)
+calls=0 0 
+0 184 13 4 3
+
+ob=(6)
+fl=(298) /home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/src/candidate.rs
+fn=(1186) <attribute_boundary_probe::candidate::CheckedAttributes as core::iter::traits::iterator::Iterator>::next
+346 8
++1 3 1
+0 2
+347 3 0 0 1
+0 1
+141 2
+cfi=(296) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs
+cfn=(1162) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=10 697 
+* 57 4 1 2
++1 4 1
+fi=(233) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+805 2 1
+fe=(298)
+0 7
+364 8
+
+fl=(296)
+fn=(1162)
+697 6
++1 4 0 0 1
+cfn=(1164) quick_xml::events::attributes::IterState::next
+calls=28 1222 
+* 32 2 1 1
+* 5 2
+0 1
+699 2
+0 2
+703 5
+
+fn=(1164)
+1222 7
++1 3
+1055 3 0 0 1
+0 1
+1055 1
+fi=(276) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+568 2 1
+fi=(180) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+1720 2
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 1 1 1
+fe=(296)
+1237 1
++1 1
+0 1
+1360 9
+
+fl=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(862) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(304) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+cfi=(250) /home/zhuhe/code/litchi/docs/performance/results/change-0801/probe-src/src/main.rs
+cfn=(864) attribute_boundary_probe::main
+calls=0 384 
+250 184 13 4 3
+fe=(249)
+
+fl=(172) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs
+fn=(598) std::rt::lang_start_internal
+fi=(304)
+cfn=(860) std::rt::lang_start::{{closure}}
+calls=0 206 
+287 184 13 4 3
+fe=(172)
+
+fn=(860)
+cfi=(249)
+cfn=(862)
+calls=0 162 
+206 184 13 4 3
+
+fl=(250)
+fn=(864)
+cfn=(1246) attribute_boundary_probe::after_consume
+calls=1 900 
+1029 184 13 4 3
+
+fn=(1246)
+900 10
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 1
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 1 1
+0 14
+fi=(174) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2533 3
+fe=(250)
+843 2
+fi=(174)
+2457 4
+fi=(236)
+1916 2
+fi=(254)
+772 1 1 1
+0 2
+fi=(174)
+844 2
+fi=(298)
+130 17
+fe=(250)
+816 3
+cfi=(298)
+cfn=(1186)
+calls=1 346 
+* 97 7 1 3
+* 4 1
+0 1
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+632 3 1
+fi=(233)
+805 5 2 2
+fi=(243) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+0 1
+fi=(283) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 3
+fe=(250)
+912 8
+
+fl=(164)
+fn=(596) main
+cfi=(172)
+cfn=(598)
+calls=0 152 
+0 184 13 4 3
+
+fn=(564)
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(165) ./csu/../csu/libc-start.c
+cfn=(566) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 184 13 4 3
+
+ob=(2)
+fl=(165)
+fn=(566)
+cfi=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(588) (below main)
+calls=0 30 
+360 184 13 4 3
+
+fl=(168)
+fn=(588)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 184 13 4 3
+
+totals: 184 13 4 3

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0801 — preserve the preflight veto after removing replay
+
+[0801](0801-xml-no-replay-preflight.md) Both short-tag benefits qualify, but one protected and twelve other consume regressions remain. All 1,248 reports, 28,392 samples and 624 counter dumps pass replay and independent audits. Candidate archived; production unchanged; broader requirements remain incomplete.
+
 ## 0800 — repair a confirmed baseline contract defect
 
 [0800](0800-xml-duplicate-error-parity.md) The controlled probe reproduces three late duplicate-error mismatches and verifies corrected parity. All 1,538 affected-crate tests pass, with three existing ignores, plus Clippy. The untested no-replay performance candidate is deferred pending rebase.
