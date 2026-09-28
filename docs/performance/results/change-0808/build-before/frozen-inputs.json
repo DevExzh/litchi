@@ -1,0 +1,17 @@
+{
+  "adoption-policy.json": "9f3547afab645c0da7b22f944b8beebacc93dbbf1e0de9ceaa5d1705489ef9bc",
+  "analysis-plan.json": "f76dbd932a042bc3944cfc74232471fb2dfe09449e3d1cf0940dbb3723213e1a",
+  "apply_candidate.py": "edbd5fc9f12da591972c8126a1b4213ec151b05147c664c829d875ce595e5fcc",
+  "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+  "build.py": "62d20cc368ee9c35bc95cea533304905b1144b7fcf322b10fd25eecbfd5037a3",
+  "capture.py": "e587289ddc4d9c45ad7abb1620d95a53a9997c0c25aaa0428363f20817618dc1",
+  "custody.py": "b0278689056ccdc87eebb507abb00a6bc35062d0c1170745887ecb4c402b458f",
+  "host.json": "7ceda96cc3ca168a6ae3bf5de8a1d317e90d27d52f0258b122177341aa9680c1",
+  "inheritance.json": "1935b14f0b22795a5b833ce696f1bfcfb82c429db174adf868b038572ae1f1fe",
+  "origin.json": "7f0efbbbba742c5e2339d0ca645ef8dd1b15caa751fbfe634f6d61bc46fc3823",
+  "plan.json": "f53c541df290fa3400d6da68c05d9111fd02835df27afc586346b7d68886e8c9",
+  "probe_quality.py": "b3af36e6ed304d1b3cd263cb5d3a7e2e57af1938c9061d3e637cf8e1eb211993",
+  "profile.py": "0074db346b87172120b7f31ba3a4cd55e76dda72fb483898af90f6cb11f1d2e0",
+  "quality.py": "99fecc6816d4b64a381242cdd42e02dbf2407158036704c9e812cd974b0d8ba6",
+  "restore_candidate.py": "4f188b71e52066e81d7e08c5639cc0f651c80b340b6d4ac900e9045a210d1990"
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "litchi.performance.0808.baseline-clippy.v1",
+  "purpose": "post-restoration control to distinguish the existing baseline errors from candidate effects",
+  "command": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 101,
+  "started": 1790572312.689111,
+  "ended": 1790572325.6471763,
+  "log": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/baseline-clippy.log",
+    "bytes": 1562,
+    "sha256": "06de23a03f230e33a5001c59bfca6dc49de3f2315bc97c411bd96fda68a77f03"
+  },
+  "restored_source_sha256": "1d3e7906f1467b460d4110decb365c92faa842e9bf7099336a801af13472dcf3",
+  "target": "/home/zhuhe/code/litchi-target-0808/quality-after"
+}

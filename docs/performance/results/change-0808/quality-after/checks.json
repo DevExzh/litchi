@@ -1,0 +1,88 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-pptx",
+      "--",
+      "--check"
+    ],
+    "ended": 1790571932.928782,
+    "exit_code": 0,
+    "gate": 1,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790571931.8280654
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790571961.9822612,
+    "exit_code": 0,
+    "gate": 2,
+    "log": {
+      "bytes": 6244,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/01.log",
+      "sha256": "f45dce26887b598dbd245ed2fa7f10997c672c20db667c2b33dac439221a9835"
+    },
+    "started": 1790571933.1234062
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790572083.6804707,
+    "exit_code": 0,
+    "gate": 3,
+    "log": {
+      "bytes": 139453,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/02.log",
+      "sha256": "4e2965b35a48ce59794355b5605dcb3c43878f7b2d8ac0265ccb9002ab965370"
+    },
+    "started": 1790571962.1800196
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790572106.1121247,
+    "exit_code": 101,
+    "gate": 4,
+    "log": {
+      "bytes": 2631,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0808/quality-after/03.log",
+      "sha256": "f406576aa16ac27c12a5e077ab2fceeece2bf12407ac8e75983fdab1f65f7808"
+    },
+    "started": 1790572083.877308
+  }
+]

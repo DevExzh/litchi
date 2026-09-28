@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0808 — event candidate deferred by a baseline quality blocker
+
+[0808](0808-pptx-direct-event-handling.md) The reviewed one-file event-handling candidate passes formatting, checking, and semantic tests, then stops at existing opened/tests.rs Clippy errors. The exact baseline is restored; no optimization is adopted and no performance gate is evaluated. Repair baseline test lint before fresh trials. The broader non-iWork goal remains open.
+
 ## 0807 — current CPU evidence narrows the next experiment
 
 [0807](0807-pptx-current-capture-profile.md) The fresh three-lane diagnostic completes 44 reports/1,286 measured outputs with source custody and independent replay. The current notes scan remains necessary; removing only its optional proof moves work to fallback. Event handoff is a new measured investigation target, but wrapper perturbation and unresolved frames limit interpretation. Production, public capabilities and the rejected 0806 disposition stay unchanged. Full non-iWork performance requirements remain incomplete; iWork is excluded.

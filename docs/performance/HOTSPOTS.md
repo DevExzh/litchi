@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0808 — event handoff hypothesis remains unmeasured
+
+[0808](0808-pptx-direct-event-handling.md) Direct Reader events with the same NamespaceResolver pass all focused differential tests, preserving both buffered oracle functions. Three existing Clippy errors stop the trial before paired captures or profiles. The 0807 event-handoff hypothesis remains open; there is no new instruction-cost or speedup evidence.
+
 ## 0807 — namespace-aware event handoff is a measured investigation target
 
 [0807](0807-pptx-current-capture-profile.md) Current exact-owner native stacks include notes scanning 896/898 times out of 1,036/1,033. NsReader event processing is the leading sampled leaf (189/190); retained disassembly and exploratory sampled offsets show event payload movement around that boundary. Test direct scanner event consumption with the same namespace owner and validation order before another workflow trial. Sampling skid and one unresolved frame per repeat prevent causal cost or phase-fraction claims. The presentation notes loader has only 10/10 nested samples; no candidate is adopted.

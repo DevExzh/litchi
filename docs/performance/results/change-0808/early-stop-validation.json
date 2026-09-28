@@ -1,0 +1,210 @@
+{
+  "adoption_eligible": false,
+  "baseline_control": {
+    "diagnostic_locations": [
+      "464:14",
+      "538:10",
+      "557:10"
+    ],
+    "exit_code": 101,
+    "log": "baseline-clippy.log",
+    "log_sha256": "06de23a03f230e33a5001c59bfca6dc49de3f2315bc97c411bd96fda68a77f03"
+  },
+  "binaries": {
+    "allocation": {
+      "bytes": 14358152,
+      "path": "/home/zhuhe/code/litchi-target-0808/before-allocation",
+      "sha256": "0cd702b774deb2668b29d3a3f1b406bca96d54fd0ecd26b500b5361acb6deb54"
+    },
+    "native": {
+      "bytes": 14431592,
+      "path": "/home/zhuhe/code/litchi-target-0808/before-native",
+      "sha256": "b1f3372ac0a796a5e86725ea3856c111361fa505bfe6c5cbfdd593ab851f64e6"
+    },
+    "profile": {
+      "bytes": 14432408,
+      "path": "/home/zhuhe/code/litchi-target-0808/before-profile",
+      "sha256": "b8622d3c21080d234e599e3a1c7844e667b7f0ea65e6a691a384af41d79e6d74"
+    }
+  },
+  "cleanup_contract": {
+    "binary_count": 3,
+    "target": "/home/zhuhe/code/litchi-target-0808",
+    "witness": "early-stop-cleanup.json"
+  },
+  "decision": "deferred-before-performance",
+  "performance_measured": false,
+  "planned_work_not_started": [
+    "build-after",
+    "native",
+    "allocation",
+    "profiles"
+  ],
+  "probe_quality_before": {
+    "gates": 3,
+    "receipts": [
+      {
+        "gate": 1,
+        "log": "probe-quality-before/0.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "gate": 2,
+        "log": "probe-quality-before/1.log",
+        "log_sha256": "f6dffa93b1da778f44b7d74da611428ee142b2250266f2da777a5386d50b3a83"
+      },
+      {
+        "gate": 3,
+        "log": "probe-quality-before/2.log",
+        "log_sha256": "fc1ed487bc3f4f4099635819d579aa5d1dff8d4d40acda2ae2b47b7ae08e14da"
+      }
+    ],
+    "tests_passed": 36
+  },
+  "production_quality_after": {
+    "diagnostic_locations": [
+      "464:14",
+      "538:10",
+      "557:10"
+    ],
+    "failed_gate": 4,
+    "failure_log": "quality-after/03.log",
+    "failure_log_sha256": "f406576aa16ac27c12a5e077ab2fceeece2bf12407ac8e75983fdab1f65f7808",
+    "failures": 1,
+    "gates_executed": 4,
+    "passes": 3,
+    "test_groups": 85,
+    "tests": {
+      "failed": 0,
+      "ignored": 3,
+      "measured": 0,
+      "passed": 1241
+    }
+  },
+  "qualification": {
+    "reports": 18,
+    "rows": [
+      {
+        "mode": "capture",
+        "report": "qualification/0-tiny-capture-before.json",
+        "report_sha256": "53ed2d484dd3b2e3b53746aba4e79acad9a03d51b842ce1556960e43580e5238",
+        "shape": "tiny"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-tiny-commit-before.json",
+        "report_sha256": "92a096ff183a9f7ff56725fabadcc3d9c4fec7120a981a1a5193d2dbf22f73c0",
+        "shape": "tiny"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-tiny-lifecycle-before.json",
+        "report_sha256": "6bc16294d3b642f7eb7961a87ae942a03b7cac7da7ffa08bab396105b5550e25",
+        "shape": "tiny"
+      },
+      {
+        "mode": "capture",
+        "report": "qualification/0-medium-capture-before.json",
+        "report_sha256": "57e4af46e31d5136dc765dff569a131f1f9fc2112e2fb7c0ce9800731e6dd55f",
+        "shape": "medium"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-medium-commit-before.json",
+        "report_sha256": "eaf9e455ca4cfdb36b42ecc86ba16231c57feedd9edbfea50b272ba3a4ce84ec",
+        "shape": "medium"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-medium-lifecycle-before.json",
+        "report_sha256": "ee9d86c584c80973a1572531675dcbc48d3fd3fe0492ee380767b09e53f4a272",
+        "shape": "medium"
+      },
+      {
+        "mode": "capture",
+        "report": "qualification/0-large-capture-before.json",
+        "report_sha256": "d817aa6080c84dcecf45c62cf69f3dd380b8f1048164ee0549c78647e6b886b9",
+        "shape": "large"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-large-commit-before.json",
+        "report_sha256": "3573645543eb0521881ecb4a2a50064c4afe6adb1f9868f7ad84e1a37dfe0c3c",
+        "shape": "large"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-large-lifecycle-before.json",
+        "report_sha256": "41c04ccb7e8488b5259876f96da08df8dd592acf0597ceb033f7a497dc0c9eef",
+        "shape": "large"
+      },
+      {
+        "mode": "capture",
+        "report": "qualification/0-vendor-capture-before.json",
+        "report_sha256": "11a66ffaafda0b1947bfd237cdeac0b5f1959c04d1c8927dcbb2af1765ae8eb6",
+        "shape": "vendor"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-vendor-commit-before.json",
+        "report_sha256": "5071d18ca2daaca710ed9858847515ca3638d88f508fb0f6137e66e5c85de7b0",
+        "shape": "vendor"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-vendor-lifecycle-before.json",
+        "report_sha256": "aa8466e84f5d219288c947079d7535a533d3d72dddc83c0abd0d0f4c7378e47c",
+        "shape": "vendor"
+      },
+      {
+        "mode": "capture",
+        "report": "qualification/0-unicode-vendor-capture-before.json",
+        "report_sha256": "07f5969cd0750e3ebea2854b118da256ff059411b5137d88e670baa95ea9fd03",
+        "shape": "unicode-vendor"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-unicode-vendor-commit-before.json",
+        "report_sha256": "ab8b86412f094d847596e83e056d1aa98ee7845dbc854b5d40d9196d65e48b6b",
+        "shape": "unicode-vendor"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-unicode-vendor-lifecycle-before.json",
+        "report_sha256": "f9cd9d540b2f23b9d46193fb2ec35f3854f42d7dc290e36b8d15da0b0c753a77",
+        "shape": "unicode-vendor"
+      },
+      {
+        "mode": "capture",
+        "report": "qualification/0-valid-4attr-capture-before.json",
+        "report_sha256": "07a588c4c3711724c52f31efc6ce573976233a8d77166455629d812a06f5dba5",
+        "shape": "valid-4attr"
+      },
+      {
+        "mode": "commit",
+        "report": "qualification/0-valid-4attr-commit-before.json",
+        "report_sha256": "e63c4faa7b0ce50aef5411f914b1a8c551a965491a48142469722ae5acf052be",
+        "shape": "valid-4attr"
+      },
+      {
+        "mode": "lifecycle",
+        "report": "qualification/0-valid-4attr-lifecycle-before.json",
+        "report_sha256": "3c140b789ba5553ef6fae0276248d6eac5f8e465a72805c17bd5937cea49ea0d",
+        "shape": "valid-4attr"
+      }
+    ],
+    "samples": 18,
+    "timings_imported": false
+  },
+  "schema": "litchi.performance.0808.early-stop-validation.v1",
+  "source": {
+    "allowlist": [
+      "crates/litchi-pptx/src/notes/codec.rs"
+    ],
+    "before_revision": "d28e3dc702d84f8752a2e329c2d3fc15f5c94f06",
+    "file_count": 9196,
+    "restored_current": true
+  },
+  "status": "stopped-before-after-build",
+  "timings_imported": false
+}

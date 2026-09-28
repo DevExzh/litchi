@@ -1,0 +1,35 @@
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:464:14
+    |
+464 |               .err()
+    |  ______________^
+465 | |             .expect("exact invalid proofs must refuse the notes graph");
+    | |___________________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+    = note: `-D clippy::err-expect` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::err_expect)]`
+
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:538:10
+    |
+538 |           .err()
+    |  __________^
+539 | |         .expect("the 16 MiB slide root limit must refuse capture");
+    | |_______________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:557:10
+    |
+557 |           .err()
+    |  __________^
+558 | |         .expect("the 64 MiB part limit must refuse capture");
+    | |_______________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,246 @@
+--- a/crates/litchi-pptx/src/notes/codec.rs
++++ b/crates/litchi-pptx/src/notes/codec.rs
+@@ -10,6 +10,8 @@
+ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+ use quick_xml::Reader;
+ use quick_xml::events::{BytesStart, Event};
++use quick_xml::name::NamespaceResolver;
++#[cfg(test)]
+ use quick_xml::reader::NsReader;
+ 
+ const NOTES_XML_DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
+@@ -369,8 +371,10 @@
+     // A slice reader's events borrow `processed` directly, so no event is
+     // copied into a scratch buffer; the parser and its errors are the ones
+     // the buffered read uses on the same bytes.
+-    let mut reader = NsReader::from_reader(processed);
++    let mut reader = Reader::from_reader(processed);
+     reader.config_mut().trim_text(false);
++    let mut resolver = NamespaceResolver::default();
++    let mut pending_pop = false;
+     let mut depth = 0usize;
+     let mut nodes = 0usize;
+     let mut attributes = 0usize;
+@@ -378,8 +382,16 @@
+     let mut root_seen = false;
+     let mut scan = XmlScan::default();
+     loop {
++        if pending_pop {
++            resolver.pop();
++            pending_pop = false;
++        }
+         match reader.read_event().map_err(xml_error)? {
+             Event::Start(element) => {
++                resolver
++                    .push(&element)
++                    .map_err(quick_xml::Error::from)
++                    .map_err(xml_error)?;
+                 nodes += 1;
+                 depth += 1;
+                 if depth > MAX_DEPTH {
+@@ -389,7 +401,7 @@
+                     return Err(limit("notes XML nodes", MAX_NODES));
+                 }
+                 inspect_element(
+-                    &reader,
++                    &resolver,
+                     &element,
+                     conformance,
+                     expected_root,
+@@ -401,6 +413,11 @@
+                 root_seen = true;
+             },
+             Event::Empty(element) => {
++                resolver
++                    .push(&element)
++                    .map_err(quick_xml::Error::from)
++                    .map_err(xml_error)?;
++                pending_pop = true;
+                 nodes += 1;
+                 if nodes > MAX_NODES {
+                     return Err(limit("notes XML nodes", MAX_NODES));
+@@ -409,7 +426,7 @@
+                     return Err(limit("notes XML depth", MAX_DEPTH));
+                 }
+                 inspect_element(
+-                    &reader,
++                    &resolver,
+                     &element,
+                     conformance,
+                     expected_root,
+@@ -421,6 +438,7 @@
+                 root_seen = true;
+             },
+             Event::End(_) => {
++                pending_pop = true;
+                 if depth == 0 {
+                     return Err(invalid("unexpected XML closing element"));
+                 }
+@@ -445,7 +463,7 @@
+     reason = "element inspector threads one slot per notes-element field"
+ )]
+ fn inspect_element(
+-    reader: &NsReader<&[u8]>,
++    resolver: &NamespaceResolver,
+     element: &BytesStart<'_>,
+     conformance: Conformance,
+     expected_root: &str,
+@@ -456,7 +474,7 @@
+ ) -> Result<()> {
+     // Every name and value below is validated exactly as before but borrowed
+     // from the event or the resolver; only a value the scan reports is owned.
+-    let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
++    let namespace = resolved(resolver.resolve_element(element.name()).0)?;
+     let local = std::str::from_utf8(element.local_name().into_inner()).map_err(xml_error)?;
+     if is_root
+         && (namespace
+@@ -484,7 +502,7 @@
+         if *attributes > MAX_ATTRIBUTES {
+             return Err(limit("notes XML attributes", MAX_ATTRIBUTES));
+         }
+-        let (namespace, attr_local) = reader.resolver().resolve_attribute(item.key);
++        let (namespace, attr_local) = resolver.resolve_attribute(item.key);
+         let namespace = resolved(namespace)?;
+         let attr_local = std::str::from_utf8(attr_local.into_inner()).map_err(xml_error)?;
+         let raw_value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;
+@@ -738,7 +756,7 @@
+         let mut attribute_bytes_seen = attribute_bytes;
+         let mut scan = XmlScan::default();
+         let result = inspect_element(
+-            &reader,
++            reader.resolver(),
+             &element,
+             Conformance::Transitional,
+             "sld",
+@@ -830,6 +848,131 @@
+                 Ok(_) => panic!("node ceiling must refuse 100001 nodes"),
+             }
+         }
++    }
++
++    #[test]
++    fn direct_resolver_preserves_nested_empty_rebind_and_scope_pop() {
++        let xml = format!(
++            r#"<p:sld xmlns:p="{P_NS}" xmlns:r="{R_NS}" xmlns="urn:outer"><p:group><plain xmlns="urn:inner"><p:empty xmlns:r="urn:empty-r" xmlns="urn:empty"/></plain><p:nested xmlns:r="urn:nested-r"><p:leaf/></p:nested><p:after r:id="after"/></p:group></p:sld>"#
++        )
++        .into_bytes();
++        let expected = outcome(buffered_scan_oracle(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        let actual = outcome(scan_processed_xml(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        assert_eq!(actual, expected);
++        let scan = scan_processed_xml(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        )
++        .expect("nested namespace scopes must remain valid");
++        assert_eq!(scan.relationship_attributes, ["after"]);
++    }
++
++    #[test]
++    fn direct_resolver_reports_namespace_error_before_depth_limit() {
++        let xml = format!(
++            r#"<p:sld xmlns:p="{P_NS}">{nested}<p:x xmlns:xml="urn:invalid-xml"></p:x>{closes}</p:sld>"#,
++            nested = "<p:x>".repeat(MAX_DEPTH - 1),
++            closes = "</p:x>".repeat(MAX_DEPTH),
++        )
++        .into_bytes();
++        let expected = outcome(buffered_scan_oracle(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        let actual = outcome(scan_processed_xml(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        assert_eq!(actual, expected);
++        assert!(
++            actual
++                .expect_err("reserved namespace must be rejected")
++                .contains("namespace prefix 'xml'")
++        );
++    }
++
++    #[test]
++    fn direct_resolver_preserves_reserved_namespace_and_declaration_cap_order() {
++        for (xml, needle) in [
++            (
++                format!(r#"<p:sld xmlns:p="{P_NS}" xmlns:xml="urn:invalid-xml"/>"#),
++                "namespace prefix 'xml'",
++            ),
++            (
++                format!(r#"<p:sld xmlns:p="{P_NS}" xmlns:xmlns="urn:invalid-xmlns"/>"#),
++                "namespace prefix 'xmlns'",
++            ),
++        ] {
++            let xml = xml.into_bytes();
++            let expected = outcome(buffered_scan_oracle(
++                &xml,
++                xml.len(),
++                crate::notes::MAX_SLIDE_XML,
++                Conformance::Transitional,
++                "sld",
++            ));
++            let actual = outcome(scan_processed_xml(
++                &xml,
++                xml.len(),
++                crate::notes::MAX_SLIDE_XML,
++                Conformance::Transitional,
++                "sld",
++            ));
++            assert_eq!(actual, expected);
++            assert!(
++                actual
++                    .expect_err("reserved namespace must be rejected")
++                    .contains(needle)
++            );
++        }
++
++        let mut declarations = format!(r#"xmlns:p="{P_NS}""#);
++        for index in 0..255 {
++            declarations.push_str(&format!(r##" xmlns:n{index}="urn:n{index}""##));
++        }
++        declarations.push_str(r##" xmlns:xml="urn:invalid-xml""##);
++        let xml = format!(r#"<p:sld {declarations}/>"#).into_bytes();
++        let expected = outcome(buffered_scan_oracle(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        let actual = outcome(scan_processed_xml(
++            &xml,
++            xml.len(),
++            crate::notes::MAX_SLIDE_XML,
++            Conformance::Transitional,
++            "sld",
++        ));
++        assert_eq!(actual, expected);
++        assert!(
++            actual
++                .expect_err("the declaration cap must be reached before the reserved binding")
++                .contains("more than 256 namespace bindings")
++        );
+     }
+ 
+     /// The scanner as it stood before change 0743, verbatim: buffered reads
