@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0804 — bounded linear equality diagnostic
+
+[0804](0804-xml-linear-equality-diagnostic.md) Against the 0803 after-control, byte-slice equality in the bounded linear scan improves 16/32/33-attribute consumption by 15.589%/24.825%/24.259%. No diagnostic regression flag occurs; short-row increases and 75 spread flags remain visible. Neither leg is production, so workflow/resource baselines remain unchanged.
+
 ## 0803 — exact-empty check placement diagnostic
 
 [0803](0803-xml-empty-check-placement.md) Fresh measurements compare the rejected 0802 helper with only its exact-empty check moved to the first request. Construction ratios are 0.296307–0.372513; no diagnostic regression flags occur. Neither leg is production, so public-workflow and resource baselines remain unchanged.

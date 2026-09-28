@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 1023406
+cmd:  /home/zhuhe/code/litchi-target-0804/attribute-boundary-probe --leg after --case syntax-equals-value-after-4 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-syntax-equals-value-after-4-consume-after.json
+part: 2
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 214578 - 238128
+desc: Trigger: Program termination
+
+positions: line
+events: Ir Bc Bcm Bi Bim
+summary: 0
+
+
+totals: 0

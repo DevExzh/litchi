@@ -1,0 +1,25 @@
+[package]
+name = "attribute-boundary-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "attribute-boundary-probe"
+path = "src/main.rs"
+
+[dependencies]
+quick-xml = "=0.41.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# This is an independent evidence project.  It is materialized and built
+# with an explicit manifest by the packet driver, outside the workspace.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

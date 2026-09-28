@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0804 — bounded linear equality diagnostic
+
+[0804](0804-xml-linear-equality-diagnostic.md) Direct linear byte equality has a measured benefit against the 0803 control while preserving bounded checks and error/clone oracles. A fresh production comparison is still required. The failed profile selector and explicit same-binary scope amendment are retained; production stays unchanged and GOAL remains incomplete.
+
 ## 0803 — exact-empty check placement diagnostic
 
 [0803](0803-xml-empty-check-placement.md) Exact-empty check placement is now isolated from the bounded linear backend: both layouts are 128 bytes, construction improves against the rejected control, and no diagnostic regression flag occurs. Production is unchanged; workflow advancement/adoption remain false and the broader GOAL is incomplete.

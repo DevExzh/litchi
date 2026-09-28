@@ -1,0 +1,137 @@
+{
+  "failed_attempts": [
+    {
+      "files": [
+        {
+          "bytes": 538,
+          "path": "profiles-failed-0/0-distinct-0-construct-before.callgrind",
+          "sha256": "88e18226eb8ea9d4441e1e8fb28129c5ec82e559f1337b1d4eee5b7bea0aff3d"
+        },
+        {
+          "bytes": 4251,
+          "path": "profiles-failed-0/0-distinct-0-construct-before.json",
+          "sha256": "8f48119a49433259ccf50c66e156169b8f16fba5a1dec191b62fbe0c9e6a5f48"
+        },
+        {
+          "bytes": 864,
+          "path": "profiles-failed-0/0-distinct-0-construct-before.log",
+          "sha256": "895eb1dc6da1b73d0cfcbf3eeb430a5ec8bec54c2c49a04cfd522a94f0ec5bd0"
+        },
+        {
+          "bytes": 2680,
+          "path": "profiles-failed-0/receipts.json",
+          "sha256": "007cfd8aff8be788ff0f3f2252e2fe2158edc5f520235f2d7f189b0dea32ed49"
+        },
+        {
+          "bytes": 408,
+          "path": "profiles-failed-0/relocation.json",
+          "sha256": "e48673b8f0514383e96eb207a7a430f8545db93d68ddfb74e53f2623d987a47e"
+        },
+        {
+          "bytes": 1182921,
+          "path": "profiles-failed-0/source.json",
+          "sha256": "16b8ac703f79f9f3fb5d3fdec8623437e05186b4e27c59a850e85fd66ad6c7d6"
+        }
+      ],
+      "id": "profiles-failed-0",
+      "profile_capture_failure": {
+        "artifacts": {
+          "0-distinct-0-construct-before.callgrind": {
+            "bytes": 538,
+            "path": "profiles-failed-0/0-distinct-0-construct-before.callgrind",
+            "sha256": "88e18226eb8ea9d4441e1e8fb28129c5ec82e559f1337b1d4eee5b7bea0aff3d"
+          },
+          "0-distinct-0-construct-before.json": {
+            "bytes": 4251,
+            "path": "profiles-failed-0/0-distinct-0-construct-before.json",
+            "sha256": "8f48119a49433259ccf50c66e156169b8f16fba5a1dec191b62fbe0c9e6a5f48"
+          },
+          "0-distinct-0-construct-before.log": {
+            "bytes": 864,
+            "path": "profiles-failed-0/0-distinct-0-construct-before.log",
+            "sha256": "895eb1dc6da1b73d0cfcbf3eeb430a5ec8bec54c2c49a04cfd522a94f0ec5bd0"
+          }
+        },
+        "binary": {
+          "bytes": 3121360,
+          "path": "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+          "sha256": "86cb01c00a4756f6493064855f3c8c2bb11ef581935e981fa4e7611555db98dd"
+        },
+        "child_exit_codes": [
+          0
+        ],
+        "driver_exit_code": 1,
+        "positive_dump_present": false,
+        "relocation": {
+          "bytes": 408,
+          "path": "profiles-failed-0/relocation.json",
+          "sha256": "e48673b8f0514383e96eb207a7a430f8545db93d68ddfb74e53f2623d987a47e"
+        },
+        "termination_dump_zero": true
+      },
+      "receipts": {
+        "bytes": 2680,
+        "commands": [
+          [
+            "taskset",
+            "-c",
+            "12",
+            "valgrind",
+            "--tool=callgrind",
+            "--branch-sim=yes",
+            "--collect-atstart=no",
+            "--toggle-collect=attribute_boundary_probe::before_construct",
+            "--zero-before=attribute_boundary_probe::before_construct",
+            "--dump-after=attribute_boundary_probe::before_construct",
+            "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.callgrind",
+            "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+            "--leg",
+            "before",
+            "--case",
+            "distinct-0",
+            "--mode",
+            "construct",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--iterations",
+            "1",
+            "--output",
+            "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/0-distinct-0-construct-before.json"
+          ]
+        ],
+        "exit_codes": [
+          0
+        ],
+        "logs": [
+          {
+            "bytes": 864,
+            "path": "profiles-failed-0/0-distinct-0-construct-before.log",
+            "sha256": "895eb1dc6da1b73d0cfcbf3eeb430a5ec8bec54c2c49a04cfd522a94f0ec5bd0"
+          }
+        ],
+        "path": "profiles-failed-0/receipts.json",
+        "sha256": "007cfd8aff8be788ff0f3f2252e2fe2158edc5f520235f2d7f189b0dea32ed49"
+      },
+      "relocation": {
+        "bytes": 408,
+        "path": "profiles-failed-0/relocation.json",
+        "sha256": "e48673b8f0514383e96eb207a7a430f8545db93d68ddfb74e53f2623d987a47e"
+      },
+      "relocation_keys": [
+        "child_exit_codes",
+        "driver_exit_code",
+        "original",
+        "reason",
+        "repair",
+        "retained"
+      ]
+    }
+  ],
+  "patches": {},
+  "path_policy": "only top-level retained failed-attempt roots are audited; no failed command is rerun; an empty list is the expected clean-run result",
+  "production_adoption": false,
+  "production_source_changed": false,
+  "schema": "litchi.performance.0804.failure-audit.v1"
+}

@@ -1,0 +1,18 @@
+{
+  "children": 312,
+  "owner_resolution": {
+    "bytes": 2147,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profile-owner-resolution.json",
+    "sha256": "16eea46672fc43ecbc91d965b5f4dbb55328aa7cd441cbce14790ddd5b8f875b"
+  },
+  "receipts": {
+    "bytes": 968522,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/receipts.json",
+    "sha256": "5461de88a1a0103ca1cf922dc9db9979085e0761824ebd17b218232f0b544809"
+  },
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0804/profiles/source.json",
+    "sha256": "16b8ac703f79f9f3fb5d3fdec8623437e05186b4e27c59a850e85fd66ad6c7d6"
+  }
+}

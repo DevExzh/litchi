@@ -1,0 +1,13 @@
+{
+  "removed_binaries": [
+    {
+      "bytes": 3121360,
+      "path": "/home/zhuhe/code/litchi-target-0804/attribute-boundary-probe",
+      "sha256": "86cb01c00a4756f6493064855f3c8c2bb11ef581935e981fa4e7611555db98dd"
+    }
+  ],
+  "removed_failed_binaries": [],
+  "removed_target_bytes": 178385224,
+  "target": "/home/zhuhe/code/litchi-target-0804",
+  "target_removed": true
+}

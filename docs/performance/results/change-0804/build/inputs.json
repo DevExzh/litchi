@@ -1,0 +1,29 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "86310ab19474945a28f52e1a3d595bd7a1a687f3fc51810fbc6600d01b0d4500",
+    "candidate.patch": "d718e7e6eb3822b739aca3dbcd05c333a42759de4f4060aef3904de91a1de850",
+    "capture.py": "9350c5d3cf3e9b908c3a26d03dbc5dac5001a9ebfc2eae4e88c2cb423f01b26d",
+    "custody.py": "5447441c87d675f18fc6b057a2ec2ac59bdb1598e154ae9c471b670c6bfcab7e",
+    "decision.py": "e45b98eea3263a8151676d1e918615cef49ca2bfaeb6527081a0c9d884ff086d",
+    "fixture_check.py": "6aef81d7f9fe32b3b29ddacf598705d036f008a2d4b17cf4a901575ff28dd511",
+    "fixtures.json": "5ced70a2491b0863e2d14c4aa81c38fdfd442be0faecb80c94cbe4d9ffb8f5d7",
+    "host.json": "f41ec14f074fea5638f72921ba74cb89d364347fcedc75b0bbd4784e81db371d",
+    "inheritance.json": "990554d3f7f055f2c0a7a99c0875f1bd776b6e957973cd0eb3146f29ce9a3df8",
+    "lock-generation.json": "7177748aa14e6ae710a3d118776e9d9843dd95fa48bcfb8b1add76a550d035be",
+    "lock-generation.log": "80c79ba0b92c0c7696dbee779e03f63558db41c667090bd908f83dbb224990e2",
+    "origin.json": "6184156a1e74f7e36e31b88f5c1fe9a17fe55ac214c2f78033d7d50a34102917",
+    "plan.json": "c6b547fae32b33a074c562f47b2fc2d6d2c0172c3d639cae4c05f43599b01594",
+    "quality.py": "6908a0a3319b07cad825e15027dbce2f6bf715c0d1f9ee2dab81a898ccb8d762",
+    "quality/archive-inputs.json": "7b0a9fdd650f4b9d8e9a260b5c2b1f1d420ed12e71ed1dd53d063abbe0022094",
+    "quality/complete.json": "5c7935848b24c946aa473e4098052513a80fb200796cfe671b1239e9e160ccbf"
+  },
+  "probe": {
+    "Cargo.lock": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187",
+    "Cargo.toml": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "Cargo.toml.template": "3216a8ea66a470a5be98eb4d7254644217d4e76bd30cd1624acc6d1eb3893d19",
+    "src/baseline.rs": "41f11ca1fb795cde7e11734364f434acb1272204b591d442216c5a07868fe2db",
+    "src/candidate.rs": "6ad5b582be2e1b5f0b24e6aaafcfb08302e0d81bf1749cf569d231202d4530c5",
+    "src/main.rs": "8c245714e19979ca7e53317eceb2178b838c4210c696de9fc91813f47cc8caa2"
+  }
+}

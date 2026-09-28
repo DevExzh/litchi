@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0804 — bounded linear equality diagnostic
+
+[0804](0804-xml-linear-equality-diagnostic.md) Both five-copy helper legs pass 100 tests and Clippy over unchanged semantic tests. The 39-case diagnostic retains 1,248 successful reports/28,392 samples plus a separate failed initial profile scope. No public CRUD or cross-format coverage is promoted.
+
 ## 0803 — exact-empty check placement diagnostic
 
 [0803](0803-xml-empty-check-placement.md) A 39-case helper diagnostic verifies empty-check relocation against the rejected 0802 control, including duplicate/syntax errors and clone/fusion. All 1,248 reports and 28,392 samples replay. No public CRUD, producer or cross-format coverage is promoted.
