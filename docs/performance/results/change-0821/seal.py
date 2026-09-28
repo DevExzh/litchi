@@ -1,4 +1,4 @@
-"""Seal the 0821 record and check the exact staged or committed change set."""
+"""Seal the 0821 record and check the exact staged or committed batch change set since the measured base."""
 import hashlib
 import json
 from pathlib import Path
@@ -32,7 +32,8 @@ def main():
         assert (P / 'seal.json').read_text() == encoded
         expected = files | {str((P / 'seal.json').relative_to(ROOT)): digest(encoded.encode())}
         index = sys.argv[1] == '--check-index'
-        command = ['git', 'diff', '--cached', '--name-only', '-z'] if index else ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', '-z', 'HEAD']
+        base = json.loads((P / 'origin.json').read_text())['base']
+        command = ['git', 'diff', '--cached', '--name-only', '-z', base] if index else ['git', 'diff', '--name-only', '-z', base, 'HEAD']
         actual = {name for name in subprocess.check_output(command, cwd=ROOT).decode().split('\0') if name}
         assert actual == set(expected), (actual - set(expected), set(expected) - actual)
         revision = ':' if index else 'HEAD:'

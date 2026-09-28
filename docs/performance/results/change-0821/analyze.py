@@ -370,8 +370,11 @@ def load_custody() -> dict[str, Any]:
     require(len(current["files"]) == PRODUCTION_FILES,
             "production source census changed")
     tool = custody.tool_source()
-    require(current.get("revision") == BASE_REVISION,
-            "production source revision changed")
+    # Evidence-only commits advance HEAD after capture. The measured base must
+    # remain an ancestor; source_witness below still checks every source hash.
+    ancestry = subprocess.run(["git", "merge-base", "--is-ancestor", BASE_REVISION,
+                               str(current["revision"])], cwd=ROOT, check=False)
+    require(ancestry.returncode == 0, "measured base is not an ancestor of current HEAD")
     require(len(tool) == TOOL_FILES, "tool source census changed")
     return {"plan": p, "origin": origin(), "root_inputs": root_inputs,
             "locks": locks, "corpus": corpus, "provenance": provenance,
