@@ -1,0 +1,14 @@
+{
+  "after_sha256": "0d79c479f990f0e43277cc2b5039e71b61f96701a06d412fff28127d30e9e5eb",
+  "before_sha256": "afe486239147d2390e17b86e70e905d3105071c7af4891f4e1267104e4efa8c5",
+  "command": [
+    "cargo",
+    "fmt",
+    "--manifest-path",
+    "tools/perf-execution/Cargo.toml"
+  ],
+  "ended": 1790586883.361023,
+  "exit_code": 0,
+  "reason": "Initial root cargo fmt --check exited1 with formatting-only diffs before quality/build freeze; snapshot retained before automatic formatting.",
+  "started": 1790586883.318017
+}

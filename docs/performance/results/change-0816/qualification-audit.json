@@ -1,0 +1,1029 @@
+{
+  "accepted_before_native": true,
+  "checks": [
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11741,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "df6e495643cb9f8c816fc1255127e09f3c76243e345518d7f37d8f8205b3fd01"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11741,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "b2312367b59f8c62e29a7e0b30bb6c6d51acdc5b054b0c961428f0b9c7af6127"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11740,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "7fefe34d7e41b61ec8552286811ca68838dab91bb9dc9fa11dbad92ca7690141"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 5,
+      "report": {
+        "bytes": 11740,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "20f32ff832fc43b15cdaff7a1fbcc1f6ee82cafeefe1937aa6d80df1c44b7c0d"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11915,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "110e496dfbc1ec4ec0b39678c6300ade34d5a56b0a1b7ebb289eb9d8423c85e0"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11915,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "a085820f23c42b4f913ad238a8b232c92a18a35333c77bfa667173764b366a8e"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "ee92a7b7bb5deda344fc868beca3d9ce89f883b1feaa141df6d6d999280ae18c"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 5,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "54e4a81a7590a2e247b96118fe4c4ab3c91386deb51dd89418c7d61d111802e9"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "d4dcc8c7a9f4dbad006f2f6831327327e7b1c8185e8a6ea5f35ae0bc67e64571"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "3b940fd247c7178995646cf12ff57da921b6785ee59f83f314ab0a0e0eb92fd6"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "4545052ab62ba03da33f9e00870b22702a59b6ab7f366dfcd232ff4ec7c33735"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 8,
+      "report": {
+        "bytes": 11917,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-fresh-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "157d059f027975e99c478f83d245553a349d519003eb1aa6a3d5efd1fbd6e8f7"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8130560,
+        "returned_bytes": 8130560,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "a88b68bd28d20e50ed05bc3b5c9fbe712ba4604256b9dec7fac8752d512309bc"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8130560,
+        "returned_bytes": 8130560,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "cba783c533ba25257b22407819a24fd1a3edeede4c0b961f0cc4d39575579ab8"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8130560,
+        "returned_bytes": 8130560,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "35ae4d1a5574cabb5e8bd1f168e090e2468459dab3ee7c8f55861627199ad4e2"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8130560,
+        "returned_bytes": 8130560,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "c26fc99db8d8e961459fa8c4a2c983a19f6d8e6f86f05ce9008991332cc749c9"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "3807b9f7659941163a8948c8c65d7b69b03127f75b787bd0d78d8d978f0d619e"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "56994f15fbf358a7541c09044cfba1efa7e4ad48d539b5461860130c74c79457"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "8d4ef576395464e5eb3babd6b0c4aec961d6c6a80002e95e51a53195b83b230b"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "6c8766b8872eb29872113b053382b82cfa4e3c70d0ce9055c74401e95a498c34"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11916,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "4a1a8e7f36f1ee316284dcab145a92784e595428244dbe530d090d93a5c110ea"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11916,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "2b0b4e3345cc20806c10ccd1864da8cf4099d10c3ca501dfcdd087bea852ba08"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11916,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "fdf1782d67567abac5a45411175fcab61bb0cfda9a75557379118bc84dfdfe8c"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 125,
+        "requested_bytes": 20320256,
+        "returned_bytes": 8130560,
+        "short_reads": 93
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11916,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-mixed-fresh-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "3e781491b260822c13e6a07cd7f45db2e74cc04ba1dd845fef47610220ce7d63"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11750,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "f98e80b62715f9decc7ce8a46fcde67d89d5672770dfc63373c6d8f7bd02a2b2"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11750,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "796b85a2035e07c554330fdf846835bf47059160a39040d84cee8f1382446aa8"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11749,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "624c583dd9971bd32a346ed23acef268b78b74a4987b1763cf8b4f72b031965f"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 32,
+        "requested_bytes": 8388608,
+        "returned_bytes": 8388608,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 6,
+      "report": {
+        "bytes": 11749,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "c4c2b334f3bc7a42eedf66196eef8c07dfd8b50b83da92220bc0e49094c9414c"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11924,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "e2b1db99e7a91c24ba6d3f2c2214396e71572c88f9a3a907fe2bae804b89efd9"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11923,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "c9ebe695ba92e7cf823541da54614cc56b4715c33ea670f0948f0354a30f8257"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 3,
+      "report": {
+        "bytes": 11923,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "8e3de00c6ec967f9cf8907e0dfa9d6e78c086d5caef5e4b0148571af6890b7ba"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 5,
+      "report": {
+        "bytes": 11923,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "2f478b6101b09ff6a1857bd306ed508d492e9c6cf2e7bb0cd62055959aa50142"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11927,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "324e2192156c5d71d10ad421cd2710ccc42bb435d01d960cf64ee8e35cc96ddf"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11927,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "2c30b91d75e0f16d831f1819a7e668e3df54e4d8cf791c3e89b4e3d061107f75"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11927,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "08a9c6a1e45d202091a6704d22af1d89a2f1ecf117e361bd7e2129776d0d6ffa"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 128,
+        "requested_bytes": 20971520,
+        "returned_bytes": 8388608,
+        "short_reads": 96
+      },
+      "max_simultaneous_reads": 8,
+      "report": {
+        "bytes": 11926,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-cfb-large-primed-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "5800df1b8a7b93d3e8f19924c906b0641e4d5da01e44e0b2169cc0235d2f52e0"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11746,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "edc35497c892792e37a98be5bfd9389e8993b6dbfb5551b47406b05c5676c525"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11748,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "e3e7596109666cb9329d9ce37aad9ab193d08d12ba49d5c888e3dd04402b2dea"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11748,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "d10adb975dd377b8ee760a3d39bf8f6082d1b8029fce4dc60196ee4a836fdc91"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11747,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "9acd51a0c54546cd53458980d8954aae5ff390490b94bc6ce28a05cbae09b7b7"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11916,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "1632cb357f9d444559d950207bb9e08f5072ed11d8c3101c4e2cd09eebd6cb0b"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "e15eba7fa06ace0df1228b74a4a2097158adc02a6f4212947e95d4e3fbda75e5"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11917,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "51815ce0771ac7fa83bd01ff83bbae1817b08cbe1d1c8cac0117b1c037d70521"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "ad0b717d3264d53cfa6aa6ebc188681cf126e8d89232089a81d830cba079898b"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11920,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "4a2f55763dfd0ebd9e91f13ed79b65bdb2f499803d0a94fb262f5c5049b7181a"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 2,
+      "report": {
+        "bytes": 11920,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "856e9b8106615ad75fc9e92586d4c4ffd80be120e047fa63c08485f0bebebae6"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 4,
+      "report": {
+        "bytes": 11920,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "055b2ca4c7b12b343f1a3d356429389801bbc244a7bb6f8980a2f5fd3df2e74b"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 146041,
+        "returned_bytes": 146041,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 8,
+      "report": {
+        "bytes": 11920,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-fresh-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "38873071cd2e798cd7d994b7626f69a26f9a66e471bea09d6eb8a7f8d0b92047"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11744,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "df5fa003fc30d56b34f7a9266f6657e7505fefb76d7e96acfbcedd1fa31d1eb4"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11744,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "758ac2de4478e47b040e5a9704cb83b7d4f1a460fd40286ae1ec0907759469c4"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11744,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "78a5fdf068d59f95395763f014ddaaa3409d22f8583535b3bbd5a4ede72a9aca"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11744,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "7e8055d96c7f111df8cf43f4cba3fa7c977c83d3595c8d1cb366155bf883588f"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "7aeeb0be5d37ee0d722624774be9c20ef36a3a1c1b56d58b349617d886765803"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "4e91cd05f010df55e90bc0322063b8d729ea913380eee4c3f0094cbf31b64183"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "21c23df540905428c751983dfd89135136d97869c32bbb5fd4f69e36b905d63d"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11914,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "0bf93e8ba025ace79a02c6a013c10c747eff86077843348c500b1d6f82b3929f"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "2ae7a1986c4d54f9c085afb7b0e2d7a7497414411507c21f23a7beefa0f6bcbf"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "4fe7127dfebc6d56e04d4bbcedcc8445e7e5d16d361f1be0c6b6b2ccdf919210"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "63c1798eae00d6ef84c7e534afa269ef32ed1ceb6a24d7c3098a311475e431c5"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 64,
+        "requested_bytes": 143782,
+        "returned_bytes": 143782,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 1,
+      "report": {
+        "bytes": 11918,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-mixed-fresh-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "a2da850e223b6016946643dee799262824fc81244751dfc301f9089fe49130c7"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11738,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers1-floor65536-maxread0-delay0.json",
+        "sha256": "ee8422d698580b5d719ea19c785e8852466f20f8372c281229b28859f3ed1ddb"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11741,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers2-floor65536-maxread0-delay0.json",
+        "sha256": "79211bd2b6eebd57361347065000aa6b5a69110fa9f3e38d90153353a52c3461"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11741,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers4-floor65536-maxread0-delay0.json",
+        "sha256": "adb1692ca88e1aaf9348c10cb6767b806e87fcc58d8b1a8421dc9bdf5deee050"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11741,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers8-floor65536-maxread0-delay0.json",
+        "sha256": "13a4bbdb90d5a56e5bd56475a0df4cc1f79896da0f09ed8b7a91b1bee8b77147"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11908,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers1-floor65536-maxread65536-delay0.json",
+        "sha256": "d0f2517c8b0d557b543fd13e362d1b0d3c5eef485df87e3f21e324ea80cf29c6"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11911,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers2-floor65536-maxread65536-delay0.json",
+        "sha256": "52a9891b33a24c3437bca4f78ad0a6370675e1decf9be7250c2b068c43703906"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11911,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers4-floor65536-maxread65536-delay0.json",
+        "sha256": "e4bdc187ca6c4d120c41e5141fde132d8f58eeebb7324cb2ed59edb9a67ca8ce"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11911,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers8-floor65536-maxread65536-delay0.json",
+        "sha256": "77c0250becd9faae737afd326c8633c8e8cc36192c6fb009ea91e1a46527568d"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11910,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers1-floor65536-maxread65536-delay250.json",
+        "sha256": "23bea217fea5281c0b7c3a8fa988a9f4d248dbc40ffe141188ebbeefb511a5ac"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers2-floor65536-maxread65536-delay250.json",
+        "sha256": "e739526821e8f50c553b32da6422ec8fc1a99c7180f562dffa4be6100a0d3d6f"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers4-floor65536-maxread65536-delay250.json",
+        "sha256": "10d5ebc8f4ac49fd9712f75a101a3201350886a17b27298da7b62ece2e7dfedc"
+      }
+    },
+    {
+      "expected_source": {
+        "logical_calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0,
+        "short_reads": 0
+      },
+      "max_simultaneous_reads": 0,
+      "report": {
+        "bytes": 11913,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0816/qualification/00-parts-large-primed-workers8-floor65536-maxread65536-delay250.json",
+        "sha256": "3636f97dacfcdb27540c516bce76fceabd2c6b4d2361e9354d459d31b10a0f88"
+      }
+    }
+  ],
+  "references": {
+    "large": {
+      "bytes": 11683,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0786/qualification/0-cfb-large-fresh-65536-1.json",
+      "sha256": "fea1143ec9275935834984e8919eda671d4718210bf83f8b4b22433fddf8781c"
+    },
+    "mixed": {
+      "bytes": 11681,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0786/qualification/0-cfb-mixed-fresh-65536-1.json",
+      "sha256": "815383f94411038e7ad75479f599b52a0ce2c391f7f8461259904367953d2975"
+    }
+  },
+  "reports": 72,
+  "samples": 72,
+  "schema": "litchi.performance.0816.qualification-audit.v1",
+  "timings_imported": false
+}

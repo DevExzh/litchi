@@ -1,0 +1,1325 @@
+{
+  "amdahl_correction": {
+    "families": [
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "cfb/mixed/fresh/65536/0/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 1.00252110238"
+        ],
+        "rmse_constrained": 0.0024142662260827666,
+        "rmse_unconstrained": 0.001576446348793558,
+        "unconstrained_serial_fraction": 1.0025211023783172
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/large/fresh/65536/0/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 1.26731583502"
+        ],
+        "rmse_constrained": 0.43359441016447847,
+        "rmse_unconstrained": 0.3878328965489165,
+        "unconstrained_serial_fraction": 1.2673158350224554
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/large/fresh/65536/65536/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 1.29127311236"
+        ],
+        "rmse_constrained": 0.46475737495867286,
+        "rmse_unconstrained": 0.41396863275939144,
+        "unconstrained_serial_fraction": 1.2912731123638908
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/large/primed/65536/0/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 92.451208875"
+        ],
+        "rmse_constrained": 67.34968616622463,
+        "rmse_unconstrained": 11.684328769932192,
+        "unconstrained_serial_fraction": 92.45120887496476
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/large/primed/65536/65536/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 92.2220942732"
+        ],
+        "rmse_constrained": 66.98899381092052,
+        "rmse_unconstrained": 10.492144179991183,
+        "unconstrained_serial_fraction": 92.2220942732147
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/large/primed/65536/65536/250",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 100.920466037"
+        ],
+        "rmse_constrained": 73.61430878894964,
+        "rmse_unconstrained": 12.923393514735634,
+        "unconstrained_serial_fraction": 100.9204660370565
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/mixed/fresh/65536/0/0",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 1.00004500896"
+        ],
+        "rmse_constrained": 0.0009982496849164802,
+        "rmse_unconstrained": 0.0009977157785625358,
+        "unconstrained_serial_fraction": 1.0000450089605493
+      },
+      {
+        "constrained_serial_fraction": 1.0,
+        "corrected_invalid": true,
+        "corrected_valid": false,
+        "family": "parts/mixed/fresh/65536/65536/250",
+        "invalid_reasons": [
+          "unconstrained serial fraction outside model-admissible [0,1]: 1.00001201807"
+        ],
+        "rmse_constrained": 7.375136682382149e-05,
+        "rmse_unconstrained": 7.323445795726556e-05,
+        "unconstrained_serial_fraction": 1.0000120180676726
+      }
+    ],
+    "families_invalidated": 8,
+    "families_total": 18,
+    "numeric_fit_values_changed": false,
+    "retained_diagnostics": [
+      "unconstrained_serial fraction",
+      "constrained serial fraction",
+      "rmse_unconstrained",
+      "rmse_constrained"
+    ],
+    "scaling_rows": [
+      {
+        "case": [
+          "cfb",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00252110238"
+            ],
+            "old": []
+          }
+        },
+        "index": 24
+      },
+      {
+        "case": [
+          "cfb",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00252110238"
+            ],
+            "old": []
+          }
+        },
+        "index": 25
+      },
+      {
+        "case": [
+          "cfb",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00252110238"
+            ],
+            "old": []
+          }
+        },
+        "index": 26
+      },
+      {
+        "case": [
+          "cfb",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00252110238"
+            ],
+            "old": []
+          }
+        },
+        "index": 27
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          0,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.26731583502"
+            ],
+            "old": []
+          }
+        },
+        "index": 36
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          0,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.26731583502"
+            ],
+            "old": []
+          }
+        },
+        "index": 37
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          0,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.26731583502"
+            ],
+            "old": []
+          }
+        },
+        "index": 38
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          0,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.26731583502"
+            ],
+            "old": []
+          }
+        },
+        "index": 39
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          65536,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.29127311236"
+            ],
+            "old": []
+          }
+        },
+        "index": 40
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          65536,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.29127311236"
+            ],
+            "old": []
+          }
+        },
+        "index": 41
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          65536,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.29127311236"
+            ],
+            "old": []
+          }
+        },
+        "index": 42
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "fresh",
+          65536,
+          65536,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.29127311236"
+            ],
+            "old": []
+          }
+        },
+        "index": 43
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          0,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.451208875"
+            ],
+            "old": []
+          }
+        },
+        "index": 48
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          0,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.451208875"
+            ],
+            "old": []
+          }
+        },
+        "index": 49
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          0,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.451208875"
+            ],
+            "old": []
+          }
+        },
+        "index": 50
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          0,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.451208875"
+            ],
+            "old": []
+          }
+        },
+        "index": 51
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.2220942732"
+            ],
+            "old": []
+          }
+        },
+        "index": 52
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.2220942732"
+            ],
+            "old": []
+          }
+        },
+        "index": 53
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.2220942732"
+            ],
+            "old": []
+          }
+        },
+        "index": 54
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 92.2220942732"
+            ],
+            "old": []
+          }
+        },
+        "index": 55
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          250,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 100.920466037"
+            ],
+            "old": []
+          }
+        },
+        "index": 56
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          250,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 100.920466037"
+            ],
+            "old": []
+          }
+        },
+        "index": 57
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          250,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 100.920466037"
+            ],
+            "old": []
+          }
+        },
+        "index": 58
+      },
+      {
+        "case": [
+          "parts",
+          "large",
+          "primed",
+          65536,
+          65536,
+          250,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 100.920466037"
+            ],
+            "old": []
+          }
+        },
+        "index": 59
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00004500896"
+            ],
+            "old": []
+          }
+        },
+        "index": 60
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00004500896"
+            ],
+            "old": []
+          }
+        },
+        "index": 61
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00004500896"
+            ],
+            "old": []
+          }
+        },
+        "index": 62
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          0,
+          0,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00004500896"
+            ],
+            "old": []
+          }
+        },
+        "index": 63
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          65536,
+          250,
+          1
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00001201807"
+            ],
+            "old": []
+          }
+        },
+        "index": 68
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          65536,
+          250,
+          2
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00001201807"
+            ],
+            "old": []
+          }
+        },
+        "index": 69
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          65536,
+          250,
+          4
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00001201807"
+            ],
+            "old": []
+          }
+        },
+        "index": 70
+      },
+      {
+        "case": [
+          "parts",
+          "mixed",
+          "fresh",
+          65536,
+          65536,
+          250,
+          8
+        ],
+        "changed": {
+          "amdahl_fit_invalid": {
+            "corrected": true,
+            "old": false
+          },
+          "amdahl_fit_valid": {
+            "corrected": false,
+            "old": true
+          },
+          "amdahl_invalid_reasons": {
+            "corrected": [
+              "unconstrained serial fraction outside model-admissible [0,1]: 1.00001201807"
+            ],
+            "old": []
+          }
+        },
+        "index": 71
+      }
+    ],
+    "scaling_rows_invalidated": 32
+  },
+  "attempt": "analysis-attempt-0",
+  "captures_and_driver_inputs_unchanged": true,
+  "corrected_files": {
+    "analysis.json": {
+      "path": "analysis.json",
+      "sha256": "caf0a67e57eb029cd9a51a1ba7e7e1b8aea33e7bc693942554d129767e3591b4"
+    },
+    "analyze.py": {
+      "path": "analyze.py",
+      "sha256": "6bae7dd1ba3fc6a3b38737e8185d871f4a21854737d225bddb07c7e182fa48d8"
+    },
+    "observer.csv": {
+      "path": "observer.csv",
+      "sha256": "c5f799ca9a492b35eb42cb99ed51d2e83578e88e66e50d9b69d7d1811da16596"
+    },
+    "raw-audit.json": {
+      "path": "raw-audit.json",
+      "sha256": "6797303910aa2d781db67a907d7c719d00f8f67f104ccf28cf1218fc954158c4"
+    },
+    "raw_audit.py": {
+      "path": "raw_audit.py",
+      "sha256": "129b44e2b2f01be0acb1c9c619ccc93e62bec3208849e5fb2b014fe13e369501"
+    },
+    "scaling.csv": {
+      "path": "scaling.csv",
+      "sha256": "cfe9c4c7893fc4e9cc1946ffb0029b6af361059dcd09e9e1371158dddcdca41a"
+    },
+    "scaling.md": {
+      "path": "scaling.md",
+      "sha256": "b94ab2f9276b42c1514056eeeda7ca84d14f05d33feefff3a11f9e15c55d4ba7"
+    },
+    "validate.py": {
+      "path": "validate.py",
+      "sha256": "689dcd50cf39b83fe39c50143aa513296c7b2fba81079101f5e9e68284fe97ec"
+    }
+  },
+  "corrected_utc": "2026-09-28T09:48:15.399562Z",
+  "correction_status": "corrected-top-level-outputs-written-and-checked",
+  "created_utc": "2026-09-28T09:43:55.724172Z",
+  "immutable_outputs_preserved": true,
+  "original_files": {
+    "analysis.json": {
+      "sha256": "b9722d1dedf5209a5b51004ffbb6e0b3b027c74fa2b51143344abcd76c91ba73",
+      "snapshot": "analysis-attempt-0/analysis.json"
+    },
+    "analyze.py": {
+      "sha256": "cf33b24df60cf55ec73da62bb7ab69a266d3eca2802a0ca6c276498af42eac64",
+      "snapshot": "analysis-attempt-0/analyze.py"
+    },
+    "observer.csv": {
+      "sha256": "c5f799ca9a492b35eb42cb99ed51d2e83578e88e66e50d9b69d7d1811da16596",
+      "snapshot": "analysis-attempt-0/observer.csv"
+    },
+    "raw-audit.json": {
+      "sha256": "6797303910aa2d781db67a907d7c719d00f8f67f104ccf28cf1218fc954158c4",
+      "snapshot": "analysis-attempt-0/raw-audit.json"
+    },
+    "raw_audit.py": {
+      "sha256": "c746264725d82d0073a51614e56c4f32e1bff4c0f063f06da7af248c45688f0e",
+      "snapshot": "analysis-attempt-0/raw_audit.py"
+    },
+    "scaling.csv": {
+      "sha256": "b582861b668fcf08d9ae0dd40ed43ecbe2494038fe7b9556173f46524c3aee32",
+      "snapshot": "analysis-attempt-0/scaling.csv"
+    },
+    "scaling.md": {
+      "sha256": "b94ab2f9276b42c1514056eeeda7ca84d14f05d33feefff3a11f9e15c55d4ba7",
+      "snapshot": "analysis-attempt-0/scaling.md"
+    },
+    "validate.py": {
+      "sha256": "23697bbe7bff82679a007d1398060d348f6aa2b68657daff9d1c8bc5710c619d",
+      "snapshot": "analysis-attempt-0/validate.py"
+    }
+  },
+  "output_comparison": {
+    "analysis_json_changed": true,
+    "bootstrap_endpoint_value_changes": [],
+    "measurement_numeric_values_changed": [],
+    "numeric_value_changes_in_analysis": [
+      {
+        "corrected": 19824,
+        "old": 19744,
+        "path": "raw_audit.script.bytes"
+      }
+    ],
+    "observer_csv_unchanged": true,
+    "raw_audit_json_unchanged": true,
+    "raw_audit_script_byte_metadata_change": {
+      "corrected": 19824,
+      "old": 19744,
+      "path": "raw_audit.script.bytes"
+    },
+    "scaling_csv_changed": true,
+    "scaling_md_unchanged": true,
+    "structural_count_changes": [
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.cfb/mixed/fresh/65536/0/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/large/fresh/65536/0/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/large/fresh/65536/65536/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/large/primed/65536/0/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/large/primed/65536/65536/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/large/primed/65536/65536/250.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/mixed/fresh/65536/0/0.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "amdahl.parts/mixed/fresh/65536/65536/250.invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[24].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[25].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[26].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[27].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[36].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[37].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[38].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[39].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[40].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[41].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[42].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[43].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[48].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[49].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[50].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[51].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[52].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[53].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[54].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[55].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[56].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[57].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[58].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[59].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[60].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[61].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[62].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[63].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[68].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[69].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[70].amdahl_invalid_reasons"
+      },
+      {
+        "corrected": 1,
+        "old": 0,
+        "path": "scaling[71].amdahl_invalid_reasons"
+      }
+    ]
+  },
+  "reason": [
+    {
+      "code": "bootstrap-endpoint-index",
+      "description": "Frozen plan requires sorted endpoint ranks 250 and 9749; the initial readers used nearest-rank percentile notation for the lower endpoint."
+    },
+    {
+      "code": "amdahl-fit-admissibility",
+      "description": "The initial Amdahl diagnostic marked unconstrained serial fractions outside the model-admissible [0,1] interval as valid; corrected output retains unconstrained, clamped, and residual diagnostics and marks those fits invalid."
+    }
+  ],
+  "schema": "litchi.performance.0816.analysis-recovery.v1",
+  "verification": {
+    "analysis_check": "pass",
+    "captures_or_driver_inputs_changed": false,
+    "raw_audit_check": "pass",
+    "validator_precleanup": "pass",
+    "workload_build_binary_execution": false
+  }
+}
