@@ -1,0 +1,26 @@
+{
+  "schema": "litchi.performance.0823.corpus-inputs.v1",
+  "synthetic": {
+    "source": "docs/performance/results/change-0823/synthetic-probe-src",
+    "inheritance": "docs/performance/results/change-0813/probe-src",
+    "timed_cases": ["tiny", "medium", "large", "vendor", "unicode-vendor", "valid-4attr"],
+    "modes": ["capture", "commit", "lifecycle"],
+    "oracle": "The probe's per-sample output and semantic verification fields, plus the retained 0813 generator and refusal corpus source review."
+  },
+  "real": {
+    "input_selector": "pinnedshapes",
+    "input": {
+      "path": "test-data/ooxml/pptx/shapes.pptx",
+      "bytes": 68822,
+      "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571"
+    },
+    "reference_selector": "0821realPPTXdefault",
+    "reference": {
+      "path": "docs/performance/results/change-0821/artifacts/real-002-pptx/default.pptx",
+      "bytes": 68284,
+      "sha256": "38c7fd3cc5037316e0a3a9c8cb6e6b013a95dd03b39bbd7fb357fc3cc3b9e5cf"
+    },
+    "mode": "direct",
+    "oracle": "Per-sample input, reference, output bytes/hash, reopen, marker, full-text digest, and slide-count verification."
+  }
+}

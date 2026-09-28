@@ -1,0 +1,126 @@
+    Checking mce-capabilities-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0823/synthetic-probe-src)
+error: function `enable` is never used
+  --> src/allocation_metrics.rs:89:8
+   |
+89 | pub fn enable() {
+   |        ^^^^^^
+   |
+   = note: `-D dead-code` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `record_allocation` is never used
+  --> src/allocation_metrics.rs:94:8
+   |
+94 | pub fn record_allocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^
+
+error: function `record_deallocation` is never used
+  --> src/allocation_metrics.rs:99:8
+   |
+99 | pub fn record_deallocation(size: usize) {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+error: function `record_reallocation` is never used
+   --> src/allocation_metrics.rs:104:8
+    |
+104 | pub fn record_reallocation(old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+error: function `record_failed_allocation` is never used
+   --> src/allocation_metrics.rs:109:8
+    |
+109 | pub fn record_failed_allocation() {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:203:15
+    |
+203 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+
+error: struct `CallbackEntryGuard` is never constructed
+   --> src/allocation_metrics.rs:499:8
+    |
+499 | struct CallbackEntryGuard;
+    |        ^^^^^^^^^^^^^^^^^^
+
+error: associated function `enter` is never used
+   --> src/allocation_metrics.rs:502:8
+    |
+501 | impl CallbackEntryGuard {
+    | ----------------------- associated function in this implementation
+502 |     fn enter(observer_invalid: &AtomicBool) -> Option<Self> {
+    |        ^^^^^
+
+error: multiple methods are never used
+   --> src/allocation_metrics.rs:634:8
+    |
+525 | impl Counters {
+    | ------------- methods in this implementation
+...
+634 |     fn update_region_peak(&self, observer: &mut ObserverState, live: u64) {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+642 |     fn enter_callback(&self) -> Option<CallbackEntryGuard> {
+    |        ^^^^^^^^^^^^^^
+...
+646 |     fn add(&self, counter: &AtomicU64, value: u64) {
+    |        ^^^
+...
+652 |     fn live_add(&self, value: u64) -> Option<u64> {
+    |        ^^^^^^^^
+...
+662 |     fn live_sub(&self, value: u64) {
+    |        ^^^^^^^^
+...
+668 |     fn update_peak(&self, live: u64) {
+    |        ^^^^^^^^^^^
+...
+683 |     fn allocation(&self, size: usize) {
+    |        ^^^^^^^^^^
+...
+691 |     fn allocation_locked(&self, size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^
+...
+703 |     fn deallocation(&self, size: usize) {
+    |        ^^^^^^^^^^^^
+...
+711 |     fn deallocation_locked(&self, size: usize) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+721 |     fn reallocation(&self, old_size: usize, new_size: usize) {
+    |        ^^^^^^^^^^^^
+...
+729 |     fn reallocation_locked(&self, old_size: usize, new_size: usize, observer: &mut ObserverState) {
+    |        ^^^^^^^^^^^^^^^^^^^
+...
+749 |     fn failed_allocation(&self) {
+    |        ^^^^^^^^^^^^^^^^^
+
+error: function `checked_add` is never used
+   --> src/allocation_metrics.rs:758:4
+    |
+758 | fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+error: function `checked_sub` is never used
+   --> src/allocation_metrics.rs:765:4
+    |
+765 | fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
+    |    ^^^^^^^^^^^
+
+error: struct `Snapshot` is never constructed
+   --> src/allocation_metrics.rs:118:12
+    |
+118 | pub struct Snapshot {
+    |            ^^^^^^^^
+
+error: function `snapshot` is never used
+   --> src/allocation_metrics.rs:136:8
+    |
+136 | pub fn snapshot() -> Snapshot {
+    |        ^^^^^^^^
+
+error: could not compile `mce-capabilities-probe` (bin "namespace-uri-probe") due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `mce-capabilities-probe` (bin "namespace-uri-probe" test) due to 7 previous errors

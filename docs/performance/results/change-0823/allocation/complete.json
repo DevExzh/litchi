@@ -1,0 +1,26 @@
+{
+  "blocks": 2,
+  "expected_reports": 76,
+  "expected_samples": 228,
+  "freeze": {
+    "bytes": 1220762,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0823/freeze.json",
+    "sha256": "e01a7d4aab0fa7271bb2af500df8ecef4d155378c3fa1e610ab4e1d4eb1e81c5"
+  },
+  "lane": "allocation",
+  "leg": null,
+  "plan": {
+    "bytes": 7757,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0823/plan.json",
+    "sha256": "2be9d8637b0504f90ec8e4298b7c9d5753ce89890cbc471426bd4062ea3f052d"
+  },
+  "receipts": {
+    "bytes": 181054,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0823/allocation/receipts.json",
+    "sha256": "24473a1fd2d05e6cb9344243ca608f6ab5ba9c617cb31d14ec6bae6e4132fafd"
+  },
+  "reports": 76,
+  "samples": 228,
+  "schema": "litchi.performance.0823.allocation.complete.v1",
+  "status": "pass"
+}

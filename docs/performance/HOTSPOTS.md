@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0823 — removing Scene event transport is insufficient
+
+[0823](0823-pptx-scene-reader-workflow.md) The exact Scene symbol loses its direct NsReader::process_event call but grows 10,276→11,485 bytes. Real edit improves 2.394%; all eligible synthetic gains remain below 3%. Reject this spelling and investigate repeated Scene construction/compaction under existing preservation and bounded-cache contracts.
+
 ## 0822 — snapshot materialization and XML work visible in real-file edit
 
 [0822](0822-real-file-pptx-edit-profile.md) Exact edit-owner profiles retain 2,971/2,996 samples. Attribute iteration (184/200 self leaves), inflate_fast (172/169), and SHA-256 compression (166/173) lead. Observed inflate/hash paths pass through snapshot package fingerprinting; shape parsing also appears in commit compaction. Review required versus avoidable materialization and repeated reads before selecting a source candidate; inclusive stacks do not establish phase fractions.

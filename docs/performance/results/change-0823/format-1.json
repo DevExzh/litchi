@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--config-path",
+        "rustfmt.toml",
+        "docs/performance/results/change-0823/candidate/after/reader.rs"
+      ],
+      "started": 1790611243.0402699,
+      "ended": 1790611243.070354,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0823/format-candidate-1.log"
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "docs/performance/results/change-0823/synthetic-probe-src/Cargo.toml"
+      ],
+      "started": 1790611243.0703557,
+      "ended": 1790611243.1239014,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0823/format-synthetic-probe-1.log"
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "docs/performance/results/change-0823/real-probe-src/Cargo.toml"
+      ],
+      "started": 1790611243.1239035,
+      "ended": 1790611243.169425,
+      "exit_code": 0,
+      "log": "docs/performance/results/change-0823/format-real-probe-1.log"
+    }
+  ],
+  "candidate_after_sha256": "a08a48f25c9e2e5f367bd67c579614f1c0c1311784ec81dd30d201b69c3db7f2",
+  "candidate_patch_sha256": "e4a97bd62ec14043922ba0babeb08bcf00a0e6ce110205d4ff67d7d14cd347c3"
+}
