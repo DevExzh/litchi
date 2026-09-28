@@ -1,0 +1,223 @@
+{
+  "advance_to_workflow_trials": false,
+  "all_consume_regressions": [
+    {
+      "bootstrap_ci_high": 1.1446021567772868,
+      "bootstrap_ci_low": 1.0871538725877128,
+      "case": "distinct-16",
+      "change_percent_median": 11.722484660765954,
+      "mode": "consume",
+      "ratio_median": 1.1172248466076595
+    },
+    {
+      "bootstrap_ci_high": 1.1235492018191402,
+      "bootstrap_ci_low": 1.0961431630595757,
+      "case": "distinct-17",
+      "change_percent_median": 11.229282050619904,
+      "mode": "consume",
+      "ratio_median": 1.112292820506199
+    },
+    {
+      "bootstrap_ci_high": 1.584618501374346,
+      "bootstrap_ci_low": 1.5352447339803699,
+      "case": "distinct-3",
+      "change_percent_median": 55.27611514914117,
+      "mode": "consume",
+      "ratio_median": 1.5527611514914117
+    },
+    {
+      "bootstrap_ci_high": 1.0710602821429132,
+      "bootstrap_ci_low": 1.0557439824668178,
+      "case": "distinct-32",
+      "change_percent_median": 6.0277803605981894,
+      "mode": "consume",
+      "ratio_median": 1.060277803605982
+    },
+    {
+      "bootstrap_ci_high": 1.487190520103306,
+      "bootstrap_ci_low": 1.4116200246165471,
+      "case": "distinct-4",
+      "change_percent_median": 43.18721461399746,
+      "mode": "consume",
+      "ratio_median": 1.4318721461399746
+    },
+    {
+      "bootstrap_ci_high": 1.2588339530623642,
+      "bootstrap_ci_low": 1.2278023047415965,
+      "case": "distinct-5",
+      "change_percent_median": 24.671351710658463,
+      "mode": "consume",
+      "ratio_median": 1.2467135171065846
+    },
+    {
+      "bootstrap_ci_high": 1.221392576339331,
+      "bootstrap_ci_low": 1.1568775190763128,
+      "case": "distinct-8",
+      "change_percent_median": 19.86611809780552,
+      "mode": "consume",
+      "ratio_median": 1.1986611809780552
+    },
+    {
+      "bootstrap_ci_high": 1.1663795792108833,
+      "bootstrap_ci_low": 1.1269570295184277,
+      "case": "distinct-9",
+      "change_percent_median": 15.262781099230827,
+      "mode": "consume",
+      "ratio_median": 1.1526278109923083
+    },
+    {
+      "bootstrap_ci_high": 1.5187788574112524,
+      "bootstrap_ci_low": 1.4886624029125946,
+      "case": "duplicate-long-quoted-after-2",
+      "change_percent_median": 50.89762597080001,
+      "mode": "consume",
+      "ratio_median": 1.508976259708
+    },
+    {
+      "bootstrap_ci_high": 1.5890689427203426,
+      "bootstrap_ci_low": 1.50363841972448,
+      "case": "duplicate-long-unterminated-after-2",
+      "change_percent_median": 53.58645382855789,
+      "mode": "consume",
+      "ratio_median": 1.535864538285579
+    },
+    {
+      "bootstrap_ci_high": 1.5662358492440105,
+      "bootstrap_ci_low": 1.4948758287116788,
+      "case": "duplicate-valid-after-2",
+      "change_percent_median": 51.87358508932254,
+      "mode": "consume",
+      "ratio_median": 1.5187358508932254
+    },
+    {
+      "bootstrap_ci_high": 1.425056560766476,
+      "bootstrap_ci_low": 1.3622618741475045,
+      "case": "duplicate-valid-after-4",
+      "change_percent_median": 39.345278030974164,
+      "mode": "consume",
+      "ratio_median": 1.3934527803097416
+    },
+    {
+      "bootstrap_ci_high": 1.2722892330775268,
+      "bootstrap_ci_low": 1.2241056884930326,
+      "case": "duplicate-valid-after-5",
+      "change_percent_median": 24.951417600238113,
+      "mode": "consume",
+      "ratio_median": 1.2495141760023811
+    },
+    {
+      "bootstrap_ci_high": 1.5718386251531344,
+      "bootstrap_ci_low": 1.529930739585013,
+      "case": "syntax-equals-value-after-2",
+      "change_percent_median": 55.99098028608043,
+      "mode": "consume",
+      "ratio_median": 1.5599098028608043
+    },
+    {
+      "bootstrap_ci_high": 1.40818486594304,
+      "bootstrap_ci_low": 1.3954582024887237,
+      "case": "syntax-equals-value-after-4",
+      "change_percent_median": 40.504842207667394,
+      "mode": "consume",
+      "ratio_median": 1.405048422076674
+    },
+    {
+      "bootstrap_ci_high": 1.5731066043396176,
+      "bootstrap_ci_low": 1.518724323049964,
+      "case": "syntax-flag-after-2",
+      "change_percent_median": 55.72975848407049,
+      "mode": "consume",
+      "ratio_median": 1.557297584840705
+    },
+    {
+      "bootstrap_ci_high": 1.4193545872194746,
+      "bootstrap_ci_low": 1.383388573238686,
+      "case": "syntax-flag-after-4",
+      "change_percent_median": 38.9484012315954,
+      "mode": "consume",
+      "ratio_median": 1.389484012315954
+    },
+    {
+      "bootstrap_ci_high": 1.5256340881368375,
+      "bootstrap_ci_low": 1.4980715426994458,
+      "case": "syntax-unique-tail-after-2",
+      "change_percent_median": 50.33047687486558,
+      "mode": "consume",
+      "ratio_median": 1.5033047687486558
+    },
+    {
+      "bootstrap_ci_high": 1.3253157099253037,
+      "bootstrap_ci_low": 1.3081466758074967,
+      "case": "syntax-unique-tail-after-4",
+      "change_percent_median": 31.873674186439203,
+      "mode": "consume",
+      "ratio_median": 1.318736741864392
+    }
+  ],
+  "analysis": {
+    "bytes": 8283611,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/analysis.json",
+    "sha256": "e7ac9b24fbbce8f231a5dcb6f630927ede463f40e1bcb8cc6fa6d10b3a6b7db3"
+  },
+  "dominant_class_benefits": {
+    "distinct-1": true,
+    "distinct-2": true
+  },
+  "independent_audit": {
+    "bytes": 16529,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/root-native-audit.json",
+    "sha256": "37112f6574ceb38c84bc6ff07040f2634af065cbdd7590a9fca4613a0abc2209"
+  },
+  "production_adoption": false,
+  "protected_consume_regressions": [
+    {
+      "bootstrap_ci_high": 1.5187788574112524,
+      "bootstrap_ci_low": 1.4886624029125946,
+      "case": "duplicate-long-quoted-after-2",
+      "change_percent_median": 50.89762597080001,
+      "mode": "consume",
+      "ratio_median": 1.508976259708
+    },
+    {
+      "bootstrap_ci_high": 1.5890689427203426,
+      "bootstrap_ci_low": 1.50363841972448,
+      "case": "duplicate-long-unterminated-after-2",
+      "change_percent_median": 53.58645382855789,
+      "mode": "consume",
+      "ratio_median": 1.535864538285579
+    },
+    {
+      "bootstrap_ci_high": 1.5662358492440105,
+      "bootstrap_ci_low": 1.4948758287116788,
+      "case": "duplicate-valid-after-2",
+      "change_percent_median": 51.87358508932254,
+      "mode": "consume",
+      "ratio_median": 1.5187358508932254
+    },
+    {
+      "bootstrap_ci_high": 1.5718386251531344,
+      "bootstrap_ci_low": 1.529930739585013,
+      "case": "syntax-equals-value-after-2",
+      "change_percent_median": 55.99098028608043,
+      "mode": "consume",
+      "ratio_median": 1.5599098028608043
+    },
+    {
+      "bootstrap_ci_high": 1.5731066043396176,
+      "bootstrap_ci_low": 1.518724323049964,
+      "case": "syntax-flag-after-2",
+      "change_percent_median": 55.72975848407049,
+      "mode": "consume",
+      "ratio_median": 1.557297584840705
+    },
+    {
+      "bootstrap_ci_high": 1.5256340881368375,
+      "bootstrap_ci_low": 1.4980715426994458,
+      "case": "syntax-unique-tail-after-2",
+      "change_percent_median": 50.33047687486558,
+      "mode": "consume",
+      "ratio_median": 1.5033047687486558
+    }
+  ],
+  "schema": "litchi.performance.0799.preflight-decision.v1"
+}

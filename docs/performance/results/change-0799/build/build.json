@@ -1,0 +1,148 @@
+{
+  "binary": {
+    "bytes": 3074488,
+    "path": "/home/zhuhe/code/litchi-target-0799/attribute-boundary-probe",
+    "sha256": "7eb101a6f1267aa0b55c7e81c548bba19a248620644fe6225aca337b0035d330"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0799",
+    "RUSTFLAGS": null
+  },
+  "inputs": {
+    "bytes": 2116,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/inputs.json",
+    "sha256": "951783c13ef25f3ae6d96b1f24dbea5ceee09a59f2fa32f6c3047ee87653cab4"
+  },
+  "lock": {
+    "bytes": 2919,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/probe-src/Cargo.lock",
+    "sha256": "9e3bd44e0a1066cb7a4bf1e6cf9be189aa89e9abfb23052a70856b9ae0d09187"
+  },
+  "rows": [
+    {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0799/probe-src/src/main.rs"
+      ],
+      "ended": 1790553163.0410106,
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/0.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "started": 1790553163.0166328
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0799/probe-src/Cargo.toml",
+        "--bin",
+        "attribute-boundary-probe"
+      ],
+      "ended": 1790553165.6365535,
+      "exit_code": 0,
+      "log": {
+        "bytes": 192,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/1.log",
+        "sha256": "aba4aa52315bd6046f8e067fec274a0aca94dfa9237c0bd0187b6fc00f84ef02"
+      },
+      "started": 1790553163.04121
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0799/probe-src/Cargo.toml",
+        "--bin",
+        "attribute-boundary-probe"
+      ],
+      "ended": 1790553165.7633255,
+      "exit_code": 0,
+      "log": {
+        "bytes": 192,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/2.log",
+        "sha256": "eebb5ce6e429b7a08f08b3231ad3f810419e59b2d69e121afce351ec3ffa0d21"
+      },
+      "started": 1790553165.6369574
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0799/probe-src/Cargo.toml",
+        "--bin",
+        "attribute-boundary-probe",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790553165.973374,
+      "exit_code": 0,
+      "log": {
+        "bytes": 192,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/3.log",
+        "sha256": "ef9cac1db5c5b65a72f4eedcd524bab2a27310728555ddbad147897f90aa3c32"
+      },
+      "started": 1790553165.76366
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi-target-0799/attribute-boundary-probe",
+        "--list-cases"
+      ],
+      "ended": 1790553165.9771745,
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/cases.json.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "output": {
+        "bytes": 187630,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/cases.json",
+        "sha256": "27303d82b6259ccb2e3afe8410cbb8edec7ff095a26c4c8250dfa22b724bdc90"
+      },
+      "started": 1790553165.9744122
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi-target-0799/attribute-boundary-probe",
+        "--self-check"
+      ],
+      "ended": 1790553165.9798741,
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/build/self-check.json.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "output": {
+        "bytes": 119305,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0799/self-check.json",
+        "sha256": "63e6bf5bc4fb5b5c677115b9a40d0156ecb17a04a683117fa585aac2a4be9413"
+      },
+      "started": 1790553165.9773822
+    }
+  ]
+}

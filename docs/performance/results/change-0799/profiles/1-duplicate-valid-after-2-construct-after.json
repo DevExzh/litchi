@@ -1,0 +1,218 @@
+{
+  "schema": "litchi.attribute-boundary-probe.v1",
+  "tool": "attribute-boundary-probe-0799",
+  "binary": "attribute-boundary-probe",
+  "leg": "after",
+  "case": "duplicate-valid-after-2",
+  "category": "duplicate-valid",
+  "attribute_count": 3,
+  "mode": "construct",
+  "iterations": 1,
+  "warmup": 0,
+  "samples_requested": 1,
+  "timing_scope": "selected named construction owner call, including its common call dispatch",
+  "source": {
+    "bytes": 26,
+    "encoding": "utf8",
+    "value": "e n0=\"0\" n1=\"1\" n0=\"again\""
+  },
+  "semantic_oracle": {
+    "quick_xml": {
+      "accepted": 2,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 16,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 16765012695773995902,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 16,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "baseline": {
+      "accepted": 2,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 16,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 16765012695773995902,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 16,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "accepted": 2,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 16,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 16765012695773995902,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626980046172116160,
+          "value_bytes": 1,
+          "value_hash": 12638134423997487868
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 16,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "baseline_matches_quick_xml": true,
+    "candidate_matches_quick_xml": true,
+    "clone_checks": [
+      {
+        "advance": 0,
+        "quick_xml_sequence_hash": 16765012695773995902,
+        "baseline_sequence_hash": 16765012695773995902,
+        "candidate_sequence_hash": 16765012695773995902,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 1,
+        "quick_xml_sequence_hash": 17983298085023151875,
+        "baseline_sequence_hash": 17983298085023151875,
+        "candidate_sequence_hash": 17983298085023151875,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 2,
+        "quick_xml_sequence_hash": 709910809743249914,
+        "baseline_sequence_hash": 709910809743249914,
+        "candidate_sequence_hash": 709910809743249914,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 3,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 4,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 5,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 32,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 33,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      }
+    ],
+    "all_checks_passed": true
+  },
+  "iterator_sizes": {
+    "baseline_checked_attributes": 120,
+    "candidate_checked_attributes": 120
+  },
+  "expected_result": {
+    "checksum": 594862322569659678,
+    "accepted": 0,
+    "error_marker": 0
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 701383,
+      "checksum": 594862322569659678,
+      "accepted": 0,
+      "error_marker": 0
+    }
+  ]
+}

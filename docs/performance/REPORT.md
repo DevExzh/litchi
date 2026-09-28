@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0799 — two-attribute preflight rejected despite short-tag gains
+
+[0799](0799-xml-two-attribute-preflight.md) All semantic and measurement audits pass, but six frozen protected-boundary failures stop workflow trials. Both iterators remain 120 bytes. Nineteen consume regression flags and 23 spread flags remain visible; production is unchanged.
+
 ## 0798 — PPTX attribute-consumption census
 
 [0798](0798-pptx-attribute-consumption-census.md) All 45 captures and independent count/semantic audits pass. Both repeats match exactly; no early drops or partial consumption occur in the observed regions. The diagnostic retains production and establishes no timing or resource claim.
