@@ -1,0 +1,115 @@
+{
+  "events": [
+    {
+      "command_sha256": "8ea8448d655a9d8bb083c4e39e75e73c81cff70050369e94b2e816e24366ce67",
+      "name": "qualification-after-native-real-edit",
+      "report_sha256": "1fce22a4770ebc8aab008d2f5b6e5df56f034e591dd862fe3a6f1eb559392d7f",
+      "reused": false
+    },
+    {
+      "command_sha256": "9df26b5757612fdfbc47b9b2937050c0d0d7273085201f1c2f7893fa5494d64a",
+      "name": "qualification-after-native-real-lifecycle",
+      "report_sha256": "90a9bc490e11c24979113bd6f3bb8ec7f2060a2fef4e2e7ae74b84003ef3d1e5",
+      "reused": false
+    },
+    {
+      "command_sha256": "0121f6ad93dfe2884ee237e87259b5bb61e95615358b43875485de0eb5cd5b8e",
+      "name": "qualification-after-native-one-cell-tiny",
+      "report_sha256": "fdac983692305353168d2554150f41723cc63eff02f66737c75fbf6d40412a28",
+      "reused": false
+    },
+    {
+      "command_sha256": "b4a8ed2b00da6543dc59c794acd303751a3b1827e8d31a50f93ef2d882a7527d",
+      "name": "qualification-after-native-one-cell-medium",
+      "report_sha256": "15ecc5397fed2c2377e608d2a37a69d23a8d8863472bcc5795e4b4950506e232",
+      "reused": false
+    },
+    {
+      "command_sha256": "326808cf0ade797f2ef880921d094a2780efb4db68a9bee58185ec87467b5458",
+      "name": "qualification-after-native-one-cell-dense-wide",
+      "report_sha256": "0f182276d3b290695b9306bfd98716bb19acdcfdfd4ee74ea2cdd5c90a397b0a",
+      "reused": false
+    },
+    {
+      "command_sha256": "4b6455dbe91bc0e7240a285cdb2addf3bb69c073ec4547565df5e434b0e648f6",
+      "name": "qualification-after-native-one-percent-tiny",
+      "report_sha256": "c8d2125ec3bb5c4e1ab48bc063f1ffbe5ae8e8552f394a6c4e3e243349a527f7",
+      "reused": false
+    },
+    {
+      "command_sha256": "affd9fe325d5ea6e2a41d9db9367ad72a4f38f6c92160add11b6feb77d71a27f",
+      "name": "qualification-after-native-one-percent-medium",
+      "report_sha256": "3590c00245b57fa19956c27f1956cc410737db2d679f4a27f9ff17c199bf4a68",
+      "reused": false
+    },
+    {
+      "command_sha256": "877bfa409a8774c211f57e6492da2ad1af24e49bd82391829173b8e85e8a246e",
+      "name": "qualification-after-native-one-percent-dense-wide",
+      "report_sha256": "8fc56206d738c88eb242784711e07f3a215ef3ef4746f5f4a0ec5c49d8fca2dd",
+      "reused": false
+    },
+    {
+      "command_sha256": "c30e6f13f39c7dba7fdbda7374b94e82f2627e6d57387620c2c0f7b188fc6485",
+      "name": "qualification-after-native-noop-medium",
+      "report_sha256": "0308644fd246df9a116ee4ccf2e6f5f2966a8d4986f75a1386b11c78f23fad71",
+      "reused": false
+    },
+    {
+      "command_sha256": "60b0abf9508fdc129d09c0371b2808302206632a3f391e251c5e42d039ed69a6",
+      "name": "qualification-after-observer-real-edit",
+      "report_sha256": "01e62acac04b1d2c888eccecc71d86a69bbbb39b2ca58bfed7567cc0dea82d7e",
+      "reused": false
+    },
+    {
+      "command_sha256": "1953d7f7e9ff0bf9165942d626a6c63d81749d22b29a52a5f3f5be4941074f45",
+      "name": "qualification-after-observer-real-lifecycle",
+      "report_sha256": "8eb791878c3179e1ada0b8179d59b507b9858faf0a55f94e49f2578d862a4c0a",
+      "reused": false
+    },
+    {
+      "command_sha256": "f36d89d2b6a7ee97fa0e1a4226ed95e4a93d27e7379fafe74b55f7dd8e5e2153",
+      "name": "qualification-after-observer-one-cell-tiny",
+      "report_sha256": "645971febf34bd81b4608496c4e3b2441018aa8c02ddb395bd79964abb21a0b0",
+      "reused": false
+    },
+    {
+      "command_sha256": "1219993c268ac8ff8ad890ba4392ac69e8c16d67194be5abed5410105d494a5c",
+      "name": "qualification-after-observer-one-cell-medium",
+      "report_sha256": "73393ab2eff39f963d52e0918ba8c789c9ab001913099811583459b4bb390962",
+      "reused": false
+    },
+    {
+      "command_sha256": "da9047007e98121a0eee93ae0976597a7dd8ef71bbce1b21dfd6deddc59b100d",
+      "name": "qualification-after-observer-one-cell-dense-wide",
+      "report_sha256": "355be6aa2b96d8b7dfd0af69b5ee61e6ebd39003445f754721cac4e741d40494",
+      "reused": false
+    },
+    {
+      "command_sha256": "1cd3a2b8c0a97fdafb6998f336525396886615a2f3e3135c8f5b4fb222d640b0",
+      "name": "qualification-after-observer-one-percent-tiny",
+      "report_sha256": "e03012e63064e149ea1d465cd0412f570c08628ef147a6a7fb6e9e2544d276f7",
+      "reused": false
+    },
+    {
+      "command_sha256": "e2010a4b7e49f729d1ecc2ee6049946a54981c47ee8d6520dce1a0750b7cf23b",
+      "name": "qualification-after-observer-one-percent-medium",
+      "report_sha256": "adb3aaf56911e14b2a3a3160a5e1b84335c43a3b710c716e70dbd4bb9775de05",
+      "reused": false
+    },
+    {
+      "command_sha256": "c67085bc73d0e1bb7018ed850142b1580d35156f833e9094bd0016ad2eb128a0",
+      "name": "qualification-after-observer-one-percent-dense-wide",
+      "report_sha256": "28039ed9933b96c90dd0bf03f84dce8796e5d22fef740556a8ca9abc5ab54779",
+      "reused": false
+    },
+    {
+      "command_sha256": "0be4c84005fe2f5fd049aff8f3e5caae7c33a86b50fc5efc66acd6319e1a672a",
+      "name": "qualification-after-observer-noop-medium",
+      "report_sha256": "245ec659a8bca20e69b9414efb913d9f5521433e5c3ba71af464fc9e18a9add3",
+      "reused": false
+    }
+  ],
+  "recovery_freeze_sha256": "ce13f510bc29fb3804cbaf81e96f82426026d3bccd343bb92ce5b29c728aad43",
+  "stage": "after",
+  "status": "pass"
+}

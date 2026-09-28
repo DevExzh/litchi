@@ -1,0 +1,27 @@
+revalidated qualification-before-native-real-edit
+revalidated qualification-before-native-real-lifecycle
+revalidated qualification-before-native-one-cell-tiny
+revalidated qualification-before-native-one-cell-medium
+revalidated qualification-before-native-one-cell-dense-wide
+revalidated qualification-before-native-one-percent-tiny
+revalidated qualification-before-native-one-percent-medium
+revalidated qualification-before-native-one-percent-dense-wide
+revalidated qualification-before-native-noop-medium
+revalidated qualification-before-observer-real-edit
+qualification-before-observer-real-lifecycle 0
+admitted qualification-before-observer-real-lifecycle
+qualification-before-observer-one-cell-tiny 0
+admitted qualification-before-observer-one-cell-tiny
+qualification-before-observer-one-cell-medium 0
+admitted qualification-before-observer-one-cell-medium
+qualification-before-observer-one-cell-dense-wide 0
+admitted qualification-before-observer-one-cell-dense-wide
+qualification-before-observer-one-percent-tiny 0
+admitted qualification-before-observer-one-percent-tiny
+qualification-before-observer-one-percent-medium 0
+admitted qualification-before-observer-one-percent-medium
+qualification-before-observer-one-percent-dense-wide 0
+admitted qualification-before-observer-one-percent-dense-wide
+qualification-before-observer-noop-medium 0
+admitted qualification-before-observer-noop-medium
+recovery before PASS

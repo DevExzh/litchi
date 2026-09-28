@@ -1,0 +1,36 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/analyze.py", line 378, in validate_metrics
+    validate_allocation(allocation if "allocation" in allocation else {"allocation": allocation},
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        samples=count, measured=(logical == "observer"))
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_allocation_schema.py", line 62, in validate_allocation
+    require(set(allocation) == {"status", "scope", *ALLOCATION_FIELDS},
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "allocation: missing or unknown fields")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_allocation_schema.py", line 36, in require
+    raise AllocationSchemaError(message)
+tools.perf_allocation_schema.AllocationSchemaError: allocation: missing or unknown fields
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/qualification_preflight.py", line 24, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/qualification_preflight.py", line 15, in main
+    rows.append(a.load_report(path, case, logical, 1, 0, builds["binaries"][logical],
+                ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        f"qualification/before/{logical}/{case['id']}"))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/analyze.py", line 564, in load_report
+    row = validate_report(path, expected, logical, count, warmup, binary, label)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/analyze.py", line 540, in validate_report
+    metrics = validate_metrics(result, count, logical, label)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/analyze.py", line 381, in validate_metrics
+    fail(f"{label} allocation schema rejected: {error}")
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/analyze.py", line 92, in fail
+    raise ReplayError(message)
+analyze.ReplayError: qualification/before/native/real-edit allocation schema rejected: allocation: missing or unknown fields

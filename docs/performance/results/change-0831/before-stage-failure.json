@@ -1,0 +1,8 @@
+{
+  "status": "failed",
+  "exit_code": 1,
+  "supervisor_session": 30941,
+  "log": "before-console.log",
+  "log_sha256": "9c43a759ec0d5b62715766f51e6e15e56821c75255dc0869297970f16ded2918",
+  "reason": "Original observer identity assertion rejected the procfs-decorated identity after child exit 0. No production source change yet."
+}

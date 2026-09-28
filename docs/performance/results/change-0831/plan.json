@@ -1,0 +1,130 @@
+{
+  "adoption": {
+    "primary": "at least 15% reduction in real-edit requested allocated bytes with identical output",
+    "regression_flags": "paired native p50 lower CI above 1.05; paired RSS above 1.05; any allocation/region-peak increase",
+    "review": "Review every flag; no pooling observer latency or hiding individual cases. Synthetic 30-sample cases are diagnostic guards."
+  },
+  "base": "3bcaee6f418a78ee62bab76aed0d6d9f1f93d024",
+  "cases": [
+    {
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "id": "real-edit",
+      "native_samples": 500,
+      "shape": null
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "id": "real-lifecycle",
+      "native_samples": 500,
+      "shape": null
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-tiny",
+      "native_samples": 30,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-medium",
+      "native_samples": 30,
+      "shape": "medium"
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-dense-wide",
+      "native_samples": 30,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-tiny",
+      "native_samples": 30,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-medium",
+      "native_samples": 30,
+      "shape": "medium"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-dense-wide",
+      "native_samples": 30,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_noop_commit_save",
+      "id": "noop-medium",
+      "native_samples": 500,
+      "shape": "medium"
+    }
+  ],
+  "cpu": 12,
+  "expected_reports": 180,
+  "expected_samples": 20304,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 3,
+    "warmup": 0
+  },
+  "qualification": {
+    "reports": 36,
+    "samples": 1,
+    "warmup": 0
+  },
+  "quality": "Fresh XLSX fmt/check/all-feature tests/clippy/doc/boundaries, pinned 0830 oracle tests and harness library tests on both source legs. Root and standalone harness locks differ but each is fixed across legs.",
+  "schema": "litchi.performance.0831.plan.v1",
+  "source": "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+  "statistics": {
+    "across_process": "midpoint median",
+    "bootstrap_resamples": 10000,
+    "endpoints": [
+      250,
+      9749
+    ],
+    "seed": 831831,
+    "within_process": "nearest-rank"
+  }
+}

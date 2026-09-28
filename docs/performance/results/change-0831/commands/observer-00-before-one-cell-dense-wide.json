@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0831/observer/00-before-one-cell-dense-wide.rss",
+    "/home/zhuhe/code/litchi-target-0831/before-observer",
+    "--case",
+    "xlsx_one_cell_commit_save",
+    "--warmup",
+    "0",
+    "--samples",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0831/observer/00-before-one-cell-dense-wide.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0831",
+    "--xlsx-shape",
+    "dense-wide"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0831/release",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790635347.3635535,
+  "input_inventory_sha256": "a36cf8f3b1f8fafd83cc6ed80ceceb4aca37810bb82d115a89f22860e7a66459",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_leg": "after",
+  "source_sha256": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5",
+  "started_unix": 1790635345.6492522
+}

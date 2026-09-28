@@ -1,0 +1,37 @@
+"""Version and retain each root-owned offline reader invocation."""
+import shutil
+import subprocess
+import sys
+import time
+
+import driver as d
+
+
+def main():
+    script = sys.argv[1]
+    extra = sys.argv[2:]
+    assert script in ("analyze.py", "audit.py", "preflight.py", "qualify.py", "qualification_preflight.py")
+    assert not extra or (script == "analyze.py" and extra == ["--check"])
+    root = d.P / "reader-attempts"
+    root.mkdir(exist_ok=True)
+    index = len(list(root.iterdir()))
+    folder = root / f"{index:02}-{script.removesuffix('.py')}"
+    folder.mkdir()
+    sources = {p.name: d.sha(p) for p in d.P.glob("*.py")}
+    for name in sources:
+        shutil.copyfile(d.P / name, folder / (name + ".source"))
+    d.write(folder / "sources.json", sources)
+    row = {"argv": ["python3", "-B", str(d.P / script), *extra],
+           "cwd": str(d.ROOT), "started_unix": time.time()}
+    d.write(folder / "started.json", row)
+    with (folder / "output.log").open("xb") as log:
+        completed = subprocess.run(row["argv"], cwd=d.ROOT, stdout=log, stderr=subprocess.STDOUT)
+    row.update(exit_code=completed.returncode, finished_unix=time.time(), output_sha256=d.sha(folder / "output.log"))
+    d.write(folder / "receipt.json", row)
+    assert all(d.sha(d.P / n) == h for n, h in sources.items())
+    print(folder.name, completed.returncode)
+    assert completed.returncode == 0
+
+
+if __name__ == "__main__":
+    main()

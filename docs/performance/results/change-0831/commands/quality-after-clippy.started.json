@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0831/quality",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings",
+    "TZ": "UTC"
+  },
+  "input_inventory_sha256": "a36cf8f3b1f8fafd83cc6ed80ceceb4aca37810bb82d115a89f22860e7a66459",
+  "source_leg": "after",
+  "source_sha256": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5",
+  "started_unix": 1790633132.368045
+}

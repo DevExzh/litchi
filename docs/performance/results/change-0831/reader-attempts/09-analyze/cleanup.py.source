@@ -1,0 +1,39 @@
+"""Remove only the isolated 0831 target and marked filesystem scratch."""
+import shutil
+import driver as d
+
+
+def main():
+    d.check("after")
+    assert d.read(d.P / "capture.json")["status"] == "pass"
+    assert d.read(d.P / "analysis.json")["status"] == "pass"
+    assert d.read(d.P / "decision.json")["adopt"] is True
+    attempts = list((d.P / "reader-attempts").iterdir())
+    for reader in ("analyze", "audit"):
+        matches = sorted(p for p in attempts if p.name.endswith("-" + reader))
+        assert matches and d.read(matches[-1] / "receipt.json")["exit_code"] == 0
+    assert d.TARGET == d.ROOT.parent / "litchi-target-0831"
+    assert d.SCRATCH == d.ROOT.parent / "litchi-fs-0831"
+    assert d.TARGET.is_dir() and not d.TARGET.is_symlink()
+    assert d.SCRATCH.is_dir() and not d.SCRATCH.is_symlink()
+    assert (d.SCRATCH / ".owner").read_text() == "litchi-performance-0831-owned-scratch\n"
+    assert not (d.P / "cleanup.json").exists()
+    binaries = {leg: d.read(d.P / ("build-" + leg + ".json"))["binaries"] for leg in ("before", "after")}
+    for logical in binaries.values():
+        for row in logical.values():
+            assert not d.Path(row["path"]).is_symlink()
+            assert d.sha(row["path"]) == row["sha256"]
+            assert d.Path(row["path"]).stat().st_size == row["bytes"]
+    removed = []
+    for directory in (d.TARGET, d.SCRATCH):
+        files = [p for p in directory.rglob("*") if p.is_file()]
+        removed.append({"path": str(directory), "files": len(files), "bytes": sum(p.stat().st_size for p in files)})
+        shutil.rmtree(directory)
+        assert not directory.exists()
+    d.check("after")
+    d.write(d.P / "cleanup.json", {"status": "pass", "removed": removed, "binaries": binaries})
+    print("0831 cleanup PASS", removed)
+
+
+if __name__ == "__main__":
+    main()

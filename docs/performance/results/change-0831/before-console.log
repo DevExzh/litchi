@@ -1,0 +1,34 @@
+quality-before-fmt 0
+quality-before-check 0
+quality-before-test 0
+quality-before-clippy 0
+quality-before-doc 0
+quality-before-boundaries 0
+quality-before-oracle 0
+quality-before-harness-test 0
+build-before-native 0
+build-before-observer 0
+qualification-before-native-real-edit 0
+qualification-before-native-real-lifecycle 0
+qualification-before-native-one-cell-tiny 0
+qualification-before-native-one-cell-medium 0
+qualification-before-native-one-cell-dense-wide 0
+qualification-before-native-one-percent-tiny 0
+qualification-before-native-one-percent-medium 0
+qualification-before-native-one-percent-dense-wide 0
+qualification-before-native-noop-medium 0
+qualification-before-observer-real-edit 0
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/driver.py", line 288, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/driver.py", line 276, in main
+    qualification(stage)
+    ~~~~~~~~~~~~~^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/driver.py", line 251, in qualification
+    run_case("qualification", 0, leg, logical, case, 1, 0, leg)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0831/driver.py", line 244, in run_case
+    assert report["tool"]["instrumentation"] == ("none" if logical == "native" else "system_allocator_operation_scoped")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

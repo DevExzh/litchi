@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0831 — unused XLSX column-action map removed
+
+[0831](0831-xlsx-empty-column-actions.md) Covers one real XLSX public edit and default-save lifecycle, one-cell and one-percent commit/save at tiny/medium/dense-wide scales, and a medium no-op control. Fresh full XLSX quality and pinned byte-oracle checks pass on both legs. The empty-column-action guard is adopted; nonempty column-action latency and broader producer/cold/range coverage remain unmeasured.
+
 ## 0830 — XLSX edit allocation maps localized
 
 [0830](0830-xlsx-edit-allocation-profile.md) The real LibreOffice XLSX one-cell public edit gains exact-owner allocation call-stack attribution. All 23 reports / 559 samples verify the complete pinned output bytes and public stored-cell readback. Opening, saving and verification stay outside the edit timer. This adds diagnostic evidence, not new format capability or broad-corpus coverage.
