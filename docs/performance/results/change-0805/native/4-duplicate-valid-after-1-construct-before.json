@@ -1,0 +1,400 @@
+{
+  "schema": "litchi.attribute-boundary-probe.v1",
+  "tool": "attribute-boundary-probe-0805",
+  "binary": "attribute-boundary-probe",
+  "leg": "before",
+  "case": "duplicate-valid-after-1",
+  "category": "duplicate-valid",
+  "attribute_count": 2,
+  "mode": "construct",
+  "iterations": 4096,
+  "warmup": 3,
+  "samples_requested": 30,
+  "timing_scope": "selected named construction owner call, including its common call dispatch",
+  "source": {
+    "bytes": 19,
+    "encoding": "utf8",
+    "value": "e n0=\"0\" n0=\"again\""
+  },
+  "semantic_oracle": {
+    "quick_xml": {
+      "accepted": 1,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 9,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 3549832135971189779,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 9,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "baseline": {
+      "accepted": 1,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 9,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 3549832135971189779,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 9,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "accepted": 1,
+      "first_error": {
+        "kind": "Duplicated",
+        "position": 9,
+        "first_position": 2
+      },
+      "repeated_none_calls": 2,
+      "sequence_hash": 3549832135971189779,
+      "items": [
+        {
+          "kind": "Attribute",
+          "key_bytes": 2,
+          "key_hash": 626981145683744371,
+          "value_bytes": 1,
+          "value_hash": 12638135523509116079
+        },
+        {
+          "kind": "Error",
+          "error": {
+            "kind": "Duplicated",
+            "position": 9,
+            "first_position": 2
+          }
+        }
+      ]
+    },
+    "baseline_matches_quick_xml": true,
+    "candidate_matches_quick_xml": true,
+    "clone_checks": [
+      {
+        "advance": 0,
+        "quick_xml_sequence_hash": 3549832135971189779,
+        "baseline_sequence_hash": 3549832135971189779,
+        "candidate_sequence_hash": 3549832135971189779,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 1,
+        "quick_xml_sequence_hash": 5980432224309594660,
+        "baseline_sequence_hash": 5980432224309594660,
+        "candidate_sequence_hash": 5980432224309594660,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 2,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 3,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 4,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 5,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 32,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      },
+      {
+        "advance": 33,
+        "quick_xml_sequence_hash": 14695981039346656037,
+        "baseline_sequence_hash": 14695981039346656037,
+        "candidate_sequence_hash": 14695981039346656037,
+        "baseline_matches_quick_xml": true,
+        "candidate_matches_quick_xml": true,
+        "terminal_behavior_matches": true
+      }
+    ],
+    "all_checks_passed": true
+  },
+  "iterator_sizes": {
+    "baseline_checked_attributes": 120,
+    "candidate_checked_attributes": 128
+  },
+  "expected_result": {
+    "checksum": 186714255643209993,
+    "accepted": 0,
+    "error_marker": 0
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 6041,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 1,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 2,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 3,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 4,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 5,
+      "elapsed_ns": 5950,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 6,
+      "elapsed_ns": 5950,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 7,
+      "elapsed_ns": 5950,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 8,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 9,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 10,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 11,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 12,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 13,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 14,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 15,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 16,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 17,
+      "elapsed_ns": 5950,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 18,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 19,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 20,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 21,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 22,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 23,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 24,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 25,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 26,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 27,
+      "elapsed_ns": 5940,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 28,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    },
+    {
+      "index": 29,
+      "elapsed_ns": 5930,
+      "checksum": 186714255643209993,
+      "accepted": 0,
+      "error_marker": 0
+    }
+  ]
+}

@@ -1,0 +1,7493 @@
+{
+  "rows": [
+    {
+      "call_rows": 0,
+      "file": "0-distinct-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 10,
+      "file": "0-distinct-0-consume-after.callgrind.1",
+      "self_rows": 33,
+      "totals": {
+        "Bc": 9,
+        "Bcm": 4,
+        "Bi": 1,
+        "Bim": 0,
+        "Ir": 122
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "0-distinct-0-consume-before.callgrind.1",
+      "self_rows": 45,
+      "totals": {
+        "Bc": 14,
+        "Bcm": 6,
+        "Bi": 2,
+        "Bim": 0,
+        "Ir": 170
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 14,
+      "file": "0-distinct-1-consume-after.callgrind.1",
+      "self_rows": 123,
+      "totals": {
+        "Bc": 47,
+        "Bcm": 9,
+        "Bi": 4,
+        "Bim": 0,
+        "Ir": 407
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "0-distinct-1-consume-before.callgrind.1",
+      "self_rows": 180,
+      "totals": {
+        "Bc": 69,
+        "Bcm": 10,
+        "Bi": 8,
+        "Bim": 1,
+        "Ir": 574
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-16-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-16-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-16-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-16-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-16-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-16-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 1598,
+        "Bcm": 64,
+        "Bi": 127,
+        "Bim": 4,
+        "Ir": 10010
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-16-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 28,
+      "file": "0-distinct-16-consume-before.callgrind.1",
+      "self_rows": 457,
+      "totals": {
+        "Bc": 1700,
+        "Bcm": 85,
+        "Bi": 119,
+        "Bim": 1,
+        "Ir": 9428
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-17-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-17-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-17-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-17-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-17-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-17-consume-after.callgrind.1",
+      "self_rows": 555,
+      "totals": {
+        "Bc": 1735,
+        "Bcm": 68,
+        "Bi": 137,
+        "Bim": 4,
+        "Ir": 10764
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-17-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 27,
+      "file": "0-distinct-17-consume-before.callgrind.1",
+      "self_rows": 534,
+      "totals": {
+        "Bc": 1933,
+        "Bcm": 106,
+        "Bi": 131,
+        "Bim": 1,
+        "Ir": 10672
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "0-distinct-2-consume-after.callgrind.1",
+      "self_rows": 229,
+      "totals": {
+        "Bc": 123,
+        "Bcm": 12,
+        "Bi": 9,
+        "Bim": 2,
+        "Ir": 870
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-distinct-2-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 119,
+        "Bcm": 17,
+        "Bi": 12,
+        "Bim": 1,
+        "Ir": 910
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-3-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-3-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-3-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-3-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-3-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 20,
+      "file": "0-distinct-3-consume-after.callgrind.1",
+      "self_rows": 359,
+      "totals": {
+        "Bc": 220,
+        "Bcm": 19,
+        "Bi": 15,
+        "Bim": 3,
+        "Ir": 1485
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-3-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-distinct-3-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 178,
+        "Bcm": 23,
+        "Bi": 17,
+        "Bim": 1,
+        "Ir": 1286
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-32-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-32-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-32-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-32-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-32-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-32-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 4502,
+        "Bcm": 109,
+        "Bi": 407,
+        "Bim": 4,
+        "Ir": 26130
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-32-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "0-distinct-32-consume-before.callgrind.1",
+      "self_rows": 524,
+      "totals": {
+        "Bc": 5130,
+        "Bcm": 148,
+        "Bi": 386,
+        "Bim": 1,
+        "Ir": 25562
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-33-consume-after.callgrind.1",
+      "self_rows": 560,
+      "totals": {
+        "Bc": 4771,
+        "Bcm": 123,
+        "Bi": 432,
+        "Bim": 4,
+        "Ir": 27487
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 55,
+      "file": "0-distinct-33-consume-before.callgrind.1",
+      "self_rows": 904,
+      "totals": {
+        "Bc": 8557,
+        "Bcm": 341,
+        "Bi": 773,
+        "Bim": 1,
+        "Ir": 50231
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-4-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 350,
+        "Bcm": 27,
+        "Bi": 25,
+        "Bim": 4,
+        "Ir": 2372
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-distinct-4-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 246,
+        "Bcm": 28,
+        "Bi": 23,
+        "Bim": 1,
+        "Ir": 1702
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-5-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-5-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-5-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-5-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-5-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-5-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 436,
+        "Bcm": 26,
+        "Bi": 33,
+        "Bim": 4,
+        "Ir": 2952
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-5-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 26,
+      "file": "0-distinct-5-consume-before.callgrind.1",
+      "self_rows": 423,
+      "totals": {
+        "Bc": 413,
+        "Bcm": 41,
+        "Bi": 33,
+        "Bim": 1,
+        "Ir": 2706
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-64-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-64-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-64-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-64-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-64-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 50,
+      "file": "0-distinct-64-consume-after.callgrind.1",
+      "self_rows": 909,
+      "totals": {
+        "Bc": 13245,
+        "Bcm": 507,
+        "Bi": 1531,
+        "Bim": 6,
+        "Ir": 90145
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-64-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 57,
+      "file": "0-distinct-64-consume-before.callgrind.1",
+      "self_rows": 904,
+      "totals": {
+        "Bc": 12425,
+        "Bcm": 478,
+        "Bi": 1243,
+        "Bim": 1,
+        "Ir": 80754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-8-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-8-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-8-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-8-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-8-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-8-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 736,
+        "Bcm": 34,
+        "Bi": 63,
+        "Bim": 4,
+        "Ir": 4914
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-8-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "0-distinct-8-consume-before.callgrind.1",
+      "self_rows": 411,
+      "totals": {
+        "Bc": 703,
+        "Bcm": 44,
+        "Bi": 60,
+        "Bim": 1,
+        "Ir": 4368
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-9-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-9-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-9-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-distinct-9-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-9-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-distinct-9-consume-after.callgrind.1",
+      "self_rows": 538,
+      "totals": {
+        "Bc": 850,
+        "Bcm": 35,
+        "Bi": 75,
+        "Bim": 4,
+        "Ir": 5642
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-distinct-9-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "0-distinct-9-consume-before.callgrind.1",
+      "self_rows": 434,
+      "totals": {
+        "Bc": 843,
+        "Bcm": 49,
+        "Bi": 73,
+        "Bim": 1,
+        "Ir": 5187
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "0-duplicate-long-quoted-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-long-quoted-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-duplicate-long-quoted-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 18,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-long-quoted-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 15,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-quoted-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-duplicate-long-quoted-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 243,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-quoted-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 53,
+      "file": "0-duplicate-long-quoted-after-33-consume-before.callgrind.1",
+      "self_rows": 714,
+      "totals": {
+        "Bc": 16564,
+        "Bcm": 271,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 74154
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "0-duplicate-long-unterminated-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-long-unterminated-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-duplicate-long-unterminated-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 17,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-long-unterminated-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 15,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-long-unterminated-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-duplicate-long-unterminated-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 243,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-long-unterminated-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "0-duplicate-long-unterminated-after-33-consume-before.callgrind.1",
+      "self_rows": 941,
+      "totals": {
+        "Bc": 16674,
+        "Bcm": 284,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 74686
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-unquoted-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-unquoted-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "0-duplicate-unquoted-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-unquoted-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-unquoted-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-unquoted-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-duplicate-unquoted-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 242,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-unquoted-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "0-duplicate-unquoted-after-33-consume-before.callgrind.1",
+      "self_rows": 943,
+      "totals": {
+        "Bc": 8480,
+        "Bcm": 282,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 50103
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "0-duplicate-valid-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-valid-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-duplicate-valid-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 16,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-valid-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 13,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-32-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-32-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-32-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-32-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-32-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-duplicate-valid-after-32-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 4525,
+        "Bcm": 111,
+        "Bi": 409,
+        "Bim": 5,
+        "Ir": 26271
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-32-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 52,
+      "file": "0-duplicate-valid-after-32-consume-before.callgrind.1",
+      "self_rows": 753,
+      "totals": {
+        "Bc": 8321,
+        "Bcm": 277,
+        "Bi": 766,
+        "Bim": 2,
+        "Ir": 49054
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-duplicate-valid-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 241,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 57,
+      "file": "0-duplicate-valid-after-33-consume-before.callgrind.1",
+      "self_rows": 902,
+      "totals": {
+        "Bc": 8516,
+        "Bcm": 314,
+        "Bi": 777,
+        "Bim": 2,
+        "Ir": 50305
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-duplicate-valid-after-4-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 373,
+        "Bcm": 26,
+        "Bi": 27,
+        "Bim": 5,
+        "Ir": 2513
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-duplicate-valid-after-4-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 272,
+        "Bcm": 22,
+        "Bi": 25,
+        "Bim": 2,
+        "Ir": 1882
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-5-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-5-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-5-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-duplicate-valid-after-5-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-5-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-duplicate-valid-after-5-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 459,
+        "Bcm": 27,
+        "Bi": 35,
+        "Bim": 5,
+        "Ir": 3093
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-duplicate-valid-after-5-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 26,
+      "file": "0-duplicate-valid-after-5-consume-before.callgrind.1",
+      "self_rows": 433,
+      "totals": {
+        "Bc": 436,
+        "Bcm": 36,
+        "Bi": 35,
+        "Bim": 2,
+        "Ir": 2873
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 12,
+      "file": "0-syntax-equals-value-after-0-consume-after.callgrind.1",
+      "self_rows": 82,
+      "totals": {
+        "Bc": 33,
+        "Bcm": 7,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 286
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "0-syntax-equals-value-after-0-consume-before.callgrind.1",
+      "self_rows": 70,
+      "totals": {
+        "Bc": 32,
+        "Bcm": 8,
+        "Bi": 3,
+        "Bim": 1,
+        "Ir": 265
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-syntax-equals-value-after-2-consume-after.callgrind.1",
+      "self_rows": 343,
+      "totals": {
+        "Bc": 196,
+        "Bcm": 21,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1270
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-syntax-equals-value-after-2-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 137,
+        "Bcm": 18,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 1006
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-syntax-equals-value-after-33-consume-after.callgrind.1",
+      "self_rows": 879,
+      "totals": {
+        "Bc": 6823,
+        "Bcm": 245,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43115
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 58,
+      "file": "0-syntax-equals-value-after-33-consume-before.callgrind.1",
+      "self_rows": 888,
+      "totals": {
+        "Bc": 8413,
+        "Bcm": 285,
+        "Bi": 772,
+        "Bim": 2,
+        "Ir": 49667
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-equals-value-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-syntax-equals-value-after-4-consume-after.callgrind.1",
+      "self_rows": 556,
+      "totals": {
+        "Bc": 391,
+        "Bcm": 31,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2633
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-equals-value-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-syntax-equals-value-after-4-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 264,
+        "Bcm": 26,
+        "Bi": 24,
+        "Bim": 2,
+        "Ir": 1798
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 12,
+      "file": "0-syntax-flag-after-0-consume-after.callgrind.1",
+      "self_rows": 81,
+      "totals": {
+        "Bc": 27,
+        "Bcm": 6,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 274
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "0-syntax-flag-after-0-consume-before.callgrind.1",
+      "self_rows": 69,
+      "totals": {
+        "Bc": 26,
+        "Bcm": 7,
+        "Bi": 3,
+        "Bim": 1,
+        "Ir": 253
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-syntax-flag-after-2-consume-after.callgrind.1",
+      "self_rows": 343,
+      "totals": {
+        "Bc": 187,
+        "Bcm": 17,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1252
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-syntax-flag-after-2-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 131,
+        "Bcm": 16,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 994
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "0-syntax-flag-after-33-consume-after.callgrind.1",
+      "self_rows": 878,
+      "totals": {
+        "Bc": 6814,
+        "Bcm": 241,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43097
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 56,
+      "file": "0-syntax-flag-after-33-consume-before.callgrind.1",
+      "self_rows": 902,
+      "totals": {
+        "Bc": 8469,
+        "Bcm": 300,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 50032
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-flag-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-syntax-flag-after-4-consume-after.callgrind.1",
+      "self_rows": 556,
+      "totals": {
+        "Bc": 382,
+        "Bcm": 26,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2615
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-flag-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-syntax-flag-after-4-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 258,
+        "Bcm": 22,
+        "Bi": 24,
+        "Bim": 2,
+        "Ir": 1786
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 13,
+      "file": "0-syntax-unique-tail-after-0-consume-after.callgrind.1",
+      "self_rows": 92,
+      "totals": {
+        "Bc": 34,
+        "Bcm": 7,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 317
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "0-syntax-unique-tail-after-0-consume-before.callgrind.1",
+      "self_rows": 149,
+      "totals": {
+        "Bc": 52,
+        "Bcm": 6,
+        "Bi": 6,
+        "Bim": 2,
+        "Ir": 448
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "0-syntax-unique-tail-after-2-consume-after.callgrind.1",
+      "self_rows": 348,
+      "totals": {
+        "Bc": 199,
+        "Bcm": 20,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1322
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "0-syntax-unique-tail-after-2-consume-before.callgrind.1",
+      "self_rows": 217,
+      "totals": {
+        "Bc": 151,
+        "Bcm": 17,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 1104
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 50,
+      "file": "0-syntax-unique-tail-after-33-consume-after.callgrind.1",
+      "self_rows": 955,
+      "totals": {
+        "Bc": 6993,
+        "Bcm": 251,
+        "Bi": 748,
+        "Bim": 7,
+        "Ir": 44370
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "0-syntax-unique-tail-after-33-consume-before.callgrind.1",
+      "self_rows": 943,
+      "totals": {
+        "Bc": 8529,
+        "Bcm": 296,
+        "Bi": 784,
+        "Bim": 2,
+        "Ir": 50525
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "0-syntax-unique-tail-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "0-syntax-unique-tail-after-4-consume-after.callgrind.1",
+      "self_rows": 582,
+      "totals": {
+        "Bc": 427,
+        "Bcm": 33,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2802
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "0-syntax-unique-tail-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 28,
+      "file": "0-syntax-unique-tail-after-4-consume-before.callgrind.1",
+      "self_rows": 402,
+      "totals": {
+        "Bc": 382,
+        "Bcm": 36,
+        "Bi": 27,
+        "Bim": 2,
+        "Ir": 2546
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 10,
+      "file": "1-distinct-0-consume-after.callgrind.1",
+      "self_rows": 33,
+      "totals": {
+        "Bc": 9,
+        "Bcm": 4,
+        "Bi": 1,
+        "Bim": 0,
+        "Ir": 122
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "1-distinct-0-consume-before.callgrind.1",
+      "self_rows": 45,
+      "totals": {
+        "Bc": 14,
+        "Bcm": 6,
+        "Bi": 2,
+        "Bim": 0,
+        "Ir": 170
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 14,
+      "file": "1-distinct-1-consume-after.callgrind.1",
+      "self_rows": 123,
+      "totals": {
+        "Bc": 47,
+        "Bcm": 9,
+        "Bi": 4,
+        "Bim": 0,
+        "Ir": 407
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "1-distinct-1-consume-before.callgrind.1",
+      "self_rows": 180,
+      "totals": {
+        "Bc": 69,
+        "Bcm": 10,
+        "Bi": 8,
+        "Bim": 1,
+        "Ir": 574
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-16-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-16-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-16-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-16-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-16-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-16-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 1598,
+        "Bcm": 64,
+        "Bi": 127,
+        "Bim": 4,
+        "Ir": 10010
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-16-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 28,
+      "file": "1-distinct-16-consume-before.callgrind.1",
+      "self_rows": 457,
+      "totals": {
+        "Bc": 1700,
+        "Bcm": 85,
+        "Bi": 119,
+        "Bim": 1,
+        "Ir": 9428
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-17-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-17-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-17-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-17-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-17-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-17-consume-after.callgrind.1",
+      "self_rows": 555,
+      "totals": {
+        "Bc": 1735,
+        "Bcm": 68,
+        "Bi": 137,
+        "Bim": 4,
+        "Ir": 10764
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-17-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 27,
+      "file": "1-distinct-17-consume-before.callgrind.1",
+      "self_rows": 534,
+      "totals": {
+        "Bc": 1933,
+        "Bcm": 106,
+        "Bi": 131,
+        "Bim": 1,
+        "Ir": 10672
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "1-distinct-2-consume-after.callgrind.1",
+      "self_rows": 229,
+      "totals": {
+        "Bc": 123,
+        "Bcm": 12,
+        "Bi": 9,
+        "Bim": 2,
+        "Ir": 870
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-distinct-2-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 119,
+        "Bcm": 17,
+        "Bi": 12,
+        "Bim": 1,
+        "Ir": 910
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-3-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-3-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-3-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-3-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-3-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 20,
+      "file": "1-distinct-3-consume-after.callgrind.1",
+      "self_rows": 359,
+      "totals": {
+        "Bc": 220,
+        "Bcm": 19,
+        "Bi": 15,
+        "Bim": 3,
+        "Ir": 1485
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-3-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-distinct-3-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 178,
+        "Bcm": 23,
+        "Bi": 17,
+        "Bim": 1,
+        "Ir": 1286
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-32-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-32-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-32-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-32-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-32-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-32-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 4502,
+        "Bcm": 109,
+        "Bi": 407,
+        "Bim": 4,
+        "Ir": 26130
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-32-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "1-distinct-32-consume-before.callgrind.1",
+      "self_rows": 524,
+      "totals": {
+        "Bc": 5130,
+        "Bcm": 148,
+        "Bi": 386,
+        "Bim": 1,
+        "Ir": 25562
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-33-consume-after.callgrind.1",
+      "self_rows": 560,
+      "totals": {
+        "Bc": 4771,
+        "Bcm": 123,
+        "Bi": 432,
+        "Bim": 4,
+        "Ir": 27487
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 55,
+      "file": "1-distinct-33-consume-before.callgrind.1",
+      "self_rows": 904,
+      "totals": {
+        "Bc": 8557,
+        "Bcm": 341,
+        "Bi": 773,
+        "Bim": 1,
+        "Ir": 50231
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-4-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 350,
+        "Bcm": 27,
+        "Bi": 25,
+        "Bim": 4,
+        "Ir": 2372
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-distinct-4-consume-before.callgrind.1",
+      "self_rows": 211,
+      "totals": {
+        "Bc": 246,
+        "Bcm": 28,
+        "Bi": 23,
+        "Bim": 1,
+        "Ir": 1702
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-5-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-5-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-5-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-5-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-5-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-5-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 436,
+        "Bcm": 26,
+        "Bi": 33,
+        "Bim": 4,
+        "Ir": 2952
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-5-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 26,
+      "file": "1-distinct-5-consume-before.callgrind.1",
+      "self_rows": 423,
+      "totals": {
+        "Bc": 413,
+        "Bcm": 41,
+        "Bi": 33,
+        "Bim": 1,
+        "Ir": 2706
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-64-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-64-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-64-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-64-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-64-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 50,
+      "file": "1-distinct-64-consume-after.callgrind.1",
+      "self_rows": 909,
+      "totals": {
+        "Bc": 13245,
+        "Bcm": 507,
+        "Bi": 1531,
+        "Bim": 6,
+        "Ir": 90145
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-64-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 57,
+      "file": "1-distinct-64-consume-before.callgrind.1",
+      "self_rows": 904,
+      "totals": {
+        "Bc": 12425,
+        "Bcm": 478,
+        "Bi": 1243,
+        "Bim": 1,
+        "Ir": 80754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-8-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-8-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-8-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-8-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-8-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-8-consume-after.callgrind.1",
+      "self_rows": 537,
+      "totals": {
+        "Bc": 736,
+        "Bcm": 34,
+        "Bi": 63,
+        "Bim": 4,
+        "Ir": 4914
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-8-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "1-distinct-8-consume-before.callgrind.1",
+      "self_rows": 411,
+      "totals": {
+        "Bc": 703,
+        "Bcm": 44,
+        "Bi": 60,
+        "Bim": 1,
+        "Ir": 4368
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-9-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-9-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-9-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-distinct-9-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-9-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-distinct-9-consume-after.callgrind.1",
+      "self_rows": 538,
+      "totals": {
+        "Bc": 850,
+        "Bcm": 35,
+        "Bi": 75,
+        "Bim": 4,
+        "Ir": 5642
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-distinct-9-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 29,
+      "file": "1-distinct-9-consume-before.callgrind.1",
+      "self_rows": 434,
+      "totals": {
+        "Bc": 843,
+        "Bcm": 49,
+        "Bi": 73,
+        "Bim": 1,
+        "Ir": 5187
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "1-duplicate-long-quoted-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-long-quoted-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-duplicate-long-quoted-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 18,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-long-quoted-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 15,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-quoted-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-duplicate-long-quoted-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 243,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-quoted-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 53,
+      "file": "1-duplicate-long-quoted-after-33-consume-before.callgrind.1",
+      "self_rows": 714,
+      "totals": {
+        "Bc": 16564,
+        "Bcm": 271,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 74154
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "1-duplicate-long-unterminated-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-long-unterminated-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-duplicate-long-unterminated-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 17,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-long-unterminated-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 15,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-long-unterminated-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-duplicate-long-unterminated-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 243,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-long-unterminated-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "1-duplicate-long-unterminated-after-33-consume-before.callgrind.1",
+      "self_rows": 941,
+      "totals": {
+        "Bc": 16674,
+        "Bcm": 284,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 74686
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-unquoted-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-unquoted-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "1-duplicate-unquoted-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-unquoted-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-unquoted-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-unquoted-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-duplicate-unquoted-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 242,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-unquoted-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "1-duplicate-unquoted-after-33-consume-before.callgrind.1",
+      "self_rows": 943,
+      "totals": {
+        "Bc": 8480,
+        "Bcm": 282,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 50103
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-1-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-1-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-1-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-1-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-1-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 15,
+      "file": "1-duplicate-valid-after-1-consume-after.callgrind.1",
+      "self_rows": 221,
+      "totals": {
+        "Bc": 86,
+        "Bcm": 9,
+        "Bi": 7,
+        "Bim": 3,
+        "Ir": 607
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-1-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-valid-after-1-consume-before.callgrind.1",
+      "self_rows": 216,
+      "totals": {
+        "Bc": 95,
+        "Bcm": 8,
+        "Bi": 10,
+        "Bim": 2,
+        "Ir": 754
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-duplicate-valid-after-2-consume-after.callgrind.1",
+      "self_rows": 347,
+      "totals": {
+        "Bc": 177,
+        "Bcm": 16,
+        "Bi": 12,
+        "Bim": 4,
+        "Ir": 1165
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-valid-after-2-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 145,
+        "Bcm": 13,
+        "Bi": 14,
+        "Bim": 2,
+        "Ir": 1090
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-32-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-32-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-32-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-32-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-32-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-duplicate-valid-after-32-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 4525,
+        "Bcm": 111,
+        "Bi": 409,
+        "Bim": 5,
+        "Ir": 26271
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-32-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 52,
+      "file": "1-duplicate-valid-after-32-consume-before.callgrind.1",
+      "self_rows": 753,
+      "totals": {
+        "Bc": 8321,
+        "Bcm": 277,
+        "Bi": 766,
+        "Bim": 2,
+        "Ir": 49054
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-duplicate-valid-after-33-consume-after.callgrind.1",
+      "self_rows": 892,
+      "totals": {
+        "Bc": 6811,
+        "Bcm": 241,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43078
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 57,
+      "file": "1-duplicate-valid-after-33-consume-before.callgrind.1",
+      "self_rows": 902,
+      "totals": {
+        "Bc": 8516,
+        "Bcm": 314,
+        "Bi": 777,
+        "Bim": 2,
+        "Ir": 50305
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-duplicate-valid-after-4-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 373,
+        "Bcm": 26,
+        "Bi": 27,
+        "Bim": 5,
+        "Ir": 2513
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-duplicate-valid-after-4-consume-before.callgrind.1",
+      "self_rows": 223,
+      "totals": {
+        "Bc": 272,
+        "Bcm": 22,
+        "Bi": 25,
+        "Bim": 2,
+        "Ir": 1882
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-5-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-5-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-5-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-duplicate-valid-after-5-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-5-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-duplicate-valid-after-5-consume-after.callgrind.1",
+      "self_rows": 548,
+      "totals": {
+        "Bc": 459,
+        "Bcm": 27,
+        "Bi": 35,
+        "Bim": 5,
+        "Ir": 3093
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-duplicate-valid-after-5-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 26,
+      "file": "1-duplicate-valid-after-5-consume-before.callgrind.1",
+      "self_rows": 433,
+      "totals": {
+        "Bc": 436,
+        "Bcm": 36,
+        "Bi": 35,
+        "Bim": 2,
+        "Ir": 2873
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 12,
+      "file": "1-syntax-equals-value-after-0-consume-after.callgrind.1",
+      "self_rows": 82,
+      "totals": {
+        "Bc": 33,
+        "Bcm": 7,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 286
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "1-syntax-equals-value-after-0-consume-before.callgrind.1",
+      "self_rows": 70,
+      "totals": {
+        "Bc": 32,
+        "Bcm": 8,
+        "Bi": 3,
+        "Bim": 1,
+        "Ir": 265
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-syntax-equals-value-after-2-consume-after.callgrind.1",
+      "self_rows": 343,
+      "totals": {
+        "Bc": 196,
+        "Bcm": 21,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1270
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-syntax-equals-value-after-2-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 137,
+        "Bcm": 18,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 1006
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-syntax-equals-value-after-33-consume-after.callgrind.1",
+      "self_rows": 879,
+      "totals": {
+        "Bc": 6823,
+        "Bcm": 245,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43115
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 58,
+      "file": "1-syntax-equals-value-after-33-consume-before.callgrind.1",
+      "self_rows": 888,
+      "totals": {
+        "Bc": 8413,
+        "Bcm": 285,
+        "Bi": 772,
+        "Bim": 2,
+        "Ir": 49667
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-equals-value-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-syntax-equals-value-after-4-consume-after.callgrind.1",
+      "self_rows": 556,
+      "totals": {
+        "Bc": 391,
+        "Bcm": 31,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2633
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-equals-value-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-syntax-equals-value-after-4-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 264,
+        "Bcm": 26,
+        "Bi": 24,
+        "Bim": 2,
+        "Ir": 1798
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 12,
+      "file": "1-syntax-flag-after-0-consume-after.callgrind.1",
+      "self_rows": 81,
+      "totals": {
+        "Bc": 27,
+        "Bcm": 6,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 274
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 11,
+      "file": "1-syntax-flag-after-0-consume-before.callgrind.1",
+      "self_rows": 69,
+      "totals": {
+        "Bc": 26,
+        "Bcm": 7,
+        "Bi": 3,
+        "Bim": 1,
+        "Ir": 253
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-syntax-flag-after-2-consume-after.callgrind.1",
+      "self_rows": 343,
+      "totals": {
+        "Bc": 187,
+        "Bcm": 17,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1252
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-syntax-flag-after-2-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 131,
+        "Bcm": 16,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 994
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 48,
+      "file": "1-syntax-flag-after-33-consume-after.callgrind.1",
+      "self_rows": 878,
+      "totals": {
+        "Bc": 6814,
+        "Bcm": 241,
+        "Bi": 724,
+        "Bim": 7,
+        "Ir": 43097
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 56,
+      "file": "1-syntax-flag-after-33-consume-before.callgrind.1",
+      "self_rows": 902,
+      "totals": {
+        "Bc": 8469,
+        "Bcm": 300,
+        "Bi": 774,
+        "Bim": 2,
+        "Ir": 50032
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-flag-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-syntax-flag-after-4-consume-after.callgrind.1",
+      "self_rows": 556,
+      "totals": {
+        "Bc": 382,
+        "Bcm": 26,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2615
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-flag-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-syntax-flag-after-4-consume-before.callgrind.1",
+      "self_rows": 219,
+      "totals": {
+        "Bc": 258,
+        "Bcm": 22,
+        "Bi": 24,
+        "Bim": 2,
+        "Ir": 1786
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-0-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-0-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-0-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-0-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-0-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 13,
+      "file": "1-syntax-unique-tail-after-0-consume-after.callgrind.1",
+      "self_rows": 92,
+      "totals": {
+        "Bc": 34,
+        "Bcm": 7,
+        "Bi": 4,
+        "Bim": 1,
+        "Ir": 317
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-0-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 16,
+      "file": "1-syntax-unique-tail-after-0-consume-before.callgrind.1",
+      "self_rows": 149,
+      "totals": {
+        "Bc": 52,
+        "Bcm": 6,
+        "Bi": 6,
+        "Bim": 2,
+        "Ir": 448
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-2-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-2-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-2-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-2-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-2-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 18,
+      "file": "1-syntax-unique-tail-after-2-consume-after.callgrind.1",
+      "self_rows": 348,
+      "totals": {
+        "Bc": 199,
+        "Bcm": 20,
+        "Bi": 13,
+        "Bim": 4,
+        "Ir": 1322
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-2-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 17,
+      "file": "1-syntax-unique-tail-after-2-consume-before.callgrind.1",
+      "self_rows": 217,
+      "totals": {
+        "Bc": 151,
+        "Bcm": 17,
+        "Bi": 13,
+        "Bim": 2,
+        "Ir": 1104
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-33-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-33-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-33-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-33-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-33-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 50,
+      "file": "1-syntax-unique-tail-after-33-consume-after.callgrind.1",
+      "self_rows": 955,
+      "totals": {
+        "Bc": 6993,
+        "Bcm": 251,
+        "Bi": 748,
+        "Bim": 7,
+        "Ir": 44370
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-33-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 60,
+      "file": "1-syntax-unique-tail-after-33-consume-before.callgrind.1",
+      "self_rows": 943,
+      "totals": {
+        "Bc": 8529,
+        "Bcm": 296,
+        "Bi": 784,
+        "Bim": 2,
+        "Ir": 50525
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-4-construct-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-4-construct-after.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-4-construct-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 9,
+      "file": "1-syntax-unique-tail-after-4-construct-before.callgrind.1",
+      "self_rows": 15,
+      "totals": {
+        "Bc": 5,
+        "Bcm": 4,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 70
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-4-consume-after.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 25,
+      "file": "1-syntax-unique-tail-after-4-consume-after.callgrind.1",
+      "self_rows": 582,
+      "totals": {
+        "Bc": 427,
+        "Bcm": 33,
+        "Bi": 28,
+        "Bim": 5,
+        "Ir": 2802
+      }
+    },
+    {
+      "call_rows": 0,
+      "file": "1-syntax-unique-tail-after-4-consume-before.callgrind",
+      "self_rows": 0,
+      "totals": {
+        "Bc": 0,
+        "Bcm": 0,
+        "Bi": 0,
+        "Bim": 0,
+        "Ir": 0
+      }
+    },
+    {
+      "call_rows": 28,
+      "file": "1-syntax-unique-tail-after-4-consume-before.callgrind.1",
+      "self_rows": 402,
+      "totals": {
+        "Bc": 382,
+        "Bcm": 36,
+        "Bi": 27,
+        "Bim": 2,
+        "Ir": 2546
+      }
+    }
+  ],
+  "scope": "Independent raw counter conservation only; no latency/cycle attribution"
+}

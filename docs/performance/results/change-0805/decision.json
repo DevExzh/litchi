@@ -1,0 +1,54 @@
+{
+  "advance_to_workflow_trials": true,
+  "all_consume_regressions": [
+    {
+      "bootstrap_ci_high": 1.24378824698924,
+      "bootstrap_ci_low": 1.198300043629417,
+      "case": "distinct-4",
+      "change_percent_median": 22.64905757608302,
+      "mode": "consume",
+      "ratio_median": 1.2264905757608302
+    },
+    {
+      "bootstrap_ci_high": 1.1199921064772156,
+      "bootstrap_ci_low": 1.0953583746694573,
+      "case": "duplicate-valid-after-4",
+      "change_percent_median": 10.726024177448057,
+      "mode": "consume",
+      "ratio_median": 1.1072602417744806
+    },
+    {
+      "bootstrap_ci_high": 1.2976702802961684,
+      "bootstrap_ci_low": 1.280224332320012,
+      "case": "syntax-equals-value-after-4",
+      "change_percent_median": 28.681722404816412,
+      "mode": "consume",
+      "ratio_median": 1.2868172240481641
+    },
+    {
+      "bootstrap_ci_high": 1.2999846016000567,
+      "bootstrap_ci_low": 1.2090928398310974,
+      "case": "syntax-flag-after-4",
+      "change_percent_median": 28.634367245616676,
+      "mode": "consume",
+      "ratio_median": 1.2863436724561668
+    }
+  ],
+  "analysis": {
+    "bytes": 8086577,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0805/analysis.json",
+    "sha256": "4eb8e96869b61da5db561a8153e85ceac95dd11f0cae1e3c2b9af456effefe93"
+  },
+  "dominant_class_benefits": {
+    "distinct-1": true,
+    "distinct-2": true
+  },
+  "independent_audit": {
+    "bytes": 16283,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0805/root-native-audit.json",
+    "sha256": "c005d4ce30eebc708b9b307a0b5c0a8321be20b4c600248aa530802630c06a23"
+  },
+  "production_adoption": false,
+  "protected_consume_regressions": [],
+  "schema": "litchi.performance.0805.preflight-decision.v1"
+}

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0805 — combined candidate passes protected preflight
+
+[0805](0805-xml-combined-preflight.md) All 1,248 helper reports/28,392 samples validate, with 70 production and 100 candidate tests plus Clippy. Passing the direct preflight authorizes fresh workflow trials only. Four-attribute costs, two construction flags and 41 spread flags remain visible; no public CRUD coverage is promoted.
+
 ## 0804 — bounded linear equality diagnostic
 
 [0804](0804-xml-linear-equality-diagnostic.md) Both five-copy helper legs pass 100 tests and Clippy over unchanged semantic tests. The 39-case diagnostic retains 1,248 successful reports/28,392 samples plus a separate failed initial profile scope. No public CRUD or cross-format coverage is promoted.

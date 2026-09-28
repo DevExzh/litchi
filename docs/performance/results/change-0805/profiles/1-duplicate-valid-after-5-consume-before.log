@@ -1,0 +1,15 @@
+==1040033== Callgrind, a call-graph generating cache profiler
+==1040033== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1040033== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1040033== Command: /home/zhuhe/code/litchi-target-0805/attribute-boundary-probe --leg before --case duplicate-valid-after-5 --mode consume --samples 1 --warmup 0 --iterations 1 --output /home/zhuhe/code/litchi/docs/performance/results/change-0805/profiles/1-duplicate-valid-after-5-consume-before.json
+==1040033== 
+==1040033== For interactive control, run 'callgrind_control -h'.
+==1040033== 
+==1040033== Events    : Ir Bc Bcm Bi Bim
+==1040033== Collected : 2873 436 36 35 2
+==1040033== 
+==1040033== I   refs:      2,873
+==1040033== 
+==1040033== Branches:        471  (436 cond + 35 ind)
+==1040033== Mispredicts:      38  ( 36 cond +  2 ind)
+==1040033== Mispred rate:    8.1% (8.3%     + 5.7%   )

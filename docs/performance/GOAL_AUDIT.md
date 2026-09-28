@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0805 — combined candidate passes protected preflight
+
+[0805](0805-xml-combined-preflight.md) The combined no-replay/bounded-equality candidate passes a fresh comparison against production under the unchanged 0802 policy. Four non-protected consume regressions and two construction regressions remain review triggers. Workflow/resource/cross-format qualification is next; no adoption and GOAL remains incomplete.
+
 ## 0804 — bounded linear equality diagnostic
 
 [0804](0804-xml-linear-equality-diagnostic.md) Direct linear byte equality has a measured benefit against the 0803 control while preserving bounded checks and error/clone oracles. A fresh production comparison is still required. The failed profile selector and explicit same-binary scope amendment are retained; production stays unchanged and GOAL remains incomplete.

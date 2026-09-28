@@ -1,0 +1,9 @@
+    Checking serde_core v1.0.229
+    Checking memchr v2.8.3
+    Checking zmij v1.0.23
+    Checking itoa v1.0.18
+    Checking quick-xml v0.41.0
+    Checking serde v1.0.229
+    Checking serde_json v1.0.151
+    Checking attribute-boundary-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0805/probe-src)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.07s

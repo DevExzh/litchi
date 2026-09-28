@@ -1,0 +1,170 @@
+{
+  "analysis": {
+    "bootstrap_seed": 805080,
+    "diagnostic_regression": {
+      "ci_low_above": 1.0,
+      "ratio_above": 1.05
+    },
+    "process_p50": "nearest rank ceil(n/2)-1",
+    "resamples": 10000,
+    "statistic": "median of six paired process-p50 ratios",
+    "zero_based_endpoints": [
+      250,
+      9749
+    ]
+  },
+  "case_count": 39,
+  "claims": {
+    "historical_timing_pooling": false,
+    "micro_input_is_hot_and_repeated": true,
+    "opaque_construction_overhead_explicit": true,
+    "production_adoption": false,
+    "public_workflow_speedup": false
+  },
+  "cpu": 12,
+  "distinct_counts": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    8,
+    9,
+    16,
+    17,
+    32,
+    33,
+    64
+  ],
+  "duplicate_counts": [
+    1,
+    2,
+    4,
+    5,
+    32,
+    33
+  ],
+  "legs": [
+    "before",
+    "after"
+  ],
+  "long_duplicate_counts": [
+    1,
+    2,
+    33
+  ],
+  "long_value_bytes": 4096,
+  "modes": [
+    "construct",
+    "consume"
+  ],
+  "native": {
+    "blocks": 6,
+    "iterations": 4096,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "preflight_decision": {
+    "advance_requires_semantics": true,
+    "benefit_cases": [
+      "distinct-1",
+      "distinct-2"
+    ],
+    "benefit_ci_high_below": 1.0,
+    "benefit_mode": "consume",
+    "benefit_ratio_at_most": 0.97,
+    "construct_flags_are_diagnostic_only": true,
+    "failure_action": "archive candidate and retain production baseline; do not run public-workflow adoption trials for this candidate",
+    "other_regressions": "retained review triggers, not automatic workflow-advancement vetoes",
+    "production_adoption": false,
+    "protected_ci_low_above": 1.0,
+    "protected_consume_cases": [
+      "distinct-0",
+      "distinct-1",
+      "distinct-2",
+      "duplicate-valid-after-1",
+      "duplicate-valid-after-2",
+      "duplicate-long-quoted-after-1",
+      "duplicate-long-quoted-after-2",
+      "duplicate-long-quoted-after-33",
+      "duplicate-long-unterminated-after-1",
+      "duplicate-long-unterminated-after-2",
+      "duplicate-long-unterminated-after-33",
+      "duplicate-unquoted-after-1",
+      "syntax-flag-after-0",
+      "syntax-flag-after-2",
+      "syntax-unique-tail-after-0",
+      "syntax-unique-tail-after-2",
+      "syntax-equals-value-after-0",
+      "syntax-equals-value-after-2"
+    ],
+    "protected_ratio_above": 1.05,
+    "success_action": "candidate eligible only for fresh public-workflow/resource/cross-format trials; no production adoption in this packet"
+  },
+  "profiles": {
+    "branch_sim": true,
+    "events": [
+      "Ir",
+      "Bc",
+      "Bcm",
+      "Bi",
+      "Bim"
+    ],
+    "iterations": 1,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "owner_pattern": "attribute_boundary_probe::{leg}_{mode}",
+    "positive_dumps": 1,
+    "repeats": 2,
+    "samples": 1,
+    "termination_empty": true,
+    "warmup": 0
+  },
+  "schema": "litchi.performance.0805.v1",
+  "syntax_prefix_counts": [
+    0,
+    2,
+    4,
+    33
+  ],
+  "syntax_tails": [
+    "flag",
+    "tail=x",
+    "=\"1\""
+  ]
+}
