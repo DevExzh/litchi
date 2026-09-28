@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0814 — current-source attribution after event-copy removal
+
+[0814](0814-pptx-current-native-attribution.md) Fresh ordinary/wrapper/fp controls and two sampled profiles retain 56 reports/1,820 verified outputs. Ordinary large-capture p50 is 16.0685455 ms; wrapper/control is 1.040429 [1.034036–1.044374], fp/wrapper 1.006262 [0.999645–1.013582]. Six spread flags remain explicit. This is instrumentation diagnosis, not another optimization comparison.
+
 ## 0813 — direct event-result workflow baseline
 
 [0813](0813-pptx-direct-result-workflow.md) Fresh qualification, six paired native blocks, two allocation blocks, and four scoped profiles retain 310 reports/6,718 verified outputs. Large-capture p50 falls from 17.926675 to 16.045099 ms (paired ratio 0.894556, interval 0.882107–0.899554); large lifecycle improves 7.269%. All eighteen rows, tail/RSS flags, and unchanged allocation medians are reported.

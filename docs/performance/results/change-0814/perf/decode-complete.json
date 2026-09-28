@@ -1,0 +1,29 @@
+{
+  "build_sha256": "0be8f7885fbd5ed778ceb11d3d3ae96108d2f15f9a008cd203479ff3d3477dc9",
+  "command_contract": [
+    "perf",
+    "script",
+    "--no-inline",
+    "--ns"
+  ],
+  "compression": {
+    "bytes": 2553,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/compression.json",
+    "sha256": "6b1a364bfc1320923127b5aed8d6ab37ee61b086491ec10c85fd4f86ed77b076"
+  },
+  "frames": {
+    "bytes": 1287,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/frame-receipts.json",
+    "sha256": "2e4f424ea93d907b90f7ee7dc44b937fe04ad76ff276f2ef98f337631179cd11"
+  },
+  "logical_artifacts": 4,
+  "plan_sha256": "0989298734e4d5809289bd7f5766f16de521fb155c23280e478da6d2fb9c95a8",
+  "raw_and_frames_retained_as": "deterministic gzip members",
+  "receipts": {
+    "bytes": 13471,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/decode-receipts.json",
+    "sha256": "b32db95ff2aa19a3f6363fdbb2f44ab508af576cac17e6404cabf8fde5d877ec"
+  },
+  "reports": 2,
+  "schema": "litchi.performance.0814.decode.complete.v1"
+}

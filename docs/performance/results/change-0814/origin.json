@@ -1,0 +1,59 @@
+{
+  "schema": "litchi.performance.0814.origin.v1",
+  "base": "5eb8629254fbf88009b988734af59eb90f8c6271",
+  "branch": "feat/office-format-completeness",
+  "worktree": "/home/zhuhe/code/litchi",
+  "production_source": {
+    "revision": "5eb8629254fbf88009b988734af59eb90f8c6271",
+    "tracked_file_count": 9196,
+    "status": "current production source is frozen before the first 0814 build; its tracked hashes match the retained 0813 after source",
+    "candidate_allowlist": [],
+    "source_allowlist": [],
+    "before_build_is_authoritative": true,
+    "sealed_0813_after_file_hashes_match": true,
+    "sealed_0813_after_source": {
+      "path": "../change-0813/build-after/source.json",
+      "sha256": "aeeb978188ea98d15e120fe1645d4fcba77f2d5995e2405eaff1633b6b17836c",
+      "revision": "03305a82aa23ea33b9e0a72470731d77cd8d8007",
+      "file_count": 9196
+    }
+  },
+  "unrelated": {
+    "docs/FORMAT_IMPLEMENTATION_REVIEW.md": "bffd00f144c4c1bbb3b0805d21352b40e9ae46f7366c03d6e581ca61b1f27ce5",
+    "docs/UNIFIED_OPS_API_DESIGN.md": "f5672c38393a2a6c52f028b2a501ddad93766ef974dbdb46cdc3c45e1db3ef6d",
+    "matrix-analysis.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "root_inputs": {
+    "copies_captured_before_first_build": true,
+    "root-Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "probe": {
+    "reference_packet": "../change-0813/probe-src",
+    "copy_policy": "all six probe files are byte-for-byte copies of change-0813",
+    "schema": "litchi.pptx.public-workflow-probe-0806.v1",
+    "tool": "public-pptx-probe-0806",
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "tests": 36
+  },
+  "baseline_quality": {
+    "packet": "../change-0813",
+    "result": {
+      "path": "../change-0813/quality-after.json",
+      "sha256": "c99e754a375fd3b56e9278619eb8dfa294b15e7a72eb9b3423b43eb6435c7c66"
+    },
+    "summary": {
+      "path": "../change-0813/quality-summary.json",
+      "sha256": "4465fb9f1e589ef6d9d2a4f669a0752596a5d7fb7e3d4fd985919997506e76ad"
+    },
+    "source_files_equal": true,
+    "passed": 1241,
+    "failed": 0,
+    "ignored": 3,
+    "suites": 85
+  },
+  "target": "/home/zhuhe/code/litchi-target-0814",
+  "historical_timing_pool": false,
+  "cross_format_lane": false,
+  "iwork": "out of scope"
+}

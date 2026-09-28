@@ -1,0 +1,85 @@
+{
+  "schema": "litchi.performance.0814.current-production.v1",
+  "purpose": "Evidence-only native timing and sampled CPU attribution for the retained current PPTX public workflow.",
+  "scope": "One unchanged production source after the retained 0813 result, three probe binary variants, and no candidate adoption decision.",
+  "source_revision": "5eb8629254fbf88009b988734af59eb90f8c6271",
+  "source_file_count": 9196,
+  "source_allowlist": [],
+  "cpu": 12,
+  "shapes": ["tiny", "medium", "large"],
+  "modes": ["capture"],
+  "binaries": {
+    "control": {
+      "features": [],
+      "rustflags": null,
+      "purpose": "ordinary release build"
+    },
+    "profile": {
+      "features": ["capture-profile"],
+      "rustflags": null,
+      "purpose": "existing non-inlined capture wrapper"
+    },
+    "fp": {
+      "features": ["capture-profile"],
+      "rustflags": "-C force-frame-pointers=yes",
+      "purpose": "the same wrapper with frame pointers for native stack sampling"
+    }
+  },
+  "native": {
+    "blocks": 6,
+    "orders": [
+      ["control", "profile", "fp"],
+      ["profile", "fp", "control"],
+      ["fp", "control", "profile"],
+      ["fp", "profile", "control"],
+      ["profile", "control", "fp"],
+      ["control", "fp", "profile"]
+    ],
+    "shapes": ["tiny", "medium", "large"],
+    "samples": 30,
+    "warmup": 3,
+    "reports": 54,
+    "samples_total": 1620,
+    "rss": "maximum resident set size in KiB from /usr/bin/time"
+  },
+  "perf": {
+    "binary": "fp",
+    "mode": "capture",
+    "shape": "large",
+    "orders": [["fp"], ["fp"]],
+    "repeats": 2,
+    "samples": 100,
+    "warmup": 0,
+    "cpu": 12,
+    "event": "cycles:u",
+    "frequency_hz": 499,
+    "call_graph": "fp",
+    "owner": "namespace_uri_probe::capture_region_0793",
+    "reports": 2,
+    "samples_total": 200,
+    "scope": "Whole-process sampled stacks and exact-owner attribution diagnostics only."
+  },
+  "totals": {
+    "reports": 56,
+    "samples": 1820
+  },
+  "statistics": {
+    "native": ["p50", "p95", "p99", "mean", "spread", "rss"],
+    "paired_ratios": ["profile/control", "fp/profile"],
+    "bootstrap": {
+      "resamples": 10000,
+      "seed": 814814,
+      "statistic": "median",
+      "sorted_zero_based_endpoints": [250, 9749]
+    },
+    "claims": [
+      "descriptive native timing and RSS only",
+      "paired profile/control and fp/profile perturbation ratios",
+      "sampled cycles:u stack attribution with unresolved and lost-event diagnostics"
+    ],
+    "adoption_threshold": null,
+    "speedup_claim": false,
+    "allocation_lane": false,
+    "callgrind_lane": false
+  }
+}

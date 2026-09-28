@@ -1,0 +1,36 @@
+[
+  {
+    "compressed": {
+      "bytes": 187319,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/0.frames.gz",
+      "sha256": "8202d3fa61d7176ceca1989ec1a8ee61f1eb27c50f423242730e57bdcaf4ce21"
+    },
+    "compression": "gzip",
+    "decompressed_sha256": "198b9d4be74ea61fc93e64126764d02f745cf6b6b2d9c1858fdadaf84385a37b",
+    "gzip_mtime": 0,
+    "kind": "frames",
+    "original": {
+      "bytes": 4288158,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/0.frames",
+      "sha256": "198b9d4be74ea61fc93e64126764d02f745cf6b6b2d9c1858fdadaf84385a37b"
+    },
+    "repeat": 0
+  },
+  {
+    "compressed": {
+      "bytes": 183703,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/1.frames.gz",
+      "sha256": "53c10321d2968b8d7b18d506177eb57e7a0a9d4fd26b0150485c43eb81cdfd8a"
+    },
+    "compression": "gzip",
+    "decompressed_sha256": "8fc23a465e1deb9ec96309811442fb1fb7a04b6a141ff16fff6853ac3a1684ac",
+    "gzip_mtime": 0,
+    "kind": "frames",
+    "original": {
+      "bytes": 4251406,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/1.frames",
+      "sha256": "8fc23a465e1deb9ec96309811442fb1fb7a04b6a141ff16fff6853ac3a1684ac"
+    },
+    "repeat": 1
+  }
+]

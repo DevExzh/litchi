@@ -1,0 +1,892 @@
+{
+  "assembly_receipt": {
+    "bytes": 12090,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/assembly/receipt.json",
+    "sha256": "b35eeb22ffbcd29f270fe22df14182880299cbeac2ca5bede538cd437dfb07f3"
+  },
+  "binary": {
+    "bytes": 14385576,
+    "path": "/home/zhuhe/code/litchi-target-0814/fp",
+    "sha256": "e587ce6bf052f35cfa9f9c817e172296e1e940e72ea9c1818aa687e5aca4c157"
+  },
+  "reports": [
+    {
+      "frames": {
+        "bytes": 187319,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/0.frames.gz",
+        "sha256": "8202d3fa61d7176ceca1989ec1a8ee61f1eb27c50f423242730e57bdcaf4ce21"
+      },
+      "other_owner_leaf_samples": 662,
+      "owner_samples": 851,
+      "repeat": 0,
+      "symbols": {
+        "inspector": {
+          "leaf_samples": 39,
+          "offsets": [
+            {
+              "hex_offset": "0x6b",
+              "instruction": "mov    $0x3a,%edi",
+              "instruction_boundary": true,
+              "offset": 107,
+              "period": 52894953,
+              "samples": 6
+            },
+            {
+              "hex_offset": "0x12e",
+              "instruction": "jne    128c63 <litchi_pptx::notes::codec::inspect_element+0x223>",
+              "instruction_boundary": true,
+              "offset": 302,
+              "period": 44137167,
+              "samples": 5
+            },
+            {
+              "hex_offset": "0x7c",
+              "instruction": "jne    128ac9 <litchi_pptx::notes::codec::inspect_element+0x89>",
+              "instruction_boundary": true,
+              "offset": 124,
+              "period": 35242193,
+              "samples": 4
+            },
+            {
+              "hex_offset": "0xb62",
+              "instruction": "pop    %rbp",
+              "instruction_boundary": true,
+              "offset": 2914,
+              "period": 17623509,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x655",
+              "instruction": "jne    1296ab <litchi_pptx::notes::codec::inspect_element+0xc6b>",
+              "instruction_boundary": true,
+              "offset": 1621,
+              "period": 17599645,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x36",
+              "instruction": "mov    %r9,-0x48(%rbp)",
+              "instruction_boundary": true,
+              "offset": 54,
+              "period": 8802777,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x431",
+              "instruction": "lea    0x10(%rsi),%rax",
+              "instruction_boundary": true,
+              "offset": 1073,
+              "period": 8818113,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xe6",
+              "instruction": "mov    (%rax),%rax",
+              "instruction_boundary": true,
+              "offset": 230,
+              "period": 8805304,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x462",
+              "instruction": "call   11bf20 <<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next>",
+              "instruction_boundary": true,
+              "offset": 1122,
+              "period": 8780843,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x537",
+              "instruction": "mov    (%rax),%rax",
+              "instruction_boundary": true,
+              "offset": 1335,
+              "period": 8828420,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x494",
+              "instruction": "cmp    -0x100(%rbp),%r12",
+              "instruction_boundary": true,
+              "offset": 1172,
+              "period": 8832614,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x46e",
+              "instruction": "cmp    -0xb8(%rbp),%r12",
+              "instruction_boundary": true,
+              "offset": 1134,
+              "period": 8822539,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x53a",
+              "instruction": "mov    $0x3a,%edi",
+              "instruction_boundary": true,
+              "offset": 1338,
+              "period": 8750221,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x548",
+              "instruction": "jne    128fa5 <litchi_pptx::notes::codec::inspect_element+0x565>",
+              "instruction_boundary": true,
+              "offset": 1352,
+              "period": 8830221,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x669",
+              "instruction": "mov    -0xd0(%rbp),%rax",
+              "instruction_boundary": true,
+              "offset": 1641,
+              "period": 8825269,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x693",
+              "instruction": "cmp    %rcx,%rbx",
+              "instruction_boundary": true,
+              "offset": 1683,
+              "period": 8771482,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x475",
+              "instruction": "je     129383 <litchi_pptx::notes::codec::inspect_element+0x943>",
+              "instruction_boundary": true,
+              "offset": 1141,
+              "period": 8826180,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x6d8",
+              "instruction": "mov    -0xa0(%rbp),%rax",
+              "instruction_boundary": true,
+              "offset": 1752,
+              "period": 8772251,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x0",
+              "instruction": "push   %rbp",
+              "instruction_boundary": true,
+              "offset": 0,
+              "period": 8825918,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb52",
+              "instruction": "add    $0x298,%rsp",
+              "instruction_boundary": true,
+              "offset": 2898,
+              "period": 8828645,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xf4",
+              "instruction": "call   *%rax",
+              "instruction_boundary": true,
+              "offset": 244,
+              "period": 8819531,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x48d",
+              "instruction": "mov    -0x1e8(%rbp),%r13",
+              "instruction_boundary": true,
+              "offset": 1165,
+              "period": 8823926,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x5c0",
+              "instruction": "mov    %rax,-0x1b0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 1472,
+              "period": 8829308,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x5b1",
+              "instruction": "cmp    $0x27,%al",
+              "instruction_boundary": true,
+              "offset": 1457,
+              "period": 8827356,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x518",
+              "instruction": "cmp    $0x7a120,%rcx",
+              "instruction_boundary": true,
+              "offset": 1304,
+              "period": 8830071,
+              "samples": 1
+            }
+          ],
+          "symbol": "litchi_pptx::notes::codec::inspect_element",
+          "symbol_bytes": 3798
+        },
+        "scanner": {
+          "leaf_samples": 150,
+          "offsets": [
+            {
+              "hex_offset": "0x25b",
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "instruction_boundary": true,
+              "offset": 603,
+              "period": 582167797,
+              "samples": 66
+            },
+            {
+              "hex_offset": "0x33b",
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "instruction_boundary": true,
+              "offset": 827,
+              "period": 520589550,
+              "samples": 59
+            },
+            {
+              "hex_offset": "0x229",
+              "instruction": "jne    12a722 <litchi_pptx::notes::codec::scan_processed_xml+0x462>",
+              "instruction_boundary": true,
+              "offset": 553,
+              "period": 26492052,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x24b",
+              "instruction": "add    %rdx,%rcx",
+              "instruction_boundary": true,
+              "offset": 587,
+              "period": 26474513,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x24e",
+              "instruction": "jmp    *%rcx",
+              "instruction_boundary": true,
+              "offset": 590,
+              "period": 17643268,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x2af",
+              "instruction": "movzbl %r14b,%eax",
+              "instruction_boundary": true,
+              "offset": 687,
+              "period": 17632181,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x3da",
+              "instruction": "jne    12a9d7 <litchi_pptx::notes::codec::scan_processed_xml+0x717>",
+              "instruction_boundary": true,
+              "offset": 986,
+              "period": 17658057,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x3d3",
+              "instruction": "cmpb   $0x27,-0x98(%rbp)",
+              "instruction_boundary": true,
+              "offset": 979,
+              "period": 8828847,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x17e",
+              "instruction": "cmp    $0x1,%dx",
+              "instruction_boundary": true,
+              "offset": 382,
+              "period": 8826982,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x21f",
+              "instruction": "inc    %rax",
+              "instruction_boundary": true,
+              "offset": 543,
+              "period": 8813192,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x209",
+              "instruction": "lea    -0x1c0(%rbp),%rsi",
+              "instruction_boundary": true,
+              "offset": 521,
+              "period": 8798900,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x215",
+              "instruction": "movabs $0x800000000000000e,%rax",
+              "instruction_boundary": true,
+              "offset": 533,
+              "period": 8827254,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x31d",
+              "instruction": "jmp    12a42d <litchi_pptx::notes::codec::scan_processed_xml+0x16d>",
+              "instruction_boundary": true,
+              "offset": 797,
+              "period": 8830014,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x16d",
+              "instruction": "test   $0x1,%r13b",
+              "instruction_boundary": true,
+              "offset": 365,
+              "period": 8834543,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x18c",
+              "instruction": "mov    -0xf8(%rbp),%rax",
+              "instruction_boundary": true,
+              "offset": 396,
+              "period": 8841508,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x2f9",
+              "instruction": "cmpb   $0x27,-0x98(%rbp)",
+              "instruction_boundary": true,
+              "offset": 761,
+              "period": 8813325,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x300",
+              "instruction": "jne    12a9d7 <litchi_pptx::notes::codec::scan_processed_xml+0x717>",
+              "instruction_boundary": true,
+              "offset": 768,
+              "period": 8813179,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x337",
+              "instruction": "movups 0x8(%rax),%xmm0",
+              "instruction_boundary": true,
+              "offset": 823,
+              "period": 8838091,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x28f",
+              "instruction": "cmp    $0x80,%r15",
+              "instruction_boundary": true,
+              "offset": 655,
+              "period": 8795163,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x1b9",
+              "instruction": "inc    %rdi",
+              "instruction_boundary": true,
+              "offset": 441,
+              "period": 8792348,
+              "samples": 1
+            }
+          ],
+          "symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+          "symbol_bytes": 2246
+        }
+      }
+    },
+    {
+      "frames": {
+        "bytes": 183703,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0814/perf/1.frames.gz",
+        "sha256": "53c10321d2968b8d7b18d506177eb57e7a0a9d4fd26b0150485c43eb81cdfd8a"
+      },
+      "other_owner_leaf_samples": 652,
+      "owner_samples": 853,
+      "repeat": 1,
+      "symbols": {
+        "inspector": {
+          "leaf_samples": 59,
+          "offsets": [
+            {
+              "hex_offset": "0x655",
+              "instruction": "jne    1296ab <litchi_pptx::notes::codec::inspect_element+0xc6b>",
+              "instruction_boundary": true,
+              "offset": 1621,
+              "period": 35312382,
+              "samples": 4
+            },
+            {
+              "hex_offset": "0x0",
+              "instruction": "push   %rbp",
+              "instruction_boundary": true,
+              "offset": 0,
+              "period": 26517577,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x6a3",
+              "instruction": "cmp    $0x800000,%rbx",
+              "instruction_boundary": true,
+              "offset": 1699,
+              "period": 26479139,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x12e",
+              "instruction": "jne    128c63 <litchi_pptx::notes::codec::inspect_element+0x223>",
+              "instruction_boundary": true,
+              "offset": 302,
+              "period": 17609438,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x518",
+              "instruction": "cmp    $0x7a120,%rcx",
+              "instruction_boundary": true,
+              "offset": 1304,
+              "period": 17662132,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x22a",
+              "instruction": "mov    %rax,-0xf0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 554,
+              "period": 17600114,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x5c0",
+              "instruction": "mov    %rax,-0x1b0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 1472,
+              "period": 17651561,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x482",
+              "instruction": "mov    %rax,-0x48(%rbp)",
+              "instruction_boundary": true,
+              "offset": 1154,
+              "period": 17673346,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x4b2",
+              "instruction": "movzbl 0x4(%r13),%ecx",
+              "instruction_boundary": true,
+              "offset": 1202,
+              "period": 17684564,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x2ed",
+              "instruction": "jmp    129592 <litchi_pptx::notes::codec::inspect_element+0xb52>",
+              "instruction_boundary": true,
+              "offset": 749,
+              "period": 17647896,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x3ab",
+              "instruction": "movaps %xmm0,-0x150(%rbp)",
+              "instruction_boundary": true,
+              "offset": 939,
+              "period": 17634122,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0xb2",
+              "instruction": "call   1325a0 <litchi_pptx::notes::resolved>",
+              "instruction_boundary": true,
+              "offset": 178,
+              "period": 17657874,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x61f",
+              "instruction": "je     12963f <litchi_pptx::notes::codec::inspect_element+0xbff>",
+              "instruction_boundary": true,
+              "offset": 1567,
+              "period": 17657300,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x475",
+              "instruction": "je     129383 <litchi_pptx::notes::codec::inspect_element+0x943>",
+              "instruction_boundary": true,
+              "offset": 1141,
+              "period": 17658016,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x45b",
+              "instruction": "lea    -0x180(%rbp),%rsi",
+              "instruction_boundary": true,
+              "offset": 1115,
+              "period": 17646046,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x494",
+              "instruction": "cmp    -0x100(%rbp),%r12",
+              "instruction_boundary": true,
+              "offset": 1172,
+              "period": 8834871,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x35e",
+              "instruction": "mov    0x20(%rbp),%rcx",
+              "instruction_boundary": true,
+              "offset": 862,
+              "period": 8803723,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x46e",
+              "instruction": "cmp    -0xb8(%rbp),%r12",
+              "instruction_boundary": true,
+              "offset": 1134,
+              "period": 8821078,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x693",
+              "instruction": "cmp    %rcx,%rbx",
+              "instruction_boundary": true,
+              "offset": 1683,
+              "period": 8832337,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb5e",
+              "instruction": "pop    %r14",
+              "instruction_boundary": true,
+              "offset": 2910,
+              "period": 8827080,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x5d2",
+              "instruction": "mov    -0xa0(%rbp),%rsi",
+              "instruction_boundary": true,
+              "offset": 1490,
+              "period": 8702726,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x127",
+              "instruction": "cmpl   $0x1,-0xe0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 295,
+              "period": 8789164,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x5b1",
+              "instruction": "cmp    $0x27,%al",
+              "instruction_boundary": true,
+              "offset": 1457,
+              "period": 8820310,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x397",
+              "instruction": "movq   $0x8,-0x158(%rbp)",
+              "instruction_boundary": true,
+              "offset": 919,
+              "period": 8809349,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x467",
+              "instruction": "mov    -0x200(%rbp),%r12",
+              "instruction_boundary": true,
+              "offset": 1127,
+              "period": 8826246,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x3cd",
+              "instruction": "mov    %rax,-0xb0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 973,
+              "period": 8821042,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x426",
+              "instruction": "lea    0x11(%rsi),%rax",
+              "instruction_boundary": true,
+              "offset": 1062,
+              "period": 8839355,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xd",
+              "instruction": "sub    $0x298,%rsp",
+              "instruction_boundary": true,
+              "offset": 13,
+              "period": 8824496,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb52",
+              "instruction": "add    $0x298,%rsp",
+              "instruction_boundary": true,
+              "offset": 2898,
+              "period": 8823152,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x6",
+              "instruction": "push   %r14",
+              "instruction_boundary": true,
+              "offset": 6,
+              "period": 8827237,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x6ba",
+              "instruction": "jne    129114 <litchi_pptx::notes::codec::inspect_element+0x6d4>",
+              "instruction_boundary": true,
+              "offset": 1722,
+              "period": 8824311,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb63",
+              "instruction": "ret",
+              "instruction_boundary": true,
+              "offset": 2915,
+              "period": 8825530,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb62",
+              "instruction": "pop    %rbp",
+              "instruction_boundary": true,
+              "offset": 2914,
+              "period": 8842340,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x6df",
+              "instruction": "shl    $1,%rax",
+              "instruction_boundary": true,
+              "offset": 1759,
+              "period": 8822129,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0xb60",
+              "instruction": "pop    %r15",
+              "instruction_boundary": true,
+              "offset": 2912,
+              "period": 8831857,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x68d",
+              "instruction": "add    %r13,%rbx",
+              "instruction_boundary": true,
+              "offset": 1677,
+              "period": 8835074,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x117",
+              "instruction": "lea    -0xe0(%rbp),%rbx",
+              "instruction_boundary": true,
+              "offset": 279,
+              "period": 8830029,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x56c",
+              "instruction": "xor    %r13d,%r13d",
+              "instruction_boundary": true,
+              "offset": 1388,
+              "period": 8816050,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x5e2",
+              "instruction": "cmpl   $0x1,-0xe0(%rbp)",
+              "instruction_boundary": true,
+              "offset": 1506,
+              "period": 8794987,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x61",
+              "instruction": "mov    0x11cd70(%rip),%rax        # 245818 <_DYNAMIC+0x6b8>",
+              "instruction_boundary": true,
+              "offset": 97,
+              "period": 8836518,
+              "samples": 1
+            }
+          ],
+          "symbol": "litchi_pptx::notes::codec::inspect_element",
+          "symbol_bytes": 3798
+        },
+        "scanner": {
+          "leaf_samples": 142,
+          "offsets": [
+            {
+              "hex_offset": "0x25b",
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "instruction_boundary": true,
+              "offset": 603,
+              "period": 547132382,
+              "samples": 62
+            },
+            {
+              "hex_offset": "0x33b",
+              "instruction": "movups 0x18(%rax),%xmm1",
+              "instruction_boundary": true,
+              "offset": 827,
+              "period": 458919049,
+              "samples": 52
+            },
+            {
+              "hex_offset": "0x24b",
+              "instruction": "add    %rdx,%rcx",
+              "instruction_boundary": true,
+              "offset": 587,
+              "period": 44134534,
+              "samples": 5
+            },
+            {
+              "hex_offset": "0x182",
+              "instruction": "adc    $0xffffffff,%edx",
+              "instruction_boundary": true,
+              "offset": 386,
+              "period": 26468500,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x1ca",
+              "instruction": "sub    %rdi,%rdx",
+              "instruction_boundary": true,
+              "offset": 458,
+              "period": 26483706,
+              "samples": 3
+            },
+            {
+              "hex_offset": "0x236",
+              "instruction": "cmp    $0xa,%rax",
+              "instruction_boundary": true,
+              "offset": 566,
+              "period": 17623153,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x229",
+              "instruction": "jne    12a722 <litchi_pptx::notes::codec::scan_processed_xml+0x462>",
+              "instruction_boundary": true,
+              "offset": 553,
+              "period": 17663972,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x3d3",
+              "instruction": "cmpb   $0x27,-0x98(%rbp)",
+              "instruction_boundary": true,
+              "offset": 979,
+              "period": 17669471,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x389",
+              "instruction": "movzbl %r14b,%eax",
+              "instruction_boundary": true,
+              "offset": 905,
+              "period": 17632938,
+              "samples": 2
+            },
+            {
+              "hex_offset": "0x1d0",
+              "instruction": "cmp    %rsi,%rdx",
+              "instruction_boundary": true,
+              "offset": 464,
+              "period": 8830913,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x38d",
+              "instruction": "and    $0x1,%eax",
+              "instruction_boundary": true,
+              "offset": 909,
+              "period": 8827898,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x23a",
+              "instruction": "ja     12a6c0 <litchi_pptx::notes::codec::scan_processed_xml+0x400>",
+              "instruction_boundary": true,
+              "offset": 570,
+              "period": 8819838,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x209",
+              "instruction": "lea    -0x1c0(%rbp),%rsi",
+              "instruction_boundary": true,
+              "offset": 521,
+              "period": 8827631,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x2f5",
+              "instruction": "add    $0x20,%rsp",
+              "instruction_boundary": true,
+              "offset": 757,
+              "period": 8827061,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x1c1",
+              "instruction": "lea    -0x20(%r8),%r8",
+              "instruction_boundary": true,
+              "offset": 449,
+              "period": 8834163,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x2af",
+              "instruction": "movzbl %r14b,%eax",
+              "instruction_boundary": true,
+              "offset": 687,
+              "period": 8835488,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x2f9",
+              "instruction": "cmpb   $0x27,-0x98(%rbp)",
+              "instruction_boundary": true,
+              "offset": 761,
+              "period": 8823222,
+              "samples": 1
+            },
+            {
+              "hex_offset": "0x3ae",
+              "instruction": "lea    -0x160(%rbp),%r10",
+              "instruction_boundary": true,
+              "offset": 942,
+              "period": 8822344,
+              "samples": 1
+            }
+          ],
+          "symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+          "symbol_bytes": 2246
+        }
+      }
+    }
+  ],
+  "schema": "litchi.performance.0814.offset-audit.v1",
+  "scope": "Exact fp binary scanner/inspector leaf offsets only; other owner leaves are counted separately. Sampling skid and frame-pointer perturbation prevent causal cycle or ordinary-build phase claims."
+}
