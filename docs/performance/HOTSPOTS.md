@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0810 — scanner event wrapper removed after workflow qualification
+
+[0810](0810-pptx-direct-event-workflow.md) The retained scanner removes its direct NsReader::process_event edge while preserving 282,612 Reader::read_event_impl calls and namespace push self Ir of 13,019,166 in each scoped profile. Large-capture p50 improves 4.975% (paired ratio 0.950252, interval 0.943695–0.953076). Other NsReader callers remain. Guest instruction attribution supports the transport mechanism without a native phase-fraction or universal speedup claim.
+
 ## 0809 — event experiment prerequisite repaired
 
 [0809](0809-pptx-refusal-test-quality-repair.md) The three baseline test lint failures are resolved, with all six quality gates passing. No runtime path or measured hotspot changes. Resume the 0807 event-handoff hypothesis using fresh before/after evidence and the existing semantic constraints.

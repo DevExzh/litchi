@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0810 — notes scanner transport preserves workflow contracts
+
+[0810](0810-pptx-direct-event-workflow.md) The retained private codec transport passes 1,241 production tests (zero failures, three ignored), both 36-test probe lanes, and exact source/output/full semantic checks across the eighteen-row public PPTX matrix. The unchanged buffered oracles and three new differential tests protect namespace transitions and refusal ordering. No new CRUD capability, API, or format coverage is claimed.
+
 ## 0809 — existing refusal coverage preserved
 
 [0809](0809-pptx-refusal-test-quality-repair.md) Three assertions now use expect_err while preserving fixtures and typed refusal checks. The existing PPTX suite passes 1,238 tests with three ignored; no public capability or new CRUD category is promoted.

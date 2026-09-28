@@ -1,0 +1,25 @@
+{
+  "packet": {
+    "adoption-policy.json": "15f93f768dcadf694769e603745b50d109f0524299dd76eef132bb4c4265fce4",
+    "analysis-plan.json": "73aa6b14a965f995c3c274a795d7ead0e309a9b50609c97d0d99198dde7d80d7",
+    "apply_candidate.py": "40af162bc39e94c0350d07855a18e42cd2432f36a8c1d2680dbce568ba61d7d0",
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "761ba5b61825f7f31673472c8c23733b7980c4b3eb6a83098a22ad51feccbc84",
+    "capture.py": "fedc863e76ba181ac0676feeb57455b83c8857c0a69197ea3b6cf065983462e6",
+    "custody.py": "d07fbd35298d847c55b63ab0579ffce6c73ecbe5fc46732281baf87d4443f27c",
+    "host.json": "fc7e1f45849b4f91dcb1952c84473a41f9891ed21d777c2300af174ce9e4a323",
+    "inheritance.json": "4a83b4d648e216125c3c9ffebcc441d12e6d2da02a224867e6fbeb3fb6f5b97a",
+    "inputs/root-Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "inputs/rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3",
+    "origin.json": "7f59cada0fba1451d4d3c6e8912345a4e661274d2403d6570b1d18efe264c07a",
+    "plan.json": "22e1e545dd45ebfdc6ae39563e32641f324bc60ace792b16e78b5b16ba792007",
+    "probe_quality.py": "7532853ec62b29399afeb05dba2f151dfdcd73b54970e0c201b42df6549befd3",
+    "profile.py": "0cebc2b04e7397a73b09d00908acdc1931e4317a037319b60cd5847651cdcb14",
+    "quality.py": "f4630754ae2118e28ba7bd902e1113e9214e05cb0262ddddb8d3853f9e0e9fba",
+    "restore_candidate.py": "ce8643eea378f27bc8ac32cd5ba672b4d919300ba02f8fd8f400d9475f46a6cf"
+  },
+  "root_inputs": {
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  }
+}

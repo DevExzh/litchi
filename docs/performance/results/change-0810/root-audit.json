@@ -1,0 +1,2762 @@
+{
+  "adoption_eligible": true,
+  "allocation": [
+    {
+      "after": 1338,
+      "before": 1338,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 117635,
+      "before": 117635,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 43477,
+      "before": 43477,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 62463,
+      "before": 62463,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 1338,
+      "before": 1338,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 117635,
+      "before": 117635,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 43477,
+      "before": 43477,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 62463,
+      "before": 62463,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "after": 1863,
+      "before": 1863,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 148164,
+      "before": 148164,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 5947,
+      "before": 5947,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 67676,
+      "before": 67676,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 1863,
+      "before": 1863,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 148164,
+      "before": 148164,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 5947,
+      "before": 5947,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 67676,
+      "before": 67676,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "after": 5670,
+      "before": 5670,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 1023938,
+      "before": 1023938,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 106060,
+      "before": 106060,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 552012,
+      "before": 552012,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 5670,
+      "before": 5670,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 1023938,
+      "before": 1023938,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 106060,
+      "before": 106060,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 552012,
+      "before": 552012,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "after": 2869,
+      "before": 2869,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 228631,
+      "before": 228631,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 2869,
+      "before": 2869,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 228631,
+      "before": 228631,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "after": 3061,
+      "before": 3061,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 233162,
+      "before": 233162,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 3061,
+      "before": 3061,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 233162,
+      "before": 233162,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "after": 9568,
+      "before": 9568,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 1331862,
+      "before": 1331862,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 135196,
+      "before": 135196,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 592974,
+      "before": 592974,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 9568,
+      "before": 9568,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 1331862,
+      "before": 1331862,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 135196,
+      "before": 135196,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 592974,
+      "before": 592974,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "after": 72106,
+      "before": 72106,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 4767939,
+      "before": 4767939,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 278201,
+      "before": 278201,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 338955,
+      "before": 338955,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 72106,
+      "before": 72106,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 4767939,
+      "before": 4767939,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 278201,
+      "before": 278201,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 338955,
+      "before": 338955,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "after": 15498,
+      "before": 15498,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 1111996,
+      "before": 1111996,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 17709,
+      "before": 17709,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 367392,
+      "before": 367392,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 15498,
+      "before": 15498,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 1111996,
+      "before": 1111996,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 17709,
+      "before": 17709,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 367392,
+      "before": 367392,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "after": 104331,
+      "before": 104331,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 8542943,
+      "before": 8542943,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 706864,
+      "before": 706864,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 1290863,
+      "before": 1290863,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 104331,
+      "before": 104331,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 8542943,
+      "before": 8542943,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 706864,
+      "before": 706864,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 1290863,
+      "before": 1290863,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "after": 3157,
+      "before": 3157,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 292567,
+      "before": 292567,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 3157,
+      "before": 3157,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 292567,
+      "before": 292567,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "after": 3165,
+      "before": 3165,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 269277,
+      "before": 269277,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 3165,
+      "before": 3165,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 269277,
+      "before": 269277,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "after": 9998,
+      "before": 9998,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 1445364,
+      "before": 1445364,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 137151,
+      "before": 137151,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 596387,
+      "before": 596387,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 9998,
+      "before": 9998,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 1445364,
+      "before": 1445364,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 137151,
+      "before": 137151,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 596387,
+      "before": 596387,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "after": 3157,
+      "before": 3157,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 292567,
+      "before": 292567,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 3157,
+      "before": 3157,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 292567,
+      "before": 292567,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 3165,
+      "before": 3165,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 269277,
+      "before": 269277,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 3165,
+      "before": 3165,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 269277,
+      "before": 269277,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 9998,
+      "before": 9998,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 1445364,
+      "before": 1445364,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 137151,
+      "before": 137151,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 596387,
+      "before": 596387,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 9998,
+      "before": 9998,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 1445364,
+      "before": 1445364,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 137151,
+      "before": 137151,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 596387,
+      "before": 596387,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    },
+    {
+      "after": 3049,
+      "before": 3049,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 277207,
+      "before": 277207,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 3049,
+      "before": 3049,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 277207,
+      "before": 277207,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 68221,
+      "before": 68221,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 90400,
+      "before": 90400,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "capture",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 3138,
+      "before": 3138,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 265257,
+      "before": 265257,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 3138,
+      "before": 3138,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 265257,
+      "before": 265257,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 7666,
+      "before": 7666,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 98477,
+      "before": 98477,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "commit",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 9848,
+      "before": 9848,
+      "block": 0,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 1421180,
+      "before": 1421180,
+      "block": 0,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 136971,
+      "before": 136971,
+      "block": 0,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 596207,
+      "before": 596207,
+      "block": 0,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 9848,
+      "before": 9848,
+      "block": 1,
+      "increase": false,
+      "metric": "allocation_calls",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 1421180,
+      "before": 1421180,
+      "block": 1,
+      "increase": false,
+      "metric": "allocated_bytes",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 136971,
+      "before": 136971,
+      "block": 1,
+      "increase": false,
+      "metric": "net_live",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    },
+    {
+      "after": 596207,
+      "before": 596207,
+      "block": 1,
+      "increase": false,
+      "metric": "peak_above_entry",
+      "mode": "lifecycle",
+      "shape": "valid-4attr"
+    }
+  ],
+  "benefits": [
+    {
+      "after_p50_ns": 17875001.0,
+      "before_p50_ns": 18810120.5,
+      "blocks": [
+        {
+          "after": 17896686,
+          "before": 18793130,
+          "block": 0,
+          "ratio": 0.9522993774852831
+        },
+        {
+          "after": 17884716,
+          "before": 18794570,
+          "block": 1,
+          "ratio": 0.951589528252043
+        },
+        {
+          "after": 17796145,
+          "before": 18825671,
+          "block": 2,
+          "ratio": 0.945312653131992
+        },
+        {
+          "after": 17746825,
+          "before": 18837971,
+          "block": 3,
+          "ratio": 0.9420773075826478
+        },
+        {
+          "after": 17865286,
+          "before": 18827071,
+          "block": 4,
+          "ratio": 0.9489147833988621
+        },
+        {
+          "after": 17888685,
+          "before": 18754150,
+          "block": 5,
+          "ratio": 0.953852080739463
+        }
+      ],
+      "ci95": {
+        "high": 0.953075729112373,
+        "low": 0.9436949803573199,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9522993774852831,
+        0.951589528252043,
+        0.945312653131992,
+        0.9420773075826478,
+        0.9489147833988621,
+        0.953852080739463
+      ],
+      "ratio": 0.9502521558254526,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 527748.0,
+      "before_p50_ns": 549398.0,
+      "blocks": [
+        {
+          "after": 528623,
+          "before": 548743,
+          "block": 0,
+          "ratio": 0.9633343842199353
+        },
+        {
+          "after": 526432,
+          "before": 548653,
+          "block": 1,
+          "ratio": 0.9594989911656365
+        },
+        {
+          "after": 525703,
+          "before": 552223,
+          "block": 2,
+          "ratio": 0.95197592277033
+        },
+        {
+          "after": 526873,
+          "before": 550053,
+          "block": 3,
+          "ratio": 0.9578586063524788
+        },
+        {
+          "after": 530793,
+          "before": 547683,
+          "block": 4,
+          "ratio": 0.9691609927640624
+        },
+        {
+          "after": 529403,
+          "before": 552013,
+          "block": 5,
+          "ratio": 0.9590408196908407
+        }
+      ],
+      "ci95": {
+        "high": 0.9662476884919988,
+        "low": 0.9549172645614044,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9633343842199353,
+        0.9594989911656365,
+        0.95197592277033,
+        0.9578586063524788,
+        0.9691609927640624,
+        0.9590408196908407
+      ],
+      "ratio": 0.9592699054282385,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 533897.5,
+      "before_p50_ns": 552943.0,
+      "blocks": [
+        {
+          "after": 534342,
+          "before": 556283,
+          "block": 0,
+          "ratio": 0.9605578455570276
+        },
+        {
+          "after": 533453,
+          "before": 556353,
+          "block": 1,
+          "ratio": 0.9588390823811501
+        },
+        {
+          "after": 528803,
+          "before": 552283,
+          "block": 2,
+          "ratio": 0.9574855644660437
+        },
+        {
+          "after": 538252,
+          "before": 552183,
+          "block": 3,
+          "ratio": 0.9747710451064231
+        },
+        {
+          "after": 533333,
+          "before": 553603,
+          "block": 4,
+          "ratio": 0.9633853140246711
+        },
+        {
+          "after": 542403,
+          "before": 551833,
+          "block": 5,
+          "ratio": 0.9829114967752925
+        }
+      ],
+      "ci95": {
+        "high": 0.9788412709408578,
+        "low": 0.958162323423597,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9605578455570276,
+        0.9588390823811501,
+        0.9574855644660437,
+        0.9747710451064231,
+        0.9633853140246711,
+        0.9829114967752925
+      ],
+      "ratio": 0.9619715797908494,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 506678.0,
+      "before_p50_ns": 528873.0,
+      "blocks": [
+        {
+          "after": 508403,
+          "before": 532183,
+          "block": 0,
+          "ratio": 0.9553161224616344
+        },
+        {
+          "after": 511573,
+          "before": 529622,
+          "block": 1,
+          "ratio": 0.9659209776028942
+        },
+        {
+          "after": 504953,
+          "before": 528963,
+          "block": 2,
+          "ratio": 0.9546093015957637
+        },
+        {
+          "after": 504833,
+          "before": 524713,
+          "block": 3,
+          "ratio": 0.9621126215664564
+        },
+        {
+          "after": 510192,
+          "before": 525072,
+          "block": 4,
+          "ratio": 0.971661029344547
+        },
+        {
+          "after": 502912,
+          "before": 528783,
+          "block": 5,
+          "ratio": 0.9510744483086635
+        }
+      ],
+      "ci95": {
+        "high": 0.9687910034737206,
+        "low": 0.9528418749522136,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9553161224616344,
+        0.9659209776028942,
+        0.9546093015957637,
+        0.9621126215664564,
+        0.971661029344547,
+        0.9510744483086635
+      ],
+      "ratio": 0.9587143720140454,
+      "shape": "valid-4attr"
+    }
+  ],
+  "bootstrap": {
+    "high_rank": 9749,
+    "low_rank": 250,
+    "resamples": 10000,
+    "seed": 810810
+  },
+  "latency_violations": [],
+  "native": [
+    {
+      "after_p50_ns": 232731.0,
+      "before_p50_ns": 238466.0,
+      "blocks": [
+        {
+          "after": 232741,
+          "before": 238661,
+          "block": 0,
+          "ratio": 0.975194941779344
+        },
+        {
+          "after": 232492,
+          "before": 238271,
+          "block": 1,
+          "ratio": 0.9757461042258605
+        },
+        {
+          "after": 232721,
+          "before": 238122,
+          "block": 2,
+          "ratio": 0.9773183494175255
+        },
+        {
+          "after": 232801,
+          "before": 239101,
+          "block": 3,
+          "ratio": 0.9736513021693761
+        },
+        {
+          "after": 232961,
+          "before": 238851,
+          "block": 4,
+          "ratio": 0.9753402748994143
+        },
+        {
+          "after": 232331,
+          "before": 238231,
+          "block": 5,
+          "ratio": 0.9752341215039184
+        }
+      ],
+      "ci95": {
+        "high": 0.9765322268216929,
+        "low": 0.97442312197436,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.975194941779344,
+        0.9757461042258605,
+        0.9773183494175255,
+        0.9736513021693761,
+        0.9753402748994143,
+        0.9752341215039184
+      ],
+      "ratio": 0.9752871982016664,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 209956.0,
+      "before_p50_ns": 213966.0,
+      "blocks": [
+        {
+          "after": 209501,
+          "before": 214961,
+          "block": 0,
+          "ratio": 0.9746000437288624
+        },
+        {
+          "after": 209431,
+          "before": 214041,
+          "block": 1,
+          "ratio": 0.9784620703510075
+        },
+        {
+          "after": 211691,
+          "before": 213652,
+          "block": 2,
+          "ratio": 0.9908215228502425
+        },
+        {
+          "after": 210351,
+          "before": 213361,
+          "block": 3,
+          "ratio": 0.9858924545722977
+        },
+        {
+          "after": 209561,
+          "before": 213891,
+          "block": 4,
+          "ratio": 0.9797560439663193
+        },
+        {
+          "after": 210391,
+          "before": 214741,
+          "block": 5,
+          "ratio": 0.9797430392891903
+        }
+      ],
+      "ci95": {
+        "high": 0.9883569887112701,
+        "low": 0.976531057039935,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9746000437288624,
+        0.9784620703510075,
+        0.9908215228502425,
+        0.9858924545722977,
+        0.9797560439663193,
+        0.9797430392891903
+      ],
+      "ratio": 0.9797495416277548,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 1406527.5,
+      "before_p50_ns": 1416893.0,
+      "blocks": [
+        {
+          "after": 1411458,
+          "before": 1422918,
+          "block": 0,
+          "ratio": 0.9919461276053856
+        },
+        {
+          "after": 1403017,
+          "before": 1416657,
+          "block": 1,
+          "ratio": 0.9903716990068874
+        },
+        {
+          "after": 1405497,
+          "before": 1416918,
+          "block": 2,
+          "ratio": 0.9919395476661317
+        },
+        {
+          "after": 1402428,
+          "before": 1416868,
+          "block": 3,
+          "ratio": 0.9898085072145041
+        },
+        {
+          "after": 1407558,
+          "before": 1417908,
+          "block": 4,
+          "ratio": 0.992700513714571
+        },
+        {
+          "after": 1412268,
+          "before": 1414787,
+          "block": 5,
+          "ratio": 0.9982195199701439
+        }
+      ],
+      "ci95": {
+        "high": 0.9954600168423575,
+        "low": 0.9900901031106957,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9919461276053856,
+        0.9903716990068874,
+        0.9919395476661317,
+        0.9898085072145041,
+        0.992700513714571,
+        0.9982195199701439
+      ],
+      "ratio": 0.9919428376357586,
+      "shape": "tiny"
+    },
+    {
+      "after_p50_ns": 446332.5,
+      "before_p50_ns": 461377.0,
+      "blocks": [
+        {
+          "after": 446813,
+          "before": 459653,
+          "block": 0,
+          "ratio": 0.9720658844824248
+        },
+        {
+          "after": 443303,
+          "before": 462912,
+          "block": 1,
+          "ratio": 0.9576398969998617
+        },
+        {
+          "after": 447022,
+          "before": 459312,
+          "block": 2,
+          "ratio": 0.9732425889155955
+        },
+        {
+          "after": 443132,
+          "before": 463333,
+          "block": 3,
+          "ratio": 0.956400688058049
+        },
+        {
+          "after": 457583,
+          "before": 464282,
+          "block": 4,
+          "ratio": 0.9855712691855381
+        },
+        {
+          "after": 445852,
+          "before": 459842,
+          "block": 5,
+          "ratio": 0.9695765067131754
+        }
+      ],
+      "ci95": {
+        "high": 0.9794069290505667,
+        "low": 0.9570202925289554,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9720658844824248,
+        0.9576398969998617,
+        0.9732425889155955,
+        0.956400688058049,
+        0.9855712691855381,
+        0.9695765067131754
+      ],
+      "ratio": 0.9708211955978001,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 293581.5,
+      "before_p50_ns": 298731.5,
+      "blocks": [
+        {
+          "after": 293702,
+          "before": 299861,
+          "block": 0,
+          "ratio": 0.9794604833572889
+        },
+        {
+          "after": 293461,
+          "before": 298711,
+          "block": 1,
+          "ratio": 0.9824244838656762
+        },
+        {
+          "after": 291941,
+          "before": 298622,
+          "block": 2,
+          "ratio": 0.9776272344301492
+        },
+        {
+          "after": 292611,
+          "before": 298752,
+          "block": 3,
+          "ratio": 0.9794444890745502
+        },
+        {
+          "after": 294071,
+          "before": 298012,
+          "block": 4,
+          "ratio": 0.9867757003073702
+        },
+        {
+          "after": 294302,
+          "before": 299942,
+          "block": 5,
+          "ratio": 0.9811963646304952
+        }
+      ],
+      "ci95": {
+        "high": 0.9846000920865232,
+        "low": 0.9785358617523496,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9794604833572889,
+        0.9824244838656762,
+        0.9776272344301492,
+        0.9794444890745502,
+        0.9867757003073702,
+        0.9811963646304952
+      ],
+      "ratio": 0.9803284239938921,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 1999646.0,
+      "before_p50_ns": 2013041.0,
+      "blocks": [
+        {
+          "after": 1995600,
+          "before": 2022301,
+          "block": 0,
+          "ratio": 0.9867967231386425
+        },
+        {
+          "after": 2001541,
+          "before": 2009551,
+          "block": 1,
+          "ratio": 0.9960140349759723
+        },
+        {
+          "after": 2003491,
+          "before": 2013151,
+          "block": 2,
+          "ratio": 0.9952015521935513
+        },
+        {
+          "after": 2005071,
+          "before": 2012931,
+          "block": 3,
+          "ratio": 0.9960952461857858
+        },
+        {
+          "after": 1987890,
+          "before": 2031161,
+          "block": 4,
+          "ratio": 0.978696420421621
+        },
+        {
+          "after": 1997751,
+          "before": 2012261,
+          "block": 5,
+          "ratio": 0.9927892057740024
+        }
+      ],
+      "ci95": {
+        "high": 0.996054640580879,
+        "low": 0.9827465717801318,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9867967231386425,
+        0.9960140349759723,
+        0.9952015521935513,
+        0.9960952461857858,
+        0.978696420421621,
+        0.9927892057740024
+      ],
+      "ratio": 0.9939953789837769,
+      "shape": "medium"
+    },
+    {
+      "after_p50_ns": 17875001.0,
+      "before_p50_ns": 18810120.5,
+      "blocks": [
+        {
+          "after": 17896686,
+          "before": 18793130,
+          "block": 0,
+          "ratio": 0.9522993774852831
+        },
+        {
+          "after": 17884716,
+          "before": 18794570,
+          "block": 1,
+          "ratio": 0.951589528252043
+        },
+        {
+          "after": 17796145,
+          "before": 18825671,
+          "block": 2,
+          "ratio": 0.945312653131992
+        },
+        {
+          "after": 17746825,
+          "before": 18837971,
+          "block": 3,
+          "ratio": 0.9420773075826478
+        },
+        {
+          "after": 17865286,
+          "before": 18827071,
+          "block": 4,
+          "ratio": 0.9489147833988621
+        },
+        {
+          "after": 17888685,
+          "before": 18754150,
+          "block": 5,
+          "ratio": 0.953852080739463
+        }
+      ],
+      "ci95": {
+        "high": 0.953075729112373,
+        "low": 0.9436949803573199,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9522993774852831,
+        0.951589528252043,
+        0.945312653131992,
+        0.9420773075826478,
+        0.9489147833988621,
+        0.953852080739463
+      ],
+      "ratio": 0.9502521558254526,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 1280557.0,
+      "before_p50_ns": 1305292.0,
+      "blocks": [
+        {
+          "after": 1284807,
+          "before": 1309957,
+          "block": 0,
+          "ratio": 0.9808008965179773
+        },
+        {
+          "after": 1279737,
+          "before": 1305367,
+          "block": 1,
+          "ratio": 0.9803656749404573
+        },
+        {
+          "after": 1278937,
+          "before": 1304137,
+          "block": 2,
+          "ratio": 0.9806768767391769
+        },
+        {
+          "after": 1279387,
+          "before": 1307017,
+          "block": 3,
+          "ratio": 0.9788602596599738
+        },
+        {
+          "after": 1281377,
+          "before": 1304807,
+          "block": 4,
+          "ratio": 0.982043321349441
+        },
+        {
+          "after": 1285807,
+          "before": 1305217,
+          "block": 5,
+          "ratio": 0.9851289095989403
+        }
+      ],
+      "ci95": {
+        "high": 0.9835861154741906,
+        "low": 0.9796129673002156,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9808008965179773,
+        0.9803656749404573,
+        0.9806768767391769,
+        0.9788602596599738,
+        0.982043321349441,
+        0.9851289095989403
+      ],
+      "ratio": 0.9807388866285771,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 27769528.0,
+      "before_p50_ns": 28362532.0,
+      "blocks": [
+        {
+          "after": 27668508,
+          "before": 28364212,
+          "block": 0,
+          "ratio": 0.9754724721420077
+        },
+        {
+          "after": 27713448,
+          "before": 28429122,
+          "block": 1,
+          "ratio": 0.974826025228637
+        },
+        {
+          "after": 27160716,
+          "before": 28272091,
+          "block": 2,
+          "ratio": 0.9606900317348299
+        },
+        {
+          "after": 27935840,
+          "before": 28360852,
+          "block": 3,
+          "ratio": 0.9850141314513401
+        },
+        {
+          "after": 27898720,
+          "before": 28376612,
+          "block": 4,
+          "ratio": 0.9831589479392395
+        },
+        {
+          "after": 27825608,
+          "before": 28339271,
+          "block": 5,
+          "ratio": 0.9818745161087594
+        }
+      ],
+      "ci95": {
+        "high": 0.9840865396952898,
+        "low": 0.9677580284817335,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9754724721420077,
+        0.974826025228637,
+        0.9606900317348299,
+        0.9850141314513401,
+        0.9831589479392395,
+        0.9818745161087594
+      ],
+      "ratio": 0.9786734941253836,
+      "shape": "large"
+    },
+    {
+      "after_p50_ns": 527748.0,
+      "before_p50_ns": 549398.0,
+      "blocks": [
+        {
+          "after": 528623,
+          "before": 548743,
+          "block": 0,
+          "ratio": 0.9633343842199353
+        },
+        {
+          "after": 526432,
+          "before": 548653,
+          "block": 1,
+          "ratio": 0.9594989911656365
+        },
+        {
+          "after": 525703,
+          "before": 552223,
+          "block": 2,
+          "ratio": 0.95197592277033
+        },
+        {
+          "after": 526873,
+          "before": 550053,
+          "block": 3,
+          "ratio": 0.9578586063524788
+        },
+        {
+          "after": 530793,
+          "before": 547683,
+          "block": 4,
+          "ratio": 0.9691609927640624
+        },
+        {
+          "after": 529403,
+          "before": 552013,
+          "block": 5,
+          "ratio": 0.9590408196908407
+        }
+      ],
+      "ci95": {
+        "high": 0.9662476884919988,
+        "low": 0.9549172645614044,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9633343842199353,
+        0.9594989911656365,
+        0.95197592277033,
+        0.9578586063524788,
+        0.9691609927640624,
+        0.9590408196908407
+      ],
+      "ratio": 0.9592699054282385,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 323377.0,
+      "before_p50_ns": 329842.0,
+      "blocks": [
+        {
+          "after": 323612,
+          "before": 330042,
+          "block": 0,
+          "ratio": 0.9805176310893765
+        },
+        {
+          "after": 322772,
+          "before": 330251,
+          "block": 1,
+          "ratio": 0.9773535886340995
+        },
+        {
+          "after": 321832,
+          "before": 329772,
+          "block": 2,
+          "ratio": 0.9759227587545334
+        },
+        {
+          "after": 323802,
+          "before": 329912,
+          "block": 3,
+          "ratio": 0.9814799097941269
+        },
+        {
+          "after": 323142,
+          "before": 328892,
+          "block": 4,
+          "ratio": 0.9825170572710799
+        },
+        {
+          "after": 323872,
+          "before": 328512,
+          "block": 5,
+          "ratio": 0.9858757062146892
+        }
+      ],
+      "ci95": {
+        "high": 0.9841963817428845,
+        "low": 0.9766381736943164,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9805176310893765,
+        0.9773535886340995,
+        0.9759227587545334,
+        0.9814799097941269,
+        0.9825170572710799,
+        0.9858757062146892
+      ],
+      "ratio": 0.9809987704417518,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 2150937.0,
+      "before_p50_ns": 2179366.5,
+      "blocks": [
+        {
+          "after": 2164812,
+          "before": 2182392,
+          "block": 0,
+          "ratio": 0.9919446185653173
+        },
+        {
+          "after": 2151502,
+          "before": 2179131,
+          "block": 1,
+          "ratio": 0.9873210926740981
+        },
+        {
+          "after": 2150372,
+          "before": 2180761,
+          "block": 2,
+          "ratio": 0.986064956223997
+        },
+        {
+          "after": 2149932,
+          "before": 2177512,
+          "block": 3,
+          "ratio": 0.9873341685373032
+        },
+        {
+          "after": 2164721,
+          "before": 2174602,
+          "block": 4,
+          "ratio": 0.9954561800274258
+        },
+        {
+          "after": 2148742,
+          "before": 2179602,
+          "block": 5,
+          "ratio": 0.985841451787987
+        }
+      ],
+      "ci95": {
+        "high": 0.9937003992963716,
+        "low": 0.985953204005992,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9919446185653173,
+        0.9873210926740981,
+        0.986064956223997,
+        0.9873341685373032,
+        0.9954561800274258,
+        0.985841451787987
+      ],
+      "ratio": 0.9873276306057006,
+      "shape": "vendor"
+    },
+    {
+      "after_p50_ns": 533897.5,
+      "before_p50_ns": 552943.0,
+      "blocks": [
+        {
+          "after": 534342,
+          "before": 556283,
+          "block": 0,
+          "ratio": 0.9605578455570276
+        },
+        {
+          "after": 533453,
+          "before": 556353,
+          "block": 1,
+          "ratio": 0.9588390823811501
+        },
+        {
+          "after": 528803,
+          "before": 552283,
+          "block": 2,
+          "ratio": 0.9574855644660437
+        },
+        {
+          "after": 538252,
+          "before": 552183,
+          "block": 3,
+          "ratio": 0.9747710451064231
+        },
+        {
+          "after": 533333,
+          "before": 553603,
+          "block": 4,
+          "ratio": 0.9633853140246711
+        },
+        {
+          "after": 542403,
+          "before": 551833,
+          "block": 5,
+          "ratio": 0.9829114967752925
+        }
+      ],
+      "ci95": {
+        "high": 0.9788412709408578,
+        "low": 0.958162323423597,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9605578455570276,
+        0.9588390823811501,
+        0.9574855644660437,
+        0.9747710451064231,
+        0.9633853140246711,
+        0.9829114967752925
+      ],
+      "ratio": 0.9619715797908494,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 323221.5,
+      "before_p50_ns": 329961.5,
+      "blocks": [
+        {
+          "after": 323242,
+          "before": 330192,
+          "block": 0,
+          "ratio": 0.9789516402577894
+        },
+        {
+          "after": 323201,
+          "before": 329862,
+          "block": 1,
+          "ratio": 0.9798067070471894
+        },
+        {
+          "after": 322632,
+          "before": 329172,
+          "block": 2,
+          "ratio": 0.9801319674820459
+        },
+        {
+          "after": 324372,
+          "before": 330771,
+          "block": 3,
+          "ratio": 0.9806542895235677
+        },
+        {
+          "after": 321162,
+          "before": 330061,
+          "block": 4,
+          "ratio": 0.9730383171595554
+        },
+        {
+          "after": 323581,
+          "before": 329451,
+          "block": 5,
+          "ratio": 0.9821824793368361
+        }
+      ],
+      "ci95": {
+        "high": 0.9814183844302019,
+        "low": 0.9759949787086724,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9789516402577894,
+        0.9798067070471894,
+        0.9801319674820459,
+        0.9806542895235677,
+        0.9730383171595554,
+        0.9821824793368361
+      ],
+      "ratio": 0.9799693372646177,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 2160237.0,
+      "before_p50_ns": 2183796.5,
+      "blocks": [
+        {
+          "after": 2162672,
+          "before": 2181322,
+          "block": 0,
+          "ratio": 0.9914501389524334
+        },
+        {
+          "after": 2160762,
+          "before": 2183562,
+          "block": 1,
+          "ratio": 0.9895583454923652
+        },
+        {
+          "after": 2159712,
+          "before": 2179712,
+          "block": 2,
+          "ratio": 0.9908244758940631
+        },
+        {
+          "after": 2157042,
+          "before": 2196011,
+          "block": 3,
+          "ratio": 0.9822546426224641
+        },
+        {
+          "after": 2167331,
+          "before": 2188872,
+          "block": 4,
+          "ratio": 0.9901588580784989
+        },
+        {
+          "after": 2147831,
+          "before": 2184031,
+          "block": 5,
+          "ratio": 0.983425143690726
+        }
+      ],
+      "ci95": {
+        "high": 0.9911373074232482,
+        "low": 0.982839893156595,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9914501389524334,
+        0.9895583454923652,
+        0.9908244758940631,
+        0.9822546426224641,
+        0.9901588580784989,
+        0.983425143690726
+      ],
+      "ratio": 0.9898586017854321,
+      "shape": "unicode-vendor"
+    },
+    {
+      "after_p50_ns": 506678.0,
+      "before_p50_ns": 528873.0,
+      "blocks": [
+        {
+          "after": 508403,
+          "before": 532183,
+          "block": 0,
+          "ratio": 0.9553161224616344
+        },
+        {
+          "after": 511573,
+          "before": 529622,
+          "block": 1,
+          "ratio": 0.9659209776028942
+        },
+        {
+          "after": 504953,
+          "before": 528963,
+          "block": 2,
+          "ratio": 0.9546093015957637
+        },
+        {
+          "after": 504833,
+          "before": 524713,
+          "block": 3,
+          "ratio": 0.9621126215664564
+        },
+        {
+          "after": 510192,
+          "before": 525072,
+          "block": 4,
+          "ratio": 0.971661029344547
+        },
+        {
+          "after": 502912,
+          "before": 528783,
+          "block": 5,
+          "ratio": 0.9510744483086635
+        }
+      ],
+      "ci95": {
+        "high": 0.9687910034737206,
+        "low": 0.9528418749522136,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "capture",
+      "paired_ratios": [
+        0.9553161224616344,
+        0.9659209776028942,
+        0.9546093015957637,
+        0.9621126215664564,
+        0.971661029344547,
+        0.9510744483086635
+      ],
+      "ratio": 0.9587143720140454,
+      "shape": "valid-4attr"
+    },
+    {
+      "after_p50_ns": 314356.5,
+      "before_p50_ns": 321901.0,
+      "blocks": [
+        {
+          "after": 313252,
+          "before": 322081,
+          "block": 0,
+          "ratio": 0.9725876409971405
+        },
+        {
+          "after": 313892,
+          "before": 323181,
+          "block": 1,
+          "ratio": 0.9712575924946083
+        },
+        {
+          "after": 315662,
+          "before": 321751,
+          "block": 2,
+          "ratio": 0.981075427892998
+        },
+        {
+          "after": 314372,
+          "before": 322051,
+          "block": 3,
+          "ratio": 0.9761559504550521
+        },
+        {
+          "after": 314341,
+          "before": 320712,
+          "block": 4,
+          "ratio": 0.9801348250143431
+        },
+        {
+          "after": 315222,
+          "before": 321642,
+          "block": 5,
+          "ratio": 0.9800399201596807
+        }
+      ],
+      "ci95": {
+        "high": 0.9806051264536706,
+        "low": 0.9719226167458743,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "commit",
+      "paired_ratios": [
+        0.9725876409971405,
+        0.9712575924946083,
+        0.981075427892998,
+        0.9761559504550521,
+        0.9801348250143431,
+        0.9800399201596807
+      ],
+      "ratio": 0.9780979353073664,
+      "shape": "valid-4attr"
+    },
+    {
+      "after_p50_ns": 2115241.5,
+      "before_p50_ns": 2143331.5,
+      "blocks": [
+        {
+          "after": 2112731,
+          "before": 2140951,
+          "block": 0,
+          "ratio": 0.9868189416759188
+        },
+        {
+          "after": 2100481,
+          "before": 2143851,
+          "block": 1,
+          "ratio": 0.9797700493177931
+        },
+        {
+          "after": 2117752,
+          "before": 2142812,
+          "block": 2,
+          "ratio": 0.9883050869604987
+        },
+        {
+          "after": 2111342,
+          "before": 2137752,
+          "block": 3,
+          "ratio": 0.9876459009277035
+        },
+        {
+          "after": 2124311,
+          "before": 2167082,
+          "block": 4,
+          "ratio": 0.9802633218309229
+        },
+        {
+          "after": 2124871,
+          "before": 2145161,
+          "block": 5,
+          "ratio": 0.9905415024793011
+        }
+      ],
+      "ci95": {
+        "high": 0.9894232947198999,
+        "low": 0.980016685574358,
+        "resamples": 10000,
+        "seed": 810810
+      },
+      "mode": "lifecycle",
+      "paired_ratios": [
+        0.9868189416759188,
+        0.9797700493177931,
+        0.9883050869604987,
+        0.9876459009277035,
+        0.9802633218309229,
+        0.9905415024793011
+      ],
+      "ratio": 0.9872324213018111,
+      "shape": "valid-4attr"
+    }
+  ],
+  "qualification": [
+    {
+      "mode": "capture",
+      "output": [
+        31530,
+        "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49"
+      ],
+      "shape": "tiny"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        31549,
+        "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      ],
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        31549,
+        "10d6819120dc881e89ae4d191a85b550d6bb11efc20418565fac605b79adc07a"
+      ],
+      "shape": "tiny"
+    },
+    {
+      "mode": "capture",
+      "output": [
+        40788,
+        "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e"
+      ],
+      "shape": "medium"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        40806,
+        "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      ],
+      "shape": "medium"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        40806,
+        "eee54f80d033e9e423625157dff22943f146e5989f814e61adc9fbbbda2ddcf4"
+      ],
+      "shape": "medium"
+    },
+    {
+      "mode": "capture",
+      "output": [
+        215220,
+        "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9"
+      ],
+      "shape": "large"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        215240,
+        "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      ],
+      "shape": "large"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        215240,
+        "af76af57c33a47c69cf921d41fd1b961a566557c372ca0e546e2e4085157ee15"
+      ],
+      "shape": "large"
+    },
+    {
+      "mode": "capture",
+      "output": [
+        42433,
+        "e8b519bbbcf4140fe3d57f0cedbeb0f266fa0bbc3d1509d4b392151f323f2be8"
+      ],
+      "shape": "vendor"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        42450,
+        "4ceca02399d8e993511be03046ed0970a23ad0d942ba95925c769eed24fdb4b4"
+      ],
+      "shape": "vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        42450,
+        "4ceca02399d8e993511be03046ed0970a23ad0d942ba95925c769eed24fdb4b4"
+      ],
+      "shape": "vendor"
+    },
+    {
+      "mode": "capture",
+      "output": [
+        42370,
+        "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+      ],
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        42386,
+        "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8"
+      ],
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        42386,
+        "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8"
+      ],
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "capture",
+      "output": [
+        42304,
+        "a15d498e5201902f749b9be08e3d698bf1c1ebc8a73aba467558105c382519f3"
+      ],
+      "shape": "valid-4attr"
+    },
+    {
+      "mode": "commit",
+      "output": [
+        42323,
+        "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      ],
+      "shape": "valid-4attr"
+    },
+    {
+      "mode": "lifecycle",
+      "output": [
+        42323,
+        "7af3fecea9679c1f7e713a7b0c5aa4b0e261e5a30b2f1ff6947c637fdc419133"
+      ],
+      "shape": "valid-4attr"
+    }
+  ],
+  "reports": 306,
+  "resource_guard": true,
+  "resource_violations": [],
+  "samples": 6714,
+  "schema": "litchi.performance.0810.root-audit.v1",
+  "scope": "Independent raw numerical policy audit only; adoption_eligible is not a retention decision. Custody, profile, and final disposition remain separate readers."
+}

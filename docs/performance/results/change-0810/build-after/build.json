@@ -1,0 +1,113 @@
+{
+  "binaries": {
+    "allocation": {
+      "bytes": 14359008,
+      "path": "/home/zhuhe/code/litchi-target-0810/after-allocation",
+      "sha256": "929066f98bd0cb0709454a3706e44b5414831a900a29970c4c36e4efa46ddf09"
+    },
+    "native": {
+      "bytes": 14432352,
+      "path": "/home/zhuhe/code/litchi-target-0810/after-native",
+      "sha256": "d1ce179dbdd58d6409c50bcf3270cc7c26892ca6433a09d1d5d2d079c48a91c4"
+    },
+    "profile": {
+      "bytes": 14433184,
+      "path": "/home/zhuhe/code/litchi-target-0810/after-profile",
+      "sha256": "123301e4ed4c8f59ed73e605cf5545d95d1946f8a3b6d281697f6852b151a08a"
+    }
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0810"
+  },
+  "lock": {
+    "bytes": 30217,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/probe-src/Cargo.lock",
+    "sha256": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07"
+  },
+  "probe": {
+    "probe-src/Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "probe-src/Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+    "probe-src/Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f",
+    "probe-src/src/allocation_metrics.rs": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67",
+    "probe-src/src/counting_allocator.rs": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e",
+    "probe-src/src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f"
+  },
+  "root_inputs": {
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0810/probe-src/Cargo.toml"
+      ],
+      "ended": 1790574862.431609,
+      "exit_code": 0,
+      "log": {
+        "bytes": 3671,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/build-after/native.log",
+        "sha256": "77c906e22be9d63e06561557485b4190a60146e7dad836902ee27536f5a84621"
+      },
+      "name": "native",
+      "started": 1790574802.6659725
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0810/probe-src/Cargo.toml",
+        "--features",
+        "allocator-metrics"
+      ],
+      "ended": 1790574873.5391805,
+      "exit_code": 0,
+      "log": {
+        "bytes": 191,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/build-after/allocation.log",
+        "sha256": "f0a8c87f8c2d7c24987d42f3793a250addc5b1d98586d8e6660fd78fa2ba13ce"
+      },
+      "name": "allocation",
+      "started": 1790574862.6400394
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--release",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0810/probe-src/Cargo.toml",
+        "--features",
+        "capture-profile"
+      ],
+      "ended": 1790574884.6269152,
+      "exit_code": 0,
+      "log": {
+        "bytes": 3594,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/build-after/profile.log",
+        "sha256": "e4ce367861de6a914b5491ad3db65c89665f28ce5a3ec55f3980da2fa65ef29d"
+      },
+      "name": "profile",
+      "started": 1790574873.7497275
+    }
+  ],
+  "schema": "litchi.performance.0810.build-after.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/build-after/source.json",
+    "sha256": "6f90c90e816c0fb9bd2cd03e65f28e9fa485d8157e53fd9bae4b0c7cc87b515d"
+  }
+}

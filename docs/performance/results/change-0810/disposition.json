@@ -1,0 +1,16 @@
+{
+  "decision": {
+    "bytes": 2187,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/decision.json",
+    "sha256": "16ceea397b9ccbd4c6b24dc55b7088de87fdabcf9ed656feff45039e5b13d581"
+  },
+  "production_change_retained": true,
+  "reason": "Candidate passes the frozen workflow adoption policy and source/quality/profile review.",
+  "schema": "litchi.performance.0810.disposition.v1",
+  "source_manifest": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/build-after/source.json",
+    "sha256": "6f90c90e816c0fb9bd2cd03e65f28e9fa485d8157e53fd9bae4b0c7cc87b515d"
+  },
+  "status": "retained"
+}

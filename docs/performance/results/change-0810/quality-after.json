@@ -1,0 +1,150 @@
+{
+  "checks": {
+    "bytes": 2939,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/checks.json",
+    "sha256": "5de6d70c27c1789ccb16047505c67b2699c59266ac0bb388a968008aadfa0709"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0810/quality-after",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "gate_count": 6,
+  "root_inputs": {
+    "Cargo.lock": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061",
+    "rustfmt.toml": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-pptx",
+        "--",
+        "--check"
+      ],
+      "ended": 1790574355.857319,
+      "exit_code": 0,
+      "gate": 1,
+      "log": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/00.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "started": 1790574354.7488506
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--all-targets"
+      ],
+      "ended": 1790574385.0122867,
+      "exit_code": 0,
+      "gate": 2,
+      "log": {
+        "bytes": 6244,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/01.log",
+        "sha256": "083ac057877f258a119ba0698870307da5a2419343e0f366c5f68ee5d2d2800e"
+      },
+      "started": 1790574356.0523443
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "ended": 1790574506.809963,
+      "exit_code": 0,
+      "gate": 3,
+      "log": {
+        "bytes": 139453,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/02.log",
+        "sha256": "c2561da52d46048fc1b87f0d407fa0d459aa315a43ab29c84ea8a6a74e0302ab"
+      },
+      "started": 1790574385.2083104
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790574530.1172962,
+      "exit_code": 0,
+      "gate": 4,
+      "log": {
+        "bytes": 1207,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/03.log",
+        "sha256": "dd880afbce97a3ba0c1431eeffd21c0a5447bfed6d88dfada78df0158f18d44d"
+      },
+      "started": 1790574507.0117269
+    },
+    {
+      "command": [
+        "cargo",
+        "doc",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pptx",
+        "--all-features",
+        "--no-deps"
+      ],
+      "ended": 1790574533.5376866,
+      "exit_code": 0,
+      "gate": 5,
+      "log": {
+        "bytes": 227,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/04.log",
+        "sha256": "dfb215bb56c6815ac633f6a58a73249d8a076c645ceaca84c847208fcc7cf4c1"
+      },
+      "started": 1790574530.3149867
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "ended": 1790574798.6323888,
+      "exit_code": 0,
+      "gate": 6,
+      "log": {
+        "bytes": 565,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/05.log",
+        "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+      },
+      "started": 1790574533.7387612
+    }
+  ],
+  "schema": "litchi.performance.0810.quality-after.v1",
+  "source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/quality-after/source.json",
+    "sha256": "6f90c90e816c0fb9bd2cd03e65f28e9fa485d8157e53fd9bae4b0c7cc87b515d"
+  }
+}

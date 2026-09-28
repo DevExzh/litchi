@@ -1,0 +1,15 @@
+{
+  "build_after_sha256": "39899cd7ecd8d7818d94ed759fcf70723668f75e3b5ccfe1ae66c15594bcb6ba",
+  "build_before_sha256": "e9d4ae2c347c7e6db7bcea208855cea0ede2767247621a1f07613433a802f10e",
+  "plan_sha256": "22e1e545dd45ebfdc6ae39563e32641f324bc60ace792b16e78b5b16ba792007",
+  "processes": 4,
+  "receipts": {
+    "bytes": 9823,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0810/profiles/receipts.json",
+    "sha256": "2b66375a61203c297312a10e7bb761d4448686c6800a2faf021d543bf313016a"
+  },
+  "reports": 4,
+  "samples": 4,
+  "schema": "litchi.performance.0810.callgrind.complete.v1",
+  "scope": "namespace_uri_probe::capture_region_0793 only; Ir attribution without latency or RSS claim"
+}

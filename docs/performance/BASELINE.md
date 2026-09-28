@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0810 — direct event handling retained
+
+[0810](0810-pptx-direct-event-workflow.md) Fresh paired measurements retain the single-codec direct Reader/namespace-resolver transport. Capture p50 improves 4.975% large, 4.073% vendor, 3.803% unicode-vendor, and 4.129% valid-4attr, each meeting the frozen confidence gate. No latency veto; all 144 allocation comparisons are equal. Evidence covers 310 reports/6,718 samples, with exact semantic checks and no historical timing pool. Three isolated p99 increases and RSS variation remain explicit limits.
+
 ## 0809 — baseline quality repaired without new measurements
 
 [0809](0809-pptx-refusal-test-quality-repair.md) The three test-only Clippy blockers are fixed. All six PPTX quality gates pass, including 1,238 tests with three ignored and warning-denied all-targets Clippy. No baseline performance metric changes; the next event-handling trial must capture fresh paired builds.
