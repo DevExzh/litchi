@@ -1,0 +1,46 @@
+{
+  "schema": "litchi.performance.0811.inheritance.v1",
+  "base_commit": "2894fbd628434bad4ef45af4f0f0b9a8d4d23468",
+  "driver_reference": {
+    "packet": "../change-0810",
+    "policy": "reuse only the public-workflow custody, quality, and semantic probe contract; this packet has no candidate or allocation lane"
+  },
+  "probe_reference": {
+    "packet": "../change-0810/probe-src",
+    "copy_policy": "byte-for-byte copy of the six final 0810 probe files",
+    "files": {
+      "src/main.rs": "3eea5b00b2f62ee26ec2a24b8c3604054b3de60df7b035d0012f28a167c1433f",
+      "src/counting_allocator.rs": "896edb6f6837235b8a17bdf0007d7ec756a63389a3750ec46f2c2681a28fce5e",
+      "src/allocation_metrics.rs": "b34e7a16a0cd29eff40e1bd3be038fbe20f720560243f1978439f93db93b2d67",
+      "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+      "Cargo.toml": "56fffbc78c0c68c809b1cabd6d1cfb6d0cf6ca03ad12977356e54227e9bb98a0",
+      "Cargo.toml.template": "7fdb50bb6f5103ddca97ec2fee66561526ca08fd757ff248fdcd0543fc46a11f"
+    },
+    "test_contract": "36 probe tests, including repaired valid-4attr identity and round-trip checks"
+  },
+  "root_inputs": {
+    "captured_before_first_build": true,
+    "files": {
+      "inputs/root-Cargo.lock": {
+        "source": "Cargo.lock",
+        "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+      },
+      "inputs/rustfmt.toml": {
+        "source": "rustfmt.toml",
+        "sha256": "5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3"
+      }
+    },
+    "use": "Every root build, quality, capture, perf, and decode receipt checks these copies."
+  },
+  "architecture": {
+    "file_count": 35,
+    "copy": "architecture-inputs.json records the 35 current hashes"
+  },
+  "production_inheritance": {
+    "source_origin": "current 2894fbd628434bad4ef45af4f0f0b9a8d4d23468 tracked production manifest",
+    "candidate_scope": [],
+    "before_source_is_frozen_before_build": true
+  },
+  "historical_candidate_chains": [],
+  "iwork": "out of scope"
+}

@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0811 — native attribution completed; broader goal remains open
+
+[0811](0811-pptx-current-native-attribution.md) Independent readers and aggregate custody checks agree on 56 reports/1,820 samples. Production and all 35 architecture inputs remain unchanged. Scanner work remains a measured investigation target, but material frame-pointer perturbation prevents ordinary-build phase-cost claims. No optimization is adopted; the OLE2/OOXML goal remains active and iWork excluded.
+
 ## 0810 — measured notes transport improvement retained
 
 [0810](0810-pptx-direct-event-workflow.md) The direct Reader/namespace-resolver candidate meets the frozen public workflow benefit gate in four capture cases, with zero latency/resource vetoes and all correctness gates passing. Independent numerical, source, and scoped profile reviews support retention of one codec file. All 35 architecture inputs are unchanged. This is progress toward the active OLE2/OOXML goal; ODF remains deferred and iWork excluded.
