@@ -1,0 +1,103 @@
+{
+  "assembly": null,
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "binary_comparison": {
+    "actual": {
+      "bytes": 14387272,
+      "path": "/home/zhuhe/code/litchi-target-0811/fp",
+      "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+    },
+    "bytes_equal": true,
+    "exact": false,
+    "expected": {
+      "bytes": 14387272,
+      "path": "/home/zhuhe/code/litchi-target-0811/fp",
+      "sha256": "b8b89fc5c4c062ab79df46c9105617327d8554b40baf8125d20351149d032062"
+    },
+    "sha256_equal": false
+  },
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+      "--features",
+      "capture-profile"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "ended": 1790578728.5696392,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0811",
+      "RUSTFLAGS": "-C force-frame-pointers=yes",
+      "inherited_compiler_environment": {
+        "CARGO_BUILD_RUSTFLAGS": null,
+        "CARGO_ENCODED_RUSTFLAGS": null,
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": null,
+        "RUSTC_WORKSPACE_WRAPPER": null,
+        "RUSTC_WRAPPER": null,
+        "RUSTFLAGS": null,
+        "RUSTUP_TOOLCHAIN": null
+      }
+    },
+    "exit_code": 0,
+    "log": {
+      "bytes": 7191,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/build.log",
+      "sha256": "e3c3784c7aebef3e4508c197f2d46a669c7f7ec833a5c843ca219d48d1ce08d9"
+    },
+    "source_after": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-after.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "source_before": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-before.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "source_files_equal": true,
+    "started": 1790578634.8813171
+  },
+  "commands": {
+    "bytes": 3680,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/commands.json",
+    "sha256": "cea1187273fa04a1e3df96e983963fc1c39bc8555ebdcf621a6619324c3bf78f"
+  },
+  "ended": 1790578728.7838829,
+  "historical_mapping_authorized": false,
+  "manifest": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/probe-src/Cargo.toml",
+  "prefreeze": {
+    "bytes": 1256014,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/prefreeze.json",
+    "sha256": "f952d8221c06a30b70375f035d0d9995481e377499e07ccf77cc2766c15c288c"
+  },
+  "schema": "litchi.performance.0812.rebuild.v1",
+  "scope": "Exact 0811 frame-pointer probe rebuild and post-build scanner disassembly only; no workload.",
+  "source": {
+    "after": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-after.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "before": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/source-before.json",
+      "sha256": "3d9e24f1509b9e4996d6234779f11bc358c6269c2871e9dcfaba657d0582d8ff"
+    },
+    "file_count": 9196,
+    "hashes_equal": true
+  },
+  "started": 1790578634.6117315,
+  "status": "binary-mismatch",
+  "target": "/home/zhuhe/code/litchi-target-0811"
+}

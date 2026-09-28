@@ -1,0 +1,34 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "command": [
+    "perf",
+    "script",
+    "--no-inline",
+    "--ns",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.data"
+  ],
+  "ended": 1790578877.2081301,
+  "errors": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.decode.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "exit_code": 0,
+  "output": {
+    "bytes": 4606874,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.frames",
+    "sha256": "9aef7a82c13c784b8a92d20611a713f0a10be871ae96db6d01d12f40bc4b6186"
+  },
+  "raw": {
+    "bytes": 574760,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.data",
+    "sha256": "ec57c2e244cae8c2dc0afdc4f5426c6aba20d14caaf014d6148fec2cdbd6a24a"
+  },
+  "repeat": 0,
+  "started": 1790578877.1714597
+}

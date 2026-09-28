@@ -1,0 +1,22 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "command": [
+    "nm",
+    "-S",
+    "--defined-only",
+    "/home/zhuhe/code/litchi-target-0811/fp"
+  ],
+  "ended": 1790578926.4870515,
+  "exit_code": 0,
+  "output": {
+    "bytes": 424522,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/symbols-resumed.txt",
+    "sha256": "120092804799ce52cb0c2c2053e95e2259801d7616dba3312cfd4ebff1808120"
+  },
+  "started": 1790578926.4764082,
+  "stderr": ""
+}

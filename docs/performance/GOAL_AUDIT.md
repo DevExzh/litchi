@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0812 — next scanner candidate narrowed by exact-binary evidence
+
+[0812](0812-pptx-scanner-instruction-localization.md) A guarded historical reconstruction fails full binary identity, so fresh samples are captured and decoded against the actual executable. Their instruction/DWARF evidence supports testing explicit event success/error matching. Production remains unchanged; adoption still requires fresh workflow benefit and full semantic/resource qualification. The broad goal remains active.
+
 ## 0811 — native attribution completed; broader goal remains open
 
 [0811](0811-pptx-current-native-attribution.md) Independent readers and aggregate custody checks agree on 56 reports/1,820 samples. Production and all 35 architecture inputs remain unchanged. Scanner work remains a measured investigation target, but material frame-pointer perturbation prevents ordinary-build phase-cost claims. No optimization is adopted; the OLE2/OOXML goal remains active and iWork excluded.

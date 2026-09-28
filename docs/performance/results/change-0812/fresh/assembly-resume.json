@@ -1,0 +1,16 @@
+{
+  "driver": {
+    "bytes": 2821,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/finish_assembly.py",
+    "sha256": "a74e9a8693eb29932ea31c2e54d61dc2f5d575779173cd7ce667f4e0c9e12f26"
+  },
+  "prior_nm_stdout": {
+    "bytes": 424522,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/symbols.txt",
+    "sha256": "120092804799ce52cb0c2c2053e95e2259801d7616dba3312cfd4ebff1808120"
+  },
+  "reason": "fresh.py completed two captures, two decodes and compression, then NameError: nm is not defined (local variable named m).",
+  "schema": "litchi.performance.0812.assembly-resume.v1",
+  "started": 1790578926.4762695,
+  "workload_retries": 0
+}

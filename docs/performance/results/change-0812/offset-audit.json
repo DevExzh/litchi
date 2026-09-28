@@ -1,0 +1,467 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "b8b89fc5c4c062ab79df46c9105617327d8554b40baf8125d20351149d032062"
+  },
+  "event": "cycles:u",
+  "inputs": {
+    "analysis": {
+      "bytes": 2820263,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/analysis.json",
+      "sha256": "30355084b7669c1128d4068303bb48499332fa26f88dca89a1b2579ea05c4196"
+    },
+    "build": {
+      "bytes": 9290,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/build/build.json",
+      "sha256": "2bc3ce8ae9c74de69547cdb9c19b7b5ebb99c826d891c9ca22408cc2619f89b2"
+    },
+    "compression": {
+      "bytes": 2553,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/compression.json",
+      "sha256": "288cf719ff1211ea0da129caac922b705d54daf509034bc91d7969fe8bb4ea62"
+    },
+    "frame_receipts": {
+      "bytes": 1287,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/frame-receipts.json",
+      "sha256": "00ac86cf04487103f55c7254fb86004bfdd7a863f8c69b916169cc4db0ebbd32"
+    },
+    "perf_complete": {
+      "bytes": 854,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/complete.json",
+      "sha256": "2f4d2a52abcd327c7a0dbb3cbf7c9cf0c0f5720af020de8c4a7ec4291adf2736"
+    },
+    "perf_receipts": {
+      "bytes": 14309,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/receipts.json",
+      "sha256": "0df71336387357f9d5bfaf0eab59ecd62ef49892e5e3f6dce4d8a0d479282c22"
+    },
+    "root_audit": {
+      "bytes": 32270,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/root-audit.json",
+      "sha256": "09220f5c953a0813894f251fe75ad971cccb9857cb04b127154d6af171373e0d"
+    },
+    "sealed_0811_entries": {
+      "docs/performance/results/change-0811/analysis.json": "30355084b7669c1128d4068303bb48499332fa26f88dca89a1b2579ea05c4196",
+      "docs/performance/results/change-0811/build/build.json": "2bc3ce8ae9c74de69547cdb9c19b7b5ebb99c826d891c9ca22408cc2619f89b2",
+      "docs/performance/results/change-0811/perf/0.frames.gz": "641aec6e53082d8a71e7591522d09d7fcf79276f5ad19b6325ff7bcbae8080e9",
+      "docs/performance/results/change-0811/perf/1.frames.gz": "1af15e3d4fca73482f062710282a7ba8abaad3465222937e86398289b4a974dd",
+      "docs/performance/results/change-0811/perf/complete.json": "2f4d2a52abcd327c7a0dbb3cbf7c9cf0c0f5720af020de8c4a7ec4291adf2736",
+      "docs/performance/results/change-0811/perf/compression.json": "288cf719ff1211ea0da129caac922b705d54daf509034bc91d7969fe8bb4ea62",
+      "docs/performance/results/change-0811/perf/frame-receipts.json": "00ac86cf04487103f55c7254fb86004bfdd7a863f8c69b916169cc4db0ebbd32",
+      "docs/performance/results/change-0811/perf/receipts.json": "0df71336387357f9d5bfaf0eab59ecd62ef49892e5e3f6dce4d8a0d479282c22",
+      "docs/performance/results/change-0811/root-audit.json": "09220f5c953a0813894f251fe75ad971cccb9857cb04b127154d6af171373e0d"
+    }
+  },
+  "owner": "namespace_uri_probe::capture_region_0793",
+  "rows": [
+    {
+      "frames": {
+        "compressed": {
+          "bytes": 202790,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/0.frames.gz",
+          "sha256": "641aec6e53082d8a71e7591522d09d7fcf79276f5ad19b6325ff7bcbae8080e9"
+        },
+        "compression": "gzip",
+        "decompressed": {
+          "bytes": 4603827,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/0.frames",
+          "sha256": "95777cb9403c0f9b5b96fc108d1b576b879d90689922a80a6ef4d82d2ea5b3a9"
+        },
+        "gzip_mtime": 0,
+        "kind": "frames",
+        "repeat": 0
+      },
+      "leaf_counts": {
+        "<core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold": 1,
+        "<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match": 1,
+        "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc": 2,
+        "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::partname": 1,
+        "<litchi_opc::rel::Relationships as core::clone::Clone>::clone": 2,
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 20,
+        "[unknown]": 4,
+        "__memcmp_evex_movbe": 46,
+        "__memmove_avx512_unaligned_erms": 1,
+        "_int_malloc": 5,
+        "alloc::fmt::format::format_inner": 2,
+        "alloc::raw_vec::RawVec<T,A>::grow_one": 2,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 4,
+        "cfree@GLIBC_2.2.5": 9,
+        "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>": 6,
+        "core::str::converts::from_utf8": 52,
+        "hashbrown::map::HashMap<K,V,S,A>::insert": 1,
+        "litchi_ooxml_common::mce::codec::contains_mce_namespace": 2,
+        "litchi_ooxml_common::xml::unqualified_attribute_value": 1,
+        "litchi_opc::package::OpcPackage::get_part": 1,
+        "litchi_opc::packuri::PackURI::validate_percent_encoding": 1,
+        "litchi_pptx::notes::codec::inspect_element": 53,
+        "litchi_pptx::notes::codec::scan_processed_xml": 217,
+        "litchi_pptx::notes::package::snapshot_from_index": 1,
+        "litchi_pptx::notes::resolved": 28,
+        "litchi_pptx::notes::transaction::Snapshot::from_parts": 2,
+        "litchi_pptx::opened::model::SlideNameIndex::build": 1,
+        "malloc": 10,
+        "memchr::arch::x86_64::avx2::memchr::One::find_raw": 15,
+        "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 4,
+        "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2": 23,
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw": 11,
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2": 38,
+        "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 20,
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 28,
+        "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 14,
+        "quick_xml::escape::unescape": 19,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 38,
+        "quick_xml::events::attributes::IterState::next": 32,
+        "quick_xml::name::NamespaceResolver::push": 15,
+        "quick_xml::name::NamespaceResolver::resolve_prefix": 23,
+        "quick_xml::reader::Reader<R>::read_event_impl": 76,
+        "quick_xml::reader::state::ReaderState::emit_end": 8,
+        "quick_xml::reader::state::ReaderState::emit_start": 29,
+        "sha2::sha256::compress256": 1,
+        "sha2::sha256::x86_sha::compress": 89,
+        "unlink_chunk.isra.0": 1
+      },
+      "offsets": [
+        {
+          "offset_hex": "0x180",
+          "period": 8831626,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1c9",
+          "period": 26480969,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x1d1",
+          "period": 17628615,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x212",
+          "period": 8823778,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x221",
+          "period": 8839784,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x242",
+          "period": 8825195,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x24a",
+          "period": 8828950,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x24d",
+          "period": 1332284759,
+          "samples": 151
+        },
+        {
+          "offset_hex": "0x25e",
+          "period": 8819783,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x266",
+          "period": 35255836,
+          "samples": 4
+        },
+        {
+          "offset_hex": "0x26b",
+          "period": 8819415,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x278",
+          "period": 52982762,
+          "samples": 6
+        },
+        {
+          "offset_hex": "0x29d",
+          "period": 26428970,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x2b2",
+          "period": 44102660,
+          "samples": 5
+        },
+        {
+          "offset_hex": "0x2b5",
+          "period": 8832670,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2bc",
+          "period": 88165110,
+          "samples": 10
+        },
+        {
+          "offset_hex": "0x35d",
+          "period": 8761844,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x368",
+          "period": 35255445,
+          "samples": 4
+        },
+        {
+          "offset_hex": "0x3a0",
+          "period": 8830705,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3a5",
+          "period": 123542669,
+          "samples": 14
+        },
+        {
+          "offset_hex": "0x3fa",
+          "period": 8841060,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x43b",
+          "period": 8832197,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x44b",
+          "period": 17637447,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x468",
+          "period": 8810509,
+          "samples": 1
+        }
+      ],
+      "owner_qualified_period": 8470352078,
+      "owner_qualified_samples": 960,
+      "repeat": 0,
+      "scanner_leaf_period": 1914462758,
+      "scanner_leaf_samples": 217,
+      "scanner_leaf_symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+      "unknown_interior_samples": 4,
+      "whole_process_period": 26991306683,
+      "whole_process_samples": 3068
+    },
+    {
+      "frames": {
+        "compressed": {
+          "bytes": 203158,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/1.frames.gz",
+          "sha256": "1af15e3d4fca73482f062710282a7ba8abaad3465222937e86398289b4a974dd"
+        },
+        "compression": "gzip",
+        "decompressed": {
+          "bytes": 4582274,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/perf/1.frames",
+          "sha256": "1ae38b0e267e2c3b1a0014dfce46c7bee65ddc4fcf3e5ec55b081bd617a4d881"
+        },
+        "gzip_mtime": 0,
+        "kind": "frames",
+        "repeat": 1
+      },
+      "leaf_counts": {
+        "<&T as core::fmt::Display>::fmt": 1,
+        "<litchi_opc::part::XmlPart as core::clone::Clone>::clone": 1,
+        "<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc": 1,
+        "<litchi_opc::xml_attributes::CheckedAttributes as core::iter::traits::iterator::Iterator>::next": 16,
+        "<str>::to_ascii_lowercase": 1,
+        "__memcmp_evex_movbe": 52,
+        "__memmove_avx512_unaligned_erms": 6,
+        "_int_free_chunk": 1,
+        "_int_free_merge_chunk": 1,
+        "_int_malloc": 2,
+        "alloc::fmt::format::format_inner": 1,
+        "alloc::raw_vec::RawVec<T,A>::grow_one": 7,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 3,
+        "cfree@GLIBC_2.2.5": 16,
+        "core::ptr::drop_in_place<litchi_opc::xml_attributes::Phase>": 2,
+        "core::slice::sort::unstable::quicksort::quicksort": 1,
+        "core::str::converts::from_utf8": 62,
+        "litchi_ooxml_common::relationships::codec::attribute_value": 2,
+        "litchi_ooxml_common::xml::unqualified_attribute_value": 1,
+        "litchi_opc::package::OpcPackage::get_part": 1,
+        "litchi_opc::packuri::PackURI::new": 1,
+        "litchi_pptx::notes::codec::inspect_element": 71,
+        "litchi_pptx::notes::codec::scan_processed_xml": 254,
+        "litchi_pptx::notes::package::load_index_with_slide_root_proofs": 1,
+        "litchi_pptx::notes::resolved": 17,
+        "litchi_pptx::opened::model::capture_internal": 1,
+        "litchi_pptx::opened::model::package_fingerprint_with_memo": 1,
+        "malloc": 3,
+        "memchr::arch::x86_64::avx2::memchr::One::find_raw": 16,
+        "memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2": 1,
+        "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 4,
+        "memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2": 16,
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw": 18,
+        "memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2": 29,
+        "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 21,
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 32,
+        "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 10,
+        "quick_xml::escape::unescape": 8,
+        "quick_xml::events::attributes::IterState::check_for_duplicates": 26,
+        "quick_xml::events::attributes::IterState::next": 46,
+        "quick_xml::name::NamespaceResolver::push": 12,
+        "quick_xml::name::NamespaceResolver::resolve_event": 1,
+        "quick_xml::name::NamespaceResolver::resolve_prefix": 26,
+        "quick_xml::reader::Reader<R>::read_event_impl": 38,
+        "quick_xml::reader::ns_reader::NsReader<R>::process_event": 1,
+        "quick_xml::reader::state::ReaderState::emit_end": 11,
+        "quick_xml::reader::state::ReaderState::emit_start": 24,
+        "sha2::sha256::x86_sha::compress": 90
+      },
+      "offsets": [
+        {
+          "offset_hex": "0x180",
+          "period": 8824049,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x187",
+          "period": 8835569,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x19b",
+          "period": 8832512,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1bd",
+          "period": 8838003,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x1c9",
+          "period": 26488174,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x1d1",
+          "period": 8821484,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x221",
+          "period": 8830790,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x246",
+          "period": 17665043,
+          "samples": 2
+        },
+        {
+          "offset_hex": "0x24d",
+          "period": 1966681714,
+          "samples": 223
+        },
+        {
+          "offset_hex": "0x251",
+          "period": 26149882,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x278",
+          "period": 8836009,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x27d",
+          "period": 8821504,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x28b",
+          "period": 8809587,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2b2",
+          "period": 8819586,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2b5",
+          "period": 8785011,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x2cf",
+          "period": 8812707,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x361",
+          "period": 8826282,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x368",
+          "period": 8844562,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x38d",
+          "period": 8825454,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3a5",
+          "period": 8827331,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x3fa",
+          "period": 26471260,
+          "samples": 3
+        },
+        {
+          "offset_hex": "0x3fc",
+          "period": 8805772,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x43b",
+          "period": 8824373,
+          "samples": 1
+        },
+        {
+          "offset_hex": "0x44b",
+          "period": 17635841,
+          "samples": 2
+        }
+      ],
+      "owner_qualified_period": 8441181119,
+      "owner_qualified_samples": 957,
+      "repeat": 1,
+      "scanner_leaf_period": 2239912499,
+      "scanner_leaf_samples": 254,
+      "scanner_leaf_symbol": "litchi_pptx::notes::codec::scan_processed_xml",
+      "unknown_interior_samples": 0,
+      "whole_process_period": 27026477620,
+      "whole_process_samples": 3073
+    }
+  ],
+  "schema": "litchi.performance.0812.offset-audit.v1",
+  "scope": "Independent retained 0811 cycles:u scanner leaf offset census for the exact owner. Counts and periods are descriptive sampled observations; no assembly mapping, instruction cost, phase fraction, causal cost, speedup, or adoption claim is made.",
+  "verification": {
+    "assembly_dependency": false,
+    "compression_members_verified": true,
+    "decompressed_lengths_and_hashes_verified": true,
+    "exact_owner_verified": true,
+    "scanner_leaf_counts_match_root_audit_and_analysis": true,
+    "sealed_0811_hashes_verified": true,
+    "strict_cycles_u_headers": true
+  }
+}

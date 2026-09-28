@@ -1,0 +1,73 @@
+{
+  "binary": {
+    "bytes": 14387272,
+    "path": "/home/zhuhe/code/litchi-target-0811/fp",
+    "sha256": "63b55206cb606f9fa0552d2a999b7c3ba9670bd5747558aec4ba29cefdc0c231"
+  },
+  "build": {
+    "bytes": 3780,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/rebuild/receipt.json",
+    "sha256": "12c5127c679d8a4ac443dfcb96eab06e97299bcd206806c70338c572f724703b"
+  },
+  "drivers": {
+    "fresh-plan.md": {
+      "bytes": 1673,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh-plan.md",
+      "sha256": "f82f74ed95f6f7a91340d038d2c9a1bccd6d6866c2b6d66febaa9547aa7e55c0"
+    },
+    "fresh.py": {
+      "bytes": 4534,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh.py",
+      "sha256": "62d6327f177d63603e98fd53d497e80fcbdfac369ad2c620adb16ba4b2d132a4"
+    },
+    "inputs.py": {
+      "bytes": 1876,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/inputs.py",
+      "sha256": "eb066c4d0227dfe82faf34c842afbfc078aee1d2a52917fcc3708eb06845dce5"
+    }
+  },
+  "inputs": {
+    "architecture_files": 35,
+    "production_files": 9196,
+    "sealed_packet": {
+      "bytes": 32145,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/seal.json",
+      "sha256": "826b6f060773beef9ea8ce4d939bdf384b36ea518f5df09aead99ded61af5a76"
+    },
+    "source": {
+      "bytes": 1182921,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0811/build/source.json",
+      "sha256": "f3e5e972b1311dd40a5d6788665372669629da8c8d6b24de5740f92dd278a395"
+    }
+  },
+  "schema": "litchi.performance.0812.fresh-frozen.v1",
+  "tool_versions": {
+    "nm": {
+      "command": [
+        "nm",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "objdump": {
+      "command": [
+        "objdump",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty.\n"
+    },
+    "perf": {
+      "command": [
+        "perf",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "perf version 7.0.14\n"
+    }
+  }
+}

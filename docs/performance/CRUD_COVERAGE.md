@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0812 — capture semantics preserved during instruction diagnosis
+
+[0812](0812-pptx-scanner-instruction-localization.md) All 200 fresh large-capture outputs match the sealed source/output/semantic oracles. Production, six probe files, and all 35 normative inputs are unchanged. This adds instruction attribution only; no new CRUD capability or production quality-gate run is claimed.
+
 ## 0811 — current capture diagnostic preserves all measured outputs
 
 [0811](0811-pptx-current-native-attribution.md) All 56 reports/1,820 outputs match the sealed public capture oracles on unchanged production. The fresh probe passes 36 tests and formatting/Clippy; exact source identity supports reuse of six 0810 production gates. This adds diagnostic coverage for tiny, medium, and large capture, with no new CRUD capability.

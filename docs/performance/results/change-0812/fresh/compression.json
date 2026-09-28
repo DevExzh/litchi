@@ -1,0 +1,58 @@
+[
+  {
+    "compressed": {
+      "bytes": 58313,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.data.gz",
+      "sha256": "c8f4598e07c0088d6f8e4def559f4002622cb5561fb8786546024764684ea058"
+    },
+    "kind": "data",
+    "original": {
+      "bytes": 574760,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.data",
+      "sha256": "ec57c2e244cae8c2dc0afdc4f5426c6aba20d14caaf014d6148fec2cdbd6a24a"
+    },
+    "repeat": 0
+  },
+  {
+    "compressed": {
+      "bytes": 208074,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.frames.gz",
+      "sha256": "43c6719e5a0095632339a29acee8b1364be5e06221e00b00a343b3787579847e"
+    },
+    "kind": "frames",
+    "original": {
+      "bytes": 4606874,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/0.frames",
+      "sha256": "9aef7a82c13c784b8a92d20611a713f0a10be871ae96db6d01d12f40bc4b6186"
+    },
+    "repeat": 0
+  },
+  {
+    "compressed": {
+      "bytes": 58620,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.data.gz",
+      "sha256": "5d3f9f6bae781f51970a7e807dc40dcabd6683c06c68c09102f1b7812d85d4af"
+    },
+    "kind": "data",
+    "original": {
+      "bytes": 579344,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.data",
+      "sha256": "50249521a167af3c1a727a0d8f8f5c372e2bda9c5c0a0bf6764eaece7ad62731"
+    },
+    "repeat": 1
+  },
+  {
+    "compressed": {
+      "bytes": 204215,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.frames.gz",
+      "sha256": "e3b6bb7d4872523dbe04e30bd5821b47da901ad9f47a631d23d18415eea92b93"
+    },
+    "kind": "frames",
+    "original": {
+      "bytes": 4644671,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0812/fresh/1.frames",
+      "sha256": "f4d5dbf69e7ae7ef3ec3e7651cc93e78b3a2821b876d71e308fb22a6d2d69ff5"
+    },
+    "repeat": 1
+  }
+]
