@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys; sys.path.insert(0,\"docs/performance/results/change-0836\"); import audit as a; c=a.preflight_components(); print(a.validate_mappings(c[\"binaries\"])[\"status\"])"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790685629.4736736,
+  "log": {
+    "bytes": 5,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-mapping-custody/output.log",
+    "sha256": "9f56e761d79bfdb34304a012586cb04d16b435ef6130091a97702e559260a2f2"
+  },
+  "started_unix": 1790685627.7156365
+}

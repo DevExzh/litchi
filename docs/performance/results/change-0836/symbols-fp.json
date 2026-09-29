@@ -1,0 +1,46 @@
+{
+  "binary": {
+    "bytes": 67622240,
+    "path": "/home/zhuhe/code/litchi-target-0836/retained/fp/litchi-perf-baseline",
+    "sha256": "e1d0c28ef203cb193b92d29de15a4de7c62c3cc3240f44aad6d805f81e296141"
+  },
+  "records": {
+    "demangled": {
+      "output": {
+        "bytes": 8896708,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-demangled/output.log",
+        "sha256": "43ec8d21fbd8278d7ad5f86d8c8d5d4cfa87b24a237eda2a41729d795503e9e2"
+      },
+      "receipt": {
+        "bytes": 707,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-demangled/receipt.json",
+        "sha256": "b6e583703b6e6099947af3cead62aeb1deffc5f6360df401f0b74f8c9c29a027"
+      }
+    },
+    "elf": {
+      "output": {
+        "bytes": 407,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-elf/output.log",
+        "sha256": "809e3f6878751890bdf4b75e1cd31a98ca3ab1ea1351576944334037f16ae79c"
+      },
+      "receipt": {
+        "bytes": 670,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-elf/receipt.json",
+        "sha256": "7004b30f59f0ee29f891c3d87ba7ac77028f5e04c092e8affa2ec044adc6f50b"
+      }
+    },
+    "raw": {
+      "output": {
+        "bytes": 11004630,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-raw/output.log",
+        "sha256": "24b89a402d3dd71ea837171ff01abc63c12bd6c2804aee458d949464a688cbec"
+      },
+      "receipt": {
+        "bytes": 693,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-raw/receipt.json",
+        "sha256": "25615f15de8ce92470791913601c217ff632cc48be71ac2db4add21324029a76"
+      }
+    }
+  },
+  "stage": "fp"
+}

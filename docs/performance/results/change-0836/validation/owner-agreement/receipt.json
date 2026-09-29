@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import json; from pathlib import Path; p=Path(\"docs/performance/results/change-0836\"); a=json.loads((p/\"profile-analysis.json\").read_text()); c=json.loads((p/\"owner-crosscheck.json\").read_text()); pairs=list(zip(a[\"profiles\"][\"captures\"],c[\"rows\"])); assert len(pairs)==4; assert all(r[\"label\"]==x[\"label\"] and r[\"owner_qualified_samples\"]==x[\"owner_samples\"] and r[\"owner_qualified_period\"]==x[\"owner_period\"] and x[\"owner_named_outside_ranges\"]==0 for r,x in pairs); print(\"four exact owner counts and sampled-period sums agree\")"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686079.1995895,
+  "log": {
+    "bytes": 54,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/owner-agreement/output.log",
+    "sha256": "323384f6681d2f2c4579c92831c41829cdb5ab4c6e597c1f5eec080165551ff8"
+  },
+  "started_unix": 1790686079.003861
+}

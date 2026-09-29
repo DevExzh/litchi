@@ -1,0 +1,59 @@
+{
+  "changes": [
+    "Runtime PIE addresses use recorded PID/timestamp/build-ID mmap and executable ELF segment offsets; no sample-derived bias. Independent owner counts and periods match all four captures.",
+    "Cold children have one pre-timer source fsync; publication scope requires successful fsync of exact rename source, rename, then destination-parent fsync. Exactly one earlier qualified-source fsync per cold child is retained outside scope; warm extra events are refused.",
+    "Retain conservative unknown-frame CPU-fraction refusal. All four captures exceed the reader stricter >500 threshold as well as the planned minimum 500.",
+    "Independent command inventory excludes historical quality-reuse command paths. Only perf-availability overlapping build-fp is permitted; all workload captures are serial."
+  ],
+  "created_unix": 1790686043.1928508,
+  "failures_retained": true,
+  "inputs": {
+    "audit.py": {
+      "bytes": 92770,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/audit.py",
+      "sha256": "db1659c0b422a7bc50348f65a33cc8bb7df34abec011a2f71e7c1539a239e93d"
+    },
+    "crosscheck.py": {
+      "bytes": 2607,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/crosscheck.py",
+      "sha256": "7ea5605e9068130696cd46bb637de0a7a7cb096623cb80abf9d4189cc4850ec0"
+    },
+    "mappings.json": {
+      "bytes": 4653,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/mappings.json",
+      "sha256": "9e2e5ed269560919f65890a9643949c6c33f3e5b794595d0f5b8b058300ded2d"
+    },
+    "owner-crosscheck.json": {
+      "bytes": 806,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/owner-crosscheck.json",
+      "sha256": "c2802d52786d7e6e9b9f0759c59c73a0df3741e208738571f8d36bf009aaa180"
+    },
+    "profile-analysis.json": {
+      "bytes": 51530876,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-analysis.json",
+      "sha256": "e4770554e74c0bb51063852face9e0a6217d5f0f2b839bcde9426e3523a37864"
+    },
+    "profile-tests.json": {
+      "bytes": 2091,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-tests.json",
+      "sha256": "5921ae387f2fc77adc02849b9dbcc4207c5e20d3896f414b244eebd0f3f848c1"
+    },
+    "profile-tests.py": {
+      "bytes": 15099,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-tests.py",
+      "sha256": "02f80d899815822d080948907baf5936d4e1d9151eb5c20d3e52d62a9895e39d"
+    },
+    "profile_analysis.py": {
+      "bytes": 54402,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py",
+      "sha256": "34bd6985d70a229d765f6bce9e34174e7f4727a5f8d9be9e585a649ee9ef990d"
+    },
+    "sharedprofile-analysis.json": {
+      "bytes": 51530876,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/sharedprofile-analysis.json",
+      "sha256": "e4770554e74c0bb51063852face9e0a6217d5f0f2b839bcde9426e3523a37864"
+    }
+  },
+  "scope": "Offline interpretation amendments only; original plan, captures, admission snapshots and failed checks retained. No workload reruns.",
+  "status": "pass"
+}

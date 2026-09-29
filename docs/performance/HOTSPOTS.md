@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0836 — OPC source save CPU and durability diagnosis
+
+[0836](0836-opc-filesystem-save-profile.md) completes 34 reports / 444 measured outputs on unchanged source. Ordinary save p50 is 77.123311 ms warm and 144.921409 ms verified cold. Independent mmap/ELF replay confirms 1,863–1,886 overlay samples per capture, with Deflate the largest observed stack group. Unknown frames keep CPU fractions withheld. All 32 traced children have the three-call atomic publication sequence; sixteen cold-preparation fsyncs remain separate. No production optimization is claimed; changed-Part compression is the next measured target.
+
 ## 0835 — filesystem route/cache baseline admitted
 
 [0835](0835-filesystem-route-cache-baseline.md) Fresh committed-source measurements retain 72 formal reports / 2,160 samples, plus seven qualification reports / sixteen samples. Source-backed OPC open p50 medians are 0.168270 ms warm and 4.766426 ms verified-cold; source-backed PPTX selected-slide lifecycle is 2.924480 / 13.871920 ms. All twelve rows, six descriptive route ratios, and process metrics pass independent replay; no planned 20% block-spread flag is triggered. OPC open lifetime asymmetry and private cold ZIP padding remain explicit. Production is unchanged, and the broader non-iWork goal remains open.

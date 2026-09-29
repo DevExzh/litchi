@@ -1,0 +1,77 @@
+{
+  "created_unix": 1790685283.1115944,
+  "inputs": {
+    "admission.json": {
+      "bytes": 4559,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/admission.json",
+      "sha256": "d874f3c6ea60830582108a71e996935f7456f275e7350eecc2d88601f8a7b549"
+    },
+    "build-environment.json": {
+      "bytes": 3739,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/build-environment.json",
+      "sha256": "a5386053ed8886db7acf6106643da22314e154364d5a8d11b67554e64d92a16d"
+    },
+    "capture.py": {
+      "bytes": 2936,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/capture.py",
+      "sha256": "ff9be30be7fab918a2a43249e4e91dc9de54de3d6f4e723b179a53ebe57d8831"
+    },
+    "mappings.py": {
+      "bytes": 1228,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/mappings.py",
+      "sha256": "e307dcbd588c0eaa2ee2895f14e3f01453befd845e330d0a92102179b7c2c2b8"
+    },
+    "native-validation.json": {
+      "bytes": 16401,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/native-validation.json",
+      "sha256": "b7c6ab24663f5133d6bfd455bc95110b68b302441156a2f49f421e0300edf191"
+    },
+    "plan.json": {
+      "bytes": 7179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/plan.json",
+      "sha256": "ef26ac9ba91871b8747caa512b7a6b2039d93929b73d93ee924b0777f4232b26"
+    },
+    "profile-admission-readers/audit.py": {
+      "bytes": 78899,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-admission-readers/audit.py",
+      "sha256": "0dd96427237417b693a443163c6f79447f7d9032deadac4441a630af2e197235"
+    },
+    "profile-admission-readers/profile-tests.py": {
+      "bytes": 12234,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-admission-readers/profile-tests.py",
+      "sha256": "4b0740b1d952f9763f62dffe322b277ba6e0b065ab2c365742425c1992c491e8"
+    },
+    "profile-admission-readers/profile_analysis.py": {
+      "bytes": 46510,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-admission-readers/profile_analysis.py",
+      "sha256": "b43b8169770658c047e26514570f0bba9d20b6ccf274d6e98f8705ef099f266d"
+    },
+    "profile-preflight-tests.json": {
+      "bytes": 1490,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-preflight-tests.json",
+      "sha256": "9afc901545377eeeeede00a3347b5cead76bf5be31584b6ae2b960fa5c434921"
+    },
+    "reader-tests.json": {
+      "bytes": 1682,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-tests.json",
+      "sha256": "ea294e0a7b5bdb6c5e7d6ce600b75261980044a16119db30d5dc3c2f6c7f2e6b"
+    },
+    "symbols.json": {
+      "bytes": 21045,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/symbols.json",
+      "sha256": "1870b9520b2acd63026c5cad7c1ff4fee0f8036b5fe39a009a1f16aa1c909cb2"
+    },
+    "validation/independent-preflight-v3/receipt.json": {
+      "bytes": 484,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight-v3/receipt.json",
+      "sha256": "8f58641b1ee861f2e0f89bb28cc4985c55cd42ecca508df216fd6b4ce5ac11d4"
+    },
+    "validation/profile-parser-preflight-v3/receipt.json": {
+      "bytes": 495,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-parser-preflight-v3/receipt.json",
+      "sha256": "941d5a085eb90136cb0db64a998da0aea5e26a68aeecac77ab3248ae80c2c978"
+    }
+  },
+  "scope": "CPU records admitted after synthetic PID/DSO/static-range tests and native controls. No sample-derived PIE bias. Independent mmap/task decode and ELF program headers retained for relocated runtime frames; actual-format reader amendments must be archived and separately qualified before attribution. Admission reader snapshots are immutable; final readers may tighten parsing without rerunning workloads.",
+  "status": "pass"
+}

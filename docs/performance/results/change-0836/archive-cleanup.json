@@ -1,0 +1,63 @@
+{
+  "roots": [
+    {
+      "files": [
+        {
+          "original": {
+            "bytes": 11601,
+            "path": "/tmp/change-0836-profile-v1-20260929T122526/profile-tests.py",
+            "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+          },
+          "retained": {
+            "bytes": 11601,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/temporary-change-0836-profile-v1-20260929T122526/profile-tests.py",
+            "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+          }
+        },
+        {
+          "original": {
+            "bytes": 47192,
+            "path": "/tmp/change-0836-profile-v1-20260929T122526/profile_analysis.py",
+            "sha256": "29b699462c9299c19197c7db6ff73e4a33bdc3704636e532e8e6d8dbed952c5b"
+          },
+          "retained": {
+            "bytes": 47192,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/temporary-change-0836-profile-v1-20260929T122526/profile_analysis.py",
+            "sha256": "29b699462c9299c19197c7db6ff73e4a33bdc3704636e532e8e6d8dbed952c5b"
+          }
+        }
+      ],
+      "path": "/tmp/change-0836-profile-v1-20260929T122526"
+    },
+    {
+      "files": [
+        {
+          "original": {
+            "bytes": 11601,
+            "path": "/tmp/change-0836-profile-v2-20260929T122652/profile-tests.py",
+            "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+          },
+          "retained": {
+            "bytes": 11601,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/temporary-change-0836-profile-v2-20260929T122652/profile-tests.py",
+            "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+          }
+        },
+        {
+          "original": {
+            "bytes": 47409,
+            "path": "/tmp/change-0836-profile-v2-20260929T122652/profile_analysis.py",
+            "sha256": "3495249d9104caf3741fbf943aa63469a529267d7d8d657d8ce8f367b6bdbca7"
+          },
+          "retained": {
+            "bytes": 47409,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/temporary-change-0836-profile-v2-20260929T122652/profile_analysis.py",
+            "sha256": "3495249d9104caf3741fbf943aa63469a529267d7d8d657d8ce8f367b6bdbca7"
+          }
+        }
+      ],
+      "path": "/tmp/change-0836-profile-v2-20260929T122652"
+    }
+  ],
+  "status": "pass"
+}

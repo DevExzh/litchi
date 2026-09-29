@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import subprocess; p=\"docs/performance/results/change-0836/\"; subprocess.run([\"python3\",\"-B\",p+\"reader-tests.py\",\"--check\"],check=True); subprocess.run([\"python3\",\"-B\",p+\"profile-tests.py\",\"--check\"],check=True)"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790686137.4027233
+}

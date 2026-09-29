@@ -1,0 +1,11 @@
+
+ Performance counter stats for 'taskset -c 12 true':
+
+            717657      cycles:u                                                              
+
+       0.028673142 seconds time elapsed
+
+       0.014352000 seconds user
+       0.014352000 seconds sys
+
+

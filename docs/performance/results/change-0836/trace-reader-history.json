@@ -1,0 +1,35 @@
+{
+  "admission": {
+    "bytes": 2105,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-admission.json",
+    "sha256": "abcdf7b86249f29cbbe4860c503fb4739fb949cb7743b0330a4f497d16e56a66"
+  },
+  "rows": [
+    {
+      "admission_descriptor": {
+        "bytes": 47796,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py",
+        "sha256": "6939623497fcc868810c373731b212fd7935e7af711d875078fba33716f6ecf7"
+      },
+      "archived": {
+        "bytes": 47796,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/profile-v3/profile_analysis.py",
+        "sha256": "6939623497fcc868810c373731b212fd7935e7af711d875078fba33716f6ecf7"
+      }
+    },
+    {
+      "admission_descriptor": {
+        "bytes": 11601,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-tests.py",
+        "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+      },
+      "archived": {
+        "bytes": 11601,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/profile-v3/profile-tests.py",
+        "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+      }
+    }
+  ],
+  "scope": "Resolve informational trace-time parser hashes to immutable archived copies; these precede separately qualified offline corrections.",
+  "status": "pass"
+}

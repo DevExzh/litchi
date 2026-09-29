@@ -1,0 +1,42 @@
+{
+  "created_unix": 1790685208.6522532,
+  "inputs": {
+    "admission.json": {
+      "bytes": 4559,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/admission.json",
+      "sha256": "d874f3c6ea60830582108a71e996935f7456f275e7350eecc2d88601f8a7b549"
+    },
+    "capture.py": {
+      "bytes": 2936,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/capture.py",
+      "sha256": "ff9be30be7fab918a2a43249e4e91dc9de54de3d6f4e723b179a53ebe57d8831"
+    },
+    "plan.json": {
+      "bytes": 7179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/plan.json",
+      "sha256": "ef26ac9ba91871b8747caa512b7a6b2039d93929b73d93ee924b0777f4232b26"
+    },
+    "profile-tests.py": {
+      "bytes": 11601,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile-tests.py",
+      "sha256": "069a4e09a4224806173d3d400b87092722ccc185664f6274a22bf22aeb6e7c83"
+    },
+    "profile_analysis.py": {
+      "bytes": 47796,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py",
+      "sha256": "6939623497fcc868810c373731b212fd7935e7af711d875078fba33716f6ecf7"
+    },
+    "validation/independent-preflight-v3/receipt.json": {
+      "bytes": 484,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight-v3/receipt.json",
+      "sha256": "8f58641b1ee861f2e0f89bb28cc4985c55cd42ecca508df216fd6b4ce5ac11d4"
+    },
+    "validation/trace-parser-preflight/receipt.json": {
+      "bytes": 763,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-parser-preflight/receipt.json",
+      "sha256": "81bcca7d89aea819f8c67a4549a1b94826e735bdf7d33e7c1bfaccbd51e2abd3"
+    }
+  },
+  "scope": "Separate durability trace capture after native qualification and synthetic syscall parser checks; final offline readers remain required. Parser is under pre-profile mapping correction, so its admission snapshot is informational for trace capture and not a final immutable parser binding.",
+  "status": "pass"
+}

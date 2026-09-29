@@ -1,0 +1,15 @@
+{
+  "absent": true,
+  "original": {
+    "bytes": 185,
+    "path": "/home/zhuhe/code/litchi/traces-validation.json",
+    "sha256": "c1d32db20cc1377cc4bde20fff9812d71bf76676620d23b2af091217f509ae8a"
+  },
+  "retained": {
+    "bytes": 185,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/archive/failed-traces-validation.json",
+    "sha256": "c1d32db20cc1377cc4bde20fff9812d71bf76676620d23b2af091217f509ae8a"
+  },
+  "scope": "Error output created by the first wrong-relative-path trace reader invocation.",
+  "status": "pass"
+}

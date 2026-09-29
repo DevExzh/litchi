@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "strace",
+    "-f",
+    "-qq",
+    "-ttt",
+    "-T",
+    "-yy",
+    "-e",
+    "trace=fsync,fdatasync,rename,renameat,renameat2",
+    "-o",
+    "/home/zhuhe/code/litchi-target-0836/trace-00.trace",
+    "--",
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline",
+    "--case",
+    "opc_file_source_one_part_atomic_save",
+    "--samples",
+    "8",
+    "--warmup",
+    "0",
+    "--filesystem-cache",
+    "warm",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0836",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-00.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "freeze": {
+    "bytes": 1206206,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-baseline.json",
+    "sha256": "89fba9596a91c92b7d2d874361abf8600cf05339ca694adcc77bdf9c7e6b021f"
+  },
+  "started_unix": 1790685208.944479
+}

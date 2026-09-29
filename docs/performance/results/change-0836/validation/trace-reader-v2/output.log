@@ -1,0 +1,90 @@
+{
+  "claim_authorized": false,
+  "manifest_valid": true,
+  "performance_claim": "none",
+  "rows": [
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 0,
+      "label": "trace-00",
+      "outputs": {
+        "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/trace-00/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-00.json",
+      "report_sha256": "267987e870ef717bad667a094cb85574e521f9fe2709408686b38fda1e8b94a2",
+      "samples": 8,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 1,
+      "label": "trace-01",
+      "outputs": {
+        "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/trace-01/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-01.json",
+      "report_sha256": "fe432d10c3ea73a7dd8896722f169ded0b53af74589afb4f0e83cad566f3cacf",
+      "samples": 8,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 0
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 2,
+      "label": "trace-02",
+      "outputs": {
+        "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/trace-02/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-02.json",
+      "report_sha256": "65c1efb179600254a438256d9dcec6c0938f9a597859d96c7d13e083ccd82845",
+      "samples": 8,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 3,
+      "label": "trace-03",
+      "outputs": {
+        "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/trace-03/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/trace-03.json",
+      "report_sha256": "ccf0674bbdd44bd1b6f9de7da5500ba6dca6c529a84561b5c413ce7a58d31ccb",
+      "samples": 8,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 0
+    }
+  ],
+  "stage_environments": {
+    "baseline": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "12",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": "ext2/ext3",
+      "git_revision": "5bb91a4de42a403cd1dfcb6e10058e3fe62d2228",
+      "git_worktree_dirty": true,
+      "kernel": "Linux 7.0.0-1012-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustflags": null,
+      "source_destination_same_device": true,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "status": "pass",
+  "validated_sample_count": 32
+}

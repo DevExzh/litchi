@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/cleanup.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686095.0260596,
+  "log": {
+    "bytes": 51,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/cleanup/output.log",
+    "sha256": "f420bd54b41078eed66a3112f9c9bfe64042d4d72ac320e6a972d7b8ea8126c6"
+  },
+  "started_unix": 1790686091.5544767
+}

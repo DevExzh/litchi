@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/profile-tests.py",
+    "--preflight"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790684774.206133,
+  "log": {
+    "bytes": 74,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-parser-preflight-v2/output.log",
+    "sha256": "1fadd07b4156b2607f6a58c69da4e4ab14a8e1e744fa524bb41a66029181355c"
+  },
+  "started_unix": 1790684774.1757565
+}

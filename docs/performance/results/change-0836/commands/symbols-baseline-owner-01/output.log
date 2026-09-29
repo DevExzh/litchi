@@ -1,0 +1,481 @@
+
+/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000001237420 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream>:
+ 1237420:	55                   	push   %rbp
+ 1237421:	41 57                	push   %r15
+ 1237423:	41 56                	push   %r14
+ 1237425:	41 55                	push   %r13
+ 1237427:	41 54                	push   %r12
+ 1237429:	53                   	push   %rbx
+ 123742a:	48 81 ec c8 07 00 00 	sub    $0x7c8,%rsp
+ 1237431:	4c 89 4c 24 78       	mov    %r9,0x78(%rsp)
+ 1237436:	49 89 cd             	mov    %rcx,%r13
+ 1237439:	48 89 d5             	mov    %rdx,%rbp
+ 123743c:	49 89 f7             	mov    %rsi,%r15
+ 123743f:	49 89 fe             	mov    %rdi,%r14
+ 1237442:	4c 89 44 24 28       	mov    %r8,0x28(%rsp)
+ 1237447:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 123744e:	00 
+ 123744f:	ff 15 ab 83 5a 02    	call   *0x25a83ab(%rip)        # 37df800 <_DYNAMIC+0x2980>
+ 1237455:	49 bc 36 00 00 00 00 	movabs $0x8000000000000036,%r12
+ 123745c:	00 00 80 
+ 123745f:	4c 39 a4 24 e0 00 00 	cmp    %r12,0xe0(%rsp)
+ 1237466:	00 
+ 1237467:	0f 85 74 01 00 00    	jne    12375e1 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x1c1>
+ 123746d:	49 83 bf b8 03 00 00 	cmpq   $0x0,0x3b8(%r15)
+ 1237474:	00 
+ 1237475:	0f 84 b5 01 00 00    	je     1237630 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x210>
+ 123747b:	49 8d bf c0 03 00 00 	lea    0x3c0(%r15),%rdi
+ 1237482:	4c 89 ee             	mov    %r13,%rsi
+ 1237485:	e8 c6 9d 6b 00       	call   18f1250 <core::hash::BuildHasher::hash_one>
+ 123748a:	48 89 c1             	mov    %rax,%rcx
+ 123748d:	48 c1 e9 39          	shr    $0x39,%rcx
+ 1237491:	49 8b b7 a0 03 00 00 	mov    0x3a0(%r15),%rsi
+ 1237498:	4c 89 7c 24 08       	mov    %r15,0x8(%rsp)
+ 123749d:	49 8b bf a8 03 00 00 	mov    0x3a8(%r15),%rdi
+ 12374a4:	66 0f 6e c1          	movd   %ecx,%xmm0
+ 12374a8:	66 0f 60 c0          	punpcklbw %xmm0,%xmm0
+ 12374ac:	f2 0f 70 c0 00       	pshuflw $0x0,%xmm0,%xmm0
+ 12374b1:	66 0f 70 c8 44       	pshufd $0x44,%xmm0,%xmm1
+ 12374b6:	49 8b 5d 08          	mov    0x8(%r13),%rbx
+ 12374ba:	49 8b 55 10          	mov    0x10(%r13),%rdx
+ 12374be:	45 31 c0             	xor    %r8d,%r8d
+ 12374c1:	66 0f 76 d2          	pcmpeqd %xmm2,%xmm2
+ 12374c5:	4c 8b 0d 94 5c 5a 02 	mov    0x25a5c94(%rip),%r9        # 37dd160 <bcmp@GLIBC_2.2.5>
+ 12374cc:	48 21 f8             	and    %rdi,%rax
+ 12374cf:	f3 0f 6f 1c 06       	movdqu (%rsi,%rax,1),%xmm3
+ 12374d4:	66 0f 6f c3          	movdqa %xmm3,%xmm0
+ 12374d8:	66 0f 74 c1          	pcmpeqb %xmm1,%xmm0
+ 12374dc:	66 0f d7 c8          	pmovmskb %xmm0,%ecx
+ 12374e0:	85 c9                	test   %ecx,%ecx
+ 12374e2:	0f 84 d8 00 00 00    	je     12375c0 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x1a0>
+ 12374e8:	48 89 84 24 b0 00 00 	mov    %rax,0xb0(%rsp)
+ 12374ef:	00 
+ 12374f0:	48 89 6c 24 20       	mov    %rbp,0x20(%rsp)
+ 12374f5:	48 89 bc 24 a8 00 00 	mov    %rdi,0xa8(%rsp)
+ 12374fc:	00 
+ 12374fd:	66 0f 7f 8c 24 d0 00 	movdqa %xmm1,0xd0(%rsp)
+ 1237504:	00 00 
+ 1237506:	48 89 b4 24 a0 00 00 	mov    %rsi,0xa0(%rsp)
+ 123750d:	00 
+ 123750e:	4c 89 84 24 98 00 00 	mov    %r8,0x98(%rsp)
+ 1237515:	00 
+ 1237516:	66 0f 7f 9c 24 c0 00 	movdqa %xmm3,0xc0(%rsp)
+ 123751d:	00 00 
+ 123751f:	48 89 8c 24 b8 00 00 	mov    %rcx,0xb8(%rsp)
+ 1237526:	00 
+ 1237527:	f3 0f bc c9          	tzcnt  %ecx,%ecx
+ 123752b:	48 01 c1             	add    %rax,%rcx
+ 123752e:	48 21 f9             	and    %rdi,%rcx
+ 1237531:	48 c1 e1 05          	shl    $0x5,%rcx
+ 1237535:	48 89 f5             	mov    %rsi,%rbp
+ 1237538:	48 29 cd             	sub    %rcx,%rbp
+ 123753b:	48 3b 55 f0          	cmp    -0x10(%rbp),%rdx
+ 123753f:	75 2e                	jne    123756f <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x14f>
+ 1237541:	48 8b 75 e8          	mov    -0x18(%rbp),%rsi
+ 1237545:	48 89 df             	mov    %rbx,%rdi
+ 1237548:	4d 89 f4             	mov    %r14,%r12
+ 123754b:	49 89 d6             	mov    %rdx,%r14
+ 123754e:	4d 89 cf             	mov    %r9,%r15
+ 1237551:	41 ff d1             	call   *%r9
+ 1237554:	4d 89 f9             	mov    %r15,%r9
+ 1237557:	4c 89 f2             	mov    %r14,%rdx
+ 123755a:	4d 89 e6             	mov    %r12,%r14
+ 123755d:	49 bc 36 00 00 00 00 	movabs $0x8000000000000036,%r12
+ 1237564:	00 00 80 
+ 1237567:	85 c0                	test   %eax,%eax
+ 1237569:	0f 84 6f 01 00 00    	je     12376de <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2be>
+ 123756f:	48 8b 8c 24 b8 00 00 	mov    0xb8(%rsp),%rcx
+ 1237576:	00 
+ 1237577:	8d 41 ff             	lea    -0x1(%rcx),%eax
+ 123757a:	66 21 c8             	and    %cx,%ax
+ 123757d:	89 c1                	mov    %eax,%ecx
+ 123757f:	48 8b 84 24 b0 00 00 	mov    0xb0(%rsp),%rax
+ 1237586:	00 
+ 1237587:	48 8b 6c 24 20       	mov    0x20(%rsp),%rbp
+ 123758c:	48 8b bc 24 a8 00 00 	mov    0xa8(%rsp),%rdi
+ 1237593:	00 
+ 1237594:	66 0f 6f 8c 24 d0 00 	movdqa 0xd0(%rsp),%xmm1
+ 123759b:	00 00 
+ 123759d:	48 8b b4 24 a0 00 00 	mov    0xa0(%rsp),%rsi
+ 12375a4:	00 
+ 12375a5:	4c 8b 84 24 98 00 00 	mov    0x98(%rsp),%r8
+ 12375ac:	00 
+ 12375ad:	66 0f 76 d2          	pcmpeqd %xmm2,%xmm2
+ 12375b1:	66 0f 6f 9c 24 c0 00 	movdqa 0xc0(%rsp),%xmm3
+ 12375b8:	00 00 
+ 12375ba:	0f 85 5f ff ff ff    	jne    123751f <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0xff>
+ 12375c0:	66 0f 74 da          	pcmpeqb %xmm2,%xmm3
+ 12375c4:	66 0f d7 cb          	pmovmskb %xmm3,%ecx
+ 12375c8:	85 c9                	test   %ecx,%ecx
+ 12375ca:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 12375cf:	75 5f                	jne    1237630 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x210>
+ 12375d1:	4c 01 c0             	add    %r8,%rax
+ 12375d4:	48 83 c0 10          	add    $0x10,%rax
+ 12375d8:	49 83 c0 10          	add    $0x10,%r8
+ 12375dc:	e9 eb fe ff ff       	jmp    12374cc <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0xac>
+ 12375e1:	f3 0f 6f 84 24 e0 00 	movdqu 0xe0(%rsp),%xmm0
+ 12375e8:	00 00 
+ 12375ea:	f3 0f 6f 8c 24 f0 00 	movdqu 0xf0(%rsp),%xmm1
+ 12375f1:	00 00 
+ 12375f3:	f3 0f 6f 94 24 00 01 	movdqu 0x100(%rsp),%xmm2
+ 12375fa:	00 00 
+ 12375fc:	f3 0f 6f 9c 24 10 01 	movdqu 0x110(%rsp),%xmm3
+ 1237603:	00 00 
+ 1237605:	f3 41 0f 7f 5e 30    	movdqu %xmm3,0x30(%r14)
+ 123760b:	f3 41 0f 7f 56 20    	movdqu %xmm2,0x20(%r14)
+ 1237611:	f3 41 0f 7f 4e 10    	movdqu %xmm1,0x10(%r14)
+ 1237617:	f3 41 0f 7f 06       	movdqu %xmm0,(%r14)
+ 123761c:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+ 1237621:	f0 48 ff 08          	lock decq (%rax)
+ 1237625:	0f 84 8b 00 00 00    	je     12376b6 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x296>
+ 123762b:	e9 91 00 00 00       	jmp    12376c1 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2a1>
+ 1237630:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+ 1237637:	00 00 
+ 1237639:	48 c7 44 24 38 01 00 	movq   $0x1,0x38(%rsp)
+ 1237640:	00 00 
+ 1237642:	48 c7 44 24 40 00 00 	movq   $0x0,0x40(%rsp)
+ 1237649:	00 00 
+ 123764b:	48 c7 84 24 f0 00 00 	movq   $0x60000020,0xf0(%rsp)
+ 1237652:	00 20 00 00 60 
+ 1237657:	48 8d 44 24 30       	lea    0x30(%rsp),%rax
+ 123765c:	48 89 84 24 e0 00 00 	mov    %rax,0xe0(%rsp)
+ 1237663:	00 
+ 1237664:	48 8d 05 7d 76 53 02 	lea    0x253767d(%rip),%rax        # 376ece8 <anon.b1f45895282076a0de69f62324a2fb0a.87.llvm.10424861749284998149+0x18>
+ 123766b:	48 89 84 24 e8 00 00 	mov    %rax,0xe8(%rsp)
+ 1237672:	00 
+ 1237673:	48 8d b4 24 e0 00 00 	lea    0xe0(%rsp),%rsi
+ 123767a:	00 
+ 123767b:	4c 89 ef             	mov    %r13,%rdi
+ 123767e:	ff 15 a4 71 5a 02    	call   *0x25a71a4(%rip)        # 37de828 <_DYNAMIC+0x19a8>
+ 1237684:	84 c0                	test   %al,%al
+ 1237686:	0f 85 96 04 00 00    	jne    1237b22 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x702>
+ 123768c:	48 8d 44 24 38       	lea    0x38(%rsp),%rax
+ 1237691:	48 8b 4c 24 30       	mov    0x30(%rsp),%rcx
+ 1237696:	f3 0f 6f 00          	movdqu (%rax),%xmm0
+ 123769a:	f3 41 0f 7f 46 10    	movdqu %xmm0,0x10(%r14)
+ 12376a0:	49 83 c4 d0          	add    $0xffffffffffffffd0,%r12
+ 12376a4:	4d 89 26             	mov    %r12,(%r14)
+ 12376a7:	49 89 4e 08          	mov    %rcx,0x8(%r14)
+ 12376ab:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+ 12376b0:	f0 48 ff 08          	lock decq (%rax)
+ 12376b4:	75 0b                	jne    12376c1 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2a1>
+ 12376b6:	48 8d 7c 24 28       	lea    0x28(%rsp),%rdi
+ 12376bb:	ff 15 bf 5b 5a 02    	call   *0x25a5bbf(%rip)        # 37dd280 <_DYNAMIC+0x400>
+ 12376c1:	4c 89 ff             	mov    %r15,%rdi
+ 12376c4:	e8 27 bb 05 00       	call   12931f0 <core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>>
+ 12376c9:	4c 89 f0             	mov    %r14,%rax
+ 12376cc:	48 81 c4 c8 07 00 00 	add    $0x7c8,%rsp
+ 12376d3:	5b                   	pop    %rbx
+ 12376d4:	41 5c                	pop    %r12
+ 12376d6:	41 5d                	pop    %r13
+ 12376d8:	41 5e                	pop    %r14
+ 12376da:	41 5f                	pop    %r15
+ 12376dc:	5d                   	pop    %rbp
+ 12376dd:	c3                   	ret
+ 12376de:	4c 8b 6d f8          	mov    -0x8(%rbp),%r13
+ 12376e2:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+ 12376e7:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 12376ec:	48 8b 40 20          	mov    0x20(%rax),%rax
+ 12376f0:	48 c7 44 24 30 01 00 	movq   $0x1,0x30(%rsp)
+ 12376f7:	00 00 
+ 12376f9:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+ 12376fe:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+ 1237703:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 123770a:	00 
+ 123770b:	48 8d 54 24 30       	lea    0x30(%rsp),%rdx
+ 1237710:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 1237715:	4c 89 fe             	mov    %r15,%rsi
+ 1237718:	e8 33 3d fc ff       	call   11fb450 <litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits>
+ 123771d:	48 8b 4c 24 78       	mov    0x78(%rsp),%rcx
+ 1237722:	4c 39 a4 24 e0 00 00 	cmp    %r12,0xe0(%rsp)
+ 1237729:	00 
+ 123772a:	75 1b                	jne    1237747 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x327>
+ 123772c:	48 85 c9             	test   %rcx,%rcx
+ 123772f:	74 56                	je     1237787 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x367>
+ 1237731:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 1237738:	00 
+ 1237739:	4c 89 fe             	mov    %r15,%rsi
+ 123773c:	4c 89 ea             	mov    %r13,%rdx
+ 123773f:	ff 15 43 82 5a 02    	call   *0x25a8243(%rip)        # 37df988 <_DYNAMIC+0x2b08>
+ 1237745:	eb 54                	jmp    123779b <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x37b>
+ 1237747:	f3 0f 6f 84 24 e0 00 	movdqu 0xe0(%rsp),%xmm0
+ 123774e:	00 00 
+ 1237750:	f3 0f 6f 8c 24 f0 00 	movdqu 0xf0(%rsp),%xmm1
+ 1237757:	00 00 
+ 1237759:	f3 0f 6f 94 24 00 01 	movdqu 0x100(%rsp),%xmm2
+ 1237760:	00 00 
+ 1237762:	f3 0f 6f 9c 24 10 01 	movdqu 0x110(%rsp),%xmm3
+ 1237769:	00 00 
+ 123776b:	f3 41 0f 7f 5e 30    	movdqu %xmm3,0x30(%r14)
+ 1237771:	f3 41 0f 7f 56 20    	movdqu %xmm2,0x20(%r14)
+ 1237777:	f3 41 0f 7f 4e 10    	movdqu %xmm1,0x10(%r14)
+ 123777d:	f3 41 0f 7f 06       	movdqu %xmm0,(%r14)
+ 1237782:	e9 e6 00 00 00       	jmp    123786d <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x44d>
+ 1237787:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 123778e:	00 
+ 123778f:	4c 89 fe             	mov    %r15,%rsi
+ 1237792:	4c 89 ea             	mov    %r13,%rdx
+ 1237795:	ff 15 dd 80 5a 02    	call   *0x25a80dd(%rip)        # 37df878 <_DYNAMIC+0x29f8>
+ 123779b:	48 8b 84 24 e0 00 00 	mov    0xe0(%rsp),%rax
+ 12377a2:	00 
+ 12377a3:	0f 10 84 24 e8 00 00 	movups 0xe8(%rsp),%xmm0
+ 12377aa:	00 
+ 12377ab:	0f 29 44 24 30       	movaps %xmm0,0x30(%rsp)
+ 12377b0:	48 8b 8c 24 f8 00 00 	mov    0xf8(%rsp),%rcx
+ 12377b7:	00 
+ 12377b8:	48 89 4c 24 40       	mov    %rcx,0x40(%rsp)
+ 12377bd:	4c 39 e0             	cmp    %r12,%rax
+ 12377c0:	75 77                	jne    1237839 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x419>
+ 12377c2:	66 0f 6f 44 24 30    	movdqa 0x30(%rsp),%xmm0
+ 12377c8:	66 0f 7f 44 24 60    	movdqa %xmm0,0x60(%rsp)
+ 12377ce:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+ 12377d3:	48 89 44 24 70       	mov    %rax,0x70(%rsp)
+ 12377d8:	48 8b 44 24 60       	mov    0x60(%rsp),%rax
+ 12377dd:	48 8b 50 20          	mov    0x20(%rax),%rdx
+ 12377e1:	48 8b 4c 24 10       	mov    0x10(%rsp),%rcx
+ 12377e6:	48 3b 51 20          	cmp    0x20(%rcx),%rdx
+ 12377ea:	75 16                	jne    1237802 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x3e2>
+ 12377ec:	48 8b 78 18          	mov    0x18(%rax),%rdi
+ 12377f0:	48 8b 71 18          	mov    0x18(%rcx),%rsi
+ 12377f4:	ff 15 66 59 5a 02    	call   *0x25a5966(%rip)        # 37dd160 <bcmp@GLIBC_2.2.5>
+ 12377fa:	85 c0                	test   %eax,%eax
+ 12377fc:	0f 84 db 01 00 00    	je     12379dd <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x5bd>
+ 1237802:	4c 89 ff             	mov    %r15,%rdi
+ 1237805:	ff 15 8d 80 5a 02    	call   *0x25a808d(%rip)        # 37df898 <_DYNAMIC+0x2a18>
+ 123780b:	84 c0                	test   %al,%al
+ 123780d:	0f 84 81 00 00 00    	je     1237894 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x474>
+ 1237813:	49 83 c4 ef          	add    $0xffffffffffffffef,%r12
+ 1237817:	4d 89 26             	mov    %r12,(%r14)
+ 123781a:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 123781f:	40 b5 01             	mov    $0x1,%bpl
+ 1237822:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+ 1237827:	e8 a4 b3 05 00       	call   1292bd0 <core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>>
+ 123782c:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 1237831:	f0 48 ff 08          	lock decq (%rax)
+ 1237835:	75 4f                	jne    1237886 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x466>
+ 1237837:	eb 42                	jmp    123787b <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x45b>
+ 1237839:	0f 10 84 24 00 01 00 	movups 0x100(%rsp),%xmm0
+ 1237840:	00 
+ 1237841:	f3 0f 6f 8c 24 10 01 	movdqu 0x110(%rsp),%xmm1
+ 1237848:	00 00 
+ 123784a:	f3 41 0f 7f 4e 30    	movdqu %xmm1,0x30(%r14)
+ 1237850:	41 0f 11 46 20       	movups %xmm0,0x20(%r14)
+ 1237855:	48 8b 4c 24 40       	mov    0x40(%rsp),%rcx
+ 123785a:	49 89 4e 18          	mov    %rcx,0x18(%r14)
+ 123785e:	66 0f 6f 44 24 30    	movdqa 0x30(%rsp),%xmm0
+ 1237864:	f3 41 0f 7f 46 08    	movdqu %xmm0,0x8(%r14)
+ 123786a:	49 89 06             	mov    %rax,(%r14)
+ 123786d:	40 b5 01             	mov    $0x1,%bpl
+ 1237870:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 1237875:	f0 48 ff 08          	lock decq (%rax)
+ 1237879:	75 0b                	jne    1237886 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x466>
+ 123787b:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+ 1237880:	ff 15 fa 59 5a 02    	call   *0x25a59fa(%rip)        # 37dd280 <_DYNAMIC+0x400>
+ 1237886:	40 84 ed             	test   %bpl,%bpl
+ 1237889:	0f 85 32 fe ff ff    	jne    12376c1 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2a1>
+ 123788f:	e9 35 fe ff ff       	jmp    12376c9 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2a9>
+ 1237894:	48 8b 44 24 08       	mov    0x8(%rsp),%rax
+ 1237899:	48 8b b0 a8 02 00 00 	mov    0x2a8(%rax),%rsi
+ 12378a0:	49 39 f5             	cmp    %rsi,%r13
+ 12378a3:	0f 83 a0 02 00 00    	jae    1237b49 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x729>
+ 12378a9:	48 8b 98 a0 02 00 00 	mov    0x2a0(%rax),%rbx
+ 12378b0:	4e 8d 3c ad 00 00 00 	lea    0x0(,%r13,4),%r15
+ 12378b7:	00 
+ 12378b8:	4d 01 ef             	add    %r13,%r15
+ 12378bb:	49 c1 e7 05          	shl    $0x5,%r15
+ 12378bf:	4a 8b 7c 3b 08       	mov    0x8(%rbx,%r15,1),%rdi
+ 12378c4:	4a 8b 74 3b 10       	mov    0x10(%rbx,%r15,1),%rsi
+ 12378c9:	4a 8b 54 3b 20       	mov    0x20(%rbx,%r15,1),%rdx
+ 12378ce:	4a 8b 4c 3b 28       	mov    0x28(%rbx,%r15,1),%rcx
+ 12378d3:	ff 15 c7 7f 5a 02    	call   *0x25a7fc7(%rip)        # 37df8a0 <_DYNAMIC+0x2a20>
+ 12378d9:	84 c0                	test   %al,%al
+ 12378db:	74 45                	je     1237922 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x502>
+ 12378dd:	4c 01 fb             	add    %r15,%rbx
+ 12378e0:	48 8b 73 08          	mov    0x8(%rbx),%rsi
+ 12378e4:	48 8b 53 10          	mov    0x10(%rbx),%rdx
+ 12378e8:	48 8b 44 24 60       	mov    0x60(%rsp),%rax
+ 12378ed:	48 8b 48 18          	mov    0x18(%rax),%rcx
+ 12378f1:	4c 8b 40 20          	mov    0x20(%rax),%r8
+ 12378f5:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 12378fa:	4c 8b 48 18          	mov    0x18(%rax),%r9
+ 12378fe:	48 8b 40 20          	mov    0x20(%rax),%rax
+ 1237902:	48 89 04 24          	mov    %rax,(%rsp)
+ 1237906:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 123790d:	00 
+ 123790e:	ff 15 94 7f 5a 02    	call   *0x25a7f94(%rip)        # 37df8a8 <_DYNAMIC+0x2a28>
+ 1237914:	4c 39 a4 24 e0 00 00 	cmp    %r12,0xe0(%rsp)
+ 123791b:	00 
+ 123791c:	0f 85 88 01 00 00    	jne    1237aaa <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x68a>
+ 1237922:	48 8b 44 24 70       	mov    0x70(%rsp),%rax
+ 1237927:	48 89 84 24 f0 00 00 	mov    %rax,0xf0(%rsp)
+ 123792e:	00 
+ 123792f:	66 0f 6f 44 24 60    	movdqa 0x60(%rsp),%xmm0
+ 1237935:	66 0f 7f 84 24 e0 00 	movdqa %xmm0,0xe0(%rsp)
+ 123793c:	00 00 
+ 123793e:	40 b5 01             	mov    $0x1,%bpl
+ 1237941:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 1237948:	00 
+ 1237949:	e8 82 b2 05 00       	call   1292bd0 <core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>>
+ 123794e:	49 83 c4 ca          	add    $0xffffffffffffffca,%r12
+ 1237952:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 1237957:	4c 89 64 24 30       	mov    %r12,0x30(%rsp)
+ 123795c:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+ 1237961:	4c 89 64 24 48       	mov    %r12,0x48(%rsp)
+ 1237966:	48 89 44 24 50       	mov    %rax,0x50(%rsp)
+ 123796b:	48 8b 5c 24 78       	mov    0x78(%rsp),%rbx
+ 1237970:	4c 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%r15
+ 1237977:	00 
+ 1237978:	ba e0 06 00 00       	mov    $0x6e0,%edx
+ 123797d:	4c 89 ff             	mov    %r15,%rdi
+ 1237980:	48 85 db             	test   %rbx,%rbx
+ 1237983:	0f 84 c3 00 00 00    	je     1237a4c <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x62c>
+ 1237989:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 123798e:	ff 15 54 57 5a 02    	call   *0x25a5754(%rip)        # 37dd0e8 <memcpy@GLIBC_2.14>
+ 1237994:	48 c7 84 24 80 00 00 	movq   $0x0,0x80(%rsp)
+ 123799b:	00 00 00 00 00 
+ 12379a0:	48 c7 84 24 88 00 00 	movq   $0x8,0x88(%rsp)
+ 12379a7:	00 08 00 00 00 
+ 12379ac:	48 c7 84 24 90 00 00 	movq   $0x0,0x90(%rsp)
+ 12379b3:	00 00 00 00 00 
+ 12379b8:	48 8d 4c 24 30       	lea    0x30(%rsp),%rcx
+ 12379bd:	4c 8d 84 24 80 00 00 	lea    0x80(%rsp),%r8
+ 12379c4:	00 
+ 12379c5:	4c 89 f7             	mov    %r14,%rdi
+ 12379c8:	4c 89 fe             	mov    %r15,%rsi
+ 12379cb:	48 8b 54 24 20       	mov    0x20(%rsp),%rdx
+ 12379d0:	49 89 d9             	mov    %rbx,%r9
+ 12379d3:	e8 28 45 00 00       	call   123bf00 <litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner>
+ 12379d8:	e9 be 00 00 00       	jmp    1237a9b <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x67b>
+ 12379dd:	48 8b 44 24 70       	mov    0x70(%rsp),%rax
+ 12379e2:	48 89 84 24 f0 00 00 	mov    %rax,0xf0(%rsp)
+ 12379e9:	00 
+ 12379ea:	66 0f 6f 44 24 60    	movdqa 0x60(%rsp),%xmm0
+ 12379f0:	66 0f 7f 84 24 e0 00 	movdqa %xmm0,0xe0(%rsp)
+ 12379f7:	00 00 
+ 12379f9:	40 b5 01             	mov    $0x1,%bpl
+ 12379fc:	48 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%rdi
+ 1237a03:	00 
+ 1237a04:	e8 c7 b1 05 00       	call   1292bd0 <core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>>
+ 1237a09:	48 8b 5c 24 78       	mov    0x78(%rsp),%rbx
+ 1237a0e:	4c 8d bc 24 e0 00 00 	lea    0xe0(%rsp),%r15
+ 1237a15:	00 
+ 1237a16:	ba e0 06 00 00       	mov    $0x6e0,%edx
+ 1237a1b:	4c 89 ff             	mov    %r15,%rdi
+ 1237a1e:	48 85 db             	test   %rbx,%rbx
+ 1237a21:	0f 84 c3 00 00 00    	je     1237aea <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x6ca>
+ 1237a27:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 1237a2c:	ff 15 b6 56 5a 02    	call   *0x25a56b6(%rip)        # 37dd0e8 <memcpy@GLIBC_2.14>
+ 1237a32:	48 89 d9             	mov    %rbx,%rcx
+ 1237a35:	31 ed                	xor    %ebp,%ebp
+ 1237a37:	4c 89 f7             	mov    %r14,%rdi
+ 1237a3a:	4c 89 fe             	mov    %r15,%rsi
+ 1237a3d:	48 8b 54 24 20       	mov    0x20(%rsp),%rdx
+ 1237a42:	e8 59 7b ff ff       	call   122f5a0 <litchi_opc::source_backed::SourceBackedPackage::write_exact_source_with_accounting>
+ 1237a47:	e9 bb 00 00 00       	jmp    1237b07 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x6e7>
+ 1237a4c:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 1237a51:	ff 15 91 56 5a 02    	call   *0x25a5691(%rip)        # 37dd0e8 <memcpy@GLIBC_2.14>
+ 1237a57:	48 c7 84 24 80 00 00 	movq   $0x0,0x80(%rsp)
+ 1237a5e:	00 00 00 00 00 
+ 1237a63:	48 c7 84 24 88 00 00 	movq   $0x8,0x88(%rsp)
+ 1237a6a:	00 08 00 00 00 
+ 1237a6f:	48 c7 84 24 90 00 00 	movq   $0x0,0x90(%rsp)
+ 1237a76:	00 00 00 00 00 
+ 1237a7b:	48 8d 4c 24 30       	lea    0x30(%rsp),%rcx
+ 1237a80:	4c 8d 84 24 80 00 00 	lea    0x80(%rsp),%r8
+ 1237a87:	00 
+ 1237a88:	4c 89 f7             	mov    %r14,%rdi
+ 1237a8b:	4c 89 fe             	mov    %r15,%rsi
+ 1237a8e:	48 8b 54 24 20       	mov    0x20(%rsp),%rdx
+ 1237a93:	45 31 c9             	xor    %r9d,%r9d
+ 1237a96:	e8 65 44 00 00       	call   123bf00 <litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner>
+ 1237a9b:	48 8d 7c 24 30       	lea    0x30(%rsp),%rdi
+ 1237aa0:	e8 0b b3 05 00       	call   1292db0 <core::ptr::drop_in_place<litchi_opc::source_backed::ChangedOverlay>>
+ 1237aa5:	e9 1f fc ff ff       	jmp    12376c9 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x2a9>
+ 1237aaa:	f3 0f 6f 84 24 e0 00 	movdqu 0xe0(%rsp),%xmm0
+ 1237ab1:	00 00 
+ 1237ab3:	f3 0f 6f 8c 24 f0 00 	movdqu 0xf0(%rsp),%xmm1
+ 1237aba:	00 00 
+ 1237abc:	f3 0f 6f 94 24 00 01 	movdqu 0x100(%rsp),%xmm2
+ 1237ac3:	00 00 
+ 1237ac5:	f3 0f 6f 9c 24 10 01 	movdqu 0x110(%rsp),%xmm3
+ 1237acc:	00 00 
+ 1237ace:	f3 41 0f 7f 5e 30    	movdqu %xmm3,0x30(%r14)
+ 1237ad4:	f3 41 0f 7f 56 20    	movdqu %xmm2,0x20(%r14)
+ 1237ada:	f3 41 0f 7f 4e 10    	movdqu %xmm1,0x10(%r14)
+ 1237ae0:	f3 41 0f 7f 06       	movdqu %xmm0,(%r14)
+ 1237ae5:	e9 30 fd ff ff       	jmp    123781a <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x3fa>
+ 1237aea:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 1237aef:	ff 15 f3 55 5a 02    	call   *0x25a55f3(%rip)        # 37dd0e8 <memcpy@GLIBC_2.14>
+ 1237af5:	31 ed                	xor    %ebp,%ebp
+ 1237af7:	4c 89 f7             	mov    %r14,%rdi
+ 1237afa:	4c 89 fe             	mov    %r15,%rsi
+ 1237afd:	48 8b 54 24 20       	mov    0x20(%rsp),%rdx
+ 1237b02:	e8 b9 96 fb ff       	call   11f11c0 <litchi_opc::source_backed::SourceBackedPackage::write_exact_source>
+ 1237b07:	31 ed                	xor    %ebp,%ebp
+ 1237b09:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 1237b0e:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 1237b13:	f0 48 ff 08          	lock decq (%rax)
+ 1237b17:	0f 84 5e fd ff ff    	je     123787b <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x45b>
+ 1237b1d:	e9 64 fd ff ff       	jmp    1237886 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x466>
+ 1237b22:	48 8d 3d 6a 83 f6 fe 	lea    -0x1097c96(%rip),%rdi        # 19fe93 <anon.b1f45895282076a0de69f62324a2fb0a.85.llvm.10424861749284998149+0x1c>
+ 1237b29:	48 8d 0d 00 72 53 02 	lea    0x2537200(%rip),%rcx        # 376ed30 <anon.b1f45895282076a0de69f62324a2fb0a.87.llvm.10424861749284998149+0x60>
+ 1237b30:	4c 8d 05 e1 71 53 02 	lea    0x25371e1(%rip),%r8        # 376ed18 <anon.b1f45895282076a0de69f62324a2fb0a.87.llvm.10424861749284998149+0x48>
+ 1237b37:	48 8d 54 24 1f       	lea    0x1f(%rsp),%rdx
+ 1237b3c:	be 37 00 00 00       	mov    $0x37,%esi
+ 1237b41:	ff 15 89 59 5a 02    	call   *0x25a5989(%rip)        # 37dd4d0 <_DYNAMIC+0x650>
+ 1237b47:	eb 10                	jmp    1237b59 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x739>
+ 1237b49:	48 8d 15 50 6f 53 02 	lea    0x2536f50(%rip),%rdx        # 376eaa0 <anon.d8a1940e6e7a236849d711497f14e28a.6756.llvm.8655768386492648201+0x16a0>
+ 1237b50:	4c 89 ef             	mov    %r13,%rdi
+ 1237b53:	ff 15 9f 55 5a 02    	call   *0x25a559f(%rip)        # 37dd0f8 <_DYNAMIC+0x278>
+ 1237b59:	0f 0b                	ud2
+ 1237b5b:	49 89 c6             	mov    %rax,%r14
+ 1237b5e:	48 8d 7c 24 30       	lea    0x30(%rsp),%rdi
+ 1237b63:	e8 48 b2 05 00       	call   1292db0 <core::ptr::drop_in_place<litchi_opc::source_backed::ChangedOverlay>>
+ 1237b68:	e9 8d 00 00 00       	jmp    1237bfa <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7da>
+ 1237b6d:	49 89 c6             	mov    %rax,%r14
+ 1237b70:	eb 1a                	jmp    1237b8c <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x76c>
+ 1237b72:	49 89 c6             	mov    %rax,%r14
+ 1237b75:	48 8d 7c 24 60       	lea    0x60(%rsp),%rdi
+ 1237b7a:	e8 51 b0 05 00       	call   1292bd0 <core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>>
+ 1237b7f:	eb 08                	jmp    1237b89 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x769>
+ 1237b81:	49 89 c6             	mov    %rax,%r14
+ 1237b84:	eb 28                	jmp    1237bae <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x78e>
+ 1237b86:	49 89 c6             	mov    %rax,%r14
+ 1237b89:	40 b5 01             	mov    $0x1,%bpl
+ 1237b8c:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 1237b91:	f0 48 ff 08          	lock decq (%rax)
+ 1237b95:	75 12                	jne    1237ba9 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x789>
+ 1237b97:	48 8d 7c 24 10       	lea    0x10(%rsp),%rdi
+ 1237b9c:	ff 15 de 56 5a 02    	call   *0x25a56de(%rip)        # 37dd280 <_DYNAMIC+0x400>
+ 1237ba2:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 1237ba7:	eb 05                	jmp    1237bae <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x78e>
+ 1237ba9:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+ 1237bae:	40 84 ed             	test   %bpl,%bpl
+ 1237bb1:	75 3f                	jne    1237bf2 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7d2>
+ 1237bb3:	eb 45                	jmp    1237bfa <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7da>
+ 1237bb5:	49 89 c6             	mov    %rax,%r14
+ 1237bb8:	eb 38                	jmp    1237bf2 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7d2>
+ 1237bba:	49 89 c6             	mov    %rax,%r14
+ 1237bbd:	eb 1d                	jmp    1237bdc <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7bc>
+ 1237bbf:	49 89 c6             	mov    %rax,%r14
+ 1237bc2:	48 8b 74 24 30       	mov    0x30(%rsp),%rsi
+ 1237bc7:	48 85 f6             	test   %rsi,%rsi
+ 1237bca:	74 10                	je     1237bdc <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7bc>
+ 1237bcc:	48 8b 7c 24 38       	mov    0x38(%rsp),%rdi
+ 1237bd1:	ba 01 00 00 00       	mov    $0x1,%edx
+ 1237bd6:	ff 15 ec 54 5a 02    	call   *0x25a54ec(%rip)        # 37dd0c8 <_DYNAMIC+0x248>
+ 1237bdc:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+ 1237be1:	f0 48 ff 08          	lock decq (%rax)
+ 1237be5:	75 0b                	jne    1237bf2 <litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream+0x7d2>
+ 1237be7:	48 8d 7c 24 28       	lea    0x28(%rsp),%rdi
+ 1237bec:	ff 15 8e 56 5a 02    	call   *0x25a568e(%rip)        # 37dd280 <_DYNAMIC+0x400>
+ 1237bf2:	4c 89 ff             	mov    %r15,%rdi
+ 1237bf5:	e8 f6 b5 05 00       	call   12931f0 <core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>>
+ 1237bfa:	4c 89 f7             	mov    %r14,%rdi
+ 1237bfd:	e8 de ef 52 02       	call   3766be0 <_Unwind_Resume@plt>
+ 1237c02:	ff 15 b8 55 5a 02    	call   *0x25a55b8(%rip)        # 37dd1c0 <_DYNAMIC+0x340>

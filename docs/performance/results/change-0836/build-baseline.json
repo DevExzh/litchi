@@ -1,0 +1,12 @@
+{
+  "binary": {
+    "bytes": 69112496,
+    "path": "/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline",
+    "sha256": "79cd220bdb5d569f0a7676ffa724d215b8e09763e6ed86df6e77e5c4c14af0d2"
+  },
+  "receipt": {
+    "bytes": 755,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/build-baseline/receipt.json",
+    "sha256": "6f8db45967a0d1641242c4d5f0a390f9d2e7ab33ae8b7b747aba8ce9eaa0cf0a"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import subprocess; p=\"docs/performance/results/change-0836/\"; subprocess.run([\"python3\",\"-B\",p+\"reader-tests.py\",\"--check\"],check=True); subprocess.run([\"python3\",\"-B\",p+\"profile-tests.py\",\"--check\"],check=True)"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686139.5076535,
+  "log": {
+    "bytes": 93,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/mutations-post-cleanup/output.log",
+    "sha256": "3d14fbdcc0ed0e43ab5a7cb363c146fe48476fac0c91f3547202a3006dc2598b"
+  },
+  "started_unix": 1790686137.4027233
+}

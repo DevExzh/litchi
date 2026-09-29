@@ -1,0 +1,324 @@
+{
+  "base": "5bb91a4de42a403cd1dfcb6e10058e3fe62d2228",
+  "case": "opc_file_source_one_part_atomic_save",
+  "cpu": 12,
+  "expected": {
+    "native_reports": 24,
+    "native_samples": 288,
+    "perf_reports": 4,
+    "perf_samples": 120,
+    "qualification_reports": 2,
+    "qualification_samples": 4,
+    "reports": 34,
+    "samples": 444,
+    "trace_reports": 4,
+    "trace_samples": 32
+  },
+  "limits": [
+    "No production before/after speedup claim.",
+    "CPU sampled cycles exclude blocked time and are not exact hardware-counter totals.",
+    "Trace durations are perturbed by ptrace and are not subtracted from native latency.",
+    "Warm/cold source padding differs as proven in0834/0835.",
+    "Child peak RSS includes setup/cold preparation history.",
+    "One host and one fixed synthetic incompressible OPC corpus; no cross-machine, producer or scaling claim."
+  ],
+  "native": [
+    {
+      "block": 0,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 0,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 0,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 0,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 1,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 1,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 1,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 1,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 2,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 2,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 2,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 2,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 3,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 3,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 3,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 3,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 4,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 4,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 4,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 4,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 5,
+      "samples": 12,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 5,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 2
+    },
+    {
+      "block": 5,
+      "samples": 12,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 2
+    },
+    {
+      "block": 5,
+      "samples": 12,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 2
+    }
+  ],
+  "perf": [
+    {
+      "repeat": 0,
+      "samples": 30,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "repeat": 0,
+      "samples": 30,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 0
+    },
+    {
+      "repeat": 1,
+      "samples": 30,
+      "stage": "fp",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "repeat": 1,
+      "samples": 30,
+      "stage": "fp",
+      "state": "cold-verified",
+      "warmup": 0
+    }
+  ],
+  "perf_contract": {
+    "call_graph": "fp",
+    "decode": [
+      "perf",
+      "script",
+      "--no-inline",
+      "--ns",
+      "--show-lost-events"
+    ],
+    "event": "cycles:u",
+    "frequency_hz": 997,
+    "inherit": true,
+    "lost_or_malformed_policy": "retain all populations and diagnostics; do not authorize CPU attribution when explicit lost events, malformed records or fewer than 500 owner samples are observed",
+    "minimum_owner_samples_per_capture": 500,
+    "no_buildid_cache": true,
+    "owner_candidates": [
+      "litchi_perf_baseline::filesystem::run_opc_source_save",
+      "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+    ],
+    "owner_selection": "first emitted candidate, selected and address/disassembly-admitted before capture; whole save or overlay-only scope stated explicitly",
+    "population": "measured child PIDs intersect exact admitted owner frames in the retained executable; all other samples separately conserved"
+  },
+  "purpose": "Current-source operation-scoped CPU and durability syscall diagnosis; no optimization adoption",
+  "qualification": [
+    {
+      "samples": 1,
+      "stage": "baseline",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    },
+    {
+      "samples": 1,
+      "stage": "fp",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    }
+  ],
+  "schema": "litchi.0836.opc-filesystem-profile-plan.v1",
+  "source_changes": false,
+  "statistics": {
+    "bootstrap_resamples": 10000,
+    "native_p50": "Rust integer midpoint; block median across six rows",
+    "paired_ratio": "fp/baseline, matched block and cache state",
+    "seed": 836083,
+    "sorted_endpoints": [
+      249,
+      9749
+    ],
+    "spread_flag": "block p50 or peak-RSS p50 max/min greater than 1.2",
+    "tails": "nearest rank; with 12 samples p95 and p99 equal block maximum"
+  },
+  "trace": [
+    {
+      "repeat": 0,
+      "samples": 8,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "repeat": 0,
+      "samples": 8,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 0
+    },
+    {
+      "repeat": 1,
+      "samples": 8,
+      "stage": "baseline",
+      "state": "warm",
+      "warmup": 0
+    },
+    {
+      "repeat": 1,
+      "samples": 8,
+      "stage": "baseline",
+      "state": "cold-verified",
+      "warmup": 0
+    }
+  ],
+  "trace_contract": {
+    "options": [
+      "-f",
+      "-qq",
+      "-ttt",
+      "-T",
+      "-yy"
+    ],
+    "population": "measured child PIDs only, exactly file fsync then atomic rename then directory fsync; preserve primers and parent events outside population",
+    "scope": "ptrace-observed syscall durations and counts, not uninstrumented causal wall fractions",
+    "syscalls": [
+      "fsync",
+      "fdatasync",
+      "rename",
+      "renameat",
+      "renameat2"
+    ]
+  }
+}

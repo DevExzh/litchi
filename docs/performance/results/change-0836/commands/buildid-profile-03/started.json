@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "perf",
+    "buildid-list",
+    "-i",
+    "/home/zhuhe/code/litchi-target-0836/profile-03.data"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "freeze": {
+    "bytes": 1206200,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+    "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+  },
+  "started_unix": 1790685420.5910733
+}

@@ -1,0 +1,42 @@
+{
+  "nm": {
+    "binary": {
+      "bytes": 48712,
+      "path": "/usr/bin/x86_64-linux-gnu-nm",
+      "sha256": "c3a5fca37dc196786df9917a59290e8be1322748453218b0e4690daa9ae43009"
+    },
+    "version": "GNU nm (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+  },
+  "objdump": {
+    "binary": {
+      "bytes": 415760,
+      "path": "/usr/bin/x86_64-linux-gnu-objdump",
+      "sha256": "6e8454a1edb913e86e4274a48bb8a836622ef80d147a1413c21369a2e5dc1cbc"
+    },
+    "version": "GNU objdump (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+  },
+  "perf": {
+    "binary": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b"
+    },
+    "version": "perf version 7.0.14"
+  },
+  "readelf": {
+    "binary": {
+      "bytes": 822408,
+      "path": "/usr/bin/x86_64-linux-gnu-readelf",
+      "sha256": "2cd76fc8d9bdddc84a7eb1c4f0e80717a7475b95e047e1f67d2203a5f4ecdffd"
+    },
+    "version": "GNU readelf (GNU Binutils for Ubuntu) 2.46\nCopyright (C) 2026 Free Software Foundation, Inc.\nThis program is free software; you may redistribute it under the terms of\nthe GNU General Public License version 3 or (at your option) any later version.\nThis program has absolutely no warranty."
+  },
+  "strace": {
+    "binary": {
+      "bytes": 2374392,
+      "path": "/usr/bin/strace",
+      "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5"
+    },
+    "version": "strace -- version 6.19\nCopyright (c) 1991-2026 The strace developers <https://strace.io>.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\nOptional features enabled: stack-trace=libunwind stack-demangle m32-mpers mx32-mpers"
+  }
+}

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/crosscheck.py", line 49, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/crosscheck.py", line 18, in main
+    pids={s['pid'] for e in report['filesystem_evidence'] for s in e['samples']}
+          ~^^^^^^^
+KeyError: 'pid'

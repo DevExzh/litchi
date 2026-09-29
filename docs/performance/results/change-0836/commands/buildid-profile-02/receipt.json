@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "perf",
+    "buildid-list",
+    "-i",
+    "/home/zhuhe/code/litchi-target-0836/profile-02.data"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790685385.3912551,
+  "freeze": {
+    "bytes": 1206200,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+    "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+  },
+  "log": {
+    "bytes": 682,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/buildid-profile-02/output.log",
+    "sha256": "2b67b5eb7b0e05ec1cdfdc3941aa0b3e37dfda1589addc8143cc1cf3690a4039"
+  },
+  "started_unix": 1790685385.3311427
+}

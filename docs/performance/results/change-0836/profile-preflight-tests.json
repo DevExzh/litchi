@@ -1,0 +1,67 @@
+{
+  "checks": [
+    {
+      "name": "valid-owner-range-and-disjoint-groups",
+      "owner_samples": 4,
+      "rejected": false
+    },
+    {
+      "name": "wrong-perf-event",
+      "rejected": true
+    },
+    {
+      "name": "outside-pid-isolation",
+      "outside_pid": 4,
+      "rejected": false
+    },
+    {
+      "name": "wrong-owner-dso-isolation",
+      "outside_owner": 1,
+      "rejected": false
+    },
+    {
+      "name": "owner-address-outside-admitted-range",
+      "rejected": false
+    },
+    {
+      "mismatch_frames": 2,
+      "name": "repeated-out-of-range-never-self-bias",
+      "rejected": false
+    },
+    {
+      "name": "malformed-frame-refuses-cpu-fraction",
+      "rejected": false
+    },
+    {
+      "name": "lost-event-refuses-cpu-fraction",
+      "rejected": false
+    },
+    {
+      "name": "unknown-stack-refuses-cpu-fraction",
+      "rejected": false
+    },
+    {
+      "name": "valid-fsync-rename-fsync-provenance",
+      "rejected": false
+    },
+    {
+      "name": "outside-trace-pid-retained",
+      "outside_events": 1,
+      "rejected": false
+    },
+    {
+      "name": "unmatched-resumed-syscall",
+      "rejected": true
+    },
+    {
+      "name": "wrong-durability-order",
+      "rejected": true
+    }
+  ],
+  "mode": "preflight",
+  "rejected_mutation_count": 3,
+  "retained_analysis_sha256": null,
+  "schema": "litchi.0836.profile-mutation-tests.v1",
+  "scope": "synthetic parser/census mutations; no workload or production claim",
+  "status": "pass"
+}

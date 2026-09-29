@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/reader.py",
+    "docs/performance/results/change-0836/native.json",
+    "--write",
+    "docs/performance/results/change-0836/native-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790684686.7892942,
+  "log": {
+    "bytes": 16401,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/native-reader/output.log",
+    "sha256": "b7c6ab24663f5133d6bfd455bc95110b68b302441156a2f49f421e0300edf191"
+  },
+  "started_unix": 1790684679.3380504
+}

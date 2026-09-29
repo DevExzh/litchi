@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys; sys.path.insert(0,"docs/performance/results/change-0836"); import profile_analysis as a; p=a.read_json(a.HERE/"plan.json"); m=a.read_json(a.HERE/"traces.json"); print([(r["label"],a.trace_row(r,e,i)["order_provenance_verified"]) for i,(r,e) in enumerate(zip(m["rows"],p["trace"]))])
+                                                                                                                                                                                                    ~~~~~~~~~~~^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py", line 891, in trace_row
+    parsed = parse_trace_text(data, pids, label=label)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py", line 835, in parse_trace_text
+    require(counts["fsync"] == 2,
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+            f"{label}: measured PID {pid} has {counts['fsync']} fsync calls, expected 2")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py", line 86, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/profile_analysis.py", line 81, in fail
+    raise EvidenceError(message)
+profile_analysis.EvidenceError: trace-01: measured PID 3197692 has 3 fsync calls, expected 2

@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/profile-tests.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790686020.1422927
+}

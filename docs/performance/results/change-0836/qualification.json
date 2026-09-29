@@ -1,0 +1,45 @@
+{
+  "report_count": 2,
+  "rows": [
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "exit_code": 0,
+      "label": "qualification-00",
+      "receipt": {
+        "bytes": 1022,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/qualification-00/receipt.json",
+        "sha256": "6d9d834ad983858a8a0a70b51063ef25c67398c05314131107e197c5a7689c25"
+      },
+      "report": {
+        "bytes": 52476,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification-00.json",
+        "sha256": "d9a4833500840c923db15e0f0d52230e157ba0b94adff1341c5c77026e78c5eb"
+      },
+      "samples": 1,
+      "stage": "baseline",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "exit_code": 0,
+      "label": "qualification-01",
+      "receipt": {
+        "bytes": 1007,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/qualification-01/receipt.json",
+        "sha256": "7fc571ae16cd1163087cf745479efc0b3d24a5e480c545cb3985bcf8229a45ad"
+      },
+      "report": {
+        "bytes": 52495,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification-01.json",
+        "sha256": "024c8f2ecbbb59946cca2acee1ed82e6ffd8fb6e54e039f1901f2b28e79ec65a"
+      },
+      "samples": 1,
+      "stage": "fp",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    }
+  ],
+  "sample_count": 4,
+  "status": "commands_pass"
+}
