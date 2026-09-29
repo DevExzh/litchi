@@ -1,0 +1,242 @@
+# 0833 — filesystem qualification and measurement protocol review
+
+This review covers the current [`design.md`](./design.md), the frozen
+[`measurement-plan.json`](./measurement-plan.json), the available host
+feasibility receipt, and the frozen driver/reader custody path. The quality
+witness is a sealed 0832 after-source replay, not a fresh test run. It is a
+protocol review only. No build, workload, or formal timing result is admitted
+by this file.
+
+The selected six cases are coherent with the intended coverage boundary:
+
+- `opc_file_eager_open`
+- `opc_file_source_open`
+- `opc_file_eager_one_part_atomic_save`
+- `opc_file_source_one_part_atomic_save`
+- `pptx_file_eager_open_selected_slide_lifecycle`
+- `pptx_file_source_open_selected_slide_lifecycle`
+
+The first four cases provide eager/source pairs for large OPC opening and
+same-filesystem one-Part atomic publication. The PPTX pair measures the
+public lifecycle boundary around opening and selected-slide access. The
+existing harness treats these lifecycle cases as eligible for `cold-verified`;
+prepared PPTX query selectors are deliberately excluded from that state. The
+selector parser, route classification, and cold eligibility rule are in
+[`filesystem.rs:835`](../../../../tools/perf-baseline/src/filesystem.rs#L835),
+[`filesystem.rs:1167`](../../../../tools/perf-baseline/src/filesystem.rs#L1167),
+and [`filesystem.rs:1191`](../../../../tools/perf-baseline/src/filesystem.rs#L1191).
+
+## Schedule and admission
+
+The plan contains six blocks. Each block has six cases in warm state and the
+same six cases in `cold-verified` state, for 12 reports per block and 72
+reports overall. Every report has 30 retained samples and three warmups, so
+the planned total is 2,160 samples. The block order alternates forward and
+reverse case ordering, which gives the planned route/cache comparisons a
+declared interleaving rather than an accidental order.
+
+Qualification must remain separate from those 72 formal reports. The frozen
+driver issues six individual one-case commands, each with one sample, zero
+warmups, and `warm,cold-verified` (see [`driver.py:132`](./driver.py#L132)).
+Its `qualification.json` status `commands_pass` would mean only that all six
+processes exited successfully. Formal admission additionally requires the
+reused quality witness and offline reader validation of all six reports. The
+current packet is fail-closed: qualification status is `failed`, the reader
+replay confirms that status, and no formal capture artifact was created. A
+fail-closed cold status is useful evidence, but it is not an admitted formal
+cold baseline; an oracle failure has the same stop condition.
+
+Because the plan requires 72 reports, each formal row must be captured as one
+case and one cache state. A single executable invocation containing all six
+cases would be a valid harness smoke but would produce a combined report and
+would not satisfy the plan's report identity or custody contract. The current
+runner integration is at
+[`lib.rs:10206`](../../../../tools/perf-baseline/src/lib.rs#L10206), and the
+report configuration records the selected cases, states, fresh-child, process
+isolation, and root-selection flags at
+[`lib.rs:12745`](../../../../tools/perf-baseline/src/lib.rs#L12745).
+
+The qualification command shape should therefore be equivalent to:
+
+```text
+<pinned-release-binary> \
+  --warmup 0 --samples 1 \
+  --filesystem-cache warm,cold-verified \
+  --filesystem-root <selected-allowlisted-filesystem> \
+  --case <one-of-the-six-cases> \
+  --json <unique-report-path>
+```
+
+Formal rows use the same shape with `--warmup 3 --samples 30` and one cache
+state matching the row. The harness accepts the cache list through
+[`lib.rs:12875`](../../../../tools/perf-baseline/src/lib.rs#L12875), and its
+filesystem command vocabulary is documented at
+[`README.md:1721`](../../../../tools/perf-baseline/README.md#L1721). The full
+corpus manifest is retained in each report's `results[0].corpus` and
+`filesystem_evidence[0].corpus`; the frozen command has no corpus-manifest
+sidecar.
+
+## Corpus, timing, and oracle boundaries
+
+The OPC fixture is the pinned `FewLarge` incompressible corpus: four logical
+4 MiB members, with source and expected one-Part-save hashes checked before
+sampling. The source and output pins are defined at
+[`filesystem.rs:39`](../../../../tools/perf-baseline/src/filesystem.rs#L39),
+and the preflight checks are implemented at
+[`filesystem.rs:1586`](../../../../tools/perf-baseline/src/filesystem.rs#L1586).
+Each save route must retain its own per-state output oracle and the source route
+must retain its materialization and positional-read evidence. Warm eager and
+source output hashes agree on the pinned corpus. The aligned cold source
+preserves its EOCD comment, so its physical output hash and byte count can
+differ from eager reconstruction; semantic package validation and a
+route/source-specific cold oracle must cover that intentional difference.
+
+The PPTX fixture is generated by the existing current-source builder: 200
+slides, eight text boxes per slide, and eight deterministic incompressible
+2 MiB media parts. Its current archive identity belongs in the embedded corpus
+manifest in each report. The lifecycle timer and selected
+slide operation are defined at
+[`filesystem.rs:5139`](../../../../tools/perf-baseline/src/filesystem.rs#L5139),
+while semantic eager/source parity and selected-slide validation remain after
+the timer at [`filesystem.rs:5901`](../../../../tools/perf-baseline/src/filesystem.rs#L5901).
+The PPTX source replay is an untimed logical-range oracle; it must not be
+reported as physical-I/O attribution.
+
+For every report, preserve the current report schema (`schema_version: 1`),
+the binary identity and source revision, the exact `configuration`, the
+`filesystem_evidence` record, and the complete corpus manifest embedded in
+both the result and evidence record. There is no separate corpus catalog or
+sidecar in the frozen protocol. Each timed result must retain its cache state
+and sorted `elapsed_ns` vector with `sample_order`; per-sample evidence must
+keep process metrics, logical reads, output hashes, materialization counters,
+and the full cold proof. The offline reader checks the embedded manifest
+against the source oracle at [`reader.py:204`](./reader.py#L204). The evidence
+envelope is defined at
+[`filesystem.rs:614`](../../../../tools/perf-baseline/src/filesystem.rs#L614)
+and [`filesystem.rs:706`](../../../../tools/perf-baseline/src/filesystem.rs#L706).
+
+The OPC materialization field has route-specific semantics that must remain
+visible in the report. `OpcPackage::from_bytes` uses the eager package-reader
+path, whose `load_parts_eager` phase inflates all admitted parts; its
+`part_count()` value is therefore the four logical OPC parts in this corpus
+and is the expected eager oracle. The owned source route retains deferred
+payloads and reports its successful lazy-load counter, which is zero for an
+open-only operation. These semantics are documented at
+[`package.rs:1127`](../../../../crates/litchi-opc/src/package.rs#L1127),
+[`pkgreader.rs:850`](../../../../crates/litchi-opc/src/pkgreader.rs#L850),
+[`package.rs:1967`](../../../../crates/litchi-opc/src/package.rs#L1967), and
+[`package.rs:1971`](../../../../crates/litchi-opc/src/package.rs#L1971).
+
+The open-route timer has an intentional lifetime boundary. The eager package
+is local to the timed closure and is dropped before `elapsed_ns` is read,
+whereas the source package is retained after the timer so its diagnostics can
+be sampled outside elapsed time. The boundaries are visible at
+[`filesystem.rs:2697`](../../../../tools/perf-baseline/src/filesystem.rs#L2697),
+[`filesystem.rs:2778`](../../../../tools/perf-baseline/src/filesystem.rs#L2778),
+and [`filesystem.rs:2806`](../../../../tools/perf-baseline/src/filesystem.rs#L2806).
+This is a configuration comparison with different intentional route scopes,
+not an equal-lifetime construction comparison. It does not by itself block
+the descriptive baseline; any ratio or route statement must retain this
+limitation. If equal destruction scope becomes a requirement, the smallest
+harness change is to retain the eager package through the elapsed boundary (or
+drop the source package before that boundary) and relabel the resulting timing
+scope.
+
+Warm and page-aligned cold ZIP copies can have different EOCD comments and
+therefore different source identities. Comparisons must stay within a cache
+state and route; the save oracle for an aligned source must be derived from
+that aligned source. This follows the harness's explicit aligned-source path
+at [`cold_verified.rs:717`](../../../../tools/perf-baseline/src/cold_verified.rs#L717)
+and the documented scope at [`README.md:1806`](../../../../tools/perf-baseline/README.md#L1806).
+
+## Verified-cold requirements
+
+The existing verifier is sufficient for this matrix, provided the driver
+checks its output rather than treating a successful process exit as admission.
+It requires a 64-bit Linux child, a regular nonempty read-write source, an
+allowlisted block filesystem, page alignment, `fsync`, accepted
+`posix_fadvise(DONTNEED)`, strict pre-operation `fincore`, strict post-operation
+`fincore`, and a positive `/proc/self/io` `read_bytes` delta. The implementation
+is at [`cold_verified.rs:523`](../../../../tools/perf-baseline/src/cold_verified.rs#L523)
+and [`cold_verified.rs:667`](../../../../tools/perf-baseline/src/cold_verified.rs#L667);
+the public evidence limits are documented at
+[`README.md:1770`](../../../../tools/perf-baseline/README.md#L1770).
+
+The current [`host-feasibility.json`](./host-feasibility.json) is only an
+untimed 8,192-byte fincore smoke. It proves that a fincore executable exists
+on the observed host, but it is explicitly not workload admission. It also
+uses a shortened output-column request and omits the actual file column,
+whereas the harness requires the strict command
+`fincore --json --bytes --output FILE,SIZE,RES,DIRTY,WRITEBACK -- <path>`.
+The qualification must therefore bind the actual canonical executable,
+version, digest, filesystem magic, exact aligned source, pre/post observations,
+and positive read-bytes proof for each selected workload.
+
+The driver must record, without exposing private paths, the ineligibility
+status and its evidence. Missing or malformed fincore output, changed tool
+provenance, unsupported filesystem, alignment failure, failed advice, zero
+read-bytes, or post-probe failure must never be relabeled warm or
+`cold-requested`. The strict JSON parser and provenance checks are at
+[`cold_verified.rs:288`](../../../../tools/perf-baseline/src/cold_verified.rs#L288)
+and [`cold_verified.rs:830`](../../../../tools/perf-baseline/src/cold_verified.rs#L830).
+
+The selected filesystem root must be on an admitted filesystem and must be
+provided explicitly to the runner. The harness creates and removes a private
+child directory below that root; the driver must bind the root selection and
+ensure all reports use unique output, receipt, and report paths. CPU 12 in
+the plan is an affinity target, not a claim that the host has an exclusively
+reserved CPU.
+
+## Current blockers
+
+The current packet has the release receipt, six qualification receipts, five
+retained qualification reports, the reused quality witness, the diagnostic
+receipts, and an offline reader replay. The replay is a pass for the recorded
+failure disposition, not a qualification pass: [`reader-replay.json`](./reader-replay.json)
+reports `qualification_valid: false`, `claim_authorized: false`, and no formal
+admission. There is no capture script or capture-freeze artifact in this
+packet; the frozen measurement plan remains intent only.
+
+The two blockers are now concrete:
+
+1. The cold source-backed PPTX lifecycle exits during payload-range
+   classification and emits no failed request vectors. Add bounded request /
+   return-range diagnostics, then decide from those vectors whether the
+   aligned EOCD metadata read needs an explicit source-specific allowance or
+   whether the classifier has an offset/coverage bug. A generic error is not a
+   cold success.
+2. The combined cold OPC save selector rejects the eager/source pair because
+   the source-preserving route keeps the aligned EOCD comment. Replace the
+   cross-route byte-equality requirement with route/source-specific cold
+   oracles plus semantic output validation, while retaining raw output,
+   comment, materialization, and logical-read evidence.
+
+After those corrections, root must run fresh qualification and offline reader
+admission before any formal row. The frozen plan still requires one case and
+one cache state per formal report, the exact sample/warmup contract, complete
+embedded corpus manifests, output/semantic oracles, sorted sample order, and
+verified-cold proof for all 72 reports. The failed qualification and diagnostic
+artifacts remain historical evidence and must not be reused as measurements.
+
+The unmeasured PPTX notes snapshot candidate in
+[`pptx-follow-up.md`](./pptx-follow-up.md) must remain outside this baseline.
+It has no authority to alter the six selectors, validation, or cold protocol.
+
+## Historical context and claim limits
+
+The verified-cold method was previously exercised for an older DOCX lifecycle
+in [change 0491](../../changes/0491-docx-provider-and-cold-baseline.md), while
+the warm PPTX lifecycle pair is described in [change 0188](../../changes/0188-ooxml-root-lifecycle-evidence.md).
+Neither is a current-source six-case OPC/PPTX baseline. The large OPC mutation
+record [0772](../../0772-opc-mutated-save-current-baseline.md#L17) explicitly
+excluded filesystem sync, cold storage, allocation, RSS, and concurrency; the
+ordinary real-file record [0819](../../0819-real-file-ordinary-save-baseline.md#L17)
+used smaller warm files and did not establish physical reads. The PPTX profile
+[0829](../../0829-pptx-edit-phase-profile.md#L1) is a diagnostic edit-phase
+profile, and the XLSX result [0832](../../0832-xlsx-inline-column-map.md#L44)
+does not broaden into cold, range, concurrency, or other-format claims.
+
+Accordingly, a passing 0833 packet can support only a descriptive current-source
+route/cache baseline for these six deterministic cases. It cannot authorize a
+before/after optimization claim, a physical-media claim, an allocation claim,
+or a general Office-format conclusion.

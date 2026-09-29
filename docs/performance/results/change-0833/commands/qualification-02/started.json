@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0833/release/litchi-perf-baseline",
+    "--case",
+    "opc_file_eager_one_part_atomic_save",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--filesystem-cache",
+    "warm,cold-verified",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0833",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-02.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "bd2a0ce6bea3a13e905e0cdaaf6fb949f5c15618029bd1d141728c2e5256b766",
+  "prepare_sha256": "993e2edfe77e1c46216c79fbd4a4a56b1ed0ac02c23cabd4de27e41cad46eaed",
+  "started_unix": 1790642878.3823428
+}

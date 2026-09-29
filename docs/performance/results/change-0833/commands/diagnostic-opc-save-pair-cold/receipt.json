@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0833/release/litchi-perf-baseline",
+    "--case",
+    "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--filesystem-cache",
+    "cold-verified",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0833",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0833/diagnostic-opc-save-pair-cold.json"
+  ],
+  "error": null,
+  "exit_code": 1,
+  "finished_unix": 1790643010.7293808,
+  "log": {
+    "bytes": 68,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/commands/diagnostic-opc-save-pair-cold/output.log",
+    "sha256": "dbcd13d8ef1f873b2da3ca9b585ae0fda829f6401867e65f597fa3c86d452b40"
+  },
+  "prepare_sha256": "993e2edfe77e1c46216c79fbd4a4a56b1ed0ac02c23cabd4de27e41cad46eaed",
+  "started_unix": 1790643006.7539675
+}

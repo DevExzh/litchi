@@ -1,0 +1,39 @@
+{
+  "performance_claim": "none",
+  "results": [
+    {
+      "exit_code": 0,
+      "label": "pptx-warm",
+      "receipt": {
+        "bytes": 885,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/commands/diagnostic-pptx-warm/receipt.json",
+        "sha256": "fcfc7ba6e75164d5a791ab2e9e5dd7da5bb136fe7394b2bb360b48b355059f4f"
+      },
+      "report": {
+        "bytes": 34727,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/diagnostic-pptx-warm.json",
+        "sha256": "3894c55a5a99891808a1326943b30e459400c94855738cbbbb5112988c9013e4"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "pptx-cold",
+      "receipt": {
+        "bytes": 896,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/commands/diagnostic-pptx-cold/receipt.json",
+        "sha256": "da6c0b86f0739eee61f7f6ab27415ce658a05bb2cf4aa97aca7f39a445e3e731"
+      },
+      "report": null
+    },
+    {
+      "exit_code": 1,
+      "label": "opc-save-pair-cold",
+      "receipt": {
+        "bytes": 939,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/commands/diagnostic-opc-save-pair-cold/receipt.json",
+        "sha256": "f8ae08567f515e17230408e68edf202257b045fd6a32e7f3d95da69484845b1e"
+      },
+      "report": null
+    }
+  ]
+}

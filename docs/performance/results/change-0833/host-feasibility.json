@@ -1,0 +1,16 @@
+{
+  "scope": "untimed host feasibility only; not workload or cold admission",
+  "argv": [
+    "fincore",
+    "--json",
+    "--bytes",
+    "--output",
+    "SIZE,RES,DIRTY,WRITEBACK",
+    "<private-8192-byte-source>"
+  ],
+  "returncode": 0,
+  "stdout": "{\n   \"fincore\": [\n      {\n         \"size\": 8192,\n         \"res\": 0,\n         \"dirty\": 0,\n         \"writeback\": 0\n      }\n   ]\n}\n",
+  "stderr": "",
+  "fincore_sha256": "5586d15dedd490ce676adb19f2848ce77ecd46ffa5ac74d768396bcac17e021f",
+  "removed_private_file": true
+}

@@ -1,0 +1,70 @@
+{
+  "qualification": {
+    "claim_authorized": false,
+    "failed_rows": [
+      {
+        "case": "pptx_file_source_open_selected_slide_lifecycle",
+        "diagnostic": "pptx_source_replay_classification",
+        "exit_code": 1
+      }
+    ],
+    "performance_claim": "none",
+    "qualification_valid": false,
+    "reports": [
+      {
+        "case": "opc_file_eager_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-00.json",
+        "report_sha256": "ac191aec58ead0800d5818f05dfed6f5a0ee0458579d252cbacb29f395adbcfe"
+      },
+      {
+        "case": "opc_file_source_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-01.json",
+        "report_sha256": "54f4edd6b43650abef59dbc3a41b22129610f66c80e3d184f9e06c7100560150"
+      },
+      {
+        "case": "opc_file_eager_one_part_atomic_save",
+        "outputs": {
+          "cold-verified": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-02.json",
+        "report_sha256": "4c7348c8e23ba9b937e52470ce24f6a797e1b75c4f91c2b7b4ca6924f4bde4f4"
+      },
+      {
+        "case": "opc_file_source_one_part_atomic_save",
+        "outputs": {
+          "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-03.json",
+        "report_sha256": "e80a8b8237983780f3909ddea3b0e26f5234c04cb0ac66fd1478e2e11f76e7a8"
+      },
+      {
+        "case": "pptx_file_eager_open_selected_slide_lifecycle",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification-04.json",
+        "report_sha256": "2a0558419f7b9aa87f972b26d13c70eb7aa8327cc7a16047abb0bbdbeb2ac315"
+      }
+    ],
+    "status": "failed"
+  },
+  "reader_sha256": "f7473c39038f710dc253faf92997a77458130f8fd79a0f6b8094c6d5d67f67cb",
+  "scope": "Offline validation confirms failed qualification; no formal admission",
+  "status": "pass",
+  "warm_diagnostic": {
+    "bytes": 34727,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/diagnostic-pptx-warm.json",
+    "sha256": "3894c55a5a99891808a1326943b30e459400c94855738cbbbb5112988c9013e4"
+  }
+}
