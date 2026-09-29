@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0837 — ZIP retry fix; fresh compression rejected
+
+[0837](0837-zip-interrupted-write-and-fresh-compression.md) rejects fresh-only level-5 OPC publication: a source created by the candidate cannot be restored exactly by a serialized DOCX inverse using the opened-package encoder. Independent ZIP readback isolates the difference to the compressed main document. Compression work now needs physical inverse/provenance proof before timing. A retryable-write poisoning defect found during qualification is fixed.
+
 ## 0836 — OPC source save CPU and durability diagnosis
 
 [0836](0836-opc-filesystem-save-profile.md) completes 34 reports / 444 measured outputs on unchanged source. Ordinary save p50 is 77.123311 ms warm and 144.921409 ms verified cold. Independent mmap/ELF replay confirms 1,863–1,886 overlay samples per capture, with Deflate the largest observed stack group. Unknown frames keep CPU fractions withheld. All 32 traced children have the three-call atomic publication sequence; sixteen cold-preparation fsyncs remain separate. No production optimization is claimed; changed-Part compression is the next measured target.

@@ -1,0 +1,94 @@
+{
+  "all_member_payloads_identical": true,
+  "archive_bytes_equal": false,
+  "members": [
+    {
+      "compressed": {
+        "left": {
+          "bytes": 257,
+          "method": 8,
+          "sha256": "aed872d127cb1d265ec5b0923777fc9e82d56b68d203cdebd9973e0dd4aadc96"
+        },
+        "right": {
+          "bytes": 257,
+          "method": 8,
+          "sha256": "aed872d127cb1d265ec5b0923777fc9e82d56b68d203cdebd9973e0dd4aadc96"
+        }
+      },
+      "compressed_equal": true,
+      "name": "[Content_Types].xml",
+      "payload_bytes": 507,
+      "payload_sha256": "439f9245977d5fe0929b6fc6e4088ec5e9eabd0d139396cf58c0b1d156efdf67"
+    },
+    {
+      "compressed": {
+        "left": {
+          "bytes": 177,
+          "method": 8,
+          "sha256": "cbb42b7c46ccaa5c35dcf22006821d441ba0aba5ba601333892769afd9915a9c"
+        },
+        "right": {
+          "bytes": 177,
+          "method": 8,
+          "sha256": "cbb42b7c46ccaa5c35dcf22006821d441ba0aba5ba601333892769afd9915a9c"
+        }
+      },
+      "compressed_equal": true,
+      "name": "_rels/.rels",
+      "payload_bytes": 297,
+      "payload_sha256": "d8b0bad955075e5c5a427fe596520be989739fbcaddd9d837b319ea620740fde"
+    },
+    {
+      "compressed": {
+        "left": {
+          "bytes": 141,
+          "method": 8,
+          "sha256": "5e6837e34596a7cb5a85a7722233ca26902c97913f403d2422487df20b4fbe89"
+        },
+        "right": {
+          "bytes": 135,
+          "method": 8,
+          "sha256": "b0f8a98c9fbba15798bf859e054277c1b56d66c787aeacc8c925ab0d8dcded5c"
+        }
+      },
+      "compressed_equal": false,
+      "name": "word/document.xml",
+      "payload_bytes": 206,
+      "payload_sha256": "53eab106e1e6912b5ee66bf71cc628c5c04d5bd35c0702970024baf082347558"
+    },
+    {
+      "compressed": {
+        "left": {
+          "bytes": 614,
+          "method": 8,
+          "sha256": "4938563c95b42211cf4b348e39849485621bb7536a71f620c187a18ce42bd7e1"
+        },
+        "right": {
+          "bytes": 614,
+          "method": 8,
+          "sha256": "4938563c95b42211cf4b348e39849485621bb7536a71f620c187a18ce42bd7e1"
+        }
+      },
+      "compressed_equal": true,
+      "name": "word/unused.bin",
+      "payload_bytes": 32768,
+      "payload_sha256": "e11360251d1173650cdcd20f111d8f1ca2e412f572e8b36a4dc067121c1799b8"
+    }
+  ],
+  "restored": {
+    "bytes": 1703,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/diagnostics/durable-restored.zip",
+    "sha256": "a5dcbfe932fcdded20dfb150b43f4146aa4a97f45362a00a2f75ea362965b394"
+  },
+  "source": {
+    "bytes": 1697,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/diagnostics/fresh-source.zip",
+    "sha256": "828a042258b1563ee6fdfe4d8fee027c792f3ce6b4351f33f21a1cfe34fa7604"
+  },
+  "source_log": {
+    "bytes": 163109,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/candidate-tests/output.log",
+    "sha256": "0bfd5d2f7c7a072fa050c0d0fd0c88aa001f17bf8d735af924c927d5db7a54ac"
+  },
+  "status": "diagnosed"
+}

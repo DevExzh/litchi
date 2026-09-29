@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "--test",
+    "streaming_interrupted_write"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790688979.7869813,
+  "log": {
+    "bytes": 487,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/final-interruption-regression/output.log",
+    "sha256": "4e0460b82f763ab697e90e860b33c8dc4de0a97bbe8d2067a7688bdfa5f8962f"
+  },
+  "started_unix": 1790688978.358642
+}

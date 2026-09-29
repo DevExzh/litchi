@@ -1,0 +1,25 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 5.74s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0837/debug/deps/litchi_opc-5e5ec62e7ad589c6)
+
+running 4 tests
+test package::compressed_transfer::tests::a_zip64_framed_member_transfers_with_fresh_zip32_framing ... ok
+test package::compressed_transfer::tests::a_deflated_member_transfers_its_exact_compressed_span_in_fresh_sized_framing ... ok
+test pkgwriter::tests::fresh_to_bytes_matches_stream_with_short_interrupted_sink ... FAILED
+test pkgwriter::tests::fresh_publication_uses_owned_staging_and_keeps_logical_payload ... ok
+
+failures:
+
+---- pkgwriter::tests::fresh_to_bytes_matches_stream_with_short_interrupted_sink stdout ----
+
+thread 'pkgwriter::tests::fresh_to_bytes_matches_stream_with_short_interrupted_sink' (3233903) panicked at crates/litchi-opc/src/pkgwriter.rs:2117:61:
+stream authored package: IncompleteOutput { written: 516, source: IoError(Custom { kind: InvalidInput, error: "streaming ZIP entry writer is poisoned" }) }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    pkgwriter::tests::fresh_to_bytes_matches_stream_with_short_interrupted_sink
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p litchi-opc --lib`

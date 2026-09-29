@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0837/diagnose.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790689003.628535,
+  "log": {
+    "bytes": 91,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/inverse-diagnostic-replay/output.log",
+    "sha256": "a7c33b8283357d287d4372f91c5fd4306d8bd49115734badfdaaf9094aa83e93"
+  },
+  "started_unix": 1790689003.6070971
+}

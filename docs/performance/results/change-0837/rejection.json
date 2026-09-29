@@ -1,0 +1,22 @@
+{
+  "adoption": "rejected-correctness",
+  "assertion": "durable_restored == source at line183",
+  "candidate_release_builds": 0,
+  "comparative_reports": 0,
+  "comparative_samples": 0,
+  "failed_gate": {
+    "bytes": 585,
+    "path": "docs/performance/results/change-0837/commands/candidate-tests/receipt.json",
+    "sha256": "64f4227c8360aede8e15904670c0822a57aec31b72095a8d0395347031c5945a"
+  },
+  "failing_test": "litchi-docx::source_backed_paragraph_copy::publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact",
+  "performance_claim": "none",
+  "production_retained": [
+    "crates/soapberry-zip/src/office.rs",
+    "crates/soapberry-zip/tests/streaming_interrupted_write.rs"
+  ],
+  "production_reverted": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-opc/src/pkgwriter.rs"
+  ]
+}

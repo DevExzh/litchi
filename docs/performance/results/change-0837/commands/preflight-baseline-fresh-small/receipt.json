@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0837/retained/baseline-v2/fresh-publication",
+    "run",
+    "fresh-small",
+    "2",
+    "1",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0837/fixtures",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0837/preflight-baseline-fresh-small.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790687288.1212204,
+  "log": {
+    "bytes": 1107,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/preflight-baseline-fresh-small/output.log",
+    "sha256": "fec25ea2732dc48dbf99f7e439a792659ca8b5b4a38bf51dbc161291842f9d46"
+  },
+  "started_unix": 1790687288.1195087
+}

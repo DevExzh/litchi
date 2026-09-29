@@ -1,0 +1,22 @@
+{
+  "artifacts": [
+    {
+      "bytes": 11802848,
+      "path": "/home/zhuhe/code/litchi-target-0837/retained/baseline-v2/fresh-publication",
+      "sha256": "e53e91242d35e82ae0a95ee3592256d5966d97c53771e39e7663dd7dae9bcc06"
+    }
+  ],
+  "roots": [
+    {
+      "files": 20288,
+      "logical_bytes": 6275195925,
+      "path": "/home/zhuhe/code/litchi-target-0837"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0837"
+    }
+  ],
+  "started_unix": 1790689009.035439
+}

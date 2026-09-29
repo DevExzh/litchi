@@ -1,0 +1,10 @@
+{
+  "case": "fresh-xml",
+  "fixture": "fixture.xml.zip",
+  "fixture_bytes": 498483,
+  "input_semantic_sha256": "66bbbeaa25b111c18612c26249d06d8d6be58618dbdbbda6a5a3f456056e3942",
+  "member_canonical_sha256": "db4bdb02338df2eb64c38a6a3cbed6f7dfa8a60d5e83712548a7aea332baa99d",
+  "raw_fixture_sha256": "3d013d8d3a2d80e13238cca1d5852bb32af8de67c59070d8489b1885dc9ea19f",
+  "schema": "fresh-publication-fixture-v1",
+  "selected_xml_part": "/custom/data.xml"
+}

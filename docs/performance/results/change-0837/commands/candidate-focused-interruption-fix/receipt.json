@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--lib",
+    "fresh_"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790687710.3449879,
+  "log": {
+    "bytes": 856,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/candidate-focused-interruption-fix/output.log",
+    "sha256": "14b797a68c442c0d260af6d06a308853ce0c23d6a643d51b6da6cbfd62277d98"
+  },
+  "started_unix": 1790687703.3347976
+}

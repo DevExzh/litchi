@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 11802848,
+    "path": "/home/zhuhe/code/litchi-target-0837/retained/baseline-v2/fresh-publication",
+    "sha256": "e53e91242d35e82ae0a95ee3592256d5966d97c53771e39e7663dd7dae9bcc06"
+  },
+  "freeze": {
+    "bytes": 1202157,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/freeze-baseline-v2.json",
+    "sha256": "1056d0ddb650ff6067b4619be06c2b0fa3b12a2a7f37eeeddc63c62e64ebbc02"
+  },
+  "receipt": {
+    "bytes": 564,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/build-baseline-v2/receipt.json",
+    "sha256": "b14b2c8f15135cda6485a7ba822ecae7879d10f8507592153ff7603a4039eeb9"
+  }
+}

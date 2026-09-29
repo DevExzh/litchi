@@ -1,0 +1,9 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `test` profile [unoptimized] target(s) in 1.38s
+     Running tests/streaming_interrupted_write.rs (/home/zhuhe/code/litchi-target-0837/debug/deps/streaming_interrupted_write-e4c7e0b12590c07c)
+
+running 1 test
+test interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

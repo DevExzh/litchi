@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0837 — ZIP retry fix; fresh compression rejected
+
+[0837](0837-zip-interrupted-write-and-fresh-compression.md) adds direct Store/Deflate coverage for short interrupted sink writes, exact accepted-byte accounting, successful finalization and payload readback. The unchanged durable paragraph-copy inverse test rejects a fresh-compression candidate. No new producer, native Office, cold-cache, concurrency or format capability coverage is claimed.
+
 ## 0836 — OPC source save CPU and durability diagnosis
 
 [0836](0836-opc-filesystem-save-profile.md) completes 34 reports / 444 measured outputs on unchanged source. Ordinary save p50 is 77.123311 ms warm and 144.921409 ms verified cold. Independent mmap/ELF replay confirms 1,863–1,886 overlay samples per capture, with Deflate the largest observed stack group. Unknown frames keep CPU fractions withheld. All 32 traced children have the three-call atomic publication sequence; sixteen cold-preparation fsyncs remain separate. No production optimization is claimed; changed-Part compression is the next measured target.

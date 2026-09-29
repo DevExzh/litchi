@@ -1,0 +1,13 @@
+{
+  "candidate-focused": "Baseline only: both git apply attempts failed before the command. Two pre-existing tests matched fresh_; no candidate qualification is claimed.",
+  "corrected": {
+    "bytes": 10627,
+    "path": "docs/performance/results/change-0837/candidate.patch",
+    "sha256": "c5af15a5af444dd5304de3dd8e1996dde08c7cd4abe8bfb168a2cd014fcb33bc"
+  },
+  "draft": {
+    "bytes": 10622,
+    "path": "docs/performance/results/change-0837/candidate-draft.patch",
+    "sha256": "beeb0d4b9451813fc9d5e9a10cf6d1f419da7d48481bc04f690dd6bbeab903be"
+  }
+}

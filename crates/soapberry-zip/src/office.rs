@@ -6986,6 +6986,14 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                 self.refresh_output_bytes();
                 Ok(written)
             },
+            // The owned entry accepts no input on an interrupted write and
+            // retains any partially drained compressed output for the retry.
+            // Keep its progress visible without turning a retryable sink
+            // interruption into a permanently poisoned entry.
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                self.refresh_output_bytes();
+                Err(error)
+            },
             Err(error) => Err(self.capture_io_failure(error)),
         }
     }
