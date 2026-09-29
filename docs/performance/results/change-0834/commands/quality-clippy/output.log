@@ -1,0 +1,14 @@
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+error: manual implementation of `.is_multiple_of()`
+   --> src/filesystem/aligned_zip.rs:168:49
+    |
+168 |     if aligned.len() != expected_aligned_len || aligned.len() % page_size != 0 {
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!aligned.len().is_multiple_of(page_size)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: could not compile `litchi-perf-baseline` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-perf-baseline` (lib test) due to 1 previous error

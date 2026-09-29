@@ -1,0 +1,39 @@
+{
+  "stage": "repaired-v3",
+  "previous_stage": "repaired-v2",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/driver_v3.py",
+    "bytes": 7338,
+    "sha256": "08a25fef24c32efa1f0c6b940d0baefb52ff4013a5eaa6f26f81b8407f5c5528"
+  },
+  "source_change": {
+    "path": "tools/perf-baseline/src/filesystem/aligned_zip.rs",
+    "before": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/sources/repaired-v2/tools/perf-baseline/src/filesystem/aligned_zip.rs",
+      "bytes": 33669,
+      "sha256": "22e9b274041d14cb4aa81a5e5e661681e58dcc27dd448e5fb88fb203c613241a"
+    },
+    "after": {
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/src/filesystem/aligned_zip.rs",
+      "bytes": 40706,
+      "sha256": "5536123cc459699d04c40d513e1075d2f67033d13436881d99c2e476e4e61192"
+    },
+    "reason": "Use existing ZIP descriptor validation; compare complete physical local spans including descriptors. Add descriptor framing tests."
+  },
+  "full_suite": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-test/receipt.json",
+    "bytes": 815,
+    "sha256": "d5e505a3b2f26013c6bf24c6d343b0c7bbd1d3abe18ec2f0d9b7a26a0888b61b"
+  },
+  "failed_qualification": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2.json",
+    "bytes": 3780,
+    "sha256": "43c350401ce4c87d47c7a784991de602a48a1390d17fb25f76ff43a27ce083df"
+  },
+  "previous_amendment": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/active-stage.json",
+    "bytes": 1101,
+    "sha256": "ddf1268d6fd877a4afcbcc470e52a09e9c6ad062dc6d5f6c72775dd676534f2c"
+  },
+  "formal_capture": "deferred to next batch after the harness repair is committed"
+}

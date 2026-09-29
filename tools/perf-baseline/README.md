@@ -1841,8 +1841,14 @@ and phase elapsed time not to exceed it. These are logical source-work and
 timing-attribution counters, not physical device I/O, copied bytes,
 allocations, or decompression evidence.
 
-When both OPC save cases are selected, their per-state sample hashes
-must also match. Save cases seed a pre-existing destination before both warm and cold measurements
+When both OPC save cases are selected, their warm and cold-requested sample
+hashes must also match. For cold-verified samples, the source-backed route
+preserves the private aligned source's EOCD comment while the eager writer
+emits the ordinary comment-free archive. An untimed framing proof checks this
+exact difference and binds each sample's raw output hash and length to its
+route oracle. It also checks the alignment transform and unchanged members;
+the normal semantic output checks remain required. Save cases seed a
+pre-existing destination before both warm and cold measurements
 and publish through a same-filesystem sibling temporary file plus atomic
 rename; the CFB case uses the checked same-length stream-overlay publisher and
 records its changed-span and published-byte report fields. The owned CFB
@@ -1879,7 +1885,16 @@ eager/source metadata, size, name, text, and semantic parity outside timing.
 Source samples add one separate untimed `SourceBackedPresentation` replay with
 exact compressed-range classification: open/count must overlap no slide or
 media payload, selected must overlap only slide 100, and list must overlap all
-slide payloads but no media. Eager samples explicitly have no `ReadAt` replay;
+slide payloads but no media. Verified aligned sources additionally retain the
+raw chronological replay reads and the constructor/query boundary. An exact
+EOCD zero-padding proof permits one complete 64 KiB tail metadata probe during
+construction. Its incidental payload overlaps remain in the raw totals;
+every other constructor read and the subsequent semantic query must satisfy
+their payload restrictions. The query receives no metadata allowance. Missing,
+duplicate, or incomplete tail probes and extra payload reads fail verification.
+This replay runs outside the operation timer, including in the verified
+primer; a primer failure does not produce a timed cold sample.
+Eager samples explicitly have no `ReadAt` replay;
 their generic filesystem counter scope is marked not applicable. These are
 correctness/logical-read observations only, not latency, RSS, allocation,
 decompression, physical-I/O, or cold-cache claims. See

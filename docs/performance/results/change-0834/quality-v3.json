@@ -1,0 +1,23 @@
+{
+  "amendment": {
+    "bytes": 1777,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/active-stage-v3.json",
+    "sha256": "57fc37e1f30000db768533d04f4a5ae06a200651d9a47643dc001191d24f555c"
+  },
+  "full_suite": {
+    "bytes": 815,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-test/receipt.json",
+    "sha256": "d5e505a3b2f26013c6bf24c6d343b0c7bbd1d3abe18ec2f0d9b7a26a0888b61b"
+  },
+  "gates": [
+    "fmt",
+    "check",
+    "test",
+    "clippy",
+    "doc",
+    "boundaries"
+  ],
+  "reused": false,
+  "status": "pass",
+  "test_scope": "filesystem::aligned_zip::tests"
+}

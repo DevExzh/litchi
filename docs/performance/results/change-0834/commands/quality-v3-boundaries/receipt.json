@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790648396.6161504,
+  "freeze": {
+    "bytes": 1206213,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired-v3.json",
+    "sha256": "0b71333af09b74e254c1648fc4af79b6b4f51cbaf54111e6695e3b71fbd68b80"
+  },
+  "log": {
+    "bytes": 565,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-boundaries/output.log",
+    "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+  },
+  "started_unix": 1790648130.1457288
+}

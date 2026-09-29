@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0834 — aligned-source filesystem harness qualified
+
+[0834](0834-aligned-source-harness-repair.md) Repairs PPTX metadata-tail classification and OPC cold EOCD-comment proof without production or timer changes. All seven final qualification commands pass (six warm/cold selectors plus paired OPC saves). Twelve retained reports contain 25 diagnostic/qualification samples; prior failures remain explicit. Independent replay and 31 mutation checks pass. The formal baseline is deferred until after this harness repair is committed; no speedup is claimed.
+
 ## 0833 — cold filesystem qualification blocked
 
 [0833](0833-filesystem-cold-qualification.md) Fresh six-case qualification stops before the planned 72-report matrix. Warm-only PPTX source access passes; cold-only replay rejects payload-range classification. Cold OPC save routes pass separately but differ by a 1,776-byte alignment comment and fail the combined output-parity gate. Six retained reports contain eleven diagnostic samples; no performance baseline advances. Production is unchanged, and the next task is a bounded harness-evidence correction.

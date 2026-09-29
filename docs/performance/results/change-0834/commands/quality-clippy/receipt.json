@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "error": null,
+  "exit_code": 101,
+  "finished_unix": 1790646812.31933,
+  "freeze": {
+    "bytes": 1206207,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired.json",
+    "sha256": "0773a8ba5726a3e734d3eceba638d72ddf0f352bf6179e8d43d00f491f16ef21"
+  },
+  "log": {
+    "bytes": 934,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-clippy/output.log",
+    "sha256": "811a3e14dd2a249ff119455a3ad05759b02e0201eea8ddcc990f8c9f50995189"
+  },
+  "started_unix": 1790646797.428658
+}

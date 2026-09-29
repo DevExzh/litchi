@@ -1,0 +1,17 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 18.77s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0834/debug/deps/litchi_perf_baseline-8203e138fbd54993)
+
+running 9 tests
+test filesystem::aligned_zip::tests::cold_output_proof_rejects_changed_aligned_member_payload ... ok
+test filesystem::aligned_zip::tests::cold_output_proof_accepts_comment_only_route_difference ... ok
+test filesystem::aligned_zip::tests::cold_output_proof_rejects_changed_unchanged_member_payload ... ok
+test filesystem::aligned_zip::tests::cold_output_proof_rejects_changed_route_eocd ... ok
+test filesystem::aligned_zip::tests::zero_padding_proof_preserves_an_existing_comment ... ok
+test filesystem::aligned_zip::tests::zero_padding_proof_reports_exact_transform ... ok
+test filesystem::aligned_zip::tests::zero_padding_rejects_changed_eocd_byte ... ok
+test filesystem::aligned_zip::tests::zero_padding_rejects_changed_member_byte ... ok
+test filesystem::aligned_zip::tests::zero_padding_rejects_nonzero_suffix ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.00s
+

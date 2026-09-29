@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "cargo",
+    "fmt",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "freeze": {
+    "bytes": 1206207,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired.json",
+    "sha256": "0773a8ba5726a3e734d3eceba638d72ddf0f352bf6179e8d43d00f491f16ef21"
+  },
+  "started_unix": 1790645819.3379145
+}

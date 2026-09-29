@@ -1,0 +1,46 @@
+{
+  "status": "pass",
+  "report_sha256": "cacfb6a523992067a5e7f32ac6f2cf096090e30bfacd36737dadca5a0bdd4b1a",
+  "mutations": [
+    {
+      "name": "missing-output-proof",
+      "rejected": true
+    },
+    {
+      "name": "wrong-base-hash",
+      "rejected": true
+    },
+    {
+      "name": "wrong-padding",
+      "rejected": true
+    },
+    {
+      "name": "wrong-eocd-position",
+      "rejected": true
+    },
+    {
+      "name": "wrong-route",
+      "rejected": true
+    },
+    {
+      "name": "wrong-canonical-hash",
+      "rejected": true
+    },
+    {
+      "name": "wrong-output-hash",
+      "rejected": true
+    },
+    {
+      "name": "wrong-output-length",
+      "rejected": true
+    },
+    {
+      "name": "wrong-comment-length",
+      "rejected": true
+    },
+    {
+      "name": "missing-unchanged-member",
+      "rejected": true
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+--- a/tools/perf-baseline/src/filesystem.rs
++++ b/tools/perf-baseline/src/filesystem.rs
+@@ -36,6 +36,8 @@
+ 
+ use crate::{cold_verified, process_metrics};
+ 
++mod aligned_zip;
++
+ const OPC_FILE_SHAPE: super::CorpusShape = super::CorpusShape::FewLarge;
+ const OPC_FILE_PAYLOAD: super::PayloadKind = super::PayloadKind::Incompressible;
+ const OPC_FILE_ENTRY_BYTES: usize = 4 * 1024 * 1024;
+@@ -721,6 +723,10 @@
+     #[serde(skip_serializing_if = "Option::is_none")]
+     pub cold_verified_fincore_command: Option<&'static str>,
+     #[serde(skip_serializing_if = "Option::is_none")]
++    pub opc_cold_alignment_proof: Option<aligned_zip::AlignmentProof>,
++    #[serde(skip_serializing_if = "Option::is_none")]
++    pub opc_cold_output_proof: Option<aligned_zip::ColdOpcRouteProof>,
++    #[serde(skip_serializing_if = "Option::is_none")]
+     pub cfb_owned: Option<Vec<CfbOwnedSampleEvidence>>,
+ }
+ 
+@@ -1338,20 +1344,29 @@
+                     .samples
+                     .iter()
+                     .map(|sample| {
+-                        Ok((
+-                            format!("{}:{}", sample.sample_index, sample.cache_state),
++                        let value = if sample.cache_state == "cold-verified" {
++                            let proof = run
++                                .evidence
++                                .opc_cold_output_proof
++                                .as_ref()
++                                .ok_or("cold-verified OPC save omitted its route proof")?;
++                            format!(
++                                "cold-verified:{}:{}",
++                                proof.aligned_source_sha256.as_str(),
++                                proof.canonical_sha256.as_str()
++                            )
++                        } else {
+                             sample
+                                 .output_sha256
+                                 .clone()
+-                                .ok_or("filesystem OPC save emitted no output digest")?,
+-                        ))
++                                .ok_or("filesystem OPC save emitted no output digest")?
++                        };
++                        Ok((format!("{}:{}", sample.sample_index, sample.cache_state), value))
+                     })
+                     .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+                 if let Some(previous) = opc_save_hashes.as_ref() {
+                     if previous != &current {
+-                        return Err(
+-                            "eager and source-backed OPC filesystem save samples differ".into()
+-                        );
++                        return Err("eager and source-backed OPC filesystem save samples differ in an unaligned state or outside the proven cold EOCD comment".into());
+                     }
+                 } else {
+                     opc_save_hashes = Some(current);
+@@ -1711,6 +1726,14 @@
+         cold_verified_status,
+         verified_source_path.as_deref(),
+     )?;
++    let (opc_cold_alignment_proof, opc_cold_output_proof) = opc_cold_proofs(
++        operation,
++        cache_selection,
++        cold_verified_status,
++        corpus,
++        verified_source_path.as_deref(),
++        verified_expected_digest.as_deref(),
++    )?;
+     let expected_xlsx_semantic_sha256 = operation
+         .is_xlsx()
+         .then(|| xlsx_semantic_sha256_for_operation(operation, corpus))
+@@ -1903,6 +1926,23 @@
+                 stem,
+                 &mut cfb_owned_evidence,
+             )?;
++            if let Some(opc_proof) = opc_cold_output_proof.as_ref() {
++                let sample = sample_evidence
++                    .iter()
++                    .rev()
++                    .find(|sample| {
++                        sample.sample_index == sample_index
++                            && sample.cache_state == "cold-verified"
++                    })
++                    .ok_or("cold-verified OPC sample was not recorded")?;
++                if sample.output_sha256.as_deref() != Some(opc_proof.output_sha256.as_str())
++                    || sample.output_bytes != Some(opc_proof.output_bytes)
++                {
++                    return Err(
++                        "cold-verified OPC sample is not bound to its route proof artifact".into(),
++                    );
++                }
++            }
+         }
+     }
+ 
+@@ -1969,6 +2009,8 @@
+             cold_verified_fincore_command: cache_selection
+                 .cold_verified()
+                 .then_some(cold_verified::FINCORE_COMMAND),
++            opc_cold_alignment_proof,
++            opc_cold_output_proof,
+             cfb_owned: (!cfb_owned_evidence.is_empty()).then_some(cfb_owned_evidence),
+         },
+         cold_verified_result,
+@@ -1993,6 +2035,112 @@
+         .transpose()
+ }
+ 
++/// Builds the route-specific OPC bytes used by the cold exact oracle.  This
++/// is deliberately separate from `expected_digest_for_source`: the existing
++/// ProviderAtomicSave arm remains source-backed and keeps its established
++/// digest routing, while this untimed copy lets the physical proof bind its
++/// hash and length to an actual deterministic output artifact.
++fn expected_opc_output_for_source_bytes(
++    operation: Operation,
++    source: &[u8],
++    replacement: &[u8],
++) -> Result<Vec<u8>, Box<dyn Error>> {
++    let target_uri = PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
++    match operation {
++        Operation::OpcEagerSave => {
++            let mut package = OpcPackage::from_bytes(source)?;
++            package
++                .get_part_mut(&target_uri)?
++                .set_blob(replacement.to_vec());
++            Ok(PackageWriter::to_bytes(&package)?)
++        },
++        Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
++            let package = SourceBackedPackage::from_read_at(Arc::new(
++                super::OwnedSource::new(source.to_vec()),
++            ))?;
++            let mut output = Vec::new();
++            package.write_part_overlay_to_stream(
++                &mut output,
++                &target_uri,
++                replacement.to_vec(),
++            )?;
++            Ok(output)
++        },
++        _ => Err("OPC byte oracle requested for a non-OPC save".into()),
++    }
++}
++
++/// Constructs the untimed per-route cold OPC proof.  `record_sample` still
++/// checks every measured child against `verified_expected_digest`; this helper
++/// adds the independent alignment, raw-member, semantic, and route-comment
++/// contracts and records enough hashes to compare cold routes canonically.
++fn opc_cold_proofs(
++    operation: Operation,
++    cache_selection: CacheSelection,
++    cold_verified_status: Option<cold_verified::Status>,
++    corpus: &super::Corpus,
++    verified_source_path: Option<&Path>,
++    verified_expected_digest: Option<&str>,
++) -> Result<
++    (
++        Option<aligned_zip::AlignmentProof>,
++        Option<aligned_zip::ColdOpcRouteProof>,
++    ),
++    Box<dyn Error>,
++> {
++    if !matches!(
++        operation,
++        Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave
++    ) || !cache_selection.cold_verified()
++        || cold_verified_status != Some(cold_verified::Status::Eligible)
++    {
++        return Ok((None, None));
++    }
++    let verified_source = verified_source_path.ok_or("cold OPC source was not prepared")?;
++    let aligned_source = fs::read(verified_source)?;
++    let page_size_bytes = match cold_verified::page_size_for_harness() {
++        Ok(page_size_bytes) => page_size_bytes,
++        Err(status) => {
++            return Err(format!("cold OPC proof cannot observe page size: {status:?}").into());
++        },
++    };
++    let alignment = aligned_zip::verify_zero_padding(
++        &corpus.archive,
++        &aligned_source,
++        page_size_bytes,
++    )?;
++    let replacement = filesystem_opc_replacement()?;
++    let output = expected_opc_output_for_source_bytes(operation, &aligned_source, &replacement)?;
++    let output_digest = super::sha256_hex(&output);
++    if verified_expected_digest != Some(output_digest.as_str()) {
++        return Err("cold OPC route proof bytes differ from expected_digest_for_source".into());
++    }
++    // Preserve the existing semantic verifier for the generated route oracle;
++    // the proof below is additive physical evidence, never a replacement.
++    super::verify_opc_overlay_output(corpus, &output, &replacement)?;
++    let output_proof = match operation {
++        Operation::OpcEagerSave => aligned_zip::verify_cold_opc_eager_output(
++            &aligned_source,
++            &output,
++            corpus.target_name.as_bytes(),
++        )?,
++        Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
++            aligned_zip::verify_cold_opc_source_output(
++                &aligned_source,
++                &output,
++                corpus.target_name.as_bytes(),
++            )?
++        },
++        _ => unreachable!("OPC cold proof route checked above"),
++    };
++    if output_proof.aligned_source_sha256 != alignment.aligned_sha256
++        || output_proof.output_sha256 != output_digest
++    {
++        return Err("cold OPC route proof is not bound to its generated bytes".into());
++    }
++    Ok((Some(alignment), Some(output_proof)))
++}
++
+ fn record_sample(
+     samples: &mut Vec<SampleEvidence>,
+     sample_index: usize,

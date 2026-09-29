@@ -1,0 +1,45 @@
+{
+  "status": "pass",
+  "diagnostic_mutations": [
+    {
+      "name": "wrong-child-mode",
+      "rejected": true
+    },
+    {
+      "name": "wrong-source-hash",
+      "rejected": true
+    },
+    {
+      "name": "shifted-open-boundary",
+      "rejected": true
+    },
+    {
+      "name": "missing-tail",
+      "rejected": true
+    },
+    {
+      "name": "duplicate-tail",
+      "rejected": true
+    },
+    {
+      "name": "short-tail",
+      "rejected": true
+    },
+    {
+      "name": "oversized-return",
+      "rejected": true
+    },
+    {
+      "name": "counter-mismatch",
+      "rejected": true
+    },
+    {
+      "name": "coverage-mismatch",
+      "rejected": true
+    },
+    {
+      "name": "selected-range-mismatch",
+      "rejected": true
+    }
+  ]
+}

@@ -36,6 +36,8 @@ use soapberry_zip::ZipArchive;
 
 use crate::{cold_verified, process_metrics};
 
+mod aligned_zip;
+
 const OPC_FILE_SHAPE: super::CorpusShape = super::CorpusShape::FewLarge;
 const OPC_FILE_PAYLOAD: super::PayloadKind = super::PayloadKind::Incompressible;
 const OPC_FILE_ENTRY_BYTES: usize = 4 * 1024 * 1024;
@@ -52,6 +54,9 @@ const CFB_FILE_OWNED_SOURCE_VERSION_ID: u64 = 0xcfb0_0184;
 const FILESYSTEM_OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-modified-stream-v1";
 const PPTX_FILE_SELECTED_POSITION: usize = super::PPTX_SOURCE_SLIDE_COUNT / 2;
 const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATOR;
+const PPTX_FILE_SOURCE_SHA256: &str =
+    "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757";
+const PPTX_FILE_SOURCE_ARCHIVE_BYTES: usize = 17_017_139;
 const DOCX_FILE_CORPUS_GENERATOR: &str = super::DOCX_SOURCE_EDIT_CORPUS_GENERATOR;
 const DOCX_FILE_SOURCE_SHA256: &str =
     "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4";
@@ -487,8 +492,46 @@ pub(crate) struct PptxSourceReplayEvidence {
     pub media_payload_read_calls: u64,
     pub media_payload_read_bytes: u64,
     pub media_payload_covered_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aligned_eocd_tail_probe: Option<PptxAlignedEocdTailProbeEvidence>,
     pub semantic_sha256: String,
     pub classification: String,
+}
+
+/// Structural proof retained when a verified page-aligned PPTX source needs
+/// the bounded EOCD tail allowance.  The raw observations are the same
+/// chronological records used for the aggregate source counters; the explicit
+/// boundary lets an external adjudicator derive open and query phases without
+/// treating requested bytes as returned payload bytes.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PptxAlignedEocdTailProbeEvidence {
+    pub alignment_proof: PptxAlignmentProofEvidence,
+    pub eocd_tail_probe_offset: u64,
+    pub eocd_tail_probe_bytes: u64,
+    pub eocd_tail_probe_read_count: u64,
+    pub open_read_count: u64,
+    pub raw_reads: Vec<PptxReplayReadObservation>,
+    pub payload_ranges: PptxReplayDiagnosticPayloadRanges,
+    pub open_slide_payload_overlap_bytes: u64,
+    pub open_selected_slide_payload_overlap_bytes: u64,
+    pub open_unselected_slide_payload_overlap_bytes: u64,
+    pub open_media_payload_overlap_bytes: u64,
+}
+
+/// A content-free copy of the helper's alignment proof.  Keeping the
+/// performance report's wire shape independent from the helper's private
+/// implementation lets the helper remain harness-only and fallible.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PptxAlignmentProofEvidence {
+    pub page_size_bytes: u64,
+    pub eocd_offset: u64,
+    pub base_bytes: u64,
+    pub aligned_bytes: u64,
+    pub padding_bytes: u64,
+    pub base_comment_bytes: u64,
+    pub aligned_comment_bytes: u64,
+    pub base_sha256: String,
+    pub aligned_sha256: String,
 }
 
 /// Untimed source-backed replay evidence for the ordinary-root DOCX cases.
@@ -720,6 +763,10 @@ pub(crate) struct Evidence {
     pub cold_verified_claim_scope: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cold_verified_fincore_command: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opc_cold_alignment_proof: Option<aligned_zip::AlignmentProof>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opc_cold_output_proof: Option<aligned_zip::ColdOpcRouteProof>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cfb_owned: Option<Vec<CfbOwnedSampleEvidence>>,
 }
@@ -1338,20 +1385,32 @@ pub(crate) fn run_selected(
                     .samples
                     .iter()
                     .map(|sample| {
-                        Ok((
-                            format!("{}:{}", sample.sample_index, sample.cache_state),
+                        let value = if sample.cache_state == "cold-verified" {
+                            let proof = run
+                                .evidence
+                                .opc_cold_output_proof
+                                .as_ref()
+                                .ok_or("cold-verified OPC save omitted its route proof")?;
+                            format!(
+                                "cold-verified:{}:{}",
+                                proof.aligned_source_sha256.as_str(),
+                                proof.canonical_sha256.as_str()
+                            )
+                        } else {
                             sample
                                 .output_sha256
                                 .clone()
-                                .ok_or("filesystem OPC save emitted no output digest")?,
+                                .ok_or("filesystem OPC save emitted no output digest")?
+                        };
+                        Ok((
+                            format!("{}:{}", sample.sample_index, sample.cache_state),
+                            value,
                         ))
                     })
                     .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
                 if let Some(previous) = opc_save_hashes.as_ref() {
                     if previous != &current {
-                        return Err(
-                            "eager and source-backed OPC filesystem save samples differ".into()
-                        );
+                        return Err("eager and source-backed OPC filesystem save samples differ in an unaligned state or outside the proven cold EOCD comment".into());
                     }
                 } else {
                     opc_save_hashes = Some(current);
@@ -1711,6 +1770,14 @@ fn run_one(
         cold_verified_status,
         verified_source_path.as_deref(),
     )?;
+    let (opc_cold_alignment_proof, opc_cold_output_proof) = opc_cold_proofs(
+        operation,
+        cache_selection,
+        cold_verified_status,
+        corpus,
+        verified_source_path.as_deref(),
+        verified_expected_digest.as_deref(),
+    )?;
     let expected_xlsx_semantic_sha256 = operation
         .is_xlsx()
         .then(|| xlsx_semantic_sha256_for_operation(operation, corpus))
@@ -1903,6 +1970,22 @@ fn run_one(
                 stem,
                 &mut cfb_owned_evidence,
             )?;
+            if let Some(opc_proof) = opc_cold_output_proof.as_ref() {
+                let sample = sample_evidence
+                    .iter()
+                    .rev()
+                    .find(|sample| {
+                        sample.sample_index == sample_index && sample.cache_state == "cold-verified"
+                    })
+                    .ok_or("cold-verified OPC sample was not recorded")?;
+                if sample.output_sha256.as_deref() != Some(opc_proof.output_sha256.as_str())
+                    || sample.output_bytes != Some(opc_proof.output_bytes)
+                {
+                    return Err(
+                        "cold-verified OPC sample is not bound to its route proof artifact".into(),
+                    );
+                }
+            }
         }
     }
 
@@ -1969,6 +2052,8 @@ fn run_one(
             cold_verified_fincore_command: cache_selection
                 .cold_verified()
                 .then_some(cold_verified::FINCORE_COMMAND),
+            opc_cold_alignment_proof,
+            opc_cold_output_proof,
             cfb_owned: (!cfb_owned_evidence.is_empty()).then_some(cfb_owned_evidence),
         },
         cold_verified_result,
@@ -1991,6 +2076,105 @@ fn verified_expected_digest(
     verified_source_path
         .map(|path| expected_digest_for_source(operation, path))
         .transpose()
+}
+
+/// Builds the route-specific OPC bytes used by the cold exact oracle.  This
+/// is deliberately separate from `expected_digest_for_source`: the existing
+/// ProviderAtomicSave arm remains source-backed and keeps its established
+/// digest routing, while this untimed copy lets the physical proof bind its
+/// hash and length to an actual deterministic output artifact.
+fn expected_opc_output_for_source_bytes(
+    operation: Operation,
+    source: &[u8],
+    replacement: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let target_uri = PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
+    match operation {
+        Operation::OpcEagerSave => {
+            let mut package = OpcPackage::from_bytes(source)?;
+            package
+                .get_part_mut(&target_uri)?
+                .set_blob(replacement.to_vec());
+            Ok(PackageWriter::to_bytes(&package)?)
+        },
+        Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
+            let package = SourceBackedPackage::from_read_at(Arc::new(super::OwnedSource::new(
+                source.to_vec(),
+            )))?;
+            let mut output = Vec::new();
+            package.write_part_overlay_to_stream(&mut output, &target_uri, replacement.to_vec())?;
+            Ok(output)
+        },
+        _ => Err("OPC byte oracle requested for a non-OPC save".into()),
+    }
+}
+
+/// Constructs the untimed per-route cold OPC proof.  `record_sample` still
+/// checks every measured child against `verified_expected_digest`; this helper
+/// adds the independent alignment, raw-member, semantic, and route-comment
+/// contracts and records enough hashes to compare cold routes canonically.
+fn opc_cold_proofs(
+    operation: Operation,
+    cache_selection: CacheSelection,
+    cold_verified_status: Option<cold_verified::Status>,
+    corpus: &super::Corpus,
+    verified_source_path: Option<&Path>,
+    verified_expected_digest: Option<&str>,
+) -> Result<
+    (
+        Option<aligned_zip::AlignmentProof>,
+        Option<aligned_zip::ColdOpcRouteProof>,
+    ),
+    Box<dyn Error>,
+> {
+    if !matches!(
+        operation,
+        Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave
+    ) || !cache_selection.cold_verified()
+        || cold_verified_status != Some(cold_verified::Status::Eligible)
+    {
+        return Ok((None, None));
+    }
+    let verified_source = verified_source_path.ok_or("cold OPC source was not prepared")?;
+    let aligned_source = fs::read(verified_source)?;
+    let page_size_bytes = match cold_verified::page_size_for_harness() {
+        Ok(page_size_bytes) => page_size_bytes,
+        Err(status) => {
+            return Err(format!("cold OPC proof cannot observe page size: {status:?}").into());
+        },
+    };
+    let alignment =
+        aligned_zip::verify_zero_padding(&corpus.archive, &aligned_source, page_size_bytes)?;
+    let replacement = filesystem_opc_replacement()?;
+    let output = expected_opc_output_for_source_bytes(operation, &aligned_source, &replacement)?;
+    let output_digest = super::sha256_hex(&output);
+    if verified_expected_digest != Some(output_digest.as_str()) {
+        return Err("cold OPC route proof bytes differ from expected_digest_for_source".into());
+    }
+    // Preserve the existing semantic verifier for the generated route oracle;
+    // the proof below is additive physical evidence, never a replacement.
+    super::verify_opc_overlay_output(corpus, &output, &replacement)?;
+    let output_proof = match operation {
+        Operation::OpcEagerSave => aligned_zip::verify_cold_opc_eager_output(
+            &aligned_source,
+            &output,
+            corpus.target_name.as_bytes(),
+        )?,
+        Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
+            aligned_zip::verify_cold_opc_source_output(
+                &aligned_source,
+                &output,
+                corpus.target_name.as_bytes(),
+            )?
+        },
+        _ => unreachable!("OPC cold proof route checked above"),
+    };
+    if output_proof.aligned_source_sha256 != alignment.aligned_sha256
+        || output_proof.output_sha256 != output_digest
+    {
+        return Err("cold OPC route proof is not bound to its generated bytes".into());
+    }
+    Ok((Some(alignment), Some(output_proof)))
 }
 
 fn record_sample(
@@ -2836,7 +3020,16 @@ where
     let corpus = filesystem_corpus(operation)?;
     let pptx_source_replay = operation
         .is_source_pptx()
-        .then(|| replay_pptx_source(&source, operation))
+        .then(|| {
+            replay_pptx_source(
+                &source,
+                operation,
+                mode,
+                &corpus,
+                matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+                cold_verified.as_ref(),
+            )
+        })
         .transpose()?;
     let docx_source_replay = operation
         .is_source_docx()
@@ -3712,7 +3905,7 @@ fn typed_xlsx_repeat_store_projection(corpus: &super::Corpus) -> Result<String, 
     Ok(super::sha256_hex(&projection.finalize()))
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
 struct PptxReplayCounters {
     read_calls: u64,
     read_bytes: u64,
@@ -3726,7 +3919,68 @@ struct PptxReplayCounters {
     media_payload_read_bytes: u64,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct PptxReplayReadObservation {
+    pub offset: u64,
+    pub requested_length: u64,
+    pub returned_length: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct PptxReplayDiagnosticRange {
+    pub start: u64,
+    pub end: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PptxReplayDiagnosticPayloadRanges {
+    pub slides: Vec<PptxReplayDiagnosticRange>,
+    pub selected_slide: Option<PptxReplayDiagnosticRange>,
+    pub unselected_slides: Vec<PptxReplayDiagnosticRange>,
+    pub media: Vec<PptxReplayDiagnosticRange>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+struct PptxReplayDiagnosticPayloadCounts {
+    slides: u64,
+    selected_slide: u64,
+    unselected_slides: u64,
+    media: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PptxReplayDiagnosticCoverage {
+    slide_observed_ranges: Vec<PptxReplayDiagnosticRange>,
+    selected_observed_ranges: Vec<PptxReplayDiagnosticRange>,
+    media_observed_ranges: Vec<PptxReplayDiagnosticRange>,
+    slide_payload_total_bytes: u64,
+    slide_payload_covered_bytes: u64,
+    slide_payload_ranges_fully_covered: u64,
+    selected_slide_payload_total_bytes: u64,
+    selected_slide_payload_covered_bytes: u64,
+    selected_slide_payload_fully_covered: bool,
+    unselected_slide_payload_total_bytes: u64,
+    unselected_slide_payload_covered_bytes: u64,
+    media_payload_total_bytes: u64,
+    media_payload_covered_bytes: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PptxReplayClassificationDiagnostic {
+    operation: String,
+    child_mode: String,
+    open_read_count: u64,
+    classification: String,
+    source_sha256: String,
+    source_bytes: u64,
+    counters: PptxReplayCounters,
+    raw_reads: Vec<PptxReplayReadObservation>,
+    payload_ranges: PptxReplayDiagnosticPayloadRanges,
+    payload_counts: PptxReplayDiagnosticPayloadCounts,
+    coverage: PptxReplayDiagnosticCoverage,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct PptxReplayCoverage {
     slide: Vec<Range<u64>>,
     selected: Vec<Range<u64>>,
@@ -3743,6 +3997,7 @@ struct PptxReplaySource {
     counters: Mutex<PptxReplayCounters>,
     coverage: Mutex<PptxReplayCoverage>,
     return_sizes: Mutex<Vec<u64>>,
+    raw_reads: Mutex<Vec<PptxReplayReadObservation>>,
 }
 
 impl PptxReplaySource {
@@ -3764,10 +4019,11 @@ impl PptxReplaySource {
             counters: Mutex::new(PptxReplayCounters::default()),
             coverage: Mutex::new(PptxReplayCoverage::default()),
             return_sizes: Mutex::new(Vec::new()),
+            raw_reads: Mutex::new(Vec::new()),
         }
     }
 
-    fn record(&self, offset: u64, count: usize) -> io::Result<()> {
+    fn record(&self, offset: u64, requested: usize, count: usize) -> io::Result<()> {
         let end = offset
             .checked_add(
                 u64::try_from(count)
@@ -3775,6 +4031,8 @@ impl PptxReplaySource {
             )
             .ok_or_else(|| io::Error::other("PPTX replay read range overflows u64"))?;
         let request = offset..end;
+        let requested_u64 = u64::try_from(requested)
+            .map_err(|_| io::Error::other("PPTX replay requested length does not fit u64"))?;
         let mut counters = self
             .counters
             .lock()
@@ -3855,6 +4113,14 @@ impl PptxReplaySource {
             .lock()
             .map_err(|_| io::Error::other("PPTX replay return sizes are poisoned"))?
             .push(count_u64);
+        self.raw_reads
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay raw reads are poisoned"))?
+            .push(PptxReplayReadObservation {
+                offset,
+                requested_length: requested_u64,
+                returned_length: count_u64,
+            });
         Ok(())
     }
 
@@ -3876,6 +4142,23 @@ impl PptxReplaySource {
         return_sizes.sort_unstable();
         Ok((counters, coverage, return_sizes))
     }
+
+    fn raw_read_observations(&self) -> io::Result<Vec<PptxReplayReadObservation>> {
+        self.raw_reads
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay raw reads are poisoned"))
+            .map(|reads| reads.clone())
+    }
+
+    fn raw_read_observation_count(&self) -> io::Result<u64> {
+        self.raw_reads
+            .lock()
+            .map_err(|_| io::Error::other("PPTX replay raw reads are poisoned"))
+            .and_then(|reads| {
+                u64::try_from(reads.len())
+                    .map_err(|_| io::Error::other("PPTX replay raw read count does not fit u64"))
+            })
+    }
 }
 
 impl ReadAt for PptxReplaySource {
@@ -3885,10 +4168,11 @@ impl ReadAt for PptxReplaySource {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let requested = output.len();
         let start = match usize::try_from(offset) {
             Ok(start) => start,
             Err(_) => {
-                self.record(offset, 0)?;
+                self.record(offset, requested, 0)?;
                 return Ok(0);
             },
         };
@@ -3899,13 +4183,321 @@ impl ReadAt for PptxReplaySource {
         if count != 0 {
             output[..count].copy_from_slice(&self.bytes[start..start + count]);
         }
-        self.record(offset, count)?;
+        self.record(offset, requested, count)?;
         Ok(count)
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
         Ok(self.version)
     }
+}
+
+#[derive(Clone, Debug, Default)]
+struct PptxReplayPhase {
+    counters: PptxReplayCounters,
+    coverage: PptxReplayCoverage,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PptxReplayPayloadInput<'a> {
+    slide_ranges: &'a [Range<u64>],
+    media_ranges: &'a [Range<u64>],
+    selected_slide_range: &'a Range<u64>,
+}
+
+struct PptxReplayAlignedInput<'a> {
+    source: &'a [u8],
+    corpus: &'a super::Corpus,
+    cold_verified_proof: Option<&'a cold_verified::Sample>,
+    payload: PptxReplayPayloadInput<'a>,
+    open_phase: &'a PptxReplayPhase,
+    open_reads: &'a [PptxReplayReadObservation],
+    raw_reads: &'a [PptxReplayReadObservation],
+    open_read_count: u64,
+}
+
+fn pptx_returned_range(
+    read: &PptxReplayReadObservation,
+    source_bytes: u64,
+) -> Result<Range<u64>, Box<dyn Error>> {
+    if read.returned_length > read.requested_length {
+        return Err(format!(
+            "PPTX replay returned {} bytes for a {}-byte request",
+            read.returned_length, read.requested_length
+        )
+        .into());
+    }
+    read.offset
+        .checked_add(read.requested_length)
+        .ok_or("PPTX replay requested range overflows u64")?;
+    let end = read
+        .offset
+        .checked_add(read.returned_length)
+        .ok_or("PPTX replay returned range overflows u64")?;
+    if read.returned_length != 0 && end > source_bytes {
+        return Err(format!(
+            "PPTX replay returned range [{}, {}) exceeds source length {}",
+            read.offset, end, source_bytes
+        )
+        .into());
+    }
+    Ok(read.offset..end)
+}
+
+fn pptx_replay_phase(
+    raw_reads: &[PptxReplayReadObservation],
+    source_bytes: u64,
+    payload: PptxReplayPayloadInput<'_>,
+) -> Result<PptxReplayPhase, Box<dyn Error>> {
+    let slide_ranges = payload.slide_ranges;
+    let media_ranges = payload.media_ranges;
+    let selected_slide_range = payload.selected_slide_range;
+    let mut phase = PptxReplayPhase::default();
+    for read in raw_reads {
+        let request = pptx_returned_range(read, source_bytes)?;
+        let count = read.returned_length;
+        checked_counter_add(&mut phase.counters.read_calls, 1, "PPTX phase read calls")?;
+        checked_counter_add(
+            &mut phase.counters.read_bytes,
+            count,
+            "PPTX phase read bytes",
+        )?;
+        let slide_overlap = overlap_with_ranges(&request, slide_ranges);
+        let selected_overlap = overlap_len(&request, selected_slide_range);
+        let unselected_overlap = slide_overlap.saturating_sub(selected_overlap);
+        let media_overlap = overlap_with_ranges(&request, media_ranges);
+        if slide_overlap != 0 {
+            checked_counter_add(
+                &mut phase.counters.slide_payload_read_calls,
+                1,
+                "PPTX phase slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut phase.counters.slide_payload_read_bytes,
+                slide_overlap,
+                "PPTX phase slide payload read bytes",
+            )?;
+        }
+        if selected_overlap != 0 {
+            checked_counter_add(
+                &mut phase.counters.selected_slide_payload_read_calls,
+                1,
+                "PPTX phase selected slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut phase.counters.selected_slide_payload_read_bytes,
+                selected_overlap,
+                "PPTX phase selected slide payload read bytes",
+            )?;
+        }
+        if unselected_overlap != 0 {
+            checked_counter_add(
+                &mut phase.counters.unselected_slide_payload_read_calls,
+                1,
+                "PPTX phase unselected slide payload read calls",
+            )?;
+            checked_counter_add(
+                &mut phase.counters.unselected_slide_payload_read_bytes,
+                unselected_overlap,
+                "PPTX phase unselected slide payload read bytes",
+            )?;
+        }
+        if media_overlap != 0 {
+            checked_counter_add(
+                &mut phase.counters.media_payload_read_calls,
+                1,
+                "PPTX phase media payload read calls",
+            )?;
+            checked_counter_add(
+                &mut phase.counters.media_payload_read_bytes,
+                media_overlap,
+                "PPTX phase media payload read bytes",
+            )?;
+        }
+        append_overlaps(&request, slide_ranges, &mut phase.coverage.slide);
+        if let Some(overlap) = overlap_range(&request, selected_slide_range) {
+            phase.coverage.selected.push(overlap);
+        }
+        append_overlaps(&request, media_ranges, &mut phase.coverage.media);
+    }
+    Ok(phase)
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PptxAlignedEocdTailProbeOverlaps {
+    slide: u64,
+    selected: u64,
+    unselected: u64,
+    media: u64,
+}
+
+fn validate_pptx_aligned_eocd_tail_probe(
+    open_phase: &PptxReplayPhase,
+    open_reads: &[PptxReplayReadObservation],
+    payload: PptxReplayPayloadInput<'_>,
+    tail_range: &Range<u64>,
+) -> Result<PptxAlignedEocdTailProbeOverlaps, Box<dyn Error>> {
+    if tail_range.is_empty() {
+        return Err("aligned PPTX EOCD tail probe range is empty".into());
+    }
+    let tail_bytes = tail_range.end - tail_range.start;
+    let exact_tail_reads = open_reads
+        .iter()
+        .filter(|read| {
+            read.offset == tail_range.start
+                && read.requested_length == tail_bytes
+                && read.returned_length == tail_bytes
+        })
+        .count();
+    let tail_start_reads = open_reads
+        .iter()
+        .filter(|read| read.offset == tail_range.start)
+        .count();
+    if exact_tail_reads != 1 || tail_start_reads != 1 {
+        return Err(format!(
+            "aligned PPTX EOCD tail probe expected exactly one full read of [{}, {}), observed {exact_tail_reads} full and {tail_start_reads} tail-start reads",
+            tail_range.start, tail_range.end
+        )
+        .into());
+    }
+
+    let expected = PptxAlignedEocdTailProbeOverlaps {
+        slide: overlap_with_ranges(tail_range, payload.slide_ranges),
+        selected: overlap_len(tail_range, payload.selected_slide_range),
+        unselected: overlap_with_ranges(tail_range, payload.slide_ranges)
+            .saturating_sub(overlap_len(tail_range, payload.selected_slide_range)),
+        media: overlap_with_ranges(tail_range, payload.media_ranges),
+    };
+    let observed = PptxAlignedEocdTailProbeOverlaps {
+        slide: open_phase.counters.slide_payload_read_bytes,
+        selected: open_phase.counters.selected_slide_payload_read_bytes,
+        unselected: open_phase.counters.unselected_slide_payload_read_bytes,
+        media: open_phase.counters.media_payload_read_bytes,
+    };
+    if observed != expected {
+        return Err(format!(
+            "aligned PPTX EOCD tail probe payload overlap differs from raw open counters: observed slide/selected/unselected/media={}/{}/{}/{}, expected={}/{}/{}/{}",
+            observed.slide,
+            observed.selected,
+            observed.unselected,
+            observed.media,
+            expected.slide,
+            expected.selected,
+            expected.unselected,
+            expected.media,
+        )
+        .into());
+    }
+    Ok(observed)
+}
+
+fn pptx_open_phase_classified(open_phase: &PptxReplayPhase, aligned_eocd_tail_probe: bool) -> bool {
+    (open_phase.counters.slide_payload_read_bytes == 0
+        && open_phase.counters.media_payload_read_bytes == 0)
+        || aligned_eocd_tail_probe
+}
+
+fn pptx_aligned_eocd_tail_probe(
+    input: PptxReplayAlignedInput<'_>,
+) -> Result<PptxAlignedEocdTailProbeEvidence, Box<dyn Error>> {
+    let PptxReplayAlignedInput {
+        source,
+        corpus,
+        cold_verified_proof,
+        payload,
+        open_phase,
+        open_reads,
+        raw_reads,
+        open_read_count,
+    } = input;
+    let slide_ranges = payload.slide_ranges;
+    let media_ranges = payload.media_ranges;
+    let selected_slide_range = payload.selected_slide_range;
+    if corpus.manifest.generator != PPTX_FILE_CORPUS_GENERATOR
+        || corpus.manifest.archive_bytes != PPTX_FILE_SOURCE_ARCHIVE_BYTES
+        || corpus.archive.len() != PPTX_FILE_SOURCE_ARCHIVE_BYTES
+        || corpus.manifest.archive_sha256 != PPTX_FILE_SOURCE_SHA256
+        || super::sha256_hex(&corpus.archive) != PPTX_FILE_SOURCE_SHA256
+    {
+        return Err("aligned PPTX replay corpus bytes do not match the pinned source".into());
+    }
+
+    let aligned_source_bytes = u64::try_from(source.len())?;
+    let aligned_source_sha256 = super::sha256_hex(source);
+    let page_size_bytes = if let Some(proof) = cold_verified_proof {
+        if proof.aligned_source_sha256.as_deref() != Some(aligned_source_sha256.as_str()) {
+            return Err("aligned PPTX replay source hash differs from retained cold proof".into());
+        }
+        if proof.aligned_source_bytes != Some(aligned_source_bytes)
+            || proof.source_bytes != Some(aligned_source_bytes)
+        {
+            return Err("aligned PPTX replay source size differs from retained cold proof".into());
+        }
+        proof
+            .page_size_bytes
+            .ok_or("aligned PPTX replay proof omitted page size")?
+    } else {
+        cold_verified::page_size_for_harness()
+            .map_err(|_| "aligned PPTX prime replay cannot observe the page size")?
+    };
+    if page_size_bytes == 0 {
+        return Err("aligned PPTX replay page size is zero".into());
+    }
+
+    let alignment = aligned_zip::verify_zero_padding(&corpus.archive, source, page_size_bytes)?;
+    if alignment.base_sha256 != PPTX_FILE_SOURCE_SHA256
+        || alignment.base_bytes != u64::try_from(PPTX_FILE_SOURCE_ARCHIVE_BYTES)?
+        || alignment.aligned_sha256 != aligned_source_sha256
+        || alignment.aligned_bytes != aligned_source_bytes
+    {
+        return Err("aligned PPTX replay alignment proof is not bound to the source pair".into());
+    }
+
+    let eocd_tail_probe_bytes = u64::try_from(soapberry_zip::RECOMMENDED_BUFFER_SIZE)?;
+    let eocd_tail_probe_offset = aligned_source_bytes
+        .checked_sub(eocd_tail_probe_bytes)
+        .ok_or("aligned PPTX source is shorter than the EOCD tail probe")?;
+    let tail_range = eocd_tail_probe_offset..aligned_source_bytes;
+    let overlaps =
+        validate_pptx_aligned_eocd_tail_probe(open_phase, open_reads, payload, &tail_range)?;
+
+    Ok(PptxAlignedEocdTailProbeEvidence {
+        alignment_proof: PptxAlignmentProofEvidence {
+            page_size_bytes: alignment.page_size_bytes,
+            eocd_offset: alignment.eocd_offset,
+            base_bytes: alignment.base_bytes,
+            aligned_bytes: alignment.aligned_bytes,
+            padding_bytes: alignment.padding_bytes,
+            base_comment_bytes: alignment.base_comment_bytes,
+            aligned_comment_bytes: alignment.aligned_comment_bytes,
+            base_sha256: alignment.base_sha256,
+            aligned_sha256: alignment.aligned_sha256,
+        },
+        eocd_tail_probe_offset,
+        eocd_tail_probe_bytes,
+        eocd_tail_probe_read_count: 1,
+        open_read_count,
+        raw_reads: raw_reads.to_vec(),
+        payload_ranges: PptxReplayDiagnosticPayloadRanges {
+            slides: pptx_diagnostic_ranges(slide_ranges),
+            selected_slide: Some(pptx_diagnostic_range(selected_slide_range)),
+            unselected_slides: pptx_diagnostic_ranges(
+                &slide_ranges
+                    .iter()
+                    .filter(|range| {
+                        range.start != selected_slide_range.start
+                            || range.end != selected_slide_range.end
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            ),
+            media: pptx_diagnostic_ranges(media_ranges),
+        },
+        open_slide_payload_overlap_bytes: overlaps.slide,
+        open_selected_slide_payload_overlap_bytes: overlaps.selected,
+        open_unselected_slide_payload_overlap_bytes: overlaps.unselected,
+        open_media_payload_overlap_bytes: overlaps.media,
+    })
 }
 
 fn checked_counter_add(value: &mut u64, amount: u64, label: &str) -> io::Result<()> {
@@ -3995,6 +4587,17 @@ fn fully_covered_range_count(expected: &[Range<u64>], observed: &[Range<u64>]) -
     .expect("PPTX replay range count fits u64")
 }
 
+fn pptx_diagnostic_range(range: &Range<u64>) -> PptxReplayDiagnosticRange {
+    PptxReplayDiagnosticRange {
+        start: range.start,
+        end: range.end,
+    }
+}
+
+fn pptx_diagnostic_ranges(ranges: &[Range<u64>]) -> Vec<PptxReplayDiagnosticRange> {
+    ranges.iter().map(pptx_diagnostic_range).collect()
+}
+
 fn pptx_slide_part_position(name: &str) -> Option<usize> {
     let number = name
         .strip_prefix("ppt/slides/slide")?
@@ -4067,6 +4670,10 @@ fn pptx_payload_ranges(bytes: &[u8]) -> Result<(Vec<Range<u64>>, Vec<Range<u64>>
 fn replay_pptx_source(
     source: &Path,
     operation: Operation,
+    child_mode: ChildMode,
+    corpus: &super::Corpus,
+    aligned_mode: bool,
+    aligned_proof: Option<&cold_verified::Sample>,
 ) -> Result<PptxSourceReplayEvidence, Box<dyn Error>> {
     let bytes = Arc::new(fs::read(source)?);
     let (slide_ranges, media_ranges) = pptx_payload_ranges(&bytes)?;
@@ -4081,6 +4688,7 @@ fn replay_pptx_source(
         Some(selected_slide_range.clone()),
     ));
     let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(replay.clone())?;
+    let open_read_count = replay.raw_read_observation_count()?;
     let slide_count = presentation.slide_count();
     let mut semantic = Sha256::new();
     match operation {
@@ -4109,13 +4717,46 @@ fn replay_pptx_source(
         },
         _ => return Err("non-source PPTX operation passed to source replay".into()),
     }
-    let (counters, coverage, return_sizes) = replay.snapshot()?;
     let unselected_slide_ranges = slide_ranges
         .iter()
         .enumerate()
         .filter(|(position, _)| *position != PPTX_FILE_SELECTED_POSITION)
         .map(|(_, range)| range.clone())
         .collect::<Vec<_>>();
+    let raw_reads = replay.raw_read_observations()?;
+    let (counters, coverage, return_sizes) = replay.snapshot()?;
+    let source_bytes = u64::try_from(bytes.len())?;
+    let payload = PptxReplayPayloadInput {
+        slide_ranges: &slide_ranges,
+        media_ranges: &media_ranges,
+        selected_slide_range: &selected_slide_range,
+    };
+    let all_phase = pptx_replay_phase(&raw_reads, source_bytes, payload)?;
+    if all_phase.counters != counters || all_phase.coverage != coverage {
+        return Err("PPTX replay raw observations disagree with aggregate counters".into());
+    }
+    let open_read_count_usize = usize::try_from(open_read_count)?;
+    if open_read_count_usize > raw_reads.len() {
+        return Err("PPTX replay open-read boundary exceeds raw observations".into());
+    }
+    let open_reads = &raw_reads[..open_read_count_usize];
+    let query_reads = &raw_reads[open_read_count_usize..];
+    let open_phase = pptx_replay_phase(open_reads, source_bytes, payload)?;
+    let query_phase = pptx_replay_phase(query_reads, source_bytes, payload)?;
+    let aligned_eocd_tail_probe = if aligned_mode {
+        Some(pptx_aligned_eocd_tail_probe(PptxReplayAlignedInput {
+            source: &bytes,
+            corpus,
+            cold_verified_proof: aligned_proof,
+            payload,
+            open_phase: &open_phase,
+            open_reads,
+            raw_reads: &raw_reads,
+            open_read_count,
+        })?)
+    } else {
+        None
+    };
     let slide_payload_covered_bytes = covered_bytes(&slide_ranges, &coverage.slide)?;
     let selected_slide_payload_covered_bytes = covered_bytes(
         std::slice::from_ref(&selected_slide_range),
@@ -4130,44 +4771,119 @@ fn replay_pptx_source(
         range_fully_covered(&selected_slide_range, &coverage.selected);
     let slide_payload_total_bytes = covered_bytes(&slide_ranges, &slide_ranges)?;
     let slide_range_count = u64::try_from(slide_ranges.len())?;
+    let query_selected_slide_payload_covered_bytes = covered_bytes(
+        std::slice::from_ref(&selected_slide_range),
+        &query_phase.coverage.selected,
+    )?;
+    let query_unselected_slide_payload_covered_bytes =
+        covered_bytes(&unselected_slide_ranges, &query_phase.coverage.slide)?;
+    let query_media_payload_covered_bytes =
+        covered_bytes(&media_ranges, &query_phase.coverage.media)?;
+    let query_slide_payload_covered_bytes =
+        covered_bytes(&slide_ranges, &query_phase.coverage.slide)?;
+    let query_slide_payload_ranges_fully_covered =
+        fully_covered_range_count(&slide_ranges, &query_phase.coverage.slide);
+    let query_selected_slide_payload_fully_covered =
+        range_fully_covered(&selected_slide_range, &query_phase.coverage.selected);
+    let query_payload_zero = query_phase.counters.slide_payload_read_bytes == 0
+        && query_phase.counters.media_payload_read_bytes == 0;
+    let open_classified =
+        pptx_open_phase_classified(&open_phase, aligned_eocd_tail_probe.is_some());
     let classification = match operation {
         Operation::PptxSourceOpen
         | Operation::PptxSourceSlideCount
         | Operation::PptxSourceOpenSlideCountLifecycle
-            if counters.slide_payload_read_bytes == 0
-                && counters.media_payload_read_bytes == 0
-                && slide_payload_covered_bytes == 0
-                && media_payload_covered_bytes == 0 =>
+            if open_classified && query_payload_zero =>
         {
-            "catalog-only:zero-slide-and-media-overlap"
+            if aligned_eocd_tail_probe.is_some() {
+                "catalog-only:aligned-eocd-tail-metadata-probe"
+            } else {
+                "catalog-only:zero-slide-and-media-overlap"
+            }
         },
         Operation::PptxSourceSelectedSlide | Operation::PptxSourceOpenSelectedSlideLifecycle
-            if selected_slide_payload_fully_covered
-                && selected_slide_payload_covered_bytes
+            if open_classified
+                && query_selected_slide_payload_fully_covered
+                && query_selected_slide_payload_covered_bytes
                     == selected_slide_range.end - selected_slide_range.start
-                && counters.selected_slide_payload_read_bytes != 0
-                && unselected_slide_payload_covered_bytes == 0
-                && media_payload_covered_bytes == 0
-                && counters.unselected_slide_payload_read_bytes == 0
-                && counters.media_payload_read_bytes == 0 =>
+                && query_phase.counters.selected_slide_payload_read_bytes != 0
+                && query_unselected_slide_payload_covered_bytes == 0
+                && query_media_payload_covered_bytes == 0
+                && query_phase.counters.unselected_slide_payload_read_bytes == 0
+                && query_phase.counters.media_payload_read_bytes == 0 =>
         {
-            "selected-slide-only:target-slide-no-unselected-or-media-overlap"
+            if aligned_eocd_tail_probe.is_some() {
+                "selected-slide-only:aligned-eocd-tail-metadata-probe;target-slide-no-unselected-or-media-overlap"
+            } else {
+                "selected-slide-only:target-slide-no-unselected-or-media-overlap"
+            }
         },
         Operation::PptxSourceListSlides
-            if slide_payload_ranges_fully_covered == slide_range_count
-                && slide_payload_covered_bytes == slide_payload_total_bytes
-                && media_payload_covered_bytes == 0
-                && counters.media_payload_read_bytes == 0 =>
+            if open_classified
+                && query_slide_payload_ranges_fully_covered == slide_range_count
+                && query_slide_payload_covered_bytes == slide_payload_total_bytes
+                && query_media_payload_covered_bytes == 0
+                && query_phase.counters.media_payload_read_bytes == 0 =>
         {
-            "list-slides:all-slide-payloads-no-media-overlap"
+            if aligned_eocd_tail_probe.is_some() {
+                "list-slides:aligned-eocd-tail-metadata-probe;all-slide-payloads-no-media-overlap"
+            } else {
+                "list-slides:all-slide-payloads-no-media-overlap"
+            }
         },
         _ => "classification-failed",
     }
     .to_owned();
     if classification == "classification-failed" {
+        let source_bytes = u64::try_from(bytes.len())?;
+        let source_sha256 = super::sha256_hex(&bytes);
+        let raw_reads = replay.raw_read_observations()?;
+        let media_payload_total_bytes = covered_bytes(&media_ranges, &media_ranges)?;
+        let diagnostic = PptxReplayClassificationDiagnostic {
+            operation: operation.case().name().to_owned(),
+            child_mode: child_mode.name().to_owned(),
+            open_read_count,
+            classification: classification.clone(),
+            source_sha256,
+            source_bytes,
+            counters,
+            raw_reads,
+            payload_ranges: PptxReplayDiagnosticPayloadRanges {
+                slides: pptx_diagnostic_ranges(&slide_ranges),
+                selected_slide: Some(pptx_diagnostic_range(&selected_slide_range)),
+                unselected_slides: pptx_diagnostic_ranges(&unselected_slide_ranges),
+                media: pptx_diagnostic_ranges(&media_ranges),
+            },
+            payload_counts: PptxReplayDiagnosticPayloadCounts {
+                slides: slide_range_count,
+                selected_slide: 1,
+                unselected_slides: u64::try_from(unselected_slide_ranges.len())?,
+                media: u64::try_from(media_ranges.len())?,
+            },
+            coverage: PptxReplayDiagnosticCoverage {
+                slide_observed_ranges: pptx_diagnostic_ranges(&coverage.slide),
+                selected_observed_ranges: pptx_diagnostic_ranges(&coverage.selected),
+                media_observed_ranges: pptx_diagnostic_ranges(&coverage.media),
+                slide_payload_total_bytes,
+                slide_payload_covered_bytes,
+                slide_payload_ranges_fully_covered,
+                selected_slide_payload_total_bytes: selected_slide_range.end
+                    - selected_slide_range.start,
+                selected_slide_payload_covered_bytes,
+                selected_slide_payload_fully_covered,
+                unselected_slide_payload_total_bytes: covered_bytes(
+                    &unselected_slide_ranges,
+                    &unselected_slide_ranges,
+                )?,
+                unselected_slide_payload_covered_bytes,
+                media_payload_total_bytes,
+                media_payload_covered_bytes,
+            },
+        };
+        let diagnostic = serde_json::to_string(&diagnostic)?;
         return Err(format!(
-            "PPTX source replay violated {} payload-range classification",
-            operation.case().name()
+            "PPTX source replay violated {} payload-range classification; diagnostic={diagnostic}",
+            operation.case().name(),
         )
         .into());
     }
@@ -4197,6 +4913,7 @@ fn replay_pptx_source(
         media_payload_read_calls: counters.media_payload_read_calls,
         media_payload_read_bytes: counters.media_payload_read_bytes,
         media_payload_covered_bytes,
+        aligned_eocd_tail_probe,
         semantic_sha256: super::sha256_hex(semantic.finalize().as_slice()),
         classification,
     })
@@ -7080,6 +7797,192 @@ mod tests {
             super::fully_covered_range_count(&[0..10, 20..30], &[0..10, 20..25]),
             1
         );
+    }
+
+    #[test]
+    fn pptx_replay_raw_observations_keep_requested_and_returned_lengths() {
+        let source = super::PptxReplaySource::new(
+            Arc::new(vec![1, 2, 3]),
+            std::iter::once(1..3).collect(),
+            Vec::new(),
+            Some(1..3),
+        );
+        let mut short = [0_u8; 4];
+        assert_eq!(source.read_at(1, &mut short).unwrap(), 2);
+        let mut eof = [0_u8; 2];
+        assert_eq!(source.read_at(3, &mut eof).unwrap(), 0);
+
+        assert_eq!(
+            source.raw_read_observations().unwrap(),
+            vec![
+                super::PptxReplayReadObservation {
+                    offset: 1,
+                    requested_length: 4,
+                    returned_length: 2,
+                },
+                super::PptxReplayReadObservation {
+                    offset: 3,
+                    requested_length: 2,
+                    returned_length: 0,
+                },
+            ]
+        );
+        let (counters, coverage, return_sizes) = source.snapshot().unwrap();
+        assert_eq!(counters.read_calls, 2);
+        assert_eq!(counters.read_bytes, 2);
+        assert_eq!(coverage.slide, std::iter::once(1..3).collect::<Vec<_>>());
+        assert_eq!(return_sizes, vec![0, 2]);
+    }
+
+    fn pptx_aligned_probe_test_payload<'a>(
+        slide_ranges: &'a [std::ops::Range<u64>],
+        media_ranges: &'a [std::ops::Range<u64>],
+        selected_slide_range: &'a std::ops::Range<u64>,
+    ) -> super::PptxReplayPayloadInput<'a> {
+        super::PptxReplayPayloadInput {
+            slide_ranges,
+            media_ranges,
+            selected_slide_range,
+        }
+    }
+
+    fn pptx_aligned_probe_test_read(
+        offset: u64,
+        requested_length: u64,
+        returned_length: u64,
+    ) -> super::PptxReplayReadObservation {
+        super::PptxReplayReadObservation {
+            offset,
+            requested_length,
+            returned_length,
+        }
+    }
+
+    #[test]
+    fn pptx_aligned_probe_accepts_one_full_tail_and_matches_overlap() {
+        let slides = [100..200, 300..400];
+        let media = std::iter::once(500..600).collect::<Vec<_>>();
+        let selected = 100..200;
+        let payload = pptx_aligned_probe_test_payload(&slides, &media, &selected);
+        let tail = 0..1000;
+        let reads = [pptx_aligned_probe_test_read(0, 1000, 1000)];
+        let phase = super::pptx_replay_phase(&reads, 2048, payload).unwrap();
+
+        let overlaps =
+            super::validate_pptx_aligned_eocd_tail_probe(&phase, &reads, payload, &tail).unwrap();
+        assert_eq!(
+            overlaps,
+            super::PptxAlignedEocdTailProbeOverlaps {
+                slide: 200,
+                selected: 100,
+                unselected: 100,
+                media: 100,
+            }
+        );
+        assert!(super::pptx_open_phase_classified(&phase, true));
+    }
+
+    #[test]
+    fn pptx_aligned_probe_rejects_duplicate_missing_and_short_tail() {
+        let slides = [100..200, 300..400];
+        let media = std::iter::once(500..600).collect::<Vec<_>>();
+        let selected = 100..200;
+        let payload = pptx_aligned_probe_test_payload(&slides, &media, &selected);
+        let tail = 0..1000;
+        let full = pptx_aligned_probe_test_read(0, 1000, 1000);
+
+        let duplicate = [full, full];
+        let duplicate_phase = super::pptx_replay_phase(&duplicate, 2048, payload).unwrap();
+        assert!(
+            super::validate_pptx_aligned_eocd_tail_probe(
+                &duplicate_phase,
+                &duplicate,
+                payload,
+                &tail,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("exactly one full")
+        );
+
+        let missing: [super::PptxReplayReadObservation; 0] = [];
+        let missing_phase = super::pptx_replay_phase(&missing, 2048, payload).unwrap();
+        assert!(
+            super::validate_pptx_aligned_eocd_tail_probe(&missing_phase, &missing, payload, &tail,)
+                .unwrap_err()
+                .to_string()
+                .contains("exactly one full")
+        );
+
+        let short = [pptx_aligned_probe_test_read(0, 1000, 999)];
+        let short_phase = super::pptx_replay_phase(&short, 2048, payload).unwrap();
+        assert!(
+            super::validate_pptx_aligned_eocd_tail_probe(&short_phase, &short, payload, &tail,)
+                .unwrap_err()
+                .to_string()
+                .contains("exactly one full")
+        );
+    }
+
+    #[test]
+    fn pptx_aligned_probe_rejects_query_tail_and_extra_payload() {
+        let slides = [100..200, 1100..1200];
+        let media = std::iter::once(1300..1400).collect::<Vec<_>>();
+        let selected = 100..200;
+        let payload = pptx_aligned_probe_test_payload(&slides, &media, &selected);
+        let tail = 0..1000;
+        let tail_read = pptx_aligned_probe_test_read(0, 1000, 1000);
+
+        let query_slides = [100..200, 300..400];
+        let query_media = std::iter::once(500..600).collect::<Vec<_>>();
+        let query_selected = 100..200;
+        let query_payload =
+            pptx_aligned_probe_test_payload(&query_slides, &query_media, &query_selected);
+        let open_reads: [super::PptxReplayReadObservation; 0] = [];
+        let query_reads = [tail_read];
+        let open_phase = super::pptx_replay_phase(&open_reads, 2048, query_payload).unwrap();
+        let query_phase = super::pptx_replay_phase(&query_reads, 2048, query_payload).unwrap();
+        assert!(
+            super::validate_pptx_aligned_eocd_tail_probe(
+                &open_phase,
+                &open_reads,
+                query_payload,
+                &tail,
+            )
+            .is_err()
+        );
+        assert_ne!(query_phase.counters.media_payload_read_bytes, 0);
+        assert_ne!(query_phase.counters.unselected_slide_payload_read_bytes, 0);
+
+        let extra_reads = [
+            tail_read,
+            pptx_aligned_probe_test_read(1100, 100, 100),
+            pptx_aligned_probe_test_read(1300, 100, 100),
+        ];
+        let extra_phase = super::pptx_replay_phase(&extra_reads, 2048, payload).unwrap();
+        assert!(
+            super::validate_pptx_aligned_eocd_tail_probe(
+                &extra_phase,
+                &extra_reads,
+                payload,
+                &tail,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("payload overlap differs")
+        );
+    }
+
+    #[test]
+    fn pptx_unaligned_open_payload_has_no_tail_allowance() {
+        let slides = [100..200, 300..400];
+        let media = std::iter::once(500..600).collect::<Vec<_>>();
+        let selected = 100..200;
+        let payload = pptx_aligned_probe_test_payload(&slides, &media, &selected);
+        let reads = [pptx_aligned_probe_test_read(0, 1000, 1000)];
+        let phase = super::pptx_replay_phase(&reads, 2048, payload).unwrap();
+        assert!(!super::pptx_open_phase_classified(&phase, false));
+        assert!(super::pptx_open_phase_classified(&phase, true));
     }
 
     #[test]

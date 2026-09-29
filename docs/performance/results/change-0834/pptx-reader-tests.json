@@ -1,0 +1,50 @@
+{
+  "status": "pass",
+  "report_sha256": "1bc8000277c441b9018c20e2a94bd8f2994f0a2efff8487abf57cf58bbe1151a",
+  "mutations": [
+    {
+      "name": "missing-aligned-proof",
+      "rejected": true
+    },
+    {
+      "name": "wrong-base-hash",
+      "rejected": true
+    },
+    {
+      "name": "wrong-padding",
+      "rejected": true
+    },
+    {
+      "name": "wrong-eocd",
+      "rejected": true
+    },
+    {
+      "name": "wrong-boundary",
+      "rejected": true
+    },
+    {
+      "name": "missing-tail",
+      "rejected": true
+    },
+    {
+      "name": "duplicate-tail",
+      "rejected": true
+    },
+    {
+      "name": "hidden-raw-overlap",
+      "rejected": true
+    },
+    {
+      "name": "overstated-return",
+      "rejected": true
+    },
+    {
+      "name": "wrong-selected-range",
+      "rejected": true
+    },
+    {
+      "name": "wrong-semantics-in-both-states",
+      "rejected": true
+    }
+  ]
+}
