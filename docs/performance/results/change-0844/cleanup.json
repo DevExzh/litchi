@@ -1,0 +1,27 @@
+{
+  "removed": [
+    {
+      "files": 32511,
+      "logical_bytes": 8169990090,
+      "path": "/home/zhuhe/code/litchi-target-0844"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0844"
+    }
+  ],
+  "status": "pass",
+  "verified_binaries": [
+    {
+      "bytes": 13373672,
+      "path": "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+      "sha256": "8ca482b0a5da90111f382ad5d3377ee96f92c63c7dbf24116a19205f7ce38bcd"
+    },
+    {
+      "bytes": 13383544,
+      "path": "/home/zhuhe/code/litchi-target-0844/retained/after/opc-preservation-probe",
+      "sha256": "c35084ba1846f490cccd68c9f2736264d101b1b7515a149f7055b7a624610a88"
+    }
+  ]
+}

@@ -1,0 +1,1848 @@
+{
+  "analysis": {
+    "bytes": 611456133,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/analysis.json",
+    "sha256": "e318c45cc0105cff4fa901e720f4987c1c4117e3f146dad432623526c392ef4a"
+  },
+  "comparison": [
+    {
+      "block": 0,
+      "insertion_events_removed": 6,
+      "insertion_requested_bytes_removed": 96,
+      "owner_events_removed": 6,
+      "owner_requested_bytes_removed": 96,
+      "parts": 4,
+      "shape": "shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 6,
+      "insertion_requested_bytes_removed": 96,
+      "owner_events_removed": 6,
+      "owner_requested_bytes_removed": 96,
+      "parts": 4,
+      "shape": "shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 126,
+      "insertion_requested_bytes_removed": 2016,
+      "owner_events_removed": 126,
+      "owner_requested_bytes_removed": 2016,
+      "parts": 64,
+      "shape": "shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 126,
+      "insertion_requested_bytes_removed": 2016,
+      "owner_events_removed": 126,
+      "owner_requested_bytes_removed": 2016,
+      "parts": 64,
+      "shape": "shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 2046,
+      "insertion_requested_bytes_removed": 32736,
+      "owner_events_removed": 2046,
+      "owner_requested_bytes_removed": 32736,
+      "parts": 1024,
+      "shape": "shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 2046,
+      "insertion_requested_bytes_removed": 32736,
+      "owner_events_removed": 2046,
+      "owner_requested_bytes_removed": 32736,
+      "parts": 1024,
+      "shape": "shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 8190,
+      "insertion_requested_bytes_removed": 131040,
+      "owner_events_removed": 8190,
+      "owner_requested_bytes_removed": 131040,
+      "parts": 4096,
+      "shape": "shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 8190,
+      "insertion_requested_bytes_removed": 131040,
+      "owner_events_removed": 8190,
+      "owner_requested_bytes_removed": 131040,
+      "parts": 4096,
+      "shape": "shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4,
+      "shape": "root"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4,
+      "shape": "root"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 64,
+      "shape": "root"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 64,
+      "shape": "root"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 1024,
+      "shape": "root"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 1024,
+      "shape": "root"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4096,
+      "shape": "root"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4096,
+      "shape": "root"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 28,
+      "insertion_requested_bytes_removed": 1900,
+      "owner_events_removed": 28,
+      "owner_requested_bytes_removed": 1900,
+      "parts": 4,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 28,
+      "insertion_requested_bytes_removed": 1900,
+      "owner_events_removed": 28,
+      "owner_requested_bytes_removed": 1900,
+      "parts": 4,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 567,
+      "insertion_requested_bytes_removed": 17388,
+      "owner_events_removed": 567,
+      "owner_requested_bytes_removed": 17388,
+      "parts": 64,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 567,
+      "insertion_requested_bytes_removed": 17388,
+      "owner_events_removed": 567,
+      "owner_requested_bytes_removed": 17388,
+      "parts": 64,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 9207,
+      "insertion_requested_bytes_removed": 282348,
+      "owner_events_removed": 9207,
+      "owner_requested_bytes_removed": 282348,
+      "parts": 1024,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 9207,
+      "insertion_requested_bytes_removed": 282348,
+      "owner_events_removed": 9207,
+      "owner_requested_bytes_removed": 282348,
+      "parts": 1024,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 36855,
+      "insertion_requested_bytes_removed": 1130220,
+      "owner_events_removed": 36855,
+      "owner_requested_bytes_removed": 1130220,
+      "parts": 4096,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 36855,
+      "insertion_requested_bytes_removed": 1130220,
+      "owner_events_removed": 36855,
+      "owner_requested_bytes_removed": 1130220,
+      "parts": 4096,
+      "shape": "deep-shared"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 64,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 64,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 1024,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 1024,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 0,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4096,
+      "shape": "deep-unique"
+    },
+    {
+      "block": 1,
+      "insertion_events_removed": 0,
+      "insertion_requested_bytes_removed": 0,
+      "owner_events_removed": 0,
+      "owner_requested_bytes_removed": 0,
+      "parts": 4096,
+      "shape": "deep-unique"
+    }
+  ],
+  "reducer": {
+    "bytes": 2203,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/mechanism.py",
+    "sha256": "45e56f558c9b4f0fb183598e22d09175afa0dcda61b50d0e7c824cdc237f4534"
+  },
+  "rows": [
+    {
+      "allocation_info_indexes": [
+        495,
+        496,
+        497,
+        498
+      ],
+      "insertion_allocation_events": 16,
+      "insertion_requested_bytes": 272,
+      "owner_allocation_events": 85,
+      "owner_requested_bytes": 576175,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        495,
+        496,
+        497,
+        498
+      ],
+      "insertion_allocation_events": 10,
+      "insertion_requested_bytes": 176,
+      "owner_allocation_events": 79,
+      "owner_requested_bytes": 576079,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        529,
+        530,
+        531,
+        532
+      ],
+      "insertion_allocation_events": 256,
+      "insertion_requested_bytes": 4352,
+      "owner_allocation_events": 568,
+      "owner_requested_bytes": 704358,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        529,
+        530,
+        531,
+        532
+      ],
+      "insertion_allocation_events": 130,
+      "insertion_requested_bytes": 2336,
+      "owner_allocation_events": 442,
+      "owner_requested_bytes": 702342,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        563,
+        564,
+        565,
+        566
+      ],
+      "insertion_allocation_events": 4096,
+      "insertion_requested_bytes": 69632,
+      "owner_allocation_events": 8250,
+      "owner_requested_bytes": 3408303,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        563,
+        564,
+        565,
+        566
+      ],
+      "insertion_allocation_events": 2050,
+      "insertion_requested_bytes": 36896,
+      "owner_allocation_events": 6204,
+      "owner_requested_bytes": 3375567,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        579,
+        580,
+        581,
+        582
+      ],
+      "insertion_allocation_events": 16384,
+      "insertion_requested_bytes": 278528,
+      "owner_allocation_events": 32826,
+      "owner_requested_bytes": 11419801,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        579,
+        580,
+        581,
+        582
+      ],
+      "insertion_allocation_events": 8194,
+      "insertion_requested_bytes": 147488,
+      "owner_allocation_events": 24636,
+      "owner_requested_bytes": 11288761,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        488,
+        489
+      ],
+      "insertion_allocation_events": 8,
+      "insertion_requested_bytes": 88,
+      "owner_allocation_events": 77,
+      "owner_requested_bytes": 575784,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        488,
+        489
+      ],
+      "insertion_allocation_events": 8,
+      "insertion_requested_bytes": 88,
+      "owner_allocation_events": 77,
+      "owner_requested_bytes": 575784,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        523,
+        524
+      ],
+      "insertion_allocation_events": 128,
+      "insertion_requested_bytes": 1408,
+      "owner_allocation_events": 440,
+      "owner_requested_bytes": 699079,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        523,
+        524
+      ],
+      "insertion_allocation_events": 128,
+      "insertion_requested_bytes": 1408,
+      "owner_allocation_events": 440,
+      "owner_requested_bytes": 699079,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555
+      ],
+      "insertion_allocation_events": 2048,
+      "insertion_requested_bytes": 22528,
+      "owner_allocation_events": 6201,
+      "owner_requested_bytes": 2522259,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555
+      ],
+      "insertion_allocation_events": 2048,
+      "insertion_requested_bytes": 22528,
+      "owner_allocation_events": 6201,
+      "owner_requested_bytes": 2522259,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        572,
+        573
+      ],
+      "insertion_allocation_events": 8192,
+      "insertion_requested_bytes": 90112,
+      "owner_allocation_events": 24634,
+      "owner_requested_bytes": 11112063,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        572,
+        573
+      ],
+      "insertion_allocation_events": 8192,
+      "insertion_requested_bytes": 90112,
+      "owner_allocation_events": 24634,
+      "owner_requested_bytes": 11112063,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        525,
+        526,
+        527,
+        528,
+        529,
+        530,
+        531,
+        532,
+        533,
+        534
+      ],
+      "insertion_allocation_events": 46,
+      "insertion_requested_bytes": 2936,
+      "owner_allocation_events": 115,
+      "owner_requested_bytes": 579118,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        522,
+        523,
+        524,
+        525,
+        526,
+        527,
+        528,
+        529,
+        530
+      ],
+      "insertion_allocation_events": 18,
+      "insertion_requested_bytes": 1036,
+      "owner_allocation_events": 87,
+      "owner_requested_bytes": 577218,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561
+      ],
+      "insertion_allocation_events": 704,
+      "insertion_requested_bytes": 21120,
+      "owner_allocation_events": 1016,
+      "owner_requested_bytes": 724237,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561
+      ],
+      "insertion_allocation_events": 137,
+      "insertion_requested_bytes": 3732,
+      "owner_allocation_events": 449,
+      "owner_requested_bytes": 706849,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594,
+        595
+      ],
+      "insertion_allocation_events": 11264,
+      "insertion_requested_bytes": 337920,
+      "owner_allocation_events": 15418,
+      "owner_requested_bytes": 3776353,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594,
+        595
+      ],
+      "insertion_allocation_events": 2057,
+      "insertion_requested_bytes": 55572,
+      "owner_allocation_events": 6211,
+      "owner_requested_bytes": 3494005,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610,
+        611
+      ],
+      "insertion_allocation_events": 45056,
+      "insertion_requested_bytes": 1351680,
+      "owner_allocation_events": 61498,
+      "owner_requested_bytes": 12901064,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610,
+        611
+      ],
+      "insertion_allocation_events": 8201,
+      "insertion_requested_bytes": 221460,
+      "owner_allocation_events": 24643,
+      "owner_requested_bytes": 11770844,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549,
+        550,
+        551,
+        552
+      ],
+      "insertion_allocation_events": 47,
+      "insertion_requested_bytes": 5220,
+      "owner_allocation_events": 116,
+      "owner_requested_bytes": 581672,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549,
+        550,
+        551,
+        552
+      ],
+      "insertion_allocation_events": 47,
+      "insertion_requested_bytes": 5220,
+      "owner_allocation_events": 116,
+      "owner_requested_bytes": 581672,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "insertion_allocation_events": 707,
+      "insertion_requested_bytes": 82800,
+      "owner_allocation_events": 1019,
+      "owner_requested_bytes": 807923,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "insertion_allocation_events": 707,
+      "insertion_requested_bytes": 82800,
+      "owner_allocation_events": 1019,
+      "owner_requested_bytes": 807923,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        624,
+        625,
+        626
+      ],
+      "insertion_allocation_events": 11267,
+      "insertion_requested_bytes": 1324080,
+      "owner_allocation_events": 15420,
+      "owner_requested_bytes": 4663967,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        624,
+        625,
+        626
+      ],
+      "insertion_allocation_events": 11267,
+      "insertion_requested_bytes": 1324080,
+      "owner_allocation_events": 15420,
+      "owner_requested_bytes": 4663967,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        631,
+        632,
+        633,
+        634,
+        635,
+        636,
+        637,
+        638,
+        639,
+        640,
+        641,
+        642,
+        643,
+        644
+      ],
+      "insertion_allocation_events": 45059,
+      "insertion_requested_bytes": 5296176,
+      "owner_allocation_events": 61500,
+      "owner_requested_bytes": 16669037,
+      "row": {
+        "block": 0,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        631,
+        632,
+        633,
+        634,
+        635,
+        636,
+        637,
+        638,
+        639,
+        640,
+        641,
+        642,
+        643,
+        644
+      ],
+      "insertion_allocation_events": 45059,
+      "insertion_requested_bytes": 5296176,
+      "owner_allocation_events": 61500,
+      "owner_requested_bytes": 16669037,
+      "row": {
+        "block": 0,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        495,
+        496,
+        497,
+        498
+      ],
+      "insertion_allocation_events": 10,
+      "insertion_requested_bytes": 176,
+      "owner_allocation_events": 79,
+      "owner_requested_bytes": 576079,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        495,
+        496,
+        497,
+        498
+      ],
+      "insertion_allocation_events": 16,
+      "insertion_requested_bytes": 272,
+      "owner_allocation_events": 85,
+      "owner_requested_bytes": 576175,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        529,
+        530,
+        531,
+        532
+      ],
+      "insertion_allocation_events": 130,
+      "insertion_requested_bytes": 2336,
+      "owner_allocation_events": 442,
+      "owner_requested_bytes": 702342,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        529,
+        530,
+        531,
+        532
+      ],
+      "insertion_allocation_events": 256,
+      "insertion_requested_bytes": 4352,
+      "owner_allocation_events": 568,
+      "owner_requested_bytes": 704358,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        563,
+        564,
+        565,
+        566
+      ],
+      "insertion_allocation_events": 2050,
+      "insertion_requested_bytes": 36896,
+      "owner_allocation_events": 6204,
+      "owner_requested_bytes": 3375567,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        563,
+        564,
+        565,
+        566
+      ],
+      "insertion_allocation_events": 4096,
+      "insertion_requested_bytes": 69632,
+      "owner_allocation_events": 8250,
+      "owner_requested_bytes": 3408303,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        579,
+        580,
+        581,
+        582
+      ],
+      "insertion_allocation_events": 8194,
+      "insertion_requested_bytes": 147488,
+      "owner_allocation_events": 24636,
+      "owner_requested_bytes": 11288761,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        579,
+        580,
+        581,
+        582
+      ],
+      "insertion_allocation_events": 16384,
+      "insertion_requested_bytes": 278528,
+      "owner_allocation_events": 32826,
+      "owner_requested_bytes": 11419801,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        488,
+        489
+      ],
+      "insertion_allocation_events": 8,
+      "insertion_requested_bytes": 88,
+      "owner_allocation_events": 77,
+      "owner_requested_bytes": 575784,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        488,
+        489
+      ],
+      "insertion_allocation_events": 8,
+      "insertion_requested_bytes": 88,
+      "owner_allocation_events": 77,
+      "owner_requested_bytes": 575784,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        523,
+        524
+      ],
+      "insertion_allocation_events": 128,
+      "insertion_requested_bytes": 1408,
+      "owner_allocation_events": 440,
+      "owner_requested_bytes": 699079,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        523,
+        524
+      ],
+      "insertion_allocation_events": 128,
+      "insertion_requested_bytes": 1408,
+      "owner_allocation_events": 440,
+      "owner_requested_bytes": 699079,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555
+      ],
+      "insertion_allocation_events": 2048,
+      "insertion_requested_bytes": 22528,
+      "owner_allocation_events": 6201,
+      "owner_requested_bytes": 2522259,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555
+      ],
+      "insertion_allocation_events": 2048,
+      "insertion_requested_bytes": 22528,
+      "owner_allocation_events": 6201,
+      "owner_requested_bytes": 2522259,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        572,
+        573
+      ],
+      "insertion_allocation_events": 8192,
+      "insertion_requested_bytes": 90112,
+      "owner_allocation_events": 24634,
+      "owner_requested_bytes": 11112063,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        572,
+        573
+      ],
+      "insertion_allocation_events": 8192,
+      "insertion_requested_bytes": 90112,
+      "owner_allocation_events": 24634,
+      "owner_requested_bytes": 11112063,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "root",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        522,
+        523,
+        524,
+        525,
+        526,
+        527,
+        528,
+        529,
+        530
+      ],
+      "insertion_allocation_events": 18,
+      "insertion_requested_bytes": 1036,
+      "owner_allocation_events": 87,
+      "owner_requested_bytes": 577218,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        525,
+        526,
+        527,
+        528,
+        529,
+        530,
+        531,
+        532,
+        533,
+        534
+      ],
+      "insertion_allocation_events": 46,
+      "insertion_requested_bytes": 2936,
+      "owner_allocation_events": 115,
+      "owner_requested_bytes": 579118,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561
+      ],
+      "insertion_allocation_events": 137,
+      "insertion_requested_bytes": 3732,
+      "owner_allocation_events": 449,
+      "owner_requested_bytes": 706849,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561
+      ],
+      "insertion_allocation_events": 704,
+      "insertion_requested_bytes": 21120,
+      "owner_allocation_events": 1016,
+      "owner_requested_bytes": 724237,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594,
+        595
+      ],
+      "insertion_allocation_events": 2057,
+      "insertion_requested_bytes": 55572,
+      "owner_allocation_events": 6211,
+      "owner_requested_bytes": 3494005,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594,
+        595
+      ],
+      "insertion_allocation_events": 11264,
+      "insertion_requested_bytes": 337920,
+      "owner_allocation_events": 15418,
+      "owner_requested_bytes": 3776353,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610,
+        611
+      ],
+      "insertion_allocation_events": 8201,
+      "insertion_requested_bytes": 221460,
+      "owner_allocation_events": 24643,
+      "owner_requested_bytes": 11770844,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610,
+        611
+      ],
+      "insertion_allocation_events": 45056,
+      "insertion_requested_bytes": 1351680,
+      "owner_allocation_events": 61498,
+      "owner_requested_bytes": 12901064,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-shared",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549,
+        550,
+        551,
+        552
+      ],
+      "insertion_allocation_events": 47,
+      "insertion_requested_bytes": 5220,
+      "owner_allocation_events": 116,
+      "owner_requested_bytes": 581672,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549,
+        550,
+        551,
+        552
+      ],
+      "insertion_allocation_events": 47,
+      "insertion_requested_bytes": 5220,
+      "owner_allocation_events": 116,
+      "owner_requested_bytes": 581672,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "insertion_allocation_events": 707,
+      "insertion_requested_bytes": 82800,
+      "owner_allocation_events": 1019,
+      "owner_requested_bytes": 807923,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "insertion_allocation_events": 707,
+      "insertion_requested_bytes": 82800,
+      "owner_allocation_events": 1019,
+      "owner_requested_bytes": 807923,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        624,
+        625,
+        626
+      ],
+      "insertion_allocation_events": 11267,
+      "insertion_requested_bytes": 1324080,
+      "owner_allocation_events": 15420,
+      "owner_requested_bytes": 4663967,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        624,
+        625,
+        626
+      ],
+      "insertion_allocation_events": 11267,
+      "insertion_requested_bytes": 1324080,
+      "owner_allocation_events": 15420,
+      "owner_requested_bytes": 4663967,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        631,
+        632,
+        633,
+        634,
+        635,
+        636,
+        637,
+        638,
+        639,
+        640,
+        641,
+        642,
+        643,
+        644
+      ],
+      "insertion_allocation_events": 45059,
+      "insertion_requested_bytes": 5296176,
+      "owner_allocation_events": 61500,
+      "owner_requested_bytes": 16669037,
+      "row": {
+        "block": 1,
+        "leg": "after",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    },
+    {
+      "allocation_info_indexes": [
+        631,
+        632,
+        633,
+        634,
+        635,
+        636,
+        637,
+        638,
+        639,
+        640,
+        641,
+        642,
+        643,
+        644
+      ],
+      "insertion_allocation_events": 45059,
+      "insertion_requested_bytes": 5296176,
+      "owner_allocation_events": 61500,
+      "owner_requested_bytes": 16669037,
+      "row": {
+        "block": 1,
+        "leg": "before",
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "shape": "deep-unique",
+        "warmup": 0
+      }
+    }
+  ],
+  "scope": "Exact owner ancestry and concrete PartNameIndex::insert stack frames; requested allocations only, not live memory, physical copies or elapsed phases.",
+  "status": "pass"
+}

@@ -1,0 +1,39 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0064-publish-after/time.txt",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0064-publish-after/trace",
+    "/home/zhuhe/code/litchi-target-0844/retained/after/opc-preservation-probe",
+    "--shape",
+    "deep-unique",
+    "--parts",
+    "64",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0064-publish-after/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0844",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790707484.688681
+}

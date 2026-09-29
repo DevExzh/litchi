@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/mechanism.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790707586.66704,
+  "log": {
+    "bytes": 48,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/mechanism/output.log",
+    "sha256": "09b29d8a4bc1093b727602952ddf58002a23a7cfbd98308fd39c30d92e21db35"
+  },
+  "started_unix": 1790707584.704914
+}

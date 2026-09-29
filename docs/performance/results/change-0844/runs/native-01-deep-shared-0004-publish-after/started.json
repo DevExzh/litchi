@@ -1,0 +1,46 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/native-01-deep-shared-0004-publish-after/time.txt",
+    "/home/zhuhe/code/litchi-target-0844/retained/after/opc-preservation-probe",
+    "--shape",
+    "deep-shared",
+    "--parts",
+    "4",
+    "--mode",
+    "publish",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/native-01-deep-shared-0004-publish-after/report.json"
+  ],
+  "binary": {
+    "bytes": 13383544,
+    "path": "/home/zhuhe/code/litchi-target-0844/retained/after/opc-preservation-probe",
+    "sha256": "c35084ba1846f490cccd68c9f2736264d101b1b7515a149f7055b7a624610a88"
+  },
+  "build": {
+    "bytes": 431,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/build-after.json",
+    "sha256": "1bd0fdba3a0a0f7d8d270e52833ff977cf42c5187683e8fb55772ea1d5a90414"
+  },
+  "lane": "native",
+  "row": {
+    "block": 1,
+    "leg": "after",
+    "mode": "publish",
+    "parts": 4,
+    "samples": 30,
+    "shape": "deep-shared",
+    "warmup": 3
+  },
+  "started_unix": 1790707395.090569
+}

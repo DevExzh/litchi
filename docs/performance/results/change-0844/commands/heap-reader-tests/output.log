@@ -1,0 +1,14 @@
+test_exact_stacks_owner_totals_and_disjoint_phases (__main__.HeapReaderTests.test_exact_stacks_owner_totals_and_disjoint_phases) ... ok
+test_hash_and_inline_frames_are_not_dropped_from_full_stack (__main__.HeapReaderTests.test_hash_and_inline_frames_are_not_dropped_from_full_stack) ... ok
+test_hash_suffix_is_supported_but_near_miss_is_not (__main__.HeapReaderTests.test_hash_suffix_is_supported_but_near_miss_is_not) ... ok
+test_limits_are_fail_closed (__main__.HeapReaderTests.test_limits_are_fail_closed) ... ok
+test_mutations_reject_malformed_strings_and_cycles (__main__.HeapReaderTests.test_mutations_reject_malformed_strings_and_cycles) ... ok
+test_mutations_reject_version_and_unknown_references (__main__.HeapReaderTests.test_mutations_reject_version_and_unknown_references) ... ok
+test_parse_heap_trace_alias_accepts_decoded_bytes (__main__.HeapReaderTests.test_parse_heap_trace_alias_accepts_decoded_bytes) ... ok
+test_phase_buckets_use_concrete_symbols_only (__main__.HeapReaderTests.test_phase_buckets_use_concrete_symbols_only) ... ok
+test_unknown_frames_and_empty_traces_are_retained (__main__.HeapReaderTests.test_unknown_frames_and_empty_traces_are_retained) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.002s
+
+OK

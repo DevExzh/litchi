@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "readelf",
+    "-n",
+    "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790705649.2225943,
+  "log": {
+    "bytes": 407,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/before-symbols-elf/output.log",
+    "sha256": "08244cf36493d759b9d26c66b0b11687776836ade12d979df903407628e05492"
+  },
+  "started_unix": 1790705649.221314
+}

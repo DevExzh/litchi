@@ -1,0 +1,16 @@
+{
+  "formal_heap_reports_already_captured": 0,
+  "measurement": {
+    "bytes": 87822,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/measurement-plan.json",
+    "sha256": "55c4241e94695154d7d13ecf80968c09e1683e9724d2b0cb13a2ea96ffca9f4d"
+  },
+  "native_reports_already_captured": 0,
+  "original": {
+    "bytes": 87822,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/plan.json",
+    "sha256": "c07144512e322d8013d44b17a910bc85b938bfb9bdc07002caa11db5384c15fa"
+  },
+  "reason": "With32cases reversing caseorder made block+position parity cancel, leaving eachcase withconstantleg-first order. Measurement schedule keys parity tostablecaseindex, so everycase has3before-first and3after-first pairs. Same cases/counts/thresholds; no native or formalheap captures exist. Build freezes continuebindingoriginalplan; qualificationrows areidentical.",
+  "status": "pass"
+}

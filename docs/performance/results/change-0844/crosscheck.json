@@ -1,0 +1,15 @@
+{
+  "analysis": {
+    "bytes": 611456133,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/analysis.json",
+    "sha256": "e318c45cc0105cff4fa901e720f4987c1c4117e3f146dad432623526c392ef4a"
+  },
+  "checker": {
+    "bytes": 1701,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/crosscheck.py",
+    "sha256": "324db57bceb7fa633463a9c25a4719c1e6047e6530318286f379956d9665808e"
+  },
+  "metric_rows": 224,
+  "raw_native_reports": 384,
+  "status": "pass"
+}

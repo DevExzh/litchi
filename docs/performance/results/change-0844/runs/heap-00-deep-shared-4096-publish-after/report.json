@@ -1,0 +1,62 @@
+{
+  "schema": "litchi.opc-preservation-profile-0844.v1",
+  "tool": "opc-preservation-probe-0844",
+  "shape": "deep-shared",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "shape": "deep-shared",
+    "part_count": 4096,
+    "member_count": 4098,
+    "payload_bytes": 256,
+    "part_name_pattern": "/a/b/c/d/e/f/g/h/p{index:05}.bin",
+    "depth": 9,
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 4095,
+    "target_part_name": "/a/b/c/d/e/f/g/h/p04095.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 1700020,
+    "sha256": "758a6e206a85fd4612642605b27a59a4f7503afafeb99732e9231817c96d016a"
+  },
+  "source_logical": {
+    "bytes": 1413568,
+    "sha256": "ef3ea839fb1e95ab5a85f28d07b8ed7128d1cd9f6509d3a7de4282690528e63a"
+  },
+  "expected_output": {
+    "bytes": 1700020,
+    "sha256": "a7f084de87b42b1c2af372d3528d4a4b3884c74016c0eb487eb943d7f69e4d2c"
+  },
+  "expected_output_logical": {
+    "bytes": 1413568,
+    "sha256": "84f13d14d9faef3083be41555b4bfb94c4420541d5aebf44d77cc4751ff16a1f"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 15429456,
+      "output": {
+        "bytes": 1700020,
+        "sha256": "a7f084de87b42b1c2af372d3528d4a4b3884c74016c0eb487eb943d7f69e4d2c"
+      },
+      "logical": {
+        "bytes": 1413568,
+        "sha256": "84f13d14d9faef3083be41555b4bfb94c4420541d5aebf44d77cc4751ff16a1f"
+      },
+      "member_count": 4098,
+      "hash_witness": {
+        "output_sha256": "a7f084de87b42b1c2af372d3528d4a4b3884c74016c0eb487eb943d7f69e4d2c",
+        "logical_sha256": "84f13d14d9faef3083be41555b4bfb94c4420541d5aebf44d77cc4751ff16a1f",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ]
+}

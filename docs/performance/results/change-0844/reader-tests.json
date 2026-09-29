@@ -1,0 +1,214 @@
+{
+  "checks": [
+    "shared-zip-crc-payload-and-raw-metadata",
+    "shared-untouched-compressed-span-proof",
+    "shared-qualification-report-valid",
+    "shared-native-identities-bind-to-qualification",
+    "root-zip-crc-payload-and-raw-metadata",
+    "root-untouched-compressed-span-proof",
+    "root-qualification-report-valid",
+    "root-native-identities-bind-to-qualification",
+    "deep-shared-zip-crc-payload-and-raw-metadata",
+    "deep-shared-untouched-compressed-span-proof",
+    "deep-shared-qualification-report-valid",
+    "deep-shared-native-identities-bind-to-qualification",
+    "deep-unique-zip-crc-payload-and-raw-metadata",
+    "deep-unique-untouched-compressed-span-proof",
+    "deep-unique-qualification-report-valid",
+    "deep-unique-native-identities-bind-to-qualification",
+    "callgrind-owner-and-cost-conservation",
+    "callgrind-file-source-attribution",
+    "callgrind-command-normalization",
+    "retained-qualification-reports"
+  ],
+  "mutation_count": 34,
+  "mutations": [
+    {
+      "error": "ReaderError",
+      "name": "expected-source-logical",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "expected-output-logical",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "qualification-without-archives",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-schema",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-unknown-top-level",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-shape",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-mode",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-timing-description",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-generator-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-generator-pattern",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-generator-depth",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-warmup",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-sample-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-sample-elapsed",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-output-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-source-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-output-witness",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-logical-witness",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-artifact-role",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-source-artifact-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-legacy-sample-fields",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "output-byte-corruption",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "target-not-changed",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "untouched-span-mutation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "changed-target-local-metadata-mutation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-duplicate-events",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-zero-summary",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-owner-call-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-negative-cost",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-terminal-nonzero",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-command-mismatch",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-missing-source-attribution",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-self-cost-conservation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-unexpected-second-dump",
+      "rejected": true
+    }
+  ],
+  "qualification_reports_checked": 32,
+  "reader": {
+    "bytes": 62994,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/reader.py",
+    "sha256": "bf8b4c65775ef49130815e90b20b29110c00535fff43d356a8344f6b1ac882cf"
+  },
+  "receipt": {
+    "bytes": 460,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/reader-tests/receipt.json",
+    "sha256": "1f0d8285573dff030def4ec3c31ef41c92c92973d8f7e4cb910c5ae57af656dc"
+  },
+  "status": "pass",
+  "test_source": {
+    "bytes": 18589,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/reader_tests.py",
+    "sha256": "8150886f0f5d516247951461e15cafdf60e2a524ddbb92176c9e18c03b6851ac"
+  }
+}

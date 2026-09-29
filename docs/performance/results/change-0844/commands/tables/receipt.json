@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tables.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790707584.700536,
+  "log": {
+    "bytes": 12,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/tables/output.log",
+    "sha256": "20a81f4eea8844dfa2831b23de0968cafc8b64a89d5d3149f244fc0fb884d2b9"
+  },
+  "started_unix": 1790707583.0054188
+}

@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-deep-unique-0004-publish-before/time.txt",
+    "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "--shape",
+    "deep-unique",
+    "--parts",
+    "4",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-deep-unique-0004-publish-before/report.json",
+    "--artifact",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-deep-unique-0004-publish-before/artifact.zip"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790705654.0819807,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/qualification-00-deep-unique-0004-publish-before/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790705654.0797648
+}

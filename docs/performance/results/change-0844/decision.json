@@ -1,0 +1,33 @@
+{
+  "all_flags_reviewed": true,
+  "allocation_flags": 0,
+  "analysis": {
+    "bytes": 611456133,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/analysis.json",
+    "sha256": "e318c45cc0105cff4fa901e720f4987c1c4117e3f146dad432623526c392ef4a"
+  },
+  "decision": "adopt",
+  "goal_complete": false,
+  "material_benefit": true,
+  "regression_flags": 0,
+  "scope": "Synthetic generic OPC publication/lifecycle; no semantic Office or mixed-catalog claim.",
+  "spread_flags": 0,
+  "status": "complete-batch",
+  "tail_capture": {
+    "bytes": 18216,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/capture-tail.json",
+    "sha256": "f9642ac62f0fdd84c6e83e1547f0a1932b31f6df5c53a66a24286810d8d0a139"
+  },
+  "tail_confirmation": {
+    "bytes": 34192635,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tail-analysis.json",
+    "sha256": "13eb4d7360d279974e7d401d4e089aa7c6113575b8ecc7a02b893f7e59f002f3"
+  },
+  "tail_confirmation_flags": 0,
+  "tail_confirmation_points": 0,
+  "tail_confirmation_reviewed": true,
+  "tail_confirmation_spreads": 0,
+  "tail_review": 6,
+  "tradeoff": "Deep-unique main p50 costs approximately 0.7\u20132.3%; confirmed deep-unique/4 lifecycle p50 +0.756%, p95 +2.317%, p99 +1.131%, below frozen 5% review trigger. Original six uncertain p99 points retained.",
+  "unresolved_common_workload_damage": false
+}

@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--all-features",
+    "--lib",
+    "--tests"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790706517.3381991,
+  "log": {
+    "bytes": 112099,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/after-workspace-check/output.log",
+    "sha256": "b45e7b56ef42ea71a65e5e41e0bfc42d3b196ed196202c4023a11b87142558ac"
+  },
+  "started_unix": 1790706284.8743985
+}

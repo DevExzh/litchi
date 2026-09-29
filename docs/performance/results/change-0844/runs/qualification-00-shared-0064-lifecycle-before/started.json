@@ -1,0 +1,48 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-shared-0064-lifecycle-before/time.txt",
+    "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "--shape",
+    "shared",
+    "--parts",
+    "64",
+    "--mode",
+    "lifecycle",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-shared-0064-lifecycle-before/report.json",
+    "--artifact",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/qualification-00-shared-0064-lifecycle-before/artifact.zip"
+  ],
+  "binary": {
+    "bytes": 13373672,
+    "path": "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "sha256": "8ca482b0a5da90111f382ad5d3377ee96f92c63c7dbf24116a19205f7ce38bcd"
+  },
+  "build": {
+    "bytes": 433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/build-before.json",
+    "sha256": "65130e320914003354629994ffd8289bec4c8c7c4163c4cfdb1957c7c76377da"
+  },
+  "lane": "qualification",
+  "row": {
+    "block": 0,
+    "leg": "before",
+    "mode": "lifecycle",
+    "parts": 64,
+    "samples": 1,
+    "shape": "shared",
+    "warmup": 0
+  },
+  "started_unix": 1790705652.9270473
+}

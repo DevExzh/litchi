@@ -1,0 +1,41 @@
+{
+  "artifacts": [
+    {
+      "bytes": 2079,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-00-deep-shared-4096-publish-after/report.json",
+      "sha256": "53e97ff4c80f0dee2603b385c1d4d4ff7ca42f6cf1c8ee6d3654f411d7abc243"
+    },
+    {
+      "bytes": 1373,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-00-deep-shared-4096-publish-after/started.json",
+      "sha256": "b9b11ec665a2180358257d826868879be5273ed8090236708f4761350f9431ca"
+    },
+    {
+      "bytes": 15,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-00-deep-shared-4096-publish-after/time.txt",
+      "sha256": "40aa8598dc10dc65ba1f6392ff13a75cf96efb6509bbb06639de197f7f849117"
+    },
+    {
+      "bytes": 51638,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-00-deep-shared-4096-publish-after/trace.zst",
+      "sha256": "1dc71989ce22faaf28002811f13272c9f6742dc1a9afc14651796df8bd5adde3"
+    }
+  ],
+  "command": {
+    "bytes": 1118,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/heap-00-deep-shared-4096-publish-after/receipt.json",
+    "sha256": "8e5c79497e4221fad78defd9d74499a5fd2f7b8c8b72913d63d687530ec6b575"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790707476.5628576,
+  "lane": "heap",
+  "row": {
+    "block": 0,
+    "leg": "after",
+    "mode": "publish",
+    "parts": 4096,
+    "samples": 1,
+    "shape": "deep-shared",
+    "warmup": 0
+  }
+}

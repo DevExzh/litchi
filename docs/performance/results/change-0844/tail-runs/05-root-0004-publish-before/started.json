@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tail-runs/05-root-0004-publish-before/time.txt",
+    "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "--shape",
+    "root",
+    "--parts",
+    "4",
+    "--mode",
+    "publish",
+    "--samples",
+    "1000",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tail-runs/05-root-0004-publish-before/report.json"
+  ],
+  "binary": {
+    "bytes": 13373672,
+    "path": "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "sha256": "8ca482b0a5da90111f382ad5d3377ee96f92c63c7dbf24116a19205f7ce38bcd"
+  },
+  "build": {
+    "bytes": 433,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/build-before.json",
+    "sha256": "65130e320914003354629994ffd8289bec4c8c7c4163c4cfdb1957c7c76377da"
+  },
+  "plan": {
+    "bytes": 13302,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tail-plan.json",
+    "sha256": "f1ae8ff7b681b0f09a7955f840d46db3e34a5f1f8c5990b766e2eeff61a93291"
+  },
+  "row": {
+    "block": 5,
+    "leg": "before",
+    "mode": "publish",
+    "parts": 4,
+    "samples": 1000,
+    "shape": "root",
+    "warmup": 3
+  },
+  "started_unix": 1790707716.5376
+}

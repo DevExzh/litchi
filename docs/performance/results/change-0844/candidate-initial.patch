@@ -1,0 +1,126 @@
+diff --git a/crates/litchi-opc/src/members.rs b/crates/litchi-opc/src/members.rs
+index fdc830d..0000000 100644
+--- a/crates/litchi-opc/src/members.rs
++++ b/crates/litchi-opc/src/members.rs
+@@ -198,19 +198,27 @@ impl PartNameIndex {
+        let mut ancestors = Vec::new();
+-        let ancestor_count = folded.match_indices('/').skip(1).count();
+-        ancestors
+-            .try_reserve_exact(ancestor_count)
+-            .map_err(|source| OpcError::Allocation {
+-                resource: "OPC part-name ancestors",
+-                source,
+-            })?;
+        for (boundary, _) in folded.match_indices('/').skip(1) {
++            let folded_ancestor = &folded[..boundary];
++            if self
++                .descendant_by_folded_ancestor
++                .contains_key(folded_ancestor)
++            {
++                continue;
++            }
++
++            ancestors
++                .try_reserve(1)
++                .map_err(|source| OpcError::Allocation {
++                    resource: "OPC part-name ancestors",
++                    source,
++                })?;
++
+            let mut ancestor = String::new();
+            ancestor
+                .try_reserve(boundary)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC part-name ancestor",
+                    source,
+                })?;
+-            ancestor.push_str(&folded[..boundary]);
++            ancestor.push_str(folded_ancestor);
+            ancestors.push(ancestor);
+        }
+@@ -367,7 +375,85 @@ mod tests {
+    #[test]
+    fn capacity_planning_is_fallible() {
+        assert!(matches!(
+            PartNameIndex::try_with_capacity(usize::MAX),
+            Err(OpcError::Allocation { .. })
+        ));
+    }
++
++    #[test]
++    fn shared_ancestors_keep_the_first_descendant_representative() {
++        let mut index = PartNameIndex::try_with_capacity(4).unwrap();
++        let first = uri("/custom/first/item.bin");
++        let second = uri("/custom/second/item.bin");
++
++        index.insert(&first).unwrap();
++        index.insert(&second).unwrap();
++
++        let first_at = index
++            .by_folded
++            .get("/custom/first/item.bin")
++            .copied()
++            .unwrap();
++        assert_eq!(index.names[first_at], first);
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom"),
++            Some(&first_at)
++        );
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom/first"),
++            Some(&first_at)
++        );
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom/second"),
++            Some(&1)
++        );
++    }
++
++    #[test]
++    fn deep_distinct_names_and_root_names_keep_their_boundaries() {
++        let mut index = PartNameIndex::try_with_capacity(4).unwrap();
++        index.insert(&uri("/root.bin")).unwrap();
++        index.insert(&uri("/other.bin")).unwrap();
++        index.insert(&uri("/one/two/three.bin")).unwrap();
++        index.insert(&uri("/a/b/c.bin")).unwrap();
++
++        assert!(index.descendant_by_folded_ancestor.get("/root.bin").is_none());
++        assert!(index.descendant_by_folded_ancestor.get("/other.bin").is_none());
++        assert!(index
++            .descendant_by_folded_ancestor
++            .contains_key("/one"));
++        assert!(index
++            .descendant_by_folded_ancestor
++            .contains_key("/one/two"));
++        assert!(index.descendant_by_folded_ancestor.contains_key("/a"));
++        assert!(index.descendant_by_folded_ancestor.contains_key("/a/b"));
++        assert_eq!(index.descendant_by_folded_ancestor.len(), 4);
++    }
++
++    #[test]
++    fn rejected_insert_is_atomic_and_next_valid_insert_succeeds() {
++        let mut index = PartNameIndex::try_with_capacity(4).unwrap();
++        index.insert(&uri("/custom/existing/item.bin")).unwrap();
++
++        let names_before = index.names.clone();
++        let by_folded_before = index.by_folded.clone();
++        let descendants_before = index.descendant_by_folded_ancestor.clone();
++        assert!(matches!(
++            index.insert(&uri("/custom/existing")),
++            Err(OpcError::DerivedPartNames { .. })
++        ));
++        assert_eq!(index.names, names_before);
++        assert_eq!(index.by_folded, by_folded_before);
++        assert_eq!(index.descendant_by_folded_ancestor, descendants_before);
++
++        index.insert(&uri("/custom/new/item.bin")).unwrap();
++        assert_eq!(index.names.len(), 2);
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom"),
++            Some(&0)
++        );
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom/new"),
++            Some(&1)
++        );
++    }

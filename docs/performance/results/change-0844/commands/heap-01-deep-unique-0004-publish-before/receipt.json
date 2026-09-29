@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0004-publish-before/time.txt",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0004-publish-before/trace",
+    "/home/zhuhe/code/litchi-target-0844/retained/before/opc-preservation-probe",
+    "--shape",
+    "deep-unique",
+    "--parts",
+    "4",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0844/runs/heap-01-deep-unique-0004-publish-before/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790707484.6775568,
+  "log": {
+    "bytes": 703,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/heap-01-deep-unique-0004-publish-before/output.log",
+    "sha256": "0a273f9fead0162002de9939e63c83f5bb87b0ef4dff7737933495d3566d4817"
+  },
+  "started_unix": 1790707484.5421615
+}

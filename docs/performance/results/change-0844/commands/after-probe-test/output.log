@@ -1,0 +1,15 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling opc-preservation-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0844/probe)
+    Finished `test` profile [unoptimized] target(s) in 3.12s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-target-0844/debug/deps/opc_preservation_probe-c71aa9732e829715)
+
+running 6 tests
+test tests::cli_bounds_are_closed_and_dimensions_are_restricted ... ok
+test tests::shape_names_have_exact_patterns_depth_and_valid_opc_uris ... ok
+test tests::metadata_members_and_member_set_are_exact ... ok
+test tests::both_modes_small_case_use_the_exact_oracle ... ok
+test tests::only_the_last_part_payload_changes ... ok
+test tests::all_supported_part_dimensions_have_n_plus_two_members ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.98s
+

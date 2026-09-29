@@ -1,0 +1,29 @@
+{
+  "previous_closure": {
+    "bytes": 7880,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/closure.json",
+    "sha256": "882805ab1c76e7d3ae5fa26e0ff2c6d649d0d20deec2bb883284a7c4616d62c7"
+  },
+  "previous_source": {
+    "bytes": 1202131,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/source.json",
+    "sha256": "9c60f55a8b14e3d05fefaa3261c6156a5636dc837e8c2282a652898a26f893ec"
+  },
+  "production_quality": {
+    "bytes": 1204369,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/quality-after.json",
+    "sha256": "4acea837ed7a60eb601554753dd91002aed55cb66779d73de08106194d454a64"
+  },
+  "reason": "Identical production source; prior6931affected-owner tests and baseline-confirmed iWork exclusions. Fresh beforeprobe and OPCtests plus afterquality required.",
+  "replay": {
+    "bytes": 503,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/baseline-evidence-replay/receipt.json",
+    "sha256": "7bb09ef18cb5481bbc17d77012e6424e91d2bd628736b8f473ce8afebc37b00f"
+  },
+  "source": {
+    "bytes": 1201915,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/source-before.json",
+    "sha256": "b191f62f51e737daa5e9c3dea93e02f4e5fcc94965e5ad83c24fc8d86446cec5"
+  },
+  "status": "pass"
+}

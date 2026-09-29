@@ -1,0 +1,145 @@
+diff --git a/crates/litchi-opc/src/members.rs b/crates/litchi-opc/src/members.rs
+index 7758bf5eb5..6f972e604d 100644
+--- a/crates/litchi-opc/src/members.rs
++++ b/crates/litchi-opc/src/members.rs
+@@ -196,23 +196,34 @@ impl PartNameIndex {
+         }
+ 
+         let mut ancestors = Vec::new();
+-        let ancestor_count = folded.match_indices('/').skip(1).count();
+-        ancestors
+-            .try_reserve_exact(ancestor_count)
+-            .map_err(|source| OpcError::Allocation {
+-                resource: "OPC part-name ancestors",
+-                source,
+-            })?;
+-        for (boundary, _) in folded.match_indices('/').skip(1) {
+-            let mut ancestor = String::new();
+-            ancestor
+-                .try_reserve(boundary)
++        let mut boundaries = folded.match_indices('/').skip(1);
++        let first_missing = boundaries.find(|(boundary, _)| {
++            !self
++                .descendant_by_folded_ancestor
++                .contains_key(&folded[..*boundary])
++        });
++        if let Some((first_boundary, _)) = first_missing {
++            // Every accepted name contributes all its ancestors, so a missing
++            // ancestor also proves that all deeper ancestors are missing. Stage
++            // that suffix once; shared ancestors need no temporary ownership.
++            let ancestor_count = 1 + boundaries.clone().count();
++            ancestors
++                .try_reserve_exact(ancestor_count)
+                 .map_err(|source| OpcError::Allocation {
+-                    resource: "OPC part-name ancestor",
++                    resource: "OPC part-name ancestors",
+                     source,
+                 })?;
+-            ancestor.push_str(&folded[..boundary]);
+-            ancestors.push(ancestor);
++            for boundary in std::iter::once(first_boundary).chain(boundaries.map(|(at, _)| at)) {
++                let mut ancestor = String::new();
++                ancestor
++                    .try_reserve(boundary)
++                    .map_err(|source| OpcError::Allocation {
++                        resource: "OPC part-name ancestor",
++                        source,
++                    })?;
++                ancestor.push_str(&folded[..boundary]);
++                ancestors.push(ancestor);
++            }
+         }
+ 
+         self.names
+@@ -371,4 +382,91 @@ mod tests {
+             Err(OpcError::Allocation { .. })
+         ));
+     }
++
++    #[test]
++    fn shared_ancestors_retain_first_descendant_and_folded_identity() {
++        let mut index = PartNameIndex::try_with_capacity(1).unwrap();
++        index.insert(&uri("/Custom/First/item.bin")).unwrap();
++        index.insert(&uri("/custom/first/other.bin")).unwrap();
++        index.insert(&uri("/CUSTOM/second/item.bin")).unwrap();
++        assert_eq!(index.descendant_by_folded_ancestor.get("/custom"), Some(&0));
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom/first"),
++            Some(&0)
++        );
++        assert_eq!(
++            index.descendant_by_folded_ancestor.get("/custom/second"),
++            Some(&2)
++        );
++        assert!(matches!(
++            index.insert(&uri("/CUSTOM")),
++            Err(OpcError::DerivedPartNames { existing, candidate })
++                if existing == "/Custom/First/item.bin" && candidate == "/CUSTOM"
++        ));
++    }
++
++    #[test]
++    fn deep_missing_suffixes_keep_the_ancestor_map_prefix_closed() {
++        let mut index = PartNameIndex::try_with_capacity(0).unwrap();
++        let names = [
++            "/root.bin",
++            "/a/b/c/d/e/f/g/h/first.bin",
++            "/a/b/c/d/e/f/g/h/second.bin",
++            "/a/b/c/new/e/f/g/h/third.bin",
++            "/u/b/c/d/e/f/g/h/fourth.bin",
++        ];
++        for (at, name) in names.iter().enumerate() {
++            index.insert(&uri(name)).unwrap();
++            for (boundary, _) in name.match_indices('/').skip(1) {
++                let ancestor = &name[..boundary];
++                let first = names[..=at]
++                    .iter()
++                    .position(|earlier| {
++                        earlier
++                            .strip_prefix(ancestor)
++                            .is_some_and(|suffix| suffix.starts_with('/'))
++                    })
++                    .unwrap();
++                assert_eq!(
++                    index.descendant_by_folded_ancestor.get(ancestor),
++                    Some(&first)
++                );
++            }
++        }
++        assert!(
++            !index
++                .descendant_by_folded_ancestor
++                .contains_key("/root.bin")
++        );
++        for candidate in ["/a/b/c", "/a/b/c/new", "/u/b/c/d/e/f/g/h"] {
++            assert!(matches!(
++                index.insert(&uri(candidate)),
++                Err(OpcError::DerivedPartNames { .. })
++            ));
++        }
++    }
++
++    #[test]
++    fn every_name_conflict_keeps_the_index_unchanged_and_usable() {
++        let mut index = PartNameIndex::try_with_capacity(1).unwrap();
++        index.insert(&uri("/a/b/item.bin")).unwrap();
++        for candidate in [
++            "/a/b/item.bin",
++            "/A/B/ITEM.BIN",
++            "/a/b",
++            "/a/b/item.bin/child.bin",
++        ] {
++            let names = index.names.clone();
++            let folded = index.by_folded.clone();
++            let ancestors = index.descendant_by_folded_ancestor.clone();
++            assert!(index.insert(&uri(candidate)).is_err());
++            assert_eq!(index.names, names);
++            assert_eq!(index.by_folded, folded);
++            assert_eq!(index.descendant_by_folded_ancestor, ancestors);
++        }
++        index.insert(&uri("/a/c/next.bin")).unwrap();
++        assert_eq!(index.names.len(), 2);
++        assert_eq!(index.descendant_by_folded_ancestor.get("/a"), Some(&0));
++        assert_eq!(index.descendant_by_folded_ancestor.get("/a/c"), Some(&1));
++    }
+ }

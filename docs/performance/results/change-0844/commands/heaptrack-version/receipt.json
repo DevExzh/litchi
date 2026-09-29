@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "heaptrack",
+    "--version"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790705333.1991315,
+  "log": {
+    "bytes": 16,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/commands/heaptrack-version/output.log",
+    "sha256": "109462d8c8512384699f2ea9cd9adb4e87fd2c1aaf9a154fac3cf5f318de3665"
+  },
+  "started_unix": 1790705333.193099
+}

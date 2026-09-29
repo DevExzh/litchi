@@ -1,0 +1,49 @@
+    Checking zerocopy v0.8.56
+    Checking bitflags v2.13.1
+    Checking rustix v1.1.4
+    Checking getrandom v0.3.4
+    Checking tempfile v3.27.0
+    Checking crypto-common v0.2.2
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking ppv-lite86 v0.2.21
+    Checking rand_chacha v0.3.1
+    Checking rand v0.8.8
+    Checking digest v0.11.3
+    Checking chrono v0.4.45
+    Checking sha2 v0.11.0
+    Checking num-integer v0.1.47
+    Checking num-iter v0.1.46
+    Checking num-bigint-dig v0.8.6
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rsa v0.9.10
+    Checking cipher v0.5.2
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking aes v0.9.3
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking sha1 v0.11.0
+    Checking hmac v0.13.0
+    Checking md-5 v0.11.0
+    Checking bytemuck v1.25.2
+    Checking font-kit v0.14.3
+    Checking allsorts v0.17.0
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking roaring v0.11.1
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking regex-syntax v0.8.11
+    Checking regex-automata v0.4.18
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking regex v1.13.1
+    Checking env_logger v0.8.4
+    Checking quickcheck v1.0.3
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `dev` profile [unoptimized] target(s) in 47.79s

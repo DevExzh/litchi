@@ -1,0 +1,703 @@
+{
+  "admission": {
+    "bytes": 191142,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/admission.json",
+    "sha256": "6e7558a4f8e9666639fc7884e603240186725792c4156f285795b8327fab6995"
+  },
+  "cases": [
+    {
+      "mode": "lifecycle",
+      "parts": 4,
+      "shape": "shared"
+    },
+    {
+      "mode": "publish",
+      "parts": 64,
+      "shape": "shared"
+    },
+    {
+      "mode": "publish",
+      "parts": 4,
+      "shape": "root"
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 4,
+      "shape": "root"
+    },
+    {
+      "mode": "publish",
+      "parts": 4,
+      "shape": "deep-unique"
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 4,
+      "shape": "deep-unique"
+    }
+  ],
+  "original_analysis": {
+    "bytes": 611456133,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/analysis.json",
+    "sha256": "e318c45cc0105cff4fa901e720f4987c1c4117e3f146dad432623526c392ef4a"
+  },
+  "reports": 72,
+  "review_threshold": "p50/p95/p99/RSS paired ratio>1.05 andCI low>1; retain alltailpoint ratios>1.05; blockp50max/min>1.20.",
+  "rows": [
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "deep-unique",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "root",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1000,
+      "shape": "shared",
+      "warmup": 3
+    }
+  ],
+  "runner": {
+    "bytes": 6508,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/tail.py",
+    "sha256": "5b9748f8ef9cf48c3f7edc93e03e70b7d34a9ddfead522d9deb0d6e72f523f9b"
+  },
+  "samples": 72000,
+  "scope": "Separate post-hoc confirmation of all6originalp99pointflags; no originalrun replaced or pooled."
+}

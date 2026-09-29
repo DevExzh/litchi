@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0844 — avoid repeated OPC ancestor allocations
+
+[0844](0844-opc-missing-ancestor-staging.md) adopts missing-suffix ancestor staging. At 4,096 Parts, shared/deep-shared publication p50 improves 3.13%/8.15%, with 24.95%/59.93% fewer owner allocation events. Deep-unique paths retain approximately 0.7–2.3% p50 costs below the frozen 5% trigger. The main 512 reports / 11,648 samples and separate 72-report / 72,000-sample tail confirmation remain distinct; original six p99 points are retained and confirmation has no review flags. Exact artifact checks and 6,934 affected-owner tests pass. These are synthetic OPC results; mixed-catalog and broader goal work remain open.
+
 ## 0843 — many-Part OPC publication diagnosis
 
 [0843](0843-opc-many-part-publication-profile.md) validates 72 formal reports / 1,464 samples, plus two separate observer preflights. At 4,096 Parts, publish p50 is 3.682305 ms; topology preparation accounts for 59.18–59.34% of guest instructions and 24,603 of 32,826 owner allocations. Part-name insertion alone accounts for 20.39–20.45% Ir. Zero native block-spread flags; no production change or speedup claim. Bounded index construction is the next candidate, with all validation contracts retained. The broad goal remains active.
