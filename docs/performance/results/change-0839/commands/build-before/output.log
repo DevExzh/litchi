@@ -1,0 +1,73 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.4
+   Compiling crossbeam-utils v0.8.22
+   Compiling libc v0.2.189
+   Compiling version_check v0.9.5
+   Compiling syn v2.0.114
+   Compiling generic-array v0.14.9
+   Compiling serde_core v1.0.229
+   Compiling crossbeam-epoch v0.9.20
+   Compiling hybrid-array v0.4.14
+   Compiling autocfg v1.5.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.4
+   Compiling getrandom v0.4.3
+   Compiling memchr v2.8.3
+   Compiling zmij v1.0.19
+   Compiling serde v1.0.229
+   Compiling cpufeatures v0.3.1
+   Compiling rand_core v0.10.1
+   Compiling rayon-core v1.13.0
+   Compiling serde_derive v1.0.229
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling const-oid v0.10.2
+   Compiling thiserror v2.0.18
+   Compiling serde_json v1.0.149
+   Compiling zerocopy v0.8.56
+   Compiling digest v0.11.3
+   Compiling chacha20 v0.10.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling thiserror-impl v2.0.18
+   Compiling getrandom v0.3.4
+   Compiling iana-time-zone v0.1.65
+   Compiling rustversion v1.0.23
+   Compiling either v1.18.0
+   Compiling itoa v1.0.18
+   Compiling once_cell v1.21.4
+   Compiling rustix v1.1.4
+   Compiling crc32fast v1.5.1
+   Compiling rayon v1.12.0
+   Compiling chrono v0.4.45
+   Compiling quick-xml v0.41.0
+   Compiling digest v0.10.7
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling cpufeatures v0.2.17
+   Compiling zlib-rs v0.6.7
+   Compiling bitflags v2.13.1
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling smallvec v1.16.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling flate2 v1.1.10
+   Compiling sha2 v0.10.9
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling fastrand v2.5.0
+   Compiling debug_unsafe v0.1.4
+   Compiling atoi_simd v0.18.1
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling zerocopy-derive v0.8.56
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0839/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 42.84s

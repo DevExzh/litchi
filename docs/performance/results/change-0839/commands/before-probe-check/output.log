@@ -1,0 +1,22 @@
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+   Compiling rustix v1.1.4
+    Checking chrono v0.4.45
+    Checking digest v0.10.7
+   Compiling thiserror-impl v2.0.18
+    Checking thiserror v2.0.18
+    Checking sha2 v0.10.9
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking tempfile v3.27.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling zerocopy-derive v0.8.56
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0839/probe)
+    Finished `dev` profile [unoptimized] target(s) in 5.11s

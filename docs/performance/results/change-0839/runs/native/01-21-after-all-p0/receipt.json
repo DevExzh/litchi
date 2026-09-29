@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "2",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56816,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/report.json",
+      "sha256": "e2ba9d6933bfcc3c2f1e7120efc476b308331dac6c7a8d6a3c73f83032c5972b"
+    },
+    {
+      "bytes": 1270,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/started.json",
+      "sha256": "142aed9228ed97b4c9ce182288dd2fa330d77087f40f97ba082735acc18abbb0"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-21-after-all-p0/time.txt",
+      "sha256": "7c6178d8dd8e925ff5ea8b9d5d6de4f46cd83548e00fad841383320eccc83e0d"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691995.089338,
+  "started_unix": 1790691994.7147267
+}

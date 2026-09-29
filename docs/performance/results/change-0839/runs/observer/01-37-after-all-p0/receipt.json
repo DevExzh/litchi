@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/observer/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "4",
+    "--samples",
+    "2",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 13323,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/report.json",
+      "sha256": "14ffb93b99330cef02a63a13a02860a557cf5293cbacf07d931175208e250727"
+    },
+    {
+      "bytes": 1303,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/started.json",
+      "sha256": "b4dcf0c594118c3961ba74989d4065b63c26c79ce4ed52e2453c7d408cb96a0b"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/observer/01-37-after-all-p0/time.txt",
+      "sha256": "e2086d1ee73b26636ec8f18a6306207f7395d76af6ca0169d3c7c8efe245ee0e"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692169.9642005,
+  "started_unix": 1790692169.893814
+}

@@ -1,0 +1,14 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0839/probe)
+    Finished `test` profile [unoptimized] target(s) in 3.07s
+     Running unittests main.rs (/home/zhuhe/code/litchi-target-0839/debug/deps/cached_part_memory-9fb5a01d867a396c)
+
+running 5 tests
+test tests::rss_phase_protocol_flushes_pid_record_and_requires_exact_ack ... ok
+test tests::rss_phase_selection_marks_first_and_last_but_not_warmups ... ok
+test tests::zero_io_budget_refuses_before_first_payload_read ... ok
+test tests::public_routes_verify_order_and_release_resources ... ok
+test tests::generator_identity_and_argument_bounds ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+

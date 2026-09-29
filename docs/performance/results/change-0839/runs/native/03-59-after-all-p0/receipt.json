@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "primed",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/report.json",
+      "sha256": "75f092803d89ae126191b0f966aad4c37376358318952665116009b2ca1c4b8d"
+    },
+    {
+      "bytes": 1281,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/started.json",
+      "sha256": "520e3782fa3fd7b947105468cbd81d8b1945c77ec6ebea85b44c5d77c75a7d46"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-59-after-all-p0/time.txt",
+      "sha256": "bb757b1c441d3c6307bd23aa458763817a106dcdad31052532e9ffe725adc85c"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692037.5874527,
+  "started_unix": 1790692037.027182
+}

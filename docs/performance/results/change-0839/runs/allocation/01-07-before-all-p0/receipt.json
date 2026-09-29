@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 71407,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/report.json",
+      "sha256": "3c6b388b4104ea3755bffb3981a29d89935dc4d7f23610d038d813a758c20e40"
+    },
+    {
+      "bytes": 1325,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/started.json",
+      "sha256": "f742ed5fece937054643b29e3e42336e5b46bcaa4753075be9af3c6e2fd7e79d"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-07-before-all-p0/time.txt",
+      "sha256": "9a27ffd3f646e5d8cacc95d68a8cc37f40a1ab6da1d9f83dacac60f278e76acd"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692203.8521566,
+  "started_unix": 1790692203.2415686
+}

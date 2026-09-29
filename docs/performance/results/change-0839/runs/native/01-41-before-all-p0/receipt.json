@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "2",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56814,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/report.json",
+      "sha256": "a042b45cd99f393e6007ed65c31aaef0505f42367af1079785adabe18511af93"
+    },
+    {
+      "bytes": 1275,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/started.json",
+      "sha256": "e220495e738f8ada1df2b9104c8b9eef902884c8606c67b45db82801fc462858"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-41-before-all-p0/time.txt",
+      "sha256": "5d192801b5c981119005ad6d472983e9e5634502f99ae947c4ec1fbf794e9b8c"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691975.9230902,
+  "started_unix": 1790691975.5547972
+}

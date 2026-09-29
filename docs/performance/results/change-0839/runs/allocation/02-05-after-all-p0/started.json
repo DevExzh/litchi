@@ -1,0 +1,53 @@
+{
+  "affinity": "all",
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-05-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-05-after-all-p0/report.json"
+  ],
+  "binary": {
+    "bytes": 12499256,
+    "path": "/home/zhuhe/code/litchi-target-0839/retained/after/allocator/cached-part-memory-alloc",
+    "sha256": "cb26bf7dc751a727c2ccc7df45cc2e212a21e77c1bbd33906bcb450320b1efd0"
+  },
+  "block": 2,
+  "case": {
+    "route": "parts",
+    "shape": "large",
+    "state": "primed",
+    "task_floor": 0,
+    "workers": 32
+  },
+  "index": 5,
+  "kind": "allocator",
+  "lane": "allocation",
+  "launcher": null,
+  "leg": "after",
+  "phase_environment": null,
+  "protocol": 0,
+  "samples": 30,
+  "started_unix": 1790692209.7547593,
+  "warmup": 3
+}

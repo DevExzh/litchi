@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56753,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/report.json",
+      "sha256": "542e481f2eed273c346bb1211f82386031450c43824170c2decd84a994a98752"
+    },
+    {
+      "bytes": 1271,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/started.json",
+      "sha256": "cd1487852da44da07a2d691d3315943e9374ea32a64cf0009c9dc29be678e995"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 12,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/01-04-after-all-p0/time.txt",
+      "sha256": "a631f2eed70cab31bffc7b4b41322b2fdf4e6ac7221003199643b6f5cc13727e"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691997.309339,
+  "started_unix": 1790691997.2696383
+}

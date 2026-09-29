@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/home/zhuhe/code/litchi-target-0839/launcher",
+    "--usage",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/usage.json",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 11529,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/report.json",
+      "sha256": "2b1241d487c3c8c8c8da2ea0e73df6445167cfa47b0dcd510a4e056ebf2e4d41"
+    },
+    {
+      "bytes": 23276,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/snapshots.json.gz",
+      "sha256": "982978c3ac6a42f7b626795983e69eb5dea8eae87b1c6bd7c541144c0676e96d"
+    },
+    {
+      "bytes": 1268,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/started.json",
+      "sha256": "59b2f05b60114b3e274074a11df36d8dc9bf74dbaf29db934c9a1826a1783d6c"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 151,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-02-before-all-p0/usage.json",
+      "sha256": "28ded5f2e5ba0ce097ab3b0cec5f9b7cacb8958ef56b3e27d380292e154e1440"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691273.7157667,
+  "started_unix": 1790691273.695198
+}

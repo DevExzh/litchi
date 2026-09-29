@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 12280,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/report.json",
+      "sha256": "9fc5c5c9eb99c4059199ad1a9f20d262f5ecdf54050a4cd7e367738432bc30be"
+    },
+    {
+      "bytes": 1345,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/started.json",
+      "sha256": "282d78fbe345c6f3e1c5534c9c2ccecd28c972d8cd6c422e0979acfd98d41b3d"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-04-after-all-p0/time.txt",
+      "sha256": "c3544f400cf7037be808cc4ce8cfbf9cfc0bc36fe6b67db0283ec2703035c1ea"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691855.1541474,
+  "started_unix": 1790691855.100335
+}

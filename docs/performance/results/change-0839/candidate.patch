@@ -1,0 +1,676 @@
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -5465,6 +5465,28 @@
+         self.budget.as_ref()
+     }
+ 
++    /// Return a read-only scheduling hint for a prepared request set.
++    ///
++    /// This deliberately observes only completed entries. Flights and
++    /// provisional publications make the hint conservative: a concurrent
++    /// loader or eviction may make a later request cold, and the ordinary
++    /// prepared read remains authoritative in that case. The check does not
++    /// advance LRU state, counters, reservations, or payload reference
++    /// counts, and it allocates no query or pinning state.
++    fn all_entries_ready<I>(&self, mut entry_ids: I) -> bool
++    where
++        I: Iterator<Item = EntryId>,
++    {
++        let mut observer = NoopDiagnosticObserver;
++        let state = lock_with_observer(&self.state, &mut observer, LockOperation::Cache)
++            .unwrap_or_else(|poisoned| poisoned.into_inner());
++        entry_ids.all(|entry_id| {
++            !state.flights.contains_key(&entry_id)
++                && !state.pending.contains_key(&entry_id)
++                && state.entries.contains_key(&entry_id)
++        })
++    }
++
+     fn write_session(&self) -> Option<&ParallelWriteSession> {
+         self.write_session.as_ref()
+     }
+@@ -19189,6 +19211,98 @@
+     }
+ 
+     #[test]
++    fn cache_ready_hint_rejects_flights_and_pending_without_touching_state() {
++        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
++            archive_bytes(root_relationships(), b"cache hint state", false),
++        )))
++        .unwrap();
++        let first_id = package.parts[0].entry_id;
++        let second_id = package.parts[1].entry_id;
++        let cache = PartCache::new(SourceCacheLimits::new(32, 3).unwrap());
++        assert!(!cache.all_entries_ready([first_id].into_iter()));
++        assert!(matches!(
++            cache.insert_for_test(
++                first_id,
++                CachedPayload {
++                    bytes: Arc::new(vec![1, 2]),
++                    reservation: None,
++                    object_reservation: None,
++                },
++            ),
++            CacheRetention::Retained
++        ));
++        let clock_before = cache.state.lock().unwrap().clock;
++        let hits_before = cache.diagnostics().hits;
++        assert!(cache.all_entries_ready([first_id].into_iter()));
++        assert_eq!(cache.state.lock().unwrap().clock, clock_before);
++        assert_eq!(cache.diagnostics().hits, hits_before);
++
++        assert!(matches!(
++            cache.insert_for_test(
++                second_id,
++                CachedPayload {
++                    bytes: Arc::new(vec![4, 5]),
++                    reservation: None,
++                    object_reservation: None,
++                },
++            ),
++            CacheRetention::Retained
++        ));
++        let flight = Arc::new(LoadFlight::new(None, None, None));
++        {
++            let mut state = cache.state.lock().unwrap();
++            state.flights.insert(second_id, Arc::clone(&flight));
++        }
++        assert!(cache.state.lock().unwrap().entries.contains_key(&second_id));
++        assert!(!cache.all_entries_ready([second_id].into_iter()));
++        {
++            let mut state = cache.state.lock().unwrap();
++            state.flights.remove(&second_id);
++        }
++        assert!(cache.all_entries_ready([second_id].into_iter()));
++        {
++            let mut state = cache.state.lock().unwrap();
++            state.pending.insert(
++                second_id,
++                PendingPublication {
++                    flight,
++                    payload: Arc::new(vec![3]),
++                },
++            );
++        }
++        assert!(!cache.all_entries_ready([second_id].into_iter()));
++        cache.state.lock().unwrap().pending.remove(&second_id);
++        assert!(cache.all_entries_ready([second_id].into_iter()));
++
++        let evicting = PartCache::new(SourceCacheLimits::new(4, 3).unwrap());
++        assert!(matches!(
++            evicting.insert_for_test(
++                first_id,
++                CachedPayload {
++                    bytes: Arc::new(vec![6, 7]),
++                    reservation: None,
++                    object_reservation: None,
++                },
++            ),
++            CacheRetention::Retained
++        ));
++        assert!(evicting.all_entries_ready([first_id].into_iter()));
++        assert!(matches!(
++            evicting.insert_for_test(
++                second_id,
++                CachedPayload {
++                    bytes: Arc::new(vec![8, 9, 10]),
++                    reservation: None,
++                    object_reservation: None,
++                },
++            ),
++            CacheRetention::Retained
++        ));
++        assert!(!evicting.all_entries_ready([first_id].into_iter()));
++        assert!(evicting.all_entries_ready([second_id].into_iter()));
++    }
++
++    #[test]
+     fn cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values() {
+         let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+             archive_bytes(root_relationships(), b"document", false),
+--- a/crates/litchi-opc/src/source_backed/batch.rs
++++ b/crates/litchi-opc/src/source_backed/batch.rs
+@@ -665,11 +665,72 @@
+     if context.scoped_workers().is_some() {
+         return read_with_scoped_workers(package, context, requests, workers, max_bytes, output);
+     }
++    if package
++        .cache
++        .all_entries_ready(requests.iter().map(|request| request.entry_id))
++    {
++        return read_cached_serial(package, requests, workers, max_bytes, output);
++    }
+     let first_end = wave_end(requests, 0, workers, max_bytes)?;
+     if first_end == requests.len() {
+         return read_one_wave(package, requests, 0, first_end, scheduler, output);
+     }
+     read_reused_workers(package, requests, workers, max_bytes, scheduler, output)
++}
++
++/// Read a cache-hit hint serially while preserving the private
++/// parallel path's wave fences and worker-panic translation.
++///
++/// The cache predicate is only a scheduling hint. Every request still goes
++/// through `read_part_prepared`, which rechecks source freshness and
++/// execution state and handles an eviction or concurrent publication as an
++/// ordinary read. A multi-wave request keeps the same fence before each wave
++/// as the reused-worker path; a failure stops later waves after all requests
++/// in the current wave have run.
++fn read_cached_serial(
++    package: &SourceBackedPackage,
++    requests: &[PreparedRequest],
++    workers: usize,
++    max_bytes: u64,
++    output: &mut Vec<PartData>,
++) -> Result<()> {
++    let first_end = wave_end(requests, 0, workers, max_bytes)?;
++    if first_end == requests.len() {
++        return read_cached_serial_wave(package, requests, 0, first_end, output);
++    }
++
++    let mut start = 0;
++    while start < requests.len() {
++        fence(package)?;
++        let end = wave_end(requests, start, workers, max_bytes)?;
++        read_cached_serial_wave(package, requests, start, end, output)?;
++        start = end;
++    }
++    Ok(())
++}
++
++fn read_cached_serial_wave(
++    package: &SourceBackedPackage,
++    requests: &[PreparedRequest],
++    start: usize,
++    end: usize,
++    output: &mut Vec<PartData>,
++) -> Result<()> {
++    let mut selected = None;
++    for (ordinal, request) in requests.iter().copied().enumerate().take(end).skip(start) {
++        let result = catch_unwind(AssertUnwindSafe(|| {
++            let declared = request
++                .declared_bytes
++                .ok_or_else(|| batch_refusal("parallel batch request lacks prepared metadata"))?;
++            package.read_part_prepared(request.index, request.entry_id, declared)
++        }))
++        .unwrap_or_else(|_| Err(OpcError::SourceBackedBatchWorkerPanic { ordinal }));
++        match result {
++            Ok(data) => output.push(data),
++            Err(error) => select_error(&mut selected, ordinal, error),
++        }
++    }
++    selected.map_or(Ok(()), |(_, error)| Err(error))
+ }
+ 
+ fn read_with_scoped_workers(
+@@ -1216,3 +1277,80 @@
+ fn batch_refusal(reason: &'static str) -> OpcError {
+     OpcError::SourceBackedBatchInvariant { reason }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use soapberry_zip::office::StreamingArchiveWriter;
++
++    fn archive_bytes() -> Vec<u8> {
++        let mut writer = StreamingArchiveWriter::new();
++        writer
++            .write_stored(
++                "[Content_Types].xml",
++                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
++            )
++            .unwrap();
++        writer
++            .write_stored(
++                "_rels/.rels",
++                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
++            )
++            .unwrap();
++        writer
++            .write_stored("word/document.xml", b"stale fallback")
++            .unwrap();
++        writer.finish_to_bytes().unwrap()
++    }
++
++    #[test]
++    fn stale_ready_hint_after_eviction_uses_authoritative_prepared_read() {
++        let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
++        let index = package
++            .parts
++            .iter()
++            .position(|part| part.partname.as_str() == "/word/document.xml")
++            .unwrap();
++        let entry_id = package.parts[index].entry_id;
++        let declared_bytes = package
++            .archive
++            .metadata_for(entry_id)
++            .unwrap()
++            .uncompressed_size();
++        let request = PreparedRequest {
++            index,
++            entry_id,
++            declared_bytes: Some(declared_bytes),
++        };
++
++        let first = package
++            .read_part_prepared(index, entry_id, declared_bytes)
++            .unwrap();
++        assert_eq!(first.as_bytes(), b"stale fallback");
++        drop(first);
++
++        let clock_before_hint = package.cache.state.lock().unwrap().clock;
++        assert!(package.cache.all_entries_ready(std::iter::once(entry_id)));
++        let clock_after_hint = package.cache.state.lock().unwrap().clock;
++        assert_eq!(clock_after_hint, clock_before_hint);
++
++        {
++            let mut state = package.cache.state.lock().unwrap();
++            assert!(package.cache.evict_oldest(&mut state));
++        }
++        assert!(!package.cache.all_entries_ready(std::iter::once(entry_id)));
++
++        let mut output = Vec::new();
++        read_cached_serial(
++            &package,
++            std::slice::from_ref(&request),
++            1,
++            declared_bytes.max(1),
++            &mut output,
++        )
++        .unwrap();
++        assert_eq!(output.len(), 1);
++        assert_eq!(output[0].as_bytes(), b"stale fallback");
++        assert_eq!(package.cache.diagnostics().cold_loads, 2);
++    }
++}
+--- a/crates/litchi-opc/tests/source_backed_batch.rs
++++ b/crates/litchi-opc/tests/source_backed_batch.rs
+@@ -14,13 +14,16 @@
+ //! observable.  The overlap assertions use a release gate and an active-call
+ //! counter; they do not infer parallelism from elapsed time.
+ 
++use std::collections::HashSet;
+ use std::io;
+ use std::num::{NonZeroU64, NonZeroUsize};
++use std::panic::{AssertUnwindSafe, catch_unwind};
+ use std::sync::{
+     Arc, Condvar, Mutex,
+-    atomic::{AtomicU64, Ordering},
++    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+ };
+ use std::thread;
++use std::thread::ThreadId;
+ use std::time::{Duration, Instant};
+ 
+ use litchi_core::{
+@@ -743,6 +746,101 @@
+     }
+ }
+ 
++#[derive(Debug, Default)]
++struct CountingScopedWorkers {
++    waves: AtomicU64,
++    tasks: AtomicU64,
++}
++
++impl litchi_core::ScopedWorkers for CountingScopedWorkers {
++    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
++        self.waves.fetch_add(1, Ordering::Relaxed);
++        self.tasks
++            .fetch_add(u64::try_from(tasks.len()).unwrap(), Ordering::Relaxed);
++        for task in tasks.iter_mut() {
++            task();
++        }
++    }
++}
++
++struct PanicAfterVersionsSource {
++    inner: Arc<dyn ReadAt>,
++    remaining: AtomicUsize,
++    panic_remaining: AtomicUsize,
++    armed: AtomicBool,
++    version_threads: Mutex<HashSet<ThreadId>>,
++}
++
++impl PanicAfterVersionsSource {
++    fn new(inner: Arc<dyn ReadAt>) -> Self {
++        Self {
++            inner,
++            remaining: AtomicUsize::new(0),
++            panic_remaining: AtomicUsize::new(0),
++            armed: AtomicBool::new(false),
++            version_threads: Mutex::new(HashSet::new()),
++        }
++    }
++
++    fn arm_after(&self, successful_versions: usize) {
++        self.arm_after_with_panics(successful_versions, 1);
++    }
++
++    fn arm_after_with_panics(&self, successful_versions: usize, panics: usize) {
++        self.remaining.store(successful_versions, Ordering::Release);
++        self.panic_remaining.store(panics, Ordering::Release);
++        self.armed.store(true, Ordering::Release);
++    }
++
++    fn clear_version_threads(&self) {
++        self.version_threads.lock().unwrap().clear();
++    }
++
++    fn version_threads(&self) -> HashSet<ThreadId> {
++        self.version_threads.lock().unwrap().clone()
++    }
++}
++
++impl ReadAt for PanicAfterVersionsSource {
++    fn len(&self) -> io::Result<u64> {
++        self.inner.len()
++    }
++
++    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
++        self.inner.read_at(offset, output)
++    }
++
++    fn version(&self) -> io::Result<SourceVersion> {
++        self.version_threads
++            .lock()
++            .unwrap()
++            .insert(thread::current().id());
++        if self.armed.load(Ordering::Acquire)
++            && self
++                .remaining
++                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
++                    remaining.checked_sub(1)
++                })
++                .is_err()
++        {
++            let panic_now = self
++                .panic_remaining
++                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
++                    remaining.checked_sub(1)
++                })
++                .is_ok();
++            if panic_now {
++                if self.panic_remaining.load(Ordering::Acquire) == 0 {
++                    self.armed.store(false, Ordering::Release);
++                }
++                panic!("intentional cached source-version panic");
++            }
++            self.armed.store(false, Ordering::Release);
++        }
++        self.inner.version()
++    }
++}
++
+ struct MutableSource {
+     bytes: Mutex<Vec<u8>>,
+     revision: AtomicU64,
+@@ -789,6 +887,52 @@
+             0x534f_5552_4345,
+             self.revision.load(Ordering::Acquire),
+         ))
++    }
++}
++
++struct ChangeAfterVersionsSource {
++    inner: Arc<MutableSource>,
++    remaining: AtomicUsize,
++    armed: AtomicBool,
++}
++
++impl ChangeAfterVersionsSource {
++    fn new(inner: Arc<MutableSource>) -> Self {
++        Self {
++            inner,
++            remaining: AtomicUsize::new(0),
++            armed: AtomicBool::new(false),
++        }
++    }
++
++    fn arm_after(&self, successful_versions: usize) {
++        self.remaining.store(successful_versions, Ordering::Release);
++        self.armed.store(true, Ordering::Release);
++    }
++}
++
++impl ReadAt for ChangeAfterVersionsSource {
++    fn len(&self) -> io::Result<u64> {
++        self.inner.len()
++    }
++
++    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
++        self.inner.read_at(offset, output)
++    }
++
++    fn version(&self) -> io::Result<SourceVersion> {
++        if self.armed.load(Ordering::Acquire)
++            && self
++                .remaining
++                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
++                    remaining.checked_sub(1)
++                })
++                .is_err()
++        {
++            self.armed.store(false, Ordering::Release);
++            self.inner.mutate();
++        }
++        self.inner.version()
+     }
+ }
+ 
+@@ -1077,6 +1221,214 @@
+     assert_eq!(budget.used(Resource::Memory), 0);
+     assert_eq!(budget.used(Resource::Objects), 0);
+     assert!(budget.used(Resource::Work) >= cold_work);
++}
++
++#[test]
++fn cached_multiwave_batch_keeps_admission_and_skips_physical_reads() {
++    let (archive, expected_parts) = archive_bytes(None);
++    let expected = expected_parts
++        .iter()
++        .map(|(_, bytes)| bytes.clone())
++        .collect::<Vec<_>>();
++    let probe = Arc::new(ProbeSource::new(Arc::new(litchi_core::OwnedSource::new(
++        archive,
++    ))));
++    let stats = Arc::clone(&probe.stats);
++    let source = Arc::new(PanicAfterVersionsSource::new(probe));
++    let (budget, _cancellation, context) =
++        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
++    let package = package_with_context(source.clone(), context);
++    let requests = requested_uris();
++
++    let cold = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&cold, &expected);
++    let cold_tasks = budget.used(Resource::CpuTasks);
++    assert_eq!(cold_tasks, u64::try_from(requests.len()).unwrap());
++    drop(cold);
++
++    stats.reset();
++    source.clear_version_threads();
++    let caller_thread = thread::current().id();
++    let warm = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&warm, &expected);
++    assert_eq!(stats.snapshot().calls, 0);
++    assert_eq!(source.version_threads(), HashSet::from([caller_thread]));
++    assert_eq!(
++        budget.used(Resource::CpuTasks),
++        cold_tasks + u64::try_from(requests.len()).unwrap()
++    );
++    assert_eq!(budget.used(Resource::Workers), 0);
++    assert_eq!(budget.used(Resource::IoConcurrency), 0);
++
++    drop(warm);
++    stats.reset();
++    let single_requests = requests[..2].to_vec();
++    let single = package.read_parts_ordered(&single_requests).unwrap();
++    assert_batch_bytes(&single, &expected[..2]);
++    assert_eq!(stats.snapshot().calls, 0);
++    assert_eq!(budget.used(Resource::CpuTasks), cold_tasks + 6);
++    assert_eq!(budget.used(Resource::Workers), 0);
++    assert_eq!(budget.used(Resource::IoConcurrency), 0);
++
++    drop(single);
++    drop(package);
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Objects), 0);
++}
++
++#[test]
++fn cached_batch_still_invokes_an_explicit_caller_worker_facility() {
++    let (archive, expected_parts) = archive_bytes(None);
++    let expected = expected_parts
++        .iter()
++        .map(|(_, bytes)| bytes.clone())
++        .collect::<Vec<_>>();
++    let probe = Arc::new(ProbeSource::new(Arc::new(litchi_core::OwnedSource::new(
++        archive,
++    ))));
++    let stats = Arc::clone(&probe.stats);
++    let (budget, _cancellation, context) =
++        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
++    let workers = Arc::new(CountingScopedWorkers::default());
++    let context = context.with_scoped_workers(workers.clone());
++    let package = package_with_context(probe, context);
++    let requests = requested_uris();
++
++    let cold = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&cold, &expected);
++    drop(cold);
++    let waves_before = workers.waves.load(Ordering::Relaxed);
++    let tasks_before = workers.tasks.load(Ordering::Relaxed);
++    stats.reset();
++
++    let warm = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&warm, &expected);
++    assert_eq!(stats.snapshot().calls, 0);
++    assert_eq!(
++        workers.waves.load(Ordering::Relaxed) - waves_before,
++        2,
++        "the cached request should retain its two admitted caller waves"
++    );
++    assert_eq!(
++        workers.tasks.load(Ordering::Relaxed) - tasks_before,
++        u64::try_from(requests.len()).unwrap()
++    );
++    assert_eq!(budget.used(Resource::Workers), 0);
++    assert_eq!(budget.used(Resource::IoConcurrency), 0);
++
++    drop(warm);
++    drop(package);
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Objects), 0);
++}
++
++#[cfg(panic = "unwind")]
++#[test]
++fn cached_worker_panic_is_typed_and_drains_only_the_current_wave() {
++    let (archive, expected_parts) = archive_bytes(None);
++    let expected = expected_parts
++        .iter()
++        .map(|(_, bytes)| bytes.clone())
++        .collect::<Vec<_>>();
++    let source = Arc::new(PanicAfterVersionsSource::new(Arc::new(
++        litchi_core::OwnedSource::new(archive),
++    )));
++    let (budget, _cancellation, context) =
++        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
++    let package = package_with_context(source.clone(), context);
++    let requests = requested_uris();
++    let first = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&first, &expected);
++    drop(first);
++    let hits_before = package.cache_diagnostics().hits;
++
++    // Four prepared requests take one opening fence, three fences per
++    // prepared request (resolve plus both declared-size fences), one final
++    // preparation fence, the read_parallel fence, and the first reused-wave
++    // fence before ordinal zero's cached source-version check.
++    source.arm_after(requests.len() * 3 + 4);
++    let observed = catch_unwind(AssertUnwindSafe(|| package.read_parts_ordered(&requests)))
++        .expect("cached worker panic must be translated inside the batch");
++    assert!(matches!(
++        observed,
++        Err(OpcError::SourceBackedBatchWorkerPanic { ordinal: 0 })
++    ));
++    assert_eq!(
++        package.cache_diagnostics().hits - hits_before,
++        2,
++        "the first wave must drain before the later wave is stopped"
++    );
++    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
++    drop(package);
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Objects), 0);
++}
++
++#[cfg(panic = "unwind")]
++#[test]
++fn cached_one_wave_panic_selects_lowest_ordinal_and_drains_the_wave() {
++    let (archive, expected_parts) = archive_bytes(None);
++    let expected = expected_parts
++        .iter()
++        .take(2)
++        .map(|(_, bytes)| bytes.clone())
++        .collect::<Vec<_>>();
++    let source = Arc::new(PanicAfterVersionsSource::new(Arc::new(
++        litchi_core::OwnedSource::new(archive),
++    )));
++    let (budget, _cancellation, context) =
++        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
++    let package = package_with_context(source.clone(), context);
++    let requests = requested_uris()[..2].to_vec();
++    let first = package.read_parts_ordered(&requests).unwrap();
++    assert_batch_bytes(&first, &expected);
++    drop(first);
++    let hits_before = package.cache_diagnostics().hits;
++
++    // The two-request preflight takes one opening fence, three fences per
++    // prepared request, one final preparation fence, and the read_parallel
++    // fence. The one-wave cached helper adds no second wave fence. Arm two
++    // panics so ordinal one also runs and the lowest ordinal is selected.
++    source.arm_after_with_panics(requests.len() * 3 + 3, 2);
++    let observed = catch_unwind(AssertUnwindSafe(|| package.read_parts_ordered(&requests)))
++        .expect("cached worker panic must be translated inside the batch");
++    assert!(matches!(
++        observed,
++        Err(OpcError::SourceBackedBatchWorkerPanic { ordinal: 0 })
++    ));
++    assert_eq!(
++        package.cache_diagnostics().hits - hits_before,
++        2,
++        "both requests in the one wave must run before the lowest error wins"
++    );
++    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
++    drop(package);
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Objects), 0);
++}
++
++#[test]
++fn cached_source_change_after_helper_entry_fence_returns_source_changed() {
++    let (archive, _) = archive_bytes(None);
++    let mutable = Arc::new(MutableSource::new(archive));
++    let source = Arc::new(ChangeAfterVersionsSource::new(Arc::clone(&mutable)));
++    let (budget, _cancellation, context) =
++        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
++    let package = package_with_context(source.clone(), context);
++    let requests = requested_uris()[..2].to_vec();
++    let first = package.read_parts_ordered(&requests).unwrap();
++    drop(first);
++
++    // The source changes at the first cached request's own freshness fence,
++    // after read_parallel's entry fence and all prepared metadata fences have
++    // already passed. The second request still runs in the same one wave.
++    source.arm_after(requests.len() * 3 + 3);
++    let result = package.read_parts_ordered(&requests);
++    assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
++    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
++    drop(package);
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Objects), 0);
+ }
+ 
+ #[test]

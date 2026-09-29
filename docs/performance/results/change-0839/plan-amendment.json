@@ -1,0 +1,9 @@
+{
+  "reason": "Read-only review requests explicit reductions already implemented by analyzer, before any formal paired capture.",
+  "thresholds_changed": false,
+  "cases_changed": false,
+  "memory_reducer": "For each child, each named phase uses maximum summed smaps RSS across observed first/last measured sample markers; samples=1 has only sample0. maximum observed RSS uses all acknowledged markers including setup/report phases. These are absolute point-in-time residency levels, not deltas or physical transient peaks. Compare six block child values via frozen paired guard separately for each affinity/protocol/case/phase.",
+  "allocation_reducer": "Each child metric is median across30 observed operation regions; compare six paired child medians. Zero/nonpositive baseline entries invoke frozen conservative absolute-increase guard. Native/observer/phase timings never pooled.",
+  "native_reducer": "Nearest-rank p50/p95/p99 perchild across30 samples; raw GNU-time RSS perchild; six paired ratios. Onlyp50/RSS gated; tails retained.",
+  "preflight": "All preflight populations excluded from paired analysis and adoption statistics."
+}

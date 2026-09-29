@@ -1,0 +1,42 @@
+{
+  "binary": {
+    "bytes": 16568,
+    "path": "/home/zhuhe/code/litchi-target-0839/launcher",
+    "sha256": "50c41893320944a19e1f15c9290c7acab7fcbcdc4b441bfa97af783cffab6480"
+  },
+  "cases": [
+    {
+      "exit_code": 0,
+      "label": "success",
+      "usage": {
+        "bytes": 150,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/launcher-checks/success.json",
+        "sha256": "c1afdc53aac4c57b6fa3b56f4b6a4725cc159e7a59bdf3fe9e0ef6dea5598ce1"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "failure",
+      "usage": {
+        "bytes": 153,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/launcher-checks/failure.json",
+        "sha256": "22ac382747eb869cb981d56b45a718b2d79eb62e444f4b14a3e842b51eb22971"
+      }
+    },
+    {
+      "exit_code": 127,
+      "label": "missing",
+      "usage": {
+        "bytes": 155,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/launcher-checks/missing.json",
+        "sha256": "ed465c0c576c59159f172db1b66cf803ae4fbf50523874071ac9ba1ec248faa1"
+      }
+    },
+    {
+      "cases": 2,
+      "exit_code": 2,
+      "label": "invalid_invocations"
+    }
+  ],
+  "status": "pass"
+}

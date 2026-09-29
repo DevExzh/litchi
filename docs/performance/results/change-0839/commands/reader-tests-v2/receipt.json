@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0839/reader_tests.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790691605.7701926,
+  "log": {
+    "bytes": 31,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/reader-tests-v2/output.log",
+    "sha256": "5a9de05de28c59403488dd3717d65c7f9f23df53b4cea89fe5d9fdb334968f71"
+  },
+  "started_unix": 1790691604.7074206
+}

@@ -1,0 +1,28 @@
+# 0839 operation-allocation observer
+
+This is an isolated evidence binary for the 0839 cached ordered-Part workload.
+It uses the same in-memory corpus, source-backed `Parts` route, deterministic
+payload/order checks, and execution-resource checks as `../probe/main.rs`.
+`cached-part-memory-alloc` accepts `--route parts` only; its output is
+allocation evidence and makes no wall-clock, CPU-time, speedup, or regression
+claim.
+
+`main.rs` enables the copied `CountingSystemAllocator` before entering the
+workload.  The safe workload keeps `#![forbid(unsafe_code)]`.  The copied
+`allocation_metrics.rs` is the existing operation observer, whose reported
+identity is `system_allocator_operation_scoped` with counter revision
+`serialized_region_peak_v3`; the allocator identity is
+`CountingSystemAllocator(std::alloc::System)`.
+
+For every warmup and measured sample, the region begins immediately before
+`SourceBackedPackage::read_parts_ordered` and finishes immediately after the
+returned `PartBatch`.  It therefore includes process-wide worker allocations
+and the returned batch while it is retained.  Package setup, the optional
+verified preload, resource snapshots, byte verification, batch/package drops,
+phase handshakes, and report serialization are outside the region.
+
+The allocation and counting-allocator tests use the shared
+`allocation_metrics::TEST_LOCK`, so their global counter state cannot contend
+when Cargo runs the test suite in parallel.  The root-owned driver remains
+responsible for building, testing, capturing, and validating this isolated
+manifest.

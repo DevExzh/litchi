@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 71318,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/report.json",
+      "sha256": "faaedc2f7b70222fa46e9b755fd5011d87522a5e14a8032799442376b2e33376"
+    },
+    {
+      "bytes": 1323,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/started.json",
+      "sha256": "64c8488cda953093451f236672a9086da6fa6aaf5050888db1ca541c21975e78"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/05-04-before-all-p0/time.txt",
+      "sha256": "b55503614d9cc7103922e14e8c477b3657e4e161dec5bfcecc2cd12c48091533"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692226.0943007,
+  "started_unix": 1790692225.4715567
+}

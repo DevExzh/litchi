@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0839 — cached Part reads avoid private workers
+
+[0839](0839-cached-part-scheduling-requalification.md) adopts the cache-ready private scheduling path after fresh current-source qualification: sixteen cached cases improve paired p50 by 96.68–98.99%, with no frozen native RSS/latency, phase-residency or operation-allocation regression flag. All 1,414 reports / 28,450 samples and six separate thread-census reports validate. Resource/source/error semantics and explicit caller workers remain intact. Five uncertain tail point estimates remain visible; no whole-Office speedup is claimed. Historical 0787 remains rejected, and the broad goal stays active.
+
 ## 0838 — current-source DOCX inverse physical diagnosis
 
 [0838](0838-docx-durable-inverse-physical-diagnostic.md) reproduces the durable inverse physical limitation with current public writers: all 18 cases restore logical bytes, and retained-source undo is exact, while serialized undo is archive-exact only for the ordinary regenerated control. Three fresh processes retain 63 ZIPs and 18 wires with independent replay and deterministic bytes. Production and exact-artifact tests are unchanged; 0837 remains rejected. No performance claim or new baseline is admitted; physical restoration design remains open.

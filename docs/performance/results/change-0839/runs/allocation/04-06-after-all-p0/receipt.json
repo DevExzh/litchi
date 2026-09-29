@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 71585,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/report.json",
+      "sha256": "916f1eea881e3f28981ade9f7dce291d0d83fef8ba14b1917ae7bfe505385562"
+    },
+    {
+      "bytes": 1316,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/started.json",
+      "sha256": "abe92de1a795a2e67a201f8becfb3f1e7642f5f9f4f98d2a14ecc5368909281a"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/04-06-after-all-p0/time.txt",
+      "sha256": "968d8be7bd96ffd43426f09a4405685224c7927b141a6c6da69a7471362494bf"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692220.5460267,
+  "started_unix": 1790692220.1844392
+}

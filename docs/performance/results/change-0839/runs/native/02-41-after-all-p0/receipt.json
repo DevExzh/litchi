@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "2",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56814,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/report.json",
+      "sha256": "cc13e2719488bf0404333dc5101e18d1f6cc4bd175cdd7f0c2f66fa428cf1839"
+    },
+    {
+      "bytes": 1270,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/started.json",
+      "sha256": "c9af715287eeefbd0a841691bb49332aac0378a352faf947ca65d360181edfe1"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-41-after-all-p0/time.txt",
+      "sha256": "6d6f87ddcc1c12f67747bebaeb35b2ce47f3b4eb66029c10f5fc27c61f29afc8"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692020.036021,
+  "started_unix": 1790692019.6680613
+}

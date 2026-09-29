@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56670,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/report.json",
+      "sha256": "b3e21fb5cd13df8585b2469ebbaec932a9f9a94722b395f0f468d071a4981bd5"
+    },
+    {
+      "bytes": 1275,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/started.json",
+      "sha256": "2b70d48e3108eafb0d17395d6d2c8529dcc69d18bee9d3cd247f606feacfb24d"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-12-before-all-p0/time.txt",
+      "sha256": "ce962fe7356c3e94501a263da09d774118094a23ff65b3ee84aede46740f68e9"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692077.4062252,
+  "started_unix": 1790692077.36671
+}

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 12286,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/report.json",
+      "sha256": "896809a3d11130cd1d5b59b2ea66d5dbb5a1f2b88cc6a2b4f213bd1cbf18b252"
+    },
+    {
+      "bytes": 1304,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/started.json",
+      "sha256": "934316ebe8242b43a466bdc6fe81b6f63c71a198282f17552c1116c730d0c5d9"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation-preflight/00-05-before-all-p0/time.txt",
+      "sha256": "6801394fc6d69378418c1aafd998c58869bb1fdfd275188384bcea7eb46ab353"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691273.9773579,
+  "started_unix": 1790691273.9224756
+}

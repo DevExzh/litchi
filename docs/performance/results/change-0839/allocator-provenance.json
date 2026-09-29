@@ -1,0 +1,12 @@
+{
+  "counter_source": "tools/perf-baseline/src/allocation_metrics.rs",
+  "counter_sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5",
+  "counter_byte_identical": true,
+  "wrapper_source": "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+  "changes": [
+    "crate-local imports",
+    "shared synthetic test lock",
+    "install global allocator only in non-test binary"
+  ],
+  "region_scope": "read_parts_ordered invocation through returned PartBatch; setup/preload/verification/drop excluded"
+}

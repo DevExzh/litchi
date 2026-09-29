@@ -1,0 +1,336 @@
+{
+  "decision": "Retain under frozen p50/RSS and independent memory gates; all five tail intervals include one; serial/ineligible controls are not proof of neutrality; no general tail benefit claimed.",
+  "observations": [
+    {
+      "after": [
+        4000.0,
+        4150.0,
+        2980.0,
+        3920.0,
+        3400.0,
+        3740.0
+      ],
+      "after_median": 3830.0,
+      "before": [
+        3160.0,
+        3170.0,
+        4330.0,
+        3070.0,
+        3160.0,
+        3190.0
+      ],
+      "before_median": 3165.0,
+      "block_ratios": [
+        1.2658227848101267,
+        1.3091482649842272,
+        0.6882217090069284,
+        1.276872964169381,
+        1.0759493670886076,
+        1.1724137931034482
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.2191182889567873,
+        "lower": 0.8820855380477679,
+        "resamples": 10000,
+        "seed": 839083,
+        "statistic": "median",
+        "upper": 1.293010614576804
+      },
+      "case": {
+        "route": "parts",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 1
+      },
+      "ci95_high": 1.293010614576804,
+      "ci95_low": 0.8820855380477679,
+      "estimate": 1.2191182889567873,
+      "guarded": false,
+      "index": 30,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "p95_ns",
+      "ratios": [
+        1.2658227848101267,
+        1.3091482649842272,
+        0.6882217090069284,
+        1.276872964169381,
+        1.0759493670886076,
+        1.1724137931034482
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        4370.0,
+        4240.0,
+        3840.0,
+        4020.0,
+        6440.0,
+        3790.0
+      ],
+      "after_median": 4130.0,
+      "before": [
+        3250.0,
+        3260.0,
+        10080.0,
+        3100.0,
+        3180.0,
+        3230.0
+      ],
+      "before_median": 3240.0,
+      "block_ratios": [
+        1.3446153846153845,
+        1.3006134969325154,
+        0.38095238095238093,
+        1.2967741935483872,
+        2.0251572327044025,
+        1.173374613003096
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.2986938452404513,
+        "lower": 0.7771634969777385,
+        "resamples": 10000,
+        "seed": 839083,
+        "statistic": "median",
+        "upper": 1.6848863086598935
+      },
+      "case": {
+        "route": "parts",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 1
+      },
+      "ci95_high": 1.6848863086598935,
+      "ci95_low": 0.7771634969777385,
+      "estimate": 1.2986938452404513,
+      "guarded": false,
+      "index": 30,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "p99_ns",
+      "ratios": [
+        1.3446153846153845,
+        1.3006134969325154,
+        0.38095238095238093,
+        1.2967741935483872,
+        2.0251572327044025,
+        1.173374613003096
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        6990.0,
+        5070.0,
+        3340.0,
+        3220.0,
+        5070.0,
+        4930.0
+      ],
+      "after_median": 5000.0,
+      "before": [
+        3370.0,
+        3300.0,
+        4670.0,
+        6490.0,
+        4630.0,
+        4630.0
+      ],
+      "before_median": 4630.0,
+      "block_ratios": [
+        2.0741839762611276,
+        1.5363636363636364,
+        0.715203426124197,
+        0.49614791987673346,
+        1.0950323974082072,
+        1.0647948164146868
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.079913606911447,
+        "lower": 0.6056756730004652,
+        "resamples": 10000,
+        "seed": 839083,
+        "statistic": "median",
+        "upper": 1.8052738063123819
+      },
+      "case": {
+        "route": "parts",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 1
+      },
+      "ci95_high": 1.8052738063123819,
+      "ci95_low": 0.6056756730004652,
+      "estimate": 1.079913606911447,
+      "guarded": false,
+      "index": 35,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "p99_ns",
+      "ratios": [
+        2.0741839762611276,
+        1.5363636363636364,
+        0.715203426124197,
+        0.49614791987673346,
+        1.0950323974082072,
+        1.0647948164146868
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1438515.0,
+        815173.0,
+        797163.0,
+        766173.0,
+        811043.0,
+        765713.0
+      ],
+      "after_median": 804103.0,
+      "before": [
+        823373.0,
+        767933.0,
+        766613.0,
+        819284.0,
+        760983.0,
+        763553.0
+      ],
+      "before_median": 767273.0,
+      "block_ratios": [
+        1.7471000385001694,
+        1.0615157832779683,
+        1.0398506156300507,
+        0.9351738835373326,
+        1.0657833355015816,
+        1.0028288802479985
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0506831994540096,
+        "lower": 0.9690013818926655,
+        "resamples": 10000,
+        "seed": 839083,
+        "statistic": "median",
+        "upper": 1.4064416870008754
+      },
+      "case": {
+        "route": "parts",
+        "shape": "mixed",
+        "state": "fresh",
+        "task_floor": 65536,
+        "workers": 8
+      },
+      "ci95_high": 1.4064416870008754,
+      "ci95_low": 0.9690013818926655,
+      "estimate": 1.0506831994540096,
+      "guarded": false,
+      "index": 48,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "p99_ns",
+      "ratios": [
+        1.7471000385001694,
+        1.0615157832779683,
+        1.0398506156300507,
+        0.9351738835373326,
+        1.0657833355015816,
+        1.0028288802479985
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        3640.0,
+        3370.0,
+        4340.0,
+        3550.0,
+        3070.0,
+        4600.0
+      ],
+      "after_median": 3595.0,
+      "before": [
+        3070.0,
+        3180.0,
+        3360.0,
+        2990.0,
+        6660.0,
+        3550.0
+      ],
+      "before_median": 3270.0,
+      "block_ratios": [
+        1.1856677524429968,
+        1.059748427672956,
+        1.2916666666666667,
+        1.1872909698996656,
+        0.46096096096096095,
+        1.295774647887324
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.1864793611713313,
+        "lower": 0.7603546943169586,
+        "resamples": 10000,
+        "seed": 839083,
+        "statistic": "median",
+        "upper": 1.2937206572769955
+      },
+      "case": {
+        "route": "parts",
+        "shape": "mixed",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 1
+      },
+      "ci95_high": 1.2937206572769955,
+      "ci95_low": 0.7603546943169586,
+      "estimate": 1.1864793611713313,
+      "guarded": false,
+      "index": 55,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "p95_ns",
+      "ratios": [
+        1.1856677524429968,
+        1.059748427672956,
+        1.2916666666666667,
+        1.1872909698996656,
+        0.46096096096096095,
+        1.295774647887324
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    }
+  ],
+  "status": "reviewed"
+}

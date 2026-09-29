@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "8",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56648,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/report.json",
+      "sha256": "9cf090e6c9f4156d9656c3712a1f8e30787c9f114b1952e9a8d9f9053655fbc0"
+    },
+    {
+      "bytes": 1272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/started.json",
+      "sha256": "044cce5908a6d70b44cbb52aea25e5f44f4d6cd1ba24ce8595b3714de5f02223"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-33-after-all-p0/time.txt",
+      "sha256": "5f9308974380d7830de8d3ffed1b54b6e68bc39bd0146b4355887f99c2b00670"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692011.2090373,
+  "started_unix": 1790692010.6033092
+}

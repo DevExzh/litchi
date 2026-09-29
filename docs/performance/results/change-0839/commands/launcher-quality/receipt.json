@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0839/launcher_quality.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790691001.8878455,
+  "log": {
+    "bytes": 22,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/launcher-quality/output.log",
+    "sha256": "4fd0167b0883713436baa66fb09e50e92a4051637f4d2805d04f4112f6b9e5fe"
+  },
+  "started_unix": 1790691001.8576794
+}

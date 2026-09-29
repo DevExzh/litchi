@@ -1,0 +1,29 @@
+   Compiling generic-array v0.14.9
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling chrono v0.4.45
+   Compiling digest v0.10.7
+   Compiling thiserror v2.0.18
+   Compiling zerocopy v0.8.56
+   Compiling sha2 v0.10.9
+   Compiling rustix v1.1.4
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling tempfile v3.27.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-perf-execution v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0839/probe)
+    Finished `test` profile [unoptimized] target(s) in 6.28s
+     Running unittests main.rs (/home/zhuhe/code/litchi-target-0839/debug/deps/cached_part_memory-9fb5a01d867a396c)
+
+running 5 tests
+test tests::rss_phase_selection_marks_first_and_last_but_not_warmups ... ok
+test tests::rss_phase_protocol_flushes_pid_record_and_requires_exact_ack ... ok
+test tests::zero_io_budget_refuses_before_first_payload_read ... ok
+test tests::public_routes_verify_order_and_release_resources ... ok
+test tests::generator_identity_and_argument_bounds ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s
+

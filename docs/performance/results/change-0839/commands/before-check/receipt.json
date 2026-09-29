@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--all-features",
+    "--all-targets"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790690573.8715165,
+  "log": {
+    "bytes": 3682,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/before-check/output.log",
+    "sha256": "403d7e5eef5028b1379746c2104dc92c26240dbd06cf09bff3344d713b73409e"
+  },
+  "started_unix": 1790690559.422812
+}

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0839/admit.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790691906.0261438,
+  "log": {
+    "bytes": 15,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/admission/output.log",
+    "sha256": "ebb6bd615d8904ccc319dc84ed4ecfd27df1546a6487aa8b67dfa57c4acdf178"
+  },
+  "started_unix": 1790691905.7131374
+}

@@ -1,0 +1,306 @@
+{
+  "benefit_cases": 16,
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "admission"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocator-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocator-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocator-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocator-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocator-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "allocator-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-allocator-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-allocator-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-allocator-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-allocator-fmt"
+    },
+    {
+      "exit_code": 101,
+      "label": "before-allocator-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-allocator-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-allocator-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-allocator-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-allocator-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-allocator-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after-allocator"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after-observer"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before-allocator"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before-observer"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-apply"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-apply-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "current-thread-census"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-analysis-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "launcher-build"
+    },
+    {
+      "exit_code": 0,
+      "label": "launcher-quality"
+    },
+    {
+      "exit_code": 0,
+      "label": "paired-analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-before-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-before-replay-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-both-replay"
+    },
+    {
+      "exit_code": 1,
+      "label": "reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-0-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-0-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-1-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-1-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-2-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-2-before"
+    }
+  ],
+  "decision": "adopt",
+  "production_changes": 3,
+  "regression_flags": 0,
+  "reports": 1414,
+  "samples": 28450,
+  "status": "pass",
+  "tests": {
+    "after-allocator-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 36
+    },
+    "after-probe-tests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5
+    },
+    "after-tests": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 995
+    },
+    "before-allocator-test": {
+      "failed": 12,
+      "ignored": 0,
+      "passed": 24
+    },
+    "before-probe-tests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 5
+    },
+    "before-tests": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 988
+    },
+    "before-v2-allocator-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 36
+    }
+  },
+  "trace_reports": 6,
+  "trace_samples": 6
+}

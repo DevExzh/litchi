@@ -1,0 +1,53 @@
+{
+  "affinity": "all",
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-31-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "2",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-31-after-all-p0/report.json"
+  ],
+  "binary": {
+    "bytes": 12296712,
+    "path": "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "sha256": "e64983b3e14779200fd5af86a6a1e65ce44557344e55a7d53490bda1f1538fe0"
+  },
+  "block": 5,
+  "case": {
+    "route": "parts",
+    "shape": "large",
+    "state": "primed",
+    "task_floor": 0,
+    "workers": 2
+  },
+  "index": 31,
+  "kind": "native",
+  "lane": "native",
+  "launcher": null,
+  "leg": "after",
+  "phase_environment": null,
+  "protocol": 0,
+  "samples": 30,
+  "started_unix": 1790692144.9631824,
+  "warmup": 3
+}

@@ -1,0 +1,25 @@
+{
+  "mutations": [
+    "schema",
+    "sample-count",
+    "member-sha",
+    "sequence-sha",
+    "member-order",
+    "cpu-charge",
+    "retained-worker",
+    "disabled-source",
+    "negative-time",
+    "unmeasured",
+    "live-conservation",
+    "region-peak",
+    "counter-revision",
+    "snapshot-pid"
+  ],
+  "reader": {
+    "bytes": 31322,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/readers.py",
+    "sha256": "fe635411ac168393d9b38b5db8a25351fb4a15b716b1aca796329c08fb4142f8"
+  },
+  "statistical_checks": 4,
+  "status": "pass"
+}
