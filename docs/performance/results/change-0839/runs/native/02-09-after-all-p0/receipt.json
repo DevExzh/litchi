@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56727,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/report.json",
+      "sha256": "d5aa7aab06a7ca018dd549306024a458551f4f5fa38476cf878587c87bcbc497"
+    },
+    {
+      "bytes": 1279,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/started.json",
+      "sha256": "478a6a3c93a410d4855054c5e2dabe59fa0b2c17de40a646b00eb9c63dc3b268"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-09-after-all-p0/time.txt",
+      "sha256": "9d600ccb86a35f7d722f1ef9d08e03626e120cb76719c08e54cb97cdc8f54d08"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691998.3086686,
+  "started_unix": 1790691998.2840514
+}

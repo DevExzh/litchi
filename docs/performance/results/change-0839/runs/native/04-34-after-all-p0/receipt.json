@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56709,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/report.json",
+      "sha256": "5807afa31a34cc1991cb5df05e47a7a9169c5ab5777daeaf387ca0629525c5b1"
+    },
+    {
+      "bytes": 1273,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/started.json",
+      "sha256": "0e7329a7a6eee5df29c18f624488aad846f371ce951e2c80d5cc6a1cdd15e0f5"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-34-after-all-p0/time.txt",
+      "sha256": "3a651a17c4dfad10bf4c7ef2d09c62f965cbfc3a8a2dac550f14836f8a155f4e"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692090.6922343,
+  "started_unix": 1790692090.087244
+}

@@ -1,0 +1,52 @@
+{
+  "removed": [
+    {
+      "files": 4290,
+      "logical_bytes": 1462640113,
+      "path": "/home/zhuhe/code/litchi-target-0839"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0839"
+    }
+  ],
+  "status": "pass",
+  "verified_binaries": [
+    {
+      "bytes": 12276432,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+      "sha256": "5608129ef10a9e403f231e2ea74fd21c6b48a53f94e8a4c077d0952d76262a5a"
+    },
+    {
+      "bytes": 12288096,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/before/observer/cached-part-memory",
+      "sha256": "3dae08ab9cf83ee30fc9ce8a06c4361e4aa52b7b28de178bd358d174c6a42a83"
+    },
+    {
+      "bytes": 12478936,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+      "sha256": "529074b4c00c435a49632daae813818fc41fa7e84bd11975f7baf6e5285fe42e"
+    },
+    {
+      "bytes": 12296712,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+      "sha256": "e64983b3e14779200fd5af86a6a1e65ce44557344e55a7d53490bda1f1538fe0"
+    },
+    {
+      "bytes": 12308408,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/after/observer/cached-part-memory",
+      "sha256": "242a81ab30418e01cdf67011221f28b5e5984c228aca34115cb0c8f19a6e1acc"
+    },
+    {
+      "bytes": 12499256,
+      "path": "/home/zhuhe/code/litchi-target-0839/retained/after/allocator/cached-part-memory-alloc",
+      "sha256": "cb26bf7dc751a727c2ccc7df45cc2e212a21e77c1bbd33906bcb450320b1efd0"
+    },
+    {
+      "bytes": 16568,
+      "path": "/home/zhuhe/code/litchi-target-0839/launcher",
+      "sha256": "50c41893320944a19e1f15c9290c7acab7fcbcdc4b441bfa97af783cffab6480"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/home/zhuhe/code/litchi-target-0839/launcher",
+    "--usage",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/usage.json",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 11518,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/report.json",
+      "sha256": "d75c4adb8b8c964a779870a1b731071b7370a7dc9fcd4bc27542e7e2db6c6356"
+    },
+    {
+      "bytes": 20016,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/snapshots.json.gz",
+      "sha256": "d5e290e69387576acc2b80e4d41ba6da4c9ad7ec5f6f6094741c40ca8468271e"
+    },
+    {
+      "bytes": 1264,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/started.json",
+      "sha256": "7e2f35fe8307e4a0b44012497db10d126de3860691045d899e198e60518c5349"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 151,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-before-all-p0/usage.json",
+      "sha256": "d0354abc54b106924c810632c4388dd42c75b034d40cf813a6c6386d90c169ec"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691273.6159642,
+  "started_unix": 1790691273.596406
+}

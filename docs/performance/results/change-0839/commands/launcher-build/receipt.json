@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cc",
+    "-std=c11",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "docs/performance/results/change-0839/launcher.c",
+    "-o",
+    "/home/zhuhe/code/litchi-target-0839/launcher"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790690978.1136591,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/launcher-build/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790690978.0375407
+}

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56796,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/report.json",
+      "sha256": "68928c33e89255fddc768ff03966d6b22558c748c2f22590674ebcc3c8b52748"
+    },
+    {
+      "bytes": 1283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/started.json",
+      "sha256": "460b648a9adbb01ea1c9958d96e746d67bf2f01f5f6a4547dda16768d155c1ee"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-27-before-all-p0/time.txt",
+      "sha256": "d9b6ed5ab07cb2a9e3c0a30c7837ee7a616d211e17af6ab42edf8d99fe35f72d"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692148.5482996,
+  "started_unix": 1790692148.1884255
+}

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "8",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56692,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/report.json",
+      "sha256": "2dc175a1e2eebf43cc65a0c2cca8db8319c27024503427a1d3a26961efe8d5ee"
+    },
+    {
+      "bytes": 1269,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/started.json",
+      "sha256": "f818b32ff2cadfd821d0ecbac1e4285a2c326b24c80e0ecefd36a444232a7562"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-03-after-all-p0/time.txt",
+      "sha256": "b8986e30f5ed6394dabb2f4dfb8de9670bd8096865e27bbaa56c986805a7b80c"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691918.981856,
+  "started_unix": 1790691918.9523704
+}

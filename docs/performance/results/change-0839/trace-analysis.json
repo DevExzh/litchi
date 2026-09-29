@@ -1,0 +1,174 @@
+{
+  "rows": [
+    {
+      "binary": {
+        "bytes": 12276432,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+        "sha256": "5608129ef10a9e403f231e2ea74fd21c6b48a53f94e8a4c077d0952d76262a5a"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      "expected": 4,
+      "leg": "before",
+      "log": {
+        "bytes": 1430,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/0-before/clone.log",
+        "sha256": "15092acdb77f0023b8b4ef3a1785174def75e57c758e6382c03d79c82782339b"
+      },
+      "report": {
+        "bytes": 11519,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/0-before/report.json",
+        "sha256": "a2d3522c60afaab693ebff7f84801a55fa7494aa6543a97cfb11567ce4a2eceb"
+      },
+      "successful_thread_creations": 4,
+      "verification_ok": true
+    },
+    {
+      "binary": {
+        "bytes": 12296712,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+        "sha256": "e64983b3e14779200fd5af86a6a1e65ce44557344e55a7d53490bda1f1538fe0"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      "expected": 4,
+      "leg": "after",
+      "log": {
+        "bytes": 1430,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/0-after/clone.log",
+        "sha256": "55c223602c7bfb2209e1ad4a019379762a94445d2d6e7fec6ed97943ed488d29"
+      },
+      "report": {
+        "bytes": 11519,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/0-after/report.json",
+        "sha256": "82de23e69b912b29cf1197ce2dbe3216700dccb7d52cb77a695aaa10f2a6f13f"
+      },
+      "successful_thread_creations": 4,
+      "verification_ok": true
+    },
+    {
+      "binary": {
+        "bytes": 12276432,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+        "sha256": "5608129ef10a9e403f231e2ea74fd21c6b48a53f94e8a4c077d0952d76262a5a"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      "expected": 8,
+      "leg": "before",
+      "log": {
+        "bytes": 2830,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/1-before/clone.log",
+        "sha256": "9ee826c83e9e70540274adc021de8112bc140d04cca23f477ab70a8780f0c9d8"
+      },
+      "report": {
+        "bytes": 11527,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/1-before/report.json",
+        "sha256": "aa10646485c4289609e0a601929dedea2fc7682dc4a18967aa2181969f994dbb"
+      },
+      "successful_thread_creations": 8,
+      "verification_ok": true
+    },
+    {
+      "binary": {
+        "bytes": 12296712,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+        "sha256": "e64983b3e14779200fd5af86a6a1e65ce44557344e55a7d53490bda1f1538fe0"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      "expected": 4,
+      "leg": "after",
+      "log": {
+        "bytes": 1430,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/1-after/clone.log",
+        "sha256": "5d0fa8f4c40ad4049a3d3aa737209e0c7113d04e85b043ed42a4876ada5f9e3c"
+      },
+      "report": {
+        "bytes": 11522,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/1-after/report.json",
+        "sha256": "cebd07789a282a2ac5a9763f464edacea4353e0212b57544d59768bf6b5c44de"
+      },
+      "successful_thread_creations": 4,
+      "verification_ok": true
+    },
+    {
+      "binary": {
+        "bytes": 12276432,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+        "sha256": "5608129ef10a9e403f231e2ea74fd21c6b48a53f94e8a4c077d0952d76262a5a"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      },
+      "expected": 64,
+      "leg": "before",
+      "log": {
+        "bytes": 23350,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/2-before/clone.log",
+        "sha256": "ba6297bb6d777aa030d65e31a81f3d750ea69361899309ab90b710cae4601b0d"
+      },
+      "report": {
+        "bytes": 11530,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/2-before/report.json",
+        "sha256": "245c32e594f24d402f93668ee6b43dd1d25cbd30144221869cccefd2668fe243"
+      },
+      "successful_thread_creations": 64,
+      "verification_ok": true
+    },
+    {
+      "binary": {
+        "bytes": 12296712,
+        "path": "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+        "sha256": "e64983b3e14779200fd5af86a6a1e65ce44557344e55a7d53490bda1f1538fe0"
+      },
+      "case": {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      },
+      "expected": 32,
+      "leg": "after",
+      "log": {
+        "bytes": 11782,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/2-after/clone.log",
+        "sha256": "0cc2b1b69e2367b30ff4811fcdb6a23f3ef38082a4f40fee22aabca16aa351c3"
+      },
+      "report": {
+        "bytes": 11525,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/traces/2-after/report.json",
+        "sha256": "dac8fecdb26656981f44b5d946f4bbf14fea591108deacd72f35eb5163291f9e"
+      },
+      "successful_thread_creations": 32,
+      "verification_ok": true
+    }
+  ],
+  "scope": "whole-child successful clone/clone3 calls; setup preload and measured read distinguished by fresh/primed control, trace timing excluded",
+  "status": "pass"
+}

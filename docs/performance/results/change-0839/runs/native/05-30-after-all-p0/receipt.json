@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56644,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/report.json",
+      "sha256": "f401519c788ce4f20f702aa076bb2b92dc4feae59dd0008f6201ec581946ef72"
+    },
+    {
+      "bytes": 1272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/started.json",
+      "sha256": "6e0bbd9df8fadd5a8efab8ecd2cfe2ba1a2254c41927a4f0b9ccf1df8a188254"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-30-after-all-p0/time.txt",
+      "sha256": "b128fbf5149baa0aca3b9932150dbd7217e87531644a8bc9dc351b47af610901"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692146.7713547,
+  "started_unix": 1790692146.1929946
+}

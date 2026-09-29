@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56727,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/report.json",
+      "sha256": "9dd7b52bf11265330494aa0c45bf21da8d4e2ce1ea4b33227f4dec142471ebe0"
+    },
+    {
+      "bytes": 1283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/started.json",
+      "sha256": "6bb73b5440e8ea5edb2e79f9f35e9084964f0053a8e829c5dc0600388e68c344"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-before-all-p0/time.txt",
+      "sha256": "aa8dc24aaab54720b9bfc8a4e0071459435e5b04f0a4e93fb5f6da26e7104320"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691919.3538942,
+  "started_unix": 1790691919.329216
+}

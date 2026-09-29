@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56760,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/report.json",
+      "sha256": "38fe53be9b93824b655bfa2183026ead8418807b27bf4e0b68b6debd400b4c62"
+    },
+    {
+      "bytes": 1283,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/started.json",
+      "sha256": "b99945c05a885e128da2132909f9d28012fcb709b8fcd22fcf7eaa58656932b7"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-25-before-all-p0/time.txt",
+      "sha256": "e76bf582886c733719b936d942d43232f04202933388585694e7eddfe68da48b"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692082.211753,
+  "started_unix": 1790692081.8882492
+}

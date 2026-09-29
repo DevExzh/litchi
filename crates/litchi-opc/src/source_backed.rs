@@ -5465,6 +5465,28 @@ impl PartCache {
         self.budget.as_ref()
     }
 
+    /// Return a read-only scheduling hint for a prepared request set.
+    ///
+    /// This deliberately observes only completed entries. Flights and
+    /// provisional publications make the hint conservative: a concurrent
+    /// loader or eviction may make a later request cold, and the ordinary
+    /// prepared read remains authoritative in that case. The check does not
+    /// advance LRU state, counters, reservations, or payload reference
+    /// counts, and it allocates no query or pinning state.
+    fn all_entries_ready<I>(&self, mut entry_ids: I) -> bool
+    where
+        I: Iterator<Item = EntryId>,
+    {
+        let mut observer = NoopDiagnosticObserver;
+        let state = lock_with_observer(&self.state, &mut observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        entry_ids.all(|entry_id| {
+            !state.flights.contains_key(&entry_id)
+                && !state.pending.contains_key(&entry_id)
+                && state.entries.contains_key(&entry_id)
+        })
+    }
+
     fn write_session(&self) -> Option<&ParallelWriteSession> {
         self.write_session.as_ref()
     }
@@ -19186,6 +19208,98 @@ mod tests {
         assert!(!state.entries.contains_key(&second_id));
         assert!(!state.pending.contains_key(&second_id));
         assert!(!state.flights.contains_key(&second_id));
+    }
+
+    #[test]
+    fn cache_ready_hint_rejects_flights_and_pending_without_touching_state() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"cache hint state", false),
+        )))
+        .unwrap();
+        let first_id = package.parts[0].entry_id;
+        let second_id = package.parts[1].entry_id;
+        let cache = PartCache::new(SourceCacheLimits::new(32, 3).unwrap());
+        assert!(!cache.all_entries_ready([first_id].into_iter()));
+        assert!(matches!(
+            cache.insert_for_test(
+                first_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![1, 2]),
+                    reservation: None,
+                    object_reservation: None,
+                },
+            ),
+            CacheRetention::Retained
+        ));
+        let clock_before = cache.state.lock().unwrap().clock;
+        let hits_before = cache.diagnostics().hits;
+        assert!(cache.all_entries_ready([first_id].into_iter()));
+        assert_eq!(cache.state.lock().unwrap().clock, clock_before);
+        assert_eq!(cache.diagnostics().hits, hits_before);
+
+        assert!(matches!(
+            cache.insert_for_test(
+                second_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![4, 5]),
+                    reservation: None,
+                    object_reservation: None,
+                },
+            ),
+            CacheRetention::Retained
+        ));
+        let flight = Arc::new(LoadFlight::new(None, None, None));
+        {
+            let mut state = cache.state.lock().unwrap();
+            state.flights.insert(second_id, Arc::clone(&flight));
+        }
+        assert!(cache.state.lock().unwrap().entries.contains_key(&second_id));
+        assert!(!cache.all_entries_ready([second_id].into_iter()));
+        {
+            let mut state = cache.state.lock().unwrap();
+            state.flights.remove(&second_id);
+        }
+        assert!(cache.all_entries_ready([second_id].into_iter()));
+        {
+            let mut state = cache.state.lock().unwrap();
+            state.pending.insert(
+                second_id,
+                PendingPublication {
+                    flight,
+                    payload: Arc::new(vec![3]),
+                },
+            );
+        }
+        assert!(!cache.all_entries_ready([second_id].into_iter()));
+        cache.state.lock().unwrap().pending.remove(&second_id);
+        assert!(cache.all_entries_ready([second_id].into_iter()));
+
+        let evicting = PartCache::new(SourceCacheLimits::new(4, 3).unwrap());
+        assert!(matches!(
+            evicting.insert_for_test(
+                first_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![6, 7]),
+                    reservation: None,
+                    object_reservation: None,
+                },
+            ),
+            CacheRetention::Retained
+        ));
+        assert!(evicting.all_entries_ready([first_id].into_iter()));
+        assert!(matches!(
+            evicting.insert_for_test(
+                second_id,
+                CachedPayload {
+                    bytes: Arc::new(vec![8, 9, 10]),
+                    reservation: None,
+                    object_reservation: None,
+                },
+            ),
+            CacheRetention::Retained
+        ));
+        assert!(!evicting.all_entries_ready([first_id].into_iter()));
+        assert!(evicting.all_entries_ready([second_id].into_iter()));
     }
 
     #[test]

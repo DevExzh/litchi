@@ -1,0 +1,5 @@
+{
+  "allocator": "Current files exactly match retained before allocator build and passing before-v2 quality; initial failure belongs to draft, reviewer read the revisions in reverse. No rebuild needed.",
+  "identity": "Reader already derives starttime from raw stat and qualifier enforces phase order. Formal capture now enforces both before ACK and binds launcher executable.",
+  "memory": "Before formal paired capture, add explicit reducers to immutable plan-amendment; thresholds and cases unchanged; preflight never pooled."
+}

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 71161,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/report.json",
+      "sha256": "4e9f6f2b958f4f2fcace90a741f0e6c32298b4d54b3a2d0e1eb9a190a245d963"
+    },
+    {
+      "bytes": 1321,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/started.json",
+      "sha256": "65bf33953b48e01bfa0b23cb865260616f10a2eb45a9cda9e4cdff9de9205f6e"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/01-00-before-all-p0/time.txt",
+      "sha256": "718985c73a2a6e22a087d32adfbcf6ad10f89ff8053ddbd81af23ebd4d46df8a"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692207.4833407,
+  "started_unix": 1790692207.4529746
+}

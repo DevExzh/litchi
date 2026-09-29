@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 12478936,
+    "path": "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "sha256": "529074b4c00c435a49632daae813818fc41fa7e84bd11975f7baf6e5285fe42e"
+  },
+  "freeze": {
+    "bytes": 1202497,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/freeze-before-allocator.json",
+    "sha256": "21c17102e0260626702f540b79f9c6d5de5af59e5dcfa95afe16161bf0fb52bc"
+  },
+  "receipt": {
+    "bytes": 572,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/build-before-allocator/receipt.json",
+    "sha256": "50381e9d916e109a44832c90ab842c156beac4cf080868e542d59e63f84a0e71"
+  }
+}

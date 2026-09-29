@@ -1,0 +1,7 @@
+{
+  "native_source": "../change-0788/probe-src/main.rs",
+  "native_byte_identical": true,
+  "launcher_source": "../change-0790/launcher.c",
+  "launcher_byte_identical": true,
+  "quality_scope": "fresh OPC all-feature and standalone native probe gates; isolated allocator gets separate fresh gates"
+}

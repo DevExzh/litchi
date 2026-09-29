@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/reader_tests.py", line 9, in check
+    try:r.validate_report(work,case,1,0,allocation=allocation)
+        ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/readers.py", line 383, in validate_report
+    require(report.get("schema") == expected_schema, f"{label} report schema changed")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/readers.py", line 44, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/readers.py", line 39, in fail
+    raise ReaderError(message)
+readers.ReaderError: /home/zhuhe/code/litchi-fs-0839/reader-mutation.json report schema changed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/reader_tests.py", line 15, in <module>
+    value=copy.deepcopy(original);mutate(value);check(name,value)
+                                                ~~~~~^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0839/reader_tests.py", line 10, in check
+    except r.ReplayError:passed.append(name)
+           ^^^^^^^^^^^^^
+AttributeError: module 'readers' has no attribute 'ReplayError'. Did you mean: 'ReaderError'?

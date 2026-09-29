@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56760,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/report.json",
+      "sha256": "0cd9676d80d39f6931f2fa316f1473156c85ab6942f8845dd6353afb741a8beb"
+    },
+    {
+      "bytes": 1277,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/started.json",
+      "sha256": "d8b477de182e8a520ef80937494005e86524b628fbde88ae7283e39ba7b861ab"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/02-25-after-all-p0/time.txt",
+      "sha256": "023d920d8dca019d2e26485bcaa0df2ae093a2323463512bbb19afe02c84fe57"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692003.3436673,
+  "started_unix": 1790692003.021854
+}

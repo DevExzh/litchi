@@ -1,0 +1,649 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "allocation": {
+    "blocks": 6,
+    "metrics": [
+      "allocation_calls",
+      "allocated_bytes",
+      "region_peak_live_bytes_minus_entry",
+      "retained_live_bytes_delta"
+    ],
+    "samples": 30,
+    "scope": "callback-ordered process-global System allocator operation region; excludes preload/setup/drop",
+    "warmup": 3
+  },
+  "allocation_cases": [
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    }
+  ],
+  "base": "6b33c24b5338bd4ba7aa5998ba451cb9b6eeebb1",
+  "bootstrap": {
+    "indexes": [
+      249,
+      9749
+    ],
+    "resamples": 10000,
+    "seed": 839083
+  },
+  "cases": [
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "large",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "fresh",
+      "task_floor": 65536,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 1
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 2
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 8
+    },
+    {
+      "route": "parts",
+      "shape": "mixed",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 32
+    }
+  ],
+  "decision": {
+    "benefit": "At least one eligible cached case paired p50 ratio <=0.97 and upper95<1",
+    "gates": "All source/output/resource/quality/admission gates pass; no unresolved regression flags. All tails and raw flags remain visible. No historic measurements pooled.",
+    "regression": "Reject if any native p50 or raw GNU-time RSS paired median >1.05 and 95% lower>1; same independent rule for phase resident RSS and operation allocation metrics. Zero-baseline allocation metrics use absolute comparisons; any increase flags review/rejection. No thresholds change after capture."
+  },
+  "memory": {
+    "affinities": [
+      "all",
+      "one"
+    ],
+    "blocks": 6,
+    "launcher": "0790 ordinary fork with direct wait4; acknowledged raw smaps/rollup/status/stat/maps",
+    "metrics": [
+      "after_preload RSS",
+      "after_operation RSS",
+      "after_batch_drop RSS",
+      "after_package_drop RSS",
+      "maximum observed RSS"
+    ],
+    "protocols": [
+      {
+        "samples": 1,
+        "warmup": 0
+      },
+      {
+        "samples": 30,
+        "warmup": 3
+      }
+    ],
+    "scope": "point-in-time observations not transient peak"
+  },
+  "memory_cases": [
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "fresh",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 4
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 0,
+      "workers": 32
+    },
+    {
+      "route": "parts",
+      "shape": "small",
+      "state": "primed",
+      "task_floor": 65536,
+      "workers": 4
+    }
+  ],
+  "native": {
+    "blocks": 6,
+    "launcher": "GNU time, independent raw maxrss; no instrumented lane pooled",
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "samples": 2,
+    "warmup": 0
+  },
+  "purpose": "Fresh adoption trial; historical0787 rejection retained",
+  "qualification": {
+    "samples": 1,
+    "warmup": 0
+  },
+  "schema": "cached-scheduling-0839-v1",
+  "scope": "Immutable in-memory category15 ordered Part reads; no filesystem-cold,remote,producer,orwhole-Office speedup claim; no compression changes; iWork excluded"
+}

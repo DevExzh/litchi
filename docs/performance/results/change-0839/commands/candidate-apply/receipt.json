@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "git",
+    "apply",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/candidate.patch"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790691293.4479208,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/candidate-apply/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790691293.4435632
+}

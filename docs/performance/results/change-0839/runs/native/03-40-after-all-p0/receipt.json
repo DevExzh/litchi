@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56754,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/report.json",
+      "sha256": "a112991147fa0531900f13e60e0c3f2a5712f6b74f14495deb9609389ab82c6c"
+    },
+    {
+      "bytes": 1270,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/started.json",
+      "sha256": "ae38184972883b06acfde1f75961ddd05e941642779e9d547387cd9c1cf35c68"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-40-after-all-p0/time.txt",
+      "sha256": "5731d7522e2e92b8ee8ea868770ee54b36d55073f41d02b16b3e6fccd13e3149"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692055.105106,
+  "started_unix": 1790692054.7924576
+}

@@ -665,11 +665,72 @@ fn read_parallel(
     if context.scoped_workers().is_some() {
         return read_with_scoped_workers(package, context, requests, workers, max_bytes, output);
     }
+    if package
+        .cache
+        .all_entries_ready(requests.iter().map(|request| request.entry_id))
+    {
+        return read_cached_serial(package, requests, workers, max_bytes, output);
+    }
     let first_end = wave_end(requests, 0, workers, max_bytes)?;
     if first_end == requests.len() {
         return read_one_wave(package, requests, 0, first_end, scheduler, output);
     }
     read_reused_workers(package, requests, workers, max_bytes, scheduler, output)
+}
+
+/// Read a cache-hit hint serially while preserving the private
+/// parallel path's wave fences and worker-panic translation.
+///
+/// The cache predicate is only a scheduling hint. Every request still goes
+/// through `read_part_prepared`, which rechecks source freshness and
+/// execution state and handles an eviction or concurrent publication as an
+/// ordinary read. A multi-wave request keeps the same fence before each wave
+/// as the reused-worker path; a failure stops later waves after all requests
+/// in the current wave have run.
+fn read_cached_serial(
+    package: &SourceBackedPackage,
+    requests: &[PreparedRequest],
+    workers: usize,
+    max_bytes: u64,
+    output: &mut Vec<PartData>,
+) -> Result<()> {
+    let first_end = wave_end(requests, 0, workers, max_bytes)?;
+    if first_end == requests.len() {
+        return read_cached_serial_wave(package, requests, 0, first_end, output);
+    }
+
+    let mut start = 0;
+    while start < requests.len() {
+        fence(package)?;
+        let end = wave_end(requests, start, workers, max_bytes)?;
+        read_cached_serial_wave(package, requests, start, end, output)?;
+        start = end;
+    }
+    Ok(())
+}
+
+fn read_cached_serial_wave(
+    package: &SourceBackedPackage,
+    requests: &[PreparedRequest],
+    start: usize,
+    end: usize,
+    output: &mut Vec<PartData>,
+) -> Result<()> {
+    let mut selected = None;
+    for (ordinal, request) in requests.iter().copied().enumerate().take(end).skip(start) {
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let declared = request
+                .declared_bytes
+                .ok_or_else(|| batch_refusal("parallel batch request lacks prepared metadata"))?;
+            package.read_part_prepared(request.index, request.entry_id, declared)
+        }))
+        .unwrap_or_else(|_| Err(OpcError::SourceBackedBatchWorkerPanic { ordinal }));
+        match result {
+            Ok(data) => output.push(data),
+            Err(error) => select_error(&mut selected, ordinal, error),
+        }
+    }
+    selected.map_or(Ok(()), |(_, error)| Err(error))
 }
 
 fn read_with_scoped_workers(
@@ -1215,4 +1276,81 @@ fn finish(package: &SourceBackedPackage, result: Result<PartBatch>) -> Result<Pa
 
 fn batch_refusal(reason: &'static str) -> OpcError {
     OpcError::SourceBackedBatchInvariant { reason }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soapberry_zip::office::StreamingArchiveWriter;
+
+    fn archive_bytes() -> Vec<u8> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("word/document.xml", b"stale fallback")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn stale_ready_hint_after_eviction_uses_authoritative_prepared_read() {
+        let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+        let index = package
+            .parts
+            .iter()
+            .position(|part| part.partname.as_str() == "/word/document.xml")
+            .unwrap();
+        let entry_id = package.parts[index].entry_id;
+        let declared_bytes = package
+            .archive
+            .metadata_for(entry_id)
+            .unwrap()
+            .uncompressed_size();
+        let request = PreparedRequest {
+            index,
+            entry_id,
+            declared_bytes: Some(declared_bytes),
+        };
+
+        let first = package
+            .read_part_prepared(index, entry_id, declared_bytes)
+            .unwrap();
+        assert_eq!(first.as_bytes(), b"stale fallback");
+        drop(first);
+
+        let clock_before_hint = package.cache.state.lock().unwrap().clock;
+        assert!(package.cache.all_entries_ready(std::iter::once(entry_id)));
+        let clock_after_hint = package.cache.state.lock().unwrap().clock;
+        assert_eq!(clock_after_hint, clock_before_hint);
+
+        {
+            let mut state = package.cache.state.lock().unwrap();
+            assert!(package.cache.evict_oldest(&mut state));
+        }
+        assert!(!package.cache.all_entries_ready(std::iter::once(entry_id)));
+
+        let mut output = Vec::new();
+        read_cached_serial(
+            &package,
+            std::slice::from_ref(&request),
+            1,
+            declared_bytes.max(1),
+            &mut output,
+        )
+        .unwrap();
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0].as_bytes(), b"stale fallback");
+        assert_eq!(package.cache.diagnostics().cold_loads, 2);
+    }
 }

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56611,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/report.json",
+      "sha256": "181edda35c2fc537e0eb65798aedc0e9ac7dfff529bda3c99b1aef3eb520f17b"
+    },
+    {
+      "bytes": 1273,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/started.json",
+      "sha256": "ffa7265a50a6fa4726a77382204466a6b62ae454a635f6d219440cee5fd19861"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 12,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/03-14-after-all-p0/time.txt",
+      "sha256": "8ed344dce38584aebab9cebb5a21bbde53393730f28e6f71e6307789a98e35df"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692075.3997507,
+  "started_unix": 1790692075.354811
+}

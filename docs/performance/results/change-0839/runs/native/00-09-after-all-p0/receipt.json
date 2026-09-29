@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "32",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56727,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/report.json",
+      "sha256": "401e41ceb4b8f18bf80ff543576696c8685b8eb27ce09b069cbf305642e2f8ae"
+    },
+    {
+      "bytes": 1279,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/started.json",
+      "sha256": "77213df27e29dc8ce36353876011c9b17f83e217b32976de196256f0094aa58e"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/00-09-after-all-p0/time.txt",
+      "sha256": "e47c787b51f1f7c3d9a66e7f30132c45b5144085953561defd66869c794dba94"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691919.3847573,
+  "started_unix": 1790691919.3602307
+}

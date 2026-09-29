@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0839/trace.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790691907.2329478,
+  "log": {
+    "bytes": 117,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/current-thread-census/output.log",
+    "sha256": "126ec4057170adcdf5de519c6010506f4ac40d580bd43df52a2ead306e77f6ad"
+  },
+  "started_unix": 1790691906.0541372
+}

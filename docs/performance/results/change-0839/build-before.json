@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 12276432,
+    "path": "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "sha256": "5608129ef10a9e403f231e2ea74fd21c6b48a53f94e8a4c077d0952d76262a5a"
+  },
+  "freeze": {
+    "bytes": 1202286,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/freeze-before.json",
+    "sha256": "fed84d5cfd80b59b4b4ea2afca3f6e9ca9939f5c4cdb278ce598d3722ecc1f9b"
+  },
+  "receipt": {
+    "bytes": 559,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/commands/build-before/receipt.json",
+    "sha256": "f96591799b37a87df9114d8fe07aadbc7907ca3b0b21699446be07b8d55a6c8a"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "mixed",
+    "--state",
+    "primed",
+    "--task-floor",
+    "0",
+    "--workers",
+    "1",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56642,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/report.json",
+      "sha256": "1932b500127d8ab367128992545cc99c37e01883d54cb37d6e3daf9fb74fb21d"
+    },
+    {
+      "bytes": 1272,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/started.json",
+      "sha256": "f8732e45aeff2700801e55ee212f93f35f34a17bf647e89a34bd0f290df6cc37"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/05-50-after-all-p0/time.txt",
+      "sha256": "09f1308b0526629760fc7c27e646f5d9d8d9b8bd7a2a8d32a0f03a4aa1608236"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692127.6419,
+  "started_unix": 1790692127.0817277
+}

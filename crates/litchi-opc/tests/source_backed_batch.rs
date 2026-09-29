@@ -14,13 +14,16 @@
 //! observable.  The overlap assertions use a release gate and an active-call
 //! counter; they do not infer parallelism from elapsed time.
 
+use std::collections::HashSet;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::{
     Arc, Condvar, Mutex,
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use std::thread;
+use std::thread::ThreadId;
 use std::time::{Duration, Instant};
 
 use litchi_core::{
@@ -743,6 +746,101 @@ impl ReadAt for ProbeSource {
     }
 }
 
+#[derive(Debug, Default)]
+struct CountingScopedWorkers {
+    waves: AtomicU64,
+    tasks: AtomicU64,
+}
+
+impl litchi_core::ScopedWorkers for CountingScopedWorkers {
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
+        self.waves.fetch_add(1, Ordering::Relaxed);
+        self.tasks
+            .fetch_add(u64::try_from(tasks.len()).unwrap(), Ordering::Relaxed);
+        for task in tasks.iter_mut() {
+            task();
+        }
+    }
+}
+
+struct PanicAfterVersionsSource {
+    inner: Arc<dyn ReadAt>,
+    remaining: AtomicUsize,
+    panic_remaining: AtomicUsize,
+    armed: AtomicBool,
+    version_threads: Mutex<HashSet<ThreadId>>,
+}
+
+impl PanicAfterVersionsSource {
+    fn new(inner: Arc<dyn ReadAt>) -> Self {
+        Self {
+            inner,
+            remaining: AtomicUsize::new(0),
+            panic_remaining: AtomicUsize::new(0),
+            armed: AtomicBool::new(false),
+            version_threads: Mutex::new(HashSet::new()),
+        }
+    }
+
+    fn arm_after(&self, successful_versions: usize) {
+        self.arm_after_with_panics(successful_versions, 1);
+    }
+
+    fn arm_after_with_panics(&self, successful_versions: usize, panics: usize) {
+        self.remaining.store(successful_versions, Ordering::Release);
+        self.panic_remaining.store(panics, Ordering::Release);
+        self.armed.store(true, Ordering::Release);
+    }
+
+    fn clear_version_threads(&self) {
+        self.version_threads.lock().unwrap().clear();
+    }
+
+    fn version_threads(&self) -> HashSet<ThreadId> {
+        self.version_threads.lock().unwrap().clone()
+    }
+}
+
+impl ReadAt for PanicAfterVersionsSource {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.inner.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.version_threads
+            .lock()
+            .unwrap()
+            .insert(thread::current().id());
+        if self.armed.load(Ordering::Acquire)
+            && self
+                .remaining
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_err()
+        {
+            let panic_now = self
+                .panic_remaining
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok();
+            if panic_now {
+                if self.panic_remaining.load(Ordering::Acquire) == 0 {
+                    self.armed.store(false, Ordering::Release);
+                }
+                panic!("intentional cached source-version panic");
+            }
+            self.armed.store(false, Ordering::Release);
+        }
+        self.inner.version()
+    }
+}
+
 struct MutableSource {
     bytes: Mutex<Vec<u8>>,
     revision: AtomicU64,
@@ -789,6 +887,52 @@ impl ReadAt for MutableSource {
             0x534f_5552_4345,
             self.revision.load(Ordering::Acquire),
         ))
+    }
+}
+
+struct ChangeAfterVersionsSource {
+    inner: Arc<MutableSource>,
+    remaining: AtomicUsize,
+    armed: AtomicBool,
+}
+
+impl ChangeAfterVersionsSource {
+    fn new(inner: Arc<MutableSource>) -> Self {
+        Self {
+            inner,
+            remaining: AtomicUsize::new(0),
+            armed: AtomicBool::new(false),
+        }
+    }
+
+    fn arm_after(&self, successful_versions: usize) {
+        self.remaining.store(successful_versions, Ordering::Release);
+        self.armed.store(true, Ordering::Release);
+    }
+}
+
+impl ReadAt for ChangeAfterVersionsSource {
+    fn len(&self) -> io::Result<u64> {
+        self.inner.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.inner.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        if self.armed.load(Ordering::Acquire)
+            && self
+                .remaining
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_err()
+        {
+            self.armed.store(false, Ordering::Release);
+            self.inner.mutate();
+        }
+        self.inner.version()
     }
 }
 
@@ -1077,6 +1221,214 @@ fn managed_batch_releases_finite_memory_and_object_reservations_after_drop() {
     assert_eq!(budget.used(Resource::Memory), 0);
     assert_eq!(budget.used(Resource::Objects), 0);
     assert!(budget.used(Resource::Work) >= cold_work);
+}
+
+#[test]
+fn cached_multiwave_batch_keeps_admission_and_skips_physical_reads() {
+    let (archive, expected_parts) = archive_bytes(None);
+    let expected = expected_parts
+        .iter()
+        .map(|(_, bytes)| bytes.clone())
+        .collect::<Vec<_>>();
+    let probe = Arc::new(ProbeSource::new(Arc::new(litchi_core::OwnedSource::new(
+        archive,
+    ))));
+    let stats = Arc::clone(&probe.stats);
+    let source = Arc::new(PanicAfterVersionsSource::new(probe));
+    let (budget, _cancellation, context) =
+        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
+    let package = package_with_context(source.clone(), context);
+    let requests = requested_uris();
+
+    let cold = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&cold, &expected);
+    let cold_tasks = budget.used(Resource::CpuTasks);
+    assert_eq!(cold_tasks, u64::try_from(requests.len()).unwrap());
+    drop(cold);
+
+    stats.reset();
+    source.clear_version_threads();
+    let caller_thread = thread::current().id();
+    let warm = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&warm, &expected);
+    assert_eq!(stats.snapshot().calls, 0);
+    assert_eq!(source.version_threads(), HashSet::from([caller_thread]));
+    assert_eq!(
+        budget.used(Resource::CpuTasks),
+        cold_tasks + u64::try_from(requests.len()).unwrap()
+    );
+    assert_eq!(budget.used(Resource::Workers), 0);
+    assert_eq!(budget.used(Resource::IoConcurrency), 0);
+
+    drop(warm);
+    stats.reset();
+    let single_requests = requests[..2].to_vec();
+    let single = package.read_parts_ordered(&single_requests).unwrap();
+    assert_batch_bytes(&single, &expected[..2]);
+    assert_eq!(stats.snapshot().calls, 0);
+    assert_eq!(budget.used(Resource::CpuTasks), cold_tasks + 6);
+    assert_eq!(budget.used(Resource::Workers), 0);
+    assert_eq!(budget.used(Resource::IoConcurrency), 0);
+
+    drop(single);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn cached_batch_still_invokes_an_explicit_caller_worker_facility() {
+    let (archive, expected_parts) = archive_bytes(None);
+    let expected = expected_parts
+        .iter()
+        .map(|(_, bytes)| bytes.clone())
+        .collect::<Vec<_>>();
+    let probe = Arc::new(ProbeSource::new(Arc::new(litchi_core::OwnedSource::new(
+        archive,
+    ))));
+    let stats = Arc::clone(&probe.stats);
+    let (budget, _cancellation, context) =
+        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
+    let workers = Arc::new(CountingScopedWorkers::default());
+    let context = context.with_scoped_workers(workers.clone());
+    let package = package_with_context(probe, context);
+    let requests = requested_uris();
+
+    let cold = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&cold, &expected);
+    drop(cold);
+    let waves_before = workers.waves.load(Ordering::Relaxed);
+    let tasks_before = workers.tasks.load(Ordering::Relaxed);
+    stats.reset();
+
+    let warm = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&warm, &expected);
+    assert_eq!(stats.snapshot().calls, 0);
+    assert_eq!(
+        workers.waves.load(Ordering::Relaxed) - waves_before,
+        2,
+        "the cached request should retain its two admitted caller waves"
+    );
+    assert_eq!(
+        workers.tasks.load(Ordering::Relaxed) - tasks_before,
+        u64::try_from(requests.len()).unwrap()
+    );
+    assert_eq!(budget.used(Resource::Workers), 0);
+    assert_eq!(budget.used(Resource::IoConcurrency), 0);
+
+    drop(warm);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[cfg(panic = "unwind")]
+#[test]
+fn cached_worker_panic_is_typed_and_drains_only_the_current_wave() {
+    let (archive, expected_parts) = archive_bytes(None);
+    let expected = expected_parts
+        .iter()
+        .map(|(_, bytes)| bytes.clone())
+        .collect::<Vec<_>>();
+    let source = Arc::new(PanicAfterVersionsSource::new(Arc::new(
+        litchi_core::OwnedSource::new(archive),
+    )));
+    let (budget, _cancellation, context) =
+        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
+    let package = package_with_context(source.clone(), context);
+    let requests = requested_uris();
+    let first = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&first, &expected);
+    drop(first);
+    let hits_before = package.cache_diagnostics().hits;
+
+    // Four prepared requests take one opening fence, three fences per
+    // prepared request (resolve plus both declared-size fences), one final
+    // preparation fence, the read_parallel fence, and the first reused-wave
+    // fence before ordinal zero's cached source-version check.
+    source.arm_after(requests.len() * 3 + 4);
+    let observed = catch_unwind(AssertUnwindSafe(|| package.read_parts_ordered(&requests)))
+        .expect("cached worker panic must be translated inside the batch");
+    assert!(matches!(
+        observed,
+        Err(OpcError::SourceBackedBatchWorkerPanic { ordinal: 0 })
+    ));
+    assert_eq!(
+        package.cache_diagnostics().hits - hits_before,
+        2,
+        "the first wave must drain before the later wave is stopped"
+    );
+    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[cfg(panic = "unwind")]
+#[test]
+fn cached_one_wave_panic_selects_lowest_ordinal_and_drains_the_wave() {
+    let (archive, expected_parts) = archive_bytes(None);
+    let expected = expected_parts
+        .iter()
+        .take(2)
+        .map(|(_, bytes)| bytes.clone())
+        .collect::<Vec<_>>();
+    let source = Arc::new(PanicAfterVersionsSource::new(Arc::new(
+        litchi_core::OwnedSource::new(archive),
+    )));
+    let (budget, _cancellation, context) =
+        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
+    let package = package_with_context(source.clone(), context);
+    let requests = requested_uris()[..2].to_vec();
+    let first = package.read_parts_ordered(&requests).unwrap();
+    assert_batch_bytes(&first, &expected);
+    drop(first);
+    let hits_before = package.cache_diagnostics().hits;
+
+    // The two-request preflight takes one opening fence, three fences per
+    // prepared request, one final preparation fence, and the read_parallel
+    // fence. The one-wave cached helper adds no second wave fence. Arm two
+    // panics so ordinal one also runs and the lowest ordinal is selected.
+    source.arm_after_with_panics(requests.len() * 3 + 3, 2);
+    let observed = catch_unwind(AssertUnwindSafe(|| package.read_parts_ordered(&requests)))
+        .expect("cached worker panic must be translated inside the batch");
+    assert!(matches!(
+        observed,
+        Err(OpcError::SourceBackedBatchWorkerPanic { ordinal: 0 })
+    ));
+    assert_eq!(
+        package.cache_diagnostics().hits - hits_before,
+        2,
+        "both requests in the one wave must run before the lowest error wins"
+    );
+    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn cached_source_change_after_helper_entry_fence_returns_source_changed() {
+    let (archive, _) = archive_bytes(None);
+    let mutable = Arc::new(MutableSource::new(archive));
+    let source = Arc::new(ChangeAfterVersionsSource::new(Arc::clone(&mutable)));
+    let (budget, _cancellation, context) =
+        managed_context(2, 2, u64::try_from(PART_BYTES * 2).unwrap(), 1, u64::MAX);
+    let package = package_with_context(source.clone(), context);
+    let requests = requested_uris()[..2].to_vec();
+    let first = package.read_parts_ordered(&requests).unwrap();
+    drop(first);
+
+    // The source changes at the first cached request's own freshness fence,
+    // after read_parallel's entry fence and all prepared metadata fences have
+    // already passed. The second request still runs in the same one wave.
+    source.arm_after(requests.len() * 3 + 3);
+    let result = package.read_parts_ordered(&requests);
+    assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
+    assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
 }
 
 #[test]

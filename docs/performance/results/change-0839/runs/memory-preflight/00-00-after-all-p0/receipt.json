@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/home/zhuhe/code/litchi-target-0839/launcher",
+    "--usage",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/usage.json",
+    "/home/zhuhe/code/litchi-target-0839/retained/after/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 11518,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/report.json",
+      "sha256": "4bc866eee1ae7bc4ef73d7715ee6d39e7e13cc4bd324847717aaaa3a4ae1d515"
+    },
+    {
+      "bytes": 20699,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/snapshots.json.gz",
+      "sha256": "f526f75444f04f63ef67a4f5cefca960229dddf68785cf572c23a098dad19c3e"
+    },
+    {
+      "bytes": 1470,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/started.json",
+      "sha256": "e6ae50d2fbb94b9323292ad3c2b4a6a581e91c5eef7273b8548ca8c4fb9cf8c1"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 151,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/memory-preflight/00-00-after-all-p0/usage.json",
+      "sha256": "a9a845ec156db0409c126837cff34c4ee815cc890618bb63685d4261a465f1cc"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790691854.8542674,
+  "started_unix": 1790691854.8351624
+}

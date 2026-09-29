@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/allocator/cached-part-memory-alloc",
+    "--route",
+    "parts",
+    "--shape",
+    "small",
+    "--state",
+    "primed",
+    "--task-floor",
+    "65536",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 70868,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/report.json",
+      "sha256": "e19a52b8d1fc992a489ca55737b03d52cc904d28d59550a6c6be5dcb6229b292"
+    },
+    {
+      "bytes": 1331,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/started.json",
+      "sha256": "568d8d2e9ef5d878f64ed07363225b8a7f27d02c5714cdffd688994e669b557e"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 11,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/allocation/02-03-before-all-p0/time.txt",
+      "sha256": "a9f6ece7eb5ca4de0833c41f70158421dca68f84d6fbc99d6696312e250e4438"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692207.8129928,
+  "started_unix": 1790692207.7809021
+}

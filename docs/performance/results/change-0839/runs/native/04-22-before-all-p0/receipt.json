@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/time.txt",
+    "/home/zhuhe/code/litchi-target-0839/retained/before/cached-part-memory",
+    "--route",
+    "parts",
+    "--shape",
+    "large",
+    "--state",
+    "fresh",
+    "--task-floor",
+    "0",
+    "--workers",
+    "4",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/report.json"
+  ],
+  "artifacts": [
+    {
+      "bytes": 56791,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/report.json",
+      "sha256": "0cecbd72f3353b7febf79020ea26cacb14575651f6cd31068491fcd063da7afb"
+    },
+    {
+      "bytes": 1274,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/started.json",
+      "sha256": "d3d129d4d6cee2c188e34d5e245e3555cd92d8cf1ecd5c27fbdec8463e381de7"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/runs/native/04-22-before-all-p0/time.txt",
+      "sha256": "058f4be61e11b5e37abf84ca7e7b0d87d49e1456ce89386335e6a6715ac425cc"
+    }
+  ],
+  "exit_code": 0,
+  "finished_unix": 1790692080.134911,
+  "started_unix": 1790692079.777295
+}
