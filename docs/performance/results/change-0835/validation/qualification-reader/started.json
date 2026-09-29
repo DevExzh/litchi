@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0835/reader.py",
+    "--qualification",
+    "docs/performance/results/change-0835/qualification.json",
+    "--write",
+    "docs/performance/results/change-0835/qualification-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790649921.2174191
+}

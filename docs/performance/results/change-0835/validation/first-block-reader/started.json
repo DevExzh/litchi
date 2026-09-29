@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "13",
+    "python3",
+    "-B",
+    "docs/performance/results/change-0835/check-first-block.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790650640.9372334
+}

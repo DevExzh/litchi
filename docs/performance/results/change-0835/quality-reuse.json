@@ -1,0 +1,83 @@
+{
+  "gates": [
+    "fmt",
+    "check",
+    "test",
+    "clippy",
+    "doc",
+    "boundaries"
+  ],
+  "inputs": {
+    "active-stage-v3.json": {
+      "bytes": 1777,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/active-stage-v3.json",
+      "sha256": "57fc37e1f30000db768533d04f4a5ae06a200651d9a47643dc001191d24f555c"
+    },
+    "active-stage.json": {
+      "bytes": 1101,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/active-stage.json",
+      "sha256": "ddf1268d6fd877a4afcbcc470e52a09e9c6ad062dc6d5f6c72775dd676534f2c"
+    },
+    "audit.json": {
+      "bytes": 187632,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/audit.json",
+      "sha256": "1491e25f767cfbb76edbcae1afbc723692f6bdd32582867a002144fb01bf0187"
+    },
+    "commands/quality-test/receipt.json": {
+      "bytes": 815,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-test/receipt.json",
+      "sha256": "d5e505a3b2f26013c6bf24c6d343b0c7bbd1d3abe18ec2f0d9b7a26a0888b61b"
+    },
+    "commands/quality-v3-boundaries/receipt.json": {
+      "bytes": 650,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-boundaries/receipt.json",
+      "sha256": "257414084c22680f8edf2fdce48ac8e618813083272695ad95e3a469ef79eca9"
+    },
+    "commands/quality-v3-check/receipt.json": {
+      "bytes": 744,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-check/receipt.json",
+      "sha256": "de7b363d23aa553c234b5e67efd3ba09d037c03c1416ad1df2b984ecc75eb54f"
+    },
+    "commands/quality-v3-clippy/receipt.json": {
+      "bytes": 781,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-clippy/receipt.json",
+      "sha256": "7afaa55c9796d252b6b126dd8f88dc09bd09df5a485a0d33138f1f8617ee74e2"
+    },
+    "commands/quality-v3-doc/receipt.json": {
+      "bytes": 736,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-doc/receipt.json",
+      "sha256": "78cebd39dcfa6d1a9096e6e76da5a62cc25469260f18893fd75b07dbec69a78e"
+    },
+    "commands/quality-v3-fmt/receipt.json": {
+      "bytes": 686,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-fmt/receipt.json",
+      "sha256": "7f6edae6e90ab857a7c497575c195ee5669af36b30c48916c64e87fbc5212f12"
+    },
+    "commands/quality-v3-test/receipt.json": {
+      "bytes": 858,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v3-test/receipt.json",
+      "sha256": "acf446d658c9e93197d105c8e4b0a6e4a6d1ed8aed612d361482e72c4178696b"
+    },
+    "freeze-repaired-v3.json": {
+      "bytes": 1206213,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired-v3.json",
+      "sha256": "0b71333af09b74e254c1648fc4af79b6b4f51cbaf54111e6695e3b71fbd68b80"
+    },
+    "quality-v3.json": {
+      "bytes": 640,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/quality-v3.json",
+      "sha256": "e712983efd46a11ab714cbe505ac529fc676b81ab70d52bae251e0e2245e2879"
+    },
+    "seal.json": {
+      "bytes": 27208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/seal.json",
+      "sha256": "2258cd3102fb60ae7bac8c30cb8e8a36b82bf91689a8e9250427e3abafad2724"
+    }
+  },
+  "prior_packet": "/home/zhuhe/code/litchi/docs/performance/results/change-0834",
+  "reused": true,
+  "scope": "Byte-identical source to committed final 0834 harness. Full library suite: 569 passed, 1 ignored before two helper amendments; final helper: 12 tests plus fmt/check/clippy/doc/boundaries. No new full-suite run claimed. New release build and complete warm/cold qualification required.",
+  "source_count": 9389,
+  "source_matches_exactly": true,
+  "status": "pass"
+}

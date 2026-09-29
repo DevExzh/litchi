@@ -1,0 +1,538 @@
+{
+  "admission": "Fresh six-case warm/cold qualification and paired OPC saves plus independent strict reader; quality reused only for byte-identical committed source with original full-suite/amendment scope disclosed.",
+  "base": "77adc4f1e24bdf76f5e34ed4dfc0113e25120c59",
+  "cpu": 12,
+  "expected_reports": 72,
+  "expected_samples": 2160,
+  "limits": [
+    "No before/after optimization claim",
+    "Cold proves page cache and procfs only",
+    "Warm and cold ZIP alignment differ; no cross-cache byte identity assumption",
+    "PPTX logical ReadAt evidence is an untimed source replay",
+    "Eager route logical read counters are unavailable, not zero I/O",
+    "No allocation observer or hardware counter claim",
+    "Default atomic save durability retained",
+    "One host and deterministic synthetic corpora"
+  ],
+  "purpose": "Descriptive current-source route/cache baseline; no production optimization",
+  "rows": [
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "cold-verified",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "opc_file_source_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "opc_file_eager_one_part_atomic_save",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "opc_file_source_open",
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "cache_state": "warm",
+      "case": "opc_file_eager_open",
+      "samples": 30,
+      "warmup": 3
+    }
+  ],
+  "schema": "litchi.0835.filesystem-plan.v1",
+  "statistics": {
+    "bootstrap_resamples": 10000,
+    "paired_comparisons": "eager/source per operation and cache state; block-paired p50 ratios",
+    "process_quantiles": "p50 integer midpoint; p95/p99 nearest rank",
+    "seed": 835083,
+    "sorted_endpoints": [
+      249,
+      9749
+    ],
+    "spread_flag": "max/min block p50, p95, p99 or peak RSS exceeds 1.2",
+    "summary": "midpoint median of six process p50 values",
+    "tail_flag": "none; p99 equals block maximum with 30 samples"
+  }
+}

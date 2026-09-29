@@ -1,0 +1,29 @@
+{
+  "analyzer": {
+    "bytes": 28256,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/analyze.py",
+    "sha256": "3713b3ab53c7d3c8634e4a95b8df90da20f54be076bdf7c843c8e159009754c6"
+  },
+  "auditor": {
+    "bytes": 46331,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/audit.py",
+    "sha256": "02af0a27167bcbcd9f356ecbb286308e131355bf74e581c4a828ecaf24833212"
+  },
+  "checks": [
+    "Python syntax",
+    "source/host/quality/build/qualification custody",
+    "both statistics plan validators",
+    "30-value midpoint/nearest-rank oracle"
+  ],
+  "plan": {
+    "bytes": 12635,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/measurement-plan.json",
+    "sha256": "34f1da4b65b6f7aac7c218763695d3fa03ab03477a6e390c6233ec8270820d1f"
+  },
+  "reader": {
+    "bytes": 36877,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/reader.py",
+    "sha256": "331422a310c4fbacc93b923b89b9370b60c669abc46a08b53fc93cad503ccf3d"
+  },
+  "status": "pass"
+}

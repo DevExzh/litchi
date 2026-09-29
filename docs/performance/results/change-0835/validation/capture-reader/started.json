@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0835/reader.py",
+    "--capture",
+    "docs/performance/results/change-0835/capture.json",
+    "--write",
+    "docs/performance/results/change-0835/capture-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790652252.8296716
+}

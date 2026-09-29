@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0835 — filesystem route/cache baseline admitted
+
+[0835](0835-filesystem-route-cache-baseline.md) Fresh committed-source measurements retain 72 formal reports / 2,160 samples, plus seven qualification reports / sixteen samples. Source-backed OPC open p50 medians are 0.168270 ms warm and 4.766426 ms verified-cold; source-backed PPTX selected-slide lifecycle is 2.924480 / 13.871920 ms. All twelve rows, six descriptive route ratios, and process metrics pass independent replay; no planned 20% block-spread flag is triggered. OPC open lifetime asymmetry and private cold ZIP padding remain explicit. Production is unchanged, and the broader non-iWork goal remains open.
+
 ## 0834 — aligned-source filesystem harness qualified
 
 [0834](0834-aligned-source-harness-repair.md) Repairs PPTX metadata-tail classification and OPC cold EOCD-comment proof without production or timer changes. All seven final qualification commands pass (six warm/cold selectors plus paired OPC saves). Twelve retained reports contain 25 diagnostic/qualification samples; prior failures remain explicit. Independent replay and 31 mutation checks pass. The formal baseline is deferred until after this harness repair is committed; no speedup is claimed.
