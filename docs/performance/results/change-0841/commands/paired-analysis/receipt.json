@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0841/analyze_v2.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790697352.6806593,
+  "log": {
+    "bytes": 804,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/paired-analysis/output.log",
+    "sha256": "8b537ed01a538d433d77bf5736ba9a1a0deb30c49e9c9a8885d9df28e6915a9a"
+  },
+  "started_unix": 1790697351.6328673
+}

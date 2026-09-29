@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys;sys.path.insert(0,'docs/performance/results/change-0841');import qualify as q;v=q.qualification();print('qualification replay PASS',v['reports'])"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790696834.1365705,
+  "log": {
+    "bytes": 29,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/reader-preflight/output.log",
+    "sha256": "ce7d2012ebb9d5a5fd1240fbd99a65e62bbec46aadf19524c17887170d29ce06"
+  },
+  "started_unix": 1790696833.82055
+}

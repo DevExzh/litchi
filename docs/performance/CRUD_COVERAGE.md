@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0841 — current PPT borrowed-text instruction diagnosis
+
+[0841](0841-ppt-borrowed-text-instruction-diagnostic.md) adds exact-output, semantic/raw-text and independent CFB evidence for ten fresh PPT write/lifecycle cases, plus scoped guest instruction diagnostics. This is not a producer, opened-edit, cold/range, concurrency or scaling coverage promotion. Both source states pass owner gates; the candidate is restored, and the full OLE2/OOXML goal remains open.
+
 ## 0840 — fresh CFB emission avoids large payload gap initialization
 
 [0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.

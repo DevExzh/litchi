@@ -1,0 +1,14 @@
+{
+  "analysis": {
+    "bytes": 3240312,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analysis.json",
+    "sha256": "ced1cf52d276d0257f27430904609d40267f689a70522a1da24ee64f6378ffcb"
+  },
+  "checker": {
+    "bytes": 985,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/interval_crosscheck.py",
+    "sha256": "d8b57f3b8ca5a7a5e3e1dabcfba16ffe59648981ea03103a47f7ffdb7b8555ed"
+  },
+  "paired_intervals": 60,
+  "status": "pass"
+}

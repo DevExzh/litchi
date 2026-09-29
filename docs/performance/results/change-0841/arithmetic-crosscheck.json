@@ -1,0 +1,10 @@
+{
+  "analysis": {
+    "bytes": 3240312,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analysis.json",
+    "sha256": "ced1cf52d276d0257f27430904609d40267f689a70522a1da24ee64f6378ffcb"
+  },
+  "native_quantile_rows": 30,
+  "profile_partitions": 8,
+  "status": "pass"
+}

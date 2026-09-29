@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-lifecycle-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "unicode",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-lifecycle-leg-b/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790697017.9070263,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/native-05-unicode-lifecycle-leg-b/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790697016.6997917
+}

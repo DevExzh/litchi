@@ -1,0 +1,39 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-a/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=ppt_profile_probe::profile_write",
+    "--zero-before=ppt_profile_probe::profile_write",
+    "--dump-after=ppt_profile_probe::profile_write",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-a/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe",
+    "--mode",
+    "write",
+    "--shape",
+    "many",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-a/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790697313.8180099,
+  "log": {
+    "bytes": 677,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/profiles-00-many-write-leg-a/output.log",
+    "sha256": "df527422e63c9eab943e1fb8f866dc05a15cc17d6a0dc399d1144a4ae2c967d2"
+  },
+  "started_unix": 1790697313.3911276
+}

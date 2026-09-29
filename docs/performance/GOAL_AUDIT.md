@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0841 — current PPT borrowed-text instruction diagnosis
+
+[0841](0841-ppt-borrowed-text-instruction-diagnostic.md) makes verified diagnostic progress: 156 reports / 3,636 samples, exact artifact parity, lower scoped guest Ir, thirty native quantile cross-checks and sixty independently recomputed intervals. Current many/Unicode regressions do not reproduce, but no candidate is adopted and no historical cause is assigned. Reader freeze/command-format defects are retained and repaired additively without rerunning workloads. Production and unrelated work are preserved; the broad goal is not complete.
+
 ## 0840 — fresh CFB emission avoids large payload gap initialization
 
 [0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.

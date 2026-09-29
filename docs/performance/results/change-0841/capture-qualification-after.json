@@ -1,0 +1,60 @@
+{
+  "plan": {
+    "bytes": 23861,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/plan.json",
+    "sha256": "f677d32292ee282228d0b25898e50662b6529247004b41205724a7725207d9d3"
+  },
+  "receipts": [
+    {
+      "bytes": 1453,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-tiny-write-leg-b/receipt.json",
+      "sha256": "52224caf2f553373a203b4b1eeac39512c25b472c4da551142bc9efdd5858f78"
+    },
+    {
+      "bytes": 1477,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "7f16f3ddb10d27b17a0bc4905be2b01e89014aa6528e05c29f32f97ab8828f43"
+    },
+    {
+      "bytes": 1455,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-many-write-leg-b/receipt.json",
+      "sha256": "a2b2508378fc64f0ce1e651071fceb8b54e3fa49ea954bbcdfc9774e3ee19133"
+    },
+    {
+      "bytes": 1478,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-many-lifecycle-leg-b/receipt.json",
+      "sha256": "2c593766ceb18fc0164ec2f0bb09471ac0952935c4c3ffc7bdb933f611fdc4a0"
+    },
+    {
+      "bytes": 1474,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-payload-write-leg-b/receipt.json",
+      "sha256": "29eda2c62533cc1ee6e3c87822a7cdfb7c93f6601dde4d3a489d77596bf6c050"
+    },
+    {
+      "bytes": 1498,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "5c82d7894169ff71dca2caa10bc6d4c32cdf93fd104ef5192ca1578d25d60f6d"
+    },
+    {
+      "bytes": 1474,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-unicode-write-leg-b/receipt.json",
+      "sha256": "c229de4e28094a22585c27e04b843a4d8e5e888ff370954a962b9b265e0bc556"
+    },
+    {
+      "bytes": 1497,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "7ca05a5ef4031b5170b298c88b515c2a7d9ae214a35247d5ba35bb3618e81fc4"
+    },
+    {
+      "bytes": 1452,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-rich-write-leg-b/receipt.json",
+      "sha256": "eea317702414eccbe4935b06bc4699024d659ae4c0876ae3483ce45f13b3c98c"
+    },
+    {
+      "bytes": 1477,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "6e4df8c13e538a582efbb7865eb981ba88cc4453e617a7aafebbe0f6597f2ef0"
+    }
+  ],
+  "status": "pass"
+}

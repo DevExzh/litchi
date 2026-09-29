@@ -1,0 +1,2767 @@
+
+/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000001229b0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children>:
+  1229b0:	55                   	push   %rbp
+  1229b1:	41 57                	push   %r15
+  1229b3:	41 56                	push   %r14
+  1229b5:	41 55                	push   %r13
+  1229b7:	41 54                	push   %r12
+  1229b9:	53                   	push   %rbx
+  1229ba:	48 81 ec 68 02 00 00 	sub    $0x268,%rsp
+  1229c1:	49 89 cf             	mov    %rcx,%r15
+  1229c4:	89 f5                	mov    %esi,%ebp
+  1229c6:	48 89 3c 24          	mov    %rdi,(%rsp)
+  1229ca:	44 8b 21             	mov    (%rcx),%r12d
+  1229cd:	44 0f b6 b2 a1 02 00 	movzbl 0x2a1(%rdx),%r14d
+  1229d4:	00 
+  1229d5:	0f b6 9a a2 02 00 00 	movzbl 0x2a2(%rdx),%ebx
+  1229dc:	48 89 54 24 10       	mov    %rdx,0x10(%rsp)
+  1229e1:	0f b7 82 9e 02 00 00 	movzwl 0x29e(%rdx),%eax
+  1229e8:	25 ff 0f 00 00       	and    $0xfff,%eax
+  1229ed:	c7 84 24 30 02 00 00 	movl   $0x0,0x230(%rsp)
+  1229f4:	00 00 00 00 
+  1229f8:	66 89 84 24 34 02 00 	mov    %ax,0x234(%rsp)
+  1229ff:	00 
+  122a00:	66 c7 84 24 36 02 00 	movw   $0xf00a,0x236(%rsp)
+  122a07:	00 0a f0 
+  122a0a:	c6 84 24 38 02 00 00 	movb   $0x2,0x238(%rsp)
+  122a11:	02 
+  122a12:	48 c7 84 24 18 02 00 	movq   $0x0,0x218(%rsp)
+  122a19:	00 00 00 00 00 
+  122a1e:	48 c7 84 24 20 02 00 	movq   $0x1,0x220(%rsp)
+  122a25:	00 01 00 00 00 
+  122a2a:	48 c7 84 24 28 02 00 	movq   $0x0,0x228(%rsp)
+  122a31:	00 00 00 00 00 
+  122a36:	48 8d bc 24 18 02 00 	lea    0x218(%rsp),%rdi
+  122a3d:	00 
+  122a3e:	ba 08 00 00 00       	mov    $0x8,%edx
+  122a43:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122a48:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122a4e:	31 f6                	xor    %esi,%esi
+  122a50:	e8 cb b1 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  122a55:	31 c0                	xor    %eax,%eax
+  122a57:	41 83 fc 02          	cmp    $0x2,%r12d
+  122a5b:	0f 94 c0             	sete   %al
+  122a5e:	41 c1 e6 06          	shl    $0x6,%r14d
+  122a62:	41 8d 04 46          	lea    (%r14,%rax,2),%eax
+  122a66:	c1 e3 07             	shl    $0x7,%ebx
+  122a69:	01 d8                	add    %ebx,%eax
+  122a6b:	05 00 0a 00 00       	add    $0xa00,%eax
+  122a70:	4c 8b b4 24 20 02 00 	mov    0x220(%rsp),%r14
+  122a77:	00 
+  122a78:	48 8b 9c 24 28 02 00 	mov    0x228(%rsp),%rbx
+  122a7f:	00 
+  122a80:	41 89 2c 1e          	mov    %ebp,(%r14,%rbx,1)
+  122a84:	41 89 44 1e 04       	mov    %eax,0x4(%r14,%rbx,1)
+  122a89:	4c 8d 6b 08          	lea    0x8(%rbx),%r13
+  122a8d:	4c 89 ac 24 28 02 00 	mov    %r13,0x228(%rsp)
+  122a94:	00 
+  122a95:	44 89 ac 24 30 02 00 	mov    %r13d,0x230(%rsp)
+  122a9c:	00 
+  122a9d:	48 83 c3 10          	add    $0x10,%rbx
+  122aa1:	79 13                	jns    122ab6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x106>
+  122aa3:	45 31 ff             	xor    %r15d,%r15d
+  122aa6:	4c 89 ff             	mov    %r15,%rdi
+  122aa9:	48 89 de             	mov    %rbx,%rsi
+  122aac:	e8 30 62 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  122ab1:	e9 c4 29 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  122ab6:	44 89 a4 24 10 02 00 	mov    %r12d,0x210(%rsp)
+  122abd:	00 
+  122abe:	4c 89 bc 24 b8 01 00 	mov    %r15,0x1b8(%rsp)
+  122ac5:	00 
+  122ac6:	48 89 df             	mov    %rbx,%rdi
+  122ac9:	ff 15 11 d5 04 00    	call   *0x4d511(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  122acf:	41 bf 01 00 00 00    	mov    $0x1,%r15d
+  122ad5:	48 85 c0             	test   %rax,%rax
+  122ad8:	74 cc                	je     122aa6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf6>
+  122ada:	49 89 c4             	mov    %rax,%r12
+  122add:	0f b6 84 24 38 02 00 	movzbl 0x238(%rsp),%eax
+  122ae4:	00 
+  122ae5:	8b 8c 24 34 02 00 00 	mov    0x234(%rsp),%ecx
+  122aec:	0f b7 94 24 36 02 00 	movzwl 0x236(%rsp),%edx
+  122af3:	00 
+  122af4:	c1 e1 04             	shl    $0x4,%ecx
+  122af7:	83 e0 0f             	and    $0xf,%eax
+  122afa:	09 c8                	or     %ecx,%eax
+  122afc:	66 41 89 04 24       	mov    %ax,(%r12)
+  122b01:	66 41 89 54 24 02    	mov    %dx,0x2(%r12)
+  122b07:	45 89 6c 24 04       	mov    %r13d,0x4(%r12)
+  122b0c:	4c 89 e7             	mov    %r12,%rdi
+  122b0f:	48 83 c7 08          	add    $0x8,%rdi
+  122b13:	4c 89 f6             	mov    %r14,%rsi
+  122b16:	4c 89 ea             	mov    %r13,%rdx
+  122b19:	ff 15 c9 d4 04 00    	call   *0x4d4c9(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  122b1f:	4c 8b 2c 24          	mov    (%rsp),%r13
+  122b23:	49 8b 45 00          	mov    0x0(%r13),%rax
+  122b27:	4d 8b 75 10          	mov    0x10(%r13),%r14
+  122b2b:	4c 29 f0             	sub    %r14,%rax
+  122b2e:	48 39 c3             	cmp    %rax,%rbx
+  122b31:	48 8b 6c 24 10       	mov    0x10(%rsp),%rbp
+  122b36:	0f 87 cf 1d 00 00    	ja     12490b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1f5b>
+  122b3c:	49 8b 7d 08          	mov    0x8(%r13),%rdi
+  122b40:	4c 01 f7             	add    %r14,%rdi
+  122b43:	4c 89 e6             	mov    %r12,%rsi
+  122b46:	48 89 da             	mov    %rbx,%rdx
+  122b49:	ff 15 99 d4 04 00    	call   *0x4d499(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  122b4f:	49 01 de             	add    %rbx,%r14
+  122b52:	4d 89 75 10          	mov    %r14,0x10(%r13)
+  122b56:	4c 89 e7             	mov    %r12,%rdi
+  122b59:	ff 15 91 d4 04 00    	call   *0x4d491(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  122b5f:	bb 60 00 00 00       	mov    $0x60,%ebx
+  122b64:	bf 60 00 00 00       	mov    $0x60,%edi
+  122b69:	ff 15 71 d4 04 00    	call   *0x4d471(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  122b6f:	48 85 c0             	test   %rax,%rax
+  122b72:	0f 84 2e ff ff ff    	je     122aa6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf6>
+  122b78:	48 c7 44 24 20 10 00 	movq   $0x10,0x20(%rsp)
+  122b7f:	00 00 
+  122b81:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+  122b86:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+  122b8d:	00 00 
+  122b8f:	83 bd 48 02 00 00 01 	cmpl   $0x1,0x248(%rbp)
+  122b96:	75 36                	jne    122bce <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x21e>
+  122b98:	8b 8d 4c 02 00 00    	mov    0x24c(%rbp),%ecx
+  122b9e:	48 89 ca             	mov    %rcx,%rdx
+  122ba1:	48 c1 e2 10          	shl    $0x10,%rdx
+  122ba5:	48 83 ca 04          	or     $0x4,%rdx
+  122ba9:	c1 e9 10             	shr    $0x10,%ecx
+  122bac:	66 89 48 04          	mov    %cx,0x4(%rax)
+  122bb0:	89 10                	mov    %edx,(%rax)
+  122bb2:	48 c7 44 24 30 01 00 	movq   $0x1,0x30(%rsp)
+  122bb9:	00 00 
+  122bbb:	ba 01 00 00 00       	mov    $0x1,%edx
+  122bc0:	4c 8b 7d 10          	mov    0x10(%rbp),%r15
+  122bc4:	4d 85 ff             	test   %r15,%r15
+  122bc7:	75 10                	jne    122bd9 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x229>
+  122bc9:	e9 88 00 00 00       	jmp    122c56 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a6>
+  122bce:	31 d2                	xor    %edx,%edx
+  122bd0:	4c 8b 7d 10          	mov    0x10(%rbp),%r15
+  122bd4:	4d 85 ff             	test   %r15,%r15
+  122bd7:	74 7d                	je     122c56 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a6>
+  122bd9:	48 8b 4d 08          	mov    0x8(%rbp),%rcx
+  122bdd:	48 89 4c 24 08       	mov    %rcx,0x8(%rsp)
+  122be2:	49 c1 e7 02          	shl    $0x2,%r15
+  122be6:	8d 0c 12             	lea    (%rdx,%rdx,1),%ecx
+  122be9:	4c 8d 2c 49          	lea    (%rcx,%rcx,2),%r13
+  122bed:	66 bd 47 01          	mov    $0x147,%bp
+  122bf1:	31 db                	xor    %ebx,%ebx
+  122bf3:	eb 42                	jmp    122c37 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x287>
+  122bf5:	66 66 2e 0f 1f 84 00 	data16 cs nopw 0x0(%rax,%rax,1)
+  122bfc:	00 00 00 00 
+  122c00:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122c05:	0f b7 ed             	movzwl %bp,%ebp
+  122c08:	49 c1 e6 10          	shl    $0x10,%r14
+  122c0c:	49 09 ee             	or     %rbp,%r14
+  122c0f:	46 89 34 28          	mov    %r14d,(%rax,%r13,1)
+  122c13:	49 c1 ee 20          	shr    $0x20,%r14
+  122c17:	66 46 89 74 28 04    	mov    %r14w,0x4(%rax,%r13,1)
+  122c1d:	4c 89 e2             	mov    %r12,%rdx
+  122c20:	48 ff c2             	inc    %rdx
+  122c23:	48 89 54 24 30       	mov    %rdx,0x30(%rsp)
+  122c28:	49 83 c5 06          	add    $0x6,%r13
+  122c2c:	48 83 c3 04          	add    $0x4,%rbx
+  122c30:	ff c5                	inc    %ebp
+  122c32:	49 39 df             	cmp    %rbx,%r15
+  122c35:	74 1f                	je     122c56 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a6>
+  122c37:	48 8b 4c 24 08       	mov    0x8(%rsp),%rcx
+  122c3c:	44 8b 34 19          	mov    (%rcx,%rbx,1),%r14d
+  122c40:	49 89 d4             	mov    %rdx,%r12
+  122c43:	48 3b 54 24 20       	cmp    0x20(%rsp),%rdx
+  122c48:	75 bb                	jne    122c05 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x255>
+  122c4a:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122c4f:	e8 3c 2b 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122c54:	eb aa                	jmp    122c00 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x250>
+  122c56:	4c 8b 64 24 10       	mov    0x10(%rsp),%r12
+  122c5b:	41 83 bc 24 58 02 00 	cmpl   $0x1,0x258(%r12)
+  122c62:	00 01 
+  122c64:	0f 85 eb 00 00 00    	jne    122d55 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x3a5>
+  122c6a:	41 8b 9c 24 5c 02 00 	mov    0x25c(%r12),%ebx
+  122c71:	00 
+  122c72:	49 89 d5             	mov    %rdx,%r13
+  122c75:	48 3b 54 24 20       	cmp    0x20(%rsp),%rdx
+  122c7a:	75 0a                	jne    122c86 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d6>
+  122c7c:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122c81:	e8 0a 2b 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122c86:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122c8b:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  122c92:	00 
+  122c93:	4c 01 e9             	add    %r13,%rcx
+  122c96:	66 c7 44 48 04 80 00 	movw   $0x80,0x4(%rax,%rcx,2)
+  122c9d:	c7 04 48 7f 00 80 00 	movl   $0x80007f,(%rax,%rcx,2)
+  122ca4:	4d 8d 75 01          	lea    0x1(%r13),%r14
+  122ca8:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  122cad:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  122cb2:	75 0a                	jne    122cbe <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x30e>
+  122cb4:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122cb9:	e8 d2 2a 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122cbe:	48 c1 e3 10          	shl    $0x10,%rbx
+  122cc2:	48 81 cb 04 41 00 00 	or     $0x4104,%rbx
+  122cc9:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122cce:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  122cd2:	89 1c 48             	mov    %ebx,(%rax,%rcx,2)
+  122cd5:	48 c1 eb 20          	shr    $0x20,%rbx
+  122cd9:	66 89 5c 48 04       	mov    %bx,0x4(%rax,%rcx,2)
+  122cde:	49 8d 5d 02          	lea    0x2(%r13),%rbx
+  122ce2:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  122ce7:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  122cec:	75 0a                	jne    122cf8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x348>
+  122cee:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122cf3:	e8 98 2a 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122cf8:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122cfd:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  122d01:	48 ba bf 01 00 00 10 	movabs $0x10000001bf,%rdx
+  122d08:	00 00 00 
+  122d0b:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  122d0e:	66 c7 44 48 04 10 00 	movw   $0x10,0x4(%rax,%rcx,2)
+  122d15:	49 8d 5d 03          	lea    0x3(%r13),%rbx
+  122d19:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  122d1e:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  122d23:	75 0a                	jne    122d2f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x37f>
+  122d25:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122d2a:	e8 61 2a 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122d2f:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122d34:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  122d38:	48 ba ff 01 00 00 08 	movabs $0x8000001ff,%rdx
+  122d3f:	00 00 00 
+  122d42:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  122d45:	66 c7 44 48 04 08 00 	movw   $0x8,0x4(%rax,%rcx,2)
+  122d4c:	49 83 c5 04          	add    $0x4,%r13
+  122d50:	e9 67 0a 00 00       	jmp    1237bc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xe0c>
+  122d55:	48 bb 01 02 02 00 00 	movabs $0x80000020201,%rbx
+  122d5c:	08 00 00 
+  122d5f:	41 80 bc 24 b0 01 00 	cmpb   $0x0,0x1b0(%r12)
+  122d66:	00 00 
+  122d68:	49 89 d5             	mov    %rdx,%r13
+  122d6b:	0f 84 e7 06 00 00    	je     123458 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xaa8>
+  122d71:	45 8b bc 24 b4 01 00 	mov    0x1b4(%r12),%r15d
+  122d78:	00 
+  122d79:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  122d7e:	41 80 bc 24 b8 01 00 	cmpb   $0x0,0x1b8(%r12)
+  122d85:	00 00 
+  122d87:	74 4d                	je     122dd6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x426>
+  122d89:	45 8b b4 24 bc 01 00 	mov    0x1bc(%r12),%r14d
+  122d90:	00 
+  122d91:	49 39 c5             	cmp    %rax,%r13
+  122d94:	75 0a                	jne    122da0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x3f0>
+  122d96:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122d9b:	e8 f0 29 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122da0:	49 c1 e6 10          	shl    $0x10,%r14
+  122da4:	49 81 ce 80 01 00 00 	or     $0x180,%r14
+  122dab:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122db0:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  122db7:	00 
+  122db8:	4c 01 e9             	add    %r13,%rcx
+  122dbb:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122dbf:	49 c1 ee 20          	shr    $0x20,%r14
+  122dc3:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122dc9:	49 ff c5             	inc    %r13
+  122dcc:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  122dd1:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  122dd6:	49 39 c5             	cmp    %rax,%r13
+  122dd9:	75 0a                	jne    122de5 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x435>
+  122ddb:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122de0:	e8 ab 29 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122de5:	49 c1 e7 10          	shl    $0x10,%r15
+  122de9:	49 81 cf 81 01 00 00 	or     $0x181,%r15
+  122df0:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122df5:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  122dfc:	00 
+  122dfd:	4c 01 e9             	add    %r13,%rcx
+  122e00:	44 89 3c 48          	mov    %r15d,(%rax,%rcx,2)
+  122e04:	49 c1 ef 20          	shr    $0x20,%r15
+  122e08:	66 44 89 7c 48 04    	mov    %r15w,0x4(%rax,%rcx,2)
+  122e0e:	4d 8d 7d 01          	lea    0x1(%r13),%r15
+  122e12:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  122e17:	41 83 bc 24 c8 01 00 	cmpl   $0x1,0x1c8(%r12)
+  122e1e:	00 01 
+  122e20:	75 47                	jne    122e69 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x4b9>
+  122e22:	45 8b b4 24 cc 01 00 	mov    0x1cc(%r12),%r14d
+  122e29:	00 
+  122e2a:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  122e2f:	75 0a                	jne    122e3b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x48b>
+  122e31:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122e36:	e8 55 29 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122e3b:	49 c1 e6 10          	shl    $0x10,%r14
+  122e3f:	49 81 ce 83 01 00 00 	or     $0x183,%r14
+  122e46:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122e4b:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  122e4f:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122e53:	49 c1 ee 20          	shr    $0x20,%r14
+  122e57:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122e5d:	49 83 c5 02          	add    $0x2,%r13
+  122e61:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  122e66:	4d 89 ef             	mov    %r13,%r15
+  122e69:	41 83 bc 24 d0 01 00 	cmpl   $0x1,0x1d0(%r12)
+  122e70:	00 01 
+  122e72:	75 43                	jne    122eb7 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x507>
+  122e74:	45 8b b4 24 d4 01 00 	mov    0x1d4(%r12),%r14d
+  122e7b:	00 
+  122e7c:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  122e81:	75 0a                	jne    122e8d <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x4dd>
+  122e83:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122e88:	e8 03 29 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122e8d:	49 c1 e6 10          	shl    $0x10,%r14
+  122e91:	49 81 ce 8b 01 00 00 	or     $0x18b,%r14
+  122e98:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122e9d:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  122ea1:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122ea5:	49 c1 ee 20          	shr    $0x20,%r14
+  122ea9:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122eaf:	49 ff c7             	inc    %r15
+  122eb2:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  122eb7:	41 83 bc 24 c0 01 00 	cmpl   $0x1,0x1c0(%r12)
+  122ebe:	00 01 
+  122ec0:	75 43                	jne    122f05 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x555>
+  122ec2:	45 8b b4 24 c4 01 00 	mov    0x1c4(%r12),%r14d
+  122ec9:	00 
+  122eca:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  122ecf:	75 0a                	jne    122edb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x52b>
+  122ed1:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122ed6:	e8 b5 28 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122edb:	49 c1 e6 10          	shl    $0x10,%r14
+  122edf:	49 81 ce 82 01 00 00 	or     $0x182,%r14
+  122ee6:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122eeb:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  122eef:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122ef3:	49 c1 ee 20          	shr    $0x20,%r14
+  122ef7:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122efd:	49 ff c7             	inc    %r15
+  122f00:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  122f05:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  122f0a:	75 0a                	jne    122f16 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x566>
+  122f0c:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122f11:	e8 7a 28 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122f16:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122f1b:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  122f1f:	66 c7 44 48 04 15 00 	movw   $0x15,0x4(%rax,%rcx,2)
+  122f26:	c7 04 48 bf 01 11 00 	movl   $0x1101bf,(%rax,%rcx,2)
+  122f2d:	49 ff c7             	inc    %r15
+  122f30:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  122f35:	41 80 bc 24 d8 01 00 	cmpb   $0x0,0x1d8(%r12)
+  122f3c:	00 00 
+  122f3e:	0f 85 d0 05 00 00    	jne    123514 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xb64>
+  122f44:	41 83 bc 24 e0 01 00 	cmpl   $0x1,0x1e0(%r12)
+  122f4b:	00 01 
+  122f4d:	0f 85 13 06 00 00    	jne    123566 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xbb6>
+  122f53:	45 8b b4 24 e4 01 00 	mov    0x1e4(%r12),%r14d
+  122f5a:	00 
+  122f5b:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  122f60:	75 0a                	jne    122f6c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x5bc>
+  122f62:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122f67:	e8 24 28 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122f6c:	49 c1 e6 10          	shl    $0x10,%r14
+  122f70:	49 81 ce c0 01 00 00 	or     $0x1c0,%r14
+  122f77:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122f7c:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  122f80:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122f84:	49 c1 ee 20          	shr    $0x20,%r14
+  122f88:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122f8e:	4d 8d 6f 01          	lea    0x1(%r15),%r13
+  122f92:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  122f97:	41 83 bc 24 f0 01 00 	cmpl   $0x1,0x1f0(%r12)
+  122f9e:	00 01 
+  122fa0:	75 4e                	jne    122ff0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x640>
+  122fa2:	45 8b b4 24 f4 01 00 	mov    0x1f4(%r12),%r14d
+  122fa9:	00 
+  122faa:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  122faf:	75 0a                	jne    122fbb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x60b>
+  122fb1:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  122fb6:	e8 d5 27 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  122fbb:	49 c1 e6 10          	shl    $0x10,%r14
+  122fbf:	49 81 ce c1 01 00 00 	or     $0x1c1,%r14
+  122fc6:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  122fcb:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  122fd2:	00 
+  122fd3:	4c 01 e9             	add    %r13,%rcx
+  122fd6:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  122fda:	49 c1 ee 20          	shr    $0x20,%r14
+  122fde:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  122fe4:	49 83 c7 02          	add    $0x2,%r15
+  122fe8:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  122fed:	4d 89 fd             	mov    %r15,%r13
+  122ff0:	41 83 bc 24 e8 01 00 	cmpl   $0x1,0x1e8(%r12)
+  122ff7:	00 01 
+  122ff9:	75 4a                	jne    123045 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x695>
+  122ffb:	45 8b b4 24 ec 01 00 	mov    0x1ec(%r12),%r14d
+  123002:	00 
+  123003:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  123008:	75 0a                	jne    123014 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x664>
+  12300a:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12300f:	e8 7c 27 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123014:	49 c1 e6 10          	shl    $0x10,%r14
+  123018:	49 81 ce cb 01 00 00 	or     $0x1cb,%r14
+  12301f:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123024:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  12302b:	00 
+  12302c:	4c 01 e9             	add    %r13,%rcx
+  12302f:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123033:	49 c1 ee 20          	shr    $0x20,%r14
+  123037:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  12303d:	49 ff c5             	inc    %r13
+  123040:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  123045:	41 83 bc 24 f8 01 00 	cmpl   $0x1,0x1f8(%r12)
+  12304c:	00 01 
+  12304e:	75 4a                	jne    12309a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x6ea>
+  123050:	45 8b b4 24 fc 01 00 	mov    0x1fc(%r12),%r14d
+  123057:	00 
+  123058:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  12305d:	75 0a                	jne    123069 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x6b9>
+  12305f:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123064:	e8 27 27 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123069:	49 c1 e6 10          	shl    $0x10,%r14
+  12306d:	49 81 ce cd 01 00 00 	or     $0x1cd,%r14
+  123074:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123079:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123080:	00 
+  123081:	4c 01 e9             	add    %r13,%rcx
+  123084:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123088:	49 c1 ee 20          	shr    $0x20,%r14
+  12308c:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123092:	49 ff c5             	inc    %r13
+  123095:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  12309a:	41 83 bc 24 00 02 00 	cmpl   $0x1,0x200(%r12)
+  1230a1:	00 01 
+  1230a3:	75 4a                	jne    1230ef <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x73f>
+  1230a5:	45 8b b4 24 04 02 00 	mov    0x204(%r12),%r14d
+  1230ac:	00 
+  1230ad:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  1230b2:	75 0a                	jne    1230be <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x70e>
+  1230b4:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1230b9:	e8 d2 26 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1230be:	49 c1 e6 10          	shl    $0x10,%r14
+  1230c2:	49 81 ce ce 01 00 00 	or     $0x1ce,%r14
+  1230c9:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1230ce:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  1230d5:	00 
+  1230d6:	4c 01 e9             	add    %r13,%rcx
+  1230d9:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  1230dd:	49 c1 ee 20          	shr    $0x20,%r14
+  1230e1:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  1230e7:	49 ff c5             	inc    %r13
+  1230ea:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1230ef:	41 83 bc 24 08 02 00 	cmpl   $0x1,0x208(%r12)
+  1230f6:	00 01 
+  1230f8:	0f 85 f7 00 00 00    	jne    1231f5 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x845>
+  1230fe:	45 8b b4 24 0c 02 00 	mov    0x20c(%r12),%r14d
+  123105:	00 
+  123106:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  12310b:	75 0a                	jne    123117 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x767>
+  12310d:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123112:	e8 79 26 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123117:	49 c1 e6 10          	shl    $0x10,%r14
+  12311b:	49 81 ce d0 01 00 00 	or     $0x1d0,%r14
+  123122:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123127:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  12312e:	00 
+  12312f:	4c 01 e9             	add    %r13,%rcx
+  123132:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123136:	49 c1 ee 20          	shr    $0x20,%r14
+  12313a:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123140:	4d 8d 75 01          	lea    0x1(%r13),%r14
+  123144:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  123149:	41 8b 84 24 1c 02 00 	mov    0x21c(%r12),%eax
+  123150:	00 
+  123151:	48 c1 e0 10          	shl    $0x10,%rax
+  123155:	48 0d d2 01 00 00    	or     $0x1d2,%rax
+  12315b:	41 80 bc 24 18 02 00 	cmpb   $0x0,0x218(%r12)
+  123162:	00 00 
+  123164:	41 bf d2 01 01 00    	mov    $0x101d2,%r15d
+  12316a:	4c 0f 45 f8          	cmovne %rax,%r15
+  12316e:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  123173:	75 0a                	jne    12317f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x7cf>
+  123175:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12317a:	e8 11 26 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12317f:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123184:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  123188:	44 89 3c 48          	mov    %r15d,(%rax,%rcx,2)
+  12318c:	49 c1 ef 20          	shr    $0x20,%r15
+  123190:	66 44 89 7c 48 04    	mov    %r15w,0x4(%rax,%rcx,2)
+  123196:	4d 8d 75 02          	lea    0x2(%r13),%r14
+  12319a:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  12319f:	41 8b 84 24 24 02 00 	mov    0x224(%r12),%eax
+  1231a6:	00 
+  1231a7:	48 c1 e0 10          	shl    $0x10,%rax
+  1231ab:	48 0d d3 01 00 00    	or     $0x1d3,%rax
+  1231b1:	41 80 bc 24 20 02 00 	cmpb   $0x0,0x220(%r12)
+  1231b8:	00 00 
+  1231ba:	41 bf d3 01 01 00    	mov    $0x101d3,%r15d
+  1231c0:	4c 0f 45 f8          	cmovne %rax,%r15
+  1231c4:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  1231c9:	75 0a                	jne    1231d5 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x825>
+  1231cb:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1231d0:	e8 bb 25 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1231d5:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1231da:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  1231de:	44 89 3c 48          	mov    %r15d,(%rax,%rcx,2)
+  1231e2:	49 c1 ef 20          	shr    $0x20,%r15
+  1231e6:	66 44 89 7c 48 04    	mov    %r15w,0x4(%rax,%rcx,2)
+  1231ec:	49 83 c5 03          	add    $0x3,%r13
+  1231f0:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1231f5:	41 80 bc 24 10 02 00 	cmpb   $0x0,0x210(%r12)
+  1231fc:	00 00 
+  1231fe:	0f 84 f7 00 00 00    	je     1232fb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x94b>
+  123204:	45 8b b4 24 14 02 00 	mov    0x214(%r12),%r14d
+  12320b:	00 
+  12320c:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  123211:	75 0a                	jne    12321d <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x86d>
+  123213:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123218:	e8 73 25 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12321d:	49 c1 e6 10          	shl    $0x10,%r14
+  123221:	49 81 ce d1 01 00 00 	or     $0x1d1,%r14
+  123228:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12322d:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123234:	00 
+  123235:	4c 01 e9             	add    %r13,%rcx
+  123238:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  12323c:	49 c1 ee 20          	shr    $0x20,%r14
+  123240:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123246:	4d 8d 75 01          	lea    0x1(%r13),%r14
+  12324a:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  12324f:	41 8b 84 24 2c 02 00 	mov    0x22c(%r12),%eax
+  123256:	00 
+  123257:	48 c1 e0 10          	shl    $0x10,%rax
+  12325b:	48 0d d4 01 00 00    	or     $0x1d4,%rax
+  123261:	41 80 bc 24 28 02 00 	cmpb   $0x0,0x228(%r12)
+  123268:	00 00 
+  12326a:	41 bf d4 01 01 00    	mov    $0x101d4,%r15d
+  123270:	4c 0f 45 f8          	cmovne %rax,%r15
+  123274:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  123279:	75 0a                	jne    123285 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x8d5>
+  12327b:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123280:	e8 0b 25 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123285:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12328a:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  12328e:	44 89 3c 48          	mov    %r15d,(%rax,%rcx,2)
+  123292:	49 c1 ef 20          	shr    $0x20,%r15
+  123296:	66 44 89 7c 48 04    	mov    %r15w,0x4(%rax,%rcx,2)
+  12329c:	4d 8d 75 02          	lea    0x2(%r13),%r14
+  1232a0:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  1232a5:	41 8b 84 24 34 02 00 	mov    0x234(%r12),%eax
+  1232ac:	00 
+  1232ad:	48 c1 e0 10          	shl    $0x10,%rax
+  1232b1:	48 0d d5 01 00 00    	or     $0x1d5,%rax
+  1232b7:	41 80 bc 24 30 02 00 	cmpb   $0x0,0x230(%r12)
+  1232be:	00 00 
+  1232c0:	41 bf d5 01 01 00    	mov    $0x101d5,%r15d
+  1232c6:	4c 0f 45 f8          	cmovne %rax,%r15
+  1232ca:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  1232cf:	75 0a                	jne    1232db <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x92b>
+  1232d1:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1232d6:	e8 b5 24 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1232db:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1232e0:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  1232e4:	44 89 3c 48          	mov    %r15d,(%rax,%rcx,2)
+  1232e8:	49 c1 ef 20          	shr    $0x20,%r15
+  1232ec:	66 44 89 7c 48 04    	mov    %r15w,0x4(%rax,%rcx,2)
+  1232f2:	49 83 c5 03          	add    $0x3,%r13
+  1232f6:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1232fb:	41 80 bc 24 38 02 00 	cmpb   $0x0,0x238(%r12)
+  123302:	00 00 
+  123304:	74 4a                	je     123350 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x9a0>
+  123306:	45 8b b4 24 3c 02 00 	mov    0x23c(%r12),%r14d
+  12330d:	00 
+  12330e:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  123313:	75 0a                	jne    12331f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x96f>
+  123315:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12331a:	e8 71 24 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12331f:	49 c1 e6 10          	shl    $0x10,%r14
+  123323:	49 81 ce d6 01 00 00 	or     $0x1d6,%r14
+  12332a:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12332f:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123336:	00 
+  123337:	4c 01 e9             	add    %r13,%rcx
+  12333a:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  12333e:	49 c1 ee 20          	shr    $0x20,%r14
+  123342:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123348:	49 ff c5             	inc    %r13
+  12334b:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  123350:	41 83 bc 24 40 02 00 	cmpl   $0x1,0x240(%r12)
+  123357:	00 01 
+  123359:	75 4a                	jne    1233a5 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x9f5>
+  12335b:	45 8b b4 24 44 02 00 	mov    0x244(%r12),%r14d
+  123362:	00 
+  123363:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  123368:	75 0a                	jne    123374 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x9c4>
+  12336a:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12336f:	e8 1c 24 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123374:	49 c1 e6 10          	shl    $0x10,%r14
+  123378:	49 81 ce d7 01 00 00 	or     $0x1d7,%r14
+  12337f:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123384:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  12338b:	00 
+  12338c:	4c 01 e9             	add    %r13,%rcx
+  12338f:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123393:	49 c1 ee 20          	shr    $0x20,%r14
+  123397:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  12339d:	49 ff c5             	inc    %r13
+  1233a0:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1233a5:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  1233aa:	75 0a                	jne    1233b6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xa06>
+  1233ac:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1233b1:	e8 da 23 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1233b6:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1233bb:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  1233c2:	00 
+  1233c3:	4c 01 e9             	add    %r13,%rcx
+  1233c6:	66 c7 44 48 04 18 00 	movw   $0x18,0x4(%rax,%rcx,2)
+  1233cd:	c7 04 48 ff 01 18 00 	movl   $0x1801ff,(%rax,%rcx,2)
+  1233d4:	49 ff c5             	inc    %r13
+  1233d7:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1233dc:	41 80 bc 24 a0 02 00 	cmpb   $0x0,0x2a0(%r12)
+  1233e3:	00 00 
+  1233e5:	0f 85 fa 01 00 00    	jne    1235e5 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xc35>
+  1233eb:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  1233f0:	75 0a                	jne    1233fc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xa4c>
+  1233f2:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1233f7:	e8 94 23 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1233fc:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123401:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123408:	00 
+  123409:	4c 01 e9             	add    %r13,%rcx
+  12340c:	89 1c 48             	mov    %ebx,(%rax,%rcx,2)
+  12340f:	48 c1 eb 20          	shr    $0x20,%rbx
+  123413:	66 89 5c 48 04       	mov    %bx,0x4(%rax,%rcx,2)
+  123418:	49 8d 5d 01          	lea    0x1(%r13),%rbx
+  12341c:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  123421:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  123426:	75 0a                	jne    123432 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xa82>
+  123428:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12342d:	e8 5e 23 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123432:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123437:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  12343b:	48 ba 3f 02 00 00 02 	movabs $0x20000023f,%rdx
+  123442:	00 00 00 
+  123445:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  123448:	66 c7 44 48 04 02 00 	movw   $0x2,0x4(%rax,%rcx,2)
+  12344f:	49 83 c5 02          	add    $0x2,%r13
+  123453:	e9 64 03 00 00       	jmp    1237bc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xe0c>
+  123458:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  12345d:	75 0a                	jne    123469 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xab9>
+  12345f:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123464:	e8 27 23 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123469:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12346e:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123475:	00 
+  123476:	4c 01 e9             	add    %r13,%rcx
+  123479:	48 8d 93 80 ff 01 00 	lea    0x1ff80(%rbx),%rdx
+  123480:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  123483:	48 c1 ea 20          	shr    $0x20,%rdx
+  123487:	66 89 54 48 04       	mov    %dx,0x4(%rax,%rcx,2)
+  12348c:	4d 8d 75 01          	lea    0x1(%r13),%r14
+  123490:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  123495:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  12349a:	75 0a                	jne    1234a6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xaf6>
+  12349c:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1234a1:	e8 ea 22 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1234a6:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1234ab:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  1234af:	48 8d 93 82 ff fd ff 	lea    -0x2007e(%rbx),%rdx
+  1234b6:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  1234b9:	48 c1 ea 20          	shr    $0x20,%rdx
+  1234bd:	66 89 54 48 04       	mov    %dx,0x4(%rax,%rcx,2)
+  1234c2:	4d 8d 75 02          	lea    0x2(%r13),%r14
+  1234c6:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  1234cb:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  1234d0:	75 0a                	jne    1234dc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xb2c>
+  1234d2:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1234d7:	e8 b4 22 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1234dc:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1234e1:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  1234e5:	48 ba bf 01 00 00 10 	movabs $0x10000001bf,%rdx
+  1234ec:	00 00 00 
+  1234ef:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  1234f2:	66 c7 44 48 04 10 00 	movw   $0x10,0x4(%rax,%rcx,2)
+  1234f9:	49 83 c5 03          	add    $0x3,%r13
+  1234fd:	4d 89 ef             	mov    %r13,%r15
+  123500:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  123505:	41 80 bc 24 d8 01 00 	cmpb   $0x0,0x1d8(%r12)
+  12350c:	00 00 
+  12350e:	0f 84 30 fa ff ff    	je     122f44 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x594>
+  123514:	45 8b b4 24 dc 01 00 	mov    0x1dc(%r12),%r14d
+  12351b:	00 
+  12351c:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  123521:	75 0a                	jne    12352d <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xb7d>
+  123523:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123528:	e8 63 22 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12352d:	49 c1 e6 10          	shl    $0x10,%r14
+  123531:	49 81 ce 86 41 00 00 	or     $0x4186,%r14
+  123538:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12353d:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  123541:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123545:	49 c1 ee 20          	shr    $0x20,%r14
+  123549:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  12354f:	49 ff c7             	inc    %r15
+  123552:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  123557:	41 83 bc 24 e0 01 00 	cmpl   $0x1,0x1e0(%r12)
+  12355e:	00 01 
+  123560:	0f 84 ed f9 ff ff    	je     122f53 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x5a3>
+  123566:	4c 3b 7c 24 20       	cmp    0x20(%rsp),%r15
+  12356b:	75 0a                	jne    123577 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xbc7>
+  12356d:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123572:	e8 19 22 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123577:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  12357c:	4b 8d 0c 7f          	lea    (%r15,%r15,2),%rcx
+  123580:	48 8d 93 bf ff fe ff 	lea    -0x10041(%rbx),%rdx
+  123587:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  12358a:	48 c1 ea 20          	shr    $0x20,%rdx
+  12358e:	66 89 54 48 04       	mov    %dx,0x4(%rax,%rcx,2)
+  123593:	4d 8d 77 01          	lea    0x1(%r15),%r14
+  123597:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  12359c:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  1235a1:	75 0a                	jne    1235ad <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xbfd>
+  1235a3:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1235a8:	e8 e3 21 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1235ad:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1235b2:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  1235b6:	48 ba ff 01 00 00 08 	movabs $0x8000001ff,%rdx
+  1235bd:	00 00 00 
+  1235c0:	89 14 48             	mov    %edx,(%rax,%rcx,2)
+  1235c3:	66 c7 44 48 04 08 00 	movw   $0x8,0x4(%rax,%rcx,2)
+  1235ca:	49 83 c7 02          	add    $0x2,%r15
+  1235ce:	4d 89 fd             	mov    %r15,%r13
+  1235d1:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  1235d6:	41 80 bc 24 a0 02 00 	cmpb   $0x0,0x2a0(%r12)
+  1235dd:	00 00 
+  1235df:	0f 84 06 fe ff ff    	je     1233eb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xa3b>
+  1235e5:	41 8b 84 24 84 02 00 	mov    0x284(%r12),%eax
+  1235ec:	00 
+  1235ed:	48 c1 e0 10          	shl    $0x10,%rax
+  1235f1:	48 0d 00 02 00 00    	or     $0x200,%rax
+  1235f7:	41 80 bc 24 80 02 00 	cmpb   $0x0,0x280(%r12)
+  1235fe:	00 00 
+  123600:	41 be 00 02 00 00    	mov    $0x200,%r14d
+  123606:	4c 0f 45 f0          	cmovne %rax,%r14
+  12360a:	4c 3b 6c 24 20       	cmp    0x20(%rsp),%r13
+  12360f:	75 0a                	jne    12361b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xc6b>
+  123611:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123616:	e8 75 21 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12361b:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123620:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  123627:	00 
+  123628:	4c 01 e9             	add    %r13,%rcx
+  12362b:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  12362f:	49 c1 ee 20          	shr    $0x20,%r14
+  123633:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123639:	4d 8d 75 01          	lea    0x1(%r13),%r14
+  12363d:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  123642:	41 8b 84 24 64 02 00 	mov    0x264(%r12),%eax
+  123649:	00 
+  12364a:	48 c1 e0 10          	shl    $0x10,%rax
+  12364e:	48 0d 01 02 00 00    	or     $0x201,%rax
+  123654:	41 80 bc 24 60 02 00 	cmpb   $0x0,0x260(%r12)
+  12365b:	00 00 
+  12365d:	48 0f 45 d8          	cmovne %rax,%rbx
+  123661:	4c 3b 74 24 20       	cmp    0x20(%rsp),%r14
+  123666:	75 0a                	jne    123672 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xcc2>
+  123668:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12366d:	e8 1e 21 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123672:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123677:	4b 8d 0c 76          	lea    (%r14,%r14,2),%rcx
+  12367b:	89 1c 48             	mov    %ebx,(%rax,%rcx,2)
+  12367e:	48 c1 eb 20          	shr    $0x20,%rbx
+  123682:	66 89 5c 48 04       	mov    %bx,0x4(%rax,%rcx,2)
+  123687:	49 8d 5d 02          	lea    0x2(%r13),%rbx
+  12368b:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  123690:	41 8b 84 24 6c 02 00 	mov    0x26c(%r12),%eax
+  123697:	00 
+  123698:	48 c1 e0 10          	shl    $0x10,%rax
+  12369c:	48 0d 05 02 00 00    	or     $0x205,%rax
+  1236a2:	41 80 bc 24 68 02 00 	cmpb   $0x0,0x268(%r12)
+  1236a9:	00 00 
+  1236ab:	41 be 05 02 38 63    	mov    $0x63380205,%r14d
+  1236b1:	4c 0f 45 f0          	cmovne %rax,%r14
+  1236b5:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  1236ba:	75 0a                	jne    1236c6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xd16>
+  1236bc:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1236c1:	e8 ca 20 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  1236c6:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1236cb:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  1236cf:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  1236d3:	49 c1 ee 20          	shr    $0x20,%r14
+  1236d7:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  1236dd:	49 8d 5d 03          	lea    0x3(%r13),%rbx
+  1236e1:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  1236e6:	41 8b 84 24 74 02 00 	mov    0x274(%r12),%eax
+  1236ed:	00 
+  1236ee:	48 c1 e0 10          	shl    $0x10,%rax
+  1236f2:	48 0d 06 02 00 00    	or     $0x206,%rax
+  1236f8:	41 80 bc 24 70 02 00 	cmpb   $0x0,0x270(%r12)
+  1236ff:	00 00 
+  123701:	41 be 06 02 38 63    	mov    $0x63380206,%r14d
+  123707:	4c 0f 45 f0          	cmovne %rax,%r14
+  12370b:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  123710:	75 0a                	jne    12371c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xd6c>
+  123712:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123717:	e8 74 20 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12371c:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123721:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  123725:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123729:	49 c1 ee 20          	shr    $0x20,%r14
+  12372d:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123733:	49 8d 5d 04          	lea    0x4(%r13),%rbx
+  123737:	48 89 5c 24 30       	mov    %rbx,0x30(%rsp)
+  12373c:	41 83 bc 24 78 02 00 	cmpl   $0x1,0x278(%r12)
+  123743:	00 01 
+  123745:	75 47                	jne    12378e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xdde>
+  123747:	45 8b b4 24 7c 02 00 	mov    0x27c(%r12),%r14d
+  12374e:	00 
+  12374f:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  123754:	75 0a                	jne    123760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xdb0>
+  123756:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12375b:	e8 30 20 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  123760:	49 c1 e6 10          	shl    $0x10,%r14
+  123764:	49 81 ce 04 02 00 00 	or     $0x204,%r14
+  12376b:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123770:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  123774:	44 89 34 48          	mov    %r14d,(%rax,%rcx,2)
+  123778:	49 c1 ee 20          	shr    $0x20,%r14
+  12377c:	66 44 89 74 48 04    	mov    %r14w,0x4(%rax,%rcx,2)
+  123782:	49 83 c5 05          	add    $0x5,%r13
+  123786:	4c 89 6c 24 30       	mov    %r13,0x30(%rsp)
+  12378b:	4c 89 eb             	mov    %r13,%rbx
+  12378e:	48 3b 5c 24 20       	cmp    0x20(%rsp),%rbx
+  123793:	75 0a                	jne    12379f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xdef>
+  123795:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12379a:	e8 f1 1f 00 00       	call   125790 <alloc::raw_vec::RawVec<T,A>::grow_one>
+  12379f:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  1237a4:	48 8d 0c 5b          	lea    (%rbx,%rbx,2),%rcx
+  1237a8:	66 c7 44 48 04 02 00 	movw   $0x2,0x4(%rax,%rcx,2)
+  1237af:	c7 04 48 3f 02 02 00 	movl   $0x2023f,(%rax,%rcx,2)
+  1237b6:	48 ff c3             	inc    %rbx
+  1237b9:	49 89 dd             	mov    %rbx,%r13
+  1237bc:	49 bc 00 00 00 00 00 	movabs $0x8000000000000000,%r12
+  1237c3:	00 00 80 
+  1237c6:	4c 8b 7c 24 20       	mov    0x20(%rsp),%r15
+  1237cb:	48 8b 6c 24 28       	mov    0x28(%rsp),%rbp
+  1237d0:	4c 89 ee             	mov    %r13,%rsi
+  1237d3:	48 c1 e6 05          	shl    $0x5,%rsi
+  1237d7:	4c 89 e8             	mov    %r13,%rax
+  1237da:	48 c1 e8 3b          	shr    $0x3b,%rax
+  1237de:	0f 95 c0             	setne  %al
+  1237e1:	49 8d 4c 24 f8       	lea    -0x8(%r12),%rcx
+  1237e6:	48 39 ce             	cmp    %rcx,%rsi
+  1237e9:	0f 97 c1             	seta   %cl
+  1237ec:	08 c1                	or     %al,%cl
+  1237ee:	74 0c                	je     1237fc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xe4c>
+  1237f0:	31 ff                	xor    %edi,%edi
+  1237f2:	e8 ea 54 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  1237f7:	e9 7e 1c 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  1237fc:	48 85 f6             	test   %rsi,%rsi
+  1237ff:	74 5f                	je     123860 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xeb0>
+  123801:	49 89 f6             	mov    %rsi,%r14
+  123804:	48 89 f7             	mov    %rsi,%rdi
+  123807:	ff 15 d3 c7 04 00    	call   *0x4c7d3(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  12380d:	4d 89 ea             	mov    %r13,%r10
+  123810:	48 89 c3             	mov    %rax,%rbx
+  123813:	48 85 c0             	test   %rax,%rax
+  123816:	0f 84 fe 1b 00 00    	je     12541a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a6a>
+  12381c:	4d 85 ed             	test   %r13,%r13
+  12381f:	74 4c                	je     12386d <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xebd>
+  123821:	4d 01 ed             	add    %r13,%r13
+  123824:	4a 8d 0c 6d 00 00 00 	lea    0x0(,%r13,2),%rcx
+  12382b:	00 
+  12382c:	4c 01 e9             	add    %r13,%rcx
+  12382f:	48 83 c1 fa          	add    $0xfffffffffffffffa,%rcx
+  123833:	48 ba ab aa aa aa aa 	movabs $0xaaaaaaaaaaaaaaab,%rdx
+  12383a:	aa aa aa 
+  12383d:	48 89 c8             	mov    %rcx,%rax
+  123840:	48 f7 e2             	mul    %rdx
+  123843:	48 c1 ea 02          	shr    $0x2,%rdx
+  123847:	48 ff c2             	inc    %rdx
+  12384a:	89 d0                	mov    %edx,%eax
+  12384c:	83 e0 03             	and    $0x3,%eax
+  12384f:	48 83 f9 12          	cmp    $0x12,%rcx
+  123853:	73 20                	jae    123875 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xec5>
+  123855:	45 31 ed             	xor    %r13d,%r13d
+  123858:	48 89 e9             	mov    %rbp,%rcx
+  12385b:	e9 94 00 00 00       	jmp    1238f4 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf44>
+  123860:	bb 08 00 00 00       	mov    $0x8,%ebx
+  123865:	45 31 d2             	xor    %r10d,%r10d
+  123868:	4d 85 ed             	test   %r13,%r13
+  12386b:	75 b4                	jne    123821 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xe71>
+  12386d:	45 31 ed             	xor    %r13d,%r13d
+  123870:	e9 d0 00 00 00       	jmp    123945 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf95>
+  123875:	49 8d 4c 24 fc       	lea    -0x4(%r12),%rcx
+  12387a:	48 21 ca             	and    %rcx,%rdx
+  12387d:	48 8d 73 68          	lea    0x68(%rbx),%rsi
+  123881:	45 31 ed             	xor    %r13d,%r13d
+  123884:	48 89 e9             	mov    %rbp,%rcx
+  123887:	66 0f 1f 84 00 00 00 	nopw   0x0(%rax,%rax,1)
+  12388e:	00 00 
+  123890:	8b 39                	mov    (%rcx),%edi
+  123892:	44 0f b7 41 04       	movzwl 0x4(%rcx),%r8d
+  123897:	66 44 89 46 9c       	mov    %r8w,-0x64(%rsi)
+  12389c:	89 7e 98             	mov    %edi,-0x68(%rsi)
+  12389f:	4c 89 66 a0          	mov    %r12,-0x60(%rsi)
+  1238a3:	0f b7 79 0a          	movzwl 0xa(%rcx),%edi
+  1238a7:	44 8b 41 06          	mov    0x6(%rcx),%r8d
+  1238ab:	44 89 46 b8          	mov    %r8d,-0x48(%rsi)
+  1238af:	66 89 7e bc          	mov    %di,-0x44(%rsi)
+  1238b3:	4c 89 66 c0          	mov    %r12,-0x40(%rsi)
+  1238b7:	0f b7 79 10          	movzwl 0x10(%rcx),%edi
+  1238bb:	44 8b 41 0c          	mov    0xc(%rcx),%r8d
+  1238bf:	44 89 46 d8          	mov    %r8d,-0x28(%rsi)
+  1238c3:	66 89 7e dc          	mov    %di,-0x24(%rsi)
+  1238c7:	4c 89 66 e0          	mov    %r12,-0x20(%rsi)
+  1238cb:	0f b7 79 16          	movzwl 0x16(%rcx),%edi
+  1238cf:	44 8b 41 12          	mov    0x12(%rcx),%r8d
+  1238d3:	48 83 c1 18          	add    $0x18,%rcx
+  1238d7:	44 89 46 f8          	mov    %r8d,-0x8(%rsi)
+  1238db:	66 89 7e fc          	mov    %di,-0x4(%rsi)
+  1238df:	4c 89 26             	mov    %r12,(%rsi)
+  1238e2:	49 83 c5 04          	add    $0x4,%r13
+  1238e6:	48 83 ee 80          	sub    $0xffffffffffffff80,%rsi
+  1238ea:	4c 39 ea             	cmp    %r13,%rdx
+  1238ed:	75 a1                	jne    123890 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xee0>
+  1238ef:	48 85 c0             	test   %rax,%rax
+  1238f2:	74 51                	je     123945 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf95>
+  1238f4:	4c 89 ea             	mov    %r13,%rdx
+  1238f7:	48 c1 e2 05          	shl    $0x5,%rdx
+  1238fb:	48 01 da             	add    %rbx,%rdx
+  1238fe:	48 83 c2 08          	add    $0x8,%rdx
+  123902:	48 f7 d8             	neg    %rax
+  123905:	31 f6                	xor    %esi,%esi
+  123907:	49 b9 00 00 00 00 00 	movabs $0x8000000000000000,%r9
+  12390e:	00 00 80 
+  123911:	66 66 66 66 66 66 2e 	data16 data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  123918:	0f 1f 84 00 00 00 00 
+  12391f:	00 
+  123920:	8b 39                	mov    (%rcx),%edi
+  123922:	44 0f b7 41 04       	movzwl 0x4(%rcx),%r8d
+  123927:	48 83 c1 06          	add    $0x6,%rcx
+  12392b:	66 44 89 42 fc       	mov    %r8w,-0x4(%rdx)
+  123930:	89 7a f8             	mov    %edi,-0x8(%rdx)
+  123933:	4c 89 0a             	mov    %r9,(%rdx)
+  123936:	48 ff ce             	dec    %rsi
+  123939:	48 83 c2 20          	add    $0x20,%rdx
+  12393d:	48 39 f0             	cmp    %rsi,%rax
+  123940:	75 de                	jne    123920 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xf70>
+  123942:	49 29 f5             	sub    %rsi,%r13
+  123945:	4d 85 ff             	test   %r15,%r15
+  123948:	74 0f                	je     123959 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xfa9>
+  12394a:	48 89 ef             	mov    %rbp,%rdi
+  12394d:	4d 89 d6             	mov    %r10,%r14
+  123950:	ff 15 9a c6 04 00    	call   *0x4c69a(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  123956:	4d 89 f2             	mov    %r14,%r10
+  123959:	4c 89 94 24 a0 01 00 	mov    %r10,0x1a0(%rsp)
+  123960:	00 
+  123961:	48 89 dd             	mov    %rbx,%rbp
+  123964:	48 89 9c 24 a8 01 00 	mov    %rbx,0x1a8(%rsp)
+  12396b:	00 
+  12396c:	4c 89 ac 24 b0 01 00 	mov    %r13,0x1b0(%rsp)
+  123973:	00 
+  123974:	48 8b 5c 24 10       	mov    0x10(%rsp),%rbx
+  123979:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+  123980:	00 00 80 
+  123983:	48 39 83 90 00 00 00 	cmp    %rax,0x90(%rbx)
+  12398a:	0f 85 f1 00 00 00    	jne    123a81 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x10d1>
+  123990:	49 83 fd 02          	cmp    $0x2,%r13
+  123994:	0f 83 0e 05 00 00    	jae    123ea8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x14f8>
+  12399a:	44 89 e8             	mov    %r13d,%eax
+  12399d:	25 ff 0f 00 00       	and    $0xfff,%eax
+  1239a2:	c7 84 24 90 01 00 00 	movl   $0x0,0x190(%rsp)
+  1239a9:	00 00 00 00 
+  1239ad:	66 89 84 24 94 01 00 	mov    %ax,0x194(%rsp)
+  1239b4:	00 
+  1239b5:	66 c7 84 24 96 01 00 	movw   $0xf00b,0x196(%rsp)
+  1239bc:	00 0b f0 
+  1239bf:	c6 84 24 98 01 00 00 	movb   $0x3,0x198(%rsp)
+  1239c6:	03 
+  1239c7:	48 c7 84 24 78 01 00 	movq   $0x0,0x178(%rsp)
+  1239ce:	00 00 00 00 00 
+  1239d3:	48 c7 84 24 80 01 00 	movq   $0x1,0x180(%rsp)
+  1239da:	00 01 00 00 00 
+  1239df:	48 c7 84 24 88 01 00 	movq   $0x0,0x188(%rsp)
+  1239e6:	00 00 00 00 00 
+  1239eb:	4d 85 ed             	test   %r13,%r13
+  1239ee:	0f 84 43 02 00 00    	je     123c37 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1287>
+  1239f4:	49 c1 e5 05          	shl    $0x5,%r13
+  1239f8:	bb 01 00 00 00       	mov    $0x1,%ebx
+  1239fd:	45 31 ff             	xor    %r15d,%r15d
+  123a00:	4c 8d a4 24 78 01 00 	lea    0x178(%rsp),%r12
+  123a07:	00 
+  123a08:	45 31 f6             	xor    %r14d,%r14d
+  123a0b:	0f 1f 44 00 00       	nopl   0x0(%rax,%rax,1)
+  123a10:	48 8b 84 24 78 01 00 	mov    0x178(%rsp),%rax
+  123a17:	00 
+  123a18:	4c 29 f8             	sub    %r15,%rax
+  123a1b:	48 83 f8 05          	cmp    $0x5,%rax
+  123a1f:	76 33                	jbe    123a54 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x10a4>
+  123a21:	49 8d 04 2e          	lea    (%r14,%rbp,1),%rax
+  123a25:	0f b7 48 04          	movzwl 0x4(%rax),%ecx
+  123a29:	66 42 89 4c 3b 04    	mov    %cx,0x4(%rbx,%r15,1)
+  123a2f:	8b 00                	mov    (%rax),%eax
+  123a31:	42 89 04 3b          	mov    %eax,(%rbx,%r15,1)
+  123a35:	49 83 c7 06          	add    $0x6,%r15
+  123a39:	4c 89 bc 24 88 01 00 	mov    %r15,0x188(%rsp)
+  123a40:	00 
+  123a41:	44 89 bc 24 90 01 00 	mov    %r15d,0x190(%rsp)
+  123a48:	00 
+  123a49:	49 83 c6 20          	add    $0x20,%r14
+  123a4d:	4d 39 f5             	cmp    %r14,%r13
+  123a50:	75 be                	jne    123a10 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1060>
+  123a52:	eb 6b                	jmp    123abf <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x110f>
+  123a54:	ba 06 00 00 00       	mov    $0x6,%edx
+  123a59:	b9 01 00 00 00       	mov    $0x1,%ecx
+  123a5e:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  123a64:	4c 89 e7             	mov    %r12,%rdi
+  123a67:	4c 89 fe             	mov    %r15,%rsi
+  123a6a:	e8 b1 a1 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  123a6f:	48 8b 9c 24 80 01 00 	mov    0x180(%rsp),%rbx
+  123a76:	00 
+  123a77:	4c 8b bc 24 88 01 00 	mov    0x188(%rsp),%r15
+  123a7e:	00 
+  123a7f:	eb a0                	jmp    123a21 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1071>
+  123a81:	48 8d b3 90 00 00 00 	lea    0x90(%rbx),%rsi
+  123a88:	44 8b a3 c0 00 00 00 	mov    0xc0(%rbx),%r12d
+  123a8f:	44 8b bb c4 00 00 00 	mov    0xc4(%rbx),%r15d
+  123a96:	44 8b b3 c8 00 00 00 	mov    0xc8(%rbx),%r14d
+  123a9d:	8b ab cc 00 00 00    	mov    0xcc(%rbx),%ebp
+  123aa3:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  123aa8:	e8 53 58 ff ff       	call   119300 <litchi_ppt::writer::escher::model::FreeformGeometry::validate>
+  123aad:	66 83 7c 24 20 01    	cmpw   $0x1,0x20(%rsp)
+  123ab3:	75 17                	jne    123acc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x111c>
+  123ab5:	4c 8b 64 24 28       	mov    0x28(%rsp),%r12
+  123aba:	e9 73 13 00 00       	jmp    124e32 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2482>
+  123abf:	45 31 e4             	xor    %r12d,%r12d
+  123ac2:	48 89 6c 24 08       	mov    %rbp,0x8(%rsp)
+  123ac7:	e9 55 04 00 00       	jmp    123f21 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1571>
+  123acc:	44 89 a4 24 40 02 00 	mov    %r12d,0x240(%rsp)
+  123ad3:	00 
+  123ad4:	44 89 bc 24 44 02 00 	mov    %r15d,0x244(%rsp)
+  123adb:	00 
+  123adc:	44 89 b4 24 48 02 00 	mov    %r14d,0x248(%rsp)
+  123ae3:	00 
+  123ae4:	89 ac 24 4c 02 00 00 	mov    %ebp,0x24c(%rsp)
+  123aeb:	0f b7 6c 24 22       	movzwl 0x22(%rsp),%ebp
+  123af0:	44 0f b7 74 24 24    	movzwl 0x24(%rsp),%r14d
+  123af6:	4c 8b bb a0 00 00 00 	mov    0xa0(%rbx),%r15
+  123afd:	4a 8d 1c fd 06 00 00 	lea    0x6(,%r15,8),%rbx
+  123b04:	00 
+  123b05:	48 89 df             	mov    %rbx,%rdi
+  123b08:	ff 15 d2 c4 04 00    	call   *0x4c4d2(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  123b0e:	48 85 c0             	test   %rax,%rax
+  123b11:	0f 84 1a 19 00 00    	je     125431 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a81>
+  123b17:	49 89 c4             	mov    %rax,%r12
+  123b1a:	66 44 89 74 24 08    	mov    %r14w,0x8(%rsp)
+  123b20:	48 89 9c 24 10 01 00 	mov    %rbx,0x110(%rsp)
+  123b27:	00 
+  123b28:	48 89 84 24 18 01 00 	mov    %rax,0x118(%rsp)
+  123b2f:	00 
+  123b30:	66 89 28             	mov    %bp,(%rax)
+  123b33:	66 89 68 02          	mov    %bp,0x2(%rax)
+  123b37:	66 c7 40 04 08 00    	movw   $0x8,0x4(%rax)
+  123b3d:	48 c7 84 24 20 01 00 	movq   $0x6,0x120(%rsp)
+  123b44:	00 06 00 00 00 
+  123b49:	4d 85 ff             	test   %r15,%r15
+  123b4c:	0f 84 f8 00 00 00    	je     123c4a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x129a>
+  123b52:	49 c1 e7 03          	shl    $0x3,%r15
+  123b56:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+  123b5b:	48 8b a8 98 00 00 00 	mov    0x98(%rax),%rbp
+  123b62:	49 01 ef             	add    %rbp,%r15
+  123b65:	bb 06 00 00 00       	mov    $0x6,%ebx
+  123b6a:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  123b71:	00 
+  123b72:	66 66 66 66 66 2e 0f 	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  123b79:	1f 84 00 00 00 00 00 
+  123b80:	44 8b 6d 00          	mov    0x0(%rbp),%r13d
+  123b84:	44 8b 75 04          	mov    0x4(%rbp),%r14d
+  123b88:	48 8b 84 24 10 01 00 	mov    0x110(%rsp),%rax
+  123b8f:	00 
+  123b90:	48 29 d8             	sub    %rbx,%rax
+  123b93:	48 83 f8 03          	cmp    $0x3,%rax
+  123b97:	76 44                	jbe    123bdd <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x122d>
+  123b99:	45 89 2c 1c          	mov    %r13d,(%r12,%rbx,1)
+  123b9d:	48 83 c3 04          	add    $0x4,%rbx
+  123ba1:	48 89 9c 24 20 01 00 	mov    %rbx,0x120(%rsp)
+  123ba8:	00 
+  123ba9:	48 8b 84 24 10 01 00 	mov    0x110(%rsp),%rax
+  123bb0:	00 
+  123bb1:	48 29 d8             	sub    %rbx,%rax
+  123bb4:	48 83 f8 03          	cmp    $0x3,%rax
+  123bb8:	76 55                	jbe    123c0f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x125f>
+  123bba:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  123bc1:	00 
+  123bc2:	45 89 34 1c          	mov    %r14d,(%r12,%rbx,1)
+  123bc6:	48 83 c3 04          	add    $0x4,%rbx
+  123bca:	48 89 9c 24 20 01 00 	mov    %rbx,0x120(%rsp)
+  123bd1:	00 
+  123bd2:	48 83 c5 08          	add    $0x8,%rbp
+  123bd6:	4c 39 fd             	cmp    %r15,%rbp
+  123bd9:	75 a5                	jne    123b80 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x11d0>
+  123bdb:	eb 72                	jmp    123c4f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x129f>
+  123bdd:	ba 04 00 00 00       	mov    $0x4,%edx
+  123be2:	b9 01 00 00 00       	mov    $0x1,%ecx
+  123be7:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  123bed:	48 89 de             	mov    %rbx,%rsi
+  123bf0:	e8 2b a0 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  123bf5:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  123bfc:	00 
+  123bfd:	48 8b 9c 24 20 01 00 	mov    0x120(%rsp),%rbx
+  123c04:	00 
+  123c05:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  123c0c:	00 
+  123c0d:	eb 8a                	jmp    123b99 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x11e9>
+  123c0f:	ba 04 00 00 00       	mov    $0x4,%edx
+  123c14:	b9 01 00 00 00       	mov    $0x1,%ecx
+  123c19:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  123c1f:	49 89 fc             	mov    %rdi,%r12
+  123c22:	48 89 de             	mov    %rbx,%rsi
+  123c25:	e8 f6 9f fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  123c2a:	48 8b 9c 24 20 01 00 	mov    0x120(%rsp),%rbx
+  123c31:	00 
+  123c32:	4c 89 e7             	mov    %r12,%rdi
+  123c35:	eb 83                	jmp    123bba <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x120a>
+  123c37:	45 31 ff             	xor    %r15d,%r15d
+  123c3a:	41 bd 08 00 00 00    	mov    $0x8,%r13d
+  123c40:	bb 01 00 00 00       	mov    $0x1,%ebx
+  123c45:	e9 25 03 00 00       	jmp    123f6f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x15bf>
+  123c4a:	bb 06 00 00 00       	mov    $0x6,%ebx
+  123c4f:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+  123c54:	4c 8b b0 b8 00 00 00 	mov    0xb8(%rax),%r14
+  123c5b:	4b 8d 2c 36          	lea    (%r14,%r14,1),%rbp
+  123c5f:	49 89 ef             	mov    %rbp,%r15
+  123c62:	49 83 c7 06          	add    $0x6,%r15
+  123c66:	79 0f                	jns    123c77 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x12c7>
+  123c68:	31 ff                	xor    %edi,%edi
+  123c6a:	4c 89 fe             	mov    %r15,%rsi
+  123c6d:	e8 6f 50 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  123c72:	e9 03 18 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  123c77:	4c 89 ff             	mov    %r15,%rdi
+  123c7a:	ff 15 60 c3 04 00    	call   *0x4c360(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  123c80:	48 85 c0             	test   %rax,%rax
+  123c83:	0f 84 c7 17 00 00    	je     125450 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aa0>
+  123c89:	4c 89 7c 24 20       	mov    %r15,0x20(%rsp)
+  123c8e:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+  123c93:	0f b7 4c 24 08       	movzwl 0x8(%rsp),%ecx
+  123c98:	66 89 08             	mov    %cx,(%rax)
+  123c9b:	66 89 48 02          	mov    %cx,0x2(%rax)
+  123c9f:	66 c7 40 04 02 00    	movw   $0x2,0x4(%rax)
+  123ca5:	48 c7 44 24 30 06 00 	movq   $0x6,0x30(%rsp)
+  123cac:	00 00 
+  123cae:	4d 85 f6             	test   %r14,%r14
+  123cb1:	0f 84 85 00 00 00    	je     123d3c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x138c>
+  123cb7:	48 8b 4c 24 10       	mov    0x10(%rsp),%rcx
+  123cbc:	4c 8b b1 b0 00 00 00 	mov    0xb0(%rcx),%r14
+  123cc3:	be 06 00 00 00       	mov    $0x6,%esi
+  123cc8:	45 31 ff             	xor    %r15d,%r15d
+  123ccb:	48 8d 5c 24 20       	lea    0x20(%rsp),%rbx
+  123cd0:	47 0f b7 24 3e       	movzwl (%r14,%r15,1),%r12d
+  123cd5:	48 8b 4c 24 20       	mov    0x20(%rsp),%rcx
+  123cda:	48 29 f1             	sub    %rsi,%rcx
+  123cdd:	48 83 f9 01          	cmp    $0x1,%rcx
+  123ce1:	76 19                	jbe    123cfc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x134c>
+  123ce3:	66 44 89 24 30       	mov    %r12w,(%rax,%rsi,1)
+  123ce8:	48 83 c6 02          	add    $0x2,%rsi
+  123cec:	48 89 74 24 30       	mov    %rsi,0x30(%rsp)
+  123cf1:	49 83 c7 02          	add    $0x2,%r15
+  123cf5:	4c 39 fd             	cmp    %r15,%rbp
+  123cf8:	75 d6                	jne    123cd0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1320>
+  123cfa:	eb 24                	jmp    123d20 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1370>
+  123cfc:	ba 02 00 00 00       	mov    $0x2,%edx
+  123d01:	b9 01 00 00 00       	mov    $0x1,%ecx
+  123d06:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  123d0c:	48 89 df             	mov    %rbx,%rdi
+  123d0f:	e8 0c 9f fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  123d14:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123d19:	48 8b 74 24 30       	mov    0x30(%rsp),%rsi
+  123d1e:	eb c3                	jmp    123ce3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1333>
+  123d20:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  123d27:	00 
+  123d28:	48 8b 9c 24 20 01 00 	mov    0x120(%rsp),%rbx
+  123d2f:	00 
+  123d30:	4c 8b 7c 24 20       	mov    0x20(%rsp),%r15
+  123d35:	48 8b 44 24 28       	mov    0x28(%rsp),%rax
+  123d3a:	eb 05                	jmp    123d41 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1391>
+  123d3c:	be 06 00 00 00       	mov    $0x6,%esi
+  123d41:	48 8b 8c 24 10 01 00 	mov    0x110(%rsp),%rcx
+  123d48:	00 
+  123d49:	4c 8b ac 24 b0 01 00 	mov    0x1b0(%rsp),%r13
+  123d50:	00 
+  123d51:	48 bf 00 00 00 00 00 	movabs $0x8000000000000000,%rdi
+  123d58:	00 00 80 
+  123d5b:	48 39 f9             	cmp    %rdi,%rcx
+  123d5e:	48 8b 54 24 10       	mov    0x10(%rsp),%rdx
+  123d63:	0f 84 c9 10 00 00    	je     124e32 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2482>
+  123d69:	8b 92 d0 00 00 00    	mov    0xd0(%rdx),%edx
+  123d6f:	48 c1 e2 10          	shl    $0x10,%rdx
+  123d73:	48 81 ca 44 01 00 00 	or     $0x144,%rdx
+  123d7a:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+  123d81:	00 00 
+  123d83:	48 c7 44 24 28 07 00 	movq   $0x7,0x28(%rsp)
+  123d8a:	00 00 
+  123d8c:	66 c7 44 24 30 40 01 	movw   $0x140,0x30(%rsp)
+  123d93:	44 8b 84 24 40 02 00 	mov    0x240(%rsp),%r8d
+  123d9a:	00 
+  123d9b:	44 89 44 24 32       	mov    %r8d,0x32(%rsp)
+  123da0:	48 89 7c 24 38       	mov    %rdi,0x38(%rsp)
+  123da5:	66 c7 44 24 50 41 01 	movw   $0x141,0x50(%rsp)
+  123dac:	44 8b 84 24 44 02 00 	mov    0x244(%rsp),%r8d
+  123db3:	00 
+  123db4:	44 89 44 24 52       	mov    %r8d,0x52(%rsp)
+  123db9:	48 89 7c 24 58       	mov    %rdi,0x58(%rsp)
+  123dbe:	66 c7 44 24 70 42 01 	movw   $0x142,0x70(%rsp)
+  123dc5:	44 8b 84 24 48 02 00 	mov    0x248(%rsp),%r8d
+  123dcc:	00 
+  123dcd:	44 89 44 24 72       	mov    %r8d,0x72(%rsp)
+  123dd2:	48 89 7c 24 78       	mov    %rdi,0x78(%rsp)
+  123dd7:	66 c7 84 24 90 00 00 	movw   $0x143,0x90(%rsp)
+  123dde:	00 43 01 
+  123de1:	44 8b 84 24 4c 02 00 	mov    0x24c(%rsp),%r8d
+  123de8:	00 
+  123de9:	44 89 84 24 92 00 00 	mov    %r8d,0x92(%rsp)
+  123df0:	00 
+  123df1:	48 89 bc 24 98 00 00 	mov    %rdi,0x98(%rsp)
+  123df8:	00 
+  123df9:	48 89 94 24 b0 00 00 	mov    %rdx,0xb0(%rsp)
+  123e00:	00 
+  123e01:	48 89 bc 24 b8 00 00 	mov    %rdi,0xb8(%rsp)
+  123e08:	00 
+  123e09:	66 c7 84 24 d0 00 00 	movw   $0x8145,0xd0(%rsp)
+  123e10:	00 45 81 
+  123e13:	89 9c 24 d2 00 00 00 	mov    %ebx,0xd2(%rsp)
+  123e1a:	48 89 8c 24 d8 00 00 	mov    %rcx,0xd8(%rsp)
+  123e21:	00 
+  123e22:	4c 89 a4 24 e0 00 00 	mov    %r12,0xe0(%rsp)
+  123e29:	00 
+  123e2a:	48 89 9c 24 e8 00 00 	mov    %rbx,0xe8(%rsp)
+  123e31:	00 
+  123e32:	66 c7 84 24 f0 00 00 	movw   $0x8146,0xf0(%rsp)
+  123e39:	00 46 81 
+  123e3c:	89 b4 24 f2 00 00 00 	mov    %esi,0xf2(%rsp)
+  123e43:	4c 89 bc 24 f8 00 00 	mov    %r15,0xf8(%rsp)
+  123e4a:	00 
+  123e4b:	48 89 84 24 00 01 00 	mov    %rax,0x100(%rsp)
+  123e52:	00 
+  123e53:	48 89 b4 24 08 01 00 	mov    %rsi,0x108(%rsp)
+  123e5a:	00 
+  123e5b:	48 8b 84 24 a0 01 00 	mov    0x1a0(%rsp),%rax
+  123e62:	00 
+  123e63:	4c 29 e8             	sub    %r13,%rax
+  123e66:	48 83 f8 06          	cmp    $0x6,%rax
+  123e6a:	0f 86 68 0b 00 00    	jbe    1249d8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2028>
+  123e70:	48 8d 74 24 30       	lea    0x30(%rsp),%rsi
+  123e75:	48 8b ac 24 a8 01 00 	mov    0x1a8(%rsp),%rbp
+  123e7c:	00 
+  123e7d:	4c 89 ef             	mov    %r13,%rdi
+  123e80:	48 c1 e7 05          	shl    $0x5,%rdi
+  123e84:	48 01 ef             	add    %rbp,%rdi
+  123e87:	ba e0 00 00 00       	mov    $0xe0,%edx
+  123e8c:	ff 15 56 c1 04 00    	call   *0x4c156(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  123e92:	49 83 c5 07          	add    $0x7,%r13
+  123e96:	4c 89 ac 24 b0 01 00 	mov    %r13,0x1b0(%rsp)
+  123e9d:	00 
+  123e9e:	49 83 fd 02          	cmp    $0x2,%r13
+  123ea2:	0f 82 f2 fa ff ff    	jb     12399a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xfea>
+  123ea8:	49 83 fd 15          	cmp    $0x15,%r13
+  123eac:	0f 83 8e 15 00 00    	jae    125440 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a90>
+  123eb2:	48 89 ef             	mov    %rbp,%rdi
+  123eb5:	4c 89 ee             	mov    %r13,%rsi
+  123eb8:	e8 63 1a 00 00       	call   125920 <core::slice::sort::shared::smallsort::insertion_sort_shift_left>
+  123ebd:	e9 d8 fa ff ff       	jmp    12399a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xfea>
+  123ec2:	b9 01 00 00 00       	mov    $0x1,%ecx
+  123ec7:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  123ecd:	48 8d bc 24 78 01 00 	lea    0x178(%rsp),%rdi
+  123ed4:	00 
+  123ed5:	4c 89 fe             	mov    %r15,%rsi
+  123ed8:	48 89 ea             	mov    %rbp,%rdx
+  123edb:	e8 40 9d fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  123ee0:	48 8b 9c 24 80 01 00 	mov    0x180(%rsp),%rbx
+  123ee7:	00 
+  123ee8:	4c 8b bc 24 88 01 00 	mov    0x188(%rsp),%r15
+  123eef:	00 
+  123ef0:	4a 8d 3c 3b          	lea    (%rbx,%r15,1),%rdi
+  123ef4:	4c 89 f6             	mov    %r14,%rsi
+  123ef7:	48 89 ea             	mov    %rbp,%rdx
+  123efa:	ff 15 e8 c0 04 00    	call   *0x4c0e8(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  123f00:	49 01 ef             	add    %rbp,%r15
+  123f03:	4c 89 bc 24 88 01 00 	mov    %r15,0x188(%rsp)
+  123f0a:	00 
+  123f0b:	44 89 bc 24 90 01 00 	mov    %r15d,0x190(%rsp)
+  123f12:	00 
+  123f13:	48 8b 6c 24 08       	mov    0x8(%rsp),%rbp
+  123f18:	49 83 c4 20          	add    $0x20,%r12
+  123f1c:	4d 39 e5             	cmp    %r12,%r13
+  123f1f:	74 36                	je     123f57 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x15a7>
+  123f21:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+  123f28:	00 00 80 
+  123f2b:	4a 39 44 25 08       	cmp    %rax,0x8(%rbp,%r12,1)
+  123f30:	74 e6                	je     123f18 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1568>
+  123f32:	4e 8b 74 25 10       	mov    0x10(%rbp,%r12,1),%r14
+  123f37:	4a 8b 6c 25 18       	mov    0x18(%rbp,%r12,1),%rbp
+  123f3c:	48 8b 84 24 78 01 00 	mov    0x178(%rsp),%rax
+  123f43:	00 
+  123f44:	4c 29 f8             	sub    %r15,%rax
+  123f47:	48 39 c5             	cmp    %rax,%rbp
+  123f4a:	0f 87 72 ff ff ff    	ja     123ec2 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1512>
+  123f50:	48 85 ed             	test   %rbp,%rbp
+  123f53:	75 9b                	jne    123ef0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1540>
+  123f55:	eb a9                	jmp    123f00 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1550>
+  123f57:	4d 89 fd             	mov    %r15,%r13
+  123f5a:	49 83 c5 08          	add    $0x8,%r13
+  123f5e:	79 0f                	jns    123f6f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x15bf>
+  123f60:	31 ff                	xor    %edi,%edi
+  123f62:	4c 89 ee             	mov    %r13,%rsi
+  123f65:	e8 77 4d f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  123f6a:	e9 0b 15 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  123f6f:	4c 89 ef             	mov    %r13,%rdi
+  123f72:	ff 15 68 c0 04 00    	call   *0x4c068(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  123f78:	48 85 c0             	test   %rax,%rax
+  123f7b:	0f 84 a6 14 00 00    	je     125427 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a77>
+  123f81:	49 89 c4             	mov    %rax,%r12
+  123f84:	0f b6 84 24 98 01 00 	movzbl 0x198(%rsp),%eax
+  123f8b:	00 
+  123f8c:	8b 8c 24 94 01 00 00 	mov    0x194(%rsp),%ecx
+  123f93:	0f b7 94 24 96 01 00 	movzwl 0x196(%rsp),%edx
+  123f9a:	00 
+  123f9b:	c1 e1 04             	shl    $0x4,%ecx
+  123f9e:	83 e0 0f             	and    $0xf,%eax
+  123fa1:	09 c8                	or     %ecx,%eax
+  123fa3:	66 41 89 04 24       	mov    %ax,(%r12)
+  123fa8:	66 41 89 54 24 02    	mov    %dx,0x2(%r12)
+  123fae:	45 89 7c 24 04       	mov    %r15d,0x4(%r12)
+  123fb3:	4d 85 ff             	test   %r15,%r15
+  123fb6:	74 13                	je     123fcb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x161b>
+  123fb8:	4c 89 e7             	mov    %r12,%rdi
+  123fbb:	48 83 c7 08          	add    $0x8,%rdi
+  123fbf:	48 89 de             	mov    %rbx,%rsi
+  123fc2:	4c 89 fa             	mov    %r15,%rdx
+  123fc5:	ff 15 1d c0 04 00    	call   *0x4c01d(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  123fcb:	48 8b 0c 24          	mov    (%rsp),%rcx
+  123fcf:	48 8b 01             	mov    (%rcx),%rax
+  123fd2:	48 8b 69 10          	mov    0x10(%rcx),%rbp
+  123fd6:	48 29 e8             	sub    %rbp,%rax
+  123fd9:	49 39 c5             	cmp    %rax,%r13
+  123fdc:	0f 87 4b 09 00 00    	ja     12492d <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1f7d>
+  123fe2:	4c 8b 34 24          	mov    (%rsp),%r14
+  123fe6:	49 8b 5e 08          	mov    0x8(%r14),%rbx
+  123fea:	48 8d 3c 2b          	lea    (%rbx,%rbp,1),%rdi
+  123fee:	4c 89 e6             	mov    %r12,%rsi
+  123ff1:	4c 89 ea             	mov    %r13,%rdx
+  123ff4:	ff 15 ee bf 04 00    	call   *0x4bfee(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  123ffa:	4c 01 ed             	add    %r13,%rbp
+  123ffd:	49 89 6e 10          	mov    %rbp,0x10(%r14)
+  124001:	4c 89 e7             	mov    %r12,%rdi
+  124004:	ff 15 e6 bf 04 00    	call   *0x4bfe6(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12400a:	8b 84 24 10 02 00 00 	mov    0x210(%rsp),%eax
+  124011:	85 c0                	test   %eax,%eax
+  124013:	0f 84 a3 00 00 00    	je     1240bc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x170c>
+  124019:	83 f8 01             	cmp    $0x1,%eax
+  12401c:	0f 85 c7 02 00 00    	jne    1242e9 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1939>
+  124022:	c7 44 24 38 00 00 00 	movl   $0x0,0x38(%rsp)
+  124029:	00 
+  12402a:	66 c7 44 24 3c 00 00 	movw   $0x0,0x3c(%rsp)
+  124031:	66 c7 44 24 3e 10 f0 	movw   $0xf010,0x3e(%rsp)
+  124038:	c6 44 24 40 00       	movb   $0x0,0x40(%rsp)
+  12403d:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+  124044:	00 00 
+  124046:	48 c7 44 24 28 01 00 	movq   $0x1,0x28(%rsp)
+  12404d:	00 00 
+  12404f:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+  124056:	00 00 
+  124058:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12405d:	ba 10 00 00 00       	mov    $0x10,%edx
+  124062:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124067:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  12406d:	31 f6                	xor    %esi,%esi
+  12406f:	e8 ac 9b fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124074:	48 8b 84 24 b8 01 00 	mov    0x1b8(%rsp),%rax
+  12407b:	00 
+  12407c:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+  124081:	4c 8b 6c 24 30       	mov    0x30(%rsp),%r13
+  124086:	66 0f 10 40 04       	movupd 0x4(%rax),%xmm0
+  12408b:	66 42 0f 11 04 29    	movupd %xmm0,(%rcx,%r13,1)
+  124091:	4d 8d 75 10          	lea    0x10(%r13),%r14
+  124095:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  12409a:	44 89 74 24 38       	mov    %r14d,0x38(%rsp)
+  12409f:	49 83 c5 18          	add    $0x18,%r13
+  1240a3:	0f 89 da 02 00 00    	jns    124383 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x19d3>
+  1240a9:	45 31 ff             	xor    %r15d,%r15d
+  1240ac:	4c 89 ff             	mov    %r15,%rdi
+  1240af:	4c 89 ee             	mov    %r13,%rsi
+  1240b2:	e8 2a 4c f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  1240b7:	e9 be 13 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  1240bc:	c7 44 24 38 00 00 00 	movl   $0x0,0x38(%rsp)
+  1240c3:	00 
+  1240c4:	66 c7 44 24 3c 00 00 	movw   $0x0,0x3c(%rsp)
+  1240cb:	66 c7 44 24 3e 10 f0 	movw   $0xf010,0x3e(%rsp)
+  1240d2:	c6 44 24 40 00       	movb   $0x0,0x40(%rsp)
+  1240d7:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+  1240de:	00 00 
+  1240e0:	48 c7 44 24 28 01 00 	movq   $0x1,0x28(%rsp)
+  1240e7:	00 00 
+  1240e9:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+  1240f0:	00 00 
+  1240f2:	4c 8b 7c 24 10       	mov    0x10(%rsp),%r15
+  1240f7:	41 8b 9f 88 02 00 00 	mov    0x288(%r15),%ebx
+  1240fe:	45 8b b7 8c 02 00 00 	mov    0x28c(%r15),%r14d
+  124105:	41 8b 87 90 02 00 00 	mov    0x290(%r15),%eax
+  12410c:	01 d8                	add    %ebx,%eax
+  12410e:	f2 0f 2a c0          	cvtsi2sd %eax,%xmm0
+  124112:	f2 0f 59 05 c6 9a ee 	mulsd  -0x11653a(%rip),%xmm0        # dbe0 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x450>
+  124119:	ff 
+  12411a:	f2 0f 5e 05 a6 9a ee 	divsd  -0x11655a(%rip),%xmm0        # dbc8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x438>
+  124121:	ff 
+  124122:	4c 8b 25 f7 be 04 00 	mov    0x4bef7(%rip),%r12        # 170020 <_DYNAMIC+0x238>
+  124129:	41 ff d4             	call   *%r12
+  12412c:	f2 0f 11 84 24 10 02 	movsd  %xmm0,0x210(%rsp)
+  124133:	00 00 
+  124135:	41 8b 87 94 02 00 00 	mov    0x294(%r15),%eax
+  12413c:	44 01 f0             	add    %r14d,%eax
+  12413f:	0f 57 c0             	xorps  %xmm0,%xmm0
+  124142:	f2 0f 2a c0          	cvtsi2sd %eax,%xmm0
+  124146:	f2 0f 59 05 92 9a ee 	mulsd  -0x11656e(%rip),%xmm0        # dbe0 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x450>
+  12414d:	ff 
+  12414e:	f2 0f 5e 05 72 9a ee 	divsd  -0x11658e(%rip),%xmm0        # dbc8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x438>
+  124155:	ff 
+  124156:	41 ff d4             	call   *%r12
+  124159:	f2 0f 11 44 24 08    	movsd  %xmm0,0x8(%rsp)
+  12415f:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  124164:	ba 02 00 00 00       	mov    $0x2,%edx
+  124169:	b9 01 00 00 00       	mov    $0x1,%ecx
+  12416e:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124174:	31 f6                	xor    %esi,%esi
+  124176:	e8 a5 9a fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12417b:	0f 57 c0             	xorps  %xmm0,%xmm0
+  12417e:	f2 41 0f 2a c6       	cvtsi2sd %r14d,%xmm0
+  124183:	f2 0f 10 0d 55 9a ee 	movsd  -0x1165ab(%rip),%xmm1        # dbe0 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x450>
+  12418a:	ff 
+  12418b:	f2 0f 59 c1          	mulsd  %xmm1,%xmm0
+  12418f:	f2 0f 10 0d 31 9a ee 	movsd  -0x1165cf(%rip),%xmm1        # dbc8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x438>
+  124196:	ff 
+  124197:	f2 0f 5e c1          	divsd  %xmm1,%xmm0
+  12419b:	41 ff d4             	call   *%r12
+  12419e:	f2 0f 10 0d ba 99 ee 	movsd  -0x116646(%rip),%xmm1        # db60 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x3d0>
+  1241a5:	ff 
+  1241a6:	f2 0f 5f c8          	maxsd  %xmm0,%xmm1
+  1241aa:	f2 0f 10 05 c6 98 ee 	movsd  -0x11673a(%rip),%xmm0        # da78 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x2e8>
+  1241b1:	ff 
+  1241b2:	f2 0f 5d c1          	minsd  %xmm1,%xmm0
+  1241b6:	f2 0f 2c c0          	cvttsd2si %xmm0,%eax
+  1241ba:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+  1241bf:	4c 8b 7c 24 30       	mov    0x30(%rsp),%r15
+  1241c4:	66 43 89 04 3e       	mov    %ax,(%r14,%r15,1)
+  1241c9:	49 83 c7 02          	add    $0x2,%r15
+  1241cd:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  1241d2:	44 89 7c 24 38       	mov    %r15d,0x38(%rsp)
+  1241d7:	0f 57 c0             	xorps  %xmm0,%xmm0
+  1241da:	f2 0f 2a c3          	cvtsi2sd %ebx,%xmm0
+  1241de:	f2 0f 59 05 fa 99 ee 	mulsd  -0x116606(%rip),%xmm0        # dbe0 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x450>
+  1241e5:	ff 
+  1241e6:	f2 0f 5e 05 da 99 ee 	divsd  -0x116626(%rip),%xmm0        # dbc8 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x438>
+  1241ed:	ff 
+  1241ee:	41 ff d4             	call   *%r12
+  1241f1:	f2 0f 11 84 24 b8 01 	movsd  %xmm0,0x1b8(%rsp)
+  1241f8:	00 00 
+  1241fa:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  1241ff:	48 89 c1             	mov    %rax,%rcx
+  124202:	4c 29 f9             	sub    %r15,%rcx
+  124205:	48 83 f9 01          	cmp    $0x1,%rcx
+  124209:	0f 86 45 07 00 00    	jbe    124954 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1fa4>
+  12420f:	f2 0f 10 05 49 99 ee 	movsd  -0x1166b7(%rip),%xmm0        # db60 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x3d0>
+  124216:	ff 
+  124217:	f2 0f 5f 84 24 b8 01 	maxsd  0x1b8(%rsp),%xmm0
+  12421e:	00 00 
+  124220:	f2 0f 10 0d 50 98 ee 	movsd  -0x1167b0(%rip),%xmm1        # da78 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x2e8>
+  124227:	ff 
+  124228:	f2 0f 5d c8          	minsd  %xmm0,%xmm1
+  12422c:	f2 0f 2c c9          	cvttsd2si %xmm1,%ecx
+  124230:	66 43 89 0c 3e       	mov    %cx,(%r14,%r15,1)
+  124235:	49 83 c7 02          	add    $0x2,%r15
+  124239:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  12423e:	44 89 7c 24 38       	mov    %r15d,0x38(%rsp)
+  124243:	4c 29 f8             	sub    %r15,%rax
+  124246:	48 83 f8 01          	cmp    $0x1,%rax
+  12424a:	0f 86 35 07 00 00    	jbe    124985 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1fd5>
+  124250:	f2 0f 10 05 08 99 ee 	movsd  -0x1166f8(%rip),%xmm0        # db60 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x3d0>
+  124257:	ff 
+  124258:	f2 0f 5f 84 24 10 02 	maxsd  0x210(%rsp),%xmm0
+  12425f:	00 00 
+  124261:	f2 0f 10 0d 0f 98 ee 	movsd  -0x1167f1(%rip),%xmm1        # da78 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x2e8>
+  124268:	ff 
+  124269:	f2 0f 5d c8          	minsd  %xmm0,%xmm1
+  12426d:	f2 0f 2c c1          	cvttsd2si %xmm1,%eax
+  124271:	66 43 89 04 3e       	mov    %ax,(%r14,%r15,1)
+  124276:	49 83 c7 02          	add    $0x2,%r15
+  12427a:	4c 89 7c 24 30       	mov    %r15,0x30(%rsp)
+  12427f:	44 89 7c 24 38       	mov    %r15d,0x38(%rsp)
+  124284:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  124289:	4c 29 f8             	sub    %r15,%rax
+  12428c:	48 83 f8 01          	cmp    $0x1,%rax
+  124290:	0f 86 1b 07 00 00    	jbe    1249b1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2001>
+  124296:	f2 0f 10 05 c2 98 ee 	movsd  -0x11673e(%rip),%xmm0        # db60 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x3d0>
+  12429d:	ff 
+  12429e:	f2 0f 5f 44 24 08    	maxsd  0x8(%rsp),%xmm0
+  1242a4:	f2 0f 10 0d cc 97 ee 	movsd  -0x116834(%rip),%xmm1        # da78 <serde_json::ser::Formatter::write_char_escape::HEX_DIGITS+0x2e8>
+  1242ab:	ff 
+  1242ac:	f2 0f 5d c8          	minsd  %xmm0,%xmm1
+  1242b0:	f2 0f 2c c1          	cvttsd2si %xmm1,%eax
+  1242b4:	48 8b 5c 24 28       	mov    0x28(%rsp),%rbx
+  1242b9:	66 42 89 04 3b       	mov    %ax,(%rbx,%r15,1)
+  1242be:	4d 8d 77 02          	lea    0x2(%r15),%r14
+  1242c2:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  1242c7:	44 89 74 24 38       	mov    %r14d,0x38(%rsp)
+  1242cc:	49 83 c7 0a          	add    $0xa,%r15
+  1242d0:	0f 89 41 01 00 00    	jns    124417 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1a67>
+  1242d6:	45 31 ed             	xor    %r13d,%r13d
+  1242d9:	4c 89 ef             	mov    %r13,%rdi
+  1242dc:	4c 89 fe             	mov    %r15,%rsi
+  1242df:	e8 fd 49 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  1242e4:	e9 91 11 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  1242e9:	c7 44 24 38 00 00 00 	movl   $0x0,0x38(%rsp)
+  1242f0:	00 
+  1242f1:	66 c7 44 24 3c 00 00 	movw   $0x0,0x3c(%rsp)
+  1242f8:	66 c7 44 24 3e 0f f0 	movw   $0xf00f,0x3e(%rsp)
+  1242ff:	c6 44 24 40 00       	movb   $0x0,0x40(%rsp)
+  124304:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+  12430b:	00 00 
+  12430d:	48 c7 44 24 28 01 00 	movq   $0x1,0x28(%rsp)
+  124314:	00 00 
+  124316:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+  12431d:	00 00 
+  12431f:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  124324:	ba 10 00 00 00       	mov    $0x10,%edx
+  124329:	b9 01 00 00 00       	mov    $0x1,%ecx
+  12432e:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124334:	31 f6                	xor    %esi,%esi
+  124336:	e8 e5 98 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12433b:	48 8b 84 24 b8 01 00 	mov    0x1b8(%rsp),%rax
+  124342:	00 
+  124343:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+  124348:	4c 8b 6c 24 30       	mov    0x30(%rsp),%r13
+  12434d:	66 0f 10 40 04       	movupd 0x4(%rax),%xmm0
+  124352:	66 42 0f 11 04 29    	movupd %xmm0,(%rcx,%r13,1)
+  124358:	4d 8d 75 10          	lea    0x10(%r13),%r14
+  12435c:	4c 89 74 24 30       	mov    %r14,0x30(%rsp)
+  124361:	44 89 74 24 38       	mov    %r14d,0x38(%rsp)
+  124366:	49 83 c5 18          	add    $0x18,%r13
+  12436a:	0f 89 5a 01 00 00    	jns    1244ca <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1b1a>
+  124370:	45 31 ff             	xor    %r15d,%r15d
+  124373:	4c 89 ff             	mov    %r15,%rdi
+  124376:	4c 89 ee             	mov    %r13,%rsi
+  124379:	e8 63 49 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  12437e:	e9 f7 10 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  124383:	48 89 4c 24 08       	mov    %rcx,0x8(%rsp)
+  124388:	41 bf 01 00 00 00    	mov    $0x1,%r15d
+  12438e:	be 01 00 00 00       	mov    $0x1,%esi
+  124393:	4c 89 ef             	mov    %r13,%rdi
+  124396:	e8 95 43 f7 ff       	call   98730 <__rustc::__rust_alloc>
+  12439b:	48 85 c0             	test   %rax,%rax
+  12439e:	0f 84 08 fd ff ff    	je     1240ac <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x16fc>
+  1243a4:	49 89 c4             	mov    %rax,%r12
+  1243a7:	0f b6 44 24 40       	movzbl 0x40(%rsp),%eax
+  1243ac:	8b 4c 24 3c          	mov    0x3c(%rsp),%ecx
+  1243b0:	0f b7 54 24 3e       	movzwl 0x3e(%rsp),%edx
+  1243b5:	c1 e1 04             	shl    $0x4,%ecx
+  1243b8:	83 e0 0f             	and    $0xf,%eax
+  1243bb:	09 c8                	or     %ecx,%eax
+  1243bd:	66 41 89 04 24       	mov    %ax,(%r12)
+  1243c2:	66 41 89 54 24 02    	mov    %dx,0x2(%r12)
+  1243c8:	45 89 74 24 04       	mov    %r14d,0x4(%r12)
+  1243cd:	4c 89 e7             	mov    %r12,%rdi
+  1243d0:	48 83 c7 08          	add    $0x8,%rdi
+  1243d4:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+  1243d9:	4c 89 fe             	mov    %r15,%rsi
+  1243dc:	4c 89 f2             	mov    %r14,%rdx
+  1243df:	ff 15 03 bc 04 00    	call   *0x4bc03(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  1243e5:	48 8b 04 24          	mov    (%rsp),%rax
+  1243e9:	48 8b 00             	mov    (%rax),%rax
+  1243ec:	48 29 e8             	sub    %rbp,%rax
+  1243ef:	49 39 c5             	cmp    %rax,%r13
+  1243f2:	0f 86 47 01 00 00    	jbe    12453f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1b8f>
+  1243f8:	b9 01 00 00 00       	mov    $0x1,%ecx
+  1243fd:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124403:	48 8b 3c 24          	mov    (%rsp),%rdi
+  124407:	48 89 ee             	mov    %rbp,%rsi
+  12440a:	4c 89 ea             	mov    %r13,%rdx
+  12440d:	e8 0e 98 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124412:	e9 2e 06 00 00       	jmp    124a45 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2095>
+  124417:	41 bd 01 00 00 00    	mov    $0x1,%r13d
+  12441d:	be 01 00 00 00       	mov    $0x1,%esi
+  124422:	4c 89 ff             	mov    %r15,%rdi
+  124425:	e8 06 43 f7 ff       	call   98730 <__rustc::__rust_alloc>
+  12442a:	48 85 c0             	test   %rax,%rax
+  12442d:	0f 84 a6 fe ff ff    	je     1242d9 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1929>
+  124433:	49 89 c4             	mov    %rax,%r12
+  124436:	0f b6 44 24 40       	movzbl 0x40(%rsp),%eax
+  12443b:	8b 4c 24 3c          	mov    0x3c(%rsp),%ecx
+  12443f:	0f b7 54 24 3e       	movzwl 0x3e(%rsp),%edx
+  124444:	c1 e1 04             	shl    $0x4,%ecx
+  124447:	83 e0 0f             	and    $0xf,%eax
+  12444a:	09 c8                	or     %ecx,%eax
+  12444c:	66 41 89 04 24       	mov    %ax,(%r12)
+  124451:	66 41 89 54 24 02    	mov    %dx,0x2(%r12)
+  124457:	45 89 74 24 04       	mov    %r14d,0x4(%r12)
+  12445c:	4c 89 e7             	mov    %r12,%rdi
+  12445f:	48 83 c7 08          	add    $0x8,%rdi
+  124463:	48 89 de             	mov    %rbx,%rsi
+  124466:	4c 89 f2             	mov    %r14,%rdx
+  124469:	ff 15 79 bb 04 00    	call   *0x4bb79(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  12446f:	4c 8b 34 24          	mov    (%rsp),%r14
+  124473:	49 8b 06             	mov    (%r14),%rax
+  124476:	48 29 e8             	sub    %rbp,%rax
+  124479:	49 39 c7             	cmp    %rax,%r15
+  12447c:	0f 87 83 05 00 00    	ja     124a05 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2055>
+  124482:	49 bd 00 00 00 00 00 	movabs $0x8000000000000000,%r13
+  124489:	00 00 80 
+  12448c:	49 8b 7e 08          	mov    0x8(%r14),%rdi
+  124490:	48 01 ef             	add    %rbp,%rdi
+  124493:	4c 89 e6             	mov    %r12,%rsi
+  124496:	4c 89 fa             	mov    %r15,%rdx
+  124499:	ff 15 49 bb 04 00    	call   *0x4bb49(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  12449f:	4c 01 fd             	add    %r15,%rbp
+  1244a2:	49 89 6e 10          	mov    %rbp,0x10(%r14)
+  1244a6:	4c 89 e7             	mov    %r12,%rdi
+  1244a9:	ff 15 41 bb 04 00    	call   *0x4bb41(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1244af:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  1244b5:	74 09                	je     1244c0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1b10>
+  1244b7:	48 89 df             	mov    %rbx,%rdi
+  1244ba:	ff 15 30 bb 04 00    	call   *0x4bb30(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1244c0:	4c 8b 64 24 10       	mov    0x10(%rsp),%r12
+  1244c5:	e9 bb 00 00 00       	jmp    124585 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1bd5>
+  1244ca:	48 89 4c 24 08       	mov    %rcx,0x8(%rsp)
+  1244cf:	41 bf 01 00 00 00    	mov    $0x1,%r15d
+  1244d5:	be 01 00 00 00       	mov    $0x1,%esi
+  1244da:	4c 89 ef             	mov    %r13,%rdi
+  1244dd:	e8 4e 42 f7 ff       	call   98730 <__rustc::__rust_alloc>
+  1244e2:	48 85 c0             	test   %rax,%rax
+  1244e5:	0f 84 88 fe ff ff    	je     124373 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x19c3>
+  1244eb:	49 89 c4             	mov    %rax,%r12
+  1244ee:	0f b6 44 24 40       	movzbl 0x40(%rsp),%eax
+  1244f3:	8b 4c 24 3c          	mov    0x3c(%rsp),%ecx
+  1244f7:	0f b7 54 24 3e       	movzwl 0x3e(%rsp),%edx
+  1244fc:	c1 e1 04             	shl    $0x4,%ecx
+  1244ff:	83 e0 0f             	and    $0xf,%eax
+  124502:	09 c8                	or     %ecx,%eax
+  124504:	66 41 89 04 24       	mov    %ax,(%r12)
+  124509:	66 41 89 54 24 02    	mov    %dx,0x2(%r12)
+  12450f:	45 89 74 24 04       	mov    %r14d,0x4(%r12)
+  124514:	4c 89 e7             	mov    %r12,%rdi
+  124517:	48 83 c7 08          	add    $0x8,%rdi
+  12451b:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+  124520:	4c 89 fe             	mov    %r15,%rsi
+  124523:	4c 89 f2             	mov    %r14,%rdx
+  124526:	ff 15 bc ba 04 00    	call   *0x4babc(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  12452c:	48 8b 04 24          	mov    (%rsp),%rax
+  124530:	48 8b 00             	mov    (%rax),%rax
+  124533:	48 29 e8             	sub    %rbp,%rax
+  124536:	49 39 c5             	cmp    %rax,%r13
+  124539:	0f 87 ec 04 00 00    	ja     124a2b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x207b>
+  12453f:	48 01 eb             	add    %rbp,%rbx
+  124542:	48 89 df             	mov    %rbx,%rdi
+  124545:	4c 89 e6             	mov    %r12,%rsi
+  124548:	4c 89 ea             	mov    %r13,%rdx
+  12454b:	ff 15 97 ba 04 00    	call   *0x4ba97(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  124551:	4c 01 ed             	add    %r13,%rbp
+  124554:	48 8b 04 24          	mov    (%rsp),%rax
+  124558:	48 89 68 10          	mov    %rbp,0x10(%rax)
+  12455c:	4c 89 e7             	mov    %r12,%rdi
+  12455f:	ff 15 8b ba 04 00    	call   *0x4ba8b(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124565:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  12456b:	74 09                	je     124576 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1bc6>
+  12456d:	4c 89 ff             	mov    %r15,%rdi
+  124570:	ff 15 7a ba 04 00    	call   *0x4ba7a(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124576:	4c 8b 64 24 10       	mov    0x10(%rsp),%r12
+  12457b:	49 bd 00 00 00 00 00 	movabs $0x8000000000000000,%r13
+  124582:	00 00 80 
+  124585:	4d 39 ac 24 d8 00 00 	cmp    %r13,0xd8(%r12)
+  12458c:	00 
+  12458d:	0f 85 e8 00 00 00    	jne    12467b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1ccb>
+  124593:	4c 89 ac 24 c0 01 00 	mov    %r13,0x1c0(%rsp)
+  12459a:	00 
+  12459b:	4d 89 ef             	mov    %r13,%r15
+  12459e:	41 8b 9c 24 50 02 00 	mov    0x250(%r12),%ebx
+  1245a5:	00 
+  1245a6:	83 fb 01             	cmp    $0x1,%ebx
+  1245a9:	0f 85 a4 05 00 00    	jne    124b53 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x21a3>
+  1245af:	41 8b 84 24 54 02 00 	mov    0x254(%r12),%eax
+  1245b6:	00 
+  1245b7:	41 0f b6 8c 24 a3 02 	movzbl 0x2a3(%r12),%ecx
+  1245be:	00 00 
+  1245c0:	41 0f b6 94 24 a4 02 	movzbl 0x2a4(%r12),%edx
+  1245c7:	00 00 
+  1245c9:	41 0f b6 b4 24 a5 02 	movzbl 0x2a5(%r12),%esi
+  1245d0:	00 00 
+  1245d2:	66 0f 57 c0          	xorpd  %xmm0,%xmm0
+  1245d6:	66 0f 29 84 24 50 02 	movapd %xmm0,0x250(%rsp)
+  1245dd:	00 00 
+  1245df:	89 84 24 54 02 00 00 	mov    %eax,0x254(%rsp)
+  1245e6:	88 8c 24 58 02 00 00 	mov    %cl,0x258(%rsp)
+  1245ed:	88 94 24 5a 02 00 00 	mov    %dl,0x25a(%rsp)
+  1245f4:	40 88 b4 24 5c 02 00 	mov    %sil,0x25c(%rsp)
+  1245fb:	00 
+  1245fc:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  124603:	00 
+  124604:	48 8d b4 24 50 02 00 	lea    0x250(%rsp),%rsi
+  12460b:	00 
+  12460c:	e8 cf 78 fc ff       	call   ebee0 <litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::InteractiveInfoAtom>::parse_payload>
+  124611:	80 bc 24 48 01 00 00 	cmpb   $0x1f,0x148(%rsp)
+  124618:	1f 
+  124619:	0f 85 e3 01 00 00    	jne    124802 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1e52>
+  12461f:	8b 84 24 4c 01 00 00 	mov    0x14c(%rsp),%eax
+  124626:	48 8b 8c 24 50 01 00 	mov    0x150(%rsp),%rcx
+  12462d:	00 
+  12462e:	48 8b 94 24 58 01 00 	mov    0x158(%rsp),%rdx
+  124635:	00 
+  124636:	89 d6                	mov    %edx,%esi
+  124638:	c1 ee 08             	shr    $0x8,%esi
+  12463b:	89 d7                	mov    %edx,%edi
+  12463d:	c1 ef 10             	shr    $0x10,%edi
+  124640:	41 89 d0             	mov    %edx,%r8d
+  124643:	41 c1 e8 18          	shr    $0x18,%r8d
+  124647:	41 80 e0 01          	and    $0x1,%r8b
+  12464b:	49 89 d1             	mov    %rdx,%r9
+  12464e:	49 c1 e9 20          	shr    $0x20,%r9
+  124652:	41 80 e1 01          	and    $0x1,%r9b
+  124656:	49 89 d2             	mov    %rdx,%r10
+  124659:	49 c1 ea 28          	shr    $0x28,%r10
+  12465d:	41 80 e2 01          	and    $0x1,%r10b
+  124661:	49 89 d3             	mov    %rdx,%r11
+  124664:	49 c1 eb 30          	shr    $0x30,%r11
+  124668:	41 80 e3 01          	and    $0x1,%r11b
+  12466c:	49 89 ce             	mov    %rcx,%r14
+  12466f:	49 c1 ee 20          	shr    $0x20,%r14
+  124673:	4d 89 ef             	mov    %r13,%r15
+  124676:	e9 dc 04 00 00       	jmp    124b57 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x21a7>
+  12467b:	49 8d b4 24 d8 00 00 	lea    0xd8(%r12),%rsi
+  124682:	00 
+  124683:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  12468a:	00 
+  12468b:	e8 30 14 00 00       	call   125ac0 <litchi_ppt::animation::writer::animation::write_animation_info>
+  124690:	80 bc 24 10 01 00 00 	cmpb   $0x1f,0x110(%rsp)
+  124697:	1f 
+  124698:	0f 85 87 00 00 00    	jne    124725 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1d75>
+  12469e:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  1246a5:	00 
+  1246a6:	48 8b 84 24 20 01 00 	mov    0x120(%rsp),%rax
+  1246ad:	00 
+  1246ae:	48 89 44 24 08       	mov    %rax,0x8(%rsp)
+  1246b3:	4c 8b bc 24 28 01 00 	mov    0x128(%rsp),%r15
+  1246ba:	00 
+  1246bb:	c7 44 24 38 00 00 00 	movl   $0x0,0x38(%rsp)
+  1246c2:	00 
+  1246c3:	66 c7 44 24 3c 00 00 	movw   $0x0,0x3c(%rsp)
+  1246ca:	66 c7 44 24 3e 11 f0 	movw   $0xf011,0x3e(%rsp)
+  1246d1:	c6 44 24 40 0f       	movb   $0xf,0x40(%rsp)
+  1246d6:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+  1246dd:	00 00 
+  1246df:	48 c7 44 24 28 01 00 	movq   $0x1,0x28(%rsp)
+  1246e6:	00 00 
+  1246e8:	48 c7 44 24 30 00 00 	movq   $0x0,0x30(%rsp)
+  1246ef:	00 00 
+  1246f1:	4d 85 ff             	test   %r15,%r15
+  1246f4:	0f 85 61 03 00 00    	jne    124a5b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x20ab>
+  1246fa:	bb 01 00 00 00       	mov    $0x1,%ebx
+  1246ff:	45 31 ed             	xor    %r13d,%r13d
+  124702:	4d 01 fd             	add    %r15,%r13
+  124705:	4d 89 ef             	mov    %r13,%r15
+  124708:	49 83 c7 08          	add    $0x8,%r15
+  12470c:	0f 89 8f 03 00 00    	jns    124aa1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x20f1>
+  124712:	45 31 f6             	xor    %r14d,%r14d
+  124715:	4c 89 f7             	mov    %r14,%rdi
+  124718:	4c 89 fe             	mov    %r15,%rsi
+  12471b:	e8 c1 45 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  124720:	e9 55 0d 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  124725:	66 0f 10 84 24 10 01 	movupd 0x110(%rsp),%xmm0
+  12472c:	00 00 
+  12472e:	66 0f 10 8c 24 20 01 	movupd 0x120(%rsp),%xmm1
+  124735:	00 00 
+  124737:	0f 10 94 24 30 01 00 	movups 0x130(%rsp),%xmm2
+  12473e:	00 
+  12473f:	0f 29 54 24 40       	movaps %xmm2,0x40(%rsp)
+  124744:	66 0f 29 4c 24 30    	movapd %xmm1,0x30(%rsp)
+  12474a:	66 0f 29 44 24 20    	movapd %xmm0,0x20(%rsp)
+  124750:	48 c7 84 24 d8 01 00 	movq   $0x0,0x1d8(%rsp)
+  124757:	00 00 00 00 00 
+  12475c:	48 c7 84 24 e0 01 00 	movq   $0x1,0x1e0(%rsp)
+  124763:	00 01 00 00 00 
+  124768:	48 c7 84 24 e8 01 00 	movq   $0x0,0x1e8(%rsp)
+  12476f:	00 00 00 00 00 
+  124774:	48 c7 84 24 58 01 00 	movq   $0x60000020,0x158(%rsp)
+  12477b:	00 20 00 00 60 
+  124780:	48 8d 84 24 d8 01 00 	lea    0x1d8(%rsp),%rax
+  124787:	00 
+  124788:	48 89 84 24 48 01 00 	mov    %rax,0x148(%rsp)
+  12478f:	00 
+  124790:	48 8d 05 99 97 04 00 	lea    0x49799(%rip),%rax        # 16df30 <encoding_rs::BIG5_INIT+0xf10>
+  124797:	48 89 84 24 50 01 00 	mov    %rax,0x150(%rsp)
+  12479e:	00 
+  12479f:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1247a4:	48 8d b4 24 48 01 00 	lea    0x148(%rsp),%rsi
+  1247ab:	00 
+  1247ac:	e8 cf 6a fd ff       	call   fb280 <<litchi_ppt::package::model::Error as core::fmt::Display>::fmt>
+  1247b1:	84 c0                	test   %al,%al
+  1247b3:	0f 85 01 0c 00 00    	jne    1253ba <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a0a>
+  1247b9:	48 8b 84 24 e8 01 00 	mov    0x1e8(%rsp),%rax
+  1247c0:	00 
+  1247c1:	48 89 84 24 00 02 00 	mov    %rax,0x200(%rsp)
+  1247c8:	00 
+  1247c9:	66 0f 10 84 24 d8 01 	movupd 0x1d8(%rsp),%xmm0
+  1247d0:	00 00 
+  1247d2:	66 0f 29 84 24 f0 01 	movapd %xmm0,0x1f0(%rsp)
+  1247d9:	00 00 
+  1247db:	48 8d b4 24 f0 01 00 	lea    0x1f0(%rsp),%rsi
+  1247e2:	00 
+  1247e3:	bf 14 00 00 00       	mov    $0x14,%edi
+  1247e8:	e8 23 7f 01 00       	call   13c710 <std::io::error::Error::new>
+  1247ed:	49 89 c4             	mov    %rax,%r12
+  1247f0:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  1247f7:	00 
+  1247f8:	e8 83 8e fb ff       	call   dd680 <core::ptr::drop_in_place<litchi_ppt::package::model::Error>>
+  1247fd:	e9 0f 06 00 00       	jmp    124e11 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2461>
+  124802:	66 0f 10 84 24 48 01 	movupd 0x148(%rsp),%xmm0
+  124809:	00 00 
+  12480b:	66 0f 10 8c 24 58 01 	movupd 0x158(%rsp),%xmm1
+  124812:	00 00 
+  124814:	0f 10 94 24 68 01 00 	movups 0x168(%rsp),%xmm2
+  12481b:	00 
+  12481c:	0f 29 94 24 30 01 00 	movaps %xmm2,0x130(%rsp)
+  124823:	00 
+  124824:	66 0f 29 8c 24 20 01 	movapd %xmm1,0x120(%rsp)
+  12482b:	00 00 
+  12482d:	66 0f 29 84 24 10 01 	movapd %xmm0,0x110(%rsp)
+  124834:	00 00 
+  124836:	48 c7 84 24 f0 01 00 	movq   $0x0,0x1f0(%rsp)
+  12483d:	00 00 00 00 00 
+  124842:	48 c7 84 24 f8 01 00 	movq   $0x1,0x1f8(%rsp)
+  124849:	00 01 00 00 00 
+  12484e:	48 c7 84 24 00 02 00 	movq   $0x0,0x200(%rsp)
+  124855:	00 00 00 00 00 
+  12485a:	48 c7 84 24 e8 01 00 	movq   $0x60000020,0x1e8(%rsp)
+  124861:	00 20 00 00 60 
+  124866:	48 8d 84 24 f0 01 00 	lea    0x1f0(%rsp),%rax
+  12486d:	00 
+  12486e:	48 89 84 24 d8 01 00 	mov    %rax,0x1d8(%rsp)
+  124875:	00 
+  124876:	48 8d 05 b3 96 04 00 	lea    0x496b3(%rip),%rax        # 16df30 <encoding_rs::BIG5_INIT+0xf10>
+  12487d:	48 89 84 24 e0 01 00 	mov    %rax,0x1e0(%rsp)
+  124884:	00 
+  124885:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  12488c:	00 
+  12488d:	48 8d b4 24 d8 01 00 	lea    0x1d8(%rsp),%rsi
+  124894:	00 
+  124895:	e8 e6 69 fd ff       	call   fb280 <<litchi_ppt::package::model::Error as core::fmt::Display>::fmt>
+  12489a:	84 c0                	test   %al,%al
+  12489c:	0f 85 41 0b 00 00    	jne    1253e3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a33>
+  1248a2:	4c 8b a4 24 f0 01 00 	mov    0x1f0(%rsp),%r12
+  1248a9:	00 
+  1248aa:	4c 8b b4 24 f8 01 00 	mov    0x1f8(%rsp),%r14
+  1248b1:	00 
+  1248b2:	48 8b 9c 24 00 02 00 	mov    0x200(%rsp),%rbx
+  1248b9:	00 
+  1248ba:	bf 18 00 00 00       	mov    $0x18,%edi
+  1248bf:	ff 15 1b b7 04 00    	call   *0x4b71b(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  1248c5:	48 85 c0             	test   %rax,%rax
+  1248c8:	0f 84 3b 0b 00 00    	je     125409 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2a59>
+  1248ce:	4c 89 20             	mov    %r12,(%rax)
+  1248d1:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  1248d5:	48 89 58 10          	mov    %rbx,0x10(%rax)
+  1248d9:	48 8d 15 d0 94 04 00 	lea    0x494d0(%rip),%rdx        # 16ddb0 <encoding_rs::BIG5_INIT+0xd90>
+  1248e0:	bf 28 00 00 00       	mov    $0x28,%edi
+  1248e5:	48 89 c6             	mov    %rax,%rsi
+  1248e8:	e8 b3 3b 04 00       	call   1684a0 <<std::io::error::Error>::_new>
+  1248ed:	49 89 c4             	mov    %rax,%r12
+  1248f0:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  1248f7:	00 
+  1248f8:	e8 83 8d fb ff       	call   dd680 <core::ptr::drop_in_place<litchi_ppt::package::model::Error>>
+  1248fd:	4d 39 ef             	cmp    %r13,%r15
+  124900:	0f 85 fd 04 00 00    	jne    124e03 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2453>
+  124906:	e9 06 05 00 00       	jmp    124e11 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2461>
+  12490b:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124910:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124916:	4c 89 ef             	mov    %r13,%rdi
+  124919:	4c 89 f6             	mov    %r14,%rsi
+  12491c:	48 89 da             	mov    %rbx,%rdx
+  12491f:	e8 fc 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124924:	4d 8b 75 10          	mov    0x10(%r13),%r14
+  124928:	e9 0f e2 ff ff       	jmp    122b3c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x18c>
+  12492d:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124932:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124938:	48 8b 3c 24          	mov    (%rsp),%rdi
+  12493c:	48 89 ee             	mov    %rbp,%rsi
+  12493f:	4c 89 ea             	mov    %r13,%rdx
+  124942:	e8 d9 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124947:	48 8b 04 24          	mov    (%rsp),%rax
+  12494b:	48 8b 68 10          	mov    0x10(%rax),%rbp
+  12494f:	e9 8e f6 ff ff       	jmp    123fe2 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1632>
+  124954:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  124959:	ba 02 00 00 00       	mov    $0x2,%edx
+  12495e:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124963:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124969:	4c 89 fe             	mov    %r15,%rsi
+  12496c:	e8 af 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124971:	4c 8b 7c 24 30       	mov    0x30(%rsp),%r15
+  124976:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+  12497b:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+  124980:	e9 8a f8 ff ff       	jmp    12420f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x185f>
+  124985:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12498a:	ba 02 00 00 00       	mov    $0x2,%edx
+  12498f:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124994:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  12499a:	4c 89 fe             	mov    %r15,%rsi
+  12499d:	e8 7e 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  1249a2:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+  1249a7:	4c 8b 7c 24 30       	mov    0x30(%rsp),%r15
+  1249ac:	e9 9f f8 ff ff       	jmp    124250 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x18a0>
+  1249b1:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  1249b6:	ba 02 00 00 00       	mov    $0x2,%edx
+  1249bb:	b9 01 00 00 00       	mov    $0x1,%ecx
+  1249c0:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  1249c6:	4c 89 fe             	mov    %r15,%rsi
+  1249c9:	e8 52 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  1249ce:	4c 8b 7c 24 30       	mov    0x30(%rsp),%r15
+  1249d3:	e9 be f8 ff ff       	jmp    124296 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x18e6>
+  1249d8:	48 8d bc 24 a0 01 00 	lea    0x1a0(%rsp),%rdi
+  1249df:	00 
+  1249e0:	ba 07 00 00 00       	mov    $0x7,%edx
+  1249e5:	b9 08 00 00 00       	mov    $0x8,%ecx
+  1249ea:	41 b8 20 00 00 00    	mov    $0x20,%r8d
+  1249f0:	4c 89 ee             	mov    %r13,%rsi
+  1249f3:	e8 28 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  1249f8:	4c 8b ac 24 b0 01 00 	mov    0x1b0(%rsp),%r13
+  1249ff:	00 
+  124a00:	e9 6b f4 ff ff       	jmp    123e70 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x14c0>
+  124a05:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124a0a:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124a10:	4c 89 f7             	mov    %r14,%rdi
+  124a13:	48 89 ee             	mov    %rbp,%rsi
+  124a16:	4c 89 fa             	mov    %r15,%rdx
+  124a19:	e8 02 92 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124a1e:	4c 8b 34 24          	mov    (%rsp),%r14
+  124a22:	49 8b 6e 10          	mov    0x10(%r14),%rbp
+  124a26:	e9 57 fa ff ff       	jmp    124482 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1ad2>
+  124a2b:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124a30:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124a36:	48 8b 3c 24          	mov    (%rsp),%rdi
+  124a3a:	48 89 ee             	mov    %rbp,%rsi
+  124a3d:	4c 89 ea             	mov    %r13,%rdx
+  124a40:	e8 db 91 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124a45:	48 8b 04 24          	mov    (%rsp),%rax
+  124a49:	48 8b 58 08          	mov    0x8(%rax),%rbx
+  124a4d:	48 8b 68 10          	mov    0x10(%rax),%rbp
+  124a51:	4c 8b 7c 24 08       	mov    0x8(%rsp),%r15
+  124a56:	e9 e4 fa ff ff       	jmp    12453f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1b8f>
+  124a5b:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  124a60:	b9 01 00 00 00       	mov    $0x1,%ecx
+  124a65:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  124a6b:	31 f6                	xor    %esi,%esi
+  124a6d:	4c 89 fa             	mov    %r15,%rdx
+  124a70:	e8 ab 91 fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  124a75:	48 8b 5c 24 28       	mov    0x28(%rsp),%rbx
+  124a7a:	4c 8b 6c 24 30       	mov    0x30(%rsp),%r13
+  124a7f:	4a 8d 3c 2b          	lea    (%rbx,%r13,1),%rdi
+  124a83:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+  124a88:	4c 89 fa             	mov    %r15,%rdx
+  124a8b:	ff 15 57 b5 04 00    	call   *0x4b557(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  124a91:	4d 01 fd             	add    %r15,%r13
+  124a94:	4d 89 ef             	mov    %r13,%r15
+  124a97:	49 83 c7 08          	add    $0x8,%r15
+  124a9b:	0f 88 71 fc ff ff    	js     124712 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1d62>
+  124aa1:	41 be 01 00 00 00    	mov    $0x1,%r14d
+  124aa7:	be 01 00 00 00       	mov    $0x1,%esi
+  124aac:	4c 89 ff             	mov    %r15,%rdi
+  124aaf:	e8 7c 3c f7 ff       	call   98730 <__rustc::__rust_alloc>
+  124ab4:	48 85 c0             	test   %rax,%rax
+  124ab7:	0f 84 58 fc ff ff    	je     124715 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1d65>
+  124abd:	48 89 c5             	mov    %rax,%rbp
+  124ac0:	0f b6 44 24 40       	movzbl 0x40(%rsp),%eax
+  124ac5:	8b 4c 24 3c          	mov    0x3c(%rsp),%ecx
+  124ac9:	0f b7 54 24 3e       	movzwl 0x3e(%rsp),%edx
+  124ace:	c1 e1 04             	shl    $0x4,%ecx
+  124ad1:	83 e0 0f             	and    $0xf,%eax
+  124ad4:	09 c8                	or     %ecx,%eax
+  124ad6:	66 89 45 00          	mov    %ax,0x0(%rbp)
+  124ada:	66 89 55 02          	mov    %dx,0x2(%rbp)
+  124ade:	44 89 6d 04          	mov    %r13d,0x4(%rbp)
+  124ae2:	4d 85 ed             	test   %r13,%r13
+  124ae5:	74 13                	je     124afa <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x214a>
+  124ae7:	48 89 ef             	mov    %rbp,%rdi
+  124aea:	48 83 c7 08          	add    $0x8,%rdi
+  124aee:	48 89 de             	mov    %rbx,%rsi
+  124af1:	4c 89 ea             	mov    %r13,%rdx
+  124af4:	ff 15 ee b4 04 00    	call   *0x4b4ee(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  124afa:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  124b00:	74 09                	je     124b0b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x215b>
+  124b02:	48 89 df             	mov    %rbx,%rdi
+  124b05:	ff 15 e5 b4 04 00    	call   *0x4b4e5(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124b0b:	4d 85 e4             	test   %r12,%r12
+  124b0e:	49 bd 00 00 00 00 00 	movabs $0x8000000000000000,%r13
+  124b15:	00 00 80 
+  124b18:	74 0b                	je     124b25 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2175>
+  124b1a:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+  124b1f:	ff 15 cb b4 04 00    	call   *0x4b4cb(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124b25:	4c 89 bc 24 c0 01 00 	mov    %r15,0x1c0(%rsp)
+  124b2c:	00 
+  124b2d:	48 89 ac 24 c8 01 00 	mov    %rbp,0x1c8(%rsp)
+  124b34:	00 
+  124b35:	4c 89 bc 24 d0 01 00 	mov    %r15,0x1d0(%rsp)
+  124b3c:	00 
+  124b3d:	4c 8b 64 24 10       	mov    0x10(%rsp),%r12
+  124b42:	41 8b 9c 24 50 02 00 	mov    0x250(%r12),%ebx
+  124b49:	00 
+  124b4a:	83 fb 01             	cmp    $0x1,%ebx
+  124b4d:	0f 84 5c fa ff ff    	je     1245af <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x1bff>
+  124b53:	4d 8d 7d 01          	lea    0x1(%r13),%r15
+  124b57:	4c 89 7c 24 20       	mov    %r15,0x20(%rsp)
+  124b5c:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+  124b61:	89 44 24 50          	mov    %eax,0x50(%rsp)
+  124b65:	89 4c 24 54          	mov    %ecx,0x54(%rsp)
+  124b69:	c6 44 24 58 00       	movb   $0x0,0x58(%rsp)
+  124b6e:	44 88 44 24 59       	mov    %r8b,0x59(%rsp)
+  124b73:	44 88 4c 24 5a       	mov    %r9b,0x5a(%rsp)
+  124b78:	44 88 54 24 5b       	mov    %r10b,0x5b(%rsp)
+  124b7d:	44 88 5c 24 5c       	mov    %r11b,0x5c(%rsp)
+  124b82:	40 88 7c 24 5d       	mov    %dil,0x5d(%rsp)
+  124b87:	40 88 74 24 5e       	mov    %sil,0x5e(%rsp)
+  124b8c:	88 54 24 5f          	mov    %dl,0x5f(%rsp)
+  124b90:	44 89 74 24 60       	mov    %r14d,0x60(%rsp)
+  124b95:	4d 8b 6c 24 20       	mov    0x20(%r12),%r13
+  124b9a:	49 8b 6c 24 28       	mov    0x28(%r12),%rbp
+  124b9f:	48 c1 e5 03          	shl    $0x3,%rbp
+  124ba3:	48 8d 14 ed 00 00 00 	lea    0x0(,%rbp,8),%rdx
+  124baa:	00 
+  124bab:	48 01 ea             	add    %rbp,%rdx
+  124bae:	4e 8d 34 2a          	lea    (%rdx,%r13,1),%r14
+  124bb2:	31 c0                	xor    %eax,%eax
+  124bb4:	4c 89 ee             	mov    %r13,%rsi
+  124bb7:	66 0f 1f 84 00 00 00 	nopw   0x0(%rax,%rax,1)
+  124bbe:	00 00 
+  124bc0:	48 85 d2             	test   %rdx,%rdx
+  124bc3:	74 17                	je     124bdc <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x222c>
+  124bc5:	48 8d 4e 48          	lea    0x48(%rsi),%rcx
+  124bc9:	48 83 c2 b8          	add    $0xffffffffffffffb8,%rdx
+  124bcd:	80 7e 38 00          	cmpb   $0x0,0x38(%rsi)
+  124bd1:	48 89 ce             	mov    %rcx,%rsi
+  124bd4:	75 ea                	jne    124bc0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2210>
+  124bd6:	48 8d 41 b8          	lea    -0x48(%rcx),%rax
+  124bda:	eb 04                	jmp    124be0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2230>
+  124bdc:	4c 89 f1             	mov    %r14,%rcx
+  124bdf:	90                   	nop
+  124be0:	4c 39 f1             	cmp    %r14,%rcx
+  124be3:	74 0f                	je     124bf4 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2244>
+  124be5:	80 79 38 00          	cmpb   $0x0,0x38(%rcx)
+  124be9:	48 8d 49 48          	lea    0x48(%rcx),%rcx
+  124bed:	75 f1                	jne    124be0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2230>
+  124bef:	e9 b9 00 00 00       	jmp    124cad <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22fd>
+  124bf4:	48 85 c0             	test   %rax,%rax
+  124bf7:	0f 95 c1             	setne  %cl
+  124bfa:	08 d9                	or     %bl,%cl
+  124bfc:	74 73                	je     124c71 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22c1>
+  124bfe:	48 85 c0             	test   %rax,%rax
+  124c01:	48 8d 74 24 20       	lea    0x20(%rsp),%rsi
+  124c06:	48 0f 45 f0          	cmovne %rax,%rsi
+  124c0a:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  124c11:	00 
+  124c12:	ba 00 00 10 00       	mov    $0x100000,%edx
+  124c17:	b9 00 00 01 00       	mov    $0x10000,%ecx
+  124c1c:	e8 8f d7 fd ff       	call   1023b0 <litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::to_bytes_with_limits>
+  124c21:	80 bc 24 48 01 00 00 	cmpb   $0x1f,0x148(%rsp)
+  124c28:	1f 
+  124c29:	0f 85 70 01 00 00    	jne    124d9f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x23ef>
+  124c2f:	48 8b 9c 24 50 01 00 	mov    0x150(%rsp),%rbx
+  124c36:	00 
+  124c37:	4c 8b bc 24 58 01 00 	mov    0x158(%rsp),%r15
+  124c3e:	00 
+  124c3f:	48 8b 94 24 60 01 00 	mov    0x160(%rsp),%rdx
+  124c46:	00 
+  124c47:	48 8d bc 24 c0 01 00 	lea    0x1c0(%rsp),%rdi
+  124c4e:	00 
+  124c4f:	4c 89 fe             	mov    %r15,%rsi
+  124c52:	e8 09 32 00 00       	call   127e60 <litchi_ppt::writer::escher::codec::client_data::append_client_data_payload>
+  124c57:	49 89 c4             	mov    %rax,%r12
+  124c5a:	48 85 c0             	test   %rax,%rax
+  124c5d:	0f 85 1c 01 00 00    	jne    124d7f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x23cf>
+  124c63:	48 85 db             	test   %rbx,%rbx
+  124c66:	74 09                	je     124c71 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22c1>
+  124c68:	4c 89 ff             	mov    %r15,%rdi
+  124c6b:	ff 15 7f b3 04 00    	call   *0x4b37f(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124c71:	48 8d 0c ed 00 00 00 	lea    0x0(,%rbp,8),%rcx
+  124c78:	00 
+  124c79:	48 01 e9             	add    %rbp,%rcx
+  124c7c:	31 f6                	xor    %esi,%esi
+  124c7e:	48 85 c9             	test   %rcx,%rcx
+  124c81:	74 18                	je     124c9b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22eb>
+  124c83:	49 8d 45 48          	lea    0x48(%r13),%rax
+  124c87:	48 83 c1 b8          	add    $0xffffffffffffffb8,%rcx
+  124c8b:	41 80 7d 38 00       	cmpb   $0x0,0x38(%r13)
+  124c90:	49 89 c5             	mov    %rax,%r13
+  124c93:	74 e9                	je     124c7e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22ce>
+  124c95:	48 8d 70 b8          	lea    -0x48(%rax),%rsi
+  124c99:	eb 03                	jmp    124c9e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22ee>
+  124c9b:	4c 89 f0             	mov    %r14,%rax
+  124c9e:	4c 39 f0             	cmp    %r14,%rax
+  124ca1:	74 7e                	je     124d21 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2371>
+  124ca3:	80 78 38 00          	cmpb   $0x0,0x38(%rax)
+  124ca7:	48 8d 40 48          	lea    0x48(%rax),%rax
+  124cab:	74 f1                	je     124c9e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x22ee>
+  124cad:	bf 2d 00 00 00       	mov    $0x2d,%edi
+  124cb2:	ff 15 28 b3 04 00    	call   *0x4b328(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  124cb8:	48 85 c0             	test   %rax,%rax
+  124cbb:	0f 84 99 07 00 00    	je     12545a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aaa>
+  124cc1:	49 89 c6             	mov    %rax,%r14
+  124cc4:	0f 10 05 3a b1 f1 ff 	movups -0xe4ec6(%rip),%xmm0        # 3fe05 <encoding_rs::data::IBM_KANJI+0x5387>
+  124ccb:	0f 11 40 1d          	movups %xmm0,0x1d(%rax)
+  124ccf:	0f 10 05 22 b1 f1 ff 	movups -0xe4ede(%rip),%xmm0        # 3fdf8 <encoding_rs::data::IBM_KANJI+0x537a>
+  124cd6:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  124cda:	66 0f 10 05 06 b1 f1 	movupd -0xe4efa(%rip),%xmm0        # 3fde8 <encoding_rs::data::IBM_KANJI+0x536a>
+  124ce1:	ff 
+  124ce2:	66 0f 11 00          	movupd %xmm0,(%rax)
+  124ce6:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  124ced:	00 00 80 
+  124cf0:	e8 fb c1 fb ff       	call   e0ef0 <alloc::boxed::box_new_uninit>
+  124cf5:	48 c7 00 2d 00 00 00 	movq   $0x2d,(%rax)
+  124cfc:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  124d00:	48 c7 40 10 2d 00 00 	movq   $0x2d,0x10(%rax)
+  124d07:	00 
+  124d08:	48 8d 15 a1 90 04 00 	lea    0x490a1(%rip),%rdx        # 16ddb0 <encoding_rs::BIG5_INIT+0xd90>
+  124d0f:	bf 28 00 00 00       	mov    $0x28,%edi
+  124d14:	48 89 c6             	mov    %rax,%rsi
+  124d17:	e8 84 37 04 00       	call   1684a0 <<std::io::error::Error>::_new>
+  124d1c:	e9 c9 00 00 00       	jmp    124dea <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x243a>
+  124d21:	48 85 f6             	test   %rsi,%rsi
+  124d24:	0f 84 8e 01 00 00    	je     124eb8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2508>
+  124d2a:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  124d31:	00 
+  124d32:	ba 00 00 10 00       	mov    $0x100000,%edx
+  124d37:	b9 00 00 01 00       	mov    $0x10000,%ecx
+  124d3c:	e8 6f d6 fd ff       	call   1023b0 <litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::to_bytes_with_limits>
+  124d41:	80 bc 24 48 01 00 00 	cmpb   $0x1f,0x148(%rsp)
+  124d48:	1f 
+  124d49:	75 54                	jne    124d9f <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x23ef>
+  124d4b:	48 8b 9c 24 50 01 00 	mov    0x150(%rsp),%rbx
+  124d52:	00 
+  124d53:	4c 8b bc 24 58 01 00 	mov    0x158(%rsp),%r15
+  124d5a:	00 
+  124d5b:	48 8b 94 24 60 01 00 	mov    0x160(%rsp),%rdx
+  124d62:	00 
+  124d63:	48 8d bc 24 c0 01 00 	lea    0x1c0(%rsp),%rdi
+  124d6a:	00 
+  124d6b:	4c 89 fe             	mov    %r15,%rsi
+  124d6e:	e8 ed 30 00 00       	call   127e60 <litchi_ppt::writer::escher::codec::client_data::append_client_data_payload>
+  124d73:	49 89 c4             	mov    %rax,%r12
+  124d76:	48 85 c0             	test   %rax,%rax
+  124d79:	0f 84 2b 01 00 00    	je     124eaa <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24fa>
+  124d7f:	48 89 d8             	mov    %rbx,%rax
+  124d82:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  124d89:	00 00 80 
+  124d8c:	40 b5 01             	mov    $0x1,%bpl
+  124d8f:	48 85 c0             	test   %rax,%rax
+  124d92:	74 5c                	je     124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  124d94:	4c 89 ff             	mov    %r15,%rdi
+  124d97:	ff 15 53 b2 04 00    	call   *0x4b253(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124d9d:	eb 51                	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  124d9f:	66 0f 10 84 24 48 01 	movupd 0x148(%rsp),%xmm0
+  124da6:	00 00 
+  124da8:	66 0f 10 8c 24 58 01 	movupd 0x158(%rsp),%xmm1
+  124daf:	00 00 
+  124db1:	0f 10 94 24 68 01 00 	movups 0x168(%rsp),%xmm2
+  124db8:	00 
+  124db9:	0f 29 94 24 30 01 00 	movaps %xmm2,0x130(%rsp)
+  124dc0:	00 
+  124dc1:	66 0f 29 8c 24 20 01 	movapd %xmm1,0x120(%rsp)
+  124dc8:	00 00 
+  124dca:	66 0f 29 84 24 10 01 	movapd %xmm0,0x110(%rsp)
+  124dd1:	00 00 
+  124dd3:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  124dda:	00 
+  124ddb:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  124de2:	00 00 80 
+  124de5:	e8 36 5c 00 00       	call   12aa20 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children::{{closure}}>
+  124dea:	49 89 c4             	mov    %rax,%r12
+  124ded:	40 b5 01             	mov    $0x1,%bpl
+  124df0:	48 ff cb             	dec    %rbx
+  124df3:	48 85 9c 24 c0 01 00 	test   %rbx,0x1c0(%rsp)
+  124dfa:	00 
+  124dfb:	0f 95 c0             	setne  %al
+  124dfe:	40 84 e8             	test   %bpl,%al
+  124e01:	74 0e                	je     124e11 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2461>
+  124e03:	48 8b bc 24 c8 01 00 	mov    0x1c8(%rsp),%rdi
+  124e0a:	00 
+  124e0b:	ff 15 df b1 04 00    	call   *0x4b1df(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124e11:	48 83 bc 24 78 01 00 	cmpq   $0x0,0x178(%rsp)
+  124e18:	00 00 
+  124e1a:	74 0e                	je     124e2a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x247a>
+  124e1c:	48 8b bc 24 80 01 00 	mov    0x180(%rsp),%rdi
+  124e23:	00 
+  124e24:	ff 15 c6 b1 04 00    	call   *0x4b1c6(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124e2a:	4c 8b ac 24 b0 01 00 	mov    0x1b0(%rsp),%r13
+  124e31:	00 
+  124e32:	48 8b 9c 24 a8 01 00 	mov    0x1a8(%rsp),%rbx
+  124e39:	00 
+  124e3a:	4d 85 ed             	test   %r13,%r13
+  124e3d:	74 29                	je     124e68 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24b8>
+  124e3f:	4c 8d 73 10          	lea    0x10(%rbx),%r14
+  124e43:	4c 8b 3d a6 b1 04 00 	mov    0x4b1a6(%rip),%r15        # 16fff0 <free@GLIBC_2.2.5>
+  124e4a:	eb 0d                	jmp    124e59 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24a9>
+  124e4c:	0f 1f 40 00          	nopl   0x0(%rax)
+  124e50:	49 83 c6 20          	add    $0x20,%r14
+  124e54:	49 ff cd             	dec    %r13
+  124e57:	74 0f                	je     124e68 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24b8>
+  124e59:	49 83 7e f8 00       	cmpq   $0x0,-0x8(%r14)
+  124e5e:	7e f0                	jle    124e50 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24a0>
+  124e60:	49 8b 3e             	mov    (%r14),%rdi
+  124e63:	41 ff d7             	call   *%r15
+  124e66:	eb e8                	jmp    124e50 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24a0>
+  124e68:	48 83 bc 24 a0 01 00 	cmpq   $0x0,0x1a0(%rsp)
+  124e6f:	00 00 
+  124e71:	74 09                	je     124e7c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24cc>
+  124e73:	48 89 df             	mov    %rbx,%rdi
+  124e76:	ff 15 74 b1 04 00    	call   *0x4b174(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124e7c:	48 83 bc 24 18 02 00 	cmpq   $0x0,0x218(%rsp)
+  124e83:	00 00 
+  124e85:	74 0e                	je     124e95 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24e5>
+  124e87:	48 8b bc 24 20 02 00 	mov    0x220(%rsp),%rdi
+  124e8e:	00 
+  124e8f:	ff 15 5b b1 04 00    	call   *0x4b15b(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124e95:	4c 89 e0             	mov    %r12,%rax
+  124e98:	48 81 c4 68 02 00 00 	add    $0x268,%rsp
+  124e9f:	5b                   	pop    %rbx
+  124ea0:	41 5c                	pop    %r12
+  124ea2:	41 5d                	pop    %r13
+  124ea4:	41 5e                	pop    %r14
+  124ea6:	41 5f                	pop    %r15
+  124ea8:	5d                   	pop    %rbp
+  124ea9:	c3                   	ret
+  124eaa:	48 85 db             	test   %rbx,%rbx
+  124ead:	74 09                	je     124eb8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2508>
+  124eaf:	4c 89 ff             	mov    %r15,%rdi
+  124eb2:	ff 15 38 b1 04 00    	call   *0x4b138(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124eb8:	48 8b 5c 24 10       	mov    0x10(%rsp),%rbx
+  124ebd:	80 bb 9c 02 00 00 00 	cmpb   $0x0,0x29c(%rbx)
+  124ec4:	4c 8b 2c 24          	mov    (%rsp),%r13
+  124ec8:	0f 84 90 00 00 00    	je     124f5e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x25ae>
+  124ece:	0f b6 b3 9d 02 00 00 	movzbl 0x29d(%rbx),%esi
+  124ed5:	40 b5 01             	mov    $0x1,%bpl
+  124ed8:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  124edf:	00 
+  124ee0:	e8 6b 19 00 00       	call   126850 <litchi_ppt::writer::escher::codec::client_data::build_client_data_with_placeholder>
+  124ee5:	4c 8b b4 24 10 01 00 	mov    0x110(%rsp),%r14
+  124eec:	00 
+  124eed:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  124ef4:	00 
+  124ef5:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+  124efc:	00 00 80 
+  124eff:	49 39 c6             	cmp    %rax,%r14
+  124f02:	0f 84 fb 02 00 00    	je     125203 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2853>
+  124f08:	48 8b 94 24 20 01 00 	mov    0x120(%rsp),%rdx
+  124f0f:	00 
+  124f10:	48 8d bc 24 c0 01 00 	lea    0x1c0(%rsp),%rdi
+  124f17:	00 
+  124f18:	4c 89 e6             	mov    %r12,%rsi
+  124f1b:	e8 10 1d 00 00       	call   126c30 <litchi_ppt::writer::escher::codec::client_data::append_client_data_record_payload>
+  124f20:	48 89 c3             	mov    %rax,%rbx
+  124f23:	48 85 c0             	test   %rax,%rax
+  124f26:	74 23                	je     124f4b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x259b>
+  124f28:	40 b5 01             	mov    $0x1,%bpl
+  124f2b:	4d 85 f6             	test   %r14,%r14
+  124f2e:	74 09                	je     124f39 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2589>
+  124f30:	4c 89 e7             	mov    %r12,%rdi
+  124f33:	ff 15 b7 b0 04 00    	call   *0x4b0b7(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124f39:	49 89 dc             	mov    %rbx,%r12
+  124f3c:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  124f43:	00 00 80 
+  124f46:	e9 a5 fe ff ff       	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  124f4b:	4d 85 f6             	test   %r14,%r14
+  124f4e:	48 8b 5c 24 10       	mov    0x10(%rsp),%rbx
+  124f53:	74 09                	je     124f5e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x25ae>
+  124f55:	4c 89 e7             	mov    %r12,%rdi
+  124f58:	ff 15 92 b0 04 00    	call   *0x4b092(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  124f5e:	49 bc 00 00 00 00 00 	movabs $0x8000000000000000,%r12
+  124f65:	00 00 80 
+  124f68:	4c 39 63 78          	cmp    %r12,0x78(%rbx)
+  124f6c:	0f 85 3d 01 00 00    	jne    1250af <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x26ff>
+  124f72:	4c 8b b4 24 c0 01 00 	mov    0x1c0(%rsp),%r14
+  124f79:	00 
+  124f7a:	40 b5 01             	mov    $0x1,%bpl
+  124f7d:	4d 39 e6             	cmp    %r12,%r14
+  124f80:	0f 84 b4 00 00 00    	je     12503a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x268a>
+  124f86:	4c 8b bc 24 c8 01 00 	mov    0x1c8(%rsp),%r15
+  124f8d:	00 
+  124f8e:	48 8b 9c 24 d0 01 00 	mov    0x1d0(%rsp),%rbx
+  124f95:	00 
+  124f96:	48 c7 84 24 10 01 00 	movq   $0x1000000,0x110(%rsp)
+  124f9d:	00 00 00 00 01 
+  124fa2:	48 c7 84 24 18 01 00 	movq   $0x1000000,0x118(%rsp)
+  124fa9:	00 00 00 00 01 
+  124fae:	48 c7 84 24 20 01 00 	movq   $0xd,0x120(%rsp)
+  124fb5:	00 0d 00 00 00 
+  124fba:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  124fc1:	00 
+  124fc2:	48 8d 8c 24 10 01 00 	lea    0x110(%rsp),%rcx
+  124fc9:	00 
+  124fca:	4c 89 fe             	mov    %r15,%rsi
+  124fcd:	48 89 da             	mov    %rbx,%rdx
+  124fd0:	e8 bb ce fb ff       	call   e1e90 <litchi_ppt::client_data::codec::<impl litchi_ppt::client_data::model::ClientData>::parse_with_limits>
+  124fd5:	80 bc 24 48 01 00 00 	cmpb   $0x1f,0x148(%rsp)
+  124fdc:	1f 
+  124fdd:	0f 85 32 02 00 00    	jne    125215 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2865>
+  124fe3:	66 0f 10 84 24 50 01 	movupd 0x150(%rsp),%xmm0
+  124fea:	00 00 
+  124fec:	48 8b 84 24 60 01 00 	mov    0x160(%rsp),%rax
+  124ff3:	00 
+  124ff4:	66 0f 11 84 24 d8 01 	movupd %xmm0,0x1d8(%rsp)
+  124ffb:	00 00 
+  124ffd:	48 89 84 24 e8 01 00 	mov    %rax,0x1e8(%rsp)
+  125004:	00 
+  125005:	48 8d bc 24 d8 01 00 	lea    0x1d8(%rsp),%rdi
+  12500c:	00 
+  12500d:	e8 ee c2 fb ff       	call   e1300 <core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::client_data::model::ClientDataChild>>>
+  125012:	4c 89 ef             	mov    %r13,%rdi
+  125015:	4c 89 fe             	mov    %r15,%rsi
+  125018:	48 89 da             	mov    %rbx,%rdx
+  12501b:	e8 50 ab fb ff       	call   dfb70 <alloc::vec::Vec<T,A>::append_elements>
+  125020:	4d 85 f6             	test   %r14,%r14
+  125023:	74 09                	je     12502e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x267e>
+  125025:	4c 89 ff             	mov    %r15,%rdi
+  125028:	ff 15 c2 af 04 00    	call   *0x4afc2(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12502e:	31 ed                	xor    %ebp,%ebp
+  125030:	49 bc 00 00 00 00 00 	movabs $0x8000000000000000,%r12
+  125037:	00 00 80 
+  12503a:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+  12503f:	4c 39 60 60          	cmp    %r12,0x60(%rax)
+  125043:	0f 85 fd 00 00 00    	jne    125146 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2796>
+  125049:	4c 39 60 48          	cmp    %r12,0x48(%rax)
+  12504d:	0f 85 32 02 00 00    	jne    125285 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x28d5>
+  125053:	48 83 78 40 00       	cmpq   $0x0,0x40(%rax)
+  125058:	0f 84 f0 02 00 00    	je     12534e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x299e>
+  12505e:	bf 35 00 00 00       	mov    $0x35,%edi
+  125063:	ff 15 77 af 04 00    	call   *0x4af77(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  125069:	48 85 c0             	test   %rax,%rax
+  12506c:	0f 84 f9 03 00 00    	je     12546b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2abb>
+  125072:	49 89 c6             	mov    %rax,%r14
+  125075:	0f 10 05 57 ad f1 ff 	movups -0xe52a9(%rip),%xmm0        # 3fdd3 <encoding_rs::data::IBM_KANJI+0x5355>
+  12507c:	0f 11 40 20          	movups %xmm0,0x20(%rax)
+  125080:	0f 10 05 3c ad f1 ff 	movups -0xe52c4(%rip),%xmm0        # 3fdc3 <encoding_rs::data::IBM_KANJI+0x5345>
+  125087:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  12508b:	66 0f 10 05 20 ad f1 	movupd -0xe52e0(%rip),%xmm0        # 3fdb3 <encoding_rs::data::IBM_KANJI+0x5335>
+  125092:	ff 
+  125093:	66 0f 11 00          	movupd %xmm0,(%rax)
+  125097:	48 b8 69 6e 67 20 74 	movabs $0x7478657420676e69,%rax
+  12509e:	65 78 74 
+  1250a1:	49 89 46 2d          	mov    %rax,0x2d(%r14)
+  1250a5:	e8 46 be fb ff       	call   e0ef0 <alloc::boxed::box_new_uninit>
+  1250aa:	e9 66 02 00 00       	jmp    125315 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2965>
+  1250af:	48 8b b3 80 00 00 00 	mov    0x80(%rbx),%rsi
+  1250b6:	48 8b 93 88 00 00 00 	mov    0x88(%rbx),%rdx
+  1250bd:	40 b5 01             	mov    $0x1,%bpl
+  1250c0:	48 8d bc 24 48 01 00 	lea    0x148(%rsp),%rdi
+  1250c7:	00 
+  1250c8:	e8 63 1d 00 00       	call   126e30 <litchi_ppt::writer::smart_tags::build_shape_text_extensions>
+  1250cd:	80 bc 24 48 01 00 00 	cmpb   $0x15,0x148(%rsp)
+  1250d4:	15 
+  1250d5:	0f 85 e4 00 00 00    	jne    1251bf <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x280f>
+  1250db:	4c 8b bc 24 50 01 00 	mov    0x150(%rsp),%r15
+  1250e2:	00 
+  1250e3:	49 bc 00 00 00 00 00 	movabs $0x8000000000000000,%r12
+  1250ea:	00 00 80 
+  1250ed:	4d 39 e7             	cmp    %r12,%r15
+  1250f0:	0f 84 7c fe ff ff    	je     124f72 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x25c2>
+  1250f6:	4c 8b b4 24 58 01 00 	mov    0x158(%rsp),%r14
+  1250fd:	00 
+  1250fe:	48 8b 94 24 60 01 00 	mov    0x160(%rsp),%rdx
+  125105:	00 
+  125106:	48 8d bc 24 c0 01 00 	lea    0x1c0(%rsp),%rdi
+  12510d:	00 
+  12510e:	4c 89 f6             	mov    %r14,%rsi
+  125111:	e8 4a 2d 00 00       	call   127e60 <litchi_ppt::writer::escher::codec::client_data::append_client_data_payload>
+  125116:	49 89 c4             	mov    %rax,%r12
+  125119:	48 85 c0             	test   %rax,%rax
+  12511c:	0f 84 73 02 00 00    	je     125395 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x29e5>
+  125122:	40 b5 01             	mov    $0x1,%bpl
+  125125:	4d 85 ff             	test   %r15,%r15
+  125128:	0f 84 81 01 00 00    	je     1252af <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x28ff>
+  12512e:	4c 89 f7             	mov    %r14,%rdi
+  125131:	ff 15 b9 ae 04 00    	call   *0x4aeb9(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125137:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  12513e:	00 00 80 
+  125141:	e9 aa fc ff ff       	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  125146:	48 8b 50 70          	mov    0x70(%rax),%rdx
+  12514a:	48 85 d2             	test   %rdx,%rdx
+  12514d:	0f 84 6b 01 00 00    	je     1252be <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x290e>
+  125153:	48 8b 70 68          	mov    0x68(%rax),%rsi
+  125157:	8b 88 98 02 00 00    	mov    0x298(%rax),%ecx
+  12515d:	4c 8b 40 38          	mov    0x38(%rax),%r8
+  125161:	4c 8b 48 40          	mov    0x40(%rax),%r9
+  125165:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  12516c:	00 
+  12516d:	e8 9e 30 00 00       	call   128210 <litchi_ppt::writer::escher::codec::text::build_client_textbox_formatted_with_interactions>
+  125172:	4c 8b b4 24 10 01 00 	mov    0x110(%rsp),%r14
+  125179:	00 
+  12517a:	4c 8b a4 24 18 01 00 	mov    0x118(%rsp),%r12
+  125181:	00 
+  125182:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+  125189:	00 00 80 
+  12518c:	49 39 c6             	cmp    %rax,%r14
+  12518f:	0f 84 1a 01 00 00    	je     1252af <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x28ff>
+  125195:	48 8b 94 24 20 01 00 	mov    0x120(%rsp),%rdx
+  12519c:	00 
+  12519d:	4c 89 ef             	mov    %r13,%rdi
+  1251a0:	4c 89 e6             	mov    %r12,%rsi
+  1251a3:	e8 c8 a9 fb ff       	call   dfb70 <alloc::vec::Vec<T,A>::append_elements>
+  1251a8:	4d 85 f6             	test   %r14,%r14
+  1251ab:	0f 84 9d 01 00 00    	je     12534e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x299e>
+  1251b1:	4c 89 e7             	mov    %r12,%rdi
+  1251b4:	ff 15 36 ae 04 00    	call   *0x4ae36(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1251ba:	e9 8f 01 00 00       	jmp    12534e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x299e>
+  1251bf:	66 0f 10 84 24 48 01 	movupd 0x148(%rsp),%xmm0
+  1251c6:	00 00 
+  1251c8:	66 0f 10 8c 24 58 01 	movupd 0x158(%rsp),%xmm1
+  1251cf:	00 00 
+  1251d1:	0f 10 94 24 68 01 00 	movups 0x168(%rsp),%xmm2
+  1251d8:	00 
+  1251d9:	0f 29 94 24 30 01 00 	movaps %xmm2,0x130(%rsp)
+  1251e0:	00 
+  1251e1:	66 0f 29 8c 24 20 01 	movapd %xmm1,0x120(%rsp)
+  1251e8:	00 00 
+  1251ea:	66 0f 29 84 24 10 01 	movapd %xmm0,0x110(%rsp)
+  1251f1:	00 00 
+  1251f3:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  1251fa:	00 
+  1251fb:	e8 f0 2a 00 00       	call   127cf0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children::{{closure}}>
+  125200:	49 89 c4             	mov    %rax,%r12
+  125203:	40 b5 01             	mov    $0x1,%bpl
+  125206:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  12520d:	00 00 80 
+  125210:	e9 db fb ff ff       	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  125215:	66 0f 10 84 24 48 01 	movupd 0x148(%rsp),%xmm0
+  12521c:	00 00 
+  12521e:	66 0f 10 8c 24 58 01 	movupd 0x158(%rsp),%xmm1
+  125225:	00 00 
+  125227:	0f 10 94 24 68 01 00 	movups 0x168(%rsp),%xmm2
+  12522e:	00 
+  12522f:	0f 29 94 24 30 01 00 	movaps %xmm2,0x130(%rsp)
+  125236:	00 
+  125237:	66 0f 29 8c 24 20 01 	movapd %xmm1,0x120(%rsp)
+  12523e:	00 00 
+  125240:	66 0f 29 84 24 10 01 	movapd %xmm0,0x110(%rsp)
+  125247:	00 00 
+  125249:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  125250:	00 
+  125251:	e8 ca 57 00 00       	call   12aa20 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children::{{closure}}>
+  125256:	49 89 c4             	mov    %rax,%r12
+  125259:	4d 85 f6             	test   %r14,%r14
+  12525c:	74 09                	je     125267 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x28b7>
+  12525e:	4c 89 ff             	mov    %r15,%rdi
+  125261:	ff 15 89 ad 04 00    	call   *0x4ad89(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125267:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12526c:	e8 8f 15 00 00       	call   126800 <core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::Interaction>>>
+  125271:	48 83 bc 24 78 01 00 	cmpq   $0x0,0x178(%rsp)
+  125278:	00 00 
+  12527a:	0f 85 9c fb ff ff    	jne    124e1c <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x246c>
+  125280:	e9 a5 fb ff ff       	jmp    124e2a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x247a>
+  125285:	48 8b 70 50          	mov    0x50(%rax),%rsi
+  125289:	48 8b 50 58          	mov    0x58(%rax),%rdx
+  12528d:	8b 88 98 02 00 00    	mov    0x298(%rax),%ecx
+  125293:	4c 8b 40 38          	mov    0x38(%rax),%r8
+  125297:	4c 8b 48 40          	mov    0x40(%rax),%r9
+  12529b:	4c 89 ef             	mov    %r13,%rdi
+  12529e:	e8 4d c6 ff ff       	call   1218f0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions>
+  1252a3:	49 89 c4             	mov    %rax,%r12
+  1252a6:	48 85 c0             	test   %rax,%rax
+  1252a9:	0f 84 9f 00 00 00    	je     12534e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x299e>
+  1252af:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  1252b6:	00 00 80 
+  1252b9:	e9 32 fb ff ff       	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  1252be:	48 83 78 40 00       	cmpq   $0x0,0x40(%rax)
+  1252c3:	0f 84 85 00 00 00    	je     12534e <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x299e>
+  1252c9:	bf 35 00 00 00       	mov    $0x35,%edi
+  1252ce:	ff 15 0c ad 04 00    	call   *0x4ad0c(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  1252d4:	48 85 c0             	test   %rax,%rax
+  1252d7:	0f 84 8e 01 00 00    	je     12546b <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2abb>
+  1252dd:	49 89 c6             	mov    %rax,%r14
+  1252e0:	0f 10 05 ec aa f1 ff 	movups -0xe5514(%rip),%xmm0        # 3fdd3 <encoding_rs::data::IBM_KANJI+0x5355>
+  1252e7:	0f 11 40 20          	movups %xmm0,0x20(%rax)
+  1252eb:	0f 10 05 d1 aa f1 ff 	movups -0xe552f(%rip),%xmm0        # 3fdc3 <encoding_rs::data::IBM_KANJI+0x5345>
+  1252f2:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  1252f6:	66 0f 10 05 b5 aa f1 	movupd -0xe554b(%rip),%xmm0        # 3fdb3 <encoding_rs::data::IBM_KANJI+0x5335>
+  1252fd:	ff 
+  1252fe:	66 0f 11 00          	movupd %xmm0,(%rax)
+  125302:	48 b8 69 6e 67 20 74 	movabs $0x7478657420676e69,%rax
+  125309:	65 78 74 
+  12530c:	49 89 46 2d          	mov    %rax,0x2d(%r14)
+  125310:	e8 db bb fb ff       	call   e0ef0 <alloc::boxed::box_new_uninit>
+  125315:	48 c7 00 35 00 00 00 	movq   $0x35,(%rax)
+  12531c:	4c 89 70 08          	mov    %r14,0x8(%rax)
+  125320:	48 c7 40 10 35 00 00 	movq   $0x35,0x10(%rax)
+  125327:	00 
+  125328:	48 8d 15 81 8a 04 00 	lea    0x48a81(%rip),%rdx        # 16ddb0 <encoding_rs::BIG5_INIT+0xd90>
+  12532f:	bf 28 00 00 00       	mov    $0x28,%edi
+  125334:	48 89 c6             	mov    %rax,%rsi
+  125337:	e8 64 31 04 00       	call   1684a0 <<std::io::error::Error>::_new>
+  12533c:	49 89 c4             	mov    %rax,%r12
+  12533f:	48 bb 00 00 00 00 00 	movabs $0x8000000000000000,%rbx
+  125346:	00 00 80 
+  125349:	e9 a2 fa ff ff       	jmp    124df0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2440>
+  12534e:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  125353:	e8 a8 14 00 00       	call   126800 <core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::Interaction>>>
+  125358:	48 83 bc 24 78 01 00 	cmpq   $0x0,0x178(%rsp)
+  12535f:	00 00 
+  125361:	74 0e                	je     125371 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x29c1>
+  125363:	48 8b bc 24 80 01 00 	mov    0x180(%rsp),%rdi
+  12536a:	00 
+  12536b:	ff 15 7f ac 04 00    	call   *0x4ac7f(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125371:	48 8d bc 24 a0 01 00 	lea    0x1a0(%rsp),%rdi
+  125378:	00 
+  125379:	e8 82 06 00 00       	call   125a00 <core::ptr::drop_in_place<alloc::vec::Vec<(litchi_odraw::write::Property,core::option::Option<alloc::vec::Vec<u8>>)>>>
+  12537e:	45 31 e4             	xor    %r12d,%r12d
+  125381:	48 83 bc 24 18 02 00 	cmpq   $0x0,0x218(%rsp)
+  125388:	00 00 
+  12538a:	0f 85 f7 fa ff ff    	jne    124e87 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24d7>
+  125390:	e9 00 fb ff ff       	jmp    124e95 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x24e5>
+  125395:	4d 85 ff             	test   %r15,%r15
+  125398:	4c 8b 2c 24          	mov    (%rsp),%r13
+  12539c:	49 bc 00 00 00 00 00 	movabs $0x8000000000000000,%r12
+  1253a3:	00 00 80 
+  1253a6:	0f 84 c6 fb ff ff    	je     124f72 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x25c2>
+  1253ac:	4c 89 f7             	mov    %r14,%rdi
+  1253af:	ff 15 3b ac 04 00    	call   *0x4ac3b(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1253b5:	e9 b8 fb ff ff       	jmp    124f72 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x25c2>
+  1253ba:	48 8d 3d 2d d2 f1 ff 	lea    -0xe2dd3(%rip),%rdi        # 425ee <itoa::DECIMAL_PAIRS+0xc8>
+  1253c1:	48 8d 0d d8 8f 04 00 	lea    0x48fd8(%rip),%rcx        # 16e3a0 <encoding_rs::BIG5_INIT+0x1380>
+  1253c8:	4c 8d 05 e1 9b 04 00 	lea    0x49be1(%rip),%r8        # 16efb0 <encoding_rs::BIG5_INIT+0x1f90>
+  1253cf:	48 8d 54 24 1f       	lea    0x1f(%rsp),%rdx
+  1253d4:	be 37 00 00 00       	mov    $0x37,%esi
+  1253d9:	e8 b2 73 f7 ff       	call   9c790 <core::result::unwrap_failed>
+  1253de:	e9 97 00 00 00       	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  1253e3:	48 8d 3d 04 d2 f1 ff 	lea    -0xe2dfc(%rip),%rdi        # 425ee <itoa::DECIMAL_PAIRS+0xc8>
+  1253ea:	48 8d 0d af 8f 04 00 	lea    0x48faf(%rip),%rcx        # 16e3a0 <encoding_rs::BIG5_INIT+0x1380>
+  1253f1:	4c 8d 05 b8 9b 04 00 	lea    0x49bb8(%rip),%r8        # 16efb0 <encoding_rs::BIG5_INIT+0x1f90>
+  1253f8:	48 8d 54 24 1f       	lea    0x1f(%rsp),%rdx
+  1253fd:	be 37 00 00 00       	mov    $0x37,%esi
+  125402:	e8 89 73 f7 ff       	call   9c790 <core::result::unwrap_failed>
+  125407:	eb 71                	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  125409:	bf 08 00 00 00       	mov    $0x8,%edi
+  12540e:	be 18 00 00 00       	mov    $0x18,%esi
+  125413:	e8 da 39 f7 ff       	call   98df2 <alloc::alloc::handle_alloc_error>
+  125418:	eb 60                	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  12541a:	bf 08 00 00 00       	mov    $0x8,%edi
+  12541f:	4c 89 f6             	mov    %r14,%rsi
+  125422:	e9 cb e3 ff ff       	jmp    1237f2 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xe42>
+  125427:	bf 01 00 00 00       	mov    $0x1,%edi
+  12542c:	e9 31 eb ff ff       	jmp    123f62 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x15b2>
+  125431:	bf 01 00 00 00       	mov    $0x1,%edi
+  125436:	48 89 de             	mov    %rbx,%rsi
+  125439:	e8 a3 38 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  12543e:	eb 3a                	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  125440:	48 89 ef             	mov    %rbp,%rdi
+  125443:	4c 89 ee             	mov    %r13,%rsi
+  125446:	e8 b5 03 00 00       	call   125800 <core::slice::sort::stable::driftsort_main>
+  12544b:	e9 4a e5 ff ff       	jmp    12399a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0xfea>
+  125450:	bf 01 00 00 00       	mov    $0x1,%edi
+  125455:	e9 10 e8 ff ff       	jmp    123c6a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x12ba>
+  12545a:	bf 01 00 00 00       	mov    $0x1,%edi
+  12545f:	be 2d 00 00 00       	mov    $0x2d,%esi
+  125464:	e8 78 38 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  125469:	eb 0f                	jmp    12547a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2aca>
+  12546b:	bf 01 00 00 00       	mov    $0x1,%edi
+  125470:	be 35 00 00 00       	mov    $0x35,%esi
+  125475:	e8 67 38 f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  12547a:	0f 0b                	ud2
+  12547c:	eb 14                	jmp    125492 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2ae2>
+  12547e:	eb 12                	jmp    125492 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2ae2>
+  125480:	48 89 c3             	mov    %rax,%rbx
+  125483:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  125488:	e8 e3 05 00 00       	call   125a70 <core::ptr::drop_in_place<core::array::iter::IntoIter<(litchi_odraw::write::Property,core::option::Option<alloc::vec::Vec<u8>>),7_usize>>>
+  12548d:	e9 5a 02 00 00       	jmp    1256ec <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d3c>
+  125492:	48 89 c3             	mov    %rax,%rbx
+  125495:	4c 89 e7             	mov    %r12,%rdi
+  125498:	ff 15 52 ab 04 00    	call   *0x4ab52(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12549e:	e9 00 02 00 00       	jmp    1256a3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2cf3>
+  1254a3:	48 89 c3             	mov    %rax,%rbx
+  1254a6:	4c 89 e7             	mov    %r12,%rdi
+  1254a9:	ff 15 41 ab 04 00    	call   *0x4ab41(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1254af:	e9 1f 02 00 00       	jmp    1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  1254b4:	48 89 c3             	mov    %rax,%rbx
+  1254b7:	eb 19                	jmp    1254d2 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2b22>
+  1254b9:	48 89 c3             	mov    %rax,%rbx
+  1254bc:	eb 58                	jmp    125516 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2b66>
+  1254be:	48 89 c3             	mov    %rax,%rbx
+  1254c1:	eb 0f                	jmp    1254d2 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2b22>
+  1254c3:	48 89 c3             	mov    %rax,%rbx
+  1254c6:	40 b5 01             	mov    $0x1,%bpl
+  1254c9:	4d 85 ff             	test   %r15,%r15
+  1254cc:	0f 84 c5 00 00 00    	je     125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  1254d2:	4c 89 f7             	mov    %r14,%rdi
+  1254d5:	ff 15 15 ab 04 00    	call   *0x4ab15(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1254db:	e9 b7 00 00 00       	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  1254e0:	48 89 c3             	mov    %rax,%rbx
+  1254e3:	4c 89 e7             	mov    %r12,%rdi
+  1254e6:	ff 15 04 ab 04 00    	call   *0x4ab04(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1254ec:	e9 6f 02 00 00       	jmp    125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  1254f1:	48 89 c3             	mov    %rax,%rbx
+  1254f4:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  1254fa:	0f 84 bb 01 00 00    	je     1256bb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d0b>
+  125500:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+  125505:	ff 15 e5 aa 04 00    	call   *0x4aae5(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12550b:	e9 ab 01 00 00       	jmp    1256bb <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d0b>
+  125510:	48 89 c3             	mov    %rax,%rbx
+  125513:	40 b5 01             	mov    $0x1,%bpl
+  125516:	4d 85 f6             	test   %r14,%r14
+  125519:	74 7c                	je     125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  12551b:	4c 89 e7             	mov    %r12,%rdi
+  12551e:	ff 15 cc aa 04 00    	call   *0x4aacc(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125524:	eb 71                	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  125526:	48 89 c3             	mov    %rax,%rbx
+  125529:	4d 85 f6             	test   %r14,%r14
+  12552c:	75 04                	jne    125532 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2b82>
+  12552e:	31 ed                	xor    %ebp,%ebp
+  125530:	eb 65                	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  125532:	4c 89 ff             	mov    %r15,%rdi
+  125535:	ff 15 b5 aa 04 00    	call   *0x4aab5(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12553b:	31 ed                	xor    %ebp,%ebp
+  12553d:	eb 58                	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  12553f:	e9 8c 01 00 00       	jmp    1256d0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d20>
+  125544:	e9 6f 01 00 00       	jmp    1256b8 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d08>
+  125549:	e9 82 01 00 00       	jmp    1256d0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d20>
+  12554e:	48 89 c3             	mov    %rax,%rbx
+  125551:	eb 44                	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  125553:	48 89 d9             	mov    %rbx,%rcx
+  125556:	48 89 c3             	mov    %rax,%rbx
+  125559:	40 b5 01             	mov    $0x1,%bpl
+  12555c:	48 85 c9             	test   %rcx,%rcx
+  12555f:	74 36                	je     125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  125561:	4c 89 ff             	mov    %r15,%rdi
+  125564:	ff 15 86 aa 04 00    	call   *0x4aa86(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12556a:	eb 2b                	jmp    125597 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be7>
+  12556c:	48 89 c3             	mov    %rax,%rbx
+  12556f:	eb 70                	jmp    1255e1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c31>
+  125571:	eb 1e                	jmp    125591 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be1>
+  125573:	48 89 c3             	mov    %rax,%rbx
+  125576:	e9 c6 00 00 00       	jmp    125641 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c91>
+  12557b:	48 89 c3             	mov    %rax,%rbx
+  12557e:	4c 89 f7             	mov    %r14,%rdi
+  125581:	ff 15 69 aa 04 00    	call   *0x4aa69(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125587:	eb 0b                	jmp    125594 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2be4>
+  125589:	48 89 c3             	mov    %rax,%rbx
+  12558c:	40 b5 01             	mov    $0x1,%bpl
+  12558f:	eb 60                	jmp    1255f1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c41>
+  125591:	48 89 c3             	mov    %rax,%rbx
+  125594:	40 b5 01             	mov    $0x1,%bpl
+  125597:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  12559c:	e8 5f 12 00 00       	call   126800 <core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::Interaction>>>
+  1255a1:	4c 8b bc 24 c0 01 00 	mov    0x1c0(%rsp),%r15
+  1255a8:	00 
+  1255a9:	eb 46                	jmp    1255f1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c41>
+  1255ab:	48 89 c3             	mov    %rax,%rbx
+  1255ae:	e9 39 01 00 00       	jmp    1256ec <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d3c>
+  1255b3:	e9 9d 00 00 00       	jmp    125655 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2ca5>
+  1255b8:	48 89 c3             	mov    %rax,%rbx
+  1255bb:	4d 85 e4             	test   %r12,%r12
+  1255be:	74 21                	je     1255e1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c31>
+  1255c0:	4c 89 f7             	mov    %r14,%rdi
+  1255c3:	eb 16                	jmp    1255db <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c2b>
+  1255c5:	48 89 c3             	mov    %rax,%rbx
+  1255c8:	48 83 bc 24 f0 01 00 	cmpq   $0x0,0x1f0(%rsp)
+  1255cf:	00 00 
+  1255d1:	74 0e                	je     1255e1 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c31>
+  1255d3:	48 8b bc 24 f8 01 00 	mov    0x1f8(%rsp),%rdi
+  1255da:	00 
+  1255db:	ff 15 0f aa 04 00    	call   *0x4aa0f(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1255e1:	40 b5 01             	mov    $0x1,%bpl
+  1255e4:	48 8d bc 24 10 01 00 	lea    0x110(%rsp),%rdi
+  1255eb:	00 
+  1255ec:	e8 8f 80 fb ff       	call   dd680 <core::ptr::drop_in_place<litchi_ppt::package::model::Error>>
+  1255f1:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+  1255f8:	00 00 80 
+  1255fb:	48 ff c8             	dec    %rax
+  1255fe:	49 85 c7             	test   %rax,%r15
+  125601:	0f 95 c0             	setne  %al
+  125604:	40 84 e8             	test   %bpl,%al
+  125607:	0f 84 c6 00 00 00    	je     1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  12560d:	48 8b bc 24 c8 01 00 	mov    0x1c8(%rsp),%rdi
+  125614:	00 
+  125615:	ff 15 d5 a9 04 00    	call   *0x4a9d5(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12561b:	e9 b3 00 00 00       	jmp    1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  125620:	e8 2e 72 f7 ff       	call   9c853 <core::panicking::panic_in_cleanup>
+  125625:	48 89 c3             	mov    %rax,%rbx
+  125628:	48 83 bc 24 d8 01 00 	cmpq   $0x0,0x1d8(%rsp)
+  12562f:	00 00 
+  125631:	74 0e                	je     125641 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2c91>
+  125633:	48 8b bc 24 e0 01 00 	mov    0x1e0(%rsp),%rdi
+  12563a:	00 
+  12563b:	ff 15 af a9 04 00    	call   *0x4a9af(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125641:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+  125646:	e8 35 80 fb ff       	call   dd680 <core::ptr::drop_in_place<litchi_ppt::package::model::Error>>
+  12564b:	e9 83 00 00 00       	jmp    1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  125650:	e8 fe 71 f7 ff       	call   9c853 <core::panicking::panic_in_cleanup>
+  125655:	48 89 c3             	mov    %rax,%rbx
+  125658:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  12565e:	0f 84 fc 00 00 00    	je     125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  125664:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+  125669:	ff 15 81 a9 04 00    	call   *0x4a981(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12566f:	e9 ec 00 00 00       	jmp    125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  125674:	48 89 c3             	mov    %rax,%rbx
+  125677:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  12567d:	74 0b                	je     12568a <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2cda>
+  12567f:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+  125684:	ff 15 66 a9 04 00    	call   *0x4a966(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12568a:	4d 85 e4             	test   %r12,%r12
+  12568d:	74 44                	je     1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  12568f:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+  125694:	ff 15 56 a9 04 00    	call   *0x4a956(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12569a:	eb 37                	jmp    1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  12569c:	eb 02                	jmp    1256a0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2cf0>
+  12569e:	eb 00                	jmp    1256a0 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2cf0>
+  1256a0:	48 89 c3             	mov    %rax,%rbx
+  1256a3:	48 83 7c 24 20 00    	cmpq   $0x0,0x20(%rsp)
+  1256a9:	74 28                	je     1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  1256ab:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+  1256b0:	ff 15 3a a9 04 00    	call   *0x4a93a(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1256b6:	eb 1b                	jmp    1256d3 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d23>
+  1256b8:	48 89 c3             	mov    %rax,%rbx
+  1256bb:	48 83 bc 24 10 01 00 	cmpq   $0x0,0x110(%rsp)
+  1256c2:	00 00 
+  1256c4:	74 26                	je     1256ec <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d3c>
+  1256c6:	48 8b bc 24 18 01 00 	mov    0x118(%rsp),%rdi
+  1256cd:	00 
+  1256ce:	eb 16                	jmp    1256e6 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d36>
+  1256d0:	48 89 c3             	mov    %rax,%rbx
+  1256d3:	48 83 bc 24 78 01 00 	cmpq   $0x0,0x178(%rsp)
+  1256da:	00 00 
+  1256dc:	74 0e                	je     1256ec <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d3c>
+  1256de:	48 8b bc 24 80 01 00 	mov    0x180(%rsp),%rdi
+  1256e5:	00 
+  1256e6:	ff 15 04 a9 04 00    	call   *0x4a904(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1256ec:	4c 8b b4 24 a8 01 00 	mov    0x1a8(%rsp),%r14
+  1256f3:	00 
+  1256f4:	4c 8b bc 24 b0 01 00 	mov    0x1b0(%rsp),%r15
+  1256fb:	00 
+  1256fc:	4d 85 ff             	test   %r15,%r15
+  1256ff:	75 16                	jne    125717 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d67>
+  125701:	48 83 bc 24 a0 01 00 	cmpq   $0x0,0x1a0(%rsp)
+  125708:	00 00 
+  12570a:	74 54                	je     125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  12570c:	4c 89 f7             	mov    %r14,%rdi
+  12570f:	ff 15 db a8 04 00    	call   *0x4a8db(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125715:	eb 49                	jmp    125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  125717:	4d 8d 66 10          	lea    0x10(%r14),%r12
+  12571b:	4c 8b 2d ce a8 04 00 	mov    0x4a8ce(%rip),%r13        # 16fff0 <free@GLIBC_2.2.5>
+  125722:	eb 15                	jmp    125739 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d89>
+  125724:	66 66 66 2e 0f 1f 84 	data16 data16 cs nopw 0x0(%rax,%rax,1)
+  12572b:	00 00 00 00 00 
+  125730:	49 83 c4 20          	add    $0x20,%r12
+  125734:	49 ff cf             	dec    %r15
+  125737:	74 c8                	je     125701 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d51>
+  125739:	49 83 7c 24 f8 00    	cmpq   $0x0,-0x8(%r12)
+  12573f:	7e ef                	jle    125730 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d80>
+  125741:	49 8b 3c 24          	mov    (%r12),%rdi
+  125745:	41 ff d5             	call   *%r13
+  125748:	eb e6                	jmp    125730 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2d80>
+  12574a:	48 89 c3             	mov    %rax,%rbx
+  12574d:	4d 85 ff             	test   %r15,%r15
+  125750:	74 0e                	je     125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  125752:	48 89 ef             	mov    %rbp,%rdi
+  125755:	ff 15 95 a8 04 00    	call   *0x4a895(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  12575b:	eb 03                	jmp    125760 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2db0>
+  12575d:	48 89 c3             	mov    %rax,%rbx
+  125760:	48 83 bc 24 18 02 00 	cmpq   $0x0,0x218(%rsp)
+  125767:	00 00 
+  125769:	74 0e                	je     125779 <litchi_ppt::writer::escher::codec::shapes::append_shape_container_children+0x2dc9>
+  12576b:	48 8b bc 24 20 02 00 	mov    0x220(%rsp),%rdi
+  125772:	00 
+  125773:	ff 15 77 a8 04 00    	call   *0x4a877(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  125779:	48 89 df             	mov    %rbx,%rdi
+  12577c:	e8 5f 54 04 00       	call   16abe0 <_Unwind_Resume@plt>

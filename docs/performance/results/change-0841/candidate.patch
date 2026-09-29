@@ -1,0 +1,538 @@
+diff --git a/crates/litchi-ppt/src/writer/core/codec.rs b/crates/litchi-ppt/src/writer/core/codec.rs
+index ee1f670e80..e8c3388a9c 100644
+--- a/crates/litchi-ppt/src/writer/core/codec.rs
++++ b/crates/litchi-ppt/src/writer/core/codec.rs
+@@ -180,18 +180,18 @@ fn shape_type_to_escher(shape_type: ShapeType) -> u16 {
+ 
+ /// Convert `WritableShape` to `UserShapeData` for Escher serialization
+ #[cfg(test)]
+-pub(super) fn convert_shape_to_escher(
+-    shape: &WritableShape,
++pub(super) fn convert_shape_to_escher<'text>(
++    shape: &'text WritableShape,
+     hyperlinks: &HyperlinkCollection,
+-) -> UserShapeData {
++) -> UserShapeData<'text> {
+     convert_shape_to_escher_with_sound_mapping(shape, hyperlinks, &HashMap::new())
+ }
+ 
+-pub(super) fn convert_shape_to_escher_with_sound_mapping(
+-    shape: &WritableShape,
++pub(super) fn convert_shape_to_escher_with_sound_mapping<'text>(
++    shape: &'text WritableShape,
+     hyperlinks: &HyperlinkCollection,
+     sound_id_mapping: &HashMap<u32, u32>,
+-) -> UserShapeData {
++) -> UserShapeData<'text> {
+     let props = &shape.properties;
+ 
+     // Extract fill properties from FillStyle
+@@ -303,7 +303,7 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
+     let text = if paragraphs.is_some() {
+         None // Don't use plain text if paragraphs are available
+     } else {
+-        props.text.clone()
++        props.text.as_deref()
+     };
+ 
+     let mut interactions = props.interactions.clone();
+diff --git a/crates/litchi-ppt/src/writer/core/package.rs b/crates/litchi-ppt/src/writer/core/package.rs
+index 0bf7ba097c..c53b8d2d54 100644
+--- a/crates/litchi-ppt/src/writer/core/package.rs
++++ b/crates/litchi-ppt/src/writer/core/package.rs
+@@ -515,7 +515,7 @@ impl Writer {
+                 ppt_stream.extend_from_slice(&slide_atom.build()?);
+ 
+                 // PPDrawing with Escher DgContainer (including user shapes)
+-                let escher_shapes: Vec<UserShapeData> = slide
++                let escher_shapes: Vec<UserShapeData<'_>> = slide
+                     .shapes
+                     .iter()
+                     .map(|s| {
+@@ -911,7 +911,7 @@ impl Writer {
+                 ppt_stream.extend_from_slice(&slide_atom.build()?);
+ 
+                 // PPDrawing with Escher DgContainer (including user shapes)
+-                let escher_shapes: Vec<UserShapeData> = slide
++                let escher_shapes: Vec<UserShapeData<'_>> = slide
+                     .shapes
+                     .iter()
+                     .map(|s| {
+diff --git a/crates/litchi-ppt/src/writer/core/tests.rs b/crates/litchi-ppt/src/writer/core/tests.rs
+index f40c5faca2..a0cee2a2e3 100644
+--- a/crates/litchi-ppt/src/writer/core/tests.rs
++++ b/crates/litchi-ppt/src/writer/core/tests.rs
+@@ -12,6 +12,7 @@ use super::*;
+ use crate::shapes::geometry::{GeometryRect, ShapePathType};
+ use crate::writer::shape_style::{ArrowSize, ShapeColor};
+ use std::io::Cursor;
++use std::mem::size_of;
+ 
+ #[test]
+ fn test_create_writer() {
+@@ -119,6 +120,36 @@ fn test_add_textbox() {
+     assert_eq!(writer.slides[0].shapes.len(), 1);
+ }
+ 
++#[test]
++fn plain_text_conversion_borrows_source_string() {
++    let mut writer = Writer::new();
++    let slide = writer.add_slide().unwrap();
++    writer
++        .add_textbox(slide, 10, 10, 300, 100, "borrowed plain text")
++        .unwrap();
++
++    let (source_ptr, source_len) = {
++        let source = writer.slides[slide].shapes[0]
++            .properties
++            .text
++            .as_ref()
++            .expect("plain source text");
++        (source.as_ptr(), source.len())
++    };
++    let shape = convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
++    let borrowed = shape
++        .text
++        .expect("plain text conversion dropped source text");
++    assert_eq!(borrowed.as_ptr(), source_ptr);
++    assert_eq!(borrowed.len(), source_len);
++}
++
++#[test]
++fn borrowed_text_option_uses_slice_layout() {
++    assert_eq!(size_of::<Option<&str>>(), size_of::<&str>());
++    assert!(size_of::<Option<&str>>() < size_of::<Option<String>>());
++}
++
+ #[test]
+ fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
+     let mut writer = Writer::new();
+@@ -136,6 +167,7 @@ fn test_plain_text_alignment_and_rotation_reach_escher_shape() {
+     let paragraphs = shape.paragraphs.as_ref().expect("formatted paragraph");
+     assert_eq!(paragraphs.len(), 1);
+     assert_eq!(paragraphs[0].alignment, TextAlign::Center);
++    assert_eq!(paragraphs[0].runs[0].text, "Centered");
+     assert_eq!(shape.rotation, Some((90 * 65536) + 32768));
+ }
+ 
+@@ -521,6 +553,16 @@ fn smart_tags_round_trip_through_both_output_paths() {
+     writer.set_last_shape_hyperlink(slide, hyperlink).unwrap();
+     let encoded_shape =
+         convert_shape_to_escher(&writer.slides[slide].shapes[0], &writer.hyperlinks);
++    assert!(
++        writer.slides[slide].shapes[0]
++            .properties
++            .paragraphs
++            .as_ref()
++            .unwrap()
++            .iter()
++            .flat_map(|paragraph| &paragraph.runs)
++            .all(|run| run.style.pp9_run_id.is_none())
++    );
+     assert_eq!(
+         encoded_shape.paragraphs.as_ref().unwrap()[0]
+             .runs
+diff --git a/crates/litchi-ppt/src/writer/escher/codec/drawing.rs b/crates/litchi-ppt/src/writer/escher/codec/drawing.rs
+index 090bc81bb0..3ba656d823 100644
+--- a/crates/litchi-ppt/src/writer/escher/codec/drawing.rs
++++ b/crates/litchi-ppt/src/writer/escher/codec/drawing.rs
+@@ -107,27 +107,27 @@ fn build_dgg_container(
+ }
+ 
+ /// Creates a drawing container with ordinary top-level shapes.
+-pub(crate) fn create_dg_container_with_shapes(
++pub(crate) fn create_dg_container_with_shapes<'text>(
+     drawing_id: u32,
+-    shapes: &[UserShapeData],
++    shapes: &[UserShapeData<'text>],
+ ) -> Result<Vec<u8>, Error> {
+     create_dg_container_with_charts(drawing_id, shapes, &[], &[])
+ }
+ 
+ /// Creates a drawing container with shapes and test-only table groups.
+ #[cfg(test)]
+-pub(crate) fn create_dg_container_with_tables(
++pub(crate) fn create_dg_container_with_tables<'text>(
+     drawing_id: u32,
+-    shapes: &[UserShapeData],
++    shapes: &[UserShapeData<'text>],
+     tables: &[crate::writer::table::PositionedTable],
+ ) -> Result<Vec<u8>, Error> {
+     create_dg_container_with_charts(drawing_id, shapes, tables, &[])
+ }
+ 
+ /// Creates a drawing container with shapes, table groups, and chart frames.
+-pub(crate) fn create_dg_container_with_charts(
++pub(crate) fn create_dg_container_with_charts<'text>(
+     drawing_id: u32,
+-    shapes: &[UserShapeData],
++    shapes: &[UserShapeData<'text>],
+     tables: &[crate::writer::table::PositionedTable],
+     charts: &[crate::writer::chart::ChartFrame],
+ ) -> Result<Vec<u8>, Error> {
+@@ -143,10 +143,10 @@ pub(crate) fn create_dg_container_with_charts(
+ /// are written directly into `output` with their lengths patched afterwards,
+ /// so shape text is not copied once per nesting level. On error `output` holds
+ /// a partial record and must be discarded.
+-pub(crate) fn append_dg_container_with_charts(
++pub(crate) fn append_dg_container_with_charts<'text>(
+     output: &mut Vec<u8>,
+     drawing_id: u32,
+-    shapes: &[UserShapeData],
++    shapes: &[UserShapeData<'text>],
+     tables: &[crate::writer::table::PositionedTable],
+     charts: &[crate::writer::chart::ChartFrame],
+ ) -> Result<(), Error> {
+@@ -162,10 +162,10 @@ pub(crate) fn append_dg_container_with_charts(
+ /// Appends the children of the `DgContainer` [`append_dg_container_with_charts`]
+ /// writes: the `Dg`, the root `SpgrContainer` in place, then the background
+ /// shape.
+-fn append_dg_container_children(
++fn append_dg_container_children<'text>(
+     output: &mut Vec<u8>,
+     drawing_id: u32,
+-    shapes: &[UserShapeData],
++    shapes: &[UserShapeData<'text>],
+     tables: &[crate::writer::table::PositionedTable],
+     charts: &[crate::writer::chart::ChartFrame],
+ ) -> Result<(), Error> {
+diff --git a/crates/litchi-ppt/src/writer/escher/codec/group.rs b/crates/litchi-ppt/src/writer/escher/codec/group.rs
+index 1bff598dd1..83787ced5d 100644
+--- a/crates/litchi-ppt/src/writer/escher/codec/group.rs
++++ b/crates/litchi-ppt/src/writer/escher/codec/group.rs
+@@ -26,7 +26,7 @@ enum GroupRole {
+ }
+ 
+ /// Encodes one top-level group shape, retaining nested group and child order.
+-pub(crate) fn create_group_shape_container(group: &GroupShape) -> Result<Vec<u8>, Error> {
++pub(crate) fn create_group_shape_container(group: &GroupShape<'_>) -> Result<Vec<u8>, Error> {
+     validate_group(group)?;
+     build_group_container(group, GroupRole::Patriarch)
+ }
+@@ -34,7 +34,7 @@ pub(crate) fn create_group_shape_container(group: &GroupShape) -> Result<Vec<u8>
+ /// Encodes a complete drawing whose root is the supplied group tree.
+ pub(crate) fn create_dg_container_with_group(
+     drawing_id: u32,
+-    group: &GroupShape,
++    group: &GroupShape<'_>,
+ ) -> Result<Vec<u8>, Error> {
+     let shape_count = validate_group(group)?;
+     let mut drawing = EscherBuilder::new(header_version::CONTAINER, 0, record_type::DG_CONTAINER);
+@@ -50,7 +50,7 @@ pub(crate) fn create_dg_container_with_group(
+     drawing.build()
+ }
+ 
+-fn build_group_container(group: &GroupShape, role: GroupRole) -> Result<Vec<u8>, Error> {
++fn build_group_container(group: &GroupShape<'_>, role: GroupRole) -> Result<Vec<u8>, Error> {
+     let mut container =
+         EscherBuilder::new(header_version::CONTAINER, 0, record_type::SPGR_CONTAINER);
+     container.add_data(&build_group_shape_header(group, role)?);
+@@ -73,7 +73,7 @@ fn build_group_container(group: &GroupShape, role: GroupRole) -> Result<Vec<u8>,
+     container.build()
+ }
+ 
+-fn build_group_shape_header(group: &GroupShape, role: GroupRole) -> Result<Vec<u8>, Error> {
++fn build_group_shape_header(group: &GroupShape<'_>, role: GroupRole) -> Result<Vec<u8>, Error> {
+     let mut container = EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+ 
+     let mut coordinate_space = EscherBuilder::new(header_version::SPGR, 0, record_type::SPGR);
+diff --git a/crates/litchi-ppt/src/writer/escher/codec/properties.rs b/crates/litchi-ppt/src/writer/escher/codec/properties.rs
+index d16eda8872..7376a1c38b 100644
+--- a/crates/litchi-ppt/src/writer/escher/codec/properties.rs
++++ b/crates/litchi-ppt/src/writer/escher/codec/properties.rs
+@@ -5,7 +5,7 @@ use litchi_odraw::write::{Property, prop_value};
+ use super::super::{UserShapeData, ppt_prop_value, prop_id};
+ 
+ /// Builds the primary property table for one PPT shape.
+-pub(crate) fn build_shape_properties(shape: &UserShapeData) -> Vec<Property> {
++pub(crate) fn build_shape_properties(shape: &UserShapeData<'_>) -> Vec<Property> {
+     let mut props = Vec::with_capacity(16);
+ 
+     if let Some(rotation) = shape.rotation {
+diff --git a/crates/litchi-ppt/src/writer/escher/codec/shapes.rs b/crates/litchi-ppt/src/writer/escher/codec/shapes.rs
+index 31bdd6affb..4c791b69bf 100644
+--- a/crates/litchi-ppt/src/writer/escher/codec/shapes.rs
++++ b/crates/litchi-ppt/src/writer/escher/codec/shapes.rs
+@@ -34,7 +34,7 @@ enum ShapeAnchor {
+ #[cfg(test)]
+ pub(crate) fn create_user_shape_container(
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+ ) -> Result<Vec<u8>, Error> {
+     create_shape_container(shape_id, shape, ShapeAnchor::Ppt)
+ }
+@@ -44,7 +44,7 @@ pub(crate) fn create_user_shape_container(
+ pub(super) fn append_user_shape_container(
+     output: &mut Vec<u8>,
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+ ) -> Result<(), Error> {
+     append_shape_container(output, shape_id, shape, ShapeAnchor::Ppt)
+ }
+@@ -52,7 +52,7 @@ pub(super) fn append_user_shape_container(
+ /// Creates a group-member shape container with a typed `ChildAnchor`.
+ pub(crate) fn create_child_shape_container(
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+     child_anchor: ChildAnchor,
+ ) -> Result<Vec<u8>, Error> {
+     create_shape_container(shape_id, shape, ShapeAnchor::Child(child_anchor))
+@@ -62,7 +62,7 @@ pub(crate) fn create_child_shape_container(
+ /// nested group records.
+ pub(super) fn create_root_group_shape_container(
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+     anchor: ChildAnchor,
+ ) -> Result<Vec<u8>, Error> {
+     create_shape_container(shape_id, shape, ShapeAnchor::Host(anchor))
+@@ -70,7 +70,7 @@ pub(super) fn create_root_group_shape_container(
+ 
+ fn create_shape_container(
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+     anchor_kind: ShapeAnchor,
+ ) -> Result<Vec<u8>, Error> {
+     let mut container = Vec::new();
+@@ -84,7 +84,7 @@ fn create_shape_container(
+ fn append_shape_container(
+     output: &mut Vec<u8>,
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+     anchor_kind: ShapeAnchor,
+ ) -> Result<(), Error> {
+     validate_user_shape(shape)?;
+@@ -101,7 +101,7 @@ fn append_shape_container(
+ fn append_shape_container_children(
+     output: &mut Vec<u8>,
+     shape_id: u32,
+-    shape: &UserShapeData,
++    shape: &UserShapeData<'_>,
+     anchor_kind: ShapeAnchor,
+ ) -> Result<(), Error> {
+     let mut flags = Flags::HAVE_ANCHOR | Flags::HAVE_SPT;
+@@ -282,7 +282,7 @@ fn append_shape_container_children(
+                 "shape has text interactions but no corresponding text",
+             ));
+         }
+-    } else if let Some(text) = &shape.text {
++    } else if let Some(text) = shape.text {
+         append_client_textbox_with_interactions(
+             output,
+             text,
+diff --git a/crates/litchi-ppt/src/writer/escher/codec/validation.rs b/crates/litchi-ppt/src/writer/escher/codec/validation.rs
+index f42b9f8ed5..b67a2b5c4f 100644
+--- a/crates/litchi-ppt/src/writer/escher/codec/validation.rs
++++ b/crates/litchi-ppt/src/writer/escher/codec/validation.rs
+@@ -14,7 +14,7 @@ const MAX_GROUP_DEPTH: usize = 64;
+ const MAX_SHAPE_ID: u32 = 0x3FFF_FFFF;
+ 
+ /// Validates one PPT shape before its record family is encoded.
+-pub(super) fn validate_user_shape(shape: &UserShapeData) -> Result<(), Error> {
++pub(super) fn validate_user_shape(shape: &UserShapeData<'_>) -> Result<(), Error> {
+     if shape.adjust_values.len() > 10 {
+         return Err(invalid_input(
+             "OfficeArt shapes support at most 10 adjustment values",
+@@ -32,7 +32,7 @@ pub(super) fn validate_user_shape(shape: &UserShapeData) -> Result<(), Error> {
+ }
+ 
+ /// Validates the bounded nested-group grammar and returns its shape count.
+-pub(super) fn validate_group(root: &GroupShape) -> Result<u32, Error> {
++pub(super) fn validate_group(root: &GroupShape<'_>) -> Result<u32, Error> {
+     if root.anchor.is_some() {
+         return Err(invalid_input(
+             "the top-level OfficeArt group cannot have a ChildAnchor",
+@@ -42,7 +42,7 @@ pub(super) fn validate_group(root: &GroupShape) -> Result<u32, Error> {
+     visit_group(root, 0, &mut ids)
+ }
+ 
+-fn visit_group(group: &GroupShape, depth: usize, ids: &mut HashSet<u32>) -> Result<u32, Error> {
++fn visit_group(group: &GroupShape<'_>, depth: usize, ids: &mut HashSet<u32>) -> Result<u32, Error> {
+     if depth >= MAX_GROUP_DEPTH {
+         return Err(invalid_input("OfficeArt group nesting exceeds 64 levels"));
+     }
+diff --git a/crates/litchi-ppt/src/writer/escher/model.rs b/crates/litchi-ppt/src/writer/escher/model.rs
+index 3eb26fe538..1e4e310203 100644
+--- a/crates/litchi-ppt/src/writer/escher/model.rs
++++ b/crates/litchi-ppt/src/writer/escher/model.rs
+@@ -422,7 +422,7 @@ impl FreeformGeometry {
+ 
+ /// Shape data for building user shapes
+ #[derive(Debug, Clone)]
+-pub(crate) struct UserShapeData {
++pub(crate) struct UserShapeData<'text> {
+     /// Shape type (Escher MSOSPT value)
+     pub shape_type: u16,
+     /// Position and size in EMUs
+@@ -469,7 +469,7 @@ pub(crate) struct UserShapeData {
+     /// Line end-cap style.
+     pub line_end_cap_style: Option<u32>,
+     /// Text content (simple string, ignored if paragraphs set)
+-    pub text: Option<String>,
++    pub text: Option<&'text str>,
+     /// Rich text paragraphs (with formatting)
+     pub paragraphs: Option<Vec<crate::writer::text_format::Paragraph>>,
+     /// `PowerPoint` 9/10/11 extensions for each rich-text run.
+@@ -521,7 +521,7 @@ pub(crate) struct UserShapeData {
+     pub shadow_type: Option<u32>,
+ }
+ 
+-impl Default for UserShapeData {
++impl<'text> Default for UserShapeData<'text> {
+     fn default() -> Self {
+         Self {
+             shape_type: shape_type::RECTANGLE,
+diff --git a/crates/litchi-ppt/src/writer/escher/semantic.rs b/crates/litchi-ppt/src/writer/escher/semantic.rs
+index d5973b9312..ba657dce53 100644
+--- a/crates/litchi-ppt/src/writer/escher/semantic.rs
++++ b/crates/litchi-ppt/src/writer/escher/semantic.rs
+@@ -13,29 +13,29 @@ use super::{ChildAnchor, EscherSpgrData, UserShapeData};
+ 
+ /// A shape that is a member of an `OfficeArt` group.
+ #[derive(Debug, Clone)]
+-pub(crate) struct ChildShape {
++pub(crate) struct ChildShape<'text> {
+     pub(crate) id: u32,
+     pub(crate) anchor: ChildAnchor,
+-    pub(crate) data: UserShapeData,
++    pub(crate) data: UserShapeData<'text>,
+ }
+ 
+-impl ChildShape {
++impl<'text> ChildShape<'text> {
+     /// Creates a child shape with coordinates in its containing group space.
+-    pub(crate) const fn new(id: u32, anchor: ChildAnchor, data: UserShapeData) -> Self {
++    pub(crate) const fn new(id: u32, anchor: ChildAnchor, data: UserShapeData<'text>) -> Self {
+         Self { id, anchor, data }
+     }
+ }
+ 
+ /// A nested `OfficeArt` group shape.
+ #[derive(Debug, Clone)]
+-pub(crate) struct GroupShape {
++pub(crate) struct GroupShape<'text> {
+     pub(crate) id: u32,
+     pub(crate) anchor: Option<ChildAnchor>,
+     pub(crate) coordinate_space: EscherSpgrData,
+-    pub(crate) children: Vec<GroupChild>,
++    pub(crate) children: Vec<GroupChild<'text>>,
+ }
+ 
+-impl GroupShape {
++impl<'text> GroupShape<'text> {
+     /// Creates a top-level patriarch group.
+     pub(crate) fn new(id: u32, coordinate_space: EscherSpgrData) -> Self {
+         Self {
+@@ -57,13 +57,18 @@ impl GroupShape {
+     }
+ 
+     /// Appends a child shape and returns the updated group.
+-    pub(crate) fn with_shape(mut self, id: u32, anchor: ChildAnchor, data: UserShapeData) -> Self {
++    pub(crate) fn with_shape(
++        mut self,
++        id: u32,
++        anchor: ChildAnchor,
++        data: UserShapeData<'text>,
++    ) -> Self {
+         self.push_shape(id, anchor, data);
+         self
+     }
+ 
+     /// Appends a child shape in the group's coordinate system.
+-    pub(crate) fn push_shape(&mut self, id: u32, anchor: ChildAnchor, data: UserShapeData) {
++    pub(crate) fn push_shape(&mut self, id: u32, anchor: ChildAnchor, data: UserShapeData<'text>) {
+         self.children
+             .push(GroupChild::Shape(Box::new(ChildShape::new(
+                 id, anchor, data,
+@@ -71,14 +76,14 @@ impl GroupShape {
+     }
+ 
+     /// Appends a nested group and returns the updated group.
+-    pub(crate) fn with_group(mut self, group: GroupShape) -> Self {
++    pub(crate) fn with_group(mut self, group: GroupShape<'text>) -> Self {
+         self.push_group(group);
+         self
+     }
+ 
+     /// Appends a nested group whose own anchor is already in this group's
+     /// coordinate system.
+-    pub(crate) fn push_group(&mut self, group: GroupShape) {
++    pub(crate) fn push_group(&mut self, group: GroupShape<'text>) {
+         self.children.push(GroupChild::Group(group));
+     }
+ 
+@@ -88,16 +93,16 @@ impl GroupShape {
+     }
+ 
+     /// Returns the immediate children in record order.
+-    pub(crate) fn children(&self) -> &[GroupChild] {
++    pub(crate) fn children(&self) -> &[GroupChild<'text>] {
+         &self.children
+     }
+ }
+ 
+ /// One record family contained by an `OfficeArtSpgrContainer`.
+ #[derive(Debug, Clone)]
+-pub(crate) enum GroupChild {
++pub(crate) enum GroupChild<'text> {
+     /// A normal child `SpContainer`.
+-    Shape(Box<ChildShape>),
++    Shape(Box<ChildShape<'text>>),
+     /// A nested `SpgrContainer`.
+-    Group(GroupShape),
++    Group(GroupShape<'text>),
+ }
+diff --git a/crates/litchi-ppt/src/writer/escher/tests/groups.rs b/crates/litchi-ppt/src/writer/escher/tests/groups.rs
+index 2f7a7692bb..c1cb51c740 100644
+--- a/crates/litchi-ppt/src/writer/escher/tests/groups.rs
++++ b/crates/litchi-ppt/src/writer/escher/tests/groups.rs
+@@ -154,3 +154,31 @@ fn group_validation_rejects_anchorless_nested_group() {
+     let error = create_group_shape_container(&group).expect_err("nested anchor must be present");
+     assert!(error.to_string().contains("ChildAnchor"));
+ }
++
++#[test]
++fn grouped_shape_accepts_borrowed_text() {
++    let source = String::from("borrowed group text");
++    let shape = UserShapeData {
++        text: Some(source.as_str()),
++        ..Default::default()
++    };
++    let group = GroupShape::new(10, EscherSpgrData::ZERO).with_shape(
++        11,
++        ChildAnchor {
++            left: 0,
++            top: 0,
++            right: 100,
++            bottom: 100,
++        },
++        shape,
++    );
++
++    let bytes = create_group_shape_container(&group).expect("group drawing");
++    let textboxes = Parser::new(&bytes).textboxes().expect("textboxes");
++    assert_eq!(textboxes.len(), 1);
++    let expected = build_client_textbox(source.as_str(), 4).expect("plain textbox");
++    assert_eq!(textboxes[0].data(), &expected[8..]);
++    let textbox =
++        crate::EscherTextboxWrapper::new(textboxes[0].data().to_vec()).expect("valid textbox");
++    assert_eq!(textbox.text(), source);
++}
+diff --git a/crates/litchi-ppt/src/writer/escher/tests/legacy.rs b/crates/litchi-ppt/src/writer/escher/tests/legacy.rs
+index 144a6b5121..db17da410b 100644
+--- a/crates/litchi-ppt/src/writer/escher/tests/legacy.rs
++++ b/crates/litchi-ppt/src/writer/escher/tests/legacy.rs
+@@ -201,7 +201,7 @@ fn test_create_dg_container_with_shapes_single() {
+         y: 100_000,
+         width: 500_000,
+         height: 300_000,
+-        text: Some("Test".to_string()),
++        text: Some("Test"),
+         ..Default::default()
+     };
+     let container = create_dg_container_with_shapes(1, &[shape]);

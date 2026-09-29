@@ -1,0 +1,39 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-a/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=ppt_profile_probe::profile_write",
+    "--zero-before=ppt_profile_probe::profile_write",
+    "--dump-after=ppt_profile_probe::profile_write",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-a/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe",
+    "--mode",
+    "write",
+    "--shape",
+    "unicode",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-a/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790697339.1653056,
+  "log": {
+    "bytes": 879,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/profiles-01-unicode-write-leg-a/output.log",
+    "sha256": "bbbbfe307caaac920300a6eda6a0c9ddffd07b059608cb41facfd9409951961f"
+  },
+  "started_unix": 1790697335.5261471
+}

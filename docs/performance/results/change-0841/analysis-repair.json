@@ -1,0 +1,37 @@
+{
+  "corrected_analyzer": {
+    "bytes": 3773,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analyze_v3.py",
+    "sha256": "45741ca39b33f42a88703997852eab0fbb2a533a10c39c1a226a5e65f8fe1079"
+  },
+  "corrected_qualifier": {
+    "bytes": 4785,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualify_v3.py",
+    "sha256": "92dd650f4ea69a479287a2f64e24a68ef59781a3f43956b4c00b1d1e401d7a4d"
+  },
+  "failure": {
+    "bytes": 460,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/paired-analysis/receipt.json",
+    "sha256": "3acc7000d7da3d504ce5e76be18ea40268b39fc75addce15fb5e610c72f862fe"
+  },
+  "metrics_changed": false,
+  "original_analyzer": {
+    "bytes": 3773,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analyze_v2.py",
+    "sha256": "51b11f78ef3293a31f08630abe6b9d2c0742cb10ef36396607a87b031399854c"
+  },
+  "original_qualifier": {
+    "bytes": 4776,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualify_v2.py",
+    "sha256": "fd667db2e0e0f0b9cbed57792ab4a587a37d05e86d8c1f466b13ad6cae0ccf2f"
+  },
+  "reason": "Valgrind writes two spaces after cmd:. The raw parser preserves one leading syntax space. Corrected exact command comparison strips only leading whitespace before comparing the unchanged expected child argv string.",
+  "status": "pass",
+  "success": {
+    "bytes": 461,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/paired-analysis-v3/receipt.json",
+    "sha256": "ab9403f96bdf2d1bcc9b4adc30de7bb8f280de801c42f1c1fb1b99cf5a876e42"
+  },
+  "thresholds_changed": false,
+  "workload_runs_replaced": 0
+}

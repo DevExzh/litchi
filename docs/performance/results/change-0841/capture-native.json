@@ -1,0 +1,610 @@
+{
+  "plan": {
+    "bytes": 23861,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/plan.json",
+    "sha256": "f677d32292ee282228d0b25898e50662b6529247004b41205724a7725207d9d3"
+  },
+  "receipts": [
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-tiny-write-leg-a/receipt.json",
+      "sha256": "ad0077f4bbb53fc47db4d33d3860d1f3400a4dea7698d656e9dfed6e8a8e8d2a"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-tiny-write-leg-b/receipt.json",
+      "sha256": "16109ef055e5634c8e240ffb0566dc3190af8184fabc43605c8fb9249f1f74a1"
+    },
+    {
+      "bytes": 1207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "7e9874bcc8b31010d635256be79759c3a8d87d0db428bf7697c397ad1fef3341"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "a3a05f1bd4f8f4cd104612fd2a34bb05d724c2810d7d2733daedb5403f1c6ddc"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-many-write-leg-a/receipt.json",
+      "sha256": "3d57b83868e9568fb583c1d5bb0673776b3f8677ff2c3912ecc825654cc65fd3"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-many-write-leg-b/receipt.json",
+      "sha256": "f9ff0145f4ccf2c45ec40830eb482807bb9a6ca454845209e16c1910869b7440"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-many-lifecycle-leg-a/receipt.json",
+      "sha256": "c770257b0cd7c6a613200878e49032656f673b1de43c4fc9d816cf771f896c24"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-many-lifecycle-leg-b/receipt.json",
+      "sha256": "5b69fb03976718eb5401146d7e92c7e40fa2dbcbfdf6a70e6e02073021ae83e8"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-payload-write-leg-a/receipt.json",
+      "sha256": "791b9b7c25be1f4ffec289b6933f48c4ffebc75e150d6d2ad05438ebd5e5ed82"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-payload-write-leg-b/receipt.json",
+      "sha256": "dcf4c812e0e12798de58c799e7fab166cbb634d2aef17ad750da215652a97591"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "9ebec055b050a1b3f9a081414866bb36182251231aabf2ab6627abc576a444ca"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "586e4710323009417e6447e6c1c499101b721bfb1e5492ef8445bbff189b556a"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-unicode-write-leg-a/receipt.json",
+      "sha256": "47edc97f95eb43a6d3bb6e3a2c143a5085202c13fc31d5160c955bbb80948a53"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-unicode-write-leg-b/receipt.json",
+      "sha256": "822afc8a6091aab32aa350ee05bfc0cdd9dffd5fec617e1ed93f9e15b33e601c"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "3d67d55601314aaeb83f7e100009906c79051eecc0ba92673f4e6db070d42108"
+    },
+    {
+      "bytes": 1222,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "72f51eee76c64b9ec820b41c7c56216e749ac4f6fa4495a09b9ab79ff14faebc"
+    },
+    {
+      "bytes": 1187,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-rich-write-leg-a/receipt.json",
+      "sha256": "16faa03b1b6948aedbe0063b3552763ee0cd5150941bbdee429ad8284ecdb308"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-rich-write-leg-b/receipt.json",
+      "sha256": "8b7fc56ab6ee84cf8fb7e4f1b9847de8a7db7000f1549754e90fe7646942a3cc"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "9e32670890760e1a922c6f05bb6db5400e42482947a5d150d9629e122e2ccadf"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-00-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "2864a64e9d4302cdc92417806ebd94194fb979f98a78eded8de2e1b905b5239e"
+    },
+    {
+      "bytes": 1207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "3bdeb36b59a4ef957ad04d32ebe3d0d4e5084f9b4bcb2f46d4da2f921b135b2e"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "073ff2bf102aaffa8945292a541e98949d247009d6623682bdcc1c52566064a0"
+    },
+    {
+      "bytes": 1187,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-rich-write-leg-b/receipt.json",
+      "sha256": "eb2d705777a97082a4e7ce6ade109210f8c5b215acd52edca9d393089e7f3ea6"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-rich-write-leg-a/receipt.json",
+      "sha256": "7c1ffa0e7a3ea8e844b25e1f18d54ae451df50e4266b85a54f052f359fa420ec"
+    },
+    {
+      "bytes": 1222,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "1d6a5de94a0cdf1d707ee6e5c2c0a119800fa83a6894a98667b4202f9e4f6f15"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "51cf7178da15627b9e025f287f863c9c3957c5edf27701e6be5b73710f4e4876"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-unicode-write-leg-b/receipt.json",
+      "sha256": "c553ddfdbb3213af550432982178042ab73678410e6079e6b6dbcdc2bc7cde0f"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-unicode-write-leg-a/receipt.json",
+      "sha256": "68daa8d9b7b46464d514613ffe8b525e987e108fc7f0e952cbe04a23df91d5d5"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "94c45d262af0fe8cce2ff9195928c7bb3e0411364e80be076799479e1558d276"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "de9b25905c6658f1d1131140f57ae15778a8f24b95704091f8fa163e80dc5ced"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-payload-write-leg-b/receipt.json",
+      "sha256": "0aeac45a93356f17062b9dd292e2026b53d2a7dbc53af2bd849a2f206040d728"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-payload-write-leg-a/receipt.json",
+      "sha256": "05876cbe7909c08183fa596b248a84ef079793f0cd04cb06c97ad05da3ca54a4"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-lifecycle-leg-b/receipt.json",
+      "sha256": "1b592711315f83c044f00c71badb3b768b235f06890c36d80ea78660e2adeba5"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-lifecycle-leg-a/receipt.json",
+      "sha256": "f80d1499ad1a62a01aa376c559c9c6ad6cb133aa6e9467979643a29c5bb98a8a"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-write-leg-b/receipt.json",
+      "sha256": "6617f6029d658e68e9c2c2e1e023ec72183f833fcafbac4c7898e9415abc66af"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-write-leg-a/receipt.json",
+      "sha256": "2724592d193ca0a7a94b69a7242b8e3829c8643df28cc1a699f5edf1f2b1114b"
+    },
+    {
+      "bytes": 1207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "1b72a48872c25578cc97847fe7506aa8f8ccc1fa7fa2babb9141591bb352bba7"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "49d5695a64140a90e55feb2459d0062ed23ffd192f63e1a39a0eefe9a2d8c361"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-tiny-write-leg-b/receipt.json",
+      "sha256": "3032875f72a14559b924b50250cc4d084b09f59185e476d7a75805d49c63940d"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-tiny-write-leg-a/receipt.json",
+      "sha256": "1a91618d4a3216a573ae43f348aebe9b0a2f57fee2816178e80331df4c009ce1"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-tiny-write-leg-a/receipt.json",
+      "sha256": "fdb580832eb2409b1512dea4f1c0c02fff5f0067dc0c4426474be32db02867d0"
+    },
+    {
+      "bytes": 1187,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-tiny-write-leg-b/receipt.json",
+      "sha256": "17529141323a5abf77c60a3a267fba1c319b62aa9ad67a2853b0b7d6a9f7026b"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "b89995380d495011e167294f91a1f27561c349e2b1115abded13588629c282f2"
+    },
+    {
+      "bytes": 1207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "fcf0f674b13ced48d7decbe34cefaf95fbbf0acce623dc8b0a63182d3a329d7e"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-many-write-leg-a/receipt.json",
+      "sha256": "8d37c0c0151310256469bd3d31c04602554667c7c198cac81959c06e21c9f73f"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-many-write-leg-b/receipt.json",
+      "sha256": "5e6af42c229c7b416339592dff93c91fa3cdb35f08c4f0e74e24caaa759d0535"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-many-lifecycle-leg-a/receipt.json",
+      "sha256": "ccf3e0a0668b80f39123529b237ee67ea688cc4eb0d35c0d6e69237e671c6d3a"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-many-lifecycle-leg-b/receipt.json",
+      "sha256": "8bb056144625f92a0df6691d16aee9965ef8df15218b1037d75e141ede852793"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-payload-write-leg-a/receipt.json",
+      "sha256": "b6111398e7d633b277a042140924740463532566f33b67e562ef3181e7f1ac22"
+    },
+    {
+      "bytes": 1202,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-payload-write-leg-b/receipt.json",
+      "sha256": "7f5f5f6cee75f6c3cc1022b1eb334becbedf6fd058b1c16f1629bfd09359b0df"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "cbfc6aaf2bd9f266524a068c69df26e5623eefcb568ef397ab0daf2aa8921701"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "4966c6a51f38f21be18c55eabfaad9a0f4ea5c3c993d0688afad7199fc0603af"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-unicode-write-leg-a/receipt.json",
+      "sha256": "04ba86bc8efb772471d9335d96a9a569b6fd3e9edb6a63fd866f3ed408c70341"
+    },
+    {
+      "bytes": 1202,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-unicode-write-leg-b/receipt.json",
+      "sha256": "a258dc9e4e3efcc1c4e4a62a293149ffb7c59376bf7e358820511da5bbb11329"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "6f795ef05a4ed68d65854847d4f99bc3bfe543709ac1c122597933c9c711ab4e"
+    },
+    {
+      "bytes": 1222,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "56c6bafa736916f390c01b2e753661b1b3c3292cc362c92f9bbecd67c339866c"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-rich-write-leg-a/receipt.json",
+      "sha256": "ecfea2b708140ec8eb062cd5e80a59f9745cda2026537ab206732df3f27bc825"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-rich-write-leg-b/receipt.json",
+      "sha256": "82d6df06ca365ed9ba7bfeb7be03be2e21ce704cdd0312b7c2ce6e9d5b15d8bd"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "52baf6ceab3c38d7858961867608718f9e0fac8d005c353581d387d6c73628e8"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-02-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "44276c7f94bdd5501f4b678fc42076475de27a036d0908549d8f95592306ae94"
+    },
+    {
+      "bytes": 1207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "8e9d5ce3055cb7c811344d8231e69aef79fa8e61c20769feb5be938e84332132"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "6b5daeee7004e8d4d9954e3778bef33163f9efe6dd8e00e6638cfcbc4e95ba49"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-rich-write-leg-b/receipt.json",
+      "sha256": "a77a8220a4ae813169453bdfed6b6bab5ebc8d0649c3148fb2ac3bb7abf01fde"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-rich-write-leg-a/receipt.json",
+      "sha256": "8d7b215c92d312b9842a60240445884e51f1386773eb07f0614ac1df22994ed6"
+    },
+    {
+      "bytes": 1222,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "4b7eb8803d19b4b8265d0538d233916802266ae1ab82ed593f25b04ad74d241e"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "e625533892bea8d434bc84846f3af8aeedae864d48c2e028009e2a755073e6d7"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-unicode-write-leg-b/receipt.json",
+      "sha256": "09fdfadf566810b22c4b60100bf84af5c7a92eeff3ece8e8d84ea77f05d6221a"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-unicode-write-leg-a/receipt.json",
+      "sha256": "23e8dc462802275e7c584c249a3defe87d11bc479658f08f61c2cdacd8b6ec5d"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "f5b9cce2125c3abceab3236a8b85207bccf23cfb47713b559b60f59aabd65a24"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "d4bc9d018db11b0832341831b1fc37ef8bf7070b219994d846f56680ef77c7ed"
+    },
+    {
+      "bytes": 1202,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-payload-write-leg-b/receipt.json",
+      "sha256": "90e3e6bf1b749f874a343dc14e81e2f6d945974c9f3788c916139b60814c1d8e"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-payload-write-leg-a/receipt.json",
+      "sha256": "d89ecaf4ac49f905e187fe6e5d0b278f93d2b5a36d5cd22999adfdf2bff2584c"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-many-lifecycle-leg-b/receipt.json",
+      "sha256": "b9af51cb57c7b4878c270bf72467772ee8335e8b7353e911070ae8832d712913"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-many-lifecycle-leg-a/receipt.json",
+      "sha256": "2f66e8a24e6a0db0ba76d0007d856143ed7401040ce366a8d0ee2aa53e11479e"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-many-write-leg-b/receipt.json",
+      "sha256": "cd8743b3b54fc064f64d4cbbb6a8ff5dfa54577315ff0b271d8204751dcf5333"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-many-write-leg-a/receipt.json",
+      "sha256": "1a75c095c66a798c51b266c49540b59dc501c961c5bc54776979d18e3f09da76"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "c746cfce45f8bf77376e3a37156c78a034d89b9a1cca2264a3d0f795221c641d"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "551cd47dae6685994b68b9c114dc7a052207e2738d2fc6ebf51887e8badbfa58"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-tiny-write-leg-b/receipt.json",
+      "sha256": "744211adcb09fe365da393641b83384ee3d8f5287e6172a50c8ce3092b7e1dd3"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-03-tiny-write-leg-a/receipt.json",
+      "sha256": "95ae74efae3669074e66c41c0bc6d7bb3e54baefd743681f6772eb3b35037a82"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-tiny-write-leg-a/receipt.json",
+      "sha256": "660913390195588637d45d031a52ff0be04ae75f6c4c53860516eec595cb6cb6"
+    },
+    {
+      "bytes": 1187,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-tiny-write-leg-b/receipt.json",
+      "sha256": "b7a60432904e48a83a0c99e38e719e0f7350093a78247d2ea847b64dd1951cb9"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "8846023fb1c35d767b960966404d2a8209b929e51348b8e08f8d2e858c3f60ab"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "e708751e436e63607cdcbf0644e724bab4acbef739662234c69bb6af7ba23a4a"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-write-leg-a/receipt.json",
+      "sha256": "6a8c3542f6a4b3dc239cf0ae9ddb0b1c3795fc39a0faa263c67d1460d6ab9755"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-write-leg-b/receipt.json",
+      "sha256": "08779484f8c043ac82b11e90658014fc5bd27aafc63fcdac01beb06e38d56970"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-lifecycle-leg-a/receipt.json",
+      "sha256": "adf2b6f3f7b8dbfd45e38c6f988f0ebd0ce5e442f07372506e4b64bc0fd69ba7"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-lifecycle-leg-b/receipt.json",
+      "sha256": "f95cfaa4e48a5633699f56a0e9398cc1cb305567eb5a1653c64524f9885ed2a6"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-payload-write-leg-a/receipt.json",
+      "sha256": "48e019ba7b5098bf887b01f2b1814264ae93e8886a889fb591463216a3c7bba7"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-payload-write-leg-b/receipt.json",
+      "sha256": "ed74ad5954101049688a603bcdcb3f23700b6e91308516a2018deb628d36ed89"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "dc37fa17303e7c41c87e1e063b7df34ab72be99c00384ac8b095c8d42b4d4d8f"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "a49d94f057110bbaa0741f87b039bc203161df89df5e350046d023f18144921f"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-unicode-write-leg-a/receipt.json",
+      "sha256": "cb24920ce6aefd20c19c59ddad96b252ccf05070810e07c09478d1e25e62ca6c"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-unicode-write-leg-b/receipt.json",
+      "sha256": "c65c5ac74813f614b2a6ba387f0d584035426d2ca97dbf45fc9d65c7cc853f58"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "8e662ddfc66cd714a9727a94484a71c2be2b6a7da0a931f79b10f79d7038c705"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "957338a6df32df1b6a3ccb56ca65bc516bd28cf6e277a2615d26c94948fc81be"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-rich-write-leg-a/receipt.json",
+      "sha256": "6e710536612f8eee1568d42ec431682f325573d70af9ee184dd2199202d2c76f"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-rich-write-leg-b/receipt.json",
+      "sha256": "cb772630e8b26b59edb8bceefcf4d4a97f0de44860338212152eb027060a9dea"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "e1db48cf92a7f8bb07c288d26e0d3ddaebac54e94864f5be7fe909d4fa9a91a1"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "f533a58b1a66890682734599fcfa869d86843d5a05fda75d54ee09a495559ff2"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-lifecycle-leg-b/receipt.json",
+      "sha256": "9ddf36f9136eaf8f1bbfc9fc686f5b776f90a9c1857ba81c9ff6409b7c5709ba"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-lifecycle-leg-a/receipt.json",
+      "sha256": "fb21c1cb3a19f899ecc7450940d03b140b3c99dd666ae51125072a5619a7756f"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-write-leg-b/receipt.json",
+      "sha256": "c5379cec7ee6aa6ba203439f851598b6848fc1f4c7901a9131303b85ea2fcbd9"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-write-leg-a/receipt.json",
+      "sha256": "3d9e3949becfc23a6af1009af03c2b4cc816ca31210eec6b9685ea5c952ee20c"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-lifecycle-leg-b/receipt.json",
+      "sha256": "f3c42b579cb3b5d9651bbdba6991339c44f441db95e4e59888c68b0bc031e69e"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-lifecycle-leg-a/receipt.json",
+      "sha256": "ced70f2c23df9a96c257ab6ee2c232317fc524587cb70add3f6f051119cfd292"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-write-leg-b/receipt.json",
+      "sha256": "346416eda847834d367ebd7f8d747d08497dffe540cfd603d7faf177dc194248"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-unicode-write-leg-a/receipt.json",
+      "sha256": "4e6680510d00289de8eab046a802cdf6120f29e625d9b6a1afa835c0a1b268a0"
+    },
+    {
+      "bytes": 1223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-payload-lifecycle-leg-b/receipt.json",
+      "sha256": "d0b73545e9a668f084ef234c6d0e305fc3d1434e14ed90b6592ef6aaff2a3912"
+    },
+    {
+      "bytes": 1224,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-payload-lifecycle-leg-a/receipt.json",
+      "sha256": "32a2888b012a5173dc3ca8dc1ae23c37ab7a0fdd3b8daef456b7db7d0d889a8e"
+    },
+    {
+      "bytes": 1203,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-payload-write-leg-b/receipt.json",
+      "sha256": "0994fc32e1d35f10cf4cdaca58c36b79cfd14ffd937bd1895f5bc92442acd4cf"
+    },
+    {
+      "bytes": 1204,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-payload-write-leg-a/receipt.json",
+      "sha256": "1d8383fa8f99aea6d0e91ff1aa3f10a926672a6313108ce3e81b3c24731af76b"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-many-lifecycle-leg-b/receipt.json",
+      "sha256": "2a1785976a051b000ceb18eecffae3bff9b595d19b7e955d84c42a42d5f4d6e1"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-many-lifecycle-leg-a/receipt.json",
+      "sha256": "8929249a28b23683675b558f9e7ffc11f081572c3d7f9d9e11cfff7d37927a14"
+    },
+    {
+      "bytes": 1187,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-many-write-leg-b/receipt.json",
+      "sha256": "eae8dac3a6a8be5424a74647107219c1afce2524796705e57305e876614db00d"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-many-write-leg-a/receipt.json",
+      "sha256": "8f4f5ed399ff87ef4d6f4c0ed343d644ee817a11b430cf1e28a06d804df36926"
+    },
+    {
+      "bytes": 1208,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-tiny-lifecycle-leg-b/receipt.json",
+      "sha256": "f235eedd2b10bb947fe0e003610eadbf97cdb7e0838210827620677e4c1eeccc"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-tiny-lifecycle-leg-a/receipt.json",
+      "sha256": "8d34f74cb9db92ec283470bf236da0dd9e430bf97a6d30061f70fa1d00524643"
+    },
+    {
+      "bytes": 1188,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-tiny-write-leg-b/receipt.json",
+      "sha256": "a0e290f5dc9d415f7196f6029dd0a361a01cf899b188d223079a538118029aa2"
+    },
+    {
+      "bytes": 1189,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-tiny-write-leg-a/receipt.json",
+      "sha256": "0baebb7417e72c414b5a515a69e912116f9e0b49d2e6fc3c41d9a87ba4a9eeec"
+    }
+  ],
+  "status": "pass"
+}

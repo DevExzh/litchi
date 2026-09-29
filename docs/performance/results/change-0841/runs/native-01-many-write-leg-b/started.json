@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-write-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "--mode",
+    "write",
+    "--shape",
+    "many",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-01-many-write-leg-b/report.json"
+  ],
+  "binary": {
+    "bytes": 9236024,
+    "path": "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "sha256": "7a057a936c6777c23cc2295f6f033ba8ba0ebe20c42147a7652391522bcfd6bf"
+  },
+  "build": {
+    "bytes": 654,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-after.json",
+    "sha256": "94b928f680b8ec7ed15241495881e814dfac012b9358af1024c3ecdce69a6f3d"
+  },
+  "lane": "native",
+  "row": {
+    "block": 1,
+    "leg": "after",
+    "mode": "write",
+    "samples": 30,
+    "shape": "many",
+    "warmup": 3
+  },
+  "started_unix": 1790696990.7311413
+}

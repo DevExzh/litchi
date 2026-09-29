@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 3748001
+cmd:  /home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe --mode write --shape many --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-a/report.json
+part: 2
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 2037590 - 7357314
+desc: Trigger: Program termination
+
+positions: line
+events: Ir
+summary: 0
+
+
+totals: 0

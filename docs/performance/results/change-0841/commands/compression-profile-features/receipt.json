@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "tree",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "-e",
+    "features",
+    "-i",
+    "zlib-rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790696659.4023798,
+  "log": {
+    "bytes": 12992,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/compression-profile-features/output.log",
+    "sha256": "cc00a6972b5b8b36dad365e5196d3c9947e9067f622ae96d9da2d6e943ff49df"
+  },
+  "started_unix": 1790696659.319134
+}

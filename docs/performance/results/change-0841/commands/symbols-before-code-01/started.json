@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "objdump",
+    "-d",
+    "-C",
+    "--start-address=0x1218f0",
+    "--stop-address=0x1221c2",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0841",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790696405.4967406
+}

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0841 — current PPT borrowed-text instruction diagnosis
+
+[0841](0841-ppt-borrowed-text-instruction-diagnostic.md) validates 156 current-source PPT diagnostic reports / 3,636 samples. All ten cases retain exact output goldens; many/Unicode historical regressions do not reproduce under the shared wrapper and current build. No new general baseline or adoption is claimed. Original and additive reader/reducer repairs preserve every workload; production is restored.
+
 ## 0840 — fresh CFB emission avoids large payload gap initialization
 
 [0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.

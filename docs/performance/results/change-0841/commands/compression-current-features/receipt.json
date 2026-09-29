@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "tree",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "-e",
+    "features",
+    "-i",
+    "zlib-rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790696659.2908382,
+  "log": {
+    "bytes": 687,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/compression-current-features/output.log",
+    "sha256": "96e8eb4aac4548833c42c83987a1f0f90f45fe69844ec442b0c70851ec2cd00e"
+  },
+  "started_unix": 1790696659.1913457
+}

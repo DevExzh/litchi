@@ -1,0 +1,14 @@
+==3748158== Callgrind, a call-graph generating cache profiler
+==3748158== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3748158== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==3748158== Command: /home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe --mode write --shape unicode --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-a/report.json
+==3748158== 
+==3748158== For interactive control, run 'callgrind_control -h'.
+==3748158== brk segment overflow in thread #1: can't grow to 0x49b0000
+==3748158== (see section Limitations in user manual)
+==3748158== NOTE: further instances of this message will not be shown
+==3748158== 
+==3748158== Events    : Ir
+==3748158== Collected : 54555031
+==3748158== 
+==3748158== I   refs:      54,555,031

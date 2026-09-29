@@ -1,0 +1,15 @@
+{
+  "note": "Initial generate-lockfile selected newer cached registry versions and was not built. Archived initial resolution; Cargo metadata then pruned a fresh root-lock copy while retaining root versions.",
+  "probe": {
+    "bytes": 35310,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/Cargo.lock",
+    "sha256": "5502dd181565fc1c5c7cd42b80decf71e9a86756200137f610ccdaffb753d192"
+  },
+  "registry_packages": 141,
+  "root": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "status": "pass"
+}

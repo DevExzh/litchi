@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys;sys.path.insert(0,'docs/performance/results/change-0841');import qualify as a,qualify_v2 as b;old=a.validate_items('native');new=b.validate_items('native');assert old==new;print('Native reader parity PASS',len(new))"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790697237.5735013,
+  "log": {
+    "bytes": 30,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/native-reader-parity/output.log",
+    "sha256": "36665d0e03d85d7ad621af815316f21d6afde71e64631c5732be7e97edbed8c0"
+  },
+  "started_unix": 1790697236.2584693
+}

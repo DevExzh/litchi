@@ -1,0 +1,31 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-write-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "--mode",
+    "write",
+    "--shape",
+    "many",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-04-many-write-leg-b/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0841",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790697008.209042
+}

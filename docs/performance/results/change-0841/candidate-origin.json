@@ -1,0 +1,27 @@
+{
+  "changed": [
+    "crates/litchi-ppt/src/writer/core/codec.rs",
+    "crates/litchi-ppt/src/writer/core/package.rs",
+    "crates/litchi-ppt/src/writer/core/tests.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/drawing.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/group.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/properties.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/shapes.rs",
+    "crates/litchi-ppt/src/writer/escher/codec/validation.rs",
+    "crates/litchi-ppt/src/writer/escher/model.rs",
+    "crates/litchi-ppt/src/writer/escher/semantic.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/groups.rs",
+    "crates/litchi-ppt/src/writer/escher/tests/legacy.rs"
+  ],
+  "historical": {
+    "bytes": 22105,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0782/candidate/applied-model.patch",
+    "sha256": "b9ea9b31f2daff2513aeb9e735324d6aab81671f1a7385a9a011abb929136d59"
+  },
+  "patch": {
+    "bytes": 22105,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/candidate.patch",
+    "sha256": "b9ea9b31f2daff2513aeb9e735324d6aab81671f1a7385a9a011abb929136d59"
+  },
+  "purpose": "Diagnostic only. Restore exact production source after all captures; adoption is not permitted by this plan."
+}

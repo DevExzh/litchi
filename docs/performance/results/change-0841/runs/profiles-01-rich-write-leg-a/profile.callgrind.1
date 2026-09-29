@@ -1,0 +1,19418 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 3748104
+cmd:  /home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe --mode write --shape rich --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-rich-write-leg-a/report.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 125624
+desc: Trigger: --dump-after=ppt_profile_probe::profile_write
+
+positions: line
+events: Ir
+summary: 236300
+
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7) /home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe
+cfi=(165) ???
+cfn=(574) (below main)
+calls=0 0 
+0 236300
+
+ob=(3) ???
+fl=(152) ???
+fn=(720) 0x00000000049f3680
+0 256
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(204) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(722) __memcpy_avx_unaligned_erms
+calls=189 255 
+0 2433
+
+ob=(7)
+fl=(275) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs
+fn=(1024) <core::fmt::Formatter>::pad_integral
+1825 88
++4 96
+0 8
+1837 16
+0 8
+1854 8
++1 16
+0 16
+1857 48
+cfn=(1026) <core::fmt::Formatter>::pad_integral::write_prefix
+calls=36 -11 
+* 160
+* 16
+fi=(237) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+2173 16
+fe=(275)
+1858 96
+cfi=(253) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs
+cfn=(1016) <alloc::string::String as core::fmt::Write>::write_str
+calls=36 3344 
+* 352
+
+fn=(1026)
+1846 72
++1 16
++3 16
+0 8
+1851 48
+
+fn=(1010) core::fmt::write
+1630 44
+878 8
+fi=(226) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+1717 4
+fe=(275)
+-65 8
+0 20
+fi=(226)
+1717 32
+fe=(275)
+-65 32
+fi=(252) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+659 32
+fe=(275)
+1655 32
++9 32
+cfi=(253)
+cfn=(1016)
+calls=20 3344 
+* 344
+fi=(237)
+2173 16
+fe=(275)
+0 8
+fi=(237)
+2173 8
+fe=(275)
+1665 32
+0 8
+fi=(252)
+659 16
+fe=(275)
+-82 40
+fi=(387) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/rt.rs
+144 8
++8 16
+cfi=(276) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/num.rs
+cfn=(1022) <u64 as core::fmt::Display>::fmt
+calls=8 -17 
+* 1200
+fi=(237)
+2173 16
+fe=(275)
+0 32
+1739 32
+
+fl=(340) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/core/codec.rs
+fn=(1588) litchi_ppt::writer::core::codec::<impl litchi_ppt::writer::core::model::Writer>::build_docinfo_list
+490 9
+fi=(245) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs
+1815 1
+fi=(388) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/smart_tags.rs
+88 2
+fi=(226)
+-88 6
+fi=(388)
+88 1
+fi=(237)
+-88 4
+fi=(258) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs
+745 2
+0 1
+745 4
+1042 3
+fe=(340)
+501 4
+fi=(232) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs
+961 3
+fi=(258)
+745 5
+fe=(340)
+498 5
+cfi=(316) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/records/codec.rs
+cfn=(1594) litchi_ppt::writer::records::codec::create_docinfo_list_container_with_extensions
+calls=1 -9 
+* 11474
+* 1
+fi=(237)
+2173 1
+0 1
+2173 2
++1 1
+fe=(340)
+497 4
+fi=(226)
+805 3
+fe=(340)
+511 8
+
+fn=(1648) litchi_ppt::writer::core::codec::build_writer_sound_collection
+54 10
+fi=(389) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/sound_collection.rs
++7 7
+fi=(345) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/collections/btree/map.rs
+2699 4
+1734 5
+fi=(252)
+-14 1
+fi=(264) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 1
+0 9
+fi=(252)
+1720 2
+fi=(264)
+180 2
+0 2
+fi=(245)
+1815 2
+fi=(252)
+-95 4
+0 14
+1720 4
+fi=(264)
+180 4
+fe=(340)
+71 12
+fi=(344) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+-71 2
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+fe=(340)
+-88 8
++1 12
+fi=(245)
+1815 4
+fi=(252)
+-95 4
+fi=(264)
+180 4
+fi=(245)
+1815 4
+fi=(252)
+-95 4
+fi=(264)
+180 4
+fe=(340)
+0 4
+fi=(252)
+1720 8
+fi=(264)
+180 4
+0 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(345)
+2822 1
+fi=(389)
+112 3
+fi=(346) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread_local/native/lazy.rs
+-53 2
+fi=(324) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cell.rs
+555 2
+fi=(265) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2457 1
+fi=(250) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/mod.rs
+902 1
+fi=(389)
+113 7
+fi=(226)
+1717 1
+fi=(345)
+1884 2
+0 8
+1918 3
+cfn=(1666) alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+calls=1 +12 
+* 27
+* 2
+fi=(237)
+966 3
+0 2
+967 8
+0 1
+fe=(340)
+128 8
+
+fl=(321) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/core/model/records.rs
+fn=(1632) litchi_ppt::writer::core::model::records::<impl litchi_ppt::writer::core::model::Writer>::plan_charts
+104 9
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+25 1
+fe=(321)
++83 1
+fi=(264)
+284 4
+0 2
+284 1
+fe=(321)
+130 9
+fi=(264)
+284 5
+0 1
+fi=(341) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/accum.rs
+53 1
+fi=(264)
+284 3
+fi=(341)
+53 1
+fi=(264)
+284 3
+fe=(321)
+109 2
++22 8
+fi=(342) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/hyperlink.rs
+460 1
+fi=(244) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+-1 2
+0 4
+fi=(245)
+965 3
+fi=(265)
+2345 7
+fi=(323) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/enumerate.rs
+0 4
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(245)
+2997 2
+fi=(229) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1916 4
+fe=(321)
+
+fl=(226)
+fn=(2528) core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>
+805 12
+fi=(244)
+632 3
+fe=(226)
+805 3
+0 1
+fi=(244)
+632 1
+fe=(226)
+805 1
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+48 1
+cob=(2)
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(756) free
+calls=1 3319 
+* 33
+* 1
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 6
+0 1
+805 10
+0 4
+805 28
+fi=(244)
+632 8
+fe=(226)
+805 12
+0 4
+fi=(244)
+632 4
+fe=(226)
+805 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 372
+* 4
+-48 12
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 372
+-48 8
+fe=(226)
+805 20
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 348
+fi=(280) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs
+200 4
+fi=(314) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs
+0 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 2
+cfn=(2538) core::ptr::drop_in_place<std::collections::hash::set::HashSet<alloc::vec::Vec<alloc::string::String>>>
+calls=1 * 
+* 18
+* 2
+cfn=(2540) core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,[u8; 16]>>
+calls=1 * 
+* 18
+* 2
+cfn=(2542) core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_cfb::writer::layout::SourceLayout>>>
+calls=1 * 
+* 9
+* 2
+cfn=(2544) core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,litchi_cfb::writer::core::DirectoryMetadata>>
+calls=1 * 
+* 18
+* 10
+cfn=(2544)
+calls=1 * 
+* 18
+
+fn=(2542)
+805 9
+
+fn=(2544)
+805 14
+fi=(328) /rust/deps/hashbrown-0.16.1/src/raw/mod.rs
+2697 2
+2312 4
+fe=(226)
+805 16
+
+fn=(2554) core::ptr::drop_in_place<litchi_ppt::writer::core::model::SerializedHeaderFooters>
+805 29
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+
+fn=(1924) core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::Interaction>>
+805 24
+0 4
+805 16
+
+fn=(1954) core::ptr::drop_in_place<litchi_ppt::writer::escher::model::UserShapeData>
+805 40
+fi=(236)
+0 8
+fe=(226)
+805 16
+cfn=(1958) core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::text_format::semantic::Paragraph>>
+calls=4 * 
+* 1480
+* 12
+fi=(236)
+0 4
+fi=(244)
+632 4
+fe=(226)
+805 16
+fi=(236)
+0 4
+fi=(244)
+632 4
+fe=(226)
+805 16
+fi=(236)
+0 4
+fi=(244)
+632 4
+fe=(226)
+805 52
+
+fn=(2558) core::ptr::drop_in_place<litchi_ppt::writer::core::package::FontPublicationPlan>
+805 7
+fi=(244)
+632 1
+fe=(226)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+805 4
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fe=(226)
+
+fn=(1926) core::ptr::drop_in_place<alloc::vec::Vec<(litchi_odraw::write::Property,core::option::Option<alloc::vec::Vec<u8>>)>>
+805 192
+fi=(236)
+0 4
+fi=(244)
+632 4
+fi=(236)
+48 28
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(226)
+
+fn=(2508) core::ptr::drop_in_place<litchi_cfb::writer::directory::DirectoryBuilder>
+805 12
+0 3
+805 15
+0 5
+fi=(244)
+632 5
+fe=(226)
+805 5
+fi=(236)
+48 5
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=5 3319 
+* 285
+fi=(377) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/smallvec-1.16.0/src/lib.rs
+1055 5
+2242 5
+1055 5
+2242 5
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 129
+fi=(328)
+2697 1
+2312 3
+0 1
+2253 3
+0 1
+2479 1
+fi=(331) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs
+1320 1
+fi=(255) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs
+863 1
+fi=(328)
+3595 3
+0 5
+3851 1
+fi=(367) /rust/deps/hashbrown-0.16.1/src/control/bitmask.rs
+50 3
+fi=(332) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/nonzero.rs
+641 1
+fi=(232)
+1072 3
+fe=(226)
+805 5
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+0 1
+fi=(265)
+3051 3
+fi=(280)
+200 3
+fi=(328)
+3173 1
+fi=(232)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(328)
+2697 1
+2312 2
+-59 3
+0 1
+2479 1
+fi=(331)
+1320 1
+fi=(255)
+863 1
+fi=(328)
+3595 4
+0 4
+3851 1
+fi=(367)
+50 2
+fi=(332)
+641 1
+fi=(232)
+1072 4
+fi=(244)
+632 1
+fi=(232)
+1400 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fi=(265)
+3051 3
+fi=(280)
+200 3
+fi=(328)
+3173 1
+fi=(232)
+1072 2
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+
+fn=(2496) core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<u8>>>
+805 30
+fi=(244)
+632 6
+fe=(226)
+805 6
+0 2
+fi=(244)
+632 2
+fe=(226)
+805 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+-48 3
+fi=(244)
+632 3
+fi=(236)
+48 14
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+fe=(226)
+805 6
+
+fn=(1390) core::ptr::drop_in_place<litchi_ppt::records::record::Record>
+805 20
+fi=(314)
+0 2
+fi=(244)
+632 2
+fe=(226)
+805 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+fi=(244)
+612 2
+fi=(245)
+4224 2
+fe=(226)
+805 12
+fi=(280)
+0 2
+fi=(244)
+632 2
+fe=(226)
+805 16
+
+fn=(2540)
+805 7
+fi=(328)
+2697 1
+2312 2
+fe=(226)
+805 8
+
+fn=(1952) core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::escher::model::UserShapeData>>
+805 24
+0 2
+805 24
+cfn=(1954)
+calls=4 * 
+* 1664
+* 8
+0 2
+fi=(244)
+632 2
+fi=(236)
+48 18
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 258
+fe=(226)
+
+fn=(1916) core::ptr::drop_in_place<litchi_ppt::writer::text_format::codec::TextPropsBuilder>
+805 52
+0 20
+805 28
+fi=(244)
+632 8
+fe=(226)
+805 36
+0 12
+fi=(244)
+632 12
+fe=(226)
+805 12
+fi=(236)
+48 12
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=12 3319 
+* 396
+-48 12
+fi=(244)
+632 12
+fi=(236)
+0 12
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(226)
+805 8
+fi=(236)
+0 8
+fi=(244)
+632 4
+fi=(236)
+48 36
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(226)
+
+fn=(2502) core::ptr::drop_in_place<alloc::collections::btree::set::BTreeSet<alloc::vec::Vec<alloc::string::String>>>
+805 7
+1717 2
+fi=(345)
+1884 2
+208 1
+0 4
+1933 2
+fi=(258)
+2766 2
+fe=(226)
+805 8
+
+fn=(2538)
+805 7
+fi=(328)
+2697 1
+2312 2
+fe=(226)
+805 8
+
+fn=(1958)
+805 52
+0 20
+805 28
+fi=(244)
+632 8
+fe=(226)
+805 36
+0 12
+fi=(244)
+632 12
+fe=(226)
+805 12
+fi=(236)
+48 12
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=12 3319 
+* 920
+-48 12
+fi=(244)
+632 12
+fi=(236)
+0 12
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(226)
+805 8
+fi=(236)
+0 8
+fi=(244)
+632 4
+fi=(236)
+48 36
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(226)
+
+fn=(2524) core::ptr::drop_in_place<litchi_ppt::text_prop::TextPropCollection>
+805 3
+fi=(244)
+632 1
+fe=(226)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(226)
+805 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(226)
+
+fl=(377)
+fn=(2148) <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+2183 16
+fi=(390) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/collect.rs
+323 4
+fi=(255)
+729 6
+fi=(265)
+3658 6
++2 6
+fi=(390)
+323 2
+fi=(286) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs
+1528 6
+fe=(377)
+1055 8
+-17 6
+1318 6
+1055 2
+-17 2
+fi=(378) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/maybe_uninit.rs
+650 8
+fe=(377)
+2192 4
+0 2
+fi=(286)
+1504 44
+fi=(252)
+1720 22
+fi=(264)
+180 22
+fi=(285) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs
+37 20
++1 40
+-38 60
+fi=(226)
+1917 20
+fe=(377)
+2475 20
+2192 40
+2482 2
+2205 16
+
+fl=(335) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/wire.rs
+fn=(1530) litchi_ppt::writer::escher::codec::wire::EscherBuilder::add_data
+40 168
+fi=(244)
+617 24
+fi=(245)
+1446 24
+fi=(265)
+2494 24
+fi=(244)
+765 24
+-94 24
+fi=(245)
+2881 8
+0 24
+fi=(232)
+961 24
+fi=(226)
+547 48
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=24 255 
+* 369
+fi=(245)
+2886 48
+fe=(335)
+42 24
++1 144
+fi=(244)
+673 140
+cfn=(1044) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+calls=20 -14 
+* 4826
+* 20
+fi=(245)
+2997 20
+2881 20
+fe=(335)
+
+fl=(244)
+fn=(1060) <alloc::raw_vec::RawVecInner>::finish_grow
+542 64
+fi=(281) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/alloc/layout.rs
+75 8
++38 8
+0 8
+fe=(244)
+632 16
+fi=(280)
+186 16
+fi=(236)
+14 16
+cob=(2)
+cfi=(155)
+cfn=(644) malloc
+calls=40 3283 
+* 729
+fe=(244)
+562 16
++1 24
+0 16
+566 48
+
+fn=(1240) alloc::raw_vec::RawVec<T,A>::grow_one
+186 4
+491 1
++30 1
+fi=(229)
+1037 3
+fe=(244)
+527 6
+cfn=(1048) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=1 +15 
+* 290
+fi=(237)
+2173 2
++1 1
+fe=(244)
+774 1
++1 1
+189 4
+-3 16
+491 4
++30 4
+fi=(229)
+1037 12
+fe=(244)
+527 24
+cfn=(1048)
+calls=4 +15 
+* 300
+fi=(237)
+2173 8
++1 4
+fe=(244)
+774 4
++1 4
+189 16
+
+fn=(1044)
+659 15
+fi=(265)
+769 5
+fi=(279) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+457 5
+0 15
+fe=(244)
+521 10
+fi=(229)
+1037 10
+fe=(244)
+159 20
+fi=(229)
+1037 10
+fe=(244)
+527 25
+cfn=(1048)
+calls=26 +15 
+* 1409
+fi=(237)
+2173 10
++1 5
+fe=(244)
+774 5
++1 5
+669 20
+-10 1296
+fi=(265)
+769 432
+fi=(279)
+457 432
+0 1296
+fe=(244)
+521 864
+fi=(229)
+1037 864
+fe=(244)
+159 3024
+fi=(229)
+1037 864
+fe=(244)
+527 2160
+cfn=(1048)
+calls=432 +15 
+* 97771
+fi=(237)
+2173 864
++1 432
+fe=(244)
+774 432
++1 432
+669 1728
+
+fn=(1048)
+542 63
+fi=(265)
+3051 56
+fi=(279)
+457 21
+0 14
+fe=(244)
+632 7
+fi=(280)
+135 3
+fi=(236)
+-82 3
+fi=(280)
+186 8
+-91 4
+fi=(236)
+-82 4
++41 9
+cob=(2)
+cfi=(155)
+cfn=(714) realloc
+calls=15 3380 
+* 865
+fe=(244)
+562 6
++1 28
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=13 3283 
+* 382
+fe=(244)
+562 8
+0 14
+566 56
+-24 279
+fi=(265)
+3051 248
+fi=(279)
+457 93
+0 31
+fe=(244)
+632 62
+fi=(280)
+135 10
+fi=(236)
+-82 10
+fi=(280)
+186 42
+-91 21
+fi=(236)
+-82 21
++41 30
+cob=(2)
+cfi=(155)
+cfn=(714)
+calls=10 3380 
+* 1963
+fe=(244)
+562 20
++1 124
+fi=(236)
+14 42
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=21 3283 
+* 3187
+fe=(244)
+562 42
+0 62
+566 248
+-24 3951
+fi=(265)
+3051 3512
+fi=(279)
+457 1317
+0 878
+fe=(244)
+632 439
+fi=(280)
+135 212
+fi=(236)
+-82 212
+fi=(280)
+186 454
+-91 227
+fi=(236)
+-82 227
++41 636
+cob=(2)
+cfi=(155)
+cfn=(714)
+calls=212 3380 
+* 61774
+fe=(244)
+562 424
++1 1756
+fi=(236)
+14 454
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=231 3283 
+* 16979
+fe=(244)
+562 454
+0 878
+566 3512
+
+fn=(1616) alloc::raw_vec::RawVecInner<A>::try_allocate_in
+445 14
++14 4
+0 6
+fi=(280)
+95 2
+fi=(236)
+-82 2
++1 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 56
+fe=(244)
+468 4
++8 4
+0 4
+481 12
+
+fn=(2178) alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+717 6
+617 2
+fi=(265)
+2494 4
+fe=(244)
+765 2
+-42 2
++11 2
+
+fn=(2268) alloc::raw_vec::RawVecInner<A>::try_reserve
+682 4
++83 4
+-77 4
++11 3
+0 5
+521 1
+fi=(229)
+1037 4
+fe=(244)
+527 6
+cfn=(1048)
+calls=1 +15 
+* 236
+fi=(237)
+2173 2
++1 1
+fe=(244)
+774 1
++1 2
+0 4
+699 1
+
+fl=(365) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/comments.rs
+fn=(1946) litchi_ppt::writer::comments::build_slide_comments
+220 16
++1 4
++1 8
++14 16
+
+fl=(319) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/tx_style/codec.rs
+fn=(1442) litchi_ppt::writer::tx_style::codec::TxMasterStyleBuilder::for_text_type
+147 56
+fi=(245)
+464 32
+fi=(244)
+673 40
+cfn=(1044)
+calls=8 -14 
+* 1192
+-61 8
+fi=(245)
+2997 8
+fi=(226)
+547 8
+fi=(245)
+2886 16
+fe=(319)
+151 24
+-1 16
++5 40
+
+fn=(1440) litchi_ppt::writer::tx_style::codec::build_spec_master_style
+577 104
++6 16
+cfn=(1442)
+calls=8 147 
+* 1440
+* 56
+fi=(264)
+180 32
+0 8
+fe=(319)
+584 8
+159 16
+584 24
+159 48
++1 16
+fi=(244)
+617 16
+fi=(245)
+1446 16
+fi=(265)
+2494 16
+fi=(244)
+765 16
+-94 16
+-59 16
+fi=(226)
+-65 16
+fi=(245)
+2886 48
+1446 16
+fe=(319)
+162 16
+fi=(265)
+2301 48
+fe=(319)
+162 16
+fi=(244)
+617 16
+fi=(265)
+2494 16
+fi=(244)
+765 16
+-94 16
+fe=(319)
+162 16
+fi=(265)
+2301 48
+fe=(319)
+162 16
+fi=(244)
+617 16
+fi=(265)
+2494 16
+fi=(244)
+765 16
+-94 16
+fi=(245)
+2886 32
+fi=(244)
+612 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fe=(319)
+165 32
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-59 40
+fi=(226)
+-65 20
+fi=(245)
+2886 40
+0 20
+fe=(319)
+169 20
+fi=(245)
+0 12
+fe=(319)
+169 12
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-59 20
+fi=(226)
+-65 20
+fi=(245)
+2886 40
+0 20
+fe=(319)
+173 20
+fi=(245)
+0 12
+fe=(319)
+173 12
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-59 20
+fi=(226)
+-65 20
+fi=(245)
+2886 40
+0 20
+fe=(319)
+177 20
+fi=(245)
+0 12
+fe=(319)
+177 12
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-59 20
+fi=(226)
+-65 20
+fi=(245)
+2886 40
+0 20
+fe=(319)
+181 20
+fi=(245)
+0 12
+fe=(319)
+181 12
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-59 20
+fi=(226)
+-65 20
+fi=(245)
+2886 40
+fi=(244)
+617 20
+fi=(265)
+2494 20
+fi=(244)
+765 20
+-94 20
+-54 12
+fi=(265)
+2494 12
+fi=(244)
+765 12
+-94 12
+-59 64
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(244)
+617 32
+fi=(265)
+2494 32
+fi=(244)
+765 32
+-94 32
+-59 32
+fi=(226)
+-65 32
+fi=(245)
+2886 64
+fi=(252)
+659 32
+1720 64
+fi=(264)
+180 40
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 2
+fi=(244)
+673 30
+cfn=(1044)
+calls=6 -14 
+* 1334
+fi=(245)
+2997 12
+fi=(244)
+673 15
+cfn=(1044)
+calls=3 -14 
+* 933
+fi=(245)
+2997 6
+fi=(244)
+673 35
+cfn=(1044)
+calls=7 -14 
+* 2738
+fi=(245)
+2997 14
+fi=(244)
+673 15
+cfn=(1044)
+calls=3 -14 
+* 1598
+fi=(245)
+2997 6
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 690
+fi=(245)
+2997 2
+fi=(244)
+673 15
+cfn=(1044)
+calls=3 -14 
+* 360
+fi=(245)
+2997 6
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 2
+fi=(244)
+673 15
+cfn=(1044)
+calls=3 -14 
+* 941
+fi=(245)
+2997 6
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 1692
+fi=(245)
+2997 8
+fe=(319)
+628 40
++1 64
+
+fl=(337) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/drawing.rs
+fn=(1806) litchi_ppt::writer::escher::codec::drawing::append_dg_container_children::{{closure}}
+194 18
+fi=(335)
+29 30
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 220
+-61 2
+fi=(245)
+2997 2
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 4
+fi=(279)
+457 2
+fi=(244)
+0 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 200
+fi=(244)
+468 4
+0 6
+fi=(350) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/model.rs
+208 4
+fi=(391) /home/zhuhe/code/litchi/crates/litchi-odraw/src/write.rs
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+* 2
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 360
+-61 2
+fi=(245)
+2997 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(236)
++6 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+fi=(335)
+-19 16
+fe=(337)
+206 6
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 212
+-61 2
+fi=(245)
+2997 2
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 4
+fi=(279)
+457 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 370
+fi=(244)
+468 4
+0 4
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 26
+fi=(244)
++70 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(236)
++6 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 4
+fi=(279)
+457 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 4
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+* 2
+fi=(244)
++70 2
+fi=(245)
+1446 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+fi=(245)
+2886 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fe=(337)
+210 22
+0 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(351) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/shapes.rs
+49 8
+fi=(352) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/validation.rs
+-31 8
++5 12
+fe=(337)
+-23 4
+fi=(351)
+96 20
+-5 8
+cfi=(317) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/records/model.rs
+cfn=(1741) litchi_ppt::writer::records::model::InPlaceRecord::write'2
+calls=4 212 
+* 59214
+fe=(337)
+211 4
+fi=(237)
+2173 8
+fi=(265)
+2457 4
+fi=(237)
+2173 8
+0 2
+fe=(337)
+214 2
++1 4
+-1 2
++1 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fe=(337)
++42 4
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(245)
+0 2
+fi=(244)
+632 2
+fe=(337)
+228 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+632 2
+fe=(337)
+228 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 6
+fi=(244)
+632 2
+fe=(337)
+228 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 306
+fe=(337)
+228 18
+fi=(236)
+0 2
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 846
+-61 2
+fi=(245)
+2997 4
+fe=(337)
+
+fn=(1538) litchi_ppt::writer::escher::codec::drawing::build_dgg_container
+32 8
+fi=(335)
+-3 7
+fi=(302) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/num.rs
+297 3
+fe=(337)
+0 1
+45 1
+fi=(252)
+1720 4
+fi=(264)
+25 1
+284 2
+0 3
+fi=(338) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/arith.rs
+105 2
+fi=(265)
+844 2
+fi=(264)
+284 4
+fe=(337)
+47 1
+fi=(229)
+1037 3
+fe=(337)
+50 1
+fi=(252)
+1720 2
+fi=(264)
+25 1
+-25 3
+fi=(255)
+729 3
+fi=(229)
+2181 1
+fi=(264)
+28 5
+-28 2
+28 1
+284 1
+0 1
+fi=(229)
+2181 2
+500 1
+2181 1
+1717 1
+fi=(264)
+284 3
+0 1
+fi=(258)
+2126 1
+fi=(335)
+29 8
+fe=(337)
++31 2
+fi=(236)
+-46 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 1
+fe=(337)
+52 3
+fi=(252)
+1720 2
+fe=(337)
+52 1
+fi=(245)
+965 2
+fi=(226)
+547 5
+fi=(245)
+2886 2
+fi=(339) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/range.rs
+563 1
+0 3
+fi=(246) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+1169 1
+0 1
+fi=(229)
+1916 1
+fi=(246)
+1169 2
+fe=(337)
+71 2
+fi=(229)
+1916 2
+fi=(246)
+1169 4
+fe=(337)
+71 4
++3 4
+fi=(263) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+219 4
+0 2
+fi=(258)
+2126 2
+fe=(337)
+75 2
+fi=(244)
+617 2
+fi=(265)
+2494 2
+fi=(244)
+765 4
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 6
+fi=(245)
+2886 6
+fi=(229)
+1916 6
+0 2
+fi=(339)
+563 4
+fi=(245)
+0 1
+fi=(229)
+1916 1
+fi=(246)
+772 1
+fi=(244)
+612 1
+0 1
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(335)
+42 3
+fi=(279)
+457 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 2
+fi=(350)
+208 2
+fi=(391)
+343 3
+fi=(226)
+547 3
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+* 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 3
+fi=(335)
+42 1
+fi=(236)
++6 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(258)
+1583 3
+fe=(337)
+85 1
+fi=(335)
+-56 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 1
+fi=(226)
+-65 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(335)
+42 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 5
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 3
+fi=(350)
+208 2
+fi=(391)
+343 3
+fi=(226)
+547 3
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(244)
++70 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 3
+fi=(335)
+42 1
+fi=(236)
++6 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(335)
+-19 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(226)
+547 4
+fi=(279)
+-90 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 3
+fi=(350)
+208 2
+fi=(391)
+343 3
+fi=(226)
+547 3
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(244)
++70 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 3
+fi=(279)
+457 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 2
+fi=(350)
+208 2
+fi=(391)
+343 3
+fi=(226)
+547 4
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+* 1
+fi=(335)
+50 4
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+0 1
+673 5
+cfn=(1044)
+calls=1 -14 
+* 238
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+0 1
+673 5
+cfn=(1044)
+calls=1 -14 
+* 427
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 515
+-61 2
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 206
+-61 2
+fi=(245)
+2997 3
+fe=(337)
+
+fl=(334) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/persist.rs
+fn=(1978) litchi_ppt::writer::persist::PersistPtrBuilder::generate_record
+115 8
+fi=(245)
+464 3
+fi=(328)
+2479 1
+2676 2
+2210 1
+3851 3
+fe=(334)
+83 1
+fi=(392) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/copied.rs
+-58 2
+fi=(255)
+863 1
+fi=(367)
+50 3
+fi=(229)
+1037 3
+fi=(265)
+3051 7
+fi=(279)
+457 2
+fe=(334)
+0 7
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 1
+fi=(226)
+1917 1
+fi=(282) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_from_iter_nested.rs
+36 4
+-36 1
+fi=(328)
+3851 1
+0 4
+fi=(245)
+0 9
+fi=(226)
+1917 3
+fi=(245)
+3980 3
+2168 6
+fi=(328)
+3851 6
+fi=(367)
+50 6
+fi=(332)
+641 3
+fi=(232)
+1072 9
+fi=(258)
+2126 3
+fi=(245)
+3971 6
+fi=(282)
+42 4
+fi=(368) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/sort/unstable/mod.rs
+-8 1
+fi=(279)
+434 1
+fe=(334)
+0 1
+fi=(328)
+3851 3
+0 22
+fe=(334)
+94 4
+fi=(263)
+272 1
+fe=(334)
+92 1
++2 2
+-94 1
+94 11
+-94 3
+94 12
+-94 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fe=(334)
+0 5
+fi=(244)
+612 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+923 2
+fi=(264)
+180 1
+0 1
+fe=(334)
+91 3
++10 2
+fi=(326) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/mod.rs
+943 2
+fi=(327) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/sip.rs
+314 5
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(265)
+2457 3
+fi=(327)
+79 2
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+318 1
++2 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 2
+fi=(327)
+78 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 2
+fi=(327)
+78 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(252)
+659 1
+fi=(279)
+2029 1
+fi=(326)
+943 6
+fi=(327)
+314 15
+fi=(265)
+2457 3
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(265)
+2457 9
+fi=(327)
+79 6
+fi=(279)
+2029 3
+fi=(327)
+78 3
+fi=(279)
+2029 3
+fi=(327)
+318 3
++2 3
+fi=(265)
+2457 3
+fi=(279)
+2029 3
+fi=(265)
+2457 3
+fi=(327)
+78 3
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(279)
+2029 3
+fi=(265)
+2457 6
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(279)
+2029 6
+fi=(327)
+78 3
+fi=(265)
+2457 3
+fi=(279)
+2029 3
+fi=(265)
+2457 3
+fi=(327)
+78 3
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(279)
+2029 3
+fi=(265)
+2457 6
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(279)
+2029 6
+fi=(327)
+78 3
+fi=(265)
+2457 3
+fi=(279)
+2029 3
+fi=(265)
+2457 3
+fi=(327)
+78 3
+fi=(279)
+2029 3
+fi=(327)
+79 3
+fi=(265)
+2457 3
+fi=(279)
+2029 3
+fi=(252)
+659 3
+fi=(279)
+2029 11
+fi=(327)
+323 3
+fi=(333) /rust/deps/hashbrown-0.16.1/src/control/tag.rs
+48 7
+fi=(328)
+-48 1
+fi=(226)
+547 1
+fi=(331)
+1563 3
+fi=(367)
+50 2
+fi=(327)
+323 9
+fi=(333)
+48 21
+fi=(328)
+-48 3
+fi=(226)
+547 3
+fi=(331)
+1563 9
+fi=(367)
+50 6
+fi=(332)
+641 4
+fi=(328)
+2073 8
+fi=(232)
+1072 12
+fi=(229)
+1878 4
+fi=(279)
+434 4
+fe=(334)
+103 8
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+fi=(226)
+547 4
+fi=(245)
+2886 8
+fi=(252)
+1720 8
+fi=(264)
+180 5
+fi=(244)
+673 12
+cfn=(1044)
+calls=2 -14 
+* 543
+-61 2
+fi=(245)
+2997 4
+fi=(244)
+673 6
+cfn=(1044)
+calls=1 -14 
+* 106
+fi=(245)
+2997 2
+fe=(334)
+109 4
+fi=(244)
+632 2
+fi=(368)
+50 2
+fi=(279)
+434 1
+fi=(232)
+961 1
+fi=(355) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/sort/shared/smallsort.rs
+547 4
+fi=(229)
+1916 1
+fi=(355)
+547 1
+fi=(232)
+961 1
+fi=(355)
+547 2
+0 1
+547 2
+0 1
+fi=(226)
+547 1
+fi=(232)
+961 2
+fi=(355)
+599 3
+-52 2
+fi=(229)
+1916 1
+fi=(355)
+547 1
+fi=(226)
+* 2
+fi=(229)
+1916 1
+fi=(355)
+547 1
+0 1
+fi=(226)
+547 2
+fi=(355)
++19 2
+fi=(226)
+-19 4
+fi=(355)
++19 4
++6 4
+fi=(229)
+1916 2
+fi=(355)
+572 2
+0 2
+fe=(334)
+86 2
+fi=(236)
+-38 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408) litchi_ppt::writer::records::model::RecordHeader::write
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(334)
+0 1
+fi=(237)
+1184 4
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fe=(334)
+-48 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 451
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+1183 3
+fe=(334)
+
+fn=(2014) litchi_ppt::writer::persist::UserEditAtom::generate_record
+241 9
+fi=(258)
+636 1
+fe=(334)
+242 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+fi=(245)
+965 2
+fe=(334)
+247 1
+fi=(226)
+547 1
+fi=(245)
+2886 1
+fe=(334)
+251 1
+fi=(226)
+547 1
+fi=(245)
+2886 1
+fe=(334)
+253 1
+fi=(226)
+547 1
+fi=(245)
+2886 1
+fe=(334)
+254 1
+fi=(244)
+617 1
+765 3
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fe=(334)
+255 2
+fi=(245)
+0 1
+fi=(317)
+133 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(334)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fi=(237)
+1184 4
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 426
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+1183 3
+fe=(334)
+
+fl=(326)
+fn=(1476) core::hash::BuildHasher::hash_one
+694 42
+fi=(327)
+203 42
++1 42
++1 42
++1 21
+fi=(299) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/hash/random.rs
+84 189
+fi=(265)
+3928 63
+fi=(327)
+233 42
+cfn=(1478) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+calls=21 +23 
+* 588
++81 63
+-2 42
++4 42
+fi=(265)
+2457 42
+fi=(279)
+2029 21
+fi=(265)
+2457 21
+fi=(327)
+78 21
+fi=(279)
+2029 21
+fi=(327)
+79 21
+fi=(279)
+2029 21
+fi=(265)
+2457 42
+fi=(279)
+2029 21
+fi=(327)
+79 21
+fi=(279)
+2029 42
+fi=(327)
+78 21
+318 21
++2 21
+fi=(265)
+2457 42
+fi=(279)
+2029 21
+fi=(327)
+78 21
+fi=(279)
+2029 42
+fi=(327)
+79 21
+fi=(265)
+2457 21
+fi=(279)
+2029 21
+fi=(265)
+2457 21
+fi=(327)
+79 21
+fi=(279)
+2029 21
+fi=(327)
+78 21
+fi=(279)
+2029 21
+fi=(265)
+2457 42
+fi=(279)
+2029 21
+fi=(327)
+78 21
+fi=(279)
+2029 42
+fi=(327)
+79 21
+fi=(265)
+2457 21
+fi=(279)
+2029 21
+fi=(265)
+2457 21
+fi=(327)
+79 21
+fi=(279)
+2029 21
+fi=(327)
+78 21
+fi=(279)
+2029 21
+fi=(265)
+2457 42
+fi=(279)
+2029 21
+fi=(327)
+78 21
+fi=(279)
+2029 21
+fi=(327)
+79 21
+fi=(265)
+2457 21
+fi=(279)
+2029 84
+fi=(327)
+323 63
+fe=(326)
+702 42
+-8 9
+fi=(327)
+203 2
++1 2
++1 2
++1 1
+fi=(299)
+84 9
+fi=(265)
+3928 3
+fi=(327)
+233 2
+cfn=(1478)
+calls=1 +23 
+* 56
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(327)
+314 3
+-2 2
++4 2
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(279)
+2029 2
+fi=(327)
+78 1
+318 1
++2 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 2
+fi=(327)
+79 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+79 1
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 2
+fi=(327)
+79 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fi=(327)
+79 1
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fi=(327)
+78 1
+fi=(279)
+2029 1
+fi=(327)
+79 1
+fi=(265)
+2457 1
+fi=(279)
+2029 4
+fi=(327)
+323 3
+fe=(326)
+702 7
+
+fl=(322) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/mod.rs
+fn=(1462) <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+173 16
++19 10
+0 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(288) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/control_flow.rs
+0 2
+fe=(322)
+175 16
+-2 36
+fi=(252)
+1720 3
+fi=(264)
+180 3
+0 2
+fe=(322)
+192 2
+fi=(323)
+-73 2
+fi=(264)
++61 4
++5 4
+fi=(258)
+745 4
+fi=(323)
+120 4
+fi=(288)
++76 14
++2 2
+fi=(323)
+0 1
+fi=(288)
+195 1
+fe=(322)
+-20 24
+
+fl=(232)
+fn=(1846) core::slice::sort::shared::smallsort::insertion_sort_shift_left
+961 48
+fi=(355)
+599 96
+0 24
+547 48
+fi=(351)
+164 72
+fi=(229)
+1916 24
+fi=(355)
+547 24
++61 4
+fe=(232)
+
+fl=(276)
+fn=(1022)
+135 32
++8 32
++55 16
++22 16
+0 8
+236 16
++12 16
+fi=(378)
+564 8
+fe=(276)
+243 8
+0 8
+fi=(263)
+410 8
+89 16
+fe=(276)
++54 40
+cfi=(275)
+cfn=(1024)
+calls=16 1825 
+* 944
++8 32
+
+fl=(325) /rust/deps/hashbrown-0.16.1/src/map.rs
+fn=(1474) hashbrown::map::HashMap<K,V,S,A>::insert
+1841 10
+258 7
+cfi=(326)
+cfn=(1476)
+calls=1 694 
+* 161
+* 1
+fi=(328)
+956 1
+fi=(279)
+457 1
+fi=(328)
+1179 2
+fi=(333)
+48 9
+fi=(236)
+-48 4
+fi=(226)
+547 1
+fi=(331)
+1563 4
+fi=(367)
+50 2
+fi=(330) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/macros/mod.rs
+433 2
+fi=(279)
++1 1
+fi=(331)
+1563 1
+fi=(367)
+50 2
+fi=(332)
+641 1
+fi=(328)
+1793 2
+fi=(331)
+1563 2
+fi=(279)
+434 2
+fi=(328)
+2687 1
+fi=(279)
+457 2
+fi=(333)
+30 1
+fi=(265)
+2494 1
+fi=(328)
+2631 1
++3 1
++1 1
+2499 6
+fi=(232)
+1072 3
+fi=(226)
+1917 6
+fe=(325)
+-65 9
+0 1
+fi=(328)
+962 3
+cfn=(1488) hashbrown::raw::RawTable<T,A>::reserve_rehash
+calls=1 +37 
+* 165
+* 1
+fe=(325)
+1841 10
+258 3
+cfi=(326)
+cfn=(1476)
+calls=1 694 
+* 119
+* 1
+fi=(328)
+956 1
+fi=(279)
+457 1
+fi=(328)
+1179 2
+fi=(333)
+48 9
+fi=(328)
+-48 1
+fi=(226)
+547 1
+fi=(331)
+1563 3
+fi=(367)
+50 2
+fi=(330)
+433 1
+fi=(279)
++1 1
+fi=(331)
+1563 1
+fi=(367)
+50 2
+fi=(332)
+641 1
+fi=(328)
+1793 2
+fi=(331)
+1563 2
+fi=(279)
+434 2
+fi=(328)
+2687 1
+fi=(279)
+457 2
+fe=(325)
+1847 4
+fi=(333)
+30 1
+fi=(265)
+2494 1
+fi=(328)
+2631 1
++3 1
++1 1
+2499 6
+fi=(232)
+1072 3
+fi=(226)
+1917 9
+fe=(325)
+-68 1
++3 7
+0 1
+fi=(328)
+962 3
+cfn=(1488)
+calls=1 +37 
+* 165
+* 1
+fe=(325)
+1841 32
+258 16
+cfi=(326)
+cfn=(1476)
+calls=4 694 
+* 476
+fi=(328)
+956 4
+fi=(279)
+457 4
+fi=(328)
+1179 8
+fi=(333)
+48 36
+fi=(328)
+-48 4
+fi=(226)
+547 4
+fi=(331)
+1563 12
+fi=(367)
+50 8
+fi=(330)
+433 4
+fi=(279)
++1 4
+fi=(331)
+1563 4
+fi=(367)
+50 8
+fi=(332)
+641 4
+fi=(328)
+1793 8
+fi=(331)
+1563 8
+fi=(279)
+434 8
+fi=(328)
+2687 4
+fi=(279)
+457 8
+fi=(333)
+30 4
+fi=(265)
+2494 4
+fi=(328)
+2631 4
++3 4
++1 4
+2499 24
+fi=(232)
+1072 16
+fi=(226)
+1917 8
+fe=(325)
+0 4
+1852 24
+fi=(328)
+962 12
+cfn=(1488)
+calls=2 +37 
+* 1008
+* 4
+fe=(325)
+
+fn=(2258) hashbrown::map::HashMap<K,V,S,A>::get_mut
+1457 16
+0 32
+258 48
+cfi=(326)
+cfn=(1476)
+calls=8 694 
+* 952
+fi=(333)
+48 24
+fi=(328)
+2492 56
+0 8
+fi=(226)
+547 8
+fi=(331)
+1563 24
+fi=(367)
+50 16
+fi=(332)
+641 8
+fi=(328)
+2073 16
+fi=(232)
+1072 24
+fi=(229)
+1878 8
+fi=(279)
+434 8
+fi=(328)
+1261 48
+fe=(325)
+1466 8
+
+fn=(2276) hashbrown::map::HashMap<K,V,S,A>::get
+1309 8
+fi=(328)
+0 4
+fe=(325)
+1318 4
+
+fl=(253)
+fn=(1016)
+3344 128
+fi=(244)
+617 16
+fi=(245)
+1446 16
+fi=(265)
+2494 16
+fi=(244)
+765 16
+-94 16
+fi=(245)
+2881 32
+0 16
+fi=(232)
+961 16
+fi=(226)
+547 32
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=68 255 
+* 248
+fi=(245)
+2886 32
+fe=(253)
+3347 112
+
+fl=(385) /home/zhuhe/code/litchi/crates/litchi-cfb/src/writer/header.rs
+fn=(2434) litchi_cfb::writer::header::HeaderBuilder::new
+37 3
++1 2
++5 9
++11 3
+
+fn=(2442) litchi_cfb::writer::header::HeaderBuilder::set_fat_sectors
+82 8
+fi=(302)
+297 3
+fi=(229)
+1076 3
+fi=(244)
+765 1
+-42 1
+fe=(385)
+91 3
++1 1
++1 1
++1 8
+-94 4
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 234
+fi=(237)
+2173 2
++1 1
+fi=(226)
+547 4
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 15
+* 3
+fi=(244)
++85 3
+fe=(385)
+
+fn=(2454) litchi_cfb::writer::header::HeaderBuilder::generate
+97 5
++6 1
+fi=(244)
+765 1
+-42 1
+0 3
+798 6
+cfn=(1048)
+calls=1 542 
+* 284
+fi=(237)
+2173 2
++1 1
+fi=(229)
+1916 1
+fi=(246)
+772 2
+fi=(226)
+1917 3
+cob=(2)
+cfi=(220) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+cfn=(794) __memset_avx2_unaligned_erms
+calls=1 198 
+* 43
+* 1
+fi=(263)
+451 2
+0 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fi=(226)
++96 1
+fi=(263)
+-96 2
+fe=(385)
+117 4
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fi=(226)
++96 1
+fi=(263)
+-96 2
+fe=(385)
+124 1
+-7 1
++7 3
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fi=(226)
++96 1
+fi=(263)
+-96 2
+fe=(385)
+134 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fe=(385)
+137 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fe=(385)
+140 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fi=(226)
++96 1
+fi=(263)
+-96 2
+fe=(385)
+149 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fe=(385)
+152 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fe=(385)
+155 1
+fi=(226)
+547 1
+fi=(263)
+-96 2
+fe=(385)
+158 1
+fi=(226)
+547 1
+fi=(244)
++65 1
+fi=(245)
+1815 1
+fi=(232)
+961 2
+fi=(349) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/take.rs
+37 3
+fi=(252)
+1720 2
+fi=(264)
+180 1
+0 3
+fi=(265)
+923 1
+fe=(385)
+161 1
+fi=(226)
+547 1
+fi=(349)
+37 2
+fi=(264)
+-37 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(229)
+1916 1
+fi=(246)
+772 1
+fi=(263)
+451 30
+0 1
+fi=(226)
+547 3
+fi=(246)
+772 2
+fi=(226)
+547 36
+fi=(246)
+772 24
+0 1
+fi=(263)
+451 2
+0 1
+451 12
+fi=(226)
++96 8
+fi=(229)
+1916 4
+fi=(246)
+772 4
+fe=(385)
+172 4
++1 6
+
+fl=(312) /home/zhuhe/code/litchi/crates/litchi-ppt/src/font/validation.rs
+fn=(1312) litchi_ppt::font::validation::validate_collection
+87 16
++1 2
+-83 4
++84 4
+fi=(252)
+1720 2
+fi=(264)
+180 2
+0 20
+fe=(312)
+95 2
+cfn=(1318) litchi_ppt::font::validation::validate_font
+calls=2 +45 
+* 280
+fi=(237)
+2173 4
+fe=(312)
+96 6
+-96 2
+fi=(245)
+1815 2
+fi=(252)
+-95 2
+fi=(264)
+180 2
+fi=(279)
+0 14
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(307) /home/zhuhe/code/litchi/crates/litchi-ppt/src/lib.rs
+0 2
+fe=(312)
+122 8
++5 4
++1 16
+
+fn=(1318)
+140 6
++1 6
+fi=(244)
+612 6
+fi=(232)
+961 15
+fi=(286)
+1504 36
+fi=(252)
+1720 18
+fi=(264)
+180 18
+fi=(285)
+37 15
++1 30
+-38 30
+fi=(251) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs
+232 15
+2646 15
+fe=(312)
+147 6
+0 15
+147 15
+fi=(251)
+2469 15
+fi=(252)
+1720 18
+fi=(264)
+180 18
+fi=(285)
+37 15
++1 30
+fe=(312)
+152 12
++1 15
++1 15
++1 15
++1 12
++6 3
++1 6
+
+fl=(356) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/compiler-builtins/compiler-builtins/src/macros.rs
+fn=(1858) round
+478 32
+fi=(359) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/f64.rs
+1228 32
+fi=(338)
+105 16
+fi=(359)
+1181 16
+fi=(358) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/bit.rs
+611 32
+fi=(357) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/compiler-builtins/compiler-builtins/src/math/../../../libm/src/math/support/float_traits.rs
+138 16
+fi=(393) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/compiler-builtins/compiler-builtins/src/math/../../../libm/src/math/generic/trunc.rs
+17 32
+fi=(357)
+143 32
+fi=(393)
+21 16
+fi=(357)
+143 32
+fi=(393)
+21 16
+fi=(358)
++42 32
+fi=(229)
+1878 16
+fi=(393)
+31 16
+fi=(358)
+746 16
+fi=(359)
+1228 16
+fe=(356)
+481 16
+
+fl=(165)
+fn=(606) main
+cfi=(242) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+cfn=(850) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 162 
+0 236300
+
+fn=(574)
+cob=(2)
+cfi=(166) ./csu/../csu/libc-start.c
+cfn=(576) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 236300
+
+fn=(1082) __rustc::__rust_alloc
+0 20
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=6 3283 
+0 262
+
+fl=(369) /home/zhuhe/code/litchi/crates/litchi-cfb/src/writer/core.rs
+fn=(2054) litchi_cfb::writer::core::OleWriter::new
+364 5
+fi=(245)
+464 6
+fi=(346)
+59 2
+fi=(324)
+555 2
+fi=(265)
+2457 4
+fi=(250)
+902 1
+fe=(369)
+387 33
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 2
+fi=(226)
+547 2
+fi=(245)
+1025 1
++3 2
+0 1
+1029 1
+cfi=(244)
+cfn=(1240)
+calls=1 186 
+* 314
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+1917 11
+fi=(245)
+1034 3
+fe=(369)
+419 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 65
+-53 5
+
+fn=(2064) litchi_cfb::writer::core::OleWriter::create_stream_owned
+714 40
++29 16
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 21
+390 6
+fi=(252)
+1720 12
+fi=(264)
+180 6
+fe=(369)
+899 12
+fi=(264)
+384 6
+fi=(251)
+2469 6
+fi=(257) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs
+20 12
+fi=(251)
+2469 2
+fi=(257)
+154 1
+cob=(2)
+cfi=(370) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(2078) __memcmp_avx2_movbe
+calls=1 -81 
+* 22
+* 1
+fi=(251)
+2469 1
+fi=(245)
+464 8
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 309
+fi=(244)
+562 8
+0 4
+774 4
++1 4
+fi=(253)
+438 12
+fe=(369)
+2216 4
+fi=(244)
+765 4
+-42 4
+fi=(226)
+1917 12
+fe=(369)
+2221 16
+fi=(244)
+765 4
+-77 4
+0 6
+fi=(232)
+961 6
+fi=(226)
+1917 24
+fi=(245)
+1034 6
+fe=(369)
+753 3
+-33 24
+fi=(244)
+0 1
+fi=(232)
+961 2
+fi=(226)
+1917 8
+fi=(245)
+1034 2
+fe=(369)
+753 1
+-33 8
+0 4
+fi=(244)
+798 16
+cfn=(1060)
+calls=4 542 
+* 240
+fi=(237)
+2173 8
+fi=(244)
+0 1
+521 1
+fi=(229)
+1037 4
+fi=(244)
+527 5
+cfn=(1048)
+calls=1 +15 
+* 75
+fi=(237)
+2173 3
++1 4
+fi=(244)
+774 4
++1 4
+fe=(369)
+2218 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 46
+* 4
+fi=(245)
+1028 8
+fi=(237)
+2174 1
+fi=(244)
+774 1
++1 2
+fe=(369)
+
+fn=(2184) litchi_cfb::writer::core::OleWriter::effective_storages
+527 8
+fi=(394) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/collections/btree/set.rs
+345 2
+fi=(328)
+2210 1
+3851 2
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 5
+180 1
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(245)
+2997 8
+fi=(229)
+1916 4
+fi=(246)
+772 4
+fe=(369)
+539 5
++1 8
+
+fn=(2368) litchi_cfb::writer::core::sector_count
+2460 8
++72 2
+fi=(265)
+3658 7
++2 2
+fi=(302)
+297 3
+fe=(369)
+0 1
+2469 2
++5 2
++1 3
+
+fn=(2082) litchi_cfb::writer::core::OleWriter::write_to
+1631 10
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 7
+fi=(252)
+1720 8
+fi=(264)
+180 4
+fe=(369)
+0 16
+2532 8
+0 4
+2394 12
+543 3
+1662 2
+fi=(374) /home/zhuhe/code/litchi/crates/litchi-cfb/src/writer/fat.rs
+56 2
+fi=(371) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs
+-19 3
+fi=(374)
++24 6
+fi=(237)
+-61 6
+fe=(369)
+1662 4
++1 1
+fi=(372) /home/zhuhe/code/litchi/crates/litchi-cfb/src/writer/minifat.rs
+53 8
+fi=(245)
+464 6
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+25 1
+-25 2
+28 4
+fi=(258)
+745 3
+fi=(264)
+28 5
+-28 1
+fe=(369)
+1672 4
+fi=(341)
+53 1
+fe=(369)
+1672 4
+fi=(341)
+53 1
+fi=(264)
+284 5
+fi=(244)
+765 1
+-42 1
+fi=(264)
+0 9
+fi=(244)
+612 3
+fi=(232)
+961 6
+fi=(226)
+1917 6
+fi=(245)
+1034 6
+fi=(252)
+1720 3
+fi=(323)
+82 3
+fi=(252)
+1720 3
+fi=(264)
+180 3
+0 4
+fe=(369)
+1685 16
+fi=(245)
+1025 3
++3 8
+fi=(232)
+-67 2
+fi=(226)
+1917 2
+fi=(245)
+1034 2
+fi=(252)
+1720 1
+fi=(323)
+82 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(245)
+1851 1
+fi=(252)
+1720 2
+fi=(264)
+180 1
+0 14
+fe=(369)
+1701 3
+0 6
+fi=(252)
+1720 3
+fi=(264)
+180 3
+0 3
+fe=(369)
+1700 3
+fi=(245)
+1815 3
+fi=(263)
+272 6
+fi=(244)
+612 3
+fi=(263)
+272 6
+fe=(369)
+0 3
+115 12
+fi=(372)
+-40 6
++3 6
++6 9
+fe=(369)
+1701 9
+fi=(265)
+3658 24
++2 6
+3051 6
+fi=(279)
+457 3
+fi=(372)
+0 3
+fi=(245)
+2997 3
+fi=(265)
+769 6
+fi=(279)
+457 3
+0 6
+fi=(244)
+617 3
+fi=(265)
+2494 9
+fi=(244)
+765 12
+fi=(372)
+285 6
+0 6
+fi=(302)
+255 3
+fi=(245)
+2997 3
+fi=(372)
+170 12
+fi=(244)
+617 3
+-5 3
+fi=(265)
+2494 6
+fi=(244)
+765 3
+-42 3
+fi=(246)
+0 1
+772 4
+fi=(226)
+1917 2
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=1 198 
+* 15
+fi=(246)
+772 6
+fi=(226)
+1917 1
+fi=(395) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/set_len_on_drop.rs
+19 2
+fi=(245)
+-19 1
+fi=(246)
+862 7
+fi=(229)
+1076 2
+fi=(373) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/zip.rs
+306 4
+fi=(226)
+1917 2
+fi=(395)
+19 4
+fi=(245)
+-19 2
+fi=(246)
+862 14
+fi=(229)
+1076 4
+fi=(373)
+306 8
+0 3
+306 30
+fi=(263)
+-28 6
+fi=(372)
+-97 6
+fi=(263)
++97 3
+0 3
+278 12
+fi=(372)
+-97 20
++5 4
+fi=(373)
+310 4
+-4 8
+fi=(372)
+188 3
+fi=(265)
+3051 6
+fi=(279)
+457 3
+fi=(372)
+0 3
+fi=(265)
+769 6
+fi=(279)
+457 3
+fi=(265)
+769 3
+fi=(279)
+457 3
+fi=(245)
+3468 12
+0 3
+fi=(265)
+2494 3
+fi=(244)
+765 6
+612 3
+fi=(232)
+961 3
+fi=(229)
+1916 6
+fi=(246)
+772 6
+fi=(226)
+1917 6
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=3 198 
+* 43
+* 3
+fi=(246)
+772 12
+fi=(226)
+1917 3
+fi=(395)
+19 6
+fi=(245)
+-19 3
+fi=(263)
+381 6
+101 3
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=3 255 
+* 46
+* 3
+fi=(244)
+798 24
+cfn=(1048)
+calls=3 542 
+* 883
+fi=(237)
+2173 6
++1 3
+fi=(244)
+774 3
++1 3
+fi=(372)
+159 3
+fi=(265)
+769 3
+fi=(279)
+457 3
+fi=(244)
+798 15
+cfn=(1048)
+calls=3 542 
+* 241
+fi=(237)
+2173 6
++1 3
+fi=(244)
+774 3
++1 3
+fi=(232)
+961 3
+fi=(229)
+1916 3
+fi=(246)
+772 5
+fi=(229)
+0 1
+fi=(258)
+745 1
+fi=(245)
+1851 1
+fi=(244)
+612 1
+fi=(232)
+961 3
+fi=(252)
+1720 2
+fi=(264)
+180 1
+0 6
+fe=(369)
+1710 1
+fi=(252)
++10 2
+fi=(264)
+180 1
+fe=(369)
+1709 1
+fi=(245)
+1815 1
+fi=(263)
+272 2
+fi=(244)
+612 1
+fi=(263)
+272 2
+fe=(369)
+0 1
+1710 2
++3 3
+cfi=(374)
+cfn=(2116) litchi_cfb::writer::fat::FatBuilder::allocate_chain
+calls=1 92 
+* 396
+fi=(237)
+2173 1
+0 1
+2173 2
+fi=(244)
+0 2
+fe=(369)
+1718 1
+fi=(245)
+3022 1
+fe=(369)
+1718 1
+0 1
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 75
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 2
+-10 1
+-42 1
+0 2
+798 6
+cfn=(1048)
+calls=1 542 
+* 75
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 1
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+fe=(369)
+1721 1
++1 6
+cfn=(2140) litchi_cfb::writer::core::validate_stream_size
+calls=1 2388 
+* 16
+fi=(237)
+2173 2
+0 2
+fe=(369)
+1723 2
+cfi=(374)
+cfn=(2116)
+calls=1 92 
+* 246
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(369)
+1724 1
+fi=(265)
+3051 1
+fi=(279)
+457 1
+fe=(369)
+1724 1
+0 1
+1728 2
+cfi=(376) /home/zhuhe/code/litchi/crates/litchi-cfb/src/writer/directory.rs
+cfn=(2144) litchi_cfb::writer::directory::DirectoryBuilder::new
+calls=1 347 
+* 1602
+fi=(245)
+2997 1
+fe=(369)
+1731 4
+fi=(244)
+612 1
+fe=(369)
+1732 3
+fi=(376)
+366 2
+fe=(369)
+1732 1
+fi=(376)
+203 3
+fi=(245)
+1815 2
+fi=(244)
+0 1
+fi=(380) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs
+156 4
+fi=(244)
+612 1
+fe=(369)
+1735 2
+fi=(376)
+374 1
+fe=(369)
+1739 1
+fi=(376)
+392 1
+fe=(369)
+1740 1
+fi=(376)
+399 1
+0 1
+fi=(245)
+464 3
+fi=(328)
+1365 2
+fi=(244)
+383 4
+cfn=(2178)
+calls=1 717 
+* 9
+fi=(237)
+966 4
+0 3
+fi=(328)
+3851 2
+fi=(244)
+612 1
+fi=(245)
+1851 1
+0 2
+fe=(369)
+1755 2
+cfi=(368)
+cfn=(2180) core::slice::<impl [T]>::sort_unstable_by
+calls=1 34 
+* 3
+fi=(245)
+464 7
+fe=(369)
+1760 2
+cfn=(2184)
+calls=1 527 
+* 63
+fi=(328)
+1365 2
+fi=(244)
+383 4
+cfn=(2178)
+calls=1 717 
+* 9
+* 1
+fi=(237)
+966 5
+fi=(328)
+2479 1
+fi=(331)
+1320 1
+fi=(255)
+863 1
+fe=(369)
+1764 8
+fi=(245)
+0 1
+fi=(328)
+3851 2
+fi=(244)
+612 1
+fi=(245)
+1851 3
+fe=(369)
+-82 2
+cfi=(368)
+cfn=(2180)
+calls=1 34 
+* 3
++4 1
+fi=(252)
+-53 1
+fi=(260) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/into_iter.rs
+223 1
+0 1
+fi=(244)
+632 1
+fe=(369)
+1776 1
+fi=(252)
+-56 1
+fi=(260)
+223 1
+0 1
+fi=(244)
+632 1
+fi=(236)
+0 1
+fi=(328)
+2479 1
+2210 1
+fi=(331)
+1320 1
+fi=(255)
+863 1
+fe=(369)
+1779 5
+fi=(328)
+3851 2
+fi=(264)
+180 2
+fi=(244)
+612 2
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 11
+fi=(252)
+1720 6
+fi=(264)
+180 3
+fe=(369)
+1807 3
+fi=(263)
+272 12
+fe=(369)
+0 3
+fi=(244)
+612 3
+fi=(245)
+1815 3
+fe=(369)
+-4 12
+cfi=(376)
+cfn=(2198) litchi_cfb::writer::directory::DirectoryBuilder::add_stream_path
+calls=3 526 
+* 5717
+fi=(237)
+2173 3
+0 3
+2173 6
+fe=(369)
+0 3
+fi=(366) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs
+1002 12
+cfi=(325)
+cfn=(2276)
+calls=3 1309 
+* 12
+fe=(369)
+1812 6
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(369)
+2005 8
+fi=(381) /home/zhuhe/code/litchi/crates/litchi-cfb/src/file.rs
+0 10
+fi=(252)
+1720 2
+fi=(264)
+180 1
+fe=(369)
+1790 1
+fi=(263)
+272 4
+fe=(369)
+0 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(369)
+-21 4
+cfi=(376)
+cfn=(2198)
+calls=1 526 
+* 2505
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(369)
+0 1
+fi=(366)
+1002 4
+cfi=(325)
+cfn=(2276)
+calls=1 1309 
+* 4
+fe=(369)
+1795 2
+fi=(237)
+0 3
+fe=(369)
+1823 1
+cfi=(376)
+cfn=(2294) litchi_cfb::writer::directory::DirectoryBuilder::generate_directory_stream
+calls=1 624 
+* 14169
+fi=(237)
+2173 1
+0 3
+2173 2
+0 1
+fe=(369)
+1824 7
+cfn=(2140)
+calls=1 2388 
+* 16
+fi=(237)
+2173 2
+0 1
+fe=(369)
+1826 3
+cfn=(2368)
+calls=1 2460 
+* 30
+fi=(237)
+2173 1
+0 1
+2173 2
+0 2
+fe=(369)
+1827 2
+cfi=(374)
+cfn=(2116)
+calls=1 92 
+* 292
+fi=(237)
+2173 1
+0 1
+2173 2
+0 1
+fi=(245)
+3022 1
+fe=(369)
+1830 1
++3 4
+cfi=(372)
+cfn=(2372) litchi_cfb::writer::minifat::MiniFatBuilder::generate_minifat_sectors
+calls=1 218 
+* 639
+fi=(237)
+2173 1
+0 4
+2173 2
+fe=(369)
+1833 4
+fi=(302)
+297 3
+fi=(245)
+0 1
+fi=(265)
+3051 1
+fi=(279)
+457 1
+fe=(369)
+1841 2
+0 2
+1844 2
+cfi=(374)
+cfn=(2116)
+calls=1 92 
+* 680
+fi=(237)
+2173 1
+0 2
+2173 2
+fe=(369)
+1848 2
++1 2
+cfn=(2386) litchi_cfb::writer::core::allocation_table_sector_counts
+calls=1 2477 
+* 80
+fi=(237)
+2173 1
+0 4
+2173 2
+0 1
+fe=(369)
+1849 3
++3 2
++5 2
+0 3
+1858 2
+cfi=(374)
+cfn=(2392) litchi_cfb::writer::fat::FatBuilder::allocate_special
+calls=1 181 
+* 213
+fi=(237)
+2173 1
+0 2
+2173 2
+0 2
+fe=(369)
+1862 1
+cfi=(374)
+cfn=(2408) litchi_cfb::writer::fat::FatBuilder::finalize_range_lock
+calls=1 265 
+* 8
+fi=(237)
+2173 2
+fe=(369)
+1863 5
+cfn=(2410) litchi_cfb::writer::core::validate_output_size
+calls=1 2439 
+* 20
+fi=(237)
+2173 2
+0 2
+fe=(369)
+1866 1
+cfi=(374)
+cfn=(2412) litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors
+calls=1 368 
+* 647
+fi=(237)
+2173 1
+0 4
+2173 2
+fe=(369)
+1866 5
++1 2
+fi=(302)
+297 3
+fi=(244)
+0 1
+fe=(369)
+1868 1
++2 2
++7 6
+cfi=(374)
+cfn=(2428) litchi_cfb::writer::fat::FatBuilder::validate
+calls=1 411 
+* 207
+fi=(237)
+2173 2
+0 1
+fe=(369)
+1880 2
+cfi=(385)
+cfn=(2434)
+calls=1 37 
+* 17
+fi=(237)
+2173 1
+0 6
+2173 3
++1 2
+fe=(369)
+1880 7
+fi=(385)
+58 2
++12 4
+-7 2
++1 5
+fe=(369)
+1886 1
+cfi=(374)
+cfn=(2436) litchi_cfb::writer::fat::FatBuilder::allocation_sector_ids
+calls=1 296 
+* 267
+fi=(237)
+2173 1
+0 5
+2173 2
+fe=(369)
+1888 2
+fi=(258)
+0 5
+fe=(369)
+1888 8
++20 2
+cfi=(385)
+cfn=(2442)
+calls=1 82 
+* 301
+fi=(237)
+2173 2
+fe=(369)
+1911 2
+fi=(385)
+0 2
+fe=(369)
+1915 1
+cfi=(385)
+cfn=(2454)
+calls=1 97 
+* 574
+fi=(237)
+2173 1
+0 5
+2173 2
+0 3
+fe=(369)
+1922 1
+cfi=(386) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/cursor.rs
+cfn=(2470) <std::io::cursor::Cursor<alloc::vec::Vec<u8,A>> as std::io::Write>::write_all
+calls=1 674 
+* 366
++3 5
++37 2
+-37 2
+fi=(245)
+1815 2
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 7
+fi=(252)
+1720 2
+fi=(264)
+180 1
+0 1
+fe=(369)
+1936 3
+0 1
+1939 1
+fi=(263)
+272 4
+fe=(369)
+0 1
+115 7
+1941 7
+cfn=(2476) litchi_cfb::writer::core::write_chain_aligned
+calls=1 2546 
+* 1334
+fi=(237)
+2173 2
+fi=(381)
+0 1
+fe=(369)
+1945 3
++1 3
++1 8
+cfn=(2476)
+calls=1 2546 
+* 200
+fi=(237)
+2173 2
+0 1
+fe=(369)
+1957 10
+cfn=(2476)
+calls=1 2546 
+* 296
+fi=(237)
+2173 2
+fe=(369)
+1966 2
+0 4
+1979 1
+cfi=(374)
+cfn=(2436)
+calls=1 296 
+* 140
+fi=(237)
+2173 1
+0 5
+2173 2
+fi=(244)
+612 4
+fe=(369)
+1980 5
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(226)
+1717 1
+fe=(369)
+1982 3
+cfn=(2492) litchi_cfb::writer::core::sector_offset
+calls=1 2519 
+* 16
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(369)
+0 4
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(369)
+1984 3
+cfi=(386)
+cfn=(2470)
+calls=1 674 
+* 113
+* 2
+fi=(237)
+0 4
+fe=(369)
+1968 1
+cfi=(374)
+cfn=(2436)
+calls=1 296 
+* 226
+fi=(237)
+2173 1
+0 5
+2173 2
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(369)
+1969 4
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(226)
+1717 1
+fe=(369)
+1972 3
+cfn=(2492)
+calls=1 2519 
+* 16
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(369)
+0 4
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(369)
+1974 3
+cfi=(386)
+cfn=(2470)
+calls=1 674 
+* 113
+* 2
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(369)
+1988 2
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+-48 2
+fe=(369)
+2001 8
++3 2
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fe=(369)
+2005 1
+cfi=(226)
+cfn=(2496)
+calls=1 805 
+* 18
+* 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(369)
+2005 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fe=(369)
+2005 1
+cfi=(226)
+cfn=(2496)
+calls=1 805 
+* 96
+* 2
+cfi=(226)
+cfn=(2496)
+calls=1 805 
+* 96
+* 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 3
+fe=(369)
+2005 1
+cfi=(226)
+cfn=(2502)
+calls=1 805 
+* 28
+0 1
+2005 1
+cfi=(226)
+cfn=(2508)
+calls=1 805 
+* 680
+* 1
+fi=(244)
+632 1
+fe=(369)
+2005 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fe=(369)
+2005 1
+cfi=(226)
+cfn=(2524)
+calls=1 805 
+* 77
+* 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+fe=(369)
+
+fn=(2492)
+2519 8
++13 4
+-11 4
+fi=(302)
+82 2
+fe=(369)
+2526 2
+fi=(265)
+3051 2
+fi=(258)
+1368 4
+fe=(369)
+2529 6
+
+fn=(2140)
+2388 12
+2532 4
+2394 4
++5 4
+0 2
+2405 6
+
+fn=(2386)
+2477 5
++55 2
+-53 2
+fi=(265)
+927 9
+fe=(369)
+0 3
+fi=(229)
+1916 1
+fi=(246)
+772 1
+fi=(229)
+1916 1
+fi=(246)
+772 1
+fe=(369)
+0 4
+fi=(265)
+769 4
+fi=(279)
+457 2
+fi=(265)
+769 2
+fi=(279)
+457 2
+fe=(369)
+2501 4
+fi=(265)
+3658 6
++2 4
+2345 6
+3659 4
++1 4
+fe=(369)
+2508 6
++1 3
++8 4
+
+fn=(2410)
+2439 4
++93 2
+-89 2
++9 2
+0 4
+2452 2
++5 1
++1 3
+
+fn=(2476)
+2546 24
++7 6
+0 12
+2532 6
+0 27
+fi=(386)
+546 9
+0 9
+fe=(369)
+2559 12
+0 9
+fi=(302)
+255 14
+fi=(263)
+-36 28
+fe=(369)
+2571 14
++3 28
+fi=(229)
+1076 28
+fe=(369)
+2574 14
++1 28
++8 22
+fi=(265)
+769 55
+fi=(279)
+457 22
+0 3
+fe=(369)
+2532 6
+-11 6
+fi=(302)
+82 3
+fe=(369)
+2526 3
+fi=(265)
+3051 3
+fi=(386)
+0 3
+fi=(265)
+923 15
+0 3
+fe=(369)
+2608 6
+0 6
+fi=(265)
+2301 15
+fi=(244)
+617 3
+fi=(245)
+2997 3
+fi=(386)
+479 6
++5 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(386)
+487 6
+fi=(245)
+0 3
+fe=(369)
+2576 9
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 203
+* 1
+fi=(245)
+2997 1
+fi=(386)
+487 3
+0 1
+539 1
+0 1
+fe=(369)
+2597 1
+fi=(232)
+961 1
+fi=(226)
+638 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 509
+fi=(386)
+-99 2
+0 2
+fe=(369)
+2597 2
+fi=(232)
+961 2
+fi=(226)
+638 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 119
+* 3
+fi=(386)
+-98 9
+fi=(245)
+2168 6
+fi=(386)
+546 3
+fe=(369)
+2614 24
++1 6
++2 9
+fi=(265)
+923 3
+2301 15
+fi=(244)
+617 3
+fi=(386)
+479 6
++5 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(386)
+487 6
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 203
+* 2
+fi=(245)
+2997 1
+fi=(386)
+487 3
+0 1
+539 1
+fi=(232)
+961 1
+fi=(226)
+638 4
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=1 198 
+* 50
+fi=(386)
+-99 2
+fi=(232)
+961 2
+fi=(226)
+638 8
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=2 198 
+* 69
+fi=(386)
+-98 6
+fi=(245)
+2168 6
+fi=(226)
+0 3
+fe=(369)
+2600 3
++1 27
+
+fl=(374)
+fn=(2412)
+368 7
++1 3
+fi=(265)
+3658 1
+0 1
+fe=(374)
+370 1
+fi=(265)
+3658 8
++2 3
+fi=(245)
+464 4
+fi=(244)
+765 1
+-42 1
+fi=(384) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter.rs
+0 4
+fi=(244)
+612 3
+0 2
+fi=(229)
+1076 3
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 284
+fi=(237)
+2173 2
++1 3
+fi=(246)
+772 1
+fi=(226)
+1917 4
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=1 198 
+* 50
+* 1
+fi=(246)
+772 1
+0 3
+fi=(226)
+1917 1
+fi=(232)
+961 2
+0 1
+fi=(265)
+923 48
+fe=(374)
+380 16
+fi=(226)
+547 16
+fi=(252)
+1720 32
+fi=(264)
+180 16
+0 1
+fi=(245)
+1028 2
+fi=(232)
+-67 1
+fi=(226)
+1917 3
+fi=(245)
+1034 3
+fi=(384)
+1506 3
+fe=(374)
+388 5
++1 8
+0 2
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 75
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 2
+fi=(384)
+1506 2
+fe=(374)
+
+fn=(2436)
+296 24
++5 6
+0 3
+304 21
+0 3
+334 24
+0 3
+fi=(302)
+255 3
+fi=(245)
+464 12
+fi=(244)
+798 18
+cfn=(1048)
+calls=3 542 
+* 426
+fi=(237)
+2173 6
++1 3
+fi=(244)
+774 3
++1 9
+fe=(374)
+333 15
+-10 18
+0 6
+fi=(226)
+1917 3
+fi=(245)
+1034 6
+fe=(374)
+316 6
++7 9
+fi=(245)
+1028 6
+fe=(374)
+
+fn=(2122) litchi_cfb::writer::fat::FatBuilder::physical_end_after
+340 30
+fi=(265)
+769 5
+fi=(279)
+457 15
+fi=(258)
+662 10
+fi=(265)
+923 10
+fe=(374)
+457 10
++5 10
+357 30
+
+fn=(2392)
+181 10
++10 1
+fi=(258)
+2427 8
+fi=(237)
+0 2
+fe=(374)
+199 5
+cfn=(2122)
+calls=1 340 
+* 24
+* 1
+fi=(237)
+2173 1
+0 1
+2173 2
+0 1
+fi=(245)
+2997 1
+fe=(374)
+204 3
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-42 1
+fi=(226)
+1917 1
+fi=(395)
+19 1
+fi=(245)
+-19 6
+fi=(263)
+278 14
+fe=(374)
+-58 1
+fi=(265)
+769 1
+fi=(279)
+457 1
+fi=(265)
+769 2
+fe=(374)
+213 2
++14 2
++1 2
++1 8
+0 2
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 85
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 2
++1 3
+fi=(232)
+961 1
+fi=(229)
+1916 3
+fe=(374)
+
+fn=(2408)
+265 2
++1 2
+0 1
+289 3
+
+fn=(2116)
+92 32
++9 8
++4 4
+fi=(265)
+3658 40
++2 12
+fi=(302)
+297 12
+fi=(375) /home/zhuhe/code/litchi/crates/litchi-cfb/src/lib.rs
+0 4
+fe=(374)
+111 4
+fi=(258)
+2427 32
+fe=(374)
+0 4
+119 20
+cfn=(2122)
+calls=4 340 
+* 96
+* 4
+fi=(237)
+2173 4
+0 4
+2173 12
+0 8
+fi=(302)
+255 4
+fi=(245)
+2997 4
+fe=(374)
+124 12
+fi=(244)
+617 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-42 4
+fi=(229)
+0 2
+fi=(246)
+772 8
+fi=(226)
+1917 8
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=2 198 
+* 27
+* 4
+fi=(246)
+772 16
+0 2
+fi=(226)
+1917 2
+fi=(395)
+19 2
+fi=(245)
+-19 4
+fe=(374)
+133 2
+fi=(246)
+0 2
+fi=(226)
+1917 2
+fi=(395)
+19 2
+fi=(245)
+-19 4
+fe=(374)
+133 2
+0 24
+fi=(279)
+457 76
+0 4
+fi=(265)
+769 8
+fi=(279)
+457 4
+fi=(265)
+769 22
+fi=(279)
+457 11
+fe=(374)
+150 15
+fi=(263)
+278 30
+fe=(374)
+150 90
+-17 15
++25 8
++2 4
+0 4
+96 32
+-96 4
+fi=(244)
+798 24
+cfn=(1048)
+calls=4 542 
+* 764
+fi=(237)
+2173 8
++1 8
+fi=(244)
+774 8
++1 8
+fi=(232)
+961 4
+fi=(229)
+1916 10
+fe=(374)
+
+fn=(2428)
+411 4
+fi=(252)
+1720 1
+fi=(264)
+180 1
+0 3
+fi=(323)
+82 16
+fi=(252)
+1720 16
+fi=(264)
+180 16
+fe=(374)
+412 64
++1 16
++2 22
++4 22
++5 22
+0 1
+439 3
+
+fl=(368)
+fn=(2180)
+34 1
+fi=(279)
+434 1
+fi=(380)
+3193 1
+fe=(368)
+34 1
+fi=(279)
+434 1
+fi=(380)
+3193 1
+fe=(368)
+
+fl=(243) /home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/src/main.rs
+fn=(926) ppt_profile_probe::run
+cfn=(1216) ppt_profile_probe::run_write
+calls=0 431 
+407 236300
+
+fn=(1216)
+cfn=(1274) ppt_profile_probe::profile_write
+calls=1 417 
+436 236300
+
+fn=(852) ppt_profile_probe::main
+cfn=(926)
+calls=0 293 
+290 236300
+
+fn=(1274)
+417 10
+fi=(258)
+636 1
+fi=(306) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/core/model/validation.rs
+16 1
+-16 1
+fi=(258)
+745 1
+1229 1
++1 2
+745 2
+0 1
+fi=(306)
+76 3
+fi=(307)
+-76 3
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(232)
+961 4
+fi=(252)
+1720 2
+fi=(264)
+180 1
+0 9
+fi=(252)
+1720 2
+fi=(264)
+180 2
+0 2
+fi=(306)
+131 4
+fi=(245)
+1815 2
+fi=(252)
+-95 2
+fi=(264)
+180 2
+0 12
+fi=(252)
+1720 4
+fi=(323)
+82 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(306)
+-48 4
+fi=(258)
+745 8
+fi=(244)
+612 4
+fi=(245)
+1815 8
+fi=(306)
+136 28
+fi=(274) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/fmt.rs
+659 16
+cfn=(996) alloc::fmt::format::format_inner
+calls=4 -9 
+* 2805
+fi=(308) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+-45 12
+fi=(306)
+134 32
+cfn=(1288) litchi_ppt::writer::core::model::validation::<impl litchi_ppt::writer::core::model::Writer>::validate_font_references::{{closure}}
+calls=4 -43 
+* 724
+fi=(237)
+2173 12
+0 8
+fi=(244)
+632 4
+0 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+-48 2
+fi=(306)
+140 6
+fi=(245)
+2997 1
+fi=(302)
+297 3
+fi=(226)
+0 6
+fi=(309) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/flatten.rs
+423 6
+fi=(252)
+659 4
+fi=(251)
+2469 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+0 8
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 4
+fi=(252)
+659 4
+fi=(258)
++86 4
+fi=(310) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/filter_map.rs
+49 4
++1 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(310)
+50 4
+fi=(309)
+420 8
+fi=(251)
+2469 8
+fi=(252)
+659 4
+fi=(232)
+961 12
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(245)
+2997 12
+fi=(252)
+659 12
+fi=(251)
+2469 12
+fi=(245)
+3022 12
+fi=(251)
+2469 12
+fi=(252)
+1720 4
+fi=(264)
+180 8
+0 9
+fi=(258)
+745 2
+fi=(308)
+491 3
+fe=(243)
+-66 8
+fi=(226)
+0 1
+fi=(344)
+250 2
+cfi=(311) /home/zhuhe/code/litchi/crates/litchi-ppt/src/font/codec.rs
+cfn=(1310) litchi_ppt::font::codec::<impl litchi_ppt::font::model::FontCollection>::to_record_bytes
+calls=1 691 
+* 1911
+fi=(258)
+1165 10
+2223 2
+1367 2
+0 2
+636 3
+fi=(315) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/core/package.rs
+62 3
++6 2
+-68 1
+71 2
++1 2
+fi=(257)
+-52 2
+fi=(244)
+612 2
+fi=(257)
+154 4
+fi=(315)
+-81 1
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
+fi=(245)
+3022 1
+fi=(315)
+45 1
+fi=(320) /home/zhuhe/code/litchi/crates/litchi-ppt/src/font/model.rs
+582 12
+fi=(312)
+15 3
+-15 1
+16 5
+cfn=(1312)
+calls=1 +71 
+* 201
+fi=(237)
+2173 3
+fi=(312)
+18 4
+fi=(307)
+-18 1
+fi=(312)
+15 2
+fi=(251)
+2468 1
+0 1
+2469 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+0 8
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(251)
+2469 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(251)
+2468 2
+fi=(312)
+37 4
+-22 2
+fi=(251)
+2646 1
+0 1
+2647 2
+2468 1
+2646 1
+fi=(312)
+18 4
+-3 3
+fi=(265)
+3051 3
+769 2
+fi=(258)
+636 4
+fi=(312)
+58 2
+-58 7
+58 2
+-43 2
+fi=(258)
+745 1
+0 1
+745 5
+fi=(312)
+76 2
+-76 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+0 1
+fi=(245)
+965 3
+fi=(311)
+389 5
+0 2
+fi=(245)
+0 1
+fi=(311)
+392 2
++6 5
+fi=(237)
+967 5
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(264)
+331 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+332 1
+fi=(245)
+3022 1
+fi=(252)
+659 2
+fi=(258)
++86 3
+0 2
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(315)
+765 11
+fi=(321)
+18 4
+-18 2
+fi=(258)
+745 6
+0 5
+745 2
+0 5
+745 2
+0 4
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(322)
+158 1
+fi=(390)
+323 9
+fi=(282)
+24 1
+cfi=(322)
+cfn=(1462)
+calls=1 173 
+* 41
+* 3
++2 2
+fi=(236)
+-12 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 216
+fi=(244)
+468 2
+fi=(282)
+0 1
+fi=(226)
+1917 3
+fi=(282)
+36 3
++5 9
+fi=(226)
+1917 4
+fi=(245)
+3980 1
+2168 1
+3969 4
+cfi=(322)
+cfn=(1462)
+calls=1 173 
+* 24
+* 3
+cfi=(322)
+cfn=(1462)
+calls=1 173 
+* 41
+* 9
++2 2
+fi=(282)
+42 3
+fi=(322)
+161 4
+fi=(237)
+2173 3
+fi=(236)
+0 1
+fi=(237)
+2174 9
+fi=(315)
+767 13
++2 2
+fi=(252)
+1720 1
+fi=(264)
+25 1
+-25 8
+fi=(265)
+844 2
+fi=(264)
+284 4
+fi=(252)
+659 2
+fi=(264)
+279 2
+fi=(252)
+1720 2
+fi=(264)
+25 2
+279 2
++5 4
+fi=(265)
+2301 8
+fi=(264)
+284 12
+fi=(258)
+745 4
+1229 4
+fi=(315)
+263 2
+0 1
+769 3
+fi=(346)
+59 2
+fi=(324)
+555 2
+fi=(265)
+2457 1
+fi=(250)
+902 1
+fi=(334)
+44 6
++9 3
+fi=(366)
+1296 3
+cfi=(325)
+cfn=(1474)
+calls=1 1841 
+* 375
+fi=(334)
+52 1
++1 3
+fi=(258)
+745 4
+fi=(317)
+133 8
+fi=(245)
+2997 2
+fi=(315)
+783 1
+cfn=(1518) litchi_ppt::writer::core::package::wire_index
+calls=1 206 
+* 9
+fi=(237)
+2173 3
+0 1
+fi=(315)
+785 1
++1 1
+-2 3
+cfi=(316)
+cfn=(1522) litchi_ppt::writer::records::codec::create_document_atom_with_font_embedding
+calls=1 229 
+* 1105
+fi=(237)
+2173 1
+0 2
+2173 4
++1 3
+fi=(315)
+792 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 157
+0 3
+794 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 571
+0 1
+fi=(244)
+612 1
+fi=(232)
+961 3
+fi=(336) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_from_iter.rs
+33 1
+cfi=(282)
+cfn=(1350) <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+calls=1 +17 
+* 78
+-33 1
+fi=(315)
+805 1
+fi=(245)
+3022 1
+fi=(315)
+805 1
+fi=(244)
+612 1
+fi=(245)
+1815 2
+fi=(337)
+20 2
+cfn=(1538)
+calls=1 +12 
+* 2975
+fi=(237)
+2173 1
+0 2
+2173 4
++1 1
+fi=(315)
+805 1
+fi=(236)
+0 2
+fi=(315)
+815 2
+cfi=(316)
+cfn=(1562) litchi_ppt::writer::records::codec::wrap_dgg_into_ppdrawing_group
+calls=1 308 
+* 901
+fi=(237)
+2173 1
+0 2
+2173 4
++1 3
+fi=(315)
+816 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 583
+fi=(238) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs
+317 3
+cfn=(1574) alloc::boxed::box_new_uninit
+calls=1 -70 
+* 39
+* 1
+0 1
+fi=(315)
+819 3
++1 1
+cfi=(316)
+cfn=(1576) litchi_ppt::writer::records::codec::create_slide_list_with_text_master
+calls=1 179 
+* 1992
+fi=(237)
+2173 1
+0 2
+2173 4
++1 3
+fi=(315)
+821 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 39
+fi=(244)
+612 2
+fi=(258)
+745 4
+fi=(315)
++79 8
+cfi=(340)
+cfn=(1588)
+calls=1 490 
+* 11545
+fi=(237)
+2173 3
++1 6
+fi=(315)
+829 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 57
++2 3
++3 3
+0 1
+fi=(245)
+2997 2
+fi=(244)
+433 3
+cfn=(1616)
+calls=1 +12 
+* 54
+0 1
+433 2
++1 1
+fi=(245)
+965 4
+2997 2
+fi=(244)
+433 3
+cfn=(1616)
+calls=1 +12 
+* 58
+0 1
+433 2
++1 1
+fi=(245)
+965 5
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 4
+fi=(315)
+0 4
+fi=(226)
+1917 4
+fi=(245)
+1034 4
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(334)
+52 2
++1 4
+fi=(245)
+1025 2
++3 4
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+fi=(315)
+844 6
+cfn=(1518)
+calls=2 206 
+* 18
+fi=(237)
+2173 6
++1 2
+fi=(245)
+1028 4
+fi=(244)
+0 1
+fi=(315)
+46 1
+cfi=(316)
+cfn=(1402) litchi_ppt::writer::records::codec::create_environment_minimal
+calls=1 331 
+* 11495
+fi=(237)
+2173 1
+0 3
+2173 2
+fi=(244)
+612 3
+fi=(315)
+849 1
+cfi=(316)
+cfn=(1620) litchi_ppt::writer::records::codec::create_slide_list_with_text_slides
+calls=1 404 
+* 3315
+fi=(237)
+2173 1
+0 1
+2173 3
++1 3
+fi=(315)
+45 1
+fi=(237)
+2174 2
+fi=(315)
+850 2
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 618
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 3
+fi=(315)
+854 1
+cfi=(321)
+cfn=(1632)
+calls=1 104 
+* 84
+fi=(237)
+2173 3
++1 3
+fi=(315)
+854 3
++1 1
+fi=(244)
+612 2
+fi=(315)
+855 2
+cfi=(343) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/chart.rs
+cfn=(1646) litchi_ppt::writer::chart::build_ex_obj_list
+calls=1 450 
+* 26
+fi=(237)
+2173 3
++1 5
+fi=(315)
+856 2
+0 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(315)
+862 3
+cfi=(340)
+cfn=(1648)
+calls=1 54 
+* 239
+fi=(237)
+2173 1
+0 4
+2173 4
++1 6
+fi=(315)
+862 3
++1 2
+0 1
+fi=(245)
+2997 1
+fi=(315)
+868 2
+fi=(236)
+0 1
+fi=(315)
+875 1
+cfi=(316)
+cfn=(1672) litchi_ppt::writer::records::codec::create_end_document
+calls=1 637 
+* 178
+fi=(237)
+2173 1
+0 2
+2173 4
++1 3
+fi=(315)
+876 1
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 40
+0 2
+879 1
+cfi=(317)
+cfn=(1610) litchi_ppt::writer::records::model::RecordBuilder::build
+calls=1 164 
+* 850
+fi=(237)
+2173 1
+0 2
+2173 4
++1 3
+fi=(347) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs
+56 1
+cfi=(245)
+cfn=(1676) alloc::vec::Vec<T,A>::append_elements
+calls=1 2877 
+* 373
+-56 1
+fi=(315)
+884 1
+cfi=(348) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/master_drawing.rs
+cfn=(1682) litchi_ppt::writer::master_drawing::build_master_ppdrawing
+calls=1 495 
+* 4206
+fi=(244)
+612 1
+fi=(245)
+1815 3
+fi=(315)
+885 1
+cfi=(316)
+cfn=(1718) litchi_ppt::writer::records::codec::create_main_master_container
+calls=1 43 
+* 45663
+fi=(237)
+2173 1
+0 1
+2173 3
++1 1
+fi=(315)
+885 3
++1 3
+fi=(245)
+1815 2
+fi=(315)
+889 1
+cfn=(1736) litchi_ppt::writer::core::package::stream_offset
+calls=1 213 
+* 9
+fi=(237)
+2173 3
++1 2
+fi=(366)
+1296 3
+cfi=(325)
+cfn=(1474)
+calls=1 1841 
+* 190
+fi=(244)
+612 1
+fi=(245)
+1815 3
+fi=(347)
+56 1
+cfi=(245)
+cfn=(1676)
+calls=1 2877 
+* 1000
+-56 1
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 5
+fi=(315)
+894 1
++1 4
+cfn=(1518)
+calls=1 206 
+* 9
+-1 1
++1 4
+cfn=(1518)
+calls=1 206 
+* 9
+fi=(237)
+2173 6
++1 2
+fi=(315)
+895 2
+fi=(245)
+2997 4
+fi=(315)
+900 42
+cfi=(317)
+cfn=(1740) litchi_ppt::writer::records::model::InPlaceRecord::write
+calls=2 212 
+* 91724
+fi=(237)
+2173 4
+fi=(315)
+0 2
+fi=(264)
+180 2
+fi=(252)
+1720 2
+fi=(264)
+180 2
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+fi=(315)
+1003 2
+fi=(236)
+0 1
+fi=(315)
+1021 1
+fi=(245)
+3022 1
+fi=(315)
+1021 1
+fi=(237)
+0 1
+fi=(315)
+1021 1
+fi=(245)
+1815 2
+fi=(315)
+1042 1
+cfn=(1736)
+calls=1 213 
+* 9
+fi=(237)
+2173 3
++1 3
+fi=(315)
+1043 1
+cfi=(334)
+cfn=(1978)
+calls=1 115 
+* 2394
+fi=(244)
+612 1
+fi=(245)
+1815 3
+fi=(347)
+56 1
+cfi=(245)
+cfn=(1676)
+calls=1 2877 
+* 37
+fi=(315)
+1056 1
+fi=(265)
+2345 3
+fi=(334)
+211 7
+fi=(245)
+1815 2
+fi=(315)
+1063 1
+cfn=(1736)
+calls=1 213 
+* 9
+fi=(237)
+2173 3
++1 3
+fi=(315)
+1064 1
+cfi=(334)
+cfn=(2014)
+calls=1 241 
+* 920
+fi=(244)
+612 1
+fi=(245)
+1815 3
+fi=(347)
+56 1
+cfi=(245)
+cfn=(1676)
+calls=1 2877 
+* 38
+-56 1
+fi=(315)
+1071 2
+cfn=(2024) litchi_ppt::writer::core::package::build_current_user_stream
+calls=1 88 
+* 52
+0 1
+1072 1
+cfn=(2030) litchi_ppt::writer::core::package::build_summary_information_stream
+calls=1 129 
+* 2215
+0 1
+1073 1
+cfn=(2042) litchi_ppt::writer::core::package::build_document_summary_information_stream
+calls=1 162 
+* 1122
+0 4
+1091 1
+cfi=(369)
+cfn=(2054)
+calls=1 364 
+* 499
+fi=(369)
+607 2
+fi=(244)
++5 1
+fi=(369)
+-4 2
++1 1
+0 2
+fi=(315)
+1096 9
+cfi=(369)
+cfn=(2064)
+calls=1 714 
+* 273
+fi=(237)
+2173 2
+0 3
+fi=(315)
+1097 8
+cfi=(369)
+cfn=(2064)
+calls=1 714 
+* 200
+fi=(237)
+2173 2
+0 3
+fi=(315)
+1098 8
+cfi=(369)
+cfn=(2064)
+calls=1 714 
+* 424
+fi=(237)
+2173 2
+0 1
+fi=(315)
+1099 7
+cfi=(369)
+cfn=(2064)
+calls=1 714 
+* 218
+fi=(237)
+2173 2
+0 2
+fi=(315)
+1102 3
+fi=(237)
+0 6
+fi=(315)
+1106 1
+cfi=(369)
+cfn=(2082)
+calls=1 1631 
+* 35899
+fi=(237)
+2173 2
+0 1
+fi=(315)
+1108 2
++1 1
+cfi=(226)
+cfn=(2528)
+calls=1 805 
+* 1471
+0 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 154
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 129
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fi=(315)
+1109 3
+cfi=(328)
+cfn=(2546) core::ptr::drop_in_place<litchi_ppt::persist::mapping::PersistMapping>
+calls=1 2312 
+* 3
+* 1
+fi=(244)
+632 1
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+0 1
+fi=(244)
+632 1
+fi=(236)
+0 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 181
+-48 1
+fi=(244)
+632 1
+fi=(315)
+1109 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+* 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(315)
+1109 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+fi=(315)
+1109 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 129
+fi=(315)
+1109 3
+cfi=(328)
+cfn=(2546)
+calls=1 2312 
+* 42
+* 2
+cfi=(226)
+cfn=(2554)
+calls=1 805 
+* 71
+* 1
+fi=(226)
+805 3
+fi=(236)
+0 1
+fi=(315)
+1109 1
+cfi=(226)
+cfn=(2558)
+calls=1 805 
+* 209
+* 3
+fe=(243)
+
+fl=(345)
+fn=(1666)
+1930 8
++3 3
+fi=(250)
+901 4
++1 1
+fi=(258)
+2766 2
+fe=(345)
+1935 1
++5 8
+
+fl=(316)
+fn=(1576)
+179 8
+fi=(317)
+-46 7
+fe=(316)
++49 2
+fi=(317)
+-49 7
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 123
+fi=(244)
+468 2
+fe=(316)
+0 1
+fi=(226)
+547 5
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 280
+0 1
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 5
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 305
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+765 2
+-94 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 3
+fi=(317)
+168 4
+fi=(244)
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 467
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(237)
+2173 3
+fe=(316)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 238
+fi=(245)
+2997 2
+fe=(316)
+
+fn=(1594)
+489 20
+fi=(317)
+133 22
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(226)
+547 5
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 309
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+0 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+0 1
+612 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 426
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+506 2
+fi=(317)
+133 15
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 335
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 288
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+0 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 250
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+* 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 1
+fe=(316)
+-48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+0 33
+0 1
+519 2
+0 1
+fi=(317)
+133 14
+fi=(396) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/env_data.rs
+245 1
++2 1
+-1 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 3
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+0 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 22
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 203
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 3
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 282
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+538 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 374
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 3
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 8
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(237)
+0 4
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 4
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fe=(316)
+578 2
+fi=(317)
+0 1
+fe=(316)
+581 2
+0 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 285
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+0 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fe=(316)
+0 1
+fi=(245)
+2886 3
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 3
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fe=(316)
+593 3
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 157
+0 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+594 2
+0 2
+598 1
+cfi=(317)
+cfn=(1610)
+calls=1 164 
+* 791
+fi=(237)
+2173 1
+0 1
+2173 3
++1 2
+fe=(316)
+598 2
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 536
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fe=(316)
+600 1
+cfi=(317)
+cfn=(1610)
+calls=1 164 
+* 699
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+-31 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+-31 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+-31 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+-31 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 238
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(307)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 366
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(307)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+fi=(307)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 426
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 366
+-61 2
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 203
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(237)
+2173 3
+fi=(244)
+0 3
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 18
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+fi=(236)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 474
+-61 2
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+-61 2
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 3
+fi=(226)
+547 1
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(237)
+2173 3
+0 1
+2173 1
+fe=(316)
+
+fn=(1620)
+404 9
+fi=(317)
+133 7
+fi=(232)
+961 7
+fi=(252)
+1720 6
+0 2
+fe=(316)
+407 4
+fi=(317)
+133 14
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 4
+fi=(226)
+547 8
+fi=(244)
+673 12
+cfn=(1044)
+calls=2 -14 
+* 220
+-61 2
+fi=(245)
+2997 2
+fi=(226)
+547 8
+fi=(245)
+2886 4
+fi=(317)
+146 2
+fi=(245)
+464 6
+fi=(317)
+166 6
+cfn=(1408)
+calls=2 -64 
+* 396
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+fi=(245)
+2886 2
+fi=(244)
+617 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 4
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(245)
+2886 6
+fi=(317)
+156 6
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fi=(244)
+673 12
+cfn=(1044)
+calls=2 -14 
+* 757
+fi=(245)
+2997 2
+fi=(317)
+168 4
+fi=(244)
+612 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+* 2
+fi=(237)
+2173 4
+fi=(244)
+673 12
+cfn=(1044)
+calls=2 -14 
+* 584
+-61 2
+fi=(245)
+2997 6
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+0 1
+fi=(232)
+961 2
+fi=(226)
+547 4
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 3
+fi=(317)
+168 4
+fi=(244)
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 582
+fi=(245)
+2997 2
+fe=(316)
+
+fn=(1672)
+637 3
+fi=(317)
+133 8
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
++2 4
+fe=(316)
+640 3
+
+fn=(1562)
+308 7
+fi=(317)
+133 7
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+168 4
+fi=(244)
+632 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+-48 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+2881 1
+fe=(316)
+
+fn=(1718)
+43 10
+fi=(317)
++90 14
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 123
+fi=(244)
+468 2
+fe=(316)
+0 1
+fi=(226)
+547 6
+fi=(244)
+673 6
+cfn=(1044)
+calls=1 -14 
+* 244
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 5
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 282
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 3
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(252)
+1720 24
+fi=(264)
+180 12
+fi=(317)
+-47 96
+fi=(397) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/spec.rs
++9 24
++4 24
+fi=(244)
+673 72
+cfn=(1044)
+calls=12 -14 
+* 1320
+-61 12
+fi=(245)
+2997 24
+fi=(226)
+547 36
+fi=(245)
+2886 24
+fi=(317)
+146 12
+fi=(245)
+464 36
+fi=(317)
+166 36
+cfn=(1408)
+calls=12 -64 
+* 3390
+fi=(244)
+617 12
+fi=(245)
+1446 12
+fi=(265)
+2494 24
+fi=(244)
+765 12
+-94 12
+fi=(245)
+2886 12
+fi=(244)
+617 12
+fi=(265)
+2494 12
+fi=(244)
+765 12
+-94 12
+0 12
+fi=(232)
+961 12
+fi=(226)
+547 36
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=12 255 
+* 144
+fi=(245)
+2886 24
+fi=(317)
+156 24
+fi=(244)
+632 12
+fi=(236)
+48 24
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=12 3319 
+* 396
+-48 12
+fi=(244)
+632 12
+fi=(236)
+48 24
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=12 3319 
+* 396
+* 12
+fi=(244)
+673 72
+cfn=(1044)
+calls=12 -14 
+* 4818
+fi=(245)
+2997 12
+fi=(317)
+168 24
+fi=(244)
+612 12
+fi=(232)
+961 12
+fi=(226)
+547 36
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=12 255 
+* 144
+fi=(237)
+2173 36
+fi=(244)
+673 24
+cfn=(1044)
+calls=4 -14 
+* 2267
+-61 8
+fi=(245)
+2997 8
+fi=(317)
+133 7
+fi=(319)
+634 8
+cfn=(1440)
+calls=1 -57 
+* 967
+fi=(244)
+-22 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 241
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fi=(317)
++85 7
+fi=(319)
+640 7
+cfn=(1440)
+calls=1 -63 
+* 2629
+fi=(244)
+-28 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 241
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(319)
+646 7
+cfn=(1440)
+calls=1 -69 
+* 2211
+fi=(244)
+-34 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 241
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(319)
+658 7
+cfn=(1440)
+calls=1 -81 
+* 2783
+fi=(244)
+-46 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 265
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(319)
+664 8
+cfn=(1440)
+calls=1 -87 
+* 841
+fi=(244)
+-52 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 265
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+121 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fi=(317)
++85 7
+fi=(319)
+670 7
+cfn=(1440)
+calls=1 -93 
+* 2408
+fi=(244)
+-58 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 265
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+132 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(319)
+676 7
+cfn=(1440)
+calls=1 -99 
+* 2840
+fi=(244)
+-64 1
+fi=(245)
+1815 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 265
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+143 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 125
+fi=(245)
+2886 2
+fi=(317)
+156 1
+-23 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 4
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+153 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fi=(317)
++85 22
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 227
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+162 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 250
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 4
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 288
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fe=(316)
+165 3
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 519
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fe=(316)
+166 1
+cfi=(317)
+cfn=(1610)
+calls=1 -2 
+* 712
+fi=(237)
+2173 1
+0 1
+2173 3
++1 2
+fe=(316)
+166 2
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 157
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fe=(316)
+167 1
+cfi=(317)
+cfn=(1610)
+calls=1 -3 
+* 710
+fi=(237)
+2173 1
+0 1
+2173 3
++1 2
+fe=(316)
+167 2
+cfi=(335)
+cfn=(1530)
+calls=1 40 
+* 39
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+168 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fe=(316)
+168 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fe=(316)
+170 1
+cfi=(317)
+cfn=(1610)
+calls=1 -6 
+* 936
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+-48 1
+fi=(244)
+632 1
+fe=(316)
+171 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 129
+fe=(316)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(236)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 473
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+fi=(237)
+2173 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 534
+-61 2
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 579
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 602
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 467
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+fi=(237)
+2173 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 574
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 624
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 206
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 426
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+* 1
+fi=(237)
+2173 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+* 1
+fi=(237)
+2173 2
+fi=(244)
+0 1
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(237)
+2173 3
+fe=(316)
+
+fn=(1402)
+331 8
+fi=(317)
+133 14
+fi=(236)
+-97 3
+cob=(2)
+cfi=(155)
+cfn=(802) calloc
+calls=1 3739 
+* 50
+fi=(244)
+468 2
+fe=(316)
+0 1
+338 5
++4 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 10
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 241
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fe=(316)
+345 3
+cfn=(1420) litchi_ppt::writer::records::codec::create_environment_with_font_collection
+calls=1 +8 
+* 9360
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+-48 3
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 470
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(237)
+2173 3
+fe=(316)
+
+fn=(1420)
+353 10
++3 5
+cfi=(318) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/records/validation.rs
+cfn=(1422) litchi_ppt::writer::records::validation::validate_complete_record
+calls=1 3 
+* 20
+fi=(237)
+2173 2
+fi=(317)
+133 22
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 192
+0 2
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 285
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 1
+fi=(226)
+0 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+-94 1
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(245)
+2886 2
+fi=(317)
+156 1
+-23 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 3
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 285
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(226)
+547 3
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 324
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(317)
+133 8
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 110
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 2
+fi=(226)
+547 3
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 288
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2886 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(317)
++85 7
+fi=(319)
+652 7
+cfn=(1440)
+calls=1 -75 
+* 1891
+fi=(244)
+-40 1
+fi=(245)
+1815 1
+fi=(244)
+765 2
+-94 1
+0 1
+fi=(245)
+2886 2
+fi=(317)
+146 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 314
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fe=(316)
+393 1
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+-94 1
+fi=(232)
+961 2
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 30
+fe=(316)
+0 1
+fi=(245)
+2886 2
+fi=(317)
+156 2
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+464 4
+fi=(317)
+166 2
+cfn=(1408)
+calls=1 -64 
+* 323
+* 1
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 65
+fi=(245)
+2886 2
+fi=(317)
+168 4
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 1
+fi=(244)
+632 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+396 8
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 15
+fi=(237)
+2173 3
+fi=(307)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 206
+-61 1
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 481
+-61 1
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(237)
+2173 3
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 247
+-61 1
+fi=(245)
+2997 2
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+* 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 573
+fi=(245)
+2997 1
+fi=(317)
+168 1
+fi=(244)
+612 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(237)
+2173 3
+fi=(236)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 489
+-61 1
+fi=(245)
+2997 1
+2881 1
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 573
+fi=(245)
+2997 1
+2881 1
+fe=(316)
+
+fn=(1522)
+229 11
+fi=(317)
+-96 7
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+fe=(316)
+0 1
+fi=(302)
+82 1
+fi=(360) /home/zhuhe/code/litchi/crates/litchi-core/src/unit.rs
+483 5
+fi=(226)
++64 1
+fi=(302)
+82 1
+fi=(360)
+483 3
+fi=(226)
++64 6
+1917 4
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 250
+fe=(316)
+0 1
+fi=(244)
+612 1
+fi=(245)
+2997 1
+fi=(226)
+547 6
+fi=(245)
+2886 2
+fi=(317)
+146 1
+fi=(245)
+464 4
+fi=(317)
+166 1
+cfn=(1408)
+calls=1 -64 
+* 155
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 12
+fi=(245)
+2886 2
+fi=(317)
+168 3
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fi=(244)
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(316)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 490
+fi=(245)
+2997 2
+fe=(316)
+
+fl=(376)
+fn=(2294)
+624 8
+fi=(245)
+2997 1
+464 3
+fi=(244)
+765 1
+-42 1
+fe=(376)
+-52 5
++1 8
+0 4
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 329
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 1
+612 2
+fi=(232)
+961 4
+0 2
+fi=(252)
+659 1
+fe=(376)
+-18 2
+cfn=(2298) litchi_cfb::writer::directory::DirectoryEntryBuilder::to_bytes
+calls=1 249 
+* 894
+fi=(232)
+0 4
+fi=(252)
+659 4
+fe=(376)
+-18 8
+cfn=(2298)
+calls=4 249 
+* 4375
+fi=(237)
+2173 10
+fi=(252)
+1720 10
+fi=(264)
+180 5
+fi=(245)
+464 2
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 215
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 5
+0 1
+fi=(226)
+1917 1
+fi=(245)
+1034 3
+fi=(252)
+1720 1
+fi=(323)
+82 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(252)
+1720 4
+fi=(323)
+82 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 5
+fe=(376)
+649 20
+fi=(302)
+297 3
+fi=(245)
+1028 2
+fe=(376)
+658 3
+fi=(252)
+1720 1
+fi=(260)
+223 1
+0 21
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 4
+fe=(376)
+669 3
+cfn=(2298)
+calls=1 249 
+* 894
+* 12
+cfn=(2298)
+calls=4 249 
+* 4375
+fi=(237)
+2173 10
++1 80
+fi=(244)
+617 5
+fi=(245)
+1446 5
+fi=(265)
+2494 5
+fi=(244)
+765 5
+-94 5
+fe=(376)
+0 5
+fi=(244)
+612 5
+fi=(226)
+-65 80
+fi=(245)
+2886 10
+fi=(252)
+1720 5
+fi=(264)
+180 6
+fi=(375)
+0 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(237)
+2173 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(237)
+2173 5
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+fi=(252)
+659 3
+fi=(325)
+258 2
+cfi=(326)
+cfn=(1476)
+calls=1 694 
+* 119
+fi=(333)
+48 7
+fi=(328)
+-48 1
+fi=(226)
+547 1
+fi=(331)
+1563 3
+fi=(367)
+50 2
+fi=(332)
+641 1
+fi=(328)
+2073 2
+fi=(232)
+1072 3
+fi=(229)
+1878 1
+fi=(279)
+434 1
+fi=(245)
+1815 1
+fe=(376)
+817 2
+0 2
+660 2
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 287
+fi=(237)
+2173 2
++1 3
+fi=(246)
+772 1
+fi=(226)
+1917 5
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=1 198 
+* 11
+* 2
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 198
+fi=(237)
+2173 2
++1 2
+fi=(229)
+1916 2
+fi=(246)
+772 1
+fi=(226)
+1917 1
+fe=(376)
+831 4
+fi=(232)
+961 6
+fe=(376)
+832 1
++2 2
+-2 3
++2 6
+94 8
+fi=(263)
+219 8
+fe=(376)
+95 8
+fi=(398) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/internal_macros.rs
+-67 4
+fe=(376)
++68 4
+834 4
+108 8
+fi=(252)
+1720 8
+fi=(264)
+180 4
+fi=(244)
+798 8
+cfn=(1048)
+calls=1 542 
+* 330
+fi=(237)
+2173 2
++1 2
+fi=(229)
+1916 1
+fi=(246)
+772 1
+fi=(226)
+1917 1
+fe=(376)
+841 5
+fi=(265)
+-72 1
+fi=(245)
+464 1
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 215
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 1
++1 1
+fe=(376)
++75 2
+0 1
+851 2
++1 2
+0 3
+851 6
++1 18
++2 4
++5 8
+0 12
+859 6
++2 15
+0 5
+fi=(377)
+1055 10
+-30 5
+fe=(376)
+861 10
+fi=(377)
+1055 10
+-30 5
+fi=(229)
+2011 20
+656 5
+fi=(377)
+1055 3
+-30 1
++30 2
+-30 1
+fi=(378)
+608 1
+fi=(229)
+1076 4
+1916 1
+fi=(246)
+772 1
+fi=(257)
+220 1
++55 1
+fi=(265)
+844 1
+fi=(288)
+116 2
+fi=(229)
+0 2
+fe=(376)
+862 16
+0 2
+859 4
+0 2
+873 1
++4 1
+-1 1
+0 2
+873 1
++2 2
+0 4
+873 2
++6 2
+0 22
+767 2
+0 1
+767 2
+0 6
+767 18
+-63 6
++3 16
++60 8
++2 2
++1 4
+0 4
+770 12
++1 3
+-67 1
++74 2
++2 7
+cfn=(2338) litchi_cfb::writer::directory::DirectoryBuilder::rotate_left
+calls=1 -69 
+* 41
+* 2
+-76 2
++3 4
+120 1
+790 1
+0 1
+782 2
+0 2
+782 1
++1 2
+0 1
+783 1
++1 3
++1 5
++1 5
+cfn=(2340) litchi_cfb::writer::directory::DirectoryBuilder::rotate_right
+calls=1 -50 
+* 35
+* 2
++22 28
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fe=(376)
+884 5
++1 7
+cfn=(2342) litchi_cfb::writer::directory::DirectoryBuilder::validate_child_tree
+calls=1 +3 
+* 633
+fi=(244)
+632 2
+fe=(376)
+886 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+* 1
+fe=(376)
+
+fn=(2212) litchi_cfb::writer::directory::directory_name_data
+963 56
++2 14
+cfi=(382) /home/zhuhe/code/litchi/crates/litchi-cfb/src/directory_name.rs
+cfn=(2214) litchi_cfb::directory_name::directory_name_data
+calls=14 168 
+* 10058
+fi=(237)
++1 42
++1 336
+2174 56
+fe=(376)
+965 224
++1 42
++1 42
+
+fn=(2198)
+526 44
++6 8
+0 4
+532 4
+fi=(380)
+282 4
+fi=(244)
+612 4
+fi=(245)
+1815 4
+fe=(376)
+549 16
+cfn=(2202) litchi_cfb::writer::directory::clone_string
+calls=4 969 
+* 979
+fi=(237)
+2173 4
+0 12
+2173 8
+0 12
+fe=(376)
+208 8
+cfn=(2212)
+calls=4 963 
+* 3230
+fi=(237)
+2173 12
++1 108
+fe=(376)
+208 76
+fi=(237)
+2173 12
+fe=(376)
+571 32
+fi=(237)
+2174 96
+fe=(376)
+548 88
++5 12
+cfn=(2242) litchi_cfb::writer::directory::DirectoryBuilder::ensure_unique_child
+calls=4 681 
+* 822
+fi=(237)
+2173 8
+fi=(245)
+2997 4
+fi=(302)
+297 12
+fi=(244)
+765 8
+-77 4
+fi=(366)
+1264 16
+cfi=(325)
+cfn=(2258)
+calls=4 1457 
+* 652
+fi=(258)
+1367 8
+0 4
+fi=(245)
+1513 4
+fi=(244)
+350 8
+cfn=(2268)
+calls=4 682 
+* 278
+fi=(237)
+966 12
+0 4
+fi=(245)
+992 8
+cfn=(2272) alloc::vec::Vec<T,A>::push_mut
+calls=4 +31 
+* 196
+fi=(366)
+1264 12
+cfi=(325)
+cfn=(2258)
+calls=4 1457 
+* 652
+fi=(258)
+1367 8
+fi=(245)
+1025 4
++3 8
+fi=(244)
+612 4
+fi=(226)
+1917 4
+fi=(245)
+1034 8
+fe=(376)
+570 8
++1 4
+fi=(244)
+-50 2
+fi=(229)
+1037 6
+fi=(244)
+527 14
+cfn=(1048)
+calls=2 +15 
+* 651
+fi=(237)
+2173 4
++1 2
+fi=(244)
+774 2
++1 4
+fe=(376)
+
+fn=(2242)
+681 36
+fi=(325)
+1309 8
+0 12
+258 12
+cfi=(326)
+cfn=(1476)
+calls=4 694 
+* 476
+fi=(333)
+48 12
+fi=(328)
+2492 28
+0 4
+fi=(226)
+547 4
+fi=(331)
+1563 12
+fi=(367)
+50 8
+fi=(332)
+641 4
+fi=(328)
+2073 8
+fi=(232)
+1072 12
+fi=(229)
+1878 4
+fi=(279)
+434 4
+fi=(251)
+2469 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 36
+fi=(251)
+0 6
+fi=(252)
+1720 6
+fi=(264)
+180 6
+fi=(251)
+2469 6
+fi=(263)
+272 24
+fi=(377)
+1055 12
+-30 6
+fi=(229)
+656 12
+fi=(377)
+1055 2
+-30 1
+fi=(378)
+608 1
+fi=(229)
+1076 4
+0 1
+1916 1
+fi=(246)
+772 1
+fi=(257)
+220 1
++55 1
+fi=(265)
+844 1
+fi=(288)
+116 2
+fe=(376)
+0 4
+701 32
+
+fn=(2342)
+888 10
+704 2
++3 5
+895 2
+0 2
+fi=(245)
+2978 1
+1028 2
+fi=(244)
+612 1
+fi=(226)
+1917 4
+fi=(245)
+1034 18
+0 2
+2791 2
+0 10
+2791 10
+0 5
+2795 10
+fi=(255)
+863 10
+fi=(226)
+1717 20
+fe=(376)
+904 5
+fi=(245)
+2795 8
+fi=(255)
+863 8
+fi=(226)
+1717 16
+fe=(376)
+904 4
++13 8
+94 8
++1 12
+fi=(263)
+219 8
+fe=(376)
+96 4
+917 4
+0 28
+91 28
++5 4
+917 4
+91 4
++10 4
+0 4
+fi=(263)
+278 4
+fe=(376)
+108 4
+923 8
+fi=(258)
+662 12
+fe=(376)
+925 10
+fi=(377)
+1055 4
+-30 2
++30 4
+-30 2
+fi=(229)
+656 4
+fe=(376)
+924 1
+fi=(377)
+1055 2
+-30 1
+fi=(378)
+608 3
+fi=(377)
+1055 2
+-30 1
+fi=(229)
++51 4
+0 1
+1916 1
+fi=(246)
+772 1
+fi=(257)
+220 1
++55 1
+fi=(265)
+844 1
+fi=(288)
+116 2
+fi=(229)
+0 2
+fe=(376)
+924 1
+fi=(258)
+662 8
+fe=(376)
+927 2
+fi=(377)
+1055 2
+-30 1
+fe=(376)
+-98 2
+fi=(377)
+1055 2
+-30 1
+fi=(229)
+656 2
+fe=(376)
+926 1
+120 8
+933 4
++10 3
+-1 6
+-8 3
+704 1
+935 3
+704 1
+0 2
+941 1
+fi=(226)
+1917 8
+fi=(245)
+1034 1
+-6 2
+fe=(376)
+0 3
+941 3
+fi=(226)
+1917 24
+fi=(245)
+1034 3
+-6 6
+fi=(244)
+612 4
+fi=(232)
+961 12
+fi=(226)
+1917 24
+fi=(245)
+1034 20
+fe=(376)
+905 20
+fi=(258)
+662 15
+fi=(252)
+1720 1
+fi=(264)
+25 1
+284 2
+0 5
+284 1
+0 5
+279 1
+fi=(265)
+85 15
+fi=(341)
+-32 1
+fi=(265)
+844 1
+fi=(264)
+284 2
+fi=(252)
+1720 1
+fi=(264)
+25 1
+284 2
+0 2
+284 1
+0 5
+279 1
+fi=(265)
+85 15
+fi=(341)
+-32 1
+fi=(265)
+844 1
+fi=(264)
+284 2
+fe=(376)
+945 2
++5 2
++1 8
+
+fn=(2340)
+736 4
++6 5
++1 2
+0 1
+743 3
++1 1
+-1 1
++2 1
++3 2
++1 2
+0 1
+749 1
++1 2
++1 1
+-1 1
+0 1
+757 1
++1 1
++1 4
+
+fn=(2144)
+347 10
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 200
+fi=(244)
+468 2
+0 3
+fi=(226)
+547 3
+fi=(399) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs
+1343 4
+fi=(377)
+835 4
+2177 1
+cfn=(2148)
+calls=1 +6 
+* 195
++1 13
+fi=(399)
+1343 5
+fi=(377)
+835 4
+2177 1
+cfn=(2148)
+calls=1 +6 
+* 195
++1 10
+fe=(376)
+179 10
+-12 16
+fi=(346)
+59 2
+fi=(324)
+555 2
+fi=(265)
+2457 1
+fi=(250)
+902 1
+fi=(366)
+363 6
+fi=(245)
+464 5
+fi=(366)
+1296 2
+cfi=(325)
+cfn=(1474)
+calls=1 1841 
+* 418
+fi=(346)
+59 2
+fi=(324)
+555 2
+fi=(265)
+2457 1
+fi=(250)
+902 1
+fi=(366)
+363 6
+fi=(245)
+464 6
+fi=(366)
+1296 2
+cfi=(325)
+cfn=(1474)
+calls=1 1841 
+* 373
+fi=(226)
+805 2
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(238)
+248 2
+fe=(376)
+354 5
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 -99 
+* 30
++1 6
++1 6
+-3 3
++5 8
+
+fn=(2202)
+969 28
+fi=(253)
+438 12
+fi=(244)
+765 4
+-77 4
+fi=(245)
+2886 4
+fe=(376)
+975 24
++1 32
+0 16
+fi=(229)
+1037 20
+fi=(244)
+527 16
+cfn=(1060)
+calls=4 +15 
+* 729
+fi=(237)
+2173 8
++1 4
+fi=(244)
+774 4
++1 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 46
+* 12
+fe=(376)
+
+fn=(2298)
+249 80
+fi=(244)
+612 10
+fi=(245)
+1815 20
+fe=(376)
+250 10
+cfn=(2212)
+calls=10 963 
+* 7640
+fi=(237)
+2173 20
++1 200
+fe=(376)
+250 200
+fi=(377)
+1055 20
+-30 10
+fe=(376)
+0 20
+fi=(377)
+1055 30
+-30 10
+fi=(257)
+20 20
+fi=(377)
+1055 10
+-30 20
+fi=(257)
+153 10
++1 10
+cob=(2)
+cfi=(370)
+cfn=(2078)
+calls=10 -81 
+* 178
+* 10
+fe=(376)
++97 10
+fi=(377)
+1055 30
+-30 10
++30 30
+-30 10
+fi=(257)
+20 20
+fi=(377)
+1055 10
+-30 40
++30 10
+-30 10
+fi=(257)
+153 10
++1 10
+cob=(2)
+cfi=(370)
+cfn=(2078)
+calls=10 -81 
+* 178
+* 10
+fe=(376)
++97 10
+0 10
+fi=(377)
+2242 10
+1055 10
+2242 10
+fe=(376)
+298 70
+-41 70
+fi=(377)
+1055 10
+-30 30
+fi=(252)
+1720 10
+fi=(264)
+180 10
+fe=(376)
+0 10
+260 30
+0 8
+260 76
+-2 12
+0 12
+fi=(323)
+82 6
+fi=(264)
++98 12
+fe=(376)
+0 10
+260 20
+0 10
+260 156
+-2 78
+fi=(252)
+659 78
+fe=(376)
+0 78
+fi=(252)
+1720 234
+fi=(264)
+180 78
+fi=(377)
+1055 10
+-30 10
+fe=(376)
+265 10
+fi=(302)
++32 20
+fi=(226)
+547 10
+fe=(376)
+271 20
++2 20
++3 10
+fi=(226)
+547 10
+fe=(376)
+278 10
+fi=(226)
+547 10
+fe=(376)
+282 24
++5 2
+fi=(226)
+547 2
+fe=(376)
+288 2
+fi=(226)
+547 2
+fe=(376)
+292 2
+fi=(226)
+547 2
+fe=(376)
+295 2
+fi=(226)
+547 2
+fe=(376)
+297 44
+-10 8
+fi=(226)
+547 8
+fe=(376)
+288 8
+fi=(226)
+547 8
+fe=(376)
+292 8
+fi=(226)
+547 8
+fe=(376)
+295 8
+fi=(226)
+547 8
+fe=(376)
+297 176
+
+fn=(2338)
+711 4
++6 5
++1 2
+0 1
+718 3
++1 1
+-1 1
++2 1
++3 2
++1 2
+0 1
+724 1
++1 2
++2 6
++1 1
+-1 1
+0 1
+732 1
++1 1
++1 4
+
+fl=(351)
+fn=(1824) litchi_ppt::writer::escher::codec::shapes::append_shape_container_children
+101 40
++7 4
++3 4
++3 8
++4 4
+fi=(350)
++82 4
+fi=(335)
+29 32
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 424
+fe=(351)
+108 12
++3 4
+-3 4
++6 12
+fi=(244)
+612 4
+fi=(245)
+2997 4
+fi=(226)
+547 8
+fi=(245)
+2886 8
+fi=(335)
+42 8
+fi=(279)
+457 4
+0 8
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 306
+* 4
+fi=(244)
+468 8
+0 8
+fi=(350)
+208 8
+fi=(391)
+343 12
+fi=(226)
+547 12
+fi=(232)
+961 8
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 52
+* 4
+fi=(244)
++70 4
+fi=(245)
+1446 4
+fi=(265)
+2494 4
+fi=(244)
+765 8
+-94 4
+0 4
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 44
+fi=(245)
+2886 8
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+-34 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 260
+fi=(244)
+468 8
+fi=(245)
+965 12
+fi=(353) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/properties.rs
+11 8
+fi=(264)
+-11 4
+fi=(245)
+1815 4
+fi=(252)
+-95 4
+fi=(264)
+180 4
+fi=(245)
+0 4
+fi=(353)
+26 8
+-26 4
+38 12
++32 8
+fi=(245)
+1028 8
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+1917 12
+fi=(245)
+1034 8
+-6 8
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+1917 8
+fi=(245)
+1034 4
++4 4
+-10 8
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+1917 16
+fi=(245)
+1034 8
+-6 8
+fi=(244)
+612 4
+fi=(232)
+961 4
+fi=(226)
+1917 16
+fi=(245)
+1034 8
+-6 8
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+1917 8
+fi=(245)
+1034 12
+fi=(353)
+65 8
+fi=(245)
+1028 8
+fi=(244)
+612 4
+fi=(232)
+961 4
+fi=(226)
+1917 16
+fi=(245)
+1034 8
+-6 8
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+1917 8
+fi=(245)
+1034 12
+fi=(353)
+119 8
+fi=(245)
+0 12
+fi=(265)
+3051 32
+fi=(279)
+457 8
+fi=(244)
++2 8
+0 4
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 600
+* 8
+fi=(244)
+468 8
+fi=(252)
+1720 4
+fi=(260)
+322 4
+0 12
+322 60
+0 4
+fi=(226)
+1717 8
+1917 12
+1717 8
+1917 12
+1717 8
+1917 12
+1717 8
+fi=(252)
+659 4
+fi=(226)
+1917 12
+fi=(395)
+19 4
+fi=(260)
+322 48
+0 4
+fi=(226)
+1717 8
+fi=(252)
+659 4
+fi=(226)
+1917 12
+fi=(260)
+322 16
+fi=(226)
+1717 16
+fi=(252)
+659 8
+fi=(226)
+1917 24
+fi=(260)
+322 32
+0 8
+fi=(244)
+632 4
+fi=(236)
+48 12
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+fi=(282)
++13 20
+fe=(351)
++65 12
+fi=(354) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/sort/stable/mod.rs
+-88 4
+fi=(279)
+434 4
+fi=(350)
+200 8
+fi=(335)
+29 28
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 24
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+-54 24
+fi=(265)
+2494 24
+fi=(244)
+765 24
+-94 24
+fe=(351)
+175 28
+fi=(226)
+547 112
+fi=(245)
+2886 56
+fi=(335)
+42 28
+fi=(252)
+1720 56
+fi=(264)
+180 32
+fi=(244)
+673 96
+cfn=(1044)
+calls=16 -14 
+* 4477
+-61 16
+fi=(245)
+2997 32
+fi=(237)
+0 12
+fi=(354)
+78 4
+fi=(279)
+434 4
+fi=(354)
+79 12
+cfi=(232)
+cfn=(1846)
+calls=4 961 
+* 340
+* 4
+fi=(252)
+1720 56
+fi=(264)
+180 28
+fe=(351)
+-2 84
+fi=(245)
+0 8
+fi=(279)
+457 4
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 120
+fi=(244)
+468 8
+0 8
+fi=(350)
+208 8
+fi=(391)
+343 12
+fi=(226)
+547 12
+fi=(245)
+2881 8
+fi=(232)
+961 8
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 48
+0 4
+fi=(244)
+617 4
+fi=(245)
+1446 4
+fi=(265)
+2494 4
+fi=(244)
+765 8
+0 4
+612 4
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 48
+fi=(245)
+2886 8
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+fe=(351)
+184 8
+fi=(335)
+29 32
+fe=(351)
+201 4
++1 8
++1 4
+fi=(302)
+82 4
+fi=(360)
+497 12
+fi=(359)
+1781 4
+cfi=(356)
+cfn=(1858)
+calls=4 478 
+* 96
+* 8
+fe=(351)
+204 4
+fi=(302)
+82 8
+fi=(360)
+497 8
+fi=(359)
+1781 4
+cfi=(356)
+cfn=(1858)
+calls=4 478 
+* 96
+* 8
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 620
+fi=(302)
+82 12
+fi=(360)
+497 12
+fi=(359)
+1781 4
+cfi=(356)
+cfn=(1858)
+calls=4 478 
+* 96
+fi=(360)
+497 20
+fi=(244)
+612 4
+fi=(245)
+2997 4
+fi=(226)
+547 4
+fi=(245)
+2886 8
+fi=(335)
+42 4
+fi=(302)
++40 8
+fi=(360)
+497 8
+fi=(359)
+1781 4
+cfi=(356)
+cfn=(1858)
+calls=4 478 
+* 96
+* 4
+fi=(244)
+617 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+fe=(351)
+0 20
+fi=(226)
+547 4
+fi=(245)
+2886 8
+fi=(335)
+42 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+0 20
+fi=(226)
+547 4
+fi=(245)
+2886 8
+fi=(335)
+42 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+0 20
+612 4
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+fi=(335)
+42 8
+fi=(279)
+457 4
+fi=(244)
+0 4
+fi=(280)
+95 12
+cfi=(165)
+cfn=(1082)
+calls=4 -95 
+* 282
+fi=(244)
+468 8
+0 8
+fi=(350)
+208 8
+fi=(391)
+343 12
+fi=(226)
+547 12
+fi=(232)
+961 8
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 52
+* 4
+fi=(244)
++70 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+0 8
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 44
+fi=(245)
+2886 8
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+-48 8
+fe=(351)
+213 8
++3 8
++2 4
+fi=(258)
+1164 8
+0 4
+fe=(351)
+218 84
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 8
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(258)
+1654 16
+fi=(264)
+180 12
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(258)
+1654 8
+fe=(351)
+298 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(351)
+298 36
+fi=(236)
+0 4
+fe=(351)
+255 12
+fi=(236)
+0 4
+fe=(351)
+259 8
++7 16
+fi=(236)
+0 4
+fe=(351)
+272 8
+fi=(245)
+2997 4
+fe=(351)
+273 8
+fi=(244)
+612 4
+fe=(351)
+276 4
+fi=(244)
+612 4
+fi=(245)
+1815 8
+fe=(351)
+274 4
+cfi=(361) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/escher/codec/text.rs
+cfn=(1872) litchi_ppt::writer::escher::codec::text::build_client_textbox_formatted_with_interactions
+calls=4 116 
+* 45787
+fi=(237)
+2173 4
+0 4
+2173 12
++1 4
+fi=(347)
+56 12
+cfi=(245)
+cfn=(1676)
+calls=4 2877 
+* 224
+-56 4
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+* 4
+fi=(244)
+-48 4
+fe=(351)
+298 4
+cfi=(226)
+cfn=(1924)
+calls=4 805 
+* 44
+* 4
+fi=(244)
+632 4
+fe=(351)
+298 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 274
+-48 4
+fe=(351)
+298 4
+cfi=(226)
+cfn=(1926)
+calls=4 805 
+* 360
+* 8
+fi=(244)
+632 4
+fe=(351)
+
+fl=(327)
+fn=(1478)
+256 22
++2 22
++4 66
+0 44
+278 22
++1 66
++3 44
+0 5
+fi=(226)
+547 1
+fe=(327)
+288 1
+fi=(265)
+2457 1
+fi=(279)
+2029 1
+fi=(265)
+2457 1
+fe=(327)
+78 1
+fi=(279)
+2029 1
+fe=(327)
+79 1
+fi=(279)
+2029 1
+fi=(265)
+2457 2
+fi=(279)
+2029 1
+fe=(327)
+79 1
+fi=(279)
+2029 2
+fe=(327)
+78 1
+290 1
++2 1
+-10 2
+0 4
+126 44
+fi=(226)
+547 42
+fe=(327)
+132 105
+0 2
+132 4
++5 44
+298 22
+0 22
+300 44
+
+fl=(361)
+fn=(1872)
+116 52
+fi=(245)
+464 24
+fi=(317)
+133 32
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 424
+fe=(361)
+0 4
+fi=(244)
+612 4
+fi=(245)
+2997 8
+fi=(226)
+547 4
+fi=(245)
+2886 8
+fi=(317)
+146 4
+fi=(245)
+464 16
+fi=(317)
+166 4
+cfn=(1408)
+calls=4 -64 
+* 620
+fi=(244)
+617 4
+fi=(245)
+1446 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+fi=(245)
+2886 8
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 884
+-61 4
+fi=(245)
+2997 8
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 52
+fi=(245)
+2886 16
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fi=(363) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/text_format/codec.rs
+-24 12
+fi=(232)
+961 32
+fi=(226)
+1917 60
+fi=(245)
+1034 12
+fi=(252)
+1720 16
+659 4
+fe=(361)
+133 8
+cfi=(278) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/text_format/semantic.rs
+cfn=(1766) <litchi_ppt::writer::text_format::semantic::Paragraph as core::clone::Clone>::clone
+calls=4 754 
+* 2068
+0 8
+fi=(245)
+1028 8
++1 8
+cfi=(244)
+cfn=(1240)
+calls=4 186 
+* 396
+fi=(244)
+612 12
+fi=(245)
+464 12
+fi=(232)
+961 32
+0 12
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 4
+fi=(245)
+1815 4
+fi=(252)
+-95 12
+fi=(363)
+41 20
+fi=(264)
+180 4
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(244)
+612 24
+fi=(252)
++47 12
+fi=(232)
+961 24
+fi=(286)
+1504 24
+0 12
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(252)
+1720 160
+fi=(264)
+180 160
+fi=(285)
+37 160
++1 320
+-38 320
+fi=(244)
+0 160
+617 160
+fi=(265)
+2494 160
+fi=(244)
+765 160
+-94 160
+fi=(226)
+547 160
+fi=(245)
+2886 480
+fi=(286)
+1504 480
+fi=(244)
+673 120
+cfn=(1044)
+calls=20 -14 
+* 6021
+-61 20
+fi=(245)
+2997 40
+0 4
+fi=(363)
+48 8
++4 16
+fi=(302)
+297 12
+fi=(317)
+133 28
+fi=(244)
+765 4
+-94 4
+0 4
+fi=(245)
+2886 8
+fi=(317)
+146 4
+fi=(245)
+464 16
+fi=(317)
+166 4
+cfn=(1408)
+calls=4 -64 
+* 1128
+fi=(244)
+617 4
+fi=(245)
+1446 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+fi=(245)
+2886 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+fi=(245)
+0 4
+fi=(232)
+961 4
+fi=(226)
+547 16
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 88
+* 4
+fi=(245)
+2886 16
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fe=(361)
++99 8
+fi=(245)
+464 12
+fi=(363)
+68 8
+fi=(232)
+961 20
+0 4
+fi=(252)
+659 8
+fi=(244)
+-47 4
+fi=(245)
+1815 4
+fi=(232)
+961 16
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(251)
+2469 24
+fi=(232)
+961 48
+fi=(286)
+1504 344
+fi=(252)
+1720 172
+fi=(264)
+180 172
+fi=(285)
+37 160
++1 320
+-38 320
+fi=(251)
+232 160
+2646 160
+fi=(302)
+297 36
+fi=(252)
+659 12
+fi=(265)
+769 12
+fi=(279)
+457 12
+fi=(265)
+769 4
+fi=(279)
+457 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+fi=(363)
+0 4
+fi=(244)
+612 4
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+fi=(363)
+105 4
+fi=(362) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/text_format/validation.rs
+-96 8
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+-59 4
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+fi=(363)
+109 4
+fi=(278)
+-6 20
+fi=(363)
++7 4
++3 24
++3 24
++3 24
++3 24
++3 24
+fi=(258)
+636 8
+fi=(363)
+128 8
+fi=(258)
+636 12
+fi=(363)
+128 4
+fi=(258)
+636 4
+fi=(363)
+128 16
+fi=(258)
+636 4
+fi=(363)
+128 4
+fi=(258)
+636 12
+fi=(363)
+134 4
+0 4
+134 4
+0 12
+fi=(258)
+636 24
+fi=(363)
+140 4
+0 4
+140 4
+0 12
+fi=(258)
+636 8
+fi=(363)
+146 8
+fi=(258)
+636 16
+fi=(363)
+146 24
+fi=(258)
+636 4
+fi=(363)
+146 4
+fi=(258)
+636 4
+fi=(363)
+152 20
+fi=(258)
+636 4
+fi=(363)
+155 8
+fi=(258)
+636 12
+fi=(363)
+155 4
+fi=(258)
+636 4
+fi=(363)
+158 12
+fi=(258)
+636 4
+fi=(363)
+158 4
+fi=(258)
+636 4
+fi=(363)
+161 12
+fi=(258)
+636 4
+fi=(363)
+161 4
+fi=(258)
+636 4
+fi=(363)
+164 12
+fi=(258)
+636 4
+fi=(363)
+164 4
+fi=(258)
+636 4
+fi=(363)
+167 12
+fi=(258)
+636 4
+fi=(363)
+167 4
+fi=(258)
+636 4
+fi=(363)
+170 12
+fi=(258)
+636 4
+fi=(363)
+170 8
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+-59 8
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+fi=(363)
+177 8
++31 8
++10 8
++3 8
++5 8
++5 8
++3 8
++3 8
++3 8
++3 8
++3 8
++3 8
++3 12
++14 8
+0 8
+271 8
++14 8
+fi=(252)
+1720 4
+fi=(264)
+180 8
+fi=(244)
+673 24
+cfn=(1044)
+calls=4 -14 
+* 840
+fi=(245)
+2997 8
+fi=(244)
+673 24
+cfn=(1044)
+calls=4 -14 
+* 480
+fi=(245)
+2997 8
+fi=(363)
+0 8
+fi=(237)
+2173 12
+fi=(236)
+48 36
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+-48 4
+fi=(317)
+133 32
+fi=(244)
+673 24
+cfn=(1044)
+calls=4 -14 
+* 440
+fe=(361)
+0 4
+fi=(244)
+612 4
+fi=(245)
+2997 8
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 48
+fi=(245)
+2886 8
+fi=(317)
+146 4
+fi=(245)
+464 16
+fi=(317)
+166 8
+cfn=(1408)
+calls=4 -64 
+* 706
+fi=(244)
+617 4
+fi=(245)
+1446 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+fi=(245)
+2886 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+0 16
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 88
+fi=(245)
+2886 12
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+fi=(364) /home/zhuhe/code/litchi/crates/litchi-ppt/src/text_interaction.rs
+-19 24
+fe=(361)
+151 20
+cfn=(1910) litchi_ppt::writer::escher::codec::text::append_text_interactions
+calls=4 +23 
+* 92
+* 4
+fi=(237)
+2173 8
+fi=(245)
+2997 4
+fi=(302)
+297 12
+fi=(244)
+617 4
+fi=(245)
+1446 4
+fi=(265)
+2494 8
+fi=(244)
+765 8
+612 4
+fi=(226)
+-65 20
+fi=(245)
+2886 8
+fi=(244)
+612 4
+fi=(265)
+2494 4
+fi=(244)
+765 8
+-94 4
+fi=(232)
+961 4
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 120
+fi=(245)
+2886 12
+fe=(361)
+171 16
+fi=(244)
+632 4
+0 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 252
+-48 4
+fi=(244)
+632 4
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 428
+-48 4
+fi=(244)
+632 4
+0 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+-48 4
+fi=(244)
+632 4
+0 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+-48 4
+fe=(361)
+172 4
+cfi=(226)
+cfn=(1916)
+calls=4 805 
+* 956
+* 4
+fi=(244)
+632 4
+0 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=4 3319 
+* 132
+-48 4
+fi=(244)
+632 4
+fi=(362)
+0 8
+fi=(245)
+2997 4
+fi=(363)
+298 12
+fi=(244)
+612 4
+fi=(232)
+961 32
+0 48
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(363)
+306 24
+fi=(339)
+873 48
+fi=(363)
+307 72
+fi=(362)
+49 24
+fi=(363)
+-49 48
+308 48
++3 24
++3 12
+fi=(362)
+79 24
+fi=(363)
+-79 48
+fi=(244)
+612 24
+fi=(232)
+961 48
+fi=(286)
+1504 344
+fi=(252)
+1720 172
+fi=(264)
+180 172
+fi=(285)
+37 160
++1 320
+-38 320
+fi=(251)
+232 160
+2646 160
+fi=(302)
+297 48
+fi=(363)
++18 12
++11 12
+fi=(265)
+769 8
+fi=(279)
+457 4
+fi=(265)
+769 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+-54 8
+fi=(265)
+2494 8
+fi=(244)
+765 8
+-94 8
+-59 12
+fi=(226)
+-65 12
+fi=(245)
+2886 24
+fi=(278)
+280 12
++1 24
++3 36
++3 24
++3 24
+-3 12
++3 12
++3 24
++3 24
+-3 12
++6 24
+-3 12
++3 12
++3 36
++3 48
+fi=(258)
+636 60
+fi=(244)
+-19 12
+fi=(265)
+2494 12
+fi=(244)
+765 12
+-94 12
+0 156
+612 12
+fi=(226)
+-65 12
+fi=(245)
+2886 24
+fi=(363)
+359 24
+0 8
+fi=(278)
+315 16
++3 16
++3 16
++3 8
++3 16
++3 16
++3 24
+fi=(258)
+1042 40
+fi=(278)
+336 8
+fi=(244)
+617 8
+fi=(265)
+2494 8
+fi=(244)
+765 8
+-94 8
+0 152
+612 8
+fi=(226)
+-65 8
+fi=(245)
+2886 24
+fi=(363)
+365 8
+fi=(244)
+617 8
+fi=(265)
+2494 8
+fi=(244)
+765 8
+-94 8
+fi=(363)
+365 4
+fi=(244)
+617 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+-59 12
+fi=(226)
+-65 12
+fi=(245)
+2886 24
+fi=(363)
+367 24
++3 24
++3 24
+fi=(244)
+617 12
+fi=(265)
+2494 12
+fi=(244)
+765 12
+-94 12
+-59 24
+fi=(226)
+-65 12
+fi=(245)
+2886 24
+fi=(278)
+414 96
+fi=(245)
+2886 12
+fi=(244)
+617 12
+fi=(265)
+2494 12
+fi=(244)
+765 12
+-94 12
+-59 12
+fi=(226)
+-65 12
+fi=(245)
+2886 24
+fi=(363)
+384 24
+fi=(245)
+0 8
+fi=(244)
+673 48
+cfn=(1044)
+calls=8 -14 
+* 3893
+fi=(245)
+2997 32
+0 8
+fi=(252)
+1720 12
+fi=(362)
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 480
+fi=(245)
+2997 4
+fi=(317)
+168 4
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 60
+* 4
+fi=(237)
+2173 8
+fi=(244)
+0 4
+673 20
+cfn=(1044)
+calls=4 -14 
+* 440
+-61 4
+fi=(245)
+2997 8
+fi=(232)
+961 8
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 88
+* 4
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 2179
+fi=(245)
+2997 4
+fi=(317)
+168 4
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 88
+* 4
+fi=(237)
+2173 8
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 2202
+-61 8
+fi=(245)
+2997 4
+2881 4
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 1893
+fi=(245)
+2997 4
+fi=(317)
+168 4
+fi=(244)
+612 4
+fi=(232)
+961 8
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 48
+fi=(237)
+2173 12
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 1962
+-61 8
+fi=(245)
+2997 12
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 840
+-56 4
+fi=(245)
+2997 8
+0 4
+fi=(244)
+673 20
+cfn=(1044)
+calls=4 -14 
+* 2231
+-61 4
+fi=(245)
+2997 8
+2881 4
+fe=(361)
+
+fn=(1910)
+174 32
++6 8
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(236)
+0 8
+fe=(361)
+194 36
+
+fl=(306)
+fn=(1288)
+91 52
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 20
+fe=(306)
+93 8
+fi=(245)
+1815 4
+fi=(252)
+-95 4
+fi=(264)
+180 4
+0 20
+fe=(306)
+104 4
+fi=(252)
+1720 12
+fi=(323)
+82 12
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fe=(306)
+-84 12
++2 12
++1 24
++1 24
++1 24
+-4 24
++7 24
+-7 36
++6 24
+-6 36
++6 24
+-6 36
++6 24
++11 24
++2 24
+-5 36
++7 24
+-7 36
++7 24
+0 8
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 4
+fe=(306)
+128 8
++1 32
+
+fl=(315)
+fn=(1736)
+213 10
+fi=(302)
++84 15
+fi=(237)
+967 10
+fe=(315)
+216 10
+
+fn=(1944) litchi_ppt::writer::core::package::build_slide_info_atom
+223 20
++1 8
++10 4
++5 4
+-5 2
++7 16
+
+fn=(2024)
+88 5
+fi=(236)
+-74 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 30
+fi=(244)
+468 2
+fi=(226)
++79 6
+fe=(315)
+126 3
++1 4
+
+fn=(2042)
+162 7
+fi=(245)
+464 4
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+-61 1
+fi=(245)
+2997 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 2
+fi=(245)
+2886 2
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+464 4
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+-61 1
+fi=(245)
+2997 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 1
+fi=(226)
+547 1
+fi=(244)
++70 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(232)
+961 1
+fi=(226)
+547 4
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 13
+fi=(245)
+2886 2
+fe=(315)
+186 4
+fi=(244)
+632 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(245)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+-56 1
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 366
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+fi=(245)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 238
+-61 1
+fi=(245)
+2997 2
+fe=(315)
+
+fn=(2030)
+129 6
+fi=(245)
+464 4
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+-61 1
+fi=(245)
+2997 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 2
+fi=(245)
+2886 2
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 2
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+464 4
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 106
+-61 1
+fi=(245)
+2997 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+612 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+612 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 1
+fi=(226)
+547 1
+fi=(244)
++70 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(232)
+961 1
+fi=(226)
+547 3
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 11
+fi=(245)
+2886 2
+fe=(315)
+159 4
+fi=(244)
+632 1
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+fi=(245)
+-48 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+-56 1
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 423
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+0 1
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+-61 1
+fi=(245)
+2997 2
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 549
+fi=(245)
+2997 1
+fi=(244)
+617 1
+-5 2
+fi=(263)
+0 1
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 427
+fi=(245)
+2997 2
+fe=(315)
+
+fn=(1518)
+206 10
+fi=(302)
++91 15
+fi=(237)
+967 10
+fe=(315)
+210 10
+
+fl=(343)
+fn=(1646)
+450 9
+fi=(245)
+2997 1
+fe=(343)
+454 3
++1 5
++16 8
+
+fl=(274)
+fn=(996)
+650 40
+fi=(275)
+878 8
+fi=(226)
+1717 4
+fi=(275)
+767 8
+0 16
+772 16
+fi=(252)
+659 8
+fi=(226)
+1717 8
+fi=(275)
+767 16
+fi=(226)
+1717 8
+fi=(275)
+767 16
+fi=(252)
+659 16
+fi=(275)
+770 32
++4 24
++8 24
++4 64
++2 32
++1 24
+fi=(252)
+659 32
+0 8
+fi=(275)
+795 8
+0 4
+fi=(281)
+113 4
+fi=(244)
+459 8
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=8 3283 
+* 257
+fi=(244)
+468 8
+fi=(253)
++17 12
+fi=(275)
+236 20
+cfn=(1010)
+calls=8 1630 
+* 2020
+fi=(237)
+1183 8
+fe=(274)
+656 16
++1 28
+
+fl=(245)
+fn=(1790) <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+3747 36
+fi=(244)
+459 8
+fe=(245)
+965 8
+2168 8
+fi=(248) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs
+440 20
+fe=(245)
+3750 32
+
+fn=(2272)
+1023 20
++2 4
++3 8
+fi=(232)
+-67 8
+fi=(226)
+1917 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 120
+fe=(245)
+1034 8
++4 16
+
+fn=(1676)
+2877 56
+fi=(244)
+617 8
+fe=(245)
+1446 8
+fi=(265)
+2494 8
+fi=(244)
+765 8
+-94 8
+fe=(245)
+2881 12
+0 6
+fi=(232)
+961 6
+fi=(226)
+547 12
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=6 255 
+* 427
+fe=(245)
+2886 16
++1 48
+fi=(244)
+673 14
+cfn=(1044)
+calls=2 -14 
+* 925
+* 2
+fe=(245)
+2997 2
+2881 2
+-4 28
+fi=(244)
+617 4
+fe=(245)
+1446 4
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 4
+fe=(245)
+2881 8
+0 4
+fi=(232)
+961 4
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 120
+fe=(245)
+2886 8
++1 24
+
+fl=(372)
+fn=(2372)
+218 10
++4 2
++5 2
++4 2
+fi=(265)
+3658 9
++2 3
+fi=(245)
+464 4
+fi=(244)
+765 1
+-42 1
+0 3
+612 1
+fi=(232)
+961 1
+fi=(226)
+1917 3
+fi=(245)
+1034 3
+fi=(384)
+1506 2
+0 1
+fi=(229)
+1076 3
+fi=(245)
+464 4
+fi=(244)
+765 2
+-42 1
+0 2
+fi=(232)
+961 2
+0 1
+fi=(265)
+923 12
+fe=(372)
+246 4
+fi=(226)
+547 4
+fi=(252)
+1720 8
+fi=(264)
+180 4
+0 1
+fe=(372)
+251 2
+fi=(245)
+1025 1
++3 2
+fi=(244)
+798 7
+cfn=(1048)
+calls=1 542 
+* 358
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 1
+fe=(372)
+244 1
+fi=(245)
+3468 2
+fi=(244)
+765 1
+-94 1
+0 1
+fi=(229)
+1916 1
+fi=(246)
+772 1
+0 2
+772 1
+fi=(226)
+1917 2
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=1 198 
+* 43
+fi=(246)
+772 3
+fi=(395)
+19 2
+fi=(226)
+1917 3
+fe=(372)
+254 6
++1 8
+0 1
+fi=(244)
+798 6
+cfn=(1048)
+calls=1 542 
+* 75
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 1
+383 3
+fe=(372)
+
+fl=(386)
+fn=(2470)
+674 24
+fi=(244)
+-57 3
+fe=(386)
+-84 3
+fi=(265)
+2301 12
+fe=(386)
+479 6
+fi=(245)
+2997 1
+fe=(386)
+484 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2997 2
+fe=(386)
+487 6
+fi=(244)
+673 8
+cfn=(1044)
+calls=1 -14 
+* 238
+* 2
+fi=(245)
+2997 1
+fe=(386)
+487 3
++52 3
+fi=(232)
+961 3
+fi=(226)
+638 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=3 255 
+* 231
+fe=(386)
+-98 6
+fi=(245)
+2168 3
+fe=(386)
+546 3
+677 24
+
+fl=(278)
+fn=(1766)
+754 56
++3 8
+fi=(244)
+459 32
+fe=(278)
+757 8
+fi=(244)
+0 32
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=8 3283 
+* 755
+fi=(244)
+468 16
+fi=(245)
+965 24
+fi=(264)
+180 40
+0 24
+fi=(378)
+564 408
+fi=(248)
+0 48
+fi=(378)
+564 24
+fi=(349)
+37 96
+fi=(252)
+1720 24
+fi=(264)
+180 24
+fe=(278)
+439 24
+fi=(244)
++20 48
+fe=(278)
+-20 48
+fi=(236)
+14 48
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=24 3283 
+* 1519
+fi=(244)
+468 48
+0 24
+fi=(226)
+547 96
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=24 255 
+* 312
+* 48
+fe=(278)
+443 24
+fi=(258)
+2262 48
+fe=(278)
+461 24
+fi=(244)
+-2 48
+fi=(248)
+-19 48
+fe=(278)
+103 8
+767 8
++4 8
+fi=(258)
+2262 88
+0 8
+2262 8
+fi=(226)
+0 8
+fi=(258)
+2262 16
+fe=(278)
+803 8
+-49 192
+fi=(258)
+2262 8
+fe=(278)
+754 80
+
+fl=(318)
+fn=(1422)
+3 3
+fi=(263)
+369 2
+fe=(318)
+11 1
++6 5
+-3 1
+fi=(265)
+769 1
+fi=(229)
+1878 1
+fe=(318)
+19 1
+-19 1
+26 4
+
+fl=(382)
+fn=(2214)
+168 112
++1 28
+0 14
+fi=(232)
+961 56
+0 14
+fi=(286)
+1504 530
+fi=(252)
+1720 265
+fi=(264)
+180 265
+fi=(285)
+37 251
++1 502
+-38 502
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs
+0 251
+fi=(251)
+232 251
+fi=(349)
+90 251
+fi=(251)
+2469 251
+fe=(382)
+210 112
+-34 28
+fi=(268) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/memchr.rs
+27 28
+-27 10
+40 112
++4 56
+-5 117
+fi=(226)
+2292 18
+fi=(268)
+71 18
+-71 36
+85 9
++1 9
+-67 54
++72 36
++4 9
+-14 27
+-81 9
+39 18
+-39 9
+40 102
+-1 153
+-39 28
+fi=(264)
+0 102
+fi=(252)
+1720 265
+fi=(264)
+180 265
+fi=(285)
+37 251
++1 502
+-38 251
+fi=(264)
+332 970
+fe=(382)
+189 28
+fi=(380)
+2154 42
+0 14
+fi=(383) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/ascii.rs
+597 28
+fi=(380)
+2154 28
+fi=(279)
+2434 28
+fi=(264)
+180 14
+fi=(259) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/mod.rs
+591 14
+fi=(264)
+315 14
+fi=(252)
+1720 14
+fi=(264)
+180 14
+fi=(259)
+591 14
+fi=(264)
+315 14
+fi=(252)
+1720 14
+fi=(264)
+180 14
+fi=(259)
+591 12
+fi=(264)
+315 12
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(259)
+591 3
+fi=(264)
+315 3
+fi=(252)
+1720 3
+fi=(264)
+180 3
+fe=(382)
++10 70
++1 56
++2 28
+0 10
+193 135
+-1 18
+fi=(259)
+851 54
+645 9
+fi=(302)
+82 9
+fi=(259)
+851 54
+645 9
+fi=(302)
+82 9
+fe=(382)
+193 18
+fi=(302)
+82 18
+fe=(382)
+194 18
+fi=(323)
+82 9
+fi=(264)
++98 18
+0 9
+fe=(382)
+193 214
+-1 107
+fi=(252)
+659 107
+fe=(382)
+193 107
+fi=(259)
+851 428
+645 107
+fi=(302)
+82 107
+fe=(382)
+194 107
+fi=(323)
+82 107
+fi=(252)
+1720 107
+fi=(264)
+180 107
+fi=(377)
+957 266
+fe=(382)
+196 70
+fi=(375)
+0 14
+fi=(383)
+597 18
+fi=(380)
+2154 18
+fi=(383)
+597 15
+fe=(382)
+
+fl=(311)
+fn=(1310)
+691 9
+fi=(320)
+582 12
+fe=(311)
+707 4
+fi=(312)
+131 3
+cfn=(1312)
+calls=1 -44 
+* 201
+fi=(237)
+2173 3
+fi=(252)
+1720 1
+fi=(264)
+180 1
+0 4
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+0 3
+fi=(252)
+1720 1
+fi=(264)
+180 1
+0 3
+fi=(251)
+2468 1
+fe=(311)
+743 2
++12 7
+fi=(237)
+0 19
+2173 2
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(251)
+2469 2
+fi=(252)
+659 1
+fe=(311)
++58 1
+fi=(251)
+2468 2
+0 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(237)
+2174 4
+fe=(311)
+702 12
+cfn=(1374) litchi_ppt::font::codec::encode_record
+calls=1 1263 
+* 189
+0 1
+702 1
+cfi=(226)
+cfn=(1390)
+calls=1 805 
+* 65
+* 1
+-9 8
+fi=(245)
+464 3
+fi=(244)
+765 1
+-77 1
+0 1
+fe=(311)
+803 3
+cfi=(312)
+cfn=(1318)
+calls=1 140 
+* 140
+fi=(237)
+2173 2
+0 3
+fi=(236)
+36 3
+cob=(2)
+cfi=(155)
+cfn=(802)
+calls=1 3739 
+* 213
+fi=(244)
+468 2
+0 2
+612 2
+fi=(232)
+961 1
+fi=(399)
+1343 3
+fi=(336)
+33 3
+cfi=(282)
+cfn=(1350)
+calls=1 -15 
+* 427
+fe=(311)
+812 3
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+547 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+547 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+547 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+547 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+fi=(226)
+1717 1
+547 1
+fi=(252)
+1720 1
+fi=(260)
+223 1
+0 1
+fi=(244)
+632 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+-48 2
+fe=(311)
+816 3
+-88 11
+-1 5
+cfn=(1374)
+calls=1 1263 
+* 189
+fi=(237)
+2173 3
++1 4
+fi=(244)
+617 1
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(245)
+2881 3
+0 1
+fi=(232)
+961 2
+fi=(226)
+547 2
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=1 255 
+* 22
+fi=(245)
+2886 4
+fi=(244)
+632 1
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fe=(311)
+730 2
+cfi=(226)
+cfn=(1390)
+calls=1 +75 
+* 65
+0 1
+fi=(245)
+1815 1
+fi=(252)
+-95 1
+fi=(264)
+180 1
+fi=(245)
+0 5
+fi=(252)
+1720 1
+fi=(264)
+180 2
+fi=(229)
+1037 4
+fi=(244)
+527 6
+cfn=(1048)
+calls=1 +15 
+* 75
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 3
+0 1
+fi=(302)
+297 2
+fe=(311)
+755 2
+fi=(302)
+297 1
+fe=(311)
+
+fn=(1374)
+1263 20
+fi=(245)
+2997 2
+fe=(311)
+1268 4
+fi=(263)
+0 2
+fi=(400) /home/zhuhe/code/litchi/crates/litchi-ppt/src/records/payload.rs
+56 6
+fi=(244)
+612 4
+fi=(245)
+1815 4
+fi=(265)
+769 2
+fi=(279)
+457 2
+fe=(311)
+0 2
+1278 12
+fi=(302)
+297 6
+fi=(244)
+0 2
+527 12
+cfn=(1048)
+calls=2 +15 
+* 150
+fi=(237)
+2173 4
++1 2
+fi=(244)
+774 2
++1 4
+fe=(311)
+1289 10
+fi=(226)
+547 2
+fe=(311)
+1290 2
+fi=(226)
+547 2
+fi=(245)
+2886 4
+fi=(244)
+765 6
+-94 2
+fi=(226)
+547 2
+fi=(245)
+2886 4
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+fi=(245)
+2881 4
+fi=(232)
+961 4
+fi=(226)
+547 4
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 44
+fi=(245)
+2886 6
+fe=(311)
+1293 12
++1 22
+
+fl=(238)
+fn=(1574)
+247 5
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 26
+fe=(238)
+248 2
++4 4
+
+fl=(282)
+fn=(1350)
+50 6
+fi=(244)
+459 2
+0 5
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 26
+fi=(244)
+468 2
+0 4
+fi=(264)
+279 2
+fi=(401) /home/zhuhe/code/litchi/crates/litchi-ppt/src/writer/core/model/mod.rs
+-3 4
+fi=(226)
+1917 2
+fi=(395)
+19 2
+fi=(264)
+284 4
+fi=(252)
+659 2
+fi=(245)
+1815 2
+fi=(252)
+-95 2
+fi=(264)
+25 2
+fe=(282)
++36 3
++1 6
+-44 7
+fi=(286)
+1504 3
+fi=(264)
+161 1
++1 1
+fi=(252)
+1720 1
+fi=(264)
+180 1
+fi=(252)
+659 1
+fi=(264)
+185 1
+fi=(285)
+37 1
++1 2
+-38 1
+fi=(286)
+1513 1
+fi=(255)
+729 3
+fi=(265)
+3658 3
++2 3
+fi=(286)
+1528 3
+fi=(229)
+1037 5
+fi=(279)
+457 1
+fi=(244)
+0 2
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 156
+fi=(244)
+468 2
+fe=(282)
+0 1
+fi=(226)
+1917 1
+fe=(282)
+36 6
+fi=(226)
+1917 4
+fi=(245)
+3980 4
+2168 8
+fi=(286)
+1504 10
+fi=(252)
+1720 5
+fi=(264)
+180 5
+fi=(285)
+37 4
++1 8
+-38 8
+fi=(245)
+3971 9
+fi=(255)
+729 2
+fi=(265)
+3658 3
++2 4
+fi=(286)
+1528 2
+fi=(265)
+2301 2
+fi=(244)
+673 5
+cfn=(1044)
+calls=1 -14 
+* 120
+-61 2
+fe=(282)
+42 5
++1 8
+
+fl=(317)
+fn=(1610)
+164 112
+fi=(245)
+464 48
+fe=(317)
+166 48
+cfn=(1408)
+calls=16 -64 
+* 3077
+fi=(244)
+612 16
+fi=(245)
+1815 16
+fi=(244)
+617 16
+fi=(245)
+1446 16
+fi=(265)
+2494 16
+fi=(244)
+765 16
+-94 16
+fi=(245)
+0 16
+fi=(232)
+961 16
+fi=(226)
+547 48
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=16 255 
+* 564
+fi=(245)
+2886 32
+fe=(317)
+168 48
++1 96
+0 16
+fi=(244)
+673 80
+cfn=(1044)
+calls=16 -14 
+* 5801
+fi=(245)
+2997 16
+2881 16
+fe=(317)
+
+fn=(1740)
+212 18
+fi=(244)
+617 2
+fi=(245)
+2997 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+-59 2
+fi=(226)
+-65 2
+fi=(245)
+2886 4
+fe=(317)
+229 8
+-9 36
+-87 14
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 8
+fi=(226)
+547 14
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 220
+fi=(315)
+0 2
+fi=(244)
+612 2
+fi=(245)
+2997 4
+fi=(226)
+547 8
+fi=(245)
+2886 4
+fe=(317)
+146 2
+fi=(245)
+464 8
+fe=(317)
+166 2
+cfn=(1408)
+calls=2 -64 
+* 396
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+fi=(226)
+0 4
+fi=(244)
+617 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 2
+fi=(232)
+961 2
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+fi=(245)
+2886 6
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 306
+-48 2
+fi=(245)
+1815 2
+fi=(265)
+3051 4
+fi=(279)
+457 4
+fi=(244)
+0 4
+459 4
+0 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 498
+* 2
+fi=(244)
+468 4
+fi=(245)
+965 6
+fi=(252)
+1720 2
+fi=(264)
+25 2
+-25 18
+fi=(350)
+0 4
+fi=(258)
+1164 12
+fi=(340)
+377 20
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 120
+* 4
+-43 76
+fi=(232)
+961 12
+fi=(226)
+1917 172
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=4 255 
+* 120
+* 496
+fi=(395)
+19 8
+fi=(264)
+284 36
+fi=(252)
+659 16
+fi=(315)
+918 16
+fi=(258)
+745 48
+1229 4
+0 4
+fi=(340)
+202 48
+0 20
+198 72
+0 16
+fi=(258)
+745 112
+1583 4
+fi=(340)
+0 92
+fi=(258)
+745 36
+1229 4
+2262 8
++1 4
+fi=(244)
+459 8
+fi=(258)
+2263 4
+fi=(265)
+3051 4
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=4 3283 
+* 593
+fi=(244)
+468 8
+fi=(245)
+965 20
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(248)
+0 4
+432 8
+cfi=(278)
+cfn=(1766)
+calls=4 754 
+* 2406
+fi=(323)
+82 4
+fi=(378)
+564 56
+fi=(349)
+37 16
+fi=(248)
+440 24
+fi=(258)
+1654 12
++1 24
+767 8
+1546 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+0 16
+fi=(251)
+2468 4
++1 8
+fi=(252)
+659 4
+fi=(251)
+2468 8
+0 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(252)
+1720 12
+fi=(264)
+180 12
+fi=(340)
++96 48
+fi=(251)
+2469 24
+fi=(252)
+659 12
+fi=(251)
+2469 12
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(340)
+281 8
++22 4
++6 4
+fi=(244)
+459 8
+fi=(245)
+965 8
+fi=(248)
+440 20
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(333)
+0 4
+fi=(340)
+313 16
+cfi=(245)
+cfn=(1790)
+calls=4 3747 
+* 112
+fi=(245)
+1851 4
+fi=(252)
+1720 4
+fi=(264)
+180 4
+fi=(333)
+0 8
+fi=(258)
+2262 8
++2 8
+0 8
+fi=(333)
+0 4
+fi=(340)
+335 4
+165 8
+336 8
++11 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 16
++1 16
++1 16
++10 4
++1 4
++1 8
+fi=(402) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/f32.rs
+654 4
+fi=(340)
+356 16
++1 16
++1 20
+fi=(402)
+654 4
+fi=(340)
+393 24
+-25 4
+fi=(244)
++91 16
+fi=(226)
+0 8
+fi=(340)
+369 16
+fi=(258)
+1545 12
+fi=(340)
+0 16
+375 12
+fi=(258)
+2262 8
+fi=(282)
+61 12
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fi=(232)
+961 4
+fi=(322)
+158 2
+fi=(390)
+323 20
+fi=(282)
+24 2
+cfi=(322)
+cfn=(1462)
+calls=2 173 
+* 50
+* 4
+fi=(322)
+161 6
+0 8
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+fi=(237)
+2173 4
+fi=(245)
+1851 2
+fi=(244)
+612 4
+fe=(317)
+221 2
+cfn=(1930) litchi_ppt::writer::records::model::InPlaceRecord::finish
+calls=2 +24 
+* 50
+fi=(237)
+2173 4
+fi=(243)
+0 2
+fi=(244)
+617 2
+fi=(245)
+2997 2
+fi=(265)
+2494 6
+fi=(244)
+765 2
+-94 2
+-59 2
+fi=(226)
+-65 2
+fi=(245)
+2886 4
+fe=(317)
+229 10
+fi=(315)
+943 4
+fi=(244)
+612 4
+fi=(245)
+1815 4
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+-94 2
+fi=(226)
+547 2
+fi=(245)
+2886 4
+fe=(317)
+229 22
+fi=(252)
+1720 2
+fi=(264)
+25 2
+fe=(317)
+222 2
++1 16
+0 2
+fi=(264)
+25 2
+fi=(341)
+-25 4
+fi=(302)
+297 4
+fi=(237)
+0 2
+fi=(302)
+297 8
+fi=(265)
+2301 16
+0 2
+fi=(350)
+200 4
+fi=(335)
+29 16
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 345
+fi=(350)
+273 2
+fi=(244)
+612 2
+fi=(245)
+2997 2
+fi=(226)
+547 4
+fi=(350)
+273 2
+fi=(226)
+547 2
+fi=(245)
+2886 4
+fi=(335)
+42 4
+fi=(279)
+457 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 200
+fi=(244)
+468 4
+0 4
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 26
+* 2
+fi=(244)
++70 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(245)
+2886 6
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fi=(337)
+187 2
++1 6
++6 24
+-5 4
+cfi=(317)
+cfn=(1741)
+calls=2 +23 
+* 62926
+fi=(237)
+2173 4
+fi=(335)
+29 28
+fi=(265)
+3928 4
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 212
+-61 2
+fi=(245)
+2997 2
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 4
+fi=(279)
+457 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 4
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 26
+* 2
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 220
+fi=(245)
+2997 4
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(236)
++6 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+fi=(335)
+-19 16
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 212
+fi=(245)
+2997 2
+fi=(244)
+617 2
+-5 2
+fi=(226)
+-65 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 2
+fi=(244)
+765 4
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(244)
+617 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+612 2
+fi=(226)
+-65 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 4
+fi=(244)
+765 4
+fi=(226)
+547 4
+fi=(245)
+2886 4
+fi=(335)
+42 2
+fi=(265)
+2494 2
+fi=(244)
+765 6
+fi=(226)
+547 10
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 6
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(244)
++65 2
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+fi=(244)
++70 2
+fi=(265)
+2494 2
+fi=(244)
+765 4
+-94 2
+-59 2
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+fi=(245)
+2886 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 4
+fi=(279)
+457 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+0 4
+fi=(350)
+208 4
+fi=(391)
+343 6
+fi=(226)
+547 6
+fi=(232)
+961 4
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 44
+* 2
+fi=(244)
++70 2
+fi=(245)
+1446 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 2
+612 4
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 44
+fi=(245)
+2886 4
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fi=(244)
+632 2
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 186
+-48 4
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 4
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 208
+-48 2
+fi=(244)
+632 2
+fi=(337)
+253 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fe=(317)
+221 6
+cfn=(1930)
+calls=2 +24 
+* 50
+fi=(237)
+2173 4
+0 2
+fe=(317)
+221 6
+cfn=(1930)
+calls=2 +24 
+* 50
+fi=(237)
+2173 4
+fe=(317)
+133 14
+fi=(397)
++17 12
+fi=(315)
+952 4
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 314
+0 4
+953 2
+cfi=(317)
+cfn=(1610)
+calls=2 164 
+* 1274
+fi=(237)
+2173 2
+0 2
+2173 6
+fi=(238)
+0 1
+fi=(244)
+673 6
+cfn=(1044)
+calls=1 -14 
+* 903
+* 1
+fi=(245)
+2997 2
+0 2
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 661
+fi=(245)
+2997 2
+fe=(317)
+168 2
+fi=(244)
+612 4
+fi=(232)
+961 2
+fi=(226)
+547 6
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 22
+fi=(237)
+2173 6
++1 4
+fi=(244)
+617 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+fi=(245)
+2881 4
+fi=(232)
+961 2
+fi=(226)
+547 8
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 24
+fi=(245)
+2886 8
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 4
+fi=(315)
+956 2
+cfn=(1944)
+calls=2 223 
+* 54
+fi=(237)
+2173 6
+0 2
+2174 2
+fi=(315)
+956 4
+fi=(236)
+0 2
+fi=(315)
+960 4
+fi=(245)
+1815 2
+fi=(263)
+272 4
+fi=(244)
+612 2
+fi=(263)
+272 2
+fi=(315)
+960 4
+fe=(317)
+133 42
+fi=(397)
+0 8
+fi=(315)
+968 4
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 312
+0 4
+969 2
+cfi=(317)
+cfn=(1610)
+calls=2 164 
+* 660
+fi=(237)
+2173 2
+0 4
+2173 4
++1 6
+fi=(315)
+969 2
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 312
+0 2
+fi=(244)
+632 2
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+612 2
+fi=(245)
+1815 4
+fi=(315)
+971 2
+cfi=(365)
+cfn=(1946)
+calls=2 220 
+* 44
+fi=(237)
+2173 2
+0 6
+2173 4
++1 2
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(244)
+468 4
+fi=(245)
+965 4
+fi=(226)
+547 6
+fi=(245)
+2168 6
+fi=(347)
+56 4
+cfi=(245)
+cfn=(1676)
+calls=2 2877 
+* 44
+fe=(317)
++77 14
+fi=(244)
+612 2
+fi=(245)
+1815 4
+fi=(315)
+975 4
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 312
+0 4
+976 2
+cfi=(317)
+cfn=(1610)
+calls=2 164 
+* 660
+fi=(237)
+2173 2
+0 4
+2173 4
++1 6
+fi=(315)
+976 2
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 966
+0 2
+fi=(244)
+632 2
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 4
+fi=(315)
+977 2
+cfi=(317)
+cfn=(1610)
+calls=2 164 
+* 1268
+fi=(237)
+2173 2
+0 4
+2173 4
++1 6
+fi=(315)
+977 2
+cfi=(335)
+cfn=(1530)
+calls=2 40 
+* 314
+0 2
+fi=(244)
+632 2
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 4
+fi=(315)
+978 2
+cfi=(317)
+cfn=(1610)
+calls=2 164 
+* 1586
+fi=(237)
+2173 2
+0 4
+2173 4
+fi=(244)
+0 2
+673 10
+cfn=(1044)
+calls=2 -14 
+* 240
+fi=(245)
+2997 2
+fi=(244)
+617 2
+-5 4
+0 2
+673 10
+cfn=(1044)
+calls=2 -14 
+* 664
+fi=(245)
+2997 2
+fi=(244)
+617 2
+-5 4
+fi=(245)
+0 2
+fi=(244)
+673 10
+cfn=(1044)
+calls=2 -14 
+* 898
+-56 2
+fi=(245)
+2997 4
+fi=(237)
+2174 6
+fi=(347)
+56 2
+cfi=(245)
+cfn=(1676)
+calls=2 2877 
+* 76
+-56 2
+fi=(244)
+632 2
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 186
+-48 2
+fi=(315)
+980 4
+fi=(245)
+1815 6
+fi=(265)
+923 2
+0 2
+fi=(315)
+980 2
+cfn=(1736)
+calls=2 213 
+* 18
+fi=(237)
+2173 6
+0 2
+fi=(245)
+1815 2
+fi=(263)
+272 4
+fi=(315)
+0 4
+fi=(244)
+612 2
+fi=(315)
+981 4
+fi=(366)
+1296 2
+cfi=(325)
+cfn=(1474)
+calls=2 1841 
+* 1219
+0 2
+fi=(244)
+632 2
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+632 2
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+632 2
+fi=(236)
+0 2
+fi=(244)
+632 2
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+632 2
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 306
+-48 2
+fi=(244)
+632 2
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 306
+-48 2
+fi=(244)
+632 2
+fi=(315)
+985 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+-48 2
+fi=(244)
+632 2
+fi=(236)
+0 2
+fi=(315)
+985 2
+cfi=(226)
+cfn=(1952)
+calls=2 805 
+* 2002
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=2 3319 
+* 66
+* 2
+fi=(244)
+632 2
+0 10
+673 10
+cfn=(1044)
+calls=2 -14 
+* 995
+fi=(245)
+2997 4
+fe=(317)
+
+fn=(1741)
+212 12
+fi=(244)
+617 2
+fi=(245)
+2997 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+-59 2
+fi=(226)
+-65 2
+fi=(245)
+2886 4
+fe=(317)
+229 8
+-9 6
+cfi=(337)
+cfn=(1806)
+calls=2 -26 
+* 62808
+fi=(237)
+2173 4
+fi=(244)
+612 2
+fi=(245)
+1851 4
+fe=(317)
+221 2
+cfn=(1930)
+calls=2 +24 
+* 50
++2 10
+-11 20
+fi=(244)
+617 4
+fi=(245)
+2997 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+-59 4
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+fe=(317)
+229 16
+fi=(351)
+96 48
+cfn=(1824)
+calls=4 +5 
+* 58946
+fi=(237)
+2173 8
+fi=(244)
+612 4
+fi=(245)
+1851 8
+fe=(317)
+221 4
+cfn=(1930)
+calls=4 +24 
+* 100
++2 20
+
+fn=(1930)
+245 36
++1 12
+fi=(265)
+923 84
+2345 12
+fe=(317)
+104 48
+fi=(226)
+547 12
+fe=(317)
+108 12
+fi=(226)
+547 36
+fe=(317)
+253 48
+
+fn=(1408)
+102 243
++2 324
+fi=(244)
+617 81
+fi=(245)
+1446 81
+fi=(265)
+2494 162
+fi=(244)
+765 81
+-94 81
+-59 81
+fi=(226)
+-65 81
+fi=(245)
+2886 162
+fe=(317)
+108 81
+fi=(265)
+2494 162
+fi=(244)
+765 81
+-94 81
+fi=(226)
+547 81
+fi=(245)
+2886 162
+fe=(317)
+111 81
+fi=(265)
+2494 81
+fi=(244)
+765 81
+-94 81
+fi=(226)
+547 81
+fi=(245)
+2886 162
+fe=(317)
+114 324
+fi=(244)
+673 648
+cfn=(1044)
+calls=81 -14 
+* 14377
+* 162
+-56 81
+fi=(245)
+2997 162
+fe=(317)
+
+fl=(348)
+fn=(1708) litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::write_ppt_header
+126 44
+fi=(244)
+617 11
+fi=(245)
+1446 11
+fi=(265)
+2494 22
+fi=(244)
+765 11
+-94 11
+-59 11
+fi=(226)
+-65 11
+fi=(245)
+2886 22
+fi=(265)
+2494 22
+fi=(244)
+765 11
+-94 11
+fi=(226)
+547 11
+fi=(245)
+2886 22
+fi=(265)
+2494 11
+fi=(244)
+765 11
+-94 11
+fi=(226)
+547 11
+fi=(245)
+2886 22
+fe=(348)
+131 44
+
+fn=(1686) litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::write_escher_header
+118 175
+fi=(302)
+-36 35
+fe=(348)
++37 70
+fi=(244)
+617 35
+fi=(245)
+1446 35
+fi=(265)
+2494 70
+fi=(244)
+765 35
+-94 35
+-59 35
+fi=(226)
+-65 35
+fi=(245)
+2886 70
+fi=(265)
+2494 70
+fi=(244)
+765 35
+-94 35
+fi=(226)
+547 35
+fi=(245)
+2886 70
+fi=(265)
+2494 35
+fi=(244)
+765 35
+-94 35
+fi=(226)
+547 35
+fi=(245)
+2886 70
+fe=(348)
+123 210
+
+fn=(1696) litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::build_placeholder_container
+297 70
+fi=(245)
+2997 10
+fe=(348)
+308 25
+cfn=(1686)
+calls=5 118 
+* 185
+fi=(245)
+2997 10
+fe=(348)
+149 30
+cfn=(1686)
+calls=5 -31 
+* 185
+fi=(244)
+617 5
+fi=(245)
+1446 5
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+0 50
+612 5
+fi=(226)
+-65 5
+fi=(245)
+2886 10
+fi=(265)
+2494 5
+fi=(244)
+765 5
+-94 5
+fi=(226)
+547 5
+fi=(245)
+2886 10
+fe=(348)
+160 10
++1 25
+cfn=(1686)
+calls=5 -43 
+* 185
+fi=(232)
+961 5
+fi=(245)
+1446 5
+0 5
+fe=(348)
+162 10
+fi=(244)
+617 5
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+fe=(348)
+162 72
+fi=(244)
+617 36
+fi=(265)
+2494 72
+fi=(244)
+765 36
+-94 36
+-59 41
+fi=(226)
+-65 41
+fi=(245)
+2886 82
+fi=(265)
+2494 41
+fi=(244)
+765 41
+-94 41
+fi=(226)
+547 41
+fi=(245)
+2886 82
+fi=(252)
+1720 82
+fi=(264)
+180 46
+fe=(348)
+-10 30
+cfn=(1686)
+calls=5 -52 
+* 185
+fi=(244)
+617 5
+fi=(245)
+1446 5
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+0 5
+612 5
+fi=(226)
+-65 5
+fi=(245)
+2886 10
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+fi=(226)
+547 5
+fi=(245)
+2886 10
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+0 5
+fi=(226)
+547 5
+fi=(245)
+2886 10
+fi=(265)
+2494 5
+fi=(244)
+765 5
+-94 5
+-59 10
+fi=(226)
+-65 5
+fi=(245)
+2886 10
+fe=(348)
+179 30
+cfn=(1686)
+calls=5 -61 
+* 185
+fi=(245)
+2997 5
+fe=(348)
+184 20
+cfn=(1708)
+calls=5 -58 
+* 155
+fi=(244)
+617 5
+fi=(245)
+1446 5
+fi=(265)
+2494 10
+fi=(244)
+765 5
+-94 5
+-59 10
+fi=(226)
+-65 5
+fi=(245)
+2886 10
+1028 10
+0 5
+fi=(226)
+1917 5
+fi=(245)
+1034 10
+-6 10
+fi=(244)
+612 5
+fi=(226)
+1917 5
+fi=(245)
+1034 10
+fi=(244)
+617 5
+fi=(265)
+2494 5
+fi=(244)
+765 5
+-94 5
+-59 5
+fi=(226)
+-65 5
+fi=(245)
+2886 10
+fe=(348)
+334 10
+0 2
+335 6
+198 8
+cfn=(1708)
+calls=2 -72 
+* 62
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(265)
+2494 2
+fi=(244)
+765 2
+-94 2
+fe=(348)
+0 2
+fi=(244)
+612 2
+fi=(226)
+-65 2
+fi=(245)
+2886 6
+fe=(348)
+203 6
++1 6
+cfn=(1708)
+calls=2 -78 
+* 62
+* 2
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+0 2
+fi=(232)
+961 4
+fi=(226)
+547 4
+cob=(2)
+cfi=(204)
+cfn=(722)
+calls=2 255 
+* 34
+* 2
+fi=(245)
+2886 4
+1028 4
+fe=(348)
+0 2
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+fe=(348)
+207 4
+fi=(245)
+1028 4
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+fe=(348)
+0 2
+212 4
++1 6
+cfn=(1708)
+calls=2 -87 
+* 62
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(265)
+2494 4
+fi=(244)
+765 2
+-94 2
+-59 2
+fi=(226)
+-65 2
+fi=(245)
+2886 4
+1028 4
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+-6 4
++6 2
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 2
+fe=(348)
+335 2
+fi=(246)
+772 5
+fi=(244)
+612 4
+fi=(226)
+1917 4
+fi=(245)
+1034 8
+fi=(229)
+1916 4
+fi=(246)
+772 4
+fi=(244)
+617 4
+fi=(265)
+2494 8
+fi=(244)
+765 4
+-94 4
+-59 4
+fi=(226)
+-65 4
+fi=(245)
+2886 8
+1028 8
+fi=(244)
+612 4
+fi=(226)
+1917 4
+fi=(245)
+1034 8
+-6 8
+0 1
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-54 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 2
+fi=(226)
+-65 2
+fi=(245)
+2886 4
+1028 4
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+-6 4
+fi=(244)
+612 2
+fi=(226)
+1917 2
+fi=(245)
+1034 4
+fe=(348)
+346 2
+fi=(263)
+451 4
+fe=(348)
+346 3
+fi=(263)
+451 6
+fi=(244)
+612 5
+fe=(348)
+344 5
+fi=(226)
+547 5
+fi=(245)
+2997 10
+fe=(348)
+351 5
+fi=(263)
+451 10
+fi=(244)
+612 5
+fe=(348)
+349 5
+fi=(226)
+547 5
+fe=(348)
+353 40
+
+fn=(1682)
+495 8
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=1 3283 
+* 142
+fi=(244)
+468 2
+fe=(348)
+112 4
+363 5
+cfn=(1686)
+calls=1 118 
+* 37
+fi=(245)
+2997 2
+fe=(348)
+367 5
+cfn=(1686)
+calls=1 118 
+* 37
+fi=(245)
+2997 2
+fe=(348)
+135 5
+cfn=(1686)
+calls=1 -17 
+* 37
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+612 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 3
+fe=(348)
+377 5
+cfn=(1686)
+calls=1 118 
+* 37
+fi=(245)
+2997 2
+fe=(348)
+238 5
+cfn=(1686)
+calls=1 118 
+* 37
+fi=(245)
+2997 2
+fe=(348)
+142 5
+cfn=(1686)
+calls=1 -24 
+* 37
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 1
+fi=(244)
+765 2
+612 1
+fi=(226)
+-65 2
+fi=(245)
+2886 3
+fe=(348)
+149 5
+cfn=(1686)
+calls=1 -31 
+* 37
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 2
+612 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 2
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fe=(348)
+251 2
+fi=(263)
+451 2
+fe=(348)
+249 1
+fi=(226)
+547 1
+fe=(348)
+384 19
++13 10
+cfn=(1696)
+calls=1 297 
+* 780
++10 17
++12 10
+cfn=(1696)
+calls=1 297 
+* 864
++10 9
++11 9
+cfn=(1696)
+calls=1 297 
+* 548
++8 9
+cfn=(1696)
+calls=1 297 
+* 548
++8 9
+cfn=(1696)
+calls=1 297 
+* 548
+fi=(245)
+2997 1
+fe=(348)
+468 3
+fi=(265)
+923 3
+fi=(244)
+612 1
+fe=(348)
+466 1
+fi=(226)
++81 1
+fi=(245)
+2997 2
+fe=(348)
+263 5
+cfn=(1686)
+calls=1 118 
+* 37
+fi=(245)
+2997 2
+fe=(348)
+149 5
+cfn=(1686)
+calls=1 -31 
+* 37
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 3
+fe=(348)
+161 5
+cfn=(1686)
+calls=1 -43 
+* 37
+fi=(244)
+617 1
+fi=(245)
+1446 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fi=(244)
+617 1
+fi=(265)
+2494 2
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(226)
+-65 1
+fi=(245)
+2886 2
+fi=(265)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(226)
+547 1
+fi=(245)
+2886 2
+fe=(348)
+289 2
+fi=(263)
+451 2
+fe=(348)
+287 1
+fi=(226)
+547 1
+fi=(245)
+2997 1
+fe=(348)
+476 3
+fi=(265)
+923 3
+fi=(244)
+612 1
+fe=(348)
+474 1
+fi=(226)
++73 1
+fi=(245)
+2997 1
+fe=(348)
+481 3
+fi=(265)
+923 3
+fi=(244)
+612 1
+fe=(348)
+479 1
+fi=(226)
++68 1
+fe=(348)
+-64 4
++14 8
+
+fl=(242)
+fn=(850)
+fi=(344)
+cfi=(243)
+cfn=(852)
+calls=0 285 
+250 236300
+fe=(242)
+
+fl=(328)
+fn=(1492) hashbrown::raw::RawTableInner::fallible_with_capacity
+1653 18
+110 4
++33 12
+fi=(279)
+457 2
+fi=(265)
+3051 4
+fe=(328)
+225 2
+fi=(265)
+769 12
+fi=(279)
+457 4
+fi=(236)
+14 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+fi=(379) /rust/deps/hashbrown-0.16.1/src/raw/alloc.rs
++5 4
+fi=(232)
+961 2
+fe=(328)
+1642 2
+185 14
+fi=(226)
+709 10
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=2 198 
+* 22
+fe=(328)
+1678 10
++3 16
+-28 18
+110 4
++33 14
+fi=(265)
+3051 4
+fi=(279)
+457 2
+fi=(265)
+769 2
+fi=(279)
+457 2
+fi=(265)
+769 2
+fe=(328)
+224 2
++1 2
+fi=(265)
+769 12
+fi=(279)
+457 4
+fi=(280)
+186 4
+0 4
+95 2
+fi=(236)
+-82 2
++1 4
+cob=(2)
+cfi=(155)
+cfn=(644)
+calls=2 3283 
+* 60
+* 4
+fi=(379)
++5 4
+fi=(232)
+961 2
+fe=(328)
+1642 2
+185 14
+fi=(226)
+709 8
+cob=(2)
+cfi=(220)
+cfn=(794)
+calls=2 198 
+* 22
+fe=(328)
+1678 10
++3 16
+
+fn=(2546)
+2312 4
+fi=(265)
+769 1
+fe=(328)
+224 1
++1 1
+fi=(280)
+-25 2
+fi=(232)
+1072 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 33
+fi=(226)
+805 1
+fe=(328)
+
+fn=(1488)
+999 8
+2794 1
+fi=(265)
+769 2
+fi=(279)
+457 1
+0 2
+fe=(328)
+2798 2
+185 9
+2799 4
++27 1
+fi=(229)
+1037 2
+fe=(328)
+2738 3
+cfn=(1492)
+calls=1 1653 
+* 101
+fi=(237)
+2173 1
+0 2
+2173 2
+0 2
+fe=(328)
+2665 2
+3986 3
+fi=(329) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/step_by.rs
+0 2
+fe=(328)
+2981 2
+fi=(226)
+1435 3
+fe=(328)
+2747 2
+1026 8
+-27 8
+2794 1
+fi=(265)
+769 2
+fi=(279)
+457 1
+0 2
+fe=(328)
+2798 2
+185 9
+2799 4
++27 1
+fi=(229)
+1037 2
+fe=(328)
+2738 3
+cfn=(1492)
+calls=1 1653 
+* 101
+fi=(237)
+2173 1
+0 2
+2173 2
+0 2
+fe=(328)
+2665 2
+3986 3
+fi=(329)
+0 2
+fe=(328)
+2981 2
+fi=(226)
+1435 3
+fe=(328)
+2747 2
+1026 8
+-27 14
+2794 2
+fi=(265)
+769 2
+fi=(279)
+457 2
+0 4
+fe=(328)
+2798 4
+185 18
+2799 8
++27 2
+fi=(229)
+1037 4
+fe=(328)
+2738 10
+cfn=(1492)
+calls=2 1653 
+* 226
+fi=(237)
+2173 2
+0 2
+2173 4
+fe=(328)
+0 6
+2665 4
+3986 6
+fi=(331)
+1320 1
+fi=(367)
+31 11
+-31 1
+50 6
+fi=(332)
+641 3
+fe=(328)
+3942 3
+fi=(232)
+1072 9
+fi=(325)
+258 12
+cfi=(326)
+cfn=(1476)
+calls=3 694 
+* 357
+fe=(328)
+0 9
+fi=(226)
+547 3
+fi=(331)
+1563 3
+fi=(367)
+50 6
+-50 3
+fi=(332)
+641 3
+fe=(328)
+1793 6
+fi=(279)
+457 6
+fe=(328)
+0 9
+fi=(333)
+48 3
+fi=(265)
+2494 3
+fe=(328)
+2631 3
++3 3
++1 3
+2439 9
+fi=(226)
+547 9
+fe=(328)
+3986 7
+fi=(329)
+0 4
+fe=(328)
+2981 4
+fi=(226)
+1435 6
+fe=(328)
+2747 4
+fi=(265)
+769 1
+fe=(328)
+224 1
++1 1
+fi=(280)
+-25 2
+fi=(232)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(756)
+calls=1 3319 
+* 153
+* 1
+fi=(280)
+200 1
+fe=(328)
+1026 16
+
+ob=(2)
+fl=(169) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606)
+calls=0 0 
+59 236300
+
+fl=(204)
+fn=(722)
+255 462
++1 462
++6 462
++1 462
++2 226
++1 226
++1 226
++3 119
++1 119
++1 119
++3 238
++30 236
++1 236
++2 69
++1 69
++2 31
++4 31
++1 9
++1 9
++1 9
++1 9
++1 1
++1 1
++2 1
++2 1
+-2 8
++2 8
++6 22
++1 22
++1 22
++1 22
++1 22
++7 167
++1 167
++1 167
++1 167
++2 167
++17 38
++1 38
++1 38
++1 38
++1 38
++7 42
++1 42
++1 42
++1 42
++1 42
++1 42
++1 84
++5 107
++1 107
++5 107
++1 107
++2 87
++1 87
++1 87
++2 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 45
++1 90
++4 20
++1 20
++4 20
++2 20
++4 20
++1 20
++11 20
++3 20
++2 20
++2 20
++4 20
++1 20
++9 19
++1 19
++2 19
++2 19
++1 19
++1 19
++3 19
++2 19
++2 19
++2 38
++6 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
+-11 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++1 128
++2 19
++1 19
++1 19
++1 19
++2 19
++4 38
++13 1
++1 1
++2 1
++1 1
++1 1
++2 1
++2 1
++2 2
++6 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
+-11 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++1 19
++2 1
++1 1
++1 1
++1 1
++2 1
++1 2
+
+fl=(155)
+fn=(726) _int_free_merge_chunk
+4407 1576
++7 985
+-6 197
++9 591
++5 591
++4 394
+-1 394
++1 394
+1895 591
+4433 394
++2 8
++2 8
++1 32
++2 8
+-4 8
++4 8
+cfn=(788) unlink_chunk.isra.0
+calls=8 1592 
+* 152
++18 394
++6 394
++4 187
++4 394
++9 15
+-1 15
++2 30
++2 45
++7 364
++1 728
++1 182
++2 364
++3 1092
++4 182
+-1 182
++2 182
++1 182
++2 546
++1 182
+-61 182
+-1 364
++1 1092
+-1 182
+cfn=(728) _int_free_maybe_trim
+calls=188 +83 
+* 4368
++57 15
+-1 15
++2 15
++1 15
++2 45
++1 15
+-61 15
+-1 30
++1 90
+-1 15
+cfn=(728)
+calls=15 +83 
+* 360
++20 10
++1 10
+-1 10
+cfn=(788)
+calls=10 1592 
+* 205
++1 10
+-49 985
+
+fn=(756)
+3319 373
++3 746
++15 746
+-4 1119
++8 1119
++6 1095
++6 365
+-3 730
++3 365
+-3 365
++1 730
++2 1095
+3007 324
++8 324
+-12 324
++4 972
++1 324
++7 324
+3354 324
++10 123
+-34 49
++40 98
+fi=(154) ./malloc/./malloc/arena.c
+151 147
+fe=(155)
+3374 147
+cfn=(724) _int_free_chunk
+calls=49 4351 
+* 5866
+
+fn=(788)
+1592 110
++2 330
+-2 110
++2 220
++3 110
++3 220
+-2 110
++2 220
++3 110
++1 110
++1 265
++2 16
++1 24
++3 16
++14 8
++1 8
++3 220
+
+fn=(804) __libc_calloc2
+3645 8
++7 2
++10 1
++1 3
++21 3
+cfn=(648) _int_malloc
+calls=2 3790 
+* 122
+* 1
++2 6
++40 1
+-12 1
++12 2
++3 5
++4 1
+fi=(313) ./malloc/../sysdeps/generic/calloc-clear-memory.h
+25 2
++2 2
++8 1
++3 1
+-1 1
+-2 1
++3 1
++2 2
++2 1
+fe=(155)
+3735 1
+fi=(313)
+44 1
+fe=(155)
+3735 7
+-49 1
+fi=(154)
+151 2
+fe=(155)
+3686 3
++3 3
+
+fn=(644)
+3283 372
+1269 744
++19 372
+3287 372
+1288 955
+3287 422
++2 624
++2 416
++2 2214
+3030 478
++4 956
++4 239
++1 239
+3294 239
+-7 322
++19 133
+cfn=(646) __libc_malloc2
+calls=206 -59 
+* 20075
+-17 322
+
+fn=(646)
+3247 798
++4 266
++28 665
+-26 399
+cfn=(648)
+calls=207 3790 
+* 17016
++1 665
+fi=(154)
+151 266
+fe=(155)
+
+fn=(728)
+4528 2167
++3 394
++19 2167
+
+fn=(714)
+3380 450
++7 450
+-7 2025
++11 450
+4837 225
++1 225
+-1 225
++1 225
+-1 450
++2 675
+3425 170
+-22 170
++22 850
++4 340
+1288 1020
+3436 340
+fi=(154)
+151 510
+fe=(155)
+3469 340
+4840 225
+3411 450
++2 114
++1 114
++36 55
++51 2025
+-30 680
+cfn=(718) _int_realloc
+calls=186 4559 
+* 49929
+* 170
++1 850
+fi=(154)
+151 510
+fe=(155)
+3472 340
+
+fn=(718)
+4559 680
++11 2040
++8 340
++2 170
++1 510
++1 680
++4 340
++14 32
++53 64
+-53 64
++57 32
+-57 32
++57 64
+-2 64
++2 24
++1 12
++16 12
++1 48
+-1 20
++1 632
+-79 336
++12 316
++12 896
+cfn=(648)
+calls=133 3790 
+* 17803
+* 128
++1 256
++3 128
++6 384
++36 20
+-4 20
++3 20
++5 20
+-4 20
+-1 20
++5 20
+-4 20
++4 20
+-1 20
++1 60
+cfn=(724)
+calls=21 4351 
+* 2300
+* 20
+-60 35
+-1 70
++5 180
+cfn=(788)
+calls=31 1592 
+* 588
++44 150
+-48 60
++28 128
+fi=(215) ./malloc/../string/bits/string_fortified.h
+29 128
+fe=(155)
+4637 128
+fi=(215)
+29 256
+fe=(155)
+4638 256
+fi=(215)
+29 128
+cob=(3)
+cfi=(152)
+cfn=(720)
+calls=133 -29 
+* 2689
+fe=(155)
+4642 768
+cfn=(724)
+calls=133 4351 
+* 15222
++2 256
+-47 10
++1 10
+-2 20
++4 40
++2 10
+-2 10
++2 10
+-2 40
++1 20
++1 10
++2 20
+
+fn=(648)
+3790 2358
++32 524
+1288 1493
+3831 366
++16 366
++54 45
++18 178
+-1 178
++12 356
+-11 356
+-1 534
++12 356
+-6 88
++5 88
+-7 88
++2 176
++9 176
++3 176
+-3 2
++3 2
++1 267
+-3 89
++5 89
++1 356
++2 356
+-10 89
++12 178
++1 178
++2 178
++11 346
++29 10
++1 10
++4 20
++31 18
++8 52
++1 5
++1 5
+-1 5
++4 10
+-4 3
++1 3
+-1 3
++4 6
++50 58
++9 29
+-9 116
++1 29
++1 29
++1 29
++1 29
++6 58
+3053 5
+-27 5
++27 5
+-27 5
++4 10
++4 20
++4 5
++1 5
+4113 5
+3831 316
+1288 79
+3850 79
++2 79
+-2 79
++2 158
+-2 174
++2 174
+-2 174
++2 348
++2 84
++1 168
++2 84
++1 84
++1 84
++2 336
++6 252
++1 168
+2919 168
+3872 252
++4 729
++1 182
++2 50
++2 25
++1 25
++1 50
++2 25
+2999 25
++16 25
+3886 25
+3003 50
++4 100
++1 25
++7 25
++32 193
+1888 84
+3893 84
+1888 168
+4340 2358
+3901 184
+-52 1044
+4105 87
+3930 102
+4111 132
++13 118
+-2 236
++2 16
++3 8
+-3 8
++3 16
+4277 12
++3 48
++2 18
++1 6
+1888 6
+4286 6
+1888 12
+4280 328
++2 123
++1 41
+1888 41
+4286 41
+1888 97
+4286 15
+1888 30
+3994 6
++1 6
+-1 6
++1 12
+2919 12
+3998 18
++4 12
++1 15
+3003 5
+3981 5
+3015 5
+4006 5
+3003 5
++4 20
++1 5
++7 5
+4007 5
++24 12
+1888 3
+4083 8
+-51 8
++51 25
+-70 2
+-54 168
++2 79
+-1 158
++27 25
++1 25
++4 50
++31 100
++2 40
++1 60
++1 20
+-1 20
++1 20
+-2 2
++1 3
++1 1
+-1 1
++1 4
++4 12
+4195 118
++1 118
++1 118
+-1 118
++1 118
++1 236
++1 354
++5 595
++16 453
++2 906
+-4 1140
++8 117
++3 234
++2 110
++1 55
++1 55
+-2 55
+-27 55
++4 228
++3 296
+-3 174
++3 208
+-3 144
++3 152
+-3 76
+4308 112
++1 168
++2 112
++3 224
++5 56
+-2 56
++2 112
+-2 56
++7 56
+-8 56
++3 56
++2 56
+-3 56
++1 224
++2 56
+1888 168
+4208 20
++5 80
++1 40
++24 124
++3 124
++2 62
++3 124
+-3 248
++3 62
+cfn=(788)
+calls=64 1592 
+* 1262
++3 372
++15 47
++1 94
++3 47
+-9 47
++9 94
++1 47
++1 47
++3 94
++1 45
++1 100
+-23 15
+-1 15
++1 30
+3965 54
++3 54
+-4 108
++3 54
+-1 54
++1 108
++1 108
++1 108
++2 28
++4 14
++6 14
+-6 98
++2 42
++5 14
+-4 14
++4 28
+cfn=(656) alloc_perturb
+calls=14 1887 
+* 70
+-7 40
++6 40
+-6 280
++2 120
++5 40
+-4 40
++4 80
+cfn=(656)
+calls=40 1887 
+* 200
++1 54
+
+fn=(802)
+3739 2
++3 8
+1269 4
++19 2
+3751 2
+1288 6
+3751 4
++2 6
++2 4
++25 2
+cfn=(804)
+calls=2 3645 
+* 186
+-23 12
+3030 3
++4 4
++4 1
++1 3
+fi=(313)
+25 1
+fi=(215)
++34 1
+fi=(313)
+-32 2
++11 1
+-1 1
++1 1
++2 2
++2 1
++2 2
+fe=(155)
+3781 2
+
+fn=(656)
+1887 54
++1 162
++2 54
+
+fn=(724)
+4351 788
++8 197
+-3 197
++3 197
+-3 394
++6 394
++6 197
+cfn=(726)
+calls=203 +39 
+* 20039
++5 394
++27 591
+
+fl=(220)
+fn=(794)
+198 17
++1 34
++5 17
++1 17
++1 10
++1 10
++1 10
++2 3
++1 3
++1 6
++9 1
++1 1
++2 2
++5 7
++1 7
++6 7
++1 7
++12 7
++3 7
++1 7
++12 6
++1 6
++13 6
++1 6
++2 6
++3 5
++3 5
++3 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
+-6 7
++1 7
++1 7
++1 7
++1 7
++1 7
++1 12
++3 5
++1 5
++1 5
++1 5
++3 10
+-6 1
++1 1
++1 1
++1 1
++3 2
++35 7
++9 7
++1 7
++5 2
++1 2
++1 2
++1 2
++23 5
++1 5
++1 5
++23 2
++1 2
++5 2
+
+fl=(370)
+fn=(2078)
+73 21
++7 21
++1 21
++3 12
++1 12
++1 12
++4 12
++1 12
++2 12
++1 12
++62 1
++10 1
++1 1
++1 1
++3 2
+337 12
++1 12
++1 12
++1 12
++1 12
++1 24
++59 9
++1 9
++5 9
++1 9
++1 9
++1 9
++1 9
++3 9
++1 9
++1 9
++1 9
++3 9
++1 9
++1 8
++1 16
+
+fl=(166)
+fn=(576)
+cfi=(169)
+cfn=(598)
+calls=0 30 
+360 236300
+
+totals: 236300

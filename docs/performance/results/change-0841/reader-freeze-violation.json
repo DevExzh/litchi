@@ -1,0 +1,19 @@
+{
+  "native_capture": {
+    "bytes": 29431,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture-native.json",
+    "sha256": "05312a3480e92cd6cdb31ccb283ee6afffeedd78e2185f27e46760283bc0b823"
+  },
+  "new": {
+    "bytes": 49081,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers_v2.py",
+    "sha256": "556f825a63c7e17380403b8b30659fa06199235004bb861898cea7887a593af6"
+  },
+  "old": {
+    "bytes": 48501,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers.py",
+    "sha256": "36e30bc12a6fdeeb10a2eb59496c77b609bfd3eb38f37963b22231d91416ec58"
+  },
+  "reason": "Reader agent changed the frozen reader to correct raw Callgrind command-header semantics after being told it was frozen. Profile driver stopped at admission hash check before creating any profile run. Native workloads, source, binaries, schedule and corpus remained unchanged. Preserve original reader and receipt; admit additive corrected reader after revalidation, do not rerun workloads.",
+  "status": "caught-before-profile-launch"
+}

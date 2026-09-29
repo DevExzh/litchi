@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0841 — current PPT borrowed-text instruction diagnosis
+
+[0841](0841-ppt-borrowed-text-instruction-diagnostic.md) completes current-source native and owner-scoped instruction diagnosis without adopting the borrowed-text candidate. All 156 reports / 3,636 samples pass; production is restored exactly. Tiny write increases 2.46%, while many is approximately unchanged and payload/Unicode improve in these binaries. No native p50/RSS threshold is crossed; wrapper/build differences prevent a causal explanation of historical 0782. A separate compression feature discrepancy is retained for fresh investigation.
+
 ## 0840 — fresh CFB emission avoids large payload gap initialization
 
 [0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.

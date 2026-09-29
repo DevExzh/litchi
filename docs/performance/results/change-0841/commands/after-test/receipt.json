@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-ppt",
+    "--all-features"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790696500.4385426,
+  "log": {
+    "bytes": 111285,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/after-test/output.log",
+    "sha256": "1123d4dae43a6375e2838f1bb319f48445b3625d8b7624f9ecf5c43dfdc534a9"
+  },
+  "started_unix": 1790696481.6708977
+}

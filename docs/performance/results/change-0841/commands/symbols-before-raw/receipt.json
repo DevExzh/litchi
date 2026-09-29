@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "nm",
+    "-S",
+    "--defined-only",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790696405.4537635,
+  "log": {
+    "bytes": 218352,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-before-raw/output.log",
+    "sha256": "b3f7f532b5c859263ebc5fb6ef624bd1909069bec669d0f155e808d2563ed352"
+  },
+  "started_unix": 1790696405.4432497
+}

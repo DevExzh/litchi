@@ -1,0 +1,250 @@
+{
+  "files": [
+    {
+      "bytes": 1170,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/admit.py",
+      "sha256": "cb10d2303c27308f7c736e98fce959ac657c1fdb7c52e08786f09b4174578779"
+    },
+    {
+      "bytes": 3758,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analyze.py",
+      "sha256": "a6fd87a3a4ec0947de3d31678a1dec3d6fa3b547fde28004296c542970a16daa"
+    },
+    {
+      "bytes": 654,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-after.json",
+      "sha256": "94b928f680b8ec7ed15241495881e814dfac012b9358af1024c3ecdce69a6f3d"
+    },
+    {
+      "bytes": 659,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-before.json",
+      "sha256": "5e86f7b3ae9e02d935f334faccfea14bf47a2f073a9c32efc0f78888d50b4697"
+    },
+    {
+      "bytes": 1933,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-initial.py",
+      "sha256": "c328471215dc9648411bc3987f205bb00d476bd6556ad23ddede545a1463e9a9"
+    },
+    {
+      "bytes": 1989,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build.py",
+      "sha256": "dff5dc0c117293def7f8582fed8c6db16260b43f36f8aff78fb3b508e4e9834e"
+    },
+    {
+      "bytes": 1268,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/candidate-origin.json",
+      "sha256": "e000538df6b7b093618163818bf14062453e4c9503b352d8b8dcbb17e1c2c66b"
+    },
+    {
+      "bytes": 3060,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/candidate-source-parity.json",
+      "sha256": "108404231ce4e2de2697253ac3f0d1966126c6479f4e9c778bc784844b515009"
+    },
+    {
+      "bytes": 22105,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/candidate.patch",
+      "sha256": "b9ea9b31f2daff2513aeb9e735324d6aab81671f1a7385a9a011abb929136d59"
+    },
+    {
+      "bytes": 1069,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/candidate.py",
+      "sha256": "332ff7e43142b6f89c0d65e80821b0fe3405f30f2cbf0354f41e6fe4da0f97ba"
+    },
+    {
+      "bytes": 2749,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture-qualification-after.json",
+      "sha256": "96d049f51146ac25a780e0ff454433b9cdd428015ce876a3d054bdf7ea3f4c67"
+    },
+    {
+      "bytes": 2749,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture-qualification-before.json",
+      "sha256": "bee7603a549c0af1c471bc93078ec4b1d68e6862d28529fa24c110038557f4af"
+    },
+    {
+      "bytes": 2260,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture.py",
+      "sha256": "0e510572c82622899b285b7222b90fd0cf56414e3b90697725dd1632d866eebf"
+    },
+    {
+      "bytes": 4405,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/compression-feature-evidence.json",
+      "sha256": "65aab081e90f3733856c2560e2f9430269c2c914f95623c524d137f2698d6051"
+    },
+    {
+      "bytes": 1420,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/crosscheck.py",
+      "sha256": "d392d3c7a6af6d50ac5b13d8768c07563f834edff8755927726f697c18831564"
+    },
+    {
+      "bytes": 2519,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/driver.py",
+      "sha256": "e60c1b536669fafe184751d9b2163c764a8fe2fa1d44591322886c686f7823c9"
+    },
+    {
+      "bytes": 1203138,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/freeze-after.json",
+      "sha256": "10db580ce7afe6384c2d43a069786ed2510d7ee52c4ea2efe5e6bffc50490fde"
+    },
+    {
+      "bytes": 1203138,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/freeze-before-v2.json",
+      "sha256": "8919d989979f668c27af9a23c69484cd8d494c932ce829f7e5ad1b1847922e4b"
+    },
+    {
+      "bytes": 1203138,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/freeze-before-v3.json",
+      "sha256": "d36e8c0febaeca5259162c6691061c199614c18a035f57e14b8aa5a9e284b27b"
+    },
+    {
+      "bytes": 1203138,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/freeze-before.json",
+      "sha256": "24cf728b99b97d82750af14f9e1d4dbc57f372f5d7c6f91bb4be16de72c48f17"
+    },
+    {
+      "bytes": 8925,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/historical-preflight.json",
+      "sha256": "3b40f94fe31b2546ed3e950fd9e6e225b6541b01c66c2e60c6da80867f906e16"
+    },
+    {
+      "bytes": 1562,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/historical_preflight.py",
+      "sha256": "3ea77b4d3b00197c708de4d115e8e64d8504af92ba72333bb14c3022b80623c2"
+    },
+    {
+      "bytes": 51308,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/host.json",
+      "sha256": "136f9ad51549ff9a4364c3dc3dcceb4e1677611f21e08870ec62e25ca0583ac0"
+    },
+    {
+      "bytes": 640,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/lock-alignment.json",
+      "sha256": "02c32bf88d1d1f24d2c17bd7477ff67714a0f226ebd5b5a788ddfed2905dafef"
+    },
+    {
+      "bytes": 4608,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/origin.json",
+      "sha256": "c63576886df2fb0e55a6d7924ddf8180f6635ad4902fa5a7c17787eca7a619c2"
+    },
+    {
+      "bytes": 23861,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/plan.json",
+      "sha256": "f677d32292ee282228d0b25898e50662b6529247004b41205724a7725207d9d3"
+    },
+    {
+      "bytes": 1454,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe-quality-after.json",
+      "sha256": "10ec00b1560c02886d26936c7f9a0db89af28bb3b190d71abddd01e035f84c98"
+    },
+    {
+      "bytes": 1478,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe-quality-before.json",
+      "sha256": "3d22f376db4bb5f523cbd4858fe59016d003b545c8564c4db9775378f3e5c1ce"
+    },
+    {
+      "bytes": 23329,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualification.json",
+      "sha256": "b2f14f6fc6ecdcbbb0addb38c41230600b0321a01e5bc6f2e7d584b53c453c1b"
+    },
+    {
+      "bytes": 4695,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualify.py",
+      "sha256": "96797672f4e2f95ca6ec4263d71a54d31af8794077318c988e6153ee042d3af5"
+    },
+    {
+      "bytes": 1201915,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/quality-after-source.json",
+      "sha256": "d40e29b3a4bbc8084320b936ee6946074576bf8afa4eb2f8fa7dd9c1f14dca0e"
+    },
+    {
+      "bytes": 1203324,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/quality-after.json",
+      "sha256": "007ca1ddfba53b948023f64e22c78d09c7b961e1b5d0661d1b46f8dfdf22ca65"
+    },
+    {
+      "bytes": 1201915,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/quality-before-source.json",
+      "sha256": "68dc6a94f12354e8dde15331ac3cf40ee8cd0bd18220a7084302c88b01be0022"
+    },
+    {
+      "bytes": 1203330,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/quality-before.json",
+      "sha256": "725ba9ee6b8093d1e5094f0ae0fec1b646246a98ced722ad5da67294d738eb85"
+    },
+    {
+      "bytes": 1089,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/quality.py",
+      "sha256": "4edab8df51538cd1357d35059aa420077b4ce47ab9158459f72af5838c1a2d7c"
+    },
+    {
+      "bytes": 16988,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader-tests.json",
+      "sha256": "cb8b58422a8c8376b344aef5309edbb271f90f693acdd92d0233078ea0d41a9d"
+    },
+    {
+      "bytes": 12160,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader_tests.py",
+      "sha256": "273d0ae006ad339f88abf5e160fb2bc6087186ccf84b53307bc3a23ffb97b368"
+    },
+    {
+      "bytes": 48501,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers.py",
+      "sha256": "36e30bc12a6fdeeb10a2eb59496c77b609bfd3eb38f37963b22231d91416ec58"
+    },
+    {
+      "bytes": 1202614,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/source-after.json",
+      "sha256": "2582df59f9dd88b1391360fe9babfc43d34bd8a3bf5088aef6ea16c9d259bec9"
+    },
+    {
+      "bytes": 1201915,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/source-before.json",
+      "sha256": "68dc6a94f12354e8dde15331ac3cf40ee8cd0bd18220a7084302c88b01be0022"
+    },
+    {
+      "bytes": 3063,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/symbols-after.json",
+      "sha256": "215224d2c15d3311dd89bea96dce937588cfce573b89b4c9bd68fd0cf933304c"
+    },
+    {
+      "bytes": 3069,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/symbols-before.json",
+      "sha256": "e0e2420a727341c5ea4cf67d57c6e4f395b41ada790083c483aacaafca1f2d1e"
+    },
+    {
+      "bytes": 2821,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/symbols.py",
+      "sha256": "99db12d5b3dc100992ac4d749cf38dca7f2cffa44c6778fe4afe2c5a4741439f"
+    },
+    {
+      "bytes": 35310,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/Cargo.lock",
+      "sha256": "5502dd181565fc1c5c7cd42b80decf71e9a86756200137f610ccdaffb753d192"
+    },
+    {
+      "bytes": 589,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/Cargo.toml",
+      "sha256": "88ccc8c9ad54a44d2919b7f6066536b7fd750437ad969efa3a37a1251f4540d0"
+    },
+    {
+      "bytes": 589,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/Cargo.toml.template",
+      "sha256": "88ccc8c9ad54a44d2919b7f6066536b7fd750437ad969efa3a37a1251f4540d0"
+    },
+    {
+      "bytes": 62274,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/src/allocation_metrics.rs",
+      "sha256": "8172a45e4230e8c81f3cad779774fad38dcb011bbfd81e26fe0ce2f170767e95"
+    },
+    {
+      "bytes": 10465,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/src/counting_allocator.rs",
+      "sha256": "50574c60f7bbf00bbb5e5bef6d4b33e57c483463fe0c0b72e01d91c4d0d9b720"
+    },
+    {
+      "bytes": 36906,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe/src/main.rs",
+      "sha256": "8c1a4f4191a09a0515d93322c0515267df972a1e48dfae4124c4efdc34a18bd7"
+    }
+  ],
+  "status": "pass"
+}

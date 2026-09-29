@@ -1,0 +1,71 @@
+{
+  "absent_queries": [
+    "litchi_ppt::writer::core::codec::convert_shape_to_escher_with_sound_mapping",
+    "litchi_ppt::writer::escher::codec::validation::validate_user_shape"
+  ],
+  "binary": {
+    "bytes": 9236024,
+    "path": "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "sha256": "7a057a936c6777c23cc2295f6f033ba8ba0ebe20c42147a7652391522bcfd6bf"
+  },
+  "inventory": {
+    "demangled": {
+      "bytes": 175800,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-demangled/output.log",
+      "sha256": "97e12b025593b416e293b2f947eb1f48c6a678f20262406764f7616d20113c35"
+    },
+    "elf": {
+      "bytes": 407,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-elf/output.log",
+      "sha256": "6a1a38ef486b52bdb3cbe40cead6133e408a074df01ba4bbd1d19d65f2b840ae"
+    },
+    "raw": {
+      "bytes": 218352,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-raw/output.log",
+      "sha256": "9826e1b39f4c9a38a804427e2bee692e0886cb9cf63f4e59975a9ef637df7875"
+    }
+  },
+  "owner": "ppt_profile_probe::profile_write",
+  "selected": [
+    {
+      "address": 494032,
+      "assembly": {
+        "bytes": 249038,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-code-00/output.log",
+        "sha256": "6c4c4b81d7cb3479ea0430f932b465bcd5e3bd53bc80d722925dc8f66772023c"
+      },
+      "kind": "t",
+      "query": "ppt_profile_probe::profile_write",
+      "raw_symbol": "_ZN17ppt_profile_probe13profile_write17h27fb2fc4dcd1d570E",
+      "size": 20050,
+      "symbol": "ppt_profile_probe::profile_write"
+    },
+    {
+      "address": 1185792,
+      "assembly": {
+        "bytes": 36829,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-code-01/output.log",
+        "sha256": "adbb0591e787977f20aaa2f0c6ec11881d69e34a808f721d26d30b9f34cca63b"
+      },
+      "kind": "t",
+      "query": "litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions",
+      "raw_symbol": "_ZN10litchi_ppt6writer6escher5codec4text39append_client_textbox_with_interactions17hf98d5fa0c24fd68cE",
+      "size": 2258,
+      "symbol": "litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions"
+    },
+    {
+      "address": 1190080,
+      "assembly": {
+        "bytes": 166824,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/symbols-after-code-02/output.log",
+        "sha256": "cfd89c533697a3f56712fd1d1453f54120f9fcf7f097d76fe42852174b1d8184"
+      },
+      "kind": "t",
+      "query": "litchi_ppt::writer::escher::codec::shapes::append_shape_container_children",
+      "raw_symbol": "_ZN10litchi_ppt6writer6escher5codec6shapes31append_shape_container_children17h9adcf66b3d75e720E",
+      "size": 11697,
+      "symbol": "litchi_ppt::writer::escher::codec::shapes::append_shape_container_children"
+    }
+  ],
+  "status": "pass"
+}

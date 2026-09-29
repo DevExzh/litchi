@@ -1,0 +1,90 @@
+{
+  "plan": {
+    "bytes": 23861,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/plan.json",
+    "sha256": "f677d32292ee282228d0b25898e50662b6529247004b41205724a7725207d9d3"
+  },
+  "receipts": [
+    {
+      "bytes": 1695,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-a/receipt.json",
+      "sha256": "dc5f34d8544583faa7e95daefb3200b01e1f936f2460385f29df27ec6cff1e69"
+    },
+    {
+      "bytes": 1694,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-many-write-leg-b/receipt.json",
+      "sha256": "dfc3a7ad08b0c03180118483012c3e1895a6a45965323c0d916bd19234d057f4"
+    },
+    {
+      "bytes": 1716,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-unicode-write-leg-a/receipt.json",
+      "sha256": "48a901622753fc55fbd3674682fe0151d4fedbc869ca8438751bdcc4c89f5e06"
+    },
+    {
+      "bytes": 1715,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-unicode-write-leg-b/receipt.json",
+      "sha256": "19184b0e525221c2222ac754dba67055ea7ce9e18030d3d975d55279355ec6cf"
+    },
+    {
+      "bytes": 1716,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-payload-write-leg-a/receipt.json",
+      "sha256": "347b20f8ac03f14b9b4d826f50cbb32215d6f9c82a9d085707a48583242d84d7"
+    },
+    {
+      "bytes": 1715,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-payload-write-leg-b/receipt.json",
+      "sha256": "93ebe346638edaa03f61f80a1da801820bfd553363bd5c1e42b2a65a560a1a19"
+    },
+    {
+      "bytes": 1694,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-rich-write-leg-a/receipt.json",
+      "sha256": "34847331274eb2e09b1640399144dbf32157ba6ea4c7cfb00cd38da6d894c7bd"
+    },
+    {
+      "bytes": 1694,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-00-rich-write-leg-b/receipt.json",
+      "sha256": "3916cc979b122583df88abb9a05c3f11bdd6774f5ed6e5ec86164503cf41b669"
+    },
+    {
+      "bytes": 1693,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-rich-write-leg-b/receipt.json",
+      "sha256": "1cfaba14cc35497fc0e44832da1b525656205466be5214c8aedb6388b960d2b6"
+    },
+    {
+      "bytes": 1694,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-rich-write-leg-a/receipt.json",
+      "sha256": "878273bbc3ccbb5214d620f7465af4d9b332402e6830582f6474093f50929b65"
+    },
+    {
+      "bytes": 1715,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-payload-write-leg-b/receipt.json",
+      "sha256": "fa2ad057ca96d8d2b0a2742d3a829aa09a46956451c170b7a8ebca027606dab1"
+    },
+    {
+      "bytes": 1716,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-payload-write-leg-a/receipt.json",
+      "sha256": "b609ad67781589d99ca1025fbf5360f6c2a5add74ee30a11255602a7a6a6c27e"
+    },
+    {
+      "bytes": 1715,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-b/receipt.json",
+      "sha256": "acfe83c92923ea39e4a4fd03a13d76fe7def3162434d832e3e43cf276e50e5ef"
+    },
+    {
+      "bytes": 1715,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-unicode-write-leg-a/receipt.json",
+      "sha256": "61858775e8312b1d93a6955fb04966065e7d963c0f46337ada7ba5c4e7851b17"
+    },
+    {
+      "bytes": 1692,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-many-write-leg-b/receipt.json",
+      "sha256": "052e82bdced88b96e5cce298c46453467ce9c29e45acd2348571dbbeab8719e0"
+    },
+    {
+      "bytes": 1695,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/profiles-01-many-write-leg-a/receipt.json",
+      "sha256": "a180329497913ce0eb45c2c85f777f28162dab90e94d93a721338484af9e22e8"
+    }
+  ],
+  "status": "pass"
+}

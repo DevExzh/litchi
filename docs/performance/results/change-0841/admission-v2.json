@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "bytes": 49009,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers_v2.py",
+      "sha256": "6302b6656dc43e4f490b14e161846f7206bdd4ae20aaf757a44dcfd936a0c672"
+    },
+    {
+      "bytes": 49081,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers_v2_initial.py",
+      "sha256": "556f825a63c7e17380403b8b30659fa06199235004bb861898cea7887a593af6"
+    },
+    {
+      "bytes": 13276,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader_tests_v2.py",
+      "sha256": "eb86c0e314fbfc6d37a35aabea11cdb3281059726fc9dfc2acb2eed18f17119f"
+    },
+    {
+      "bytes": 17612,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader-tests-v2.json",
+      "sha256": "973fd09876ade15ff4eb55bea0789e7d76fed9e6aaf95ec912f2b3642061cff1"
+    },
+    {
+      "bytes": 4776,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualify_v2.py",
+      "sha256": "fd667db2e0e0f0b9cbed57792ab4a587a37d05e86d8c1f466b13ad6cae0ccf2f"
+    },
+    {
+      "bytes": 23332,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/qualification-v2.json",
+      "sha256": "6c402d95a99e930f4802c821e5ec8593c57223834c909a444b207a2a9af3f1ea"
+    },
+    {
+      "bytes": 3773,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/analyze_v2.py",
+      "sha256": "51b11f78ef3293a31f08630abe6b9d2c0742cb10ef36396607a87b031399854c"
+    },
+    {
+      "bytes": 379,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture_v2.py",
+      "sha256": "d529810e230586021e9bf29da38c9c83d777cfa6acf1a216d1bbe9f5d66ccd6e"
+    },
+    {
+      "bytes": 2064,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/admit_v2.py",
+      "sha256": "ba1c5d7bfcba549600a98a7927514da442af5ebcb25416ed88cb457e8a1d5b60"
+    },
+    {
+      "bytes": 1909,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader-repair.json",
+      "sha256": "3f085cc593c11d30e45479652c8d1a51cdcd3b998a02f8d2a739fdb3c0c75c48"
+    },
+    {
+      "bytes": 1088,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader-freeze-violation.json",
+      "sha256": "e6b9e2002b3ee18dd80a506c0250e699c316cc3b0e9c8e06dc97dde067070704"
+    },
+    {
+      "bytes": 29431,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/capture-native.json",
+      "sha256": "05312a3480e92cd6cdb31ccb283ee6afffeedd78e2185f27e46760283bc0b823"
+    }
+  ],
+  "status": "pass"
+}

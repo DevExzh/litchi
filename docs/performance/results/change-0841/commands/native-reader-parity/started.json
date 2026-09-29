@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys;sys.path.insert(0,'docs/performance/results/change-0841');import qualify as a,qualify_v2 as b;old=a.validate_items('native');new=b.validate_items('native');assert old==new;print('Native reader parity PASS',len(new))"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0841",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790697236.2584693
+}

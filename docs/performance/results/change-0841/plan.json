@@ -1,0 +1,1316 @@
+{
+  "base": "307434b454f622023818f86f724b56ae5c99ee15",
+  "cases": [
+    {
+      "mode": "write",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "write",
+      "shape": "many"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "many"
+    },
+    {
+      "mode": "write",
+      "shape": "payload"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "payload"
+    },
+    {
+      "mode": "write",
+      "shape": "unicode"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "unicode"
+    },
+    {
+      "mode": "write",
+      "shape": "rich"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "rich"
+    }
+  ],
+  "cpu": 12,
+  "expected": {
+    "native_reports": 120,
+    "native_samples": 3600,
+    "profile_reports": 16,
+    "qualification_reports": 20,
+    "total_reports": 156,
+    "total_samples": 3636
+  },
+  "limits": [
+    "Guest Ir is not native-cycle, wall-time or physical-copy attribution.",
+    "Fresh source and shared named wrapper; historical0782 timings are not pooled.",
+    "No production adoption even if new timings improve.",
+    "Native scopes preserve write/lifecycle boundaries; profile scope only Writer::write_to and wrapper black_box.",
+    "Rich is unchanged text-ownership route control, not assumed noise-free.",
+    "This plan does not establish opened-document, cold/range, scaling or interoperability results."
+  ],
+  "native": [
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "rich",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "unicode",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "payload",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "many",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 30,
+      "shape": "tiny",
+      "warmup": 3
+    }
+  ],
+  "profile_options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=ppt_profile_probe::profile_write",
+    "--zero-before=ppt_profile_probe::profile_write",
+    "--dump-after=ppt_profile_probe::profile_write"
+  ],
+  "profile_owner": "ppt_profile_probe::profile_write",
+  "profiles": [
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    }
+  ],
+  "qualification": [
+    {
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "tiny",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "tiny",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "leg": "before",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "tiny",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "tiny",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "many",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "payload",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "unicode",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "write",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    },
+    {
+      "leg": "after",
+      "mode": "lifecycle",
+      "samples": 1,
+      "shape": "rich",
+      "warmup": 0
+    }
+  ],
+  "schema": "litchi.0841.ppt-regression-diagnosis.v1",
+  "statistics": {
+    "bootstrap_resamples": 10000,
+    "native_guard": "Report every p50/RSS paired ratio above1.05 with lower interval above1; diagnosis only, no adoption",
+    "quantile": "nearest rank",
+    "seed": 841084,
+    "sorted_endpoints": [
+      249,
+      9749
+    ],
+    "spread": "Report max/min process p50 above1.2"
+  }
+}

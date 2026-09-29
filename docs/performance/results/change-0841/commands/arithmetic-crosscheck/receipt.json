@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0841/crosscheck.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790697423.028203,
+  "log": {
+    "bytes": 33,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/arithmetic-crosscheck/output.log",
+    "sha256": "86d96a0dd3bfdd32a682fa3edaccf95f1fc133b777d7a6b736386108eacdd896"
+  },
+  "started_unix": 1790697422.9585946
+}

@@ -1,0 +1,128 @@
+zlib-rs v0.6.7
+├── zlib-rs feature "rust-allocator"
+│   └── flate2 v1.1.9
+│       ├── flate2 feature "any_impl"
+│       │   └── flate2 feature "any_zlib"
+│       │       └── flate2 feature "zlib-rs"
+│       │           ├── litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+│       │           │   └── litchi-odf-common feature "default"
+│       │           │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+│       │           │       │   ├── litchi feature "cfb"
+│       │           │       │   │   ├── litchi feature "doc"
+│       │           │       │   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+│       │           │       │   │   │       └── litchi-perf-baseline feature "default" (command-line)
+│       │           │       │   │   └── litchi feature "ppt"
+│       │           │       │   │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "default"
+│       │           │       │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "doc" (*)
+│       │           │       │   ├── litchi feature "docx"
+│       │           │       │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "drawingml"
+│       │           │       │   │   ├── litchi feature "pptx"
+│       │           │       │   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   │   └── litchi feature "xlsx"
+│       │           │       │   │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "odf-common"
+│       │           │       │   │   ├── litchi feature "odp"
+│       │           │       │   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   │   ├── litchi feature "ods"
+│       │           │       │   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   │   └── litchi feature "odt"
+│       │           │       │   │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "odp" (*)
+│       │           │       │   ├── litchi feature "ods" (*)
+│       │           │       │   ├── litchi feature "odt" (*)
+│       │           │       │   ├── litchi feature "ole"
+│       │           │       │   │   ├── litchi feature "doc" (*)
+│       │           │       │   │   └── litchi feature "ppt" (*)
+│       │           │       │   ├── litchi feature "ooxml-common"
+│       │           │       │   │   ├── litchi feature "pptx" (*)
+│       │           │       │   │   └── litchi feature "xlsx" (*)
+│       │           │       │   ├── litchi feature "opc"
+│       │           │       │   │   ├── litchi feature "docx" (*)
+│       │           │       │   │   ├── litchi feature "pptx" (*)
+│       │           │       │   │   └── litchi feature "xlsx" (*)
+│       │           │       │   ├── litchi feature "ppt" (*)
+│       │           │       │   ├── litchi feature "pptx" (*)
+│       │           │       │   ├── litchi feature "rtf"
+│       │           │       │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       │   ├── litchi feature "sheet"
+│       │           │       │   │   ├── litchi feature "ods" (*)
+│       │           │       │   │   └── litchi feature "xlsx" (*)
+│       │           │       │   └── litchi feature "xlsx" (*)
+│       │           │       ├── litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+│       │           │       │   └── litchi-odp feature "default"
+│       │           │       │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │           │       │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       ├── litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+│       │           │       │   └── litchi-ods feature "default"
+│       │           │       │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │           │       │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       ├── litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+│       │           │       │   └── litchi-odt feature "default"
+│       │           │       │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │           │       │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           ├── litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp) (*)
+│       │           ├── litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt) (*)
+│       │           ├── litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+│       │           │   └── litchi-ppt feature "default"
+│       │           │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │           │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │           └── soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+│       │               └── soapberry-zip feature "default"
+│       │                   ├── litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common) (*)
+│       │                   ├── litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp) (*)
+│       │                   ├── litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt) (*)
+│       │                   ├── litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+│       │                   │   ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   ├── litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+│       │                   │   │   └── litchi-docx feature "default"
+│       │                   │   │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   ├── litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+│       │                   │   │   └── litchi-ooxml-common feature "default"
+│       │                   │   │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   │       ├── litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx) (*)
+│       │                   │   │       ├── litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+│       │                   │   │       │   └── litchi-drawingml feature "default"
+│       │                   │   │       │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   │       │       ├── litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx) (*)
+│       │                   │   │       │       ├── litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+│       │                   │   │       │       │   └── litchi-pptx feature "default"
+│       │                   │   │       │       │       ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   │       │       │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   │       │       ├── litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+│       │                   │   │       │       │   └── litchi-spreadsheet-drawing feature "default"
+│       │                   │   │       │       │       ├── litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+│       │                   │   │       │       │       │   └── litchi-xlsb feature "default"
+│       │                   │   │       │       │       │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   │       │       │       └── litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+│       │                   │   │       │       │           └── litchi-xlsx feature "default"
+│       │                   │   │       │       │               ├── litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi) (*)
+│       │                   │   │       │       │               └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   │       │       ├── litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb) (*)
+│       │                   │   │       │       └── litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx) (*)
+│       │                   │   │       ├── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   │       ├── litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx) (*)
+│       │                   │   │       ├── litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing) (*)
+│       │                   │   │       ├── litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb) (*)
+│       │                   │   │       └── litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx) (*)
+│       │                   │   ├── litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt) (*)
+│       │                   │   ├── litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx) (*)
+│       │                   │   ├── litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing) (*)
+│       │                   │   ├── litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb) (*)
+│       │                   │   └── litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx) (*)
+│       │                   │   ├── litchi-opc feature "default"
+│       │                   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   ├── litchi-opc feature "performance-diagnostics"
+│       │                   │   │   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   │   └── litchi-opc feature "sign"
+│       │                   │       └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       │                   └── litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline) (*)
+│       ├── flate2 feature "any_zlib" (*)
+│       └── flate2 feature "zlib-rs" (*)
+│   └── zlib-rs feature "std"
+│       └── flate2 v1.1.9 (*)
+└── zlib-rs feature "std" (*)

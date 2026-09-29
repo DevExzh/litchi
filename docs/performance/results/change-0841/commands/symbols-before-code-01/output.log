@@ -1,0 +1,558 @@
+
+/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000001218f0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions>:
+  1218f0:	55                   	push   %rbp
+  1218f1:	41 57                	push   %r15
+  1218f3:	41 56                	push   %r14
+  1218f5:	41 55                	push   %r13
+  1218f7:	41 54                	push   %r12
+  1218f9:	53                   	push   %rbx
+  1218fa:	48 83 ec 48          	sub    $0x48,%rsp
+  1218fe:	49 89 d2             	mov    %rdx,%r10
+  121901:	48 89 f5             	mov    %rsi,%rbp
+  121904:	48 89 fb             	mov    %rdi,%rbx
+  121907:	48 83 fa 40          	cmp    $0x40,%rdx
+  12190b:	4c 89 4c 24 40       	mov    %r9,0x40(%rsp)
+  121910:	4c 89 44 24 38       	mov    %r8,0x38(%rsp)
+  121915:	89 4c 24 28          	mov    %ecx,0x28(%rsp)
+  121919:	0f 83 c0 00 00 00    	jae    1219df <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0xef>
+  12191f:	4c 89 d0             	mov    %r10,%rax
+  121922:	48 83 e0 38          	and    $0x38,%rax
+  121926:	74 1d                	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121928:	48 b9 80 80 80 80 80 	movabs $0x8080808080808080,%rcx
+  12192f:	80 80 80 
+  121932:	48 85 4d 00          	test   %rcx,0x0(%rbp)
+  121936:	0f 85 1c 01 00 00    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  12193c:	83 f8 08             	cmp    $0x8,%eax
+  12193f:	0f 85 69 05 00 00    	jne    121eae <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x5be>
+  121945:	44 89 d1             	mov    %r10d,%ecx
+  121948:	41 b6 01             	mov    $0x1,%r14b
+  12194b:	83 e1 07             	and    $0x7,%ecx
+  12194e:	0f 84 10 01 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  121954:	80 7c 05 00 00       	cmpb   $0x0,0x0(%rbp,%rax,1)
+  121959:	0f 88 f9 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  12195f:	83 f9 01             	cmp    $0x1,%ecx
+  121962:	0f 84 fc 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  121968:	80 7c 05 01 00       	cmpb   $0x0,0x1(%rbp,%rax,1)
+  12196d:	0f 88 e5 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121973:	83 f9 02             	cmp    $0x2,%ecx
+  121976:	0f 84 e8 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  12197c:	80 7c 05 02 00       	cmpb   $0x0,0x2(%rbp,%rax,1)
+  121981:	0f 88 d1 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121987:	83 f9 03             	cmp    $0x3,%ecx
+  12198a:	0f 84 d4 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  121990:	80 7c 05 03 00       	cmpb   $0x0,0x3(%rbp,%rax,1)
+  121995:	0f 88 bd 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  12199b:	83 f9 04             	cmp    $0x4,%ecx
+  12199e:	0f 84 c0 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  1219a4:	80 7c 05 04 00       	cmpb   $0x0,0x4(%rbp,%rax,1)
+  1219a9:	0f 88 a9 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  1219af:	83 f9 05             	cmp    $0x5,%ecx
+  1219b2:	0f 84 ac 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  1219b8:	80 7c 05 05 00       	cmpb   $0x0,0x5(%rbp,%rax,1)
+  1219bd:	0f 88 95 00 00 00    	js     121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  1219c3:	83 f9 06             	cmp    $0x6,%ecx
+  1219c6:	0f 84 98 00 00 00    	je     121a64 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x174>
+  1219cc:	80 7c 05 06 00       	cmpb   $0x0,0x6(%rbp,%rax,1)
+  1219d1:	4c 89 d0             	mov    %r10,%rax
+  1219d4:	0f 89 8d 00 00 00    	jns    121a67 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x177>
+  1219da:	e9 79 00 00 00       	jmp    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  1219df:	48 b8 c0 ff ff ff ff 	movabs $0x7fffffffffffffc0,%rax
+  1219e6:	ff ff 7f 
+  1219e9:	4c 21 d0             	and    %r10,%rax
+  1219ec:	48 01 e8             	add    %rbp,%rax
+  1219ef:	44 89 d7             	mov    %r10d,%edi
+  1219f2:	83 e7 3f             	and    $0x3f,%edi
+  1219f5:	48 89 ea             	mov    %rbp,%rdx
+  1219f8:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
+  1219ff:	00 
+  121a00:	f3 0f 6f 02          	movdqu (%rdx),%xmm0
+  121a04:	f3 0f 6f 4a 10       	movdqu 0x10(%rdx),%xmm1
+  121a09:	66 0f eb c8          	por    %xmm0,%xmm1
+  121a0d:	f3 0f 6f 42 20       	movdqu 0x20(%rdx),%xmm0
+  121a12:	f3 0f 6f 52 30       	movdqu 0x30(%rdx),%xmm2
+  121a17:	66 0f eb d0          	por    %xmm0,%xmm2
+  121a1b:	66 0f eb d1          	por    %xmm1,%xmm2
+  121a1f:	66 0f d7 f2          	pmovmskb %xmm2,%esi
+  121a23:	85 f6                	test   %esi,%esi
+  121a25:	75 28                	jne    121a4f <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x15f>
+  121a27:	48 83 c2 40          	add    $0x40,%rdx
+  121a2b:	48 39 c2             	cmp    %rax,%rdx
+  121a2e:	75 d0                	jne    121a00 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x110>
+  121a30:	31 d2                	xor    %edx,%edx
+  121a32:	66 66 66 66 66 2e 0f 	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  121a39:	1f 84 00 00 00 00 00 
+  121a40:	48 39 d7             	cmp    %rdx,%rdi
+  121a43:	74 1c                	je     121a61 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x171>
+  121a45:	80 3c 10 00          	cmpb   $0x0,(%rax,%rdx,1)
+  121a49:	48 8d 52 01          	lea    0x1(%rdx),%rdx
+  121a4d:	79 f1                	jns    121a40 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x150>
+  121a4f:	4d 85 d2             	test   %r10,%r10
+  121a52:	0f 88 e2 05 00 00    	js     12203a <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x74a>
+  121a58:	4b 8d 04 12          	lea    (%r10,%r10,1),%rax
+  121a5c:	45 31 f6             	xor    %r14d,%r14d
+  121a5f:	eb 06                	jmp    121a67 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x177>
+  121a61:	41 b6 01             	mov    $0x1,%r14b
+  121a64:	4c 89 d0             	mov    %r10,%rax
+  121a67:	4d 89 d4             	mov    %r10,%r12
+  121a6a:	48 83 c0 36          	add    $0x36,%rax
+  121a6e:	48 c7 c2 ff ff ff ff 	mov    $0xffffffffffffffff,%rdx
+  121a75:	48 0f 43 d0          	cmovae %rax,%rdx
+  121a79:	48 8b 03             	mov    (%rbx),%rax
+  121a7c:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  121a80:	48 29 f0             	sub    %rsi,%rax
+  121a83:	48 39 c2             	cmp    %rax,%rdx
+  121a86:	0f 87 3d 05 00 00    	ja     121fc9 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x6d9>
+  121a8c:	48 89 74 24 30       	mov    %rsi,0x30(%rsp)
+  121a91:	48 89 f0             	mov    %rsi,%rax
+  121a94:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  121a98:	48 c7 04 01 00 00 00 	movq   $0x0,(%rcx,%rax,1)
+  121a9f:	00 
+  121aa0:	48 83 c0 08          	add    $0x8,%rax
+  121aa4:	48 89 43 10          	mov    %rax,0x10(%rbx)
+  121aa8:	c6 44 24 10 00       	movb   $0x0,0x10(%rsp)
+  121aad:	48 b8 04 00 00 00 00 	movabs $0xf9f000000000004,%rax
+  121ab4:	00 9f 0f 
+  121ab7:	48 89 44 24 08       	mov    %rax,0x8(%rsp)
+  121abc:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+  121ac1:	48 89 de             	mov    %rbx,%rsi
+  121ac4:	e8 87 bd fc ff       	call   ed850 <litchi_ppt::writer::records::model::RecordHeader::write>
+  121ac9:	48 8b 03             	mov    (%rbx),%rax
+  121acc:	4c 8b 6b 10          	mov    0x10(%rbx),%r13
+  121ad0:	4c 29 e8             	sub    %r13,%rax
+  121ad3:	48 83 f8 03          	cmp    $0x3,%rax
+  121ad7:	0f 86 39 05 00 00    	jbe    122016 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x726>
+  121add:	4d 89 e1             	mov    %r12,%r9
+  121ae0:	4c 8b 7b 08          	mov    0x8(%rbx),%r15
+  121ae4:	8b 44 24 28          	mov    0x28(%rsp),%eax
+  121ae8:	43 89 04 2f          	mov    %eax,(%r15,%r13,1)
+  121aec:	49 83 c5 04          	add    $0x4,%r13
+  121af0:	4c 89 6b 10          	mov    %r13,0x10(%rbx)
+  121af4:	45 84 f6             	test   %r14b,%r14b
+  121af7:	0f 84 95 00 00 00    	je     121b92 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x2a2>
+  121afd:	48 8b 03             	mov    (%rbx),%rax
+  121b00:	48 89 c1             	mov    %rax,%rcx
+  121b03:	4c 29 e9             	sub    %r13,%rcx
+  121b06:	4d 89 ee             	mov    %r13,%r14
+  121b09:	48 83 f9 07          	cmp    $0x7,%rcx
+  121b0d:	0f 86 33 05 00 00    	jbe    122046 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x756>
+  121b13:	4b c7 04 37 00 00 00 	movq   $0x0,(%r15,%r14,1)
+  121b1a:	00 
+  121b1b:	49 83 c6 08          	add    $0x8,%r14
+  121b1f:	4c 89 73 10          	mov    %r14,0x10(%rbx)
+  121b23:	4c 89 6c 24 08       	mov    %r13,0x8(%rsp)
+  121b28:	48 b9 00 00 00 00 00 	movabs $0xfa8000000000000,%rcx
+  121b2f:	00 a8 0f 
+  121b32:	48 89 4c 24 10       	mov    %rcx,0x10(%rsp)
+  121b37:	c6 44 24 18 00       	movb   $0x0,0x18(%rsp)
+  121b3c:	4c 29 f0             	sub    %r14,%rax
+  121b3f:	49 39 c1             	cmp    %rax,%r9
+  121b42:	0f 87 2c 05 00 00    	ja     122074 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x784>
+  121b48:	4d 85 c9             	test   %r9,%r9
+  121b4b:	74 13                	je     121b60 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x270>
+  121b4d:	4b 8d 3c 37          	lea    (%r15,%r14,1),%rdi
+  121b51:	48 89 ee             	mov    %rbp,%rsi
+  121b54:	4c 89 ca             	mov    %r9,%rdx
+  121b57:	ff 15 8b e4 04 00    	call   *0x4e48b(%rip)        # 16ffe8 <memcpy@GLIBC_2.14>
+  121b5d:	4d 89 e1             	mov    %r12,%r9
+  121b60:	4d 01 ce             	add    %r9,%r14
+  121b63:	4c 89 73 10          	mov    %r14,0x10(%rbx)
+  121b67:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+  121b6c:	4c 89 fe             	mov    %r15,%rsi
+  121b6f:	4c 89 f2             	mov    %r14,%rdx
+  121b72:	e8 79 d0 ff ff       	call   11ebf0 <litchi_ppt::writer::records::model::InPlaceRecord::finish>
+  121b77:	48 85 c0             	test   %rax,%rax
+  121b7a:	0f 85 db 02 00 00    	jne    121e5b <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x56b>
+  121b80:	4c 89 e0             	mov    %r12,%rax
+  121b83:	48 c1 e8 20          	shr    $0x20,%rax
+  121b87:	0f 84 b2 01 00 00    	je     121d3f <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x44f>
+  121b8d:	e9 f8 02 00 00       	jmp    121e8a <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x59a>
+  121b92:	48 8b 03             	mov    (%rbx),%rax
+  121b95:	4c 29 e8             	sub    %r13,%rax
+  121b98:	4d 89 ee             	mov    %r13,%r14
+  121b9b:	48 83 f8 07          	cmp    $0x7,%rax
+  121b9f:	0f 86 f8 04 00 00    	jbe    12209d <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x7ad>
+  121ba5:	4b c7 04 37 00 00 00 	movq   $0x0,(%r15,%r14,1)
+  121bac:	00 
+  121bad:	49 83 c6 08          	add    $0x8,%r14
+  121bb1:	4c 89 73 10          	mov    %r14,0x10(%rbx)
+  121bb5:	4c 89 6c 24 08       	mov    %r13,0x8(%rsp)
+  121bba:	48 b8 00 00 00 00 00 	movabs $0xfa0000000000000,%rax
+  121bc1:	00 a0 0f 
+  121bc4:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+  121bc9:	c6 44 24 18 00       	movb   $0x0,0x18(%rsp)
+  121bce:	49 01 e9             	add    %rbp,%r9
+  121bd1:	45 31 ed             	xor    %r13d,%r13d
+  121bd4:	4c 89 74 24 28       	mov    %r14,0x28(%rsp)
+  121bd9:	66 45 85 ed          	test   %r13w,%r13w
+  121bdd:	0f 85 fd 00 00 00    	jne    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121be3:	e9 1d 01 00 00       	jmp    121d05 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x415>
+  121be8:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
+  121bef:	00 
+  121bf0:	44 0f b6 6d 00       	movzbl 0x0(%rbp),%r13d
+  121bf5:	45 84 ed             	test   %r13b,%r13b
+  121bf8:	78 16                	js     121c10 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x320>
+  121bfa:	48 ff c5             	inc    %rbp
+  121bfd:	e9 de 00 00 00       	jmp    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121c02:	66 66 66 66 66 2e 0f 	data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+  121c09:	1f 84 00 00 00 00 00 
+  121c10:	44 89 e8             	mov    %r13d,%eax
+  121c13:	83 e0 1f             	and    $0x1f,%eax
+  121c16:	0f b6 55 01          	movzbl 0x1(%rbp),%edx
+  121c1a:	83 e2 3f             	and    $0x3f,%edx
+  121c1d:	41 80 fd df          	cmp    $0xdf,%r13b
+  121c21:	76 3d                	jbe    121c60 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x370>
+  121c23:	0f b6 4d 02          	movzbl 0x2(%rbp),%ecx
+  121c27:	c1 e2 06             	shl    $0x6,%edx
+  121c2a:	83 e1 3f             	and    $0x3f,%ecx
+  121c2d:	09 d1                	or     %edx,%ecx
+  121c2f:	41 80 fd f0          	cmp    $0xf0,%r13b
+  121c33:	72 39                	jb     121c6e <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x37e>
+  121c35:	44 0f b6 6d 03       	movzbl 0x3(%rbp),%r13d
+  121c3a:	48 83 c5 04          	add    $0x4,%rbp
+  121c3e:	83 e0 07             	and    $0x7,%eax
+  121c41:	c1 e0 12             	shl    $0x12,%eax
+  121c44:	c1 e1 06             	shl    $0x6,%ecx
+  121c47:	41 83 e5 3f          	and    $0x3f,%r13d
+  121c4b:	41 09 cd             	or     %ecx,%r13d
+  121c4e:	41 09 c5             	or     %eax,%r13d
+  121c51:	41 81 fd ff ff 00 00 	cmp    $0xffff,%r13d
+  121c58:	0f 86 82 00 00 00    	jbe    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121c5e:	eb 23                	jmp    121c83 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x393>
+  121c60:	48 83 c5 02          	add    $0x2,%rbp
+  121c64:	c1 e0 06             	shl    $0x6,%eax
+  121c67:	09 d0                	or     %edx,%eax
+  121c69:	41 89 c5             	mov    %eax,%r13d
+  121c6c:	eb 72                	jmp    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121c6e:	48 83 c5 03          	add    $0x3,%rbp
+  121c72:	c1 e0 0c             	shl    $0xc,%eax
+  121c75:	09 c1                	or     %eax,%ecx
+  121c77:	41 89 cd             	mov    %ecx,%r13d
+  121c7a:	41 81 fd ff ff 00 00 	cmp    $0xffff,%r13d
+  121c81:	76 5d                	jbe    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121c83:	41 8d 85 00 00 ff 00 	lea    0xff0000(%r13),%eax
+  121c8a:	c1 e8 0a             	shr    $0xa,%eax
+  121c8d:	0d 00 d8 00 00       	or     $0xd800,%eax
+  121c92:	41 81 e5 ff 03 00 00 	and    $0x3ff,%r13d
+  121c99:	41 81 cd 00 dc 00 00 	or     $0xdc00,%r13d
+  121ca0:	45 89 ec             	mov    %r13d,%r12d
+  121ca3:	41 89 c5             	mov    %eax,%r13d
+  121ca6:	48 8b 03             	mov    (%rbx),%rax
+  121ca9:	4c 29 f0             	sub    %r14,%rax
+  121cac:	48 83 f8 01          	cmp    $0x1,%rax
+  121cb0:	77 3d                	ja     121cef <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3ff>
+  121cb2:	ba 02 00 00 00       	mov    $0x2,%edx
+  121cb7:	b9 01 00 00 00       	mov    $0x1,%ecx
+  121cbc:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  121cc2:	48 89 df             	mov    %rbx,%rdi
+  121cc5:	4c 89 f6             	mov    %r14,%rsi
+  121cc8:	4d 89 ce             	mov    %r9,%r14
+  121ccb:	e8 50 bf fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  121cd0:	4d 89 f1             	mov    %r14,%r9
+  121cd3:	4c 8b 7b 08          	mov    0x8(%rbx),%r15
+  121cd7:	4c 8b 73 10          	mov    0x10(%rbx),%r14
+  121cdb:	eb 12                	jmp    121cef <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3ff>
+  121cdd:	0f 1f 00             	nopl   (%rax)
+  121ce0:	45 31 e4             	xor    %r12d,%r12d
+  121ce3:	48 8b 03             	mov    (%rbx),%rax
+  121ce6:	4c 29 f0             	sub    %r14,%rax
+  121ce9:	48 83 f8 01          	cmp    $0x1,%rax
+  121ced:	76 c3                	jbe    121cb2 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3c2>
+  121cef:	66 47 89 2c 37       	mov    %r13w,(%r15,%r14,1)
+  121cf4:	49 83 c6 02          	add    $0x2,%r14
+  121cf8:	4c 89 73 10          	mov    %r14,0x10(%rbx)
+  121cfc:	45 89 e5             	mov    %r12d,%r13d
+  121cff:	66 45 85 ed          	test   %r13w,%r13w
+  121d03:	75 db                	jne    121ce0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x3f0>
+  121d05:	4c 39 cd             	cmp    %r9,%rbp
+  121d08:	0f 85 e2 fe ff ff    	jne    121bf0 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x300>
+  121d0e:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+  121d13:	4c 89 fe             	mov    %r15,%rsi
+  121d16:	4c 89 f2             	mov    %r14,%rdx
+  121d19:	e8 d2 ce ff ff       	call   11ebf0 <litchi_ppt::writer::records::model::InPlaceRecord::finish>
+  121d1e:	48 85 c0             	test   %rax,%rax
+  121d21:	0f 85 34 01 00 00    	jne    121e5b <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x56b>
+  121d27:	4c 2b 74 24 28       	sub    0x28(%rsp),%r14
+  121d2c:	49 d1 ee             	shr    $1,%r14
+  121d2f:	4d 89 f4             	mov    %r14,%r12
+  121d32:	4c 89 e0             	mov    %r12,%rax
+  121d35:	48 c1 e8 20          	shr    $0x20,%rax
+  121d39:	0f 85 4b 01 00 00    	jne    121e8a <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x59a>
+  121d3f:	b8 ff ff ff ff       	mov    $0xffffffff,%eax
+  121d44:	49 39 c4             	cmp    %rax,%r12
+  121d47:	0f 84 3d 01 00 00    	je     121e8a <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x59a>
+  121d4d:	4d 89 e7             	mov    %r12,%r15
+  121d50:	41 8d 6c 24 01       	lea    0x1(%r12),%ebp
+  121d55:	c6 44 24 10 00       	movb   $0x0,0x10(%rsp)
+  121d5a:	48 b8 12 00 00 00 00 	movabs $0xfa1000000000012,%rax
+  121d61:	00 a1 0f 
+  121d64:	48 89 44 24 08       	mov    %rax,0x8(%rsp)
+  121d69:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+  121d6e:	48 89 de             	mov    %rbx,%rsi
+  121d71:	e8 da ba fc ff       	call   ed850 <litchi_ppt::writer::records::model::RecordHeader::write>
+  121d76:	48 8b 03             	mov    (%rbx),%rax
+  121d79:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  121d7d:	48 89 c1             	mov    %rax,%rcx
+  121d80:	48 29 f1             	sub    %rsi,%rcx
+  121d83:	48 83 f9 03          	cmp    $0x3,%rcx
+  121d87:	4c 8b 74 24 40       	mov    0x40(%rsp),%r14
+  121d8c:	0f 86 36 03 00 00    	jbe    1220c8 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x7d8>
+  121d92:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  121d96:	89 2c 31             	mov    %ebp,(%rcx,%rsi,1)
+  121d99:	48 83 c6 04          	add    $0x4,%rsi
+  121d9d:	48 89 73 10          	mov    %rsi,0x10(%rbx)
+  121da1:	48 89 c2             	mov    %rax,%rdx
+  121da4:	48 29 f2             	sub    %rsi,%rdx
+  121da7:	48 83 fa 01          	cmp    $0x1,%rdx
+  121dab:	0f 86 3b 03 00 00    	jbe    1220ec <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x7fc>
+  121db1:	4c 89 fa             	mov    %r15,%rdx
+  121db4:	66 c7 04 31 00 00    	movw   $0x0,(%rcx,%rsi,1)
+  121dba:	48 83 c6 02          	add    $0x2,%rsi
+  121dbe:	48 89 73 10          	mov    %rsi,0x10(%rbx)
+  121dc2:	48 29 f0             	sub    %rsi,%rax
+  121dc5:	48 83 f8 03          	cmp    $0x3,%rax
+  121dc9:	0f 86 48 03 00 00    	jbe    122117 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x827>
+  121dcf:	c7 04 31 00 00 00 00 	movl   $0x0,(%rcx,%rsi,1)
+  121dd6:	48 83 c6 04          	add    $0x4,%rsi
+  121dda:	48 89 73 10          	mov    %rsi,0x10(%rbx)
+  121dde:	48 8b 03             	mov    (%rbx),%rax
+  121de1:	48 89 c1             	mov    %rax,%rcx
+  121de4:	48 29 f1             	sub    %rsi,%rcx
+  121de7:	48 83 f9 03          	cmp    $0x3,%rcx
+  121deb:	0f 86 4e 03 00 00    	jbe    12213f <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x84f>
+  121df1:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  121df5:	89 2c 31             	mov    %ebp,(%rcx,%rsi,1)
+  121df8:	48 83 c6 04          	add    $0x4,%rsi
+  121dfc:	48 89 73 10          	mov    %rsi,0x10(%rbx)
+  121e00:	48 29 f0             	sub    %rsi,%rax
+  121e03:	48 83 f8 03          	cmp    $0x3,%rax
+  121e07:	0f 86 59 03 00 00    	jbe    122166 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x876>
+  121e0d:	c7 04 31 00 00 00 00 	movl   $0x0,(%rcx,%rsi,1)
+  121e14:	48 83 c6 04          	add    $0x4,%rsi
+  121e18:	48 89 73 10          	mov    %rsi,0x10(%rbx)
+  121e1c:	48 c7 44 24 08 00 00 	movq   $0x100000,0x8(%rsp)
+  121e23:	10 00 
+  121e25:	48 c7 44 24 10 00 00 	movq   $0x10000,0x10(%rsp)
+  121e2c:	01 00 
+  121e2e:	48 c7 44 24 18 00 10 	movq   $0x1000,0x18(%rsp)
+  121e35:	00 00 
+  121e37:	c7 44 24 20 00 00 00 	movl   $0x1000000,0x20(%rsp)
+  121e3e:	01 
+  121e3f:	4c 8d 44 24 08       	lea    0x8(%rsp),%r8
+  121e44:	48 89 df             	mov    %rbx,%rdi
+  121e47:	89 d6                	mov    %edx,%esi
+  121e49:	48 8b 54 24 38       	mov    0x38(%rsp),%rdx
+  121e4e:	4c 89 f1             	mov    %r14,%rcx
+  121e51:	e8 7a 03 00 00       	call   1221d0 <litchi_ppt::writer::escher::codec::text::append_text_interactions>
+  121e56:	48 85 c0             	test   %rax,%rax
+  121e59:	74 0f                	je     121e6a <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x57a>
+  121e5b:	48 83 c4 48          	add    $0x48,%rsp
+  121e5f:	5b                   	pop    %rbx
+  121e60:	41 5c                	pop    %r12
+  121e62:	41 5d                	pop    %r13
+  121e64:	41 5e                	pop    %r14
+  121e66:	41 5f                	pop    %r15
+  121e68:	5d                   	pop    %rbp
+  121e69:	c3                   	ret
+  121e6a:	48 8b 4b 10          	mov    0x10(%rbx),%rcx
+  121e6e:	48 89 c8             	mov    %rcx,%rax
+  121e71:	48 8b 74 24 30       	mov    0x30(%rsp),%rsi
+  121e76:	48 29 f0             	sub    %rsi,%rax
+  121e79:	48 83 c0 f8          	add    $0xfffffffffffffff8,%rax
+  121e7d:	48 89 c2             	mov    %rax,%rdx
+  121e80:	48 c1 ea 20          	shr    $0x20,%rdx
+  121e84:	0f 84 9c 00 00 00    	je     121f26 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x636>
+  121e8a:	48 8d 35 cb de f1 ff 	lea    -0xe2135(%rip),%rsi        # 3fd5c <encoding_rs::data::IBM_KANJI+0x52de>
+  121e91:	ba 2d 00 00 00       	mov    $0x2d,%edx
+  121e96:	bf 14 00 00 00       	mov    $0x14,%edi
+  121e9b:	48 83 c4 48          	add    $0x48,%rsp
+  121e9f:	5b                   	pop    %rbx
+  121ea0:	41 5c                	pop    %r12
+  121ea2:	41 5d                	pop    %r13
+  121ea4:	41 5e                	pop    %r14
+  121ea6:	41 5f                	pop    %r15
+  121ea8:	5d                   	pop    %rbp
+  121ea9:	e9 62 0f 04 00       	jmp    162e10 <<std::io::error::Error>::new::<&str>>
+  121eae:	48 85 4d 08          	test   %rcx,0x8(%rbp)
+  121eb2:	0f 85 a0 fb ff ff    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121eb8:	83 f8 10             	cmp    $0x10,%eax
+  121ebb:	0f 84 84 fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121ec1:	48 85 4d 10          	test   %rcx,0x10(%rbp)
+  121ec5:	0f 85 8d fb ff ff    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121ecb:	83 f8 18             	cmp    $0x18,%eax
+  121ece:	0f 84 71 fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121ed4:	48 85 4d 18          	test   %rcx,0x18(%rbp)
+  121ed8:	0f 85 7a fb ff ff    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121ede:	83 f8 20             	cmp    $0x20,%eax
+  121ee1:	0f 84 5e fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121ee7:	48 85 4d 20          	test   %rcx,0x20(%rbp)
+  121eeb:	0f 85 67 fb ff ff    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121ef1:	83 f8 28             	cmp    $0x28,%eax
+  121ef4:	0f 84 4b fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121efa:	48 85 4d 28          	test   %rcx,0x28(%rbp)
+  121efe:	0f 85 54 fb ff ff    	jne    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121f04:	83 f8 30             	cmp    $0x30,%eax
+  121f07:	0f 84 38 fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121f0d:	48 23 4d 30          	and    0x30(%rbp),%rcx
+  121f11:	48 89 c2             	mov    %rax,%rdx
+  121f14:	48 83 f2 38          	xor    $0x38,%rdx
+  121f18:	48 09 ca             	or     %rcx,%rdx
+  121f1b:	0f 84 24 fa ff ff    	je     121945 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x55>
+  121f21:	e9 32 fb ff ff       	jmp    121a58 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x168>
+  121f26:	48 8d 56 08          	lea    0x8(%rsi),%rdx
+  121f2a:	48 39 ca             	cmp    %rcx,%rdx
+  121f2d:	0f 86 80 00 00 00    	jbe    121fb3 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x6c3>
+  121f33:	bf 2a 00 00 00       	mov    $0x2a,%edi
+  121f38:	ff 15 a2 e0 04 00    	call   *0x4e0a2(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  121f3e:	48 85 c0             	test   %rax,%rax
+  121f41:	0f 84 58 02 00 00    	je     12219f <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x8af>
+  121f47:	48 89 c3             	mov    %rax,%rbx
+  121f4a:	0f 10 05 52 de f1 ff 	movups -0xe21ae(%rip),%xmm0        # 3fda3 <encoding_rs::data::IBM_KANJI+0x5325>
+  121f51:	0f 11 40 1a          	movups %xmm0,0x1a(%rax)
+  121f55:	0f 10 05 3d de f1 ff 	movups -0xe21c3(%rip),%xmm0        # 3fd99 <encoding_rs::data::IBM_KANJI+0x531b>
+  121f5c:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+  121f60:	0f 10 05 22 de f1 ff 	movups -0xe21de(%rip),%xmm0        # 3fd89 <encoding_rs::data::IBM_KANJI+0x530b>
+  121f67:	0f 11 00             	movups %xmm0,(%rax)
+  121f6a:	bf 18 00 00 00       	mov    $0x18,%edi
+  121f6f:	ff 15 6b e0 04 00    	call   *0x4e06b(%rip)        # 16ffe0 <malloc@GLIBC_2.2.5>
+  121f75:	48 85 c0             	test   %rax,%rax
+  121f78:	0f 84 10 02 00 00    	je     12218e <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x89e>
+  121f7e:	48 c7 00 2a 00 00 00 	movq   $0x2a,(%rax)
+  121f85:	48 89 58 08          	mov    %rbx,0x8(%rax)
+  121f89:	48 c7 40 10 2a 00 00 	movq   $0x2a,0x10(%rax)
+  121f90:	00 
+  121f91:	48 8d 15 18 be 04 00 	lea    0x4be18(%rip),%rdx        # 16ddb0 <encoding_rs::BIG5_INIT+0xd90>
+  121f98:	bf 28 00 00 00       	mov    $0x28,%edi
+  121f9d:	48 89 c6             	mov    %rax,%rsi
+  121fa0:	48 83 c4 48          	add    $0x48,%rsp
+  121fa4:	5b                   	pop    %rbx
+  121fa5:	41 5c                	pop    %r12
+  121fa7:	41 5d                	pop    %r13
+  121fa9:	41 5e                	pop    %r14
+  121fab:	41 5f                	pop    %r15
+  121fad:	5d                   	pop    %rbp
+  121fae:	e9 ed 64 04 00       	jmp    1684a0 <<std::io::error::Error>::_new>
+  121fb3:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  121fb7:	c7 04 31 0f 00 0d f0 	movl   $0xf00d000f,(%rcx,%rsi,1)
+  121fbe:	89 44 31 04          	mov    %eax,0x4(%rcx,%rsi,1)
+  121fc2:	31 c0                	xor    %eax,%eax
+  121fc4:	e9 92 fe ff ff       	jmp    121e5b <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x56b>
+  121fc9:	b9 01 00 00 00       	mov    $0x1,%ecx
+  121fce:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  121fd4:	48 89 df             	mov    %rbx,%rdi
+  121fd7:	e8 44 bc fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  121fdc:	48 8b 03             	mov    (%rbx),%rax
+  121fdf:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  121fe3:	48 29 f0             	sub    %rsi,%rax
+  121fe6:	48 83 f8 07          	cmp    $0x7,%rax
+  121fea:	48 89 74 24 30       	mov    %rsi,0x30(%rsp)
+  121fef:	0f 87 9c fa ff ff    	ja     121a91 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x1a1>
+  121ff5:	ba 08 00 00 00       	mov    $0x8,%edx
+  121ffa:	b9 01 00 00 00       	mov    $0x1,%ecx
+  121fff:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122005:	48 89 df             	mov    %rbx,%rdi
+  122008:	e8 13 bc fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12200d:	48 8b 43 10          	mov    0x10(%rbx),%rax
+  122011:	e9 7e fa ff ff       	jmp    121a94 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x1a4>
+  122016:	ba 04 00 00 00       	mov    $0x4,%edx
+  12201b:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122020:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122026:	48 89 df             	mov    %rbx,%rdi
+  122029:	4c 89 ee             	mov    %r13,%rsi
+  12202c:	e8 ef bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  122031:	4c 8b 6b 10          	mov    0x10(%rbx),%r13
+  122035:	e9 a3 fa ff ff       	jmp    121add <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x1ed>
+  12203a:	48 c7 c0 ff ff ff ff 	mov    $0xffffffffffffffff,%rax
+  122041:	e9 16 fa ff ff       	jmp    121a5c <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x16c>
+  122046:	ba 08 00 00 00       	mov    $0x8,%edx
+  12204b:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122050:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122056:	48 89 df             	mov    %rbx,%rdi
+  122059:	4c 89 ee             	mov    %r13,%rsi
+  12205c:	e8 bf bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  122061:	4d 89 e1             	mov    %r12,%r9
+  122064:	4c 8b 73 10          	mov    0x10(%rbx),%r14
+  122068:	48 8b 03             	mov    (%rbx),%rax
+  12206b:	4c 8b 7b 08          	mov    0x8(%rbx),%r15
+  12206f:	e9 9f fa ff ff       	jmp    121b13 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x223>
+  122074:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122079:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  12207f:	48 89 df             	mov    %rbx,%rdi
+  122082:	4c 89 f6             	mov    %r14,%rsi
+  122085:	4c 89 ca             	mov    %r9,%rdx
+  122088:	e8 93 bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12208d:	4d 89 e1             	mov    %r12,%r9
+  122090:	4c 8b 7b 08          	mov    0x8(%rbx),%r15
+  122094:	4c 8b 73 10          	mov    0x10(%rbx),%r14
+  122098:	e9 b0 fa ff ff       	jmp    121b4d <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x25d>
+  12209d:	ba 08 00 00 00       	mov    $0x8,%edx
+  1220a2:	b9 01 00 00 00       	mov    $0x1,%ecx
+  1220a7:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  1220ad:	48 89 df             	mov    %rbx,%rdi
+  1220b0:	4c 89 ee             	mov    %r13,%rsi
+  1220b3:	e8 68 bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  1220b8:	4d 89 e1             	mov    %r12,%r9
+  1220bb:	4c 8b 7b 08          	mov    0x8(%rbx),%r15
+  1220bf:	4c 8b 73 10          	mov    0x10(%rbx),%r14
+  1220c3:	e9 dd fa ff ff       	jmp    121ba5 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x2b5>
+  1220c8:	ba 04 00 00 00       	mov    $0x4,%edx
+  1220cd:	b9 01 00 00 00       	mov    $0x1,%ecx
+  1220d2:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  1220d8:	48 89 df             	mov    %rbx,%rdi
+  1220db:	e8 40 bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  1220e0:	48 8b 03             	mov    (%rbx),%rax
+  1220e3:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  1220e7:	e9 a6 fc ff ff       	jmp    121d92 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x4a2>
+  1220ec:	ba 02 00 00 00       	mov    $0x2,%edx
+  1220f1:	b9 01 00 00 00       	mov    $0x1,%ecx
+  1220f6:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  1220fc:	48 89 df             	mov    %rbx,%rdi
+  1220ff:	e8 1c bb fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  122104:	4c 89 fa             	mov    %r15,%rdx
+  122107:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  12210b:	48 8b 03             	mov    (%rbx),%rax
+  12210e:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  122112:	e9 9d fc ff ff       	jmp    121db4 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x4c4>
+  122117:	ba 04 00 00 00       	mov    $0x4,%edx
+  12211c:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122121:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122127:	48 89 df             	mov    %rbx,%rdi
+  12212a:	e8 f1 ba fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12212f:	4c 89 fa             	mov    %r15,%rdx
+  122132:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  122136:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  12213a:	e9 90 fc ff ff       	jmp    121dcf <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x4df>
+  12213f:	ba 04 00 00 00       	mov    $0x4,%edx
+  122144:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122149:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  12214f:	48 89 df             	mov    %rbx,%rdi
+  122152:	e8 c9 ba fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  122157:	4c 89 fa             	mov    %r15,%rdx
+  12215a:	48 8b 03             	mov    (%rbx),%rax
+  12215d:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  122161:	e9 8b fc ff ff       	jmp    121df1 <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x501>
+  122166:	ba 04 00 00 00       	mov    $0x4,%edx
+  12216b:	b9 01 00 00 00       	mov    $0x1,%ecx
+  122170:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  122176:	48 89 df             	mov    %rbx,%rdi
+  122179:	e8 a2 ba fb ff       	call   ddc20 <alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle>
+  12217e:	4c 89 fa             	mov    %r15,%rdx
+  122181:	48 8b 4b 08          	mov    0x8(%rbx),%rcx
+  122185:	48 8b 73 10          	mov    0x10(%rbx),%rsi
+  122189:	e9 7f fc ff ff       	jmp    121e0d <litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions+0x51d>
+  12218e:	bf 08 00 00 00       	mov    $0x8,%edi
+  122193:	be 18 00 00 00       	mov    $0x18,%esi
+  122198:	e8 55 6c f7 ff       	call   98df2 <alloc::alloc::handle_alloc_error>
+  12219d:	0f 0b                	ud2
+  12219f:	bf 01 00 00 00       	mov    $0x1,%edi
+  1221a4:	be 2a 00 00 00       	mov    $0x2a,%esi
+  1221a9:	e8 33 6b f7 ff       	call   98ce1 <alloc::raw_vec::handle_error>
+  1221ae:	49 89 c6             	mov    %rax,%r14
+  1221b1:	48 89 df             	mov    %rbx,%rdi
+  1221b4:	ff 15 36 de 04 00    	call   *0x4de36(%rip)        # 16fff0 <free@GLIBC_2.2.5>
+  1221ba:	4c 89 f7             	mov    %r14,%rdi
+  1221bd:	e8 1e 8a 04 00       	call   16abe0 <_Unwind_Resume@plt>

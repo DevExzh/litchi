@@ -1,0 +1,96 @@
+   Compiling libc v0.2.189
+    Checking hybrid-array v0.4.14
+   Compiling generic-array v0.14.9
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking getrandom v0.4.3
+    Checking digest v0.11.3
+    Checking either v1.18.0
+    Checking chrono v0.4.45
+    Checking rayon v1.12.0
+    Checking rand v0.10.2
+    Checking sha2 v0.11.0
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking getrandom v0.3.4
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking tempfile v3.27.0
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-biff)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking ppt-profile-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0841/probe)
+warning: struct `Snapshot` is never constructed
+   --> src/allocation_metrics.rs:116:12
+    |
+116 | pub struct Snapshot {
+    |            ^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `snapshot` is never used
+   --> src/allocation_metrics.rs:132:8
+    |
+132 | pub fn snapshot() -> Snapshot {
+    |        ^^^^^^^^
+
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:198:15
+    |
+198 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+
+warning: field `segment_before` is never read
+   --> src/allocation_metrics.rs:291:5
+    |
+285 | struct ActiveRegion {
+    |        ------------ field in this struct
+...
+291 |     segment_before: CountersSnapshot,
+    |     ^^^^^^^^^^^^^^
+
+warning: methods `split` and `finish_split` are never used
+   --> src/allocation_metrics.rs:315:19
+    |
+306 | impl Region {
+    | ----------- methods in this implementation
+...
+315 |     pub(crate) fn split(&mut self) -> Option<Sample> {
+    |                   ^^^^^
+...
+351 |     pub(crate) fn finish_split(mut self) -> (Option<Sample>, Option<Sample>) {
+    |                   ^^^^^^^^^^^^
+
+warning: methods `snapshot` and `split_region` are never used
+   --> src/allocation_metrics.rs:514:8
+    |
+513 | impl Counters {
+    | ------------- methods in this implementation
+514 |     fn snapshot(&self) -> CountersSnapshot {
+    |        ^^^^^^^^
+...
+561 |     fn split_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
+    |        ^^^^^^^^^^^^
+
+warning: `ppt-profile-probe` (bin "ppt-profile-probe") generated 6 warnings
+warning: function `unavailable_sample` is never used
+   --> src/allocation_metrics.rs:198:15
+    |
+198 | pub(crate) fn unavailable_sample() -> Sample {
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ppt-profile-probe` (bin "ppt-profile-probe" test) generated 1 warning
+    Finished `dev` profile [unoptimized] target(s) in 9.09s

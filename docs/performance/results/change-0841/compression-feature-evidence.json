@@ -1,0 +1,99 @@
+{
+  "current_tree": {
+    "bytes": 687,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/compression-current-features/output.log",
+    "sha256": "96e8eb4aac4548833c42c83987a1f0f90f45fe69844ec442b0c70851ec2cd00e"
+  },
+  "dependency_sources": [
+    {
+      "original": {
+        "bytes": 5253,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.9/Cargo.toml",
+        "sha256": "06464242e6674c339ff6c564551fddc9288a57c2bc1b78f363a643d7c566f007"
+      },
+      "retained": {
+        "bytes": 5253,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/flate2-1.1.9/Cargo.toml",
+        "sha256": "06464242e6674c339ff6c564551fddc9288a57c2bc1b78f363a643d7c566f007"
+      }
+    },
+    {
+      "original": {
+        "bytes": 5101,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/Cargo.toml",
+        "sha256": "1365f28dd7ad9f83ebcc9afd545d7cdcedb284bf6e059081b0e1d1847ce6a94e"
+      },
+      "retained": {
+        "bytes": 5101,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/flate2-1.1.10/Cargo.toml",
+        "sha256": "1365f28dd7ad9f83ebcc9afd545d7cdcedb284bf6e059081b0e1d1847ce6a94e"
+      }
+    },
+    {
+      "original": {
+        "bytes": 1664,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/Cargo.toml",
+        "sha256": "3b6d5c17260ea4045a9911573ed30e71350d68718e5370918215f7dab67b98d3"
+      },
+      "retained": {
+        "bytes": 1664,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/zlib-rs-0.6.7/Cargo.toml",
+        "sha256": "3b6d5c17260ea4045a9911573ed30e71350d68718e5370918215f7dab67b98d3"
+      }
+    },
+    {
+      "original": {
+        "bytes": 2864,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/cpu_features.rs",
+        "sha256": "05ecb3dcd40ef6bebca2850767a5f8f59488ebf0916e1534fe42946873212630"
+      },
+      "retained": {
+        "bytes": 2864,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/zlib-rs-0.6.7/src/cpu_features.rs",
+        "sha256": "05ecb3dcd40ef6bebca2850767a5f8f59488ebf0916e1534fe42946873212630"
+      }
+    },
+    {
+      "original": {
+        "bytes": 16496,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/compare256.rs",
+        "sha256": "8665cb4170e55935bd386e0c76c24ee2977801e86f48a32c6c743942aeebaab4"
+      },
+      "retained": {
+        "bytes": 16496,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/zlib-rs-0.6.7/src/deflate/compare256.rs",
+        "sha256": "8665cb4170e55935bd386e0c76c24ee2977801e86f48a32c6c743942aeebaab4"
+      }
+    },
+    {
+      "original": {
+        "bytes": 6692,
+        "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/slide_hash.rs",
+        "sha256": "3b75be5113161e1408c12556a7c0ce9ffaedb4ffe1013c1bc2ddc83405d433fd"
+      },
+      "retained": {
+        "bytes": 6692,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/dependency-sources/zlib-rs-0.6.7/src/deflate/slide_hash.rs",
+        "sha256": "3b75be5113161e1408c12556a7c0ce9ffaedb4ffe1013c1bc2ddc83405d433fd"
+      }
+    }
+  ],
+  "harness_lock": {
+    "bytes": 56919,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+    "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+  },
+  "historical_tree": {
+    "bytes": 12992,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/compression-profile-features/output.log",
+    "sha256": "cc00a6972b5b8b36dad365e5196d3c9947e9067f622ae96d9da2d6e943ff49df"
+  },
+  "next": "Measure current-root flate2 1.1.10 with and without explicit runtime_detection, unchanged zlib-rs0.6.7 and compression policy, exact byte guards before performance.",
+  "root_lock": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "scope": "Read-only current package feature graph and historical harness graph, not a performance result",
+  "status": "pass"
+}

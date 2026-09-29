@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0841 — current PPT borrowed-text instruction diagnosis
+
+[0841](0841-ppt-borrowed-text-instruction-diagnostic.md) localizes the rejected borrowed-text candidate to lower operation-scoped guest Ir: many about −1.36%, Unicode −5.48%, ASCII payload −37.51%, with identical Unicode textbox-encoder self Ir. Historical native regressions do not reproduce; their cause remains unproven. A separate dependency audit confirms that the current OPC-only flate2 1.1.10 graph lacks the runtime-dispatch feature present in 0836’s 1.1.9 harness graph. Fresh current-graph qualification is the next compression target.
+
 ## 0840 — fresh CFB emission avoids large payload gap initialization
 
 [0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.

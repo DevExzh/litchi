@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-lifecycle-leg-a/time.txt",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "rich",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/native-05-rich-lifecycle-leg-a/report.json"
+  ],
+  "binary": {
+    "bytes": 9238248,
+    "path": "/home/zhuhe/code/litchi-target-0841/retained/leg-a/ppt-profile-probe",
+    "sha256": "0cc6b3cd12ab09cdb088d8d4a9ecfcb55a1e092527d229a2108438f6224585d9"
+  },
+  "build": {
+    "bytes": 659,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-before.json",
+    "sha256": "5e86f7b3ae9e02d935f334faccfea14bf47a2f073a9c32efc0f78888d50b4697"
+  },
+  "lane": "native",
+  "row": {
+    "block": 5,
+    "leg": "before",
+    "mode": "lifecycle",
+    "samples": 30,
+    "shape": "rich",
+    "warmup": 3
+  },
+  "started_unix": 1790697016.6528852
+}

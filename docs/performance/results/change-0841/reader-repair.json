@@ -1,0 +1,51 @@
+{
+  "changes": [
+    "Read child-only raw Callgrind command header; enforce launcher flags through exact recorded argv",
+    "Reject pending child edges without a cost at function transition or EOF"
+  ],
+  "corrected_reader": {
+    "bytes": 49009,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers_v2.py",
+    "sha256": "6302b6656dc43e4f490b14e161846f7206bdd4ae20aaf757a44dcfd936a0c672"
+  },
+  "initial_replacement_archive": {
+    "bytes": 49081,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers_v2_initial.py",
+    "sha256": "556f825a63c7e17380403b8b30659fa06199235004bb861898cea7887a593af6"
+  },
+  "native_parity": {
+    "bytes": 650,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/native-reader-parity/receipt.json",
+    "sha256": "23360e5c45dfe01bd3d6f6bd8faccb5871ba0c11b7369d0dab07e65a98ab0a6b"
+  },
+  "native_reports": 120,
+  "original_admission": {
+    "bytes": 10569,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/admission.json",
+    "sha256": "5f75acd7cd69a0a7d952b06cbade147bf9a1704b97d850ece05972785006a48a"
+  },
+  "original_reader": {
+    "bytes": 48501,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/readers.py",
+    "sha256": "36e30bc12a6fdeeb10a2eb59496c77b609bfd3eb38f37963b22231d91416ec58"
+  },
+  "qualification_parity": "All20rows identical; only reader identity differs",
+  "status": "pass",
+  "unchanged": [
+    "candidate",
+    "baseline",
+    "binaries",
+    "probe",
+    "corpus",
+    "schedule",
+    "native metrics",
+    "bootstrap",
+    "all workload outputs"
+  ],
+  "violation": {
+    "bytes": 1088,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/reader-freeze-violation.json",
+    "sha256": "e6b9e2002b3ee18dd80a506c0250e699c316cc3b0e9c8e06dc97dde067070704"
+  },
+  "workload_runs_replaced": 0
+}

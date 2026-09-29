@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 9236024,
+    "path": "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "sha256": "7a057a936c6777c23cc2295f6f033ba8ba0ebe20c42147a7652391522bcfd6bf"
+  },
+  "freeze": {
+    "bytes": 1203138,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/freeze-after.json",
+    "sha256": "10db580ce7afe6384c2d43a069786ed2510d7ee52c4ea2efe5e6bffc50490fde"
+  },
+  "receipt": {
+    "bytes": 556,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/commands/build-after/receipt.json",
+    "sha256": "e92e422885fa8c8f564cd636c7c59ca442514a27b23c2a6040b504abbc13d44b"
+  }
+}

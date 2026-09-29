@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-payload-lifecycle-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "--mode",
+    "lifecycle",
+    "--shape",
+    "payload",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-payload-lifecycle-leg-b/report.json",
+    "--artifact",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0841/runs/qualification-00-payload-lifecycle-leg-b/artifact.ppt"
+  ],
+  "binary": {
+    "bytes": 9236024,
+    "path": "/home/zhuhe/code/litchi-target-0841/retained/leg-b/ppt-profile-probe",
+    "sha256": "7a057a936c6777c23cc2295f6f033ba8ba0ebe20c42147a7652391522bcfd6bf"
+  },
+  "build": {
+    "bytes": 654,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0841/build-after.json",
+    "sha256": "94b928f680b8ec7ed15241495881e814dfac012b9358af1024c3ecdce69a6f3d"
+  },
+  "lane": "qualification",
+  "row": {
+    "leg": "after",
+    "mode": "lifecycle",
+    "samples": 1,
+    "shape": "payload",
+    "warmup": 0
+  },
+  "started_unix": 1790696649.446017
+}

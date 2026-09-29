@@ -1,0 +1,1885 @@
+0000000000171ca8 0000000000000008 d DW.ref.rust_eh_personality
+000000000000cd64 r GCC_except_table0
+00000000000081d8 r GCC_except_table100
+000000000000b688 r GCC_except_table1001
+000000000000b6f8 r GCC_except_table1003
+000000000000b738 r GCC_except_table1004
+000000000000b778 r GCC_except_table1005
+000000000000b7e8 r GCC_except_table1006
+000000000000b820 r GCC_except_table1007
+000000000000b87c r GCC_except_table1008
+000000000000b964 r GCC_except_table1009
+000000000000b99c r GCC_except_table1014
+000000000000b9c4 r GCC_except_table1016
+000000000000b9d8 r GCC_except_table1018
+000000000000ba60 r GCC_except_table1019
+0000000000008200 r GCC_except_table102
+000000000000bad0 r GCC_except_table1020
+000000000000badc r GCC_except_table1021
+000000000000bafc r GCC_except_table1022
+000000000000bd2c r GCC_except_table1023
+000000000000bd54 r GCC_except_table1024
+000000000000bd98 r GCC_except_table1025
+000000000000bde0 r GCC_except_table1026
+000000000000be70 r GCC_except_table1027
+000000000000beac r GCC_except_table1035
+000000000000becc r GCC_except_table1036
+000000000000bed8 r GCC_except_table1037
+000000000000bee0 r GCC_except_table1038
+000000000000821c r GCC_except_table104
+0000000000008238 r GCC_except_table108
+000000000000beec r GCC_except_table1088
+0000000000008244 r GCC_except_table109
+000000000000bf08 r GCC_except_table1101
+000000000000bf30 r GCC_except_table1108
+000000000000bf48 r GCC_except_table1109
+0000000000008254 r GCC_except_table111
+000000000000bfb8 r GCC_except_table1112
+000000000000bfe0 r GCC_except_table1113
+000000000000bfec r GCC_except_table1117
+0000000000008270 r GCC_except_table112
+000000000000c01c r GCC_except_table1120
+000000000000c028 r GCC_except_table1125
+000000000000c054 r GCC_except_table1126
+000000000000c068 r GCC_except_table1129
+000000000000c07c r GCC_except_table1130
+000000000000c25c r GCC_except_table1135
+000000000000c290 r GCC_except_table1136
+000000000000c2b8 r GCC_except_table1137
+000000000000c2d4 r GCC_except_table1140
+000000000000c2f8 r GCC_except_table1141
+000000000000c398 r GCC_except_table1143
+000000000000c3a8 r GCC_except_table1148
+0000000000008284 r GCC_except_table115
+000000000000c3bc r GCC_except_table1150
+000000000000c420 r GCC_except_table1151
+000000000000c538 r GCC_except_table1152
+000000000000c55c r GCC_except_table1154
+000000000000c590 r GCC_except_table1155
+000000000000c5ac r GCC_except_table1156
+000000000000c5c8 r GCC_except_table1160
+000000000000c658 r GCC_except_table1161
+000000000000c668 r GCC_except_table1162
+000000000000c674 r GCC_except_table1166
+00000000000082cc r GCC_except_table117
+000000000000c6ec r GCC_except_table1173
+000000000000c700 r GCC_except_table1177
+000000000000c728 r GCC_except_table1182
+000000000000c73c r GCC_except_table1184
+000000000000c77c r GCC_except_table1185
+00000000000082dc r GCC_except_table119
+000000000000c7a8 r GCC_except_table1190
+000000000000c7bc r GCC_except_table1194
+0000000000006ca0 r GCC_except_table12
+000000000000c7d0 r GCC_except_table1205
+000000000000c7e4 r GCC_except_table1213
+000000000000c7f8 r GCC_except_table1215
+000000000000c820 r GCC_except_table1216
+000000000000c834 r GCC_except_table1218
+00000000000082f8 r GCC_except_table122
+000000000000c844 r GCC_except_table1226
+000000000000c858 r GCC_except_table1229
+000000000000830c r GCC_except_table123
+000000000000c87c r GCC_except_table1230
+000000000000c890 r GCC_except_table1235
+000000000000c8ac r GCC_except_table1236
+000000000000c8cc r GCC_except_table1237
+000000000000c8dc r GCC_except_table1238
+0000000000008328 r GCC_except_table124
+000000000000c8fc r GCC_except_table1242
+000000000000c910 r GCC_except_table1243
+000000000000c924 r GCC_except_table1245
+000000000000c940 r GCC_except_table1246
+000000000000c960 r GCC_except_table1249
+000000000000c980 r GCC_except_table1251
+000000000000c994 r GCC_except_table1254
+000000000000c9a8 r GCC_except_table1262
+000000000000c9bc r GCC_except_table1266
+000000000000c9cc r GCC_except_table1269
+000000000000835c r GCC_except_table127
+000000000000c9e0 r GCC_except_table1270
+000000000000ca08 r GCC_except_table1275
+000000000000ca34 r GCC_except_table1277
+0000000000008384 r GCC_except_table128
+000000000000ca54 r GCC_except_table1282
+000000000000ca60 r GCC_except_table1285
+000000000000ca6c r GCC_except_table1286
+000000000000ca80 r GCC_except_table1287
+00000000000083bc r GCC_except_table129
+000000000000ca94 r GCC_except_table1292
+0000000000006cb8 r GCC_except_table13
+000000000000caa8 r GCC_except_table1309
+000000000000cac0 r GCC_except_table1311
+000000000000cacc r GCC_except_table1313
+000000000000cae0 r GCC_except_table1314
+00000000000083d0 r GCC_except_table132
+000000000000caec r GCC_except_table1324
+000000000000cafc r GCC_except_table1326
+000000000000cb0c r GCC_except_table1330
+000000000000cb34 r GCC_except_table1331
+000000000000cb4c r GCC_except_table1335
+000000000000cb70 r GCC_except_table1337
+000000000000cb90 r GCC_except_table1340
+000000000000cbf0 r GCC_except_table1341
+000000000000cc04 r GCC_except_table1343
+000000000000cc1c r GCC_except_table1344
+000000000000cc30 r GCC_except_table1345
+000000000000cc48 r GCC_except_table1347
+00000000000083f0 r GCC_except_table135
+000000000000cc98 r GCC_except_table1350
+000000000000ccac r GCC_except_table1354
+000000000000ccd4 r GCC_except_table1360
+000000000000cce8 r GCC_except_table1361
+000000000000cd00 r GCC_except_table1363
+000000000000cd24 r GCC_except_table1364
+000000000000cd3c r GCC_except_table1365
+000000000000cd50 r GCC_except_table1366
+0000000000008410 r GCC_except_table137
+0000000000008434 r GCC_except_table141
+0000000000008440 r GCC_except_table142
+000000000000845c r GCC_except_table144
+0000000000008484 r GCC_except_table145
+00000000000084a0 r GCC_except_table147
+00000000000084bc r GCC_except_table148
+0000000000006ccc r GCC_except_table15
+00000000000084ec r GCC_except_table150
+0000000000008508 r GCC_except_table152
+0000000000008538 r GCC_except_table154
+0000000000008554 r GCC_except_table158
+0000000000006d08 r GCC_except_table16
+0000000000008570 r GCC_except_table164
+000000000000858c r GCC_except_table169
+0000000000006d24 r GCC_except_table17
+00000000000085a8 r GCC_except_table171
+00000000000085cc r GCC_except_table177
+0000000000006d3c r GCC_except_table18
+0000000000006d80 r GCC_except_table19
+00000000000085e0 r GCC_except_table199
+0000000000006db4 r GCC_except_table20
+0000000000008634 r GCC_except_table200
+0000000000008648 r GCC_except_table201
+000000000000865c r GCC_except_table219
+0000000000008678 r GCC_except_table223
+00000000000086ac r GCC_except_table237
+000000000000872c r GCC_except_table243
+000000000000873c r GCC_except_table249
+0000000000008758 r GCC_except_table251
+000000000000876c r GCC_except_table262
+0000000000008778 r GCC_except_table268
+0000000000006efc r GCC_except_table27
+0000000000006f30 r GCC_except_table29
+0000000000008788 r GCC_except_table306
+0000000000006f48 r GCC_except_table31
+0000000000006f84 r GCC_except_table32
+0000000000006fa8 r GCC_except_table34
+0000000000008798 r GCC_except_table348
+00000000000087f0 r GCC_except_table363
+0000000000008804 r GCC_except_table364
+0000000000008810 r GCC_except_table366
+0000000000008838 r GCC_except_table367
+0000000000008854 r GCC_except_table368
+0000000000008870 r GCC_except_table373
+0000000000008888 r GCC_except_table380
+00000000000088a0 r GCC_except_table381
+00000000000088bc r GCC_except_table382
+00000000000088f0 r GCC_except_table385
+000000000000890c r GCC_except_table386
+000000000000891c r GCC_except_table387
+000000000000892c r GCC_except_table389
+0000000000008948 r GCC_except_table399
+0000000000007020 r GCC_except_table40
+000000000000897c r GCC_except_table420
+00000000000089e4 r GCC_except_table421
+0000000000008a18 r GCC_except_table423
+0000000000008a74 r GCC_except_table424
+0000000000008a9c r GCC_except_table429
+0000000000008ab0 r GCC_except_table431
+0000000000008adc r GCC_except_table432
+0000000000008b04 r GCC_except_table435
+0000000000008b24 r GCC_except_table446
+0000000000008b38 r GCC_except_table453
+0000000000008b4c r GCC_except_table458
+0000000000008b58 r GCC_except_table467
+0000000000008b6c r GCC_except_table468
+0000000000008b7c r GCC_except_table474
+0000000000008ba4 r GCC_except_table480
+0000000000008bbc r GCC_except_table483
+0000000000008bcc r GCC_except_table486
+0000000000007340 r GCC_except_table49
+0000000000008be0 r GCC_except_table491
+0000000000008c04 r GCC_except_table493
+0000000000008c18 r GCC_except_table494
+0000000000008c58 r GCC_except_table495
+0000000000008c6c r GCC_except_table496
+0000000000008cc0 r GCC_except_table498
+0000000000008cd4 r GCC_except_table499
+0000000000007364 r GCC_except_table50
+0000000000008fac r GCC_except_table501
+0000000000008fbc r GCC_except_table503
+0000000000008fcc r GCC_except_table505
+0000000000008fdc r GCC_except_table507
+00000000000075d0 r GCC_except_table51
+0000000000008fec r GCC_except_table513
+00000000000075dc r GCC_except_table52
+0000000000008ffc r GCC_except_table520
+00000000000075f4 r GCC_except_table54
+0000000000007634 r GCC_except_table55
+0000000000007650 r GCC_except_table56
+0000000000009010 r GCC_except_table561
+0000000000009048 r GCC_except_table562
+0000000000009054 r GCC_except_table563
+0000000000009084 r GCC_except_table565
+0000000000007670 r GCC_except_table57
+0000000000009094 r GCC_except_table579
+0000000000007690 r GCC_except_table58
+00000000000090c8 r GCC_except_table581
+00000000000090f4 r GCC_except_table583
+0000000000009198 r GCC_except_table584
+00000000000091c0 r GCC_except_table586
+000000000000930c r GCC_except_table587
+0000000000009340 r GCC_except_table588
+0000000000007954 r GCC_except_table59
+0000000000009374 r GCC_except_table597
+000000000000938c r GCC_except_table599
+00000000000079b0 r GCC_except_table60
+00000000000093a4 r GCC_except_table601
+00000000000093c0 r GCC_except_table605
+00000000000093e8 r GCC_except_table609
+0000000000007b68 r GCC_except_table61
+0000000000007b84 r GCC_except_table62
+0000000000009424 r GCC_except_table624
+0000000000007c38 r GCC_except_table65
+000000000000944c r GCC_except_table652
+0000000000007c54 r GCC_except_table66
+0000000000009460 r GCC_except_table675
+00000000000094c8 r GCC_except_table676
+0000000000007c80 r GCC_except_table68
+000000000000954c r GCC_except_table684
+000000000000956c r GCC_except_table685
+0000000000009580 r GCC_except_table686
+0000000000007cd8 r GCC_except_table69
+000000000000958c r GCC_except_table691
+00000000000095b8 r GCC_except_table692
+00000000000095d8 r GCC_except_table694
+00000000000095ec r GCC_except_table695
+000000000000960c r GCC_except_table697
+0000000000007d3c r GCC_except_table70
+0000000000009640 r GCC_except_table701
+0000000000009668 r GCC_except_table702
+0000000000007d5c r GCC_except_table71
+0000000000007f88 r GCC_except_table72
+000000000000969c r GCC_except_table723
+00000000000096e8 r GCC_except_table724
+0000000000008044 r GCC_except_table73
+0000000000009704 r GCC_except_table735
+0000000000008064 r GCC_except_table74
+0000000000009718 r GCC_except_table741
+00000000000097ac r GCC_except_table742
+0000000000009834 r GCC_except_table744
+000000000000984c r GCC_except_table747
+000000000000985c r GCC_except_table749
+0000000000008088 r GCC_except_table75
+0000000000009874 r GCC_except_table752
+0000000000009880 r GCC_except_table754
+00000000000098d4 r GCC_except_table759
+00000000000080d4 r GCC_except_table76
+000000000000996c r GCC_except_table761
+000000000000999c r GCC_except_table765
+0000000000009a08 r GCC_except_table773
+0000000000009a1c r GCC_except_table776
+0000000000009a44 r GCC_except_table777
+0000000000009a58 r GCC_except_table778
+0000000000009a74 r GCC_except_table779
+0000000000009a88 r GCC_except_table785
+0000000000009ad8 r GCC_except_table788
+0000000000009b30 r GCC_except_table789
+0000000000009b4c r GCC_except_table790
+0000000000009b60 r GCC_except_table792
+0000000000009b7c r GCC_except_table793
+0000000000009bb4 r GCC_except_table794
+0000000000009bd4 r GCC_except_table799
+0000000000009c0c r GCC_except_table801
+0000000000009c3c r GCC_except_table806
+0000000000009c74 r GCC_except_table807
+0000000000009df0 r GCC_except_table814
+0000000000009dfc r GCC_except_table821
+0000000000009e44 r GCC_except_table822
+0000000000009e60 r GCC_except_table823
+0000000000009e7c r GCC_except_table825
+0000000000009ea4 r GCC_except_table826
+0000000000009ecc r GCC_except_table827
+0000000000009ef0 r GCC_except_table828
+0000000000009f0c r GCC_except_table830
+0000000000009f34 r GCC_except_table831
+0000000000009f5c r GCC_except_table832
+0000000000009f8c r GCC_except_table834
+0000000000009fa4 r GCC_except_table835
+000000000000a08c r GCC_except_table837
+000000000000a09c r GCC_except_table838
+000000000000a0b0 r GCC_except_table847
+000000000000a0cc r GCC_except_table857
+000000000000a114 r GCC_except_table858
+0000000000008108 r GCC_except_table86
+000000000000a1cc r GCC_except_table862
+000000000000a1e8 r GCC_except_table863
+000000000000a318 r GCC_except_table864
+000000000000a34c r GCC_except_table866
+000000000000a378 r GCC_except_table869
+000000000000a3ac r GCC_except_table872
+000000000000a428 r GCC_except_table873
+000000000000a43c r GCC_except_table877
+0000000000008130 r GCC_except_table88
+000000000000a450 r GCC_except_table885
+000000000000a518 r GCC_except_table886
+000000000000a54c r GCC_except_table887
+000000000000a56c r GCC_except_table891
+000000000000a588 r GCC_except_table893
+000000000000a5c0 r GCC_except_table896
+000000000000a5d4 r GCC_except_table898
+000000000000a66c r GCC_except_table900
+000000000000a68c r GCC_except_table901
+000000000000a6a8 r GCC_except_table902
+000000000000a714 r GCC_except_table906
+000000000000a774 r GCC_except_table908
+000000000000a7a0 r GCC_except_table909
+000000000000814c r GCC_except_table91
+000000000000a8d0 r GCC_except_table914
+000000000000a8ec r GCC_except_table916
+000000000000a92c r GCC_except_table918
+000000000000a954 r GCC_except_table921
+000000000000a9dc r GCC_except_table929
+000000000000a9f4 r GCC_except_table931
+000000000000aa04 r GCC_except_table932
+000000000000aa18 r GCC_except_table933
+000000000000aa30 r GCC_except_table934
+000000000000aaa8 r GCC_except_table936
+000000000000ac64 r GCC_except_table937
+000000000000ac9c r GCC_except_table938
+000000000000acc4 r GCC_except_table939
+0000000000008174 r GCC_except_table94
+000000000000acf4 r GCC_except_table955
+000000000000ad10 r GCC_except_table956
+000000000000ad88 r GCC_except_table957
+0000000000008188 r GCC_except_table96
+000000000000ada0 r GCC_except_table960
+000000000000adc4 r GCC_except_table969
+000000000000819c r GCC_except_table97
+000000000000ade0 r GCC_except_table973
+000000000000ae40 r GCC_except_table975
+000000000000ae68 r GCC_except_table976
+000000000000ae90 r GCC_except_table977
+000000000000af9c r GCC_except_table978
+000000000000aff0 r GCC_except_table979
+000000000000b008 r GCC_except_table980
+000000000000b014 r GCC_except_table981
+000000000000b0ec r GCC_except_table982
+000000000000b18c r GCC_except_table983
+000000000000b1ac r GCC_except_table984
+000000000000b1f8 r GCC_except_table986
+000000000000b220 r GCC_except_table987
+00000000000081c4 r GCC_except_table99
+000000000000b348 r GCC_except_table991
+000000000000b38c r GCC_except_table992
+000000000000b444 r GCC_except_table993
+000000000000b458 r GCC_except_table994
+000000000000b4bc r GCC_except_table995
+000000000000b674 r GCC_except_table997
+000000000016fde8 d _DYNAMIC
+00000000001702d8 d _GLOBAL_OFFSET_TABLE_
+000000000015cfc0 000000000000003c t <core::cell::once::OnceCell<core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>>>::try_init::<<core::cell::once::OnceCell<core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>>>::get_or_init<<addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::dwarf_and_unit::{closure#2}>::{closure#0}, !>
+000000000015d000 0000000000000052 t <core::cell::once::OnceCell<core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>>>::try_init::<<core::cell::once::OnceCell<core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>>>::get_or_init<<addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::dwarf_and_unit::{closure#4}>::{closure#0}, !>
+0000000000152b80 00000000000007ed t <core::cell::once::OnceCell<core::result::Result<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>>>::try_init::<<core::cell::once::OnceCell<core::result::Result<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>>>::get_or_init<<addr2line::function::LazyFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::borrow::{closure#0}>::{closure#0}, !>
+0000000000151cf0 0000000000000e90 t <core::cell::once::OnceCell<core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>>>::try_init::<<core::cell::once::OnceCell<core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>>>::get_or_init<<addr2line::function::LazyFunctions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::borrow::{closure#0}>::{closure#0}, !>
+000000000014d9c0 0000000000001e55 t <core::cell::once::OnceCell<core::result::Result<addr2line::line::Lines, gimli::read::Error>>>::try_init::<<core::cell::once::OnceCell<core::result::Result<addr2line::line::Lines, gimli::read::Error>>>::get_or_init<<addr2line::line::LazyLines>::borrow<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#0}>::{closure#0}, !>
+0000000000168ce4 0000000000000057 t <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::cleanup::{closure#0}>::{closure#0}, !>
+0000000000169aa4 0000000000000078 t <std::sync::once_lock::OnceLock<std::fs::File>>::initialize::<std::sys::random::linux::getrandom::{closure#0}, std::io::error::Error>
+000000000013e515 0000000000004808 t <std::backtrace_rs::symbolize::gimli::Cache>::with_global::<std::backtrace_rs::symbolize::gimli::resolve::{closure#1}>
+00000000001350bc 00000000000000ec t <rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>
+0000000000136854 00000000000000ec t <rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>
+000000000013797c 00000000000000df t <rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>
+0000000000136fd6 0000000000000089 t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_const::{closure#2}>
+000000000013705f 0000000000000094 t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_const::{closure#3}>
+00000000001370f3 00000000000001d9 t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_const::{closure#5}>
+0000000000137a5b 000000000000008f t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_type>
+0000000000137e39 0000000000000255 t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_dyn_trait>
+0000000000135db1 000000000000014a t <rustc_demangle::v0::Printer>::print_sep_list::<<rustc_demangle::v0::Printer>::print_generic_arg>
+00000000001357ba 0000000000000055 t <rustc_demangle::v0::Printer>::skipping_printing::<<rustc_demangle::v0::Printer>::print_path::{closure#0}>
+0000000000136b11 00000000000001af t <rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>
+00000000001377ff 000000000000017d t <rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#0}>
+0000000000137aea 0000000000000174 t <rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#1}>
+0000000000162e10 00000000000000da t <std::io::error::Error>::new::<&str>
+0000000000165d70 0000000000000b91 t <alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo>>::remove_kv::{closure#0}, alloc::alloc::Global>
+000000000015b430 000000000000038e t <gimli::read::line::FileEntryFormat>::parse::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+000000000014ff40 0000000000000932 t addr2line::line::render_file::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+0000000000157a60 0000000000000435 t addr2line::function::name_entry::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+0000000000156290 00000000000002c2 t addr2line::function::name_attr::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+000000000015e6a0 0000000000000060 t core::ptr::drop_in_place::<addr2line::Context<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+000000000014d4f0 000000000000006b t core::ptr::drop_in_place::<core::option::Option<gimli::read::line::IncompleteLineProgram<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>>
+000000000015ac20 00000000000000ff t core::ptr::drop_in_place::<core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>>
+0000000000159af0 000000000000009e t core::ptr::drop_in_place::<core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>>
+0000000000165d00 0000000000000063 t core::ptr::drop_in_place::<core::result::Result<std::sync::poison::mutex::MutexGuard<()>, std::sync::poison::PoisonError<std::sync::poison::mutex::MutexGuard<()>>>>
+0000000000150940 00000000000000ae t core::ptr::drop_in_place::<core::result::Result<addr2line::line::Lines, gimli::read::Error>>
+000000000014d560 0000000000000005 t core::ptr::drop_in_place::<core::result::Result<&core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>, (&core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>, core::result::Result<core::option::Option<alloc::boxed::Box<addr2line::unit::DwoUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>, gimli::read::Error>)>>
+0000000000156730 0000000000000049 t core::ptr::drop_in_place::<core::result::Result<&core::result::Result<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>, (&core::result::Result<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>, core::result::Result<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>)>>
+0000000000159a30 00000000000000b1 t core::ptr::drop_in_place::<core::result::Result<&core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>, (&core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>, core::result::Result<addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>)>>
+0000000000150880 00000000000000be t core::ptr::drop_in_place::<core::result::Result<&core::result::Result<addr2line::line::Lines, gimli::read::Error>, (&core::result::Result<addr2line::line::Lines, gimli::read::Error>, core::result::Result<addr2line::line::Lines, gimli::read::Error>)>>
+000000000013d7c0 000000000000008c t core::ptr::drop_in_place::<core::result::Result<(), std::io::error::Error>>
+000000000015d2d0 0000000000000284 t core::ptr::drop_in_place::<addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+000000000015d220 00000000000000a5 t core::ptr::drop_in_place::<addr2line::unit::SupUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+000000000015d060 00000000000000af t core::ptr::drop_in_place::<addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+000000000015d110 000000000000010f t core::ptr::drop_in_place::<addr2line::unit::SupUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+00000000001598b0 0000000000000049 t core::ptr::drop_in_place::<addr2line::function::LazyFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>
+000000000015dae0 00000000000000a7 t core::ptr::drop_in_place::<alloc::vec::Vec<addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>
+000000000015db90 0000000000000136 t core::ptr::drop_in_place::<alloc::vec::Vec<addr2line::unit::SupUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>
+0000000000159900 0000000000000093 t core::ptr::drop_in_place::<alloc::vec::Vec<addr2line::function::LazyFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>
+000000000014fec0 0000000000000076 t core::ptr::drop_in_place::<alloc::vec::Vec<alloc::string::String>>
+000000000014fb80 0000000000000076 t core::ptr::drop_in_place::<alloc::vec::Vec<addr2line::line::LineSequence>>
+0000000000169410 0000000000000076 t core::ptr::drop_in_place::<alloc::vec::Vec<std::ffi::os_str::OsString>>
+000000000014a5f0 000000000000005a t core::ptr::drop_in_place::<alloc::sync::ArcInner<gimli::read::dwarf::Dwarf<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>
+0000000000133b50 000000000000006b t core::ptr::drop_in_place::<alloc::boxed::Box<panic_unwind::imp::Exception>>
+00000000001599a0 0000000000000081 t core::ptr::drop_in_place::<alloc::boxed::Box<[addr2line::function::LazyFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>]>>
+000000000014fc00 0000000000000064 t core::ptr::drop_in_place::<alloc::boxed::Box<[alloc::string::String]>>
+000000000014fb10 0000000000000066 t core::ptr::drop_in_place::<gimli::read::line::LineRows<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, gimli::read::line::IncompleteLineProgram<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>, usize>>
+000000000014d3e0 00000000000000a5 t core::ptr::drop_in_place::<gimli::read::dwarf::Unit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>
+0000000000168d40 000000000000003f t core::ptr::drop_in_place::<std::sync::reentrant_lock::ReentrantLockGuard<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>
+0000000000168d80 00000000000000d1 t core::ptr::drop_in_place::<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>
+000000000013d860 0000000000000027 t core::ptr::drop_in_place::<std::sync::nonpoison::rwlock::RwLockReadGuard<std::panicking::Hook>>
+0000000000163cd0 0000000000000090 t core::ptr::drop_in_place::<std::io::default_write_fmt::Adapter<std::io::cursor::Cursor<&mut [u8]>>>
+000000000015cee0 0000000000000063 t core::ptr::drop_in_place::<<alloc::collections::btree::map::IntoIter<_, _, _> as core::ops::drop::Drop>::drop::DropGuard<u64, core::result::Result<alloc::sync::Arc<gimli::read::abbrev::Abbreviations>, gimli::read::Error>, alloc::alloc::Global>>
+0000000000163b30 0000000000000011 t core::ptr::drop_in_place::<std::sys::backtrace::_print_fmt::{closure#0}>
+0000000000133ad0 000000000000005d t core::ptr::drop_in_place::<panic_unwind::imp::Exception>
+0000000000099260 0000000000000011 t core::ptr::drop_in_place::<alloc::string::String>
+0000000000164910 0000000000000011 t core::ptr::drop_in_place::<alloc::string::String>
+000000000015ad20 00000000000003c5 t core::ptr::drop_in_place::<gimli::read::abbrev::Abbreviations>
+000000000015cac0 00000000000000bc t core::ptr::drop_in_place::<gimli::read::abbrev::AbbreviationsCache>
+000000000013dc60 000000000000008a t core::ptr::drop_in_place::<std::io::error::Error>
+0000000000169570 0000000000000035 t core::ptr::drop_in_place::<std::io::stdio::StderrLock>
+000000000013df90 0000000000000060 t core::ptr::drop_in_place::<std::sys::backtrace::BacktraceLock>
+000000000013e3a0 000000000000001c t core::ptr::drop_in_place::<std::backtrace_rs::backtrace::libunwind::Bomb>
+0000000000162c40 0000000000000037 t core::ptr::drop_in_place::<std::backtrace_rs::symbolize::gimli::Library>
+000000000015d560 000000000000000f t core::ptr::drop_in_place::<std::backtrace_rs::symbolize::gimli::elf::Object>
+0000000000144430 00000000000000c2 t core::ptr::drop_in_place::<std::backtrace_rs::symbolize::gimli::stash::Stash>
+00000000000996f0 0000000000000011 t core::ptr::drop_in_place::<<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError>
+0000000000162ef0 0000000000000011 t core::ptr::drop_in_place::<<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError>
+00000000001499d0 00000000000000e7 t core::ptr::drop_in_place::<(usize, std::backtrace_rs::symbolize::gimli::Mapping)>
+000000000013759d 00000000000000b9 t core::escape::escape_unicode::<10>
+0000000000164422 0000000000000028 t core::panicking::assert_failed::<i32, i32>
+00000000001693e0 000000000000002a t std::rt::handle_rt_panic::<isize>
+000000000015b9b0 00000000000002e8 t gimli::read::line::parse_file_v5::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+000000000015bf00 000000000000097f t gimli::read::line::parse_attribute::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+000000000015b860 00000000000000e0 t gimli::read::line::parse_directory_v5::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+0000000000153370 00000000000013c2 t gimli::read::unit::parse_attribute::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+0000000000157f80 00000000000005d5 t gimli::read::unit::skip_attributes::<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>
+0000000000164530 0000000000000009 t std::sys::backtrace::__rust_end_short_backtrace::<std::alloc::rust_oom::{closure#0}, !>
+0000000000164690 0000000000000009 t std::sys::backtrace::__rust_end_short_backtrace::<std::panicking::panic_handler::{closure#0}, !>
+000000000014fc70 0000000000000123 t core::slice::sort::stable::driftsort_main::<addr2line::line::LineSequence, <[addr2line::line::LineSequence]>::sort_by_key<u64, <addr2line::line::Lines>::parse<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#1}>::{closure#0}, alloc::vec::Vec<addr2line::line::LineSequence>>
+000000000015d960 0000000000000110 t core::slice::sort::stable::driftsort_main::<addr2line::unit::UnitRange, <[addr2line::unit::UnitRange]>::sort_by_key<u64, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#4}>::{closure#0}, alloc::vec::Vec<addr2line::unit::UnitRange>>
+0000000000159720 0000000000000115 t core::slice::sort::stable::driftsort_main::<addr2line::function::FunctionAddress, <[addr2line::function::FunctionAddress]>::sort_by_key<u64, <addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#1}>::{closure#0}, alloc::vec::Vec<addr2line::function::FunctionAddress>>
+0000000000156560 0000000000000110 t core::slice::sort::stable::driftsort_main::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}, alloc::vec::Vec<addr2line::function::InlinedFunctionAddress>>
+000000000015d850 0000000000000110 t core::slice::sort::stable::driftsort_main::<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset), <[(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)]>::sort_by_key<gimli::common::DebugInfoOffset, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}, alloc::vec::Vec<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)>>
+0000000000161c10 00000000000000dc t core::slice::sort::unstable::ipnsort::<std::backtrace_rs::symbolize::gimli::elf::ParsedSym, <[std::backtrace_rs::symbolize::gimli::elf::ParsedSym]>::sort_unstable_by_key<u64, <std::backtrace_rs::symbolize::gimli::elf::Object>::parse::{closure#3}>::{closure#0}>
+0000000000145730 0000000000000097 t std::sys::helpers::small_c_string::run_with_cstr_allocating::<std::path::PathBuf>
+0000000000162810 000000000000009d t std::sys::helpers::small_c_string::run_with_cstr_allocating::<std::sys::fs::unix::File>
+0000000000161980 0000000000000166 t std::sys::helpers::small_c_string::run_with_cstr_allocating::<std::sys::fs::unix::FileAttr>
+000000000016a8b0 0000000000000212 t compiler_builtins::math::libm_math::support::modular::linear_mul_reduction::<u64>
+0000000000151c30 00000000000000b2 t core::slice::sort::shared::pivot::median3_rec::<addr2line::line::LineSequence, <[addr2line::line::LineSequence]>::sort_by_key<u64, <addr2line::line::Lines>::parse<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#1}>::{closure#0}>
+000000000015f750 00000000000000b2 t core::slice::sort::shared::pivot::median3_rec::<addr2line::unit::UnitRange, <[addr2line::unit::UnitRange]>::sort_by_key<u64, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#4}>::{closure#0}>
+000000000015ab60 00000000000000b3 t core::slice::sort::shared::pivot::median3_rec::<addr2line::function::FunctionAddress, <[addr2line::function::FunctionAddress]>::sort_by_key<u64, <addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#1}>::{closure#0}>
+0000000000157950 0000000000000103 t core::slice::sort::shared::pivot::median3_rec::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000162750 00000000000000b3 t core::slice::sort::shared::pivot::median3_rec::<std::backtrace_rs::symbolize::gimli::elf::ParsedSym, <[std::backtrace_rs::symbolize::gimli::elf::ParsedSym]>::sort_unstable_by_key<u64, <std::backtrace_rs::symbolize::gimli::elf::Object>::parse::{closure#3}>::{closure#0}>
+0000000000160cb0 00000000000000ac t core::slice::sort::shared::pivot::median3_rec::<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset), <[(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)]>::sort_by_key<gimli::common::DebugInfoOffset, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+00000000001577e0 0000000000000165 t core::slice::sort::shared::smallsort::sort4_stable::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000160930 0000000000000376 t core::slice::sort::shared::smallsort::sort8_stable::<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset), <[(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)]>::sort_by_key<gimli::common::DebugInfoOffset, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000162100 000000000000054b t core::slice::sort::shared::smallsort::small_sort_general::<std::backtrace_rs::symbolize::gimli::elf::ParsedSym, <[std::backtrace_rs::symbolize::gimli::elf::ParsedSym]>::sort_unstable_by_key<u64, <std::backtrace_rs::symbolize::gimli::elf::Object>::parse::{closure#3}>::{closure#0}>
+000000000014fda0 00000000000000a4 t core::slice::sort::shared::smallsort::insertion_sort_shift_left::<addr2line::line::LineSequence, <[addr2line::line::LineSequence]>::sort_by_key<u64, <addr2line::line::Lines>::parse<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#1}>::{closure#0}>
+0000000000156670 00000000000000bf t core::slice::sort::shared::smallsort::insertion_sort_shift_left::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000150be0 0000000000000642 t core::slice::sort::stable::drift::sort::<addr2line::line::LineSequence, <[addr2line::line::LineSequence]>::sort_by_key<u64, <addr2line::line::Lines>::parse<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#1}>::{closure#0}>
+000000000015e700 0000000000000642 t core::slice::sort::stable::drift::sort::<addr2line::unit::UnitRange, <[addr2line::unit::UnitRange]>::sort_by_key<u64, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#4}>::{closure#0}>
+0000000000159b90 0000000000000632 t core::slice::sort::stable::drift::sort::<addr2line::function::FunctionAddress, <[addr2line::function::FunctionAddress]>::sort_by_key<u64, <addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#1}>::{closure#0}>
+0000000000156780 000000000000068e t core::slice::sort::stable::drift::sort::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+000000000015f810 00000000000006a2 t core::slice::sort::stable::drift::sort::<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset), <[(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)]>::sort_by_key<gimli::common::DebugInfoOffset, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000151230 00000000000009f3 t core::slice::sort::stable::quicksort::quicksort::<addr2line::line::LineSequence, <[addr2line::line::LineSequence]>::sort_by_key<u64, <addr2line::line::Lines>::parse<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>::{closure#1}>::{closure#0}>
+000000000015ed50 00000000000009f3 t core::slice::sort::stable::quicksort::quicksort::<addr2line::unit::UnitRange, <[addr2line::unit::UnitRange]>::sort_by_key<u64, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#4}>::{closure#0}>
+000000000015a1d0 0000000000000986 t core::slice::sort::stable::quicksort::quicksort::<addr2line::function::FunctionAddress, <[addr2line::function::FunctionAddress]>::sort_by_key<u64, <addr2line::function::Functions<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#1}>::{closure#0}>
+0000000000156e10 00000000000009c3 t core::slice::sort::stable::quicksort::quicksort::<addr2line::function::InlinedFunctionAddress, <[addr2line::function::InlinedFunctionAddress]>::sort_by<<addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+000000000015fec0 0000000000000a66 t core::slice::sort::stable::quicksort::quicksort::<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset), <[(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)]>::sort_by_key<gimli::common::DebugInfoOffset, <addr2line::unit::ResUnits<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse::{closure#0}>::{closure#0}>
+0000000000162650 00000000000000f5 t core::slice::sort::unstable::heapsort::heapsort::<std::backtrace_rs::symbolize::gimli::elf::ParsedSym, <[std::backtrace_rs::symbolize::gimli::elf::ParsedSym]>::sort_unstable_by_key<u64, <std::backtrace_rs::symbolize::gimli::elf::Object>::parse::{closure#3}>::{closure#0}>
+0000000000161cf0 000000000000040a t core::slice::sort::unstable::quicksort::quicksort::<std::backtrace_rs::symbolize::gimli::elf::ParsedSym, <[std::backtrace_rs::symbolize::gimli::elf::ParsedSym]>::sort_unstable_by_key<u64, <std::backtrace_rs::symbolize::gimli::elf::Object>::parse::{closure#3}>::{closure#0}>
+0000000000098d00 0000000000000070 t <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+0000000000098809 0000000000000030 t <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+000000000013dbe0 0000000000000080 t <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+0000000000162d10 00000000000000f9 t std::io::default_read_to_end::small_probe_read::<&std::fs::File>
+0000000000168fc0 0000000000000048 t <std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::cleanup::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+0000000000169cb0 0000000000000184 t <std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::fs::File>>::initialize<std::sys::random::linux::getrandom::{closure#0}, std::io::error::Error>::{closure#0}>::{closure#0}
+0000000000168530 00000000000007b4 t <std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
+00000000001693b0 000000000000002a t std::rt::lang_start_internal::{closure#0}::{closure#0}::{closure#1}
+0000000000162f10 000000000000025c t std::sys::backtrace::_print_fmt::{closure#1}::{closure#0}
+000000000014d570 0000000000000449 t <addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::find_function_or_location::{closure#0}
+00000000001381d7 000000000000036a t <rustc_demangle::v0::Printer>::print_type::{closure#0}
+0000000000164540 000000000000000e t std::alloc::rust_oom::{closure#0}
+00000000001646a0 0000000000000094 t std::panicking::panic_handler::{closure#0}
+0000000000163a40 00000000000000ed t core::str::pattern::simd_contains::{closure#2}
+0000000000163bd0 000000000000001a t std::sys::backtrace::_print_fmt::{closure#0}
+000000000013e3d0 0000000000000145 t std::sys::backtrace::_print_fmt::{closure#1}
+00000000001643e0 000000000000000c t std::sys::personality::gcc::find_eh_action::{closure#0}
+0000000000164400 000000000000000c t std::sys::personality::gcc::find_eh_action::{closure#1}
+0000000000168f70 0000000000000048 t <<std::sync::once::Once>::call_once_force<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::cleanup::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0} as core::ops::function::FnOnce<(&std::sync::once::OnceState,)>>::call_once::{shim:vtable#0}
+0000000000169b20 0000000000000184 t <<std::sync::once::Once>::call_once_force<<std::sync::once_lock::OnceLock<std::fs::File>>::initialize<std::sys::random::linux::getrandom::{closure#0}, std::io::error::Error>::{closure#0}>::{closure#0} as core::ops::function::FnOnce<(&std::sync::once::OnceState,)>>::call_once::{shim:vtable#0}
+0000000000168510 000000000000001e t <<std::sync::once::Once>::call_once<std::rt::cleanup::{closure#0}>::{closure#0} as core::ops::function::FnOnce<(&std::sync::once::OnceState,)>>::call_once::{shim:vtable#0}
+0000000000163b50 000000000000007d t <std::sys::backtrace::_print_fmt::{closure#0} as core::ops::function::FnOnce<(&mut core::fmt::Formatter, std::backtrace_rs::types::BytesOrWideString)>>::call_once::{shim:vtable#0}
+000000000013e3c0 0000000000000005 t <std::sys::backtrace::_print_fmt::{closure#1} as core::ops::function::FnOnce<(&std::backtrace_rs::backtrace::Frame,)>>::call_once::{shim:vtable#0}
+00000000001643d0 000000000000000c t <std::sys::personality::gcc::find_eh_action::{closure#0} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+00000000001643f0 000000000000000c t <std::sys::personality::gcc::find_eh_action::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+000000000013d890 0000000000000044 t __rustc::rust_panic
+0000000000098730 0000000000000041 t __rustc::__rust_alloc
+0000000000098780 0000000000000089 t __rustc::__rust_realloc
+0000000000164b70 00000000000000ae t __rustc::__rust_drop_panic
+0000000000164c20 000000000000001c t __rustc::rust_begin_unwind
+0000000000133a30 0000000000000094 t __rustc::__rust_start_panic
+0000000000133bc0 0000000000000047 t __rustc::__rust_panic_cleanup
+0000000000164c40 00000000000000ae t __rustc::__rust_foreign_exception
+0000000000164cf0 0000000000000012 t __rustc::__rust_alloc_error_handler
+0000000000133fb3 0000000000000a19 t rustc_demangle::try_demangle
+0000000000149ac0 0000000000000531 t <addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::find_function_or_location
+0000000000098a30 00000000000002b1 t <alloc::string::String>::from_utf16
+0000000000098e30 0000000000000224 t <alloc::string::String>::from_utf8_lossy
+00000000000e8290 000000000000004b t <alloc::string::String>::push
+000000000009ab10 000000000000023d t <char>::escape_debug_ext
+0000000000146620 00000000000005cc t <std::backtrace_rs::symbolize::gimli::Mapping>::load_dwarf_package
+00000000001449d0 0000000000000ca3 t <std::backtrace_rs::symbolize::gimli::Mapping>::new_debug
+000000000015c8f0 00000000000000b3 t <std::backtrace_rs::symbolize::gimli::stash::Stash>::allocate
+0000000000164d20 00000000000000c5 t <std::sys::pal::unix::time::Timespec>::sub_timespec
+0000000000164df0 00000000000000ca t <std::sys::pal::unix::time::Timespec>::now
+000000000013de40 00000000000000e7 t <std::sys::sync::mutex::futex::Mutex>::lock_contended
+000000000013d4b0 0000000000000194 t <std::sys::sync::rwlock::futex::RwLock>::read_contended
+00000000001640c0 00000000000000d6 t <std::sys::sync::rwlock::futex::RwLock>::wake_writer_or_readers
+00000000001509f0 00000000000001e5 t <gimli::read::dwarf::Dwarf<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::attr_string
+00000000001681b0 000000000000021b t <std::sys::sync::once::futex::Once>::call
+0000000000166910 0000000000000344 t <alloc::collections::btree::node::BalancingContext<usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo>>::bulk_steal_left
+0000000000166c60 0000000000000399 t <alloc::collections::btree::node::BalancingContext<usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo>>::bulk_steal_right
+0000000000146380 0000000000000296 t <std::path::Path>::_strip_prefix
+00000000001683d0 00000000000000c8 t <std::path::Path>::is_dir
+0000000000154740 00000000000012eb t <addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse_children
+00000000001369cb 0000000000000146 t <rustc_demangle::v0::HexNibbles>::try_parse_uint
+000000000009b460 000000000000017c t <core::fmt::builders::DebugStruct>::field
+000000000014a000 000000000000055d t <addr2line::lookup::LoopingLookup<core::result::Result<addr2line::frame::FrameIter<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>, gimli::read::Error>, addr2line::lookup::MappedLookup<core::result::Result<(core::option::Option<&addr2line::function::Function<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>, core::option::Option<addr2line::frame::Location>), gimli::read::Error>, addr2line::lookup::SimpleLookup<core::result::Result<(addr2line::DebugFile, gimli::read::dwarf::UnitRef<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>), gimli::read::Error>, gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, <addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::dwarf_and_unit::{closure#6}>, <addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::find_function_or_location::{closure#0}>, <addr2line::Context<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::find_frames::{closure#0}>>::new_lookup
+0000000000135efb 000000000000009d t <rustc_demangle::v0::Parser>::integer_62
+0000000000136940 000000000000008b t <rustc_demangle::v0::Parser>::hex_nibbles
+00000000001351a8 0000000000000071 t <rustc_demangle::v0::Parser>::opt_integer_62
+0000000000135219 00000000000001b7 t <rustc_demangle::v0::Parser>::ident
+0000000000137759 000000000000007b t <rustc_demangle::v0::Parser>::backref
+00000000000a7b28 0000000000000039 t <alloc::raw_vec::RawVecInner>::deallocate
+000000000015ca50 0000000000000066 t <alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one
+000000000015da70 0000000000000066 t <alloc::raw_vec::RawVec<addr2line::unit::ResUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::grow_one
+000000000015dcd0 0000000000000066 t <alloc::raw_vec::RawVec<addr2line::unit::SupUnit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::grow_one
+0000000000159840 0000000000000066 t <alloc::raw_vec::RawVec<addr2line::function::LazyFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::grow_one
+0000000000158560 0000000000000066 t <alloc::raw_vec::RawVec<addr2line::function::InlinedFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::grow_one
+000000000014faa0 0000000000000066 t <alloc::raw_vec::RawVec<gimli::read::line::FileEntry<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>>::grow_one
+000000000015b940 0000000000000066 t <alloc::raw_vec::RawVec<gimli::read::unit::AttributeValue<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>>::grow_one
+000000000014fe50 0000000000000066 t <alloc::raw_vec::RawVec<addr2line::line::LineSequence>>::grow_one
+000000000015c880 0000000000000066 t <alloc::raw_vec::RawVec<gimli::read::line::FileEntryFormat>>::grow_one
+00000000000a7cb0 0000000000000038 t <alloc::raw_vec::RawVec<gimli::read::abbrev::Abbreviation>>::grow_one
+00000000000a7e48 0000000000000038 t <alloc::raw_vec::RawVec<gimli::read::abbrev::AttributeSpecification>>::grow_one
+0000000000162bd0 0000000000000066 t <alloc::raw_vec::RawVec<std::backtrace_rs::symbolize::gimli::Library>>::grow_one
+000000000014a650 0000000000000066 t <alloc::raw_vec::RawVec<std::backtrace_rs::symbolize::gimli::mmap::Mmap>>::grow_one
+000000000015cf50 0000000000000066 t <alloc::raw_vec::RawVec<&addr2line::function::InlinedFunction<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::grow_one
+000000000015d7e0 0000000000000066 t <alloc::raw_vec::RawVec<(gimli::common::DebugInfoOffset, gimli::common::DebugArangesOffset)>>::grow_one
+0000000000099060 000000000000005a t <alloc::raw_vec::RawVec<u8>>::grow_one
+000000000009b5e0 0000000000000112 t <core::ffi::c_str::CStr>::from_bytes_with_nul
+00000000001349cc 00000000000006d7 t <rustc_demangle::v0::Printer>::print_path
+000000000013580f 00000000000005a2 t <rustc_demangle::v0::Printer>::print_type
+0000000000135f98 000000000000067a t <rustc_demangle::v0::Printer>::print_const
+00000000001366fd 0000000000000157 t <rustc_demangle::v0::Printer>::print_const_uint
+0000000000136cc0 0000000000000316 t <rustc_demangle::v0::Printer>::print_const_str_literal
+0000000000136612 00000000000000eb t <rustc_demangle::v0::Printer>::print_lifetime_from_index
+000000000013808e 0000000000000149 t <rustc_demangle::v0::Printer>::print_path_maybe_open_generics
+0000000000137c5e 00000000000001db t <rustc_demangle::v0::Printer>::print_pat
+0000000000098d70 0000000000000082 t <alloc::raw_vec::RawVecInner>::finish_grow
+00000000000a7d72 00000000000000d6 t <alloc::raw_vec::RawVecInner>::finish_grow
+000000000013dcf0 000000000000014a t <alloc::raw_vec::RawVecInner>::finish_grow
+00000000000a7ce8 000000000000008a t <alloc::raw_vec::RawVecInner>::grow_amortized
+000000000014b0e0 00000000000022f9 t <gimli::read::dwarf::Unit<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>::new
+00000000000a7e80 000000000000093e t <gimli::read::abbrev::Abbreviations>::insert
+000000000015d570 000000000000026f t <gimli::read::aranges::ArangeHeader<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>::parse
+000000000009b700 0000000000000110 t <core::fmt::builders::DebugList>::entry
+00000000001684a0 0000000000000068 t <std::io::error::Error>::_new
+000000000014aae0 0000000000000600 t <gimli::read::unit::DebugInfoUnitHeadersIter<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::next
+0000000000161af0 000000000000011f t <std::path::Components>::parse_next_component_back
+0000000000145c00 0000000000000254 t <std::path::Components>::as_path
+000000000015dd40 0000000000000954 t <gimli::read::index::UnitIndex<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::parse
+00000000000a7a22 0000000000000106 t <alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, gimli::read::abbrev::Abbreviation, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::Edge>>::insert_fit
+00000000000a7b61 000000000000014f t <alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, u64, gimli::read::abbrev::Abbreviation, alloc::collections::btree::node::marker::Internal>, alloc::collections::btree::node::marker::Edge>>::insert_fit
+00000000000a79fd 0000000000000025 t <alloc::boxed::Box<alloc::collections::btree::node::InternalNode<u64, gimli::read::abbrev::Abbreviation>>>::new_uninit_in
+00000000000a79d8 0000000000000025 t <alloc::boxed::Box<alloc::collections::btree::node::LeafNode<u64, gimli::read::abbrev::Abbreviation>>>::new_uninit_in
+0000000000142d20 00000000000003ee t <std::backtrace_rs::print::BacktraceFrameFmt>::print_raw_with_column
+0000000000163170 00000000000000cc t <std::backtrace_rs::symbolize::Symbol>::name
+0000000000146bec 0000000000002de2 t <std::backtrace_rs::symbolize::gimli::Context>::new
+0000000000168e60 0000000000000104 t <std::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
+000000000014f820 00000000000000f0 t <std::backtrace_rs::symbolize::gimli::elf::Object>::search_symtab
+0000000000143cc0 0000000000000761 t <std::backtrace_rs::symbolize::gimli::elf::Object>::parse
+000000000014a6c0 0000000000000420 t <std::backtrace_rs::symbolize::gimli::elf::Object>::section
+0000000000144500 0000000000000192 t <std::backtrace_rs::symbolize::gimli::elf::Object>::build_id
+000000000009a530 000000000000026b t <core::fmt::Formatter>::pad_integral
+000000000009b810 00000000000000a9 t <core::fmt::Formatter>::debug_struct_field1_finish
+000000000009b8c0 0000000000000271 t <core::fmt::Formatter>::debug_struct_field4_finish
+0000000000099a70 0000000000000429 t <core::fmt::Formatter>::pad
+0000000000155a30 0000000000000852 t <gimli::read::unit::Attribute<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::value
+0000000000157ea0 0000000000000064 t <gimli::read::unit::AttributeValue<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>::u8_value
+0000000000157f10 000000000000006c t <gimli::read::unit::AttributeValue<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>::u16_value
+00000000001585d0 0000000000000fb1 t <gimli::read::rnglists::RngListIter<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::next
+000000000015bca0 0000000000000254 t <gimli::read::line::FileEntry<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize>>::parse
+000000000015b0f0 000000000000033e t <gimli::read::unit::EntriesCursor<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>::next_entry
+0000000000138541 0000000000000158 t <core::str::iter::SplitInternal<char>>::next
+00000000001433c0 000000000000019c t <std::sys::fs::unix::File>::open_c
+000000000014a560 000000000000008a t <alloc::sync::Arc<gimli::read::dwarf::Dwarf<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>>>>::drop_slow
+000000000014d490 0000000000000053 t <alloc::sync::Arc<gimli::read::abbrev::Abbreviations>>::drop_slow
+000000000009bb40 000000000000051c t <core::str::pattern::StrSearcher>::new
+000000000015cb80 0000000000000355 t <alloc::collections::btree::map::IntoIter<u64, core::result::Result<alloc::sync::Arc<gimli::read::abbrev::Abbreviations>, gimli::read::Error>>>::dying_next
+0000000000000000 0000000000000010 b std::panicking::panic_count::LOCAL_PANIC_COUNT::{K#0}::{closure#1}::__RUST_STD_INTERNAL_VAL
+0000000000000018 0000000000000018 b <std::hash::random::RandomState>::new::KEYS::{K#0}::{closure#1}::__RUST_STD_INTERNAL_VAL
+0000000000171311 0000000000000001 d std::panicking::default_hook::{closure#0}::FIRST_PANIC
+00000000000989f4 0000000000000033 t addr2line::line::has_backward_slash_root
+0000000000098839 00000000000001bb t addr2line::line::path_push
+00000000000998b0 00000000000001c0 t core::fmt::write
+000000000009c160 0000000000000009 t core::str::slice_error_fail
+000000000009c170 000000000000049a t core::str::slice_error_fail_rt
+000000000009c700 000000000000002e t core::cell::panic_already_borrowed
+000000000009c750 0000000000000033 t core::option::expect_failed
+000000000009b1e0 0000000000000018 t core::option::unwrap_failed
+000000000009c790 0000000000000051 t core::result::unwrap_failed
+000000000009c7f0 0000000000000017 t core::panicking::panic_nounwind
+000000000009c853 0000000000000009 t core::panicking::panic_in_cleanup
+000000000009b417 000000000000003c t core::panicking::panic_bounds_check
+000000000009c810 0000000000000033 t core::panicking::panic_nounwind_fmt
+00000000000997d8 0000000000000070 t core::panicking::assert_failed_inner
+000000000009c843 0000000000000010 t core::panicking::panic_cannot_unwind
+000000000009c860 0000000000000021 t core::panicking::panic_nounwind_nobacktrace
+000000000009b200 0000000000000011 t core::panicking::panic
+0000000000099880 000000000000002b t core::panicking::panic_fmt
+00000000001377d4 000000000000002b t rustc_demangle::v0::basic_type
+00000000001628b0 000000000000031c t std::env::current_exe
+000000000016454e 000000000000013f t std::alloc::default_alloc_error_hook
+0000000000164d10 0000000000000009 t std::alloc::rust_oom
+0000000000171d18 0000000000000001 b std::panic::SHOULD_CAPTURE
+000000000013d8e0 00000000000002e7 t std::panic::get_backtrace_style
+000000000013d850 0000000000000009 t std::process::abort
+000000000013cd9e 0000000000000706 t std::panicking::panic_with_hook
+0000000000171d20 0000000000000018 b std::panicking::HOOK
+0000000000098df2 0000000000000012 t alloc::alloc::handle_alloc_error
+000000000005baa0 000000000000002b t alloc::boxed::box_new_uninit
+00000000000a9460 0000000000000022 t alloc::boxed::box_new_uninit
+00000000000e0ef0 0000000000000022 t alloc::boxed::box_new_uninit
+0000000000098ce1 0000000000000013 t alloc::raw_vec::handle_error
+0000000000098e10 000000000000001c t alloc::raw_vec::capacity_overflow
+0000000000169ec0 0000000000000657 t std_detect::detect::cache::detect_and_initialize
+0000000000171de8 0000000000000008 b std_detect::detect::cache::CACHE
+000000000013149c 0000000000001cd2 t miniz_oxide::inflate::core::decompress
+00000000001338dc 0000000000000146 t miniz_oxide::inflate::core::apply_match
+0000000000133531 00000000000003ab t miniz_oxide::inflate::core::transfer
+000000000013316e 00000000000003c3 t miniz_oxide::inflate::core::init_tree
+0000000000099ea0 00000000000004c3 t core::str::count::do_count_chars
+000000000009b220 00000000000001f7 t core::str::converts::from_utf8
+000000000009b110 00000000000000c5 t core::slice::index::slice_index_fail
+000000000009c890 00000000000000d4 t core::slice::memchr::memchr_aligned
+000000000009ad50 00000000000002b1 t core::unicode::printable::is_printable
+000000000009c970 0000000000000018 t core::panicking::panic_const::panic_const_div_by_zero
+000000000009c990 0000000000000018 t core::panicking::panic_const::panic_const_rem_by_zero
+0000000000171318 0000000000000040 d std::io::stdio::STDOUT
+0000000000145f20 0000000000000235 t std::sys::fs::metadata
+0000000000163bf0 00000000000000db t std::sys::backtrace::output_filename
+000000000013df30 000000000000005a t std::sys::backtrace::lock
+0000000000171d38 0000000000000008 b std::thread::main_thread::MAIN
+000000000013dbd0 000000000000000e t std::panicking::panic_count::is_zero_slow_path
+0000000000171d40 0000000000000008 b std::panicking::panic_count::GLOBAL_PANIC_COUNT
+000000000016a5c0 000000000000021a t compiler_builtins::math::libm_math::fmod::fmod
+000000000009c9b0 00000000000000f7 t core::unicode::unicode_data::conversions::to_upper
+0000000000043823 0000000000000100 r core::unicode::unicode_data::white_space::WHITESPACE_MAP
+000000000009b010 00000000000000f9 t core::unicode::unicode_data::grapheme_extend::lookup_slow
+000000000001f480 0000000000000084 r core::unicode::unicode_data::grapheme_extend::SHORT_OFFSET_RUNS
+000000000001b49f 00000000000002ff r core::unicode::unicode_data::grapheme_extend::OFFSETS
+000000000016a520 000000000000000d t core::core_arch::x86::xsave::_xgetbv
+0000000000143910 00000000000003b0 t std::backtrace_rs::symbolize::gimli::mmap
+0000000000145680 00000000000000a7 t std::sys::fs::unix::canonicalize
+00000000001616b0 00000000000002c8 t std::sys::fs::unix::try_statx
+0000000000171d48 000000000000000c b std::sys::env::unix::ENV_LOCK
+00000000001641a0 000000000000000a t std::sys::pal::unix::abort_internal
+0000000000169840 0000000000000264 t std::sys::random::linux::hashmap_random_keys
+0000000000000010 0000000000000008 b std::thread::current::id::ID
+000000000009cab0 000000000000001c t core::slice::sort::shared::smallsort::panic_on_ord_violation
+0000000000143560 00000000000003a2 t std::backtrace_rs::symbolize::gimli::libs_dl_iterate_phdr::callback
+000000000015c9b0 0000000000000098 t std::backtrace_rs::symbolize::gimli::elf::decompress_zlib
+00000000001446a0 000000000000032d t std::backtrace_rs::symbolize::gimli::elf::locate_build_id
+0000000000146160 000000000000021d t std::backtrace_rs::symbolize::gimli::elf::debug_path_exists
+0000000000162c80 0000000000000089 t std::sys::io::error::unix::decode_error_kind
+000000000016bbf8 0000000000000008 D std::sys::args::unix::imp::ARGV_INIT_ARRAY
+0000000000171d58 0000000000000008 b std::sys::args::unix::imp::ARGC
+0000000000171d60 0000000000000008 b std::sys::args::unix::imp::ARGV
+0000000000171d68 0000000000000008 b std::sys::pal::unix::stack_overflow::thread_info::THREAD_INFO
+0000000000171d70 0000000000000008 b std::sys::pal::unix::stack_overflow::thread_info::THREAD_INFO
+0000000000171d78 0000000000000008 b std::sys::pal::unix::stack_overflow::thread_info::THREAD_INFO
+0000000000167000 0000000000000f19 t std::sys::pal::unix::stack_overflow::thread_info::set_current_info
+0000000000171d80 0000000000000008 b std::sys::pal::unix::stack_overflow::thread_info::LOCK
+0000000000171d88 0000000000000008 b std::sys::pal::unix::stack_overflow::thread_info::SPIN_LOCK
+0000000000165b80 000000000000017a t std::sys::pal::unix::stack_overflow::imp::make_handler
+0000000000171d90 0000000000000008 b std::sys::pal::unix::stack_overflow::imp::MAIN_ALTSTACK
+0000000000171d98 0000000000000001 b std::sys::pal::unix::stack_overflow::imp::NEED_ALTSTACK
+0000000000169010 0000000000000398 t std::sys::pal::unix::stack_overflow::imp::signal_handler
+0000000000171da0 0000000000000008 b std::sys::pal::unix::stack_overflow::imp::PAGE_SIZE
+0000000000171da8 0000000000000008 b <std::thread::id::ThreadId>::new::COUNTER
+0000000000165b60 000000000000001c t <std::thread::id::ThreadId>::new::exhausted
+0000000000171358 0000000000000940 d <std::backtrace_rs::symbolize::gimli::Cache>::with_global::MAPPINGS_CACHE
+0000000000161150 0000000000000118 t <std::sys::os_str::bytes::Slice>::check_public_boundary::slow_path
+000000000009a7a0 0000000000000054 t <core::fmt::Formatter>::pad_integral::write_prefix
+000000000009cad0 0000000000000046 t core::slice::copy_from_slice_impl::len_mismatch_fail
+0000000000133b30 0000000000000016 t panic_unwind::imp::panic::exception_cleanup
+0000000000171c98 0000000000000004 d std::rt::cleanup::CLEANUP
+0000000000171db0 0000000000000001 b std::alloc::default_alloc_error_hook::PREV_ALLOC_FAILURE
+00000000000990c0 0000000000000180 t alloc::fmt::format::format_inner
+0000000000171db8 0000000000000018 b std::io::stdio::stderr::INSTANCE
+0000000000171dd0 0000000000000008 b std::sys::exit::unique_thread_exit::EXITING_THREAD_ID
+0000000000171dd8 0000000000000008 b std::sys::backtrace::lock::LOCK
+0000000000171308 0000000000000008 d memchr::arch::x86_64::memchr::memchr_raw::FN
+0000000000131150 00000000000001ac t memchr::arch::x86_64::memchr::memchr_raw::detect
+0000000000131300 000000000000019c t memchr::arch::x86_64::memchr::memchr_raw::find_sse2
+000000000013e360 000000000000003c t std::backtrace_rs::backtrace::libunwind::trace::trace_fn
+0000000000171de0 0000000000000001 b std::sys::fs::unix::try_statx::STATX_SAVED_STATE
+0000000000171c9c 0000000000000001 d std::sys::random::linux::getrandom::GETRANDOM_AVAILABLE
+0000000000171c9d 0000000000000001 d std::sys::random::linux::getrandom::GRND_INSECURE_AVAILABLE
+0000000000171ca0 0000000000000008 d std::sys::random::linux::getrandom::DEVICE
+0000000000171de1 0000000000000001 b std::backtrace_rs::symbolize::gimli::elf::debug_path_exists::DEBUG_PATH_EXISTS
+0000000000164410 0000000000000012 t std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
+0000000000164930 000000000000000e t <alloc::string::String as core::any::Any>::type_id
+00000000001643c0 000000000000000e t <&str as core::any::Any>::type_id
+000000000009cc40 0000000000000014 t <core::num::error::TryFromIntError as core::fmt::Display>::fmt
+000000000013766a 0000000000000031 t <core::str::iter::Chars as core::iter::traits::iterator::Iterator>::count
+0000000000164ec0 0000000000000b8e t <std::io::error::Error as core::fmt::Debug>::fmt
+000000000009cc60 0000000000000094 t <u8 as core::fmt::Display>::fmt
+00000000001372cc 00000000000002d1 t <core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next
+000000000013dff0 0000000000000369 t <<std::sys::backtrace::BacktraceLock>::print::DisplayBacktrace as core::fmt::Display>::fmt
+0000000000163d60 0000000000000102 t <std::io::default_write_fmt::Adapter<std::io::cursor::Cursor<&mut [u8]>> as core::fmt::Write>::write_str
+00000000001695b0 00000000000000ef t <std::io::default_write_fmt::Adapter<std::io::stdio::StderrLock> as core::fmt::Write>::write_str
+00000000001641b0 000000000000013d t <std::io::default_write_fmt::Adapter<std::sys::stdio::unix::Stderr> as core::fmt::Write>::write_str
+000000000013870c 0000000000000036 t <rustc_demangle::SizeLimitedFmtAdapter<&mut core::fmt::Formatter> as core::fmt::Write>::write_str
+00000000001353d0 00000000000003ea t <rustc_demangle::v0::Ident as core::fmt::Display>::fmt
+000000000009aa90 000000000000005f t <core::fmt::builders::PadAdapter as core::fmt::Write>::write_char
+000000000009a800 000000000000028e t <core::fmt::builders::PadAdapter as core::fmt::Write>::write_str
+0000000000169490 00000000000000d9 t <std::io::stdio::StderrRaw as std::io::Write>::write_all
+0000000000164740 0000000000000039 t <std::panicking::panic_handler::FormatStringPayload as core::fmt::Display>::fmt
+0000000000099420 000000000000001a t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::fmt::Debug>::fmt
+000000000014f910 000000000000018d t <gimli::read::line::FileEntry<gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian>, usize> as core::clone::Clone>::clone
+0000000000145e60 00000000000000b7 t <std::path::Component as core::cmp::PartialEq>::eq
+0000000000164b50 000000000000000b t <std::panicking::panic_handler::StaticStrPayload as core::panic::PanicPayload>::get
+0000000000164b60 0000000000000008 t <std::panicking::panic_handler::StaticStrPayload as core::panic::PanicPayload>::as_str
+0000000000164b10 0000000000000040 t <std::panicking::panic_handler::StaticStrPayload as core::panic::PanicPayload>::take_box
+0000000000169e40 0000000000000012 t <std::path::Display as core::fmt::Display>::fmt
+0000000000099870 0000000000000010 t <&dyn core::fmt::Debug as core::fmt::Debug>::fmt
+00000000001386dd 000000000000002f t <&core::num::error::IntErrorKind as core::fmt::Debug>::fmt
+0000000000160d60 00000000000003e9 t <&std::ffi::os_str::OsStr as core::fmt::Debug>::fmt
+0000000000137740 0000000000000019 t <&str as core::fmt::Debug>::fmt
+0000000000133f90 0000000000000023 t <&u8 as core::fmt::Debug>::fmt
+0000000000164450 00000000000000d2 t <&i32 as core::fmt::Debug>::fmt
+000000000013769b 00000000000000a5 t <&mut [u8] as core::fmt::Debug>::fmt
+0000000000138742 0000000000000b51 t <&rustc_demangle::DemangleStyle as core::fmt::Display>::fmt
+000000000013d650 0000000000000061 t <&core::panic::location::Location as core::fmt::Display>::fmt
+0000000000099850 0000000000000012 t <&str as core::fmt::Display>::fmt
+0000000000099440 0000000000000073 t <alloc::collections::TryReserveError as core::fmt::Display>::fmt
+000000000009cd80 000000000000018a t <core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next
+00000000001431d0 00000000000001e7 t <std::backtrace_rs::symbolize::SymbolName as core::fmt::Display>::fmt
+0000000000164af0 0000000000000017 t <std::panicking::panic_handler::StaticStrPayload as core::fmt::Display>::fmt
+0000000000161270 000000000000011a t <std::path::StripPrefixError as core::fmt::Debug>::fmt
+000000000009d160 000000000000043a t <core::bstr::ByteStr as core::fmt::Display>::fmt
+000000000009d660 0000000000000027 t <core::num::error::ParseIntError as core::fmt::Display>::fmt
+000000000009da30 00000000000000f4 t <u16 as core::fmt::Display>::fmt
+00000000000994c0 0000000000000062 t <alloc::string::String as core::clone::Clone>::clone
+000000000005bad0 0000000000000267 t <core::alloc::layout::Layout as core::fmt::Debug>::fmt
+000000000009db30 00000000000000ff t <i16 as core::fmt::Display>::fmt
+000000000005bd40 0000000000000120 t <core::num::error::TryFromIntError as core::fmt::Debug>::fmt
+0000000000167f20 0000000000000269 t <std::io::error::Error as core::fmt::Display>::fmt
+0000000000139293 0000000000000019 t <rustc_demangle::SizeLimitExhausted as core::fmt::Debug>::fmt
+000000000005be60 00000000000000b0 t <alloc::collections::TryReserveError as core::fmt::Debug>::fmt
+0000000000169e60 0000000000000029 t <std::io::error::Error as core::error::Error>::cause
+0000000000169e90 0000000000000029 t <std::io::error::Error as core::error::Error>::source
+000000000009c060 00000000000000fa t <u32 as core::fmt::Display>::fmt
+000000000009cb20 0000000000000113 t <i32 as core::fmt::Display>::fmt
+000000000009dd30 0000000000000071 t <u64 as core::fmt::LowerHex>::fmt
+000000000009ddb0 0000000000000008 t <core::num::nonzero::NonZero<usize> as core::fmt::Debug>::fmt
+000000000005bf10 0000000000000019 t <core::fmt::Error as core::fmt::Debug>::fmt
+00000000001350a3 0000000000000019 t <core::fmt::Error as core::fmt::Debug>::fmt
+0000000000099240 0000000000000019 t <core::fmt::Error as core::fmt::Debug>::fmt
+0000000000165a80 00000000000000d2 t <i32 as core::fmt::Debug>::fmt
+000000000005bf30 00000000000001af t <u16 as core::fmt::Debug>::fmt
+000000000005c0e0 00000000000001b2 t <u32 as core::fmt::Debug>::fmt
+000000000009cf90 00000000000001c3 t <u32 as core::fmt::Debug>::fmt
+000000000005c2a0 00000000000001b2 t <u64 as core::fmt::Debug>::fmt
+000000000005c460 000000000000010e t <alloc::string::String as core::fmt::Write>::write_char
+00000000000a9000 000000000000010e t <alloc::string::String as core::fmt::Write>::write_char
+00000000000d1dd0 0000000000000103 t <alloc::string::String as core::fmt::Write>::write_char
+00000000000dfcd0 000000000000010e t <alloc::string::String as core::fmt::Write>::write_char
+0000000000139870 0000000000000103 t <alloc::string::String as core::fmt::Write>::write_char
+00000000001649b0 0000000000000112 t <alloc::string::String as core::fmt::Write>::write_char
+00000000000992f0 0000000000000107 t <alloc::string::String as core::fmt::Write>::write_char
+000000000005c570 000000000000006c t <alloc::string::String as core::fmt::Write>::write_str
+00000000000a8f90 000000000000006c t <alloc::string::String as core::fmt::Write>::write_str
+00000000000d1d60 0000000000000061 t <alloc::string::String as core::fmt::Write>::write_str
+00000000000dfc60 000000000000006c t <alloc::string::String as core::fmt::Write>::write_str
+0000000000139800 0000000000000061 t <alloc::string::String as core::fmt::Write>::write_str
+0000000000164940 000000000000006c t <alloc::string::String as core::fmt::Write>::write_str
+0000000000099280 0000000000000061 t <alloc::string::String as core::fmt::Write>::write_str
+000000000009a370 00000000000001b2 t <usize as core::fmt::Debug>::fmt
+000000000009c6b0 000000000000004a t <core::ops::range::Range<usize> as core::fmt::Debug>::fmt
+0000000000099530 000000000000012f t <&[u8] as <alloc::ffi::c_str::CString>::new::SpecNewImpl>::spec_new_impl
+0000000000164880 000000000000008d t <std::panicking::panic_handler::FormatStringPayload as core::panic::PanicPayload>::get
+0000000000164780 00000000000000f5 t <std::panicking::panic_handler::FormatStringPayload as core::panic::PanicPayload>::take_box
+0000000000099660 0000000000000013 t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::fmt::Display>::fmt
+00000000000a87be 000000000000003b t <gimli::read::abbrev::Attributes as core::ops::deref::Deref>::deref
+0000000000138699 0000000000000044 t <core::num::error::ParseIntError as core::fmt::Debug>::fmt
+000000000009ddc0 0000000000000109 t <u64 as core::fmt::Display>::fmt
+000000000009dc30 0000000000000073 t <u8 as core::fmt::LowerHex>::fmt
+0000000000165a50 000000000000002d t <std::io::error::ErrorKind as core::fmt::Debug>::fmt
+000000000009cf10 0000000000000071 t <u8 as core::fmt::UpperHex>::fmt
+0000000000099680 0000000000000065 t <alloc::boxed::Box<dyn core::error::Error> as core::convert::From<alloc::string::String>>::from
+000000000009d690 0000000000000398 t <str as core::fmt::Debug>::fmt
+0000000000161390 0000000000000317 t <std::path::Components as core::iter::traits::iterator::Iterator>::next
+0000000000099750 0000000000000088 t <alloc::boxed::Box<dyn core::error::Error> as core::convert::From<&str>>::from
+000000000009c610 0000000000000099 t <char as core::fmt::Debug>::fmt
+00000000001457d0 000000000000042d t <std::path::Components as core::iter::traits::double_ended::DoubleEndedIterator>::next_back
+000000000009d5a0 00000000000000b6 t <char as core::fmt::Display>::fmt
+000000000009cd00 0000000000000073 t <u16 as core::fmt::UpperHex>::fmt
+0000000000143110 00000000000000b9 t <*mut core::ffi::c_void as core::fmt::Debug>::fmt
+000000000005c5e0 0000000000000013 t <alloc::string::String as core::fmt::Display>::fmt
+0000000000168190 0000000000000013 t <alloc::string::String as core::fmt::Display>::fmt
+000000000009c730 0000000000000014 t <core::cell::BorrowMutError as core::fmt::Display>::fmt
+00000000000b46b0 000000000000001a t <alloc::string::String as core::fmt::Debug>::fmt
+0000000000137656 0000000000000014 t <() as core::fmt::Debug>::fmt
+0000000000163240 00000000000007f8 t <&str as core::str::pattern::Pattern>::is_contained_in
+000000000009dcb0 0000000000000072 t <u32 as core::fmt::LowerHex>::fmt
+0000000000133c07 0000000000000389 t <core::str::pattern::StrSearcher as core::str::pattern::Searcher>::next
+000000000009ded0 0000000000000072 t <u32 as core::fmt::UpperHex>::fmt
+00000000001392ac 00000000000000c4 t <rustc_demangle::SizeLimitedFmtAdapter<&mut core::fmt::Formatter> as core::fmt::Write>::write_char
+0000000000139370 0000000000000012 t <rustc_demangle::SizeLimitedFmtAdapter<&mut core::fmt::Formatter> as core::fmt::Write>::write_fmt
+00000000001596a0 000000000000007e t <gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian> as gimli::read::reader::Reader>::read_offset
+000000000015b7c0 0000000000000093 t <gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian> as gimli::read::reader::Reader>::read_uleb128
+0000000000159590 000000000000010c t <gimli::read::endian_slice::EndianSlice<gimli::endianity::LittleEndian> as gimli::read::reader::Reader>::read_sized_offset
+0000000000163e70 000000000000017f t <std::io::default_write_fmt::Adapter<std::io::cursor::Cursor<&mut [u8]>> as core::fmt::Write>::write_char
+0000000000163ff0 0000000000000012 t <std::io::default_write_fmt::Adapter<std::io::cursor::Cursor<&mut [u8]>> as core::fmt::Write>::write_fmt
+00000000001696a0 0000000000000172 t <std::io::default_write_fmt::Adapter<std::io::stdio::StderrLock> as core::fmt::Write>::write_char
+0000000000169820 0000000000000012 t <std::io::default_write_fmt::Adapter<std::io::stdio::StderrLock> as core::fmt::Write>::write_fmt
+00000000001642f0 0000000000000099 t <std::io::default_write_fmt::Adapter<std::sys::stdio::unix::Stderr> as core::fmt::Write>::write_char
+0000000000164390 0000000000000012 t <std::io::default_write_fmt::Adapter<std::sys::stdio::unix::Stderr> as core::fmt::Write>::write_fmt
+00000000001643b0 0000000000000003 t <std::panicking::begin_panic::Payload<&str> as core::panic::PanicPayload>::as_str
+0000000000099400 0000000000000012 t <alloc::string::String as core::fmt::Write>::write_fmt
+0000000000164ad0 0000000000000012 t <alloc::string::String as core::fmt::Write>::write_fmt
+000000000009aaf0 0000000000000012 t <core::fmt::builders::PadAdapter as core::fmt::Write>::write_fmt
+0000000000164010 00000000000000a3 t <std::sys::stdio::unix::Stderr as std::io::Write>::write_all
+000000000013d6c0 00000000000000ff t <std::sys::stdio::unix::Stderr as std::io::Write>::write_fmt
+0000000000099720 000000000000000d t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::error::Error>::description
+0000000000099730 0000000000000003 t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::error::Error>::cause
+0000000000099740 0000000000000001 t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::error::Error>::provide
+0000000000099710 000000000000000e t <<alloc::boxed::Box<dyn core::error::Error + core::marker::Sync + core::marker::Send> as core::convert::From<alloc::string::String>>::from::StringError as core::error::Error>::type_id
+000000000005c600 00000000000002bb t <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+00000000000dd800 000000000000003b t <litchi_ppt::records::payload::RecordPayload as core::convert::AsRef<[u8]>>::as_ref
+00000000001186f0 00000000000001f8 t <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+000000000005c8c0 000000000000017e t <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+00000000000f8e70 0000000000000344 t <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+0000000000108200 00000000000002fd t <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+00000000000c1520 0000000000000226 t <alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+00000000000c46d0 00000000000001d1 t <alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+00000000000c0de0 0000000000000215 t <alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+00000000000c1180 000000000000020d t <alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+000000000005ca40 0000000000000376 t <core::iter::adapters::filter::Filter<I,P> as core::iter::traits::iterator::Iterator>::next
+00000000000ade20 00000000000002e1 t litchi_cfb::directory_name::ascii_lookup_key
+00000000000ac950 00000000000000a0 t litchi_cfb::directory_name::DirectoryNameData::compare
+00000000000acda0 0000000000000c30 t litchi_cfb::directory_name::directory_name_data
+00000000000abb30 000000000000028d t litchi_cfb::file::format_clsid
+00000000000ac590 00000000000000e6 t litchi_cfb::file::CheckedBitSet::try_with_capacity
+00000000000ac680 00000000000000d4 t litchi_cfb::file::CheckedBitSet::insert
+00000000000aa790 0000000000000086 t litchi_cfb::file::MiniStreamEnd::admits_chain_end
+00000000000ab7a0 0000000000000390 t litchi_cfb::file::decode_utf16le
+00000000000aaea0 0000000000000383 t litchi_cfb::file::try_filled_vec
+000000000005cdc0 00000000000000bd t litchi_cfb::file::try_filled_vec
+000000000005ce80 00000000000004ea t litchi_cfb::file::try_filled_vec
+00000000000a9890 00000000000000bd t litchi_cfb::file::try_filled_vec
+000000000005d370 000000000000045d t litchi_cfb::file::try_filled_vec
+00000000000ae840 000000000000052f t litchi_cfb::file::EndChainScratch::collect
+000000000005d7d0 0000000000000617 t litchi_cfb::file::OleFile<R>::find_entry
+000000000005ddf0 000000000000083a t litchi_cfb::file::OleFile<R>::open_stream
+000000000005e630 00000000000006e9 t litchi_cfb::file::OleFile<R>::load_minifat
+00000000000cd240 00000000000006e9 t litchi_cfb::file::OleFile<R>::load_minifat
+00000000000ce8a0 0000000000000055 t litchi_cfb::file::OleFile<R>::load_minifat::{{closure}}
+00000000000c8f60 000000000000377c t litchi_cfb::file::OleFile<R>::load_directory
+000000000005ed20 00000000000036da t litchi_cfb::file::OleFile<R>::load_directory
+0000000000062400 0000000000000051 t litchi_cfb::file::OleFile<R>::sector_position::{{closure}}
+00000000000cee20 0000000000000058 t litchi_cfb::file::OleFile<R>::sector_position::{{closure}}
+00000000000cf610 0000000000000094 t litchi_cfb::file::OleFile<R>::validated_entry
+00000000000ce590 000000000000014d t litchi_cfb::file::OleFile<R>::file_bytes_equal
+0000000000062460 0000000000000055 t litchi_cfb::file::OleFile<R>::read_minifat_chain::{{closure}}
+00000000000624c0 0000000000000055 t litchi_cfb::file::OleFile<R>::read_minifat_chain::{{closure}}
+0000000000062520 0000000000000055 t litchi_cfb::file::OleFile<R>::read_minifat_chain::{{closure}}
+0000000000062580 0000000000000058 t litchi_cfb::file::OleFile<R>::read_minifat_chain::{{closure}}
+00000000000ce900 0000000000000514 t litchi_cfb::file::OleFile<R>::read_sector_run_into
+00000000000625e0 0000000000000405 t litchi_cfb::file::OleFile<R>::read_sector_run_into
+00000000000629f0 0000000000000667 t litchi_cfb::file::OleFile<R>::read_stream_from_fat
+00000000000cf710 00000000000001b5 t litchi_cfb::file::OleFile<R>::sector_batch_scratch
+0000000000063060 00000000000001cd t litchi_cfb::file::OleFile<R>::sector_batch_scratch
+0000000000063230 00000000000002ca t litchi_cfb::file::OleFile<R>::parse_directory_entry
+00000000000ce530 000000000000005c t litchi_cfb::file::OleFile<R>::ministream_physical_offset::{{closure}}
+00000000000c8bf0 0000000000000366 t litchi_cfb::file::OleFile<R>::validate_range_lock_sector
+0000000000063500 0000000000000366 t litchi_cfb::file::OleFile<R>::validate_range_lock_sector
+0000000000063870 0000000000000b57 t litchi_cfb::file::OleFile<R>::validate_stream_allocations
+00000000000cc6e0 0000000000000b51 t litchi_cfb::file::OleFile<R>::validate_stream_allocations
+00000000000643d0 0000000000000774 t litchi_cfb::file::OleFile<R>::build_storage_tree_iterative
+00000000000cee80 000000000000078a t litchi_cfb::file::OleFile<R>::build_storage_tree_iterative
+00000000000cd930 0000000000000111 t litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+0000000000064b50 0000000000000111 t litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+00000000000c7270 00000000000017d1 t litchi_cfb::file::OleFile<R>::load_fat
+0000000000064c70 00000000000016a8 t litchi_cfb::file::OleFile<R>::load_fat
+0000000000066320 0000000000000058 t litchi_cfb::file::OleFile<R>::load_fat::{{closure}}
+00000000000ce470 0000000000000055 t litchi_cfb::file::visit_sector_runs::{{closure}}
+00000000000ce410 0000000000000055 t litchi_cfb::file::visit_sector_runs::{{closure}}
+00000000000cf6b0 0000000000000055 t litchi_cfb::file::visit_sector_runs::{{closure}}
+00000000000ce4d0 000000000000005c t litchi_cfb::file::visit_sector_runs::{{closure}}
+00000000000aa150 000000000000063f t litchi_cfb::file::SectorChainScratch::collect_exact
+00000000000ac820 0000000000000051 t litchi_cfb::file::try_vec_with_capacity
+0000000000066380 0000000000000051 t litchi_cfb::file::try_vec_with_capacity
+00000000000aa000 0000000000000082 t litchi_cfb::file::claim_sector_bounds_error
+00000000000aa890 0000000000000055 t litchi_cfb::file::checked_directory_data_len::{{closure}}
+00000000000a9950 00000000000006a5 t litchi_cfb::file::collect_sector_chain_exact
+00000000000aa090 00000000000000b9 t litchi_cfb::file::claim_sector_conflict_error
+00000000000a9830 0000000000000060 t litchi_cfb::file::checked_allocation_table_bytes
+00000000000adcf0 000000000000005c t litchi_cfb::file::checked_allocation_table_bytes::{{closure}}
+00000000000aa8f0 00000000000005ad t litchi_cfb::file::collect_directory_sector_chain
+00000000000663e0 00000000000000bb t litchi_cfb::file::try_push
+00000000000ac880 00000000000000d0 t litchi_cfb::file::try_push
+00000000000664a0 00000000000000d0 t litchi_cfb::file::try_push
+00000000000ac760 00000000000000bb t litchi_cfb::file::try_push
+00000000000b76f0 0000000000000515 t litchi_cfb::writer::fat::FatBuilder::allocate_chain
+00000000000b1ef0 000000000000038c t litchi_cfb::writer::fat::FatBuilder::allocate_special
+00000000000b3bf0 000000000000005c t litchi_cfb::writer::fat::FatBuilder::allocate_special::{{closure}}
+00000000000b3b80 0000000000000063 t litchi_cfb::writer::fat::FatBuilder::allocate_special::{{closure}}
+00000000000b7690 0000000000000055 t litchi_cfb::writer::fat::FatBuilder::allocate_chain_u64::{{closure}}
+00000000000b39a0 00000000000001dd t litchi_cfb::writer::fat::FatBuilder::physical_end_after
+00000000000b3cb0 0000000000000060 t litchi_cfb::writer::fat::FatBuilder::physical_end_after::{{closure}}
+00000000000b2280 00000000000000db t litchi_cfb::writer::fat::FatBuilder::finalize_range_lock
+00000000000b3940 0000000000000055 t litchi_cfb::writer::fat::FatBuilder::finalize_range_lock::{{closure}}
+00000000000b2d90 000000000000037a t litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors
+00000000000b7c10 00000000000002d5 t litchi_cfb::writer::fat::FatBuilder::allocation_sector_ids
+00000000000b2360 0000000000000147 t litchi_cfb::writer::fat::FatBuilder::validate
+00000000000b3c50 0000000000000055 t litchi_cfb::writer::fat::checked_sector_end::{{closure}}
+00000000000b7ef0 0000000000000156 t litchi_cfb::writer::core::sector_count
+00000000000b8050 00000000000000ef t litchi_cfb::writer::core::sector_offset
+0000000000066570 000000000000074e t litchi_cfb::writer::core::write_chain_aligned
+00000000000b8140 000000000000016a t litchi_cfb::writer::core::validate_output_size
+00000000000b82b0 00000000000000d1 t litchi_cfb::writer::core::validate_stream_size
+00000000000b8390 0000000000000296 t litchi_cfb::writer::core::allocation_table_sector_counts
+00000000000b8b10 000000000000019a t litchi_cfb::writer::core::OleWriter::stream_inputs
+00000000000b9870 0000000000000424 t litchi_cfb::writer::core::OleWriter::effective_storages
+00000000000b8630 00000000000003fa t litchi_cfb::writer::core::OleWriter::create_stream_owned
+00000000000c6620 000000000000029f t litchi_cfb::writer::core::OleWriter::new
+0000000000066cc0 0000000000007ec4 t litchi_cfb::writer::core::OleWriter::write_to
+000000000006eb90 0000000000000055 t litchi_cfb::writer::core::OleWriter::write_to::{{closure}}
+000000000006ebf0 0000000000000058 t litchi_cfb::writer::core::OleWriter::write_to::{{closure}}
+000000000006ec50 0000000000000055 t litchi_cfb::writer::core::OleWriter::write_to::{{closure}}
+00000000000b2540 00000000000001ac t litchi_cfb::writer::difat::DifatBuilder::set_fat_sectors
+00000000000b27b0 00000000000005d8 t litchi_cfb::writer::difat::DifatBuilder::generate_difat_sectors
+00000000000b26f0 00000000000000bf t litchi_cfb::writer::difat::DifatBuilder::calculate_difat_sector_count
+00000000000b24b0 0000000000000088 t litchi_cfb::writer::difat::DifatBuilder::new
+00000000000b3870 0000000000000063 t litchi_cfb::writer::difat::checked_sector_end::{{closure}}
+00000000000b3810 0000000000000055 t litchi_cfb::writer::difat::checked_sector_end::{{closure}}
+00000000000b38e0 0000000000000055 t litchi_cfb::writer::difat::allocated_sector_at::{{closure}}
+00000000000b31c0 0000000000000151 t litchi_cfb::writer::header::HeaderBuilder::set_fat_sectors
+00000000000b3110 00000000000000a4 t litchi_cfb::writer::header::HeaderBuilder::new
+00000000000b3320 0000000000000490 t litchi_cfb::writer::header::HeaderBuilder::generate
+00000000000c69d0 00000000000000dc t litchi_cfb::writer::layout::PlanCursor::io_error
+00000000000c27b0 0000000000000101 t litchi_cfb::writer::layout::SectorPool::high_water
+00000000000c1f70 00000000000000f4 t litchi_cfb::writer::layout::SectorPool::claim
+00000000000c2ae0 0000000000000098 t litchi_cfb::writer::layout::SectorPool::release
+00000000000c2260 0000000000000397 t litchi_cfb::writer::layout::SectorPool::allocate
+00000000000c0cc0 0000000000000115 t litchi_cfb::writer::layout::filled_vec
+00000000000bb100 0000000000005832 t litchi_cfb::writer::layout::plan_reuse
+00000000000c1df0 000000000000005b t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c28c0 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c39a0 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3a60 0000000000000064 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3450 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3a00 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c35b0 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c38e0 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3740 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2f70 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3380 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c1a20 0000000000000063 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2600 0000000000000066 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2b80 00000000000000e1 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2c70 0000000000000064 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c4670 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c37a0 000000000000006e t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c36e0 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2670 0000000000000055 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3810 0000000000000063 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2a80 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3940 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2dd0 0000000000000067 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3610 0000000000000066 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c4b50 000000000000006e t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2f00 000000000000006e t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c4d30 000000000000005c t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c4af0 000000000000005c t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3680 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2200 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c34b0 00000000000000f9 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c2d70 0000000000000060 t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c3880 000000000000005c t litchi_cfb::writer::layout::plan_reuse::{{closure}}
+00000000000c4230 0000000000000439 t litchi_cfb::writer::layout::walk_chain
+00000000000c2e40 00000000000000bd t litchi_cfb::writer::layout::zeroed_vec
+00000000000c30d0 000000000000008b t litchi_cfb::writer::layout::patch_entry
+00000000000c1a90 00000000000000db t litchi_cfb::writer::layout::LayoutBitSet::try_with_capacity
+00000000000c4c30 00000000000000f1 t litchi_cfb::writer::layout::LayoutBitSet::insert
+00000000000c2ce0 0000000000000090 t litchi_cfb::writer::layout::reserved_vec
+00000000000c1750 0000000000000091 t litchi_cfb::writer::layout::entry_metadata
+00000000000c3040 0000000000000085 t litchi_cfb::writer::layout::patch_class_id
+00000000000c26d0 000000000000005d t litchi_cfb::writer::layout::invalid
+00000000000c31e0 0000000000000075 t litchi_cfb::writer::layout::read_u32
+00000000000cda50 00000000000009bf t litchi_cfb::writer::layout::ReusePlan::examine_at
+000000000006ecb0 0000000000000976 t litchi_cfb::writer::layout::ReusePlan::emit
+00000000000ce730 000000000000016d t litchi_cfb::writer::layout::ReusePlan::image_run
+00000000000c20a0 0000000000000151 t litchi_cfb::writer::layout::units_for
+00000000000c3160 0000000000000076 t litchi_cfb::writer::layout::write_u32
+00000000000b37b0 000000000000005c t litchi_cfb::writer::minifat::checked_end::{{closure}}
+00000000000aed70 0000000000000059 t litchi_cfb::writer::minifat::MiniFatBuilder::ministream_size::{{closure}}
+00000000000cfa60 000000000000005c t litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain::{{closure}}
+00000000000cf990 0000000000000063 t litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain::{{closure}}
+00000000000cfa00 0000000000000060 t litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain::{{closure}}
+00000000000b1ab0 000000000000043a t litchi_cfb::writer::minifat::MiniFatBuilder::generate_minifat_sectors
+00000000000b5760 00000000000000d8 t litchi_cfb::writer::directory::clone_string
+00000000000b4590 000000000000011b t litchi_cfb::writer::directory::DirectoryBuilder::rotate_left
+00000000000b4470 000000000000011b t litchi_cfb::writer::directory::DirectoryBuilder::rotate_right
+00000000000b0050 0000000000000740 t litchi_cfb::writer::directory::DirectoryBuilder::add_stream_path
+00000000000b5bf0 0000000000000055 t litchi_cfb::writer::directory::DirectoryBuilder::add_stream_path::{{closure}}
+00000000000aedd0 0000000000001279 t litchi_cfb::writer::directory::DirectoryBuilder::add_storage_path
+00000000000b5840 00000000000001f8 t litchi_cfb::writer::directory::DirectoryBuilder::ensure_unique_child
+00000000000b46d0 0000000000000b4f t litchi_cfb::writer::directory::DirectoryBuilder::validate_child_tree
+00000000000b0790 0000000000000101 t litchi_cfb::writer::directory::DirectoryBuilder::set_stream_metadata_sid
+00000000000b08a0 0000000000001201 t litchi_cfb::writer::directory::DirectoryBuilder::generate_directory_stream
+00000000000cfac0 00000000000004d6 t litchi_cfb::writer::directory::DirectoryBuilder::new
+00000000000b5400 000000000000035e t litchi_cfb::writer::directory::directory_name_data
+00000000000b3d10 00000000000005d5 t litchi_cfb::writer::directory::DirectoryEntryBuilder::to_bytes
+00000000000e0d10 000000000000014c t litchi_ppt::transition::writer::encode_transition_direction
+00000000000e1d20 0000000000000095 t litchi_ppt::client_data::codec::require_len
+00000000000e0f90 0000000000000366 t litchi_ppt::client_data::codec::validate_sequence
+00000000000e1cc0 000000000000005c t litchi_ppt::client_data::codec::validate_sequence::{{closure}}
+00000000000e1e90 0000000000000961 t litchi_ppt::client_data::codec::<impl litchi_ppt::client_data::model::ClientData>::parse_with_limits
+00000000000e1370 000000000000091f t litchi_ppt::client_data::codec::<impl litchi_ppt::client_data::model::ClientDataChild>::validate
+00000000000e2b00 0000000000000105 t litchi_ppt::named_shows::record_bytes
+00000000000e67e0 0000000000000392 t litchi_ppt::current_user::CurrentUser::parse_with_limits
+00000000000e3720 000000000000005b t litchi_ppt::current_user::CurrentUser::parse
+00000000000fcde0 0000000000000617 t litchi_ppt::presentation::model::Presentation::text
+00000000000edaf0 00000000000005e9 t litchi_ppt::presentation::model::Presentation::slides
+000000000006f630 00000000000002c8 t litchi_ppt::presentation::package::locate_stream
+000000000006f900 000000000000003a t litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_ole_with_options::{{closure}}
+000000000006f940 0000000000000050 t litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_ole_with_options::{{closure}}
+00000000000fefe0 00000000000002b5 t litchi_ppt::header_footer::codec::append_record
+00000000000ff2a0 0000000000000255 t litchi_ppt::header_footer::codec::append_cstring
+00000000000fbb90 0000000000000239 t litchi_ppt::header_footer::codec::validated_encoded_len
+00000000000fbdd0 0000000000000058 t litchi_ppt::header_footer::codec::validated_encoded_len::{{closure}}
+00000000000fef80 000000000000005f t litchi_ppt::header_footer::codec::<impl litchi_ppt::header_footer::model::HeaderFooter>::validate_for_write::{{closure}}
+00000000000f03f0 0000000000000067 t litchi_ppt::escher_textbox::EscherTextboxWrapper::text_interactions_from_records::{{closure}}
+00000000000ff500 0000000000002ea2 t litchi_ppt::escher_textbox::EscherTextboxWrapper::new
+00000000000eb8a0 0000000000000397 t litchi_ppt::text_interaction::parse_anchor
+00000000000f08a0 0000000000000737 t litchi_ppt::text_interaction::TextInteraction::parse_records
+00000000000f0460 0000000000000434 t litchi_ppt::text_interaction::text_units_from_records
+00000000000f0340 00000000000000ab t litchi_ppt::text_interaction::TextType::parse
+00000000000ebd50 0000000000000187 t litchi_ppt::text_interaction::TextRange::validate_for_text
+00000000000ea790 0000000000000150 t litchi_ppt::text_si_exception::OutlineTextRef::parse_record
+00000000000fc8e0 00000000000002d4 t litchi_ppt::font::validation::validate_font
+00000000000fc480 0000000000000451 t litchi_ppt::font::validation::validate_collection
+00000000000fcbc0 000000000000004d t litchi_ppt::font::validation::validate_collection::{{closure}}
+00000000000fcc10 0000000000000051 t litchi_ppt::font::validation::validate_collection::{{closure}}
+0000000000103190 000000000000067d t litchi_ppt::font::codec::encode_record
+0000000000103810 000000000000004d t litchi_ppt::font::codec::encode_record::{{closure}}
+00000000001038c0 00000000000016bb t litchi_ppt::font::codec::<impl litchi_ppt::font::model::FontCollection>::to_record_bytes
+0000000000103860 0000000000000051 t litchi_ppt::font::codec::<impl litchi_ppt::font::model::FontCollection>::to_record_with_limits::{{closure}}
+00000000000ecc40 0000000000000132 t litchi_ppt::text::extractor::decode_text_bytes
+00000000000ec830 000000000000040d t litchi_ppt::text::extractor::from_utf16le_lossy
+00000000000fbe30 0000000000000498 t litchi_ppt::odraw::codec::push_children
+00000000000eee60 000000000000005a t litchi_ppt::odraw::package::corrupted
+00000000000fd400 0000000000001b54 t litchi_ppt::slide::types::semantic::<impl litchi_ppt::slide::types::Slide>::text
+00000000000f91c0 00000000000020ba t litchi_ppt::slide::factory::SlideFactory::parse_slide
+00000000000e6b80 00000000000001c0 t litchi_ppt::slide::directory::read_header
+00000000000e4fd0 0000000000001806 t litchi_ppt::slide::directory::SlideDirectory::build_with_limits
+00000000000e78f0 0000000000000087 t litchi_ppt::slide::directory::read_u32
+0000000000113000 00000000000005f0 t litchi_ppt::writer::smart_tags::intern_string
+00000000001138d0 000000000000066b t litchi_ppt::writer::smart_tags::build_binary_tag
+0000000000113650 00000000000000f2 t litchi_ppt::writer::smart_tags::build_document_binary_tag::{{closure}}
+00000000001135f0 000000000000005f t litchi_ppt::writer::smart_tags::build_document_binary_tag::{{closure}}
+0000000000112f60 000000000000005c t litchi_ppt::writer::smart_tags::build_document_binary_tag::{{closure}}
+0000000000126e30 0000000000000eb9 t litchi_ppt::writer::smart_tags::build_shape_text_extensions
+000000000012ada0 000000000000005c t litchi_ppt::writer::smart_tags::build_shape_text_extensions::{{closure}}::{{closure}}
+000000000012ae00 000000000000005c t litchi_ppt::writer::smart_tags::build_shape_text_extensions::{{closure}}::{{closure}}
+000000000012ae60 00000000000001da t litchi_ppt::writer::smart_tags::atom
+0000000000107290 0000000000000f68 t litchi_ppt::writer::custom_shows::build_named_shows
+0000000000108500 00000000000001cd t litchi_ppt::writer::slide_timing::build_slide_timing
+0000000000108ff0 00000000000000dc t litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::write_ppt_header
+00000000001086d0 000000000000010b t litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::write_escher_header
+00000000001087e0 0000000000000806 t litchi_ppt::writer::master_drawing::MasterPPDrawingBuilder::build_placeholder_container
+00000000001090d0 0000000000000c1c t litchi_ppt::writer::master_drawing::build_master_ppdrawing
+000000000010c030 000000000000027e t litchi_ppt::writer::sound_collection::write_cstring
+000000000010b560 0000000000000a3b t litchi_ppt::writer::sound_collection::build_sound_container
+000000000010b080 00000000000000e2 t litchi_ppt::writer::sound_collection::SoundCollectionBuilder::register_reference
+000000000010a160 0000000000000ea2 t litchi_ppt::writer::sound_collection::SoundCollectionBuilder::insert
+000000000010b010 000000000000006e t litchi_ppt::writer::sound_collection::SoundCollectionBuilder::insert::{{closure}}
+0000000000109cf0 0000000000000467 t litchi_ppt::writer::sound_collection::SoundCollectionBuilder::register
+000000000010c2b0 00000000000001aa t litchi_ppt::writer::blip::Pictures::delay
+000000000010d200 0000000000000cdf t litchi_ppt::writer::blip::Pictures::store
+000000000010c460 00000000000007b7 t litchi_ppt::writer::blip::Pictures::builder
+000000000010df40 000000000000013f t litchi_ppt::writer::core::codec::sound_collection_error
+000000000010e080 000000000000152e t litchi_ppt::writer::core::codec::build_writer_sound_collection
+000000000010f5b0 00000000000001e5 t litchi_ppt::writer::core::codec::append_child_to_built_container
+0000000000110630 0000000000002028 t litchi_ppt::writer::core::codec::<impl litchi_ppt::writer::core::model::Writer>::build_docinfo_list
+0000000000117290 000000000000048b t litchi_ppt::writer::core::model::validation::<impl litchi_ppt::writer::core::model::Writer>::validate_font_references::{{closure}}
+0000000000117720 000000000000034b t litchi_ppt::writer::core::model::records::<impl litchi_ppt::writer::core::model::Writer>::plan_charts
+0000000000117a70 0000000000000c72 t litchi_ppt::writer::core::model::records::<impl litchi_ppt::writer::core::model::Writer>::serialize_header_footers::{{closure}}::{{closure}}
+00000000001194f0 000000000000006d t litchi_ppt::writer::core::package::wire_index
+0000000000119560 0000000000000066 t litchi_ppt::writer::core::package::stream_offset
+00000000001195d0 0000000000000bef t litchi_ppt::writer::core::package::build_slide_info_atom
+000000000011a1c0 0000000000000063 t litchi_ppt::writer::core::package::build_current_user_stream
+000000000011a230 00000000000005c1 t litchi_ppt::writer::core::package::build_summary_information_stream
+000000000011a800 00000000000003a6 t litchi_ppt::writer::core::package::build_document_summary_information_stream
+000000000006f990 0000000000000055 t litchi_ppt::writer::core::package::<impl litchi_ppt::writer::core::model::Writer>::write_to::{{closure}}
+000000000006f9f0 00000000000000d0 t litchi_ppt::writer::core::package::<impl litchi_ppt::writer::core::model::Writer>::write_to::{{closure}}
+000000000011c530 0000000000001437 t litchi_ppt::writer::chart::build_ex_obj_list
+000000000011e8e0 0000000000000270 t litchi_ppt::writer::chart::chart_storage_record
+0000000000120d30 0000000000000bb8 t litchi_ppt::writer::chart::build_chart_sp_container
+0000000000120760 00000000000005c3 t litchi_ppt::writer::table::build_cell_container
+0000000000127e60 00000000000003a2 t litchi_ppt::writer::escher::codec::client_data::append_client_data_payload
+0000000000126c30 00000000000001f6 t litchi_ppt::writer::escher::codec::client_data::append_client_data_record_payload
+0000000000126850 00000000000003d4 t litchi_ppt::writer::escher::codec::client_data::build_client_data_with_placeholder
+00000000001221d0 00000000000007d2 t litchi_ppt::writer::escher::codec::text::append_text_interactions
+00000000001218f0 00000000000008d2 t litchi_ppt::writer::escher::codec::text::append_client_textbox_with_interactions
+0000000000128210 0000000000002804 t litchi_ppt::writer::escher::codec::text::build_client_textbox_formatted_with_interactions
+00000000001206c0 000000000000009a t litchi_ppt::writer::escher::codec::wire::EscherBuilder::build
+0000000000120650 000000000000006e t litchi_ppt::writer::escher::codec::wire::EscherBuilder::add_data
+00000000001229b0 0000000000002dd1 t litchi_ppt::writer::escher::codec::shapes::append_shape_container_children
+000000000012aa20 0000000000000167 t litchi_ppt::writer::escher::codec::shapes::append_shape_container_children::{{closure}}
+0000000000127cf0 0000000000000167 t litchi_ppt::writer::escher::codec::shapes::append_shape_container_children::{{closure}}
+000000000012c310 0000000000000ce0 t litchi_ppt::writer::escher::codec::drawing::build_dgg_container
+000000000011ed30 0000000000001847 t litchi_ppt::writer::escher::codec::drawing::append_dg_container_children::{{closure}}
+0000000000119300 0000000000000092 t litchi_ppt::writer::escher::model::FreeformGeometry::validate
+00000000000ed520 000000000000032c t litchi_ppt::writer::persist::UserEditAtom::generate_record
+000000000012cff0 00000000000009eb t litchi_ppt::writer::persist::PersistPtrBuilder::generate_record
+00000000001161b0 0000000000000195 t litchi_ppt::writer::records::validation::validate_complete_record
+000000000012d9e0 0000000000000098 t litchi_ppt::writer::records::codec::create_end_document
+000000000011bb40 00000000000003d5 t litchi_ppt::writer::records::codec::create_environment_minimal
+000000000012dca0 0000000000001d47 t litchi_ppt::writer::records::codec::create_main_master_container
+000000000012f9f0 0000000000000190 t litchi_ppt::writer::records::codec::wrap_dgg_into_ppdrawing_group
+000000000012fb80 00000000000003d9 t litchi_ppt::writer::records::codec::create_slide_list_with_text_master
+000000000012ff60 000000000000046f t litchi_ppt::writer::records::codec::create_slide_list_with_text_slides
+000000000011abb0 0000000000000f88 t litchi_ppt::writer::records::codec::create_environment_with_font_collection
+000000000012da80 0000000000000219 t litchi_ppt::writer::records::codec::create_document_atom_with_font_embedding
+0000000000113f70 0000000000001a9e t litchi_ppt::writer::records::codec::create_docinfo_list_container_with_extensions
+00000000000ed850 0000000000000101 t litchi_ppt::writer::records::model::RecordHeader::write
+000000000011eb50 000000000000009c t litchi_ppt::writer::records::model::InPlaceRecord::write
+000000000006fac0 0000000000004d9a t litchi_ppt::writer::records::model::InPlaceRecord::write
+0000000000120580 00000000000000c2 t litchi_ppt::writer::records::model::InPlaceRecord::write
+000000000011ebf0 000000000000013a t litchi_ppt::writer::records::model::InPlaceRecord::finish
+0000000000113800 00000000000000c5 t litchi_ppt::writer::records::model::RecordBuilder::build
+0000000000130d40 00000000000003d3 t litchi_ppt::writer::comments::write_cstring
+00000000001303d0 000000000000096d t litchi_ppt::writer::comments::build_slide_comments
+000000000011c490 000000000000009c t litchi_ppt::writer::tx_style::codec::TxMasterStyleBuilder::for_text_type
+000000000011bf20 000000000000056a t litchi_ppt::writer::tx_style::codec::build_spec_master_style
+000000000011d970 0000000000000d7a t litchi_ppt::writer::hyperlink::HyperlinkCollection::build_ex_hyperlink
+000000000011e6f0 00000000000001f0 t litchi_ppt::writer::hyperlink::build_cstring_with_options
+00000000000e3780 0000000000000419 t litchi_ppt::parsers::parser::RecordParser::parse_shared_document_with_limits
+00000000000e6d40 00000000000000c6 t litchi_ppt::persist::mapping::PersistMapping::get_offset
+00000000000ea450 000000000000033d t litchi_ppt::records::slide_atoms_set::SlideAtomsSet::outline_text_refs
+00000000000e8440 0000000000001fb0 t litchi_ppt::records::slide_atoms_set::SlideAtomsSet::text_interactions_with_limits
+00000000000df1a0 0000000000000051 t litchi_ppt::records::record::ParseBudget::charge_copy::{{closure}}
+00000000000dfb10 0000000000000051 t litchi_ppt::records::record::ParseBudget::charge_visit::{{closure}}
+00000000000df200 00000000000000cd t litchi_ppt::records::record::PayloadStore::payload
+00000000000de4c0 0000000000000c7a t litchi_ppt::records::record::Record::parse_impl
+00000000000df140 0000000000000055 t litchi_ppt::records::record::Record::parse_impl::{{closure}}
+00000000000e7c40 000000000000064c t litchi_ppt::records::record::Record::extract_text
+00000000000e6e10 0000000000000122 t litchi_ppt::records::record::Record::parse_with_limits
+00000000000df2d0 0000000000000387 t litchi_ppt::records::record::Record::parse_container_children
+00000000000e7580 0000000000000361 t litchi_ppt::records::record::Record::group_into_slide_atoms_sets
+00000000000e6f40 000000000000014c t litchi_ppt::records::record::Record::extract_slide_list_with_texts
+00000000000df660 000000000000043c t litchi_ppt::records::record::Record::parse_container_children_strict
+00000000000f0300 000000000000003b t litchi_ppt::records::payload::RecordPayload::as_slice
+00000000000ed960 000000000000018b t litchi_ppt::embedded::object::codec::wire::record_bytes_raw
+00000000000e3ba0 0000000000001425 t litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping
+0000000000131120 000000000000002e t litchi_ppt::embedded::storage::codec::<impl litchi_ppt::embedded::storage::model::Storage>::to_record_bytes
+0000000000104f80 00000000000002c0 t litchi_ppt::embedded::storage::codec::<impl litchi_ppt::embedded::storage::snapshot::Snapshot>::to_record_bytes
+00000000000e1dc0 00000000000000cf t litchi_ppt::embedded::reference::Reference::parse_payload
+00000000000f78c0 000000000000005f t litchi_ppt::text_run::codec::formatting_from_style::{{closure}}
+00000000000f7650 00000000000000e5 t litchi_ppt::text_run::codec::paragraph_formatting_from_style::{{closure}}
+00000000000eeec0 0000000000001002 t litchi_ppt::text_run::codec::<impl litchi_ppt::text_run::package::TextRunExtractor>::process_record
+00000000000f0fe0 00000000000065ca t litchi_ppt::text_run::codec::<impl litchi_ppt::text_run::package::TextRunExtractor>::apply_style_properties
+00000000000f7920 00000000000002f8 t litchi_ppt::text_run::model::TextRun::with_formatting
+0000000000125ac0 0000000000000d31 t litchi_ppt::animation::writer::animation::write_animation_info
+00000000001028e0 0000000000000118 t litchi_ppt::hyperlink::codec::encode_record
+00000000000ec2c0 0000000000000374 t litchi_ppt::hyperlink::codec::decode_macro_name
+0000000000103100 0000000000000051 t litchi_ppt::hyperlink::codec::validate_serialized_interaction_size::{{closure}}
+00000000000eaa40 0000000000000e25 t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::parse_with_limits
+00000000000ec210 000000000000006c t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::parse_with_limits::{{closure}}
+00000000001023b0 000000000000052d t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::to_bytes_with_limits
+0000000000102a00 00000000000006f8 t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::Interaction>::validated_macro_name_data
+00000000000ec0f0 0000000000000118 t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::MacroNameAtom>::parse_payload
+00000000000ebee0 000000000000020d t litchi_ppt::hyperlink::codec::<impl litchi_ppt::hyperlink::model::InteractiveInfoAtom>::parse_payload
+00000000000f7c20 000000000000005f t litchi_ppt::text_prop::parse_style_text_prop_atom_strict::{{closure}}
+0000000000115a10 00000000000006de t litchi_ppt::view_info::SlideViewInfo::to_bytes
+0000000000074860 0000000000000082 t serde_json::ser::to_vec_pretty
+00000000000748f0 0000000000003393 t serde_json::ser::to_writer_pretty
+0000000000042425 0000000000000100 r serde_json::ser::ESCAPE
+000000000000d790 0000000000000010 r serde_json::ser::Formatter::write_char_escape::HEX_DIGITS
+00000000000e2800 00000000000002f4 t <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+0000000000077c90 000000000000012b t <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+00000000000ee190 0000000000000298 t <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+00000000000de020 0000000000000357 t <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+0000000000077dc0 0000000000000670 t <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+00000000000ee430 000000000000013d t <core::iter::adapters::flatten::FlatMap<I,U,F> as core::iter::traits::iterator::Iterator>::next
+000000000016c648 0000000000000020 d encoding_rs::UTF_8_INIT
+000000000016c668 0000000000000020 d encoding_rs::EUC_JP_INIT
+000000000016c688 0000000000000020 d encoding_rs::EUC_KR_INIT
+000000000016c6a8 0000000000000020 d encoding_rs::IBM866_INIT
+000000000016c6c8 0000000000000020 d encoding_rs::KOI8_R_INIT
+000000000016c6e8 0000000000000020 d encoding_rs::KOI8_U_INIT
+00000000000a7480 00000000000004db t encoding_rs::iso_2022_jp::is_mapped_for_two_byte_encode
+000000000016c7b0 0000000000000020 d encoding_rs::GB18030_INIT
+000000000001f6c2 0000000000000024 r encoding_rs::gb18030_2022::GB18030_2022_OVERRIDE_BYTES
+000000000016c7e8 0000000000000020 d encoding_rs::UTF_16BE_INIT
+000000000016c808 0000000000000020 d encoding_rs::UTF_16LE_INIT
+000000000016c828 0000000000000020 d encoding_rs::MACINTOSH_INIT
+000000000016c848 0000000000000020 d encoding_rs::SHIFT_JIS_INIT
+000000000016c868 0000000000000020 d encoding_rs::ISO_8859_2_INIT
+000000000016c888 0000000000000020 d encoding_rs::ISO_8859_3_INIT
+000000000016c8a8 0000000000000020 d encoding_rs::ISO_8859_4_INIT
+000000000016c8c8 0000000000000020 d encoding_rs::ISO_8859_5_INIT
+000000000016c8e8 0000000000000020 d encoding_rs::ISO_8859_6_INIT
+000000000016c908 0000000000000020 d encoding_rs::ISO_8859_7_INIT
+000000000016c928 0000000000000020 d encoding_rs::ISO_8859_8_INIT
+000000000016c948 0000000000000020 d encoding_rs::ISO_2022_JP_INIT
+000000000016c968 0000000000000020 d encoding_rs::ISO_8859_13_INIT
+000000000016c988 0000000000000020 d encoding_rs::ISO_8859_15_INIT
+000000000016c9a8 0000000000000020 d encoding_rs::REPLACEMENT_INIT
+000000000016c9c8 0000000000000020 d encoding_rs::WINDOWS_874_INIT
+000000000016c9e8 0000000000000020 d encoding_rs::WINDOWS_1250_INIT
+000000000016ca08 0000000000000020 d encoding_rs::WINDOWS_1251_INIT
+000000000016ca28 0000000000000020 d encoding_rs::WINDOWS_1252_INIT
+000000000016ca48 0000000000000020 d encoding_rs::WINDOWS_1253_INIT
+000000000016ca68 0000000000000020 d encoding_rs::WINDOWS_1254_INIT
+000000000016ca88 0000000000000020 d encoding_rs::WINDOWS_1255_INIT
+000000000016caa8 0000000000000020 d encoding_rs::WINDOWS_1256_INIT
+000000000016cac8 0000000000000020 d encoding_rs::WINDOWS_1257_INIT
+000000000016cae8 0000000000000020 d encoding_rs::WINDOWS_1258_INIT
+000000000001f7e2 00000000000000ca r encoding_rs::data::GBK_BOTTOM
+000000000001f8ac 00000000000034e0 r encoding_rs::data::GB2312_HANZI
+0000000000022d8c 0000000000009330 r encoding_rs::data::BIG5_LOW_BITS
+000000000002c0bc 0000000000002630 r encoding_rs::data::KSX1001_HANJA
+000000000002e6ec 00000000000000bc r encoding_rs::data::GB2312_SYMBOLS
+000000000002e7a8 000000000000125c r encoding_rs::data::KSX1001_HANGUL
+000000000002fa04 0000000000000934 r encoding_rs::data::BIG5_ASTRALNESS
+0000000000030338 00000000000001e0 r encoding_rs::data::JIS0208_SYMBOLS
+0000000000030518 000000000000014a r encoding_rs::data::KSX1001_SYMBOLS
+0000000000030680 0000000000001b00 r encoding_rs::data::SINGLE_BYTE_DATA
+0000000000032180 0000000000000078 r encoding_rs::data::GBK_OTHER_POINTERS
+00000000000321f8 000000000000172a r encoding_rs::data::JIS0208_LEVEL1_KANJI
+0000000000033922 000000000000019c r encoding_rs::data::GB18030_RANGE_OFFSETS
+0000000000033abe 000000000000005e r encoding_rs::data::GB2312_OTHER_POINTERS
+0000000000033b1c 000000000000006c r encoding_rs::data::JIS0208_RANGE_TRIPLES
+0000000000033b88 000000000000019c r encoding_rs::data::GB18030_RANGE_POINTERS
+0000000000033d24 0000000000000042 r encoding_rs::data::JIS0208_SYMBOL_TRIPLES
+0000000000033d66 000000000000009c r encoding_rs::data::KSX1001_OTHER_POINTERS
+0000000000033e02 000000000000086e r encoding_rs::data::CP949_TOP_HANGUL_OFFSETS
+0000000000034670 000000000000042e r encoding_rs::data::CP949_LEFT_HANGUL_OFFSETS
+0000000000034a9e 000000000000086e r encoding_rs::data::CP949_TOP_HANGUL_POINTERS
+000000000003530c 0000000000000ef8 r encoding_rs::data::GBK_TOP_IDEOGRAPH_OFFSETS
+0000000000036204 000000000000042e r encoding_rs::data::CP949_LEFT_HANGUL_POINTERS
+0000000000036632 0000000000000cb6 r encoding_rs::data::GBK_LEFT_IDEOGRAPH_OFFSETS
+00000000000372e8 0000000000000076 r encoding_rs::data::GBK_OTHER_UNSORTED_OFFSETS
+000000000003735e 0000000000000ef8 r encoding_rs::data::GBK_TOP_IDEOGRAPH_POINTERS
+0000000000038256 0000000000000cb6 r encoding_rs::data::GBK_LEFT_IDEOGRAPH_POINTERS
+000000000001f659 000000000000003f r encoding_rs::data::ISO_2022_JP_HALF_WIDTH_TRAIL
+0000000000038f0c 000000000000005c r encoding_rs::data::GB2312_OTHER_UNSORTED_OFFSETS
+0000000000038f68 000000000000009a r encoding_rs::data::KSX1001_OTHER_UNSORTED_OFFSETS
+0000000000039002 0000000000001a7c r encoding_rs::data::JIS0208_LEVEL2_AND_ADDITIONAL_KANJI
+000000000003aa7e 00000000000002d0 r encoding_rs::data::IBM_KANJI
+00000000000a69e0 0000000000000a95 t encoding_rs::gb18030::gbk_encode_non_unified
+000000000009df50 0000000000008a89 t encoding_rs::variant::VariantEncoder::encode_from_utf8_raw
+000000000016d000 0000000000000020 d encoding_rs::GBK_INIT
+000000000016d020 0000000000000020 d encoding_rs::BIG5_INIT
+00000000000d0440 000000000000000d t litchi_core::simd::cmp::is_all_zero_avx2
+00000000000d0200 00000000000000bb t litchi_core::simd::fmt::hex_encode_avx2
+00000000000d0380 00000000000000bb t litchi_core::simd::fmt::hex_encode_sse41
+00000000000d02c0 00000000000000bb t litchi_core::simd::fmt::hex_encode_ssse3
+00000000000d0140 00000000000000bb t litchi_core::simd::fmt::hex_encode_avx512
+00000000000abdc0 00000000000002d2 t litchi_core::simd::fmt::hex_encode_to_string
+000000000010cc20 00000000000004ed t litchi_odraw::image::write::BlipBuilder::write
+00000000000d0bf0 000000000000005b t litchi_odraw::image::write::BlipBuilder::body_len::{{closure}}
+00000000000d0c50 000000000000005b t litchi_odraw::image::write::BlipBuilder::wire_len::{{closure}}
+00000000000d1020 000000000000005b t litchi_odraw::image::write::EntryBuilder::body_len::{{closure}}
+00000000000d0e80 0000000000000191 t litchi_odraw::image::write::EntryBuilder::name_len
+00000000000d1080 000000000000005b t litchi_odraw::image::write::EntryBuilder::name_len::{{closure}}
+00000000000d0cb0 00000000000001cb t litchi_odraw::image::write::EntryBuilder::validate
+00000000000d2090 000000000000005b t litchi_odraw::image::write::EntryBuilder::wire_len::{{closure}}
+000000000010dee0 0000000000000060 t litchi_odraw::image::write::StoreBuilder::write_store::{{closure}}
+00000000000d1f00 0000000000000121 t litchi_odraw::image::write::StoreBuilder::delay_body_len
+00000000000d2030 000000000000005b t litchi_odraw::image::write::StoreBuilder::delay_body_len::{{closure}}::{{closure}}
+00000000000d20f0 000000000000005b t litchi_odraw::image::write::StoreBuilder::store_body_len::{{closure}}::{{closure}}
+00000000000d2150 00000000000005e3 t litchi_odraw::image::write::compress
+00000000000d0740 0000000000000373 t litchi_odraw::write::Header::atom
+00000000000d05b0 0000000000000107 t litchi_odraw::record::RecordKind::from_raw
+00000000000d2740 0000000000000105 t litchi_odraw::record::Record::parse
+00000000000ac9f0 00000000000003ac t <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+0000000000113750 00000000000000a8 t <alloc::vec::Vec<T,A1> as alloc::vec::spec_extend::SpecExtend<T,alloc::vec::into_iter::IntoIter<T,A2>>>::spec_extend
+00000000000db820 0000000000001515 t litchi_ole_common::smart_tags::codec::append_pb_string
+00000000000dac00 0000000000000c1e t litchi_ole_common::smart_tags::codec::<impl litchi_ole_common::smart_tags::model::PropertyBagStore>::to_bytes_with_bags
+00000000000dcef0 0000000000000058 t litchi_ole_common::smart_tags::codec::<impl litchi_ole_common::smart_tags::model::PropertyBagStore>::to_bytes_with_bags::{{closure}}
+0000000000078430 0000000000000223 t ppt_profile_probe::FixtureBox::text
+0000000000078660 00000000000001d2 t ppt_profile_probe::next_string
+0000000000078840 0000000000000255 t ppt_profile_probe::parse_count
+0000000000078aa0 0000000000004e52 t ppt_profile_probe::profile_write
+000000000007d900 0000000000000470 t ppt_profile_probe::run_lifecycle
+000000000007dd70 0000000000003879 t ppt_profile_probe::verify_output
+00000000000815f0 00000000000001bd t ppt_profile_probe::observe_output
+00000000000817b0 0000000000001328 t ppt_profile_probe::populate_writer
+0000000000082ae0 000000000000061a t ppt_profile_probe::allocation_metrics::Region::finish
+0000000000171cb8 0000000000000060 b ppt_profile_probe::allocation_metrics::COUNTERS
+0000000000083100 0000000000000193 t ppt_profile_probe::allocation_metrics::Counters::finish_region
+00000000000832a0 0000000000000218 t ppt_profile_probe::executable_identity
+00000000000834c0 0000000000000258 t ppt_profile_probe::semantic_slide_text
+0000000000083720 000000000000023f t ppt_profile_probe::_::<impl serde_core::ser::Serialize for ppt_profile_probe::Identity>::serialize
+0000000000083960 00000000000006f5 t ppt_profile_probe::collect_ppt_text_atoms
+0000000000084060 0000000000000685 t ppt_profile_probe::collect_officeart_textboxes
+00000000000846f0 0000000000000099 t ppt_profile_probe::collect_officeart_textboxes::{{closure}}
+0000000000084790 0000000000003850 t ppt_profile_probe::run
+0000000000087fe0 0000000000001236 t ppt_profile_probe::main
+0000000000089220 0000000000000401 t ppt_profile_probe::identity
+0000000000089630 00000000000000aa t ppt_profile_probe::raw_error
+00000000000896e0 0000000000000436 t ppt_profile_probe::run_write
+0000000000089b20 00000000000002d9 t ppt_profile_probe::write_new
+00000000000a89e0 0000000000000243 t <u64 as itoa::Unsigned>::fmt
+00000000001160f0 00000000000000b2 t std::io::error::Error::new
+00000000000cf8d0 00000000000000bc t std::io::error::Error::new
+00000000000d0b30 00000000000000bc t std::io::error::Error::new
+000000000013c710 00000000000000bb t std::io::error::Error::new
+000000000010d190 0000000000000065 t std::io::impls::<impl std::io::Write for alloc::vec::Vec<u8,A>>::write_all
+0000000000089e00 0000000000000005 t std::sys::backtrace::__rust_begin_short_backtrace
+00000000000e2db0 0000000000000059 t std::thread::local::LocalKey<T>::with
+0000000000106790 00000000000001b2 t <&T as core::fmt::Debug>::fmt
+0000000000107070 000000000000021d t <&T as core::fmt::Debug>::fmt
+0000000000089e10 000000000000014d t <&T as core::fmt::Debug>::fmt
+00000000000d9fd0 000000000000001a t <&T as core::fmt::Debug>::fmt
+00000000000fb840 00000000000000fc t <&T as core::fmt::Debug>::fmt
+0000000000106f50 000000000000002f t <&T as core::fmt::Debug>::fmt
+00000000000d1b30 0000000000000033 t <&T as core::fmt::Debug>::fmt
+00000000000d1b70 0000000000000032 t <&T as core::fmt::Debug>::fmt
+0000000000089f60 00000000000001c2 t <&T as core::fmt::Debug>::fmt
+00000000000d1bb0 00000000000001af t <&T as core::fmt::Debug>::fmt
+00000000000adb50 0000000000000097 t <&T as core::fmt::Debug>::fmt
+000000000008a130 0000000000000267 t <&T as core::fmt::Debug>::fmt
+00000000000d9fb0 0000000000000019 t <&T as core::fmt::Debug>::fmt
+00000000000fb940 00000000000001bf t <&T as core::fmt::Debug>::fmt
+000000000008a3a0 00000000000000d2 t <&T as core::fmt::Debug>::fmt
+000000000008a480 0000000000000019 t <&T as core::fmt::Debug>::fmt
+000000000008a4a0 00000000000000f9 t <&T as core::fmt::Debug>::fmt
+0000000000106fb0 00000000000000b3 t <&T as core::fmt::Debug>::fmt
+00000000000d1690 0000000000000492 t <&T as core::fmt::Debug>::fmt
+00000000000ae650 00000000000001e8 t <&T as core::fmt::Debug>::fmt
+00000000000d1670 0000000000000015 t <&T as core::fmt::Display>::fmt
+00000000000d9ea0 0000000000000008 t <&T as core::fmt::Display>::fmt
+00000000000fb810 0000000000000008 t <&T as core::fmt::Display>::fmt
+00000000000adbf0 00000000000000f8 t <&T as core::fmt::Display>::fmt
+00000000000e33f0 00000000000000f9 t <&T as core::fmt::Display>::fmt
+00000000000d9ff0 000000000000008d t <&T as core::fmt::Display>::fmt
+00000000000d9eb0 0000000000000008 t <&T as core::fmt::Display>::fmt
+00000000000ae170 0000000000000016 t <&T as core::fmt::Display>::fmt
+00000000000de000 0000000000000012 t <&T as core::fmt::Display>::fmt
+00000000000ae190 0000000000000064 t <&T as core::fmt::Display>::fmt
+00000000000a8f20 000000000000002f t <&T as core::fmt::Display>::fmt
+00000000000a8f50 0000000000000035 t <&T as core::fmt::Display>::fmt
+00000000000fb820 0000000000000008 t <&T as core::fmt::Display>::fmt
+00000000000fb830 0000000000000008 t <&T as core::fmt::Display>::fmt
+000000000008a5a0 000000000000006d t <&T as core::fmt::LowerHex>::fmt
+00000000000d9ec0 000000000000006f t <&T as core::fmt::UpperHex>::fmt
+00000000000d9f30 0000000000000071 t <&T as core::fmt::UpperHex>::fmt
+00000000000d1ee0 0000000000000012 t core::fmt::Write::write_fmt
+00000000000dfde0 0000000000000012 t core::fmt::Write::write_fmt
+00000000000a9110 0000000000000012 t core::fmt::Write::write_fmt
+000000000008a610 0000000000000012 t core::fmt::Write::write_fmt
+0000000000139980 0000000000000012 t core::fmt::Write::write_fmt
+00000000000c0940 000000000000006c t core::ptr::drop_in_place<(alloc::vec::Vec<alloc::string::String>,[u8; 16])>
+00000000000f88e0 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::build::ParagraphBuildLevel>>
+000000000008a630 00000000000000e4 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::effects::TimeNodeContainer>>
+00000000000f8c00 00000000000000e4 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::effects::TimeNodeContainer>>
+000000000008a720 00000000000000a2 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::writer::core::model::WriterModifyPassword>>
+00000000000a9690 00000000000000dd t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>>
+000000000008a7d0 00000000000000dd t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>>
+00000000000e82e0 000000000000001b t core::ptr::drop_in_place<core::result::Result<alloc::string::String,litchi_ppt::package::model::Error>>
+0000000000113f40 0000000000000024 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<(&str,&str,&str),u16>>
+000000000008a8b0 000000000000008a t core::ptr::drop_in_place<std::sync::once_lock::OnceLock<alloc::vec::Vec<alloc::vec::Vec<u8>>>>
+00000000000add70 0000000000000038 t core::ptr::drop_in_place<alloc::sync::Weak<dyn litchi_core::source::ReadAt,&alloc::alloc::Global>>
+00000000000eec10 00000000000000d8 t core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<dyn litchi_ppt::shapes::shape::Shape>>>
+000000000008a940 0000000000000162 t core::ptr::drop_in_place<std::collections::hash::set::HashSet<alloc::vec::Vec<alloc::string::String>>>
+00000000000b8f80 0000000000000162 t core::ptr::drop_in_place<std::collections::hash::set::HashSet<alloc::vec::Vec<alloc::string::String>>>
+000000000008aab0 00000000000001ae t core::ptr::drop_in_place<litchi_cfb::file::OleFile<std::io::cursor::Cursor<alloc::vec::Vec<u8>>>>
+000000000008ac60 000000000000007e t core::ptr::drop_in_place<once_cell::unsync::OnceCell<litchi_ppt::slide_round_trip::SlideRoundTripMetadata12>>
+000000000008ace0 0000000000000118 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::string::String,alloc::string::String>>
+00000000000e8300 000000000000006f t core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<litchi_ppt::records::slide_atoms_set::SlideAtomsSet>>
+00000000000c09b0 0000000000000304 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<&[alloc::string::String],usize>>
+000000000008ae00 0000000000000388 t core::ptr::drop_in_place<alloc::collections::btree::set::BTreeSet<alloc::vec::Vec<alloc::string::String>>>
+00000000000b9ca0 0000000000000398 t core::ptr::drop_in_place<alloc::collections::btree::set::BTreeSet<alloc::vec::Vec<alloc::string::String>>>
+000000000008b190 00000000000000aa t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::ValidatedDirectoryEntry>>>
+00000000000ab640 00000000000000aa t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::ValidatedDirectoryEntry>>>
+00000000000c17f0 000000000000002a t core::ptr::drop_in_place<core::result::Result<litchi_cfb::writer::layout::Outcome,litchi_cfb::file::OleError>>
+000000000008b240 0000000000000375 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<u32,litchi_ppt::animation::sound::SoundType>>
+000000000008b5c0 000000000000013d t core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<litchi_cfb::writer::layout::SourceLayout>>>
+00000000000b8a30 00000000000000a1 t core::ptr::drop_in_place<(alloc::vec::Vec<alloc::string::String>,litchi_cfb::writer::core::StreamPayload)>
+00000000000b7440 0000000000000152 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,u32>>
+00000000000a9770 0000000000000087 t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>>
+000000000008b700 0000000000000087 t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>>
+00000000000b94d0 0000000000000398 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<alloc::vec::Vec<alloc::string::String>,u32>>
+000000000008b790 0000000000000388 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<alloc::vec::Vec<alloc::string::String>,u32>>
+00000000000bace0 000000000000006c t core::ptr::drop_in_place<(alloc::vec::Vec<alloc::string::String>,alloc::collections::btree::set_val::SetValZST)>
+000000000008bb20 0000000000000107 t core::ptr::drop_in_place<once_cell::unsync::OnceCell<core::option::Option<litchi_ppt::slide::notes::SpeakerNotes>>>
+000000000010f7a0 0000000000000102 t core::ptr::drop_in_place<core::option::Option<alloc::vec::Vec<litchi_ppt::writer::text_format::semantic::Paragraph>>>
+000000000010bfa0 000000000000008b t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<u32,litchi_ppt::writer::sound_collection::PlannedSound>>
+000000000010f920 000000000000006b t core::ptr::drop_in_place<core::option::Option<alloc::vec::Vec<litchi_ppt::writer::smart_tags::ShapeTextExtensionRun>>>
+000000000008bc30 000000000000003f t core::ptr::drop_in_place<once_cell::unsync::OnceCell<core::option::Option<litchi_ppt::slide_sync::model::Synchronization>>>
+000000000008bc70 00000000000000b4 t core::ptr::drop_in_place<once_cell::unsync::OnceCell<alloc::vec::Vec<litchi_ppt::animation::types::animation::ShapeAnimation>>>
+00000000000b90f0 0000000000000162 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,[u8; 16]>>
+000000000008bd30 0000000000000162 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,[u8; 16]>>
+0000000000125a00 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<(litchi_odraw::write::Property,core::option::Option<alloc::vec::Vec<u8>>)>>
+00000000000b8d20 0000000000000058 t core::ptr::drop_in_place<alloc::vec::Vec<(alloc::vec::Vec<alloc::string::String>,litchi_cfb::writer::core::StreamPayload)>>
+00000000000ce6e0 000000000000004a t core::ptr::drop_in_place<litchi_cfb::file::StreamComparer<litchi_cfb::writer::layout::PlanCursor,litchi_cfb::writer::layout::PlanView>>
+00000000000bad50 00000000000003a8 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<alloc::vec::Vec<alloc::string::String>,[u8; 16]>>
+000000000008bea0 0000000000000084 t core::ptr::drop_in_place<once_cell::unsync::OnceCell<core::option::Option<litchi_ppt::animation::types::build::SlideAnimationExtension>>>
+000000000008bf30 0000000000000159 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,litchi_cfb::writer::core::DirectoryMetadata>>
+00000000000b9370 0000000000000159 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::vec::Vec<alloc::string::String>,litchi_cfb::writer::core::DirectoryMetadata>>
+0000000000125a70 0000000000000048 t core::ptr::drop_in_place<core::array::iter::IntoIter<(litchi_odraw::write::Property,core::option::Option<alloc::vec::Vec<u8>>),7_usize>>
+000000000008c090 000000000000006f t core::ptr::drop_in_place<core::iter::adapters::map::Map<alloc::vec::into_iter::IntoIter<ppt_profile_probe::RawTextbox>,ppt_profile_probe::verify_output::{{closure}}>>
+00000000000add50 0000000000000011 t core::ptr::drop_in_place<alloc::boxed::convert::<impl core::convert::From<alloc::string::String> for alloc::boxed::Box<dyn core::error::Error+core::marker::Sync+core::marker::Send>>::from::StringError>
+000000000013c7d0 0000000000000011 t core::ptr::drop_in_place<alloc::boxed::convert::<impl core::convert::From<alloc::string::String> for alloc::boxed::Box<dyn core::error::Error+core::marker::Sync+core::marker::Send>>::from::StringError>
+00000000000ab580 00000000000000c0 t core::ptr::drop_in_place<core::iter::adapters::zip::Zip<core::iter::adapters::zip::Zip<core::slice::iter::IterMut<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>,core::slice::iter::Iter<core::option::Option<litchi_cfb::file::DirectoryEntry>>>,alloc::vec::into_iter::IntoIter<core::option::Option<litchi_cfb::file::ValidatedDirectoryEntry>>>>
+000000000008c100 0000000000000011 t core::ptr::drop_in_place<alloc::string::String>
+000000000008c120 000000000000008d t core::ptr::drop_in_place<std::io::error::Error>
+000000000008c1b0 00000000000000b0 t core::ptr::drop_in_place<serde_json::error::Error>
+000000000008c260 0000000000000028 t core::ptr::drop_in_place<ppt_profile_probe::Config>
+000000000008c290 0000000000000128 t core::ptr::drop_in_place<ppt_profile_probe::Report>
+000000000008c3c0 00000000000000eb t core::ptr::drop_in_place<litchi_cfb::file::OleError>
+00000000000a92f0 00000000000000eb t core::ptr::drop_in_place<litchi_cfb::file::OleError>
+000000000008c4b0 000000000000003f t core::ptr::drop_in_place<ppt_profile_probe::Fixture>
+0000000000116a90 000000000000003d t core::ptr::drop_in_place<litchi_ograph::error::Error>
+00000000000fc3e0 000000000000009c t core::ptr::drop_in_place<litchi_ppt::font::model::Font>
+000000000008c4f0 0000000000000022 t core::ptr::drop_in_place<ppt_profile_probe::FixtureBox>
+00000000000f7d90 000000000000032f t core::ptr::drop_in_place<litchi_ppt::slide::types::Slide>
+000000000008c520 0000000000000298 t core::ptr::drop_in_place<litchi_ppt::slide::types::Slide>
+000000000008c7c0 0000000000000079 t core::ptr::drop_in_place<ppt_profile_probe::FixtureSlide>
+000000000008c840 00000000000001a0 t core::ptr::drop_in_place<ppt_profile_probe::SampleRecord>
+000000000008c9e0 000000000000004a t core::ptr::drop_in_place<ppt_profile_probe::Verification>
+00000000000a95c0 00000000000000c7 t core::ptr::drop_in_place<litchi_cfb::file::DirectoryEntry>
+000000000008ca30 00000000000000c7 t core::ptr::drop_in_place<litchi_cfb::file::DirectoryEntry>
+00000000000a9800 0000000000000028 t core::ptr::drop_in_place<litchi_cfb::file::EndChainScratch>
+00000000000dd680 00000000000000ec t core::ptr::drop_in_place<litchi_ppt::package::model::Error>
+00000000000e2c10 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::named_shows::NamedShow>
+000000000008cb00 000000000000006c t core::ptr::drop_in_place<litchi_ppt::writer::blip::Pictures>
+000000000008cb70 0000000000000131 t core::ptr::drop_in_place<ppt_profile_probe::OperationResult>
+000000000008ccb0 00000000000001a1 t core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>
+00000000000b8d80 0000000000000114 t core::ptr::drop_in_place<litchi_cfb::writer::core::OleWriter>
+00000000000fcce0 000000000000007c t core::ptr::drop_in_place<litchi_ppt::named_shows::NamedShows>
+00000000000de380 0000000000000103 t core::ptr::drop_in_place<litchi_ppt::records::record::Record>
+000000000008ce60 00000000000000d4 t core::ptr::drop_in_place<litchi_ppt::records::record::Record>
+00000000000f8e00 000000000000006d t core::ptr::drop_in_place<litchi_ppt::slide::notes::NotesIndex>
+00000000000f75b0 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::text_run::model::TextRun>
+00000000001190a0 0000000000000117 t core::ptr::drop_in_place<litchi_ppt::writer::notes::NotesPage>
+00000000000dd770 000000000000008a t core::ptr::drop_in_place<std::io::error::repr_bitpacked::Repr>
+00000000000c33e0 000000000000006f t core::ptr::drop_in_place<litchi_cfb::writer::layout::ReusePlan>
+00000000000c2070 0000000000000024 t core::ptr::drop_in_place<litchi_cfb::writer::layout::SectorPool>
+00000000000b8ae0 000000000000002f t core::ptr::drop_in_place<litchi_cfb::writer::core::StreamPayload>
+000000000008cf40 000000000000037f t core::ptr::drop_in_place<litchi_ppt::writer::core::model::Writer>
+00000000000b9260 000000000000010c t core::ptr::drop_in_place<litchi_cfb::writer::layout::SourceLayout>
+00000000000d10e0 0000000000000028 t core::ptr::drop_in_place<litchi_odraw::image::write::EntryBuilder>
+000000000010d110 000000000000007c t core::ptr::drop_in_place<litchi_odraw::image::write::StoreBuilder>
+000000000008d2c0 0000000000000016 t core::ptr::drop_in_place<litchi_ppt::font::model::FontCollections>
+000000000008d2e0 000000000000003c t core::ptr::drop_in_place<litchi_cfb::file::ValidatedDirectoryEntry>
+00000000000ebcb0 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::hyperlink::model::Interaction>
+000000000008d320 0000000000000124 t core::ptr::drop_in_place<litchi_ppt::parsers::parser::RecordParser>
+00000000000ee620 00000000000005e8 t core::ptr::drop_in_place<litchi_ppt::shapes::shape_enum::ShapeEnum>
+000000000008d450 00000000000005e8 t core::ptr::drop_in_place<litchi_ppt::shapes::shape_enum::ShapeEnum>
+00000000000f7cf0 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::text_prop::TextPropCollection>
+00000000000f77b0 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::text_run::model::ParagraphRun>
+0000000000112fc0 0000000000000039 t core::ptr::drop_in_place<litchi_ole_common::smart_tags::model::Type>
+0000000000103160 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::hyperlink::model::MacroNameAtom>
+00000000000de490 000000000000002a t core::ptr::drop_in_place<litchi_ppt::records::payload::RecordPayload>
+0000000000105370 00000000000000e4 t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WriteError>
+000000000008da40 00000000000000e4 t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WriteError>
+000000000008db30 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>
+00000000000ae500 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>
+00000000000e34f0 0000000000000024 t core::ptr::drop_in_place<litchi_ppt::persist::mapping::PersistMapping>
+000000000008dba0 00000000000000da t core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory>
+00000000000adaa0 000000000000002c t core::ptr::drop_in_place<litchi_cfb::directory_name::DirectoryNameData>
+000000000008dc80 00000000000000e1 t core::ptr::drop_in_place<litchi_ppt::presentation::model::Presentation>
+00000000000eb870 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::text_interaction::TextInteraction>
+000000000008dd70 00000000000000f8 t core::ptr::drop_in_place<ppt_profile_probe::allocation_metrics::Region>
+00000000000fbb00 0000000000000088 t core::ptr::drop_in_place<litchi_ppt::header_footer::model::HeaderFooter>
+0000000000118d00 0000000000000235 t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WritableShape>
+000000000008de70 000000000000015f t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WritableShape>
+000000000008dfd0 000000000000023f t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WritableSlide>
+00000000001189d0 0000000000000325 t core::ptr::drop_in_place<litchi_ppt::writer::core::model::WritableSlide>
+000000000008e210 000000000000029d t core::ptr::drop_in_place<litchi_cfb::writer::directory::DirectoryBuilder>
+00000000000efed0 0000000000000101 t core::ptr::drop_in_place<litchi_ppt::text_run::package::TextRunExtractor>
+00000000000dcec0 0000000000000024 t core::ptr::drop_in_place<std::collections::hash::set::HashSet<u16>>
+00000000000e2e10 0000000000000024 t core::ptr::drop_in_place<std::collections::hash::set::HashSet<u32>>
+00000000000e2cc0 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<u8>>>
+00000000000f8990 00000000000000fa t core::ptr::drop_in_place<litchi_ppt::animation::types::time::TimeBehavior>
+000000000008e4b0 00000000000002ce t core::ptr::drop_in_place<litchi_ppt::escher_textbox::EscherTextboxWrapper>
+000000000008e780 00000000000001bc t core::ptr::drop_in_place<litchi_ppt::writer::escher::model::UserShapeData>
+00000000000ae570 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<u32>>>
+00000000000ecdf0 0000000000000079 t core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectoryEntry>
+00000000000ea8e0 00000000000000dd t core::ptr::drop_in_place<litchi_ppt::text_interaction::TextBodyInteractions>
+0000000000119450 00000000000000a0 t core::ptr::drop_in_place<litchi_ppt::writer::hyperlink::HyperlinkCollection>
+000000000008e940 00000000000000a0 t core::ptr::drop_in_place<litchi_ppt::writer::hyperlink::HyperlinkCollection>
+000000000008e9e0 0000000000000028 t core::ptr::drop_in_place<litchi_ppt::writer::text_format::semantic::TextRun>
+000000000008ea10 000000000000004e t core::ptr::drop_in_place<alloc::boxed::Box<dyn core::error::Error>>
+00000000000c1b70 000000000000027c t core::ptr::drop_in_place<alloc::collections::btree::set::BTreeSet<u32>>
+000000000008ea60 00000000000000b4 t core::ptr::drop_in_place<litchi_ppt::animation::types::build::BuildListEntry>
+00000000000fc2d0 000000000000010d t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::font::model::Font>>
+000000000008eb20 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<ppt_profile_probe::RawTextbox>>
+00000000000b5c50 000000000000003c t core::ptr::drop_in_place<litchi_cfb::writer::directory::DirectoryEntryBuilder>
+00000000000f8380 00000000000003dc t core::ptr::drop_in_place<litchi_ppt::animation::types::time::ExtendedTimeNode>
+000000000008eb90 00000000000003ec t core::ptr::drop_in_place<litchi_ppt::animation::types::time::ExtendedTimeNode>
+00000000001052e0 000000000000008d t core::ptr::drop_in_place<litchi_ppt::writer::text_format::semantic::Paragraph>
+00000000000ee0e0 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::slide::types::Slide>>
+000000000008ef80 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::slide::types::Slide>>
+000000000008f030 0000000000000205 t core::ptr::drop_in_place<alloc::vec::Vec<ppt_profile_probe::FixtureSlide>>
+000000000008f240 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<ppt_profile_probe::SampleRecord>>
+0000000000112660 00000000000000dd t core::ptr::drop_in_place<litchi_ole_common::smart_tags::model::PropertyBagStore>
+000000000008f2f0 00000000000001ec t core::ptr::drop_in_place<litchi_ppt::animation::types::animation::AnimationInfo>
+00000000000f8a90 000000000000016f t core::ptr::drop_in_place<litchi_ppt::animation::types::animation::AnimationInfo>
+00000000000f8200 0000000000000069 t core::ptr::drop_in_place<litchi_ppt::slide_round_trip::SlideRoundTripMetadata12>
+000000000008f4e0 000000000000007d t core::ptr::drop_in_place<litchi_ppt::writer::core::package::FontPublicationPlan>
+00000000000ab6f0 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_cfb::file::DirectoryEntry>>
+000000000008f560 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_cfb::file::DirectoryEntry>>
+000000000008f610 000000000000007f t core::ptr::drop_in_place<core::iter::adapters::skip::Skip<std::env::ArgsOs>>
+00000000000f8cf0 0000000000000107 t core::ptr::drop_in_place<litchi_ppt::animation::types::effects::TimeNodeContainer>
+000000000008f690 0000000000000107 t core::ptr::drop_in_place<litchi_ppt::animation::types::effects::TimeNodeContainer>
+000000000008f7a0 000000000000009c t core::ptr::drop_in_place<litchi_ppt::writer::core::model::SerializedHeaderFooters>
+000000000012ab90 00000000000000f5 t core::ptr::drop_in_place<litchi_ppt::writer::text_format::codec::TextPropsBuilder>
+00000000000e3010 000000000000008b t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<u32,u32>>
+00000000000e2c40 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::named_shows::NamedShow>>
+00000000001127b0 0000000000000028 t core::ptr::drop_in_place<std::collections::hash::map::HashMap<&str,u32>>
+00000000000ddf10 00000000000000e2 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>>
+000000000008f840 00000000000000a3 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>>
+000000000008f8f0 000000000000007f t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_run::model::TextRun>>
+00000000000eecf0 000000000000007f t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_run::model::TextRun>>
+00000000000e30a0 000000000000004a t core::ptr::drop_in_place<litchi_ppt::embedded::object::model::containers::Definition>
+00000000000fef60 0000000000000012 t core::ptr::drop_in_place<core::result::Result<(),alloc::string::String>>
+00000000000f8170 000000000000008f t core::ptr::drop_in_place<litchi_ppt::animation::types::build::SlideAnimationExtension>
+000000000010b4d0 000000000000008b t core::ptr::drop_in_place<litchi_ppt::writer::sound_collection::SoundCollectionBuilder>
+000000000008f970 0000000000000076 t core::ptr::drop_in_place<alloc::boxed::Box<litchi_cfb::writer::layout::ReusePlan>>
+000000000008f9f0 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_metachar::TextMetachar>>
+00000000000ebce0 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_metachar::TextMetachar>>
+00000000000fcd60 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::hyperlink::model::Interaction>>
+00000000000ee570 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::shapes::shape_enum::ShapeEnum>>
+000000000008fa60 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::shapes::shape_enum::ShapeEnum>>
+00000000000f77e0 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_prop::TextPropCollection>>
+00000000000eed70 000000000000007f t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_run::model::ParagraphRun>>
+00000000000e2d30 000000000000007f t core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<alloc::vec::Vec<u8>>>
+000000000008fb10 0000000000000035 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::writer::notes::NotesPage>>
+0000000000119030 0000000000000069 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::chart::PositionedChart>>
+00000000001191c0 000000000000008c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::comments::SlideComment>>
+0000000000118f40 00000000000000f0 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::table::PositionedTable>>
+000000000008fb50 00000000000000f0 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::table::PositionedTable>>
+00000000000f8270 0000000000000107 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::slide::notes::SpeakerNotes>>
+000000000008fc40 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::custom_shows::CustomShow>>
+000000000008fcc0 000000000000011a t core::ptr::drop_in_place<core::option::Option<litchi_ppt::font::model::FontCollection>>
+00000000000b8f10 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_cfb::writer::core::WriteDirectoryEntry>>
+000000000008fde0 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_interaction::TextInteraction>>
+00000000000ea9c0 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_interaction::TextInteraction>>
+00000000001193a0 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::core::model::WritableSlide>>
+0000000000126800 0000000000000044 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::Interaction>>
+00000000000e1300 0000000000000069 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::client_data::model::ClientDataChild>>
+000000000008fe60 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::escher::model::UserShapeData>>
+00000000000ec280 0000000000000035 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::hyperlink::model::MacroNameAtom>>
+00000000000c8a50 0000000000000192 t core::ptr::drop_in_place<litchi_cfb::file::OleFile<litchi_cfb::writer::layout::PlanCursor>>
+0000000000112740 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ole_common::smart_tags::model::PropertyBag>>
+000000000010fb40 00000000000000a4 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::effects::BuildLevel>>
+00000000000e3520 00000000000001f2 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::slide::directory::SlideDirectoryEntry>>
+000000000008ff10 000000000000003f t core::ptr::drop_in_place<core::option::Option<litchi_ppt::animation::sound::AnimationSound>>
+000000000008ff50 0000000000000147 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_interaction::TextBodyInteractions>>
+00000000000ea3f0 0000000000000057 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_interaction::TextBodyInteractions>>
+00000000000900a0 0000000000000117 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::smart_tags::SmartTagDefinition>>
+00000000001105b0 000000000000007c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::text_format::semantic::TextRun>>
+00000000000901c0 0000000000000038 t core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>
+0000000000090200 0000000000000086 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::presentation::model::LazyPictures>>
+0000000000090290 000000000000003f t core::ptr::drop_in_place<core::option::Option<litchi_ppt::transition::types::TransitionInfo>>
+0000000000119250 000000000000003f t core::ptr::drop_in_place<core::option::Option<litchi_ppt::transition::types::TransitionInfo>>
+00000000000f8760 0000000000000173 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::build::BuildListEntry>>
+00000000000ece70 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::slide_atoms_set::SlideAtomsSet>>
+000000000010ffd0 00000000000000b3 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::animation::types::build::BuildInfo>>
+00000000000902d0 000000000000015d t core::ptr::drop_in_place<core::option::Option<litchi_ppt::animation::types::build::BuildList>>
+0000000000090430 0000000000000096 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::header_footer::model::HeaderFooter>>
+00000000000904d0 0000000000000041 t core::ptr::drop_in_place<std::sync::once_lock::OnceLock<alloc::sync::Arc<[u8]>>>
+0000000000090520 00000000000000b1 t core::ptr::drop_in_place<alloc::collections::btree::map::BTreeMap<alloc::string::String,u64>>
+00000000001104b0 00000000000000f5 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::text_format::semantic::Paragraph>>
+00000000001188f0 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<alloc::vec::Vec<u8>>>>
+000000000010f8b0 000000000000006c t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::writer::smart_tags::ShapeTextExtensionRun>>
+00000000000905e0 0000000000000035 t core::ptr::drop_in_place<core::option::Option<litchi_ppt::shapes::autoshape::AutoShapeGeometry>>
+00000000000b75a0 00000000000000ea t core::ptr::drop_in_place<std::collections::hash::map::HashMap<u32,alloc::vec::Vec<u32>>>
+00000000000eedf0 000000000000006b t core::ptr::drop_in_place<core::option::Option<litchi_ppt::text_extensions::TextStyleExtension11>>
+00000000000f80c0 00000000000000a6 t core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::animation::types::animation::ShapeAnimation>>
+00000000000dd840 0000000000000297 t core::str::<impl str>::trim_matches
+0000000000116be0 0000000000000186 t core::hash::BuildHasher::hash_one
+00000000000b42f0 0000000000000172 t core::hash::BuildHasher::hash_one
+00000000000da5d0 0000000000000172 t core::hash::BuildHasher::hash_one
+00000000000dcd40 0000000000000173 t core::hash::BuildHasher::hash_one
+00000000000b6110 00000000000001db t core::hash::BuildHasher::hash_one
+00000000001127e0 00000000000001dc t core::hash::BuildHasher::hash_one
+00000000000b5f30 00000000000001db t core::hash::BuildHasher::hash_one
+0000000000090620 00000000000000d5 t core::iter::traits::iterator::Iterator::nth
+0000000000090700 000000000000014f t core::iter::traits::iterator::Iterator::try_fold
+00000000000effe0 000000000000031d t core::iter::adapters::try_process
+0000000000090850 000000000000000d t core::error::Error::description
+0000000000090860 000000000000000d t core::error::Error::description
+0000000000116a30 0000000000000060 t core::error::Error::cause
+0000000000090870 0000000000000029 t core::error::Error::cause
+0000000000116b00 0000000000000029 t core::error::Error::cause
+00000000000908a0 0000000000000003 t core::error::Error::cause
+00000000000908b0 000000000000004a t core::error::Error::cause
+0000000000090900 0000000000000035 t core::error::Error::cause
+0000000000090940 0000000000000033 t core::error::Error::cause
+0000000000090980 0000000000000060 t core::error::Error::cause
+00000000000909e0 0000000000000003 t core::error::Error::cause
+0000000000116b90 0000000000000033 t core::error::Error::cause
+0000000000116b40 0000000000000001 t core::error::Error::provide
+00000000000909f0 0000000000000001 t core::error::Error::provide
+0000000000116b30 000000000000000e t core::error::Error::type_id
+0000000000116a20 000000000000000e t core::error::Error::type_id
+0000000000090a00 000000000000000e t core::error::Error::type_id
+0000000000090a10 000000000000000e t core::error::Error::type_id
+0000000000090a20 000000000000000e t core::error::Error::type_id
+0000000000090a30 000000000000000e t core::error::Error::type_id
+0000000000090a40 000000000000000e t core::error::Error::type_id
+0000000000116bd0 000000000000000e t core::error::Error::type_id
+000000000013c7f0 000000000000000e t core::error::Error::type_id
+0000000000090a50 000000000000000e t core::error::Error::type_id
+0000000000090a60 000000000000000e t core::error::Error::type_id
+0000000000090a70 0000000000000016 t core::slice::<impl [T]>::sort_unstable_by
+0000000000090a90 0000000000000016 t core::slice::<impl [T]>::sort_unstable_by
+000000000012c250 00000000000000bc t core::slice::sort::shared::pivot::median3_rec
+00000000000c6570 00000000000000a9 t core::slice::sort::shared::pivot::median3_rec
+00000000000d96f0 0000000000000203 t core::slice::sort::shared::pivot::median3_rec
+00000000000d44e0 0000000000000203 t core::slice::sort::shared::pivot::median3_rec
+00000000000d3bf0 00000000000003d5 t core::slice::sort::shared::smallsort::sort4_stable
+00000000000d3fd0 00000000000002b6 t core::slice::sort::shared::smallsort::bidirectional_merge
+0000000000125920 00000000000000d1 t core::slice::sort::shared::smallsort::insertion_sort_shift_left
+0000000000090ab0 00000000000001af t core::slice::sort::shared::smallsort::insertion_sort_shift_left
+0000000000090c60 00000000000001b5 t core::slice::sort::shared::smallsort::insertion_sort_shift_left
+0000000000125800 000000000000011f t core::slice::sort::stable::driftsort_main
+000000000012b040 0000000000000675 t core::slice::sort::stable::drift::sort
+000000000012b6c0 0000000000000b90 t core::slice::sort::stable::quicksort::quicksort
+00000000000d29e0 0000000000000315 t core::slice::sort::unstable::ipnsort
+00000000000c2920 0000000000000153 t core::slice::sort::unstable::ipnsort
+00000000000d46f0 0000000000000316 t core::slice::sort::unstable::ipnsort
+00000000000d94e0 0000000000000205 t core::slice::sort::unstable::heapsort::heapsort
+00000000000d4290 0000000000000249 t core::slice::sort::unstable::heapsort::heapsort
+00000000000c64d0 0000000000000098 t core::slice::sort::unstable::heapsort::heapsort
+00000000000c5af0 00000000000009d7 t core::slice::sort::unstable::quicksort::quicksort
+00000000000d4a10 0000000000004ace t core::slice::sort::unstable::quicksort::quicksort
+00000000000d2d00 0000000000000ee9 t core::slice::sort::unstable::quicksort::quicksort
+0000000000042526 00000000000000c8 r itoa::DECIMAL_PAIRS
+0000000000139a80 000000000000283a t sha2::sha256::compress256
+0000000000171310 0000000000000001 d sha2::sha256::shani_cpuid::STORAGE
+000000000013c2c0 0000000000000056 t sha2::sha256::shani_cpuid::init_get::init_inner
+000000000013c320 00000000000003b3 t sha2::sha256::x86_sha::compress
+00000000000c1390 000000000000018c t alloc::collections::btree::map::BTreeMap<K,V,A>::get
+00000000000c1000 000000000000017c t alloc::collections::btree::map::BTreeMap<K,V,A>::get
+00000000000ba040 0000000000000c9b t alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+0000000000090e20 0000000000000cdb t alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+00000000000c3ad0 0000000000000700 t alloc::collections::btree::map::BTreeMap<K,V,A>::insert
+00000000000c48b0 0000000000000235 t alloc::collections::btree::map::BTreeMap<K,V,A>::remove
+000000000010b170 0000000000000355 t alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+0000000000091b00 0000000000000345 t alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+00000000000e30f0 00000000000002fd t alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+00000000000c5370 000000000000021b t alloc::collections::btree::node::BalancingContext<K,V>::bulk_steal_left
+00000000000c58b0 0000000000000233 t alloc::collections::btree::node::BalancingContext<K,V>::bulk_steal_right
+00000000000c5590 0000000000000318 t alloc::collections::btree::node::BalancingContext<K,V>::merge_tracking_child_edge
+00000000000c4d90 00000000000005de t alloc::collections::btree::remove::<impl alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::KV>>::remove_leaf_kv
+00000000000ec640 00000000000001ed t alloc::str::join_generic_copy
+0000000000091e50 0000000000000282 t alloc::str::join_generic_copy
+00000000000dfb70 000000000000006a t alloc::vec::Vec<T,A>::append_elements
+00000000000ae110 0000000000000051 t alloc::vec::Vec<T,A>::append_elements
+00000000000920e0 000000000000006a t alloc::vec::Vec<T,A>::append_elements
+00000000000c3260 000000000000011c t alloc::vec::Vec<T,A>::resize
+00000000000c1e50 000000000000011f t alloc::vec::Vec<T,A>::resize
+00000000000c41d0 000000000000005c t alloc::vec::Vec<T,A>::push_mut
+00000000000b5b90 0000000000000055 t alloc::vec::Vec<T,A>::push_mut
+00000000000e7a40 000000000000007d t alloc::vec::Vec<T,A>::push_mut
+00000000000f7860 0000000000000056 t alloc::vec::Vec<T,A>::push_mut
+00000000000a9490 000000000000012b t alloc::sync::Arc<T,A>::drop_slow
+00000000000dd560 000000000000011e t alloc::sync::Arc<T,A>::drop_slow
+00000000000d0450 000000000000001e t alloc::sync::Arc<T,A>::drop_slow
+000000000013c6e0 000000000000002e t alloc::sync::Arc<T,A>::drop_slow
+00000000000a93e0 0000000000000080 t alloc::sync::Arc<T,A>::drop_slow
+00000000000b8cb0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000119290 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000ecd80 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000e0f20 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000118960 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000b8ea0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000dd4f0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000f7d20 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000105270 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000092150 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000a8800 0000000000000057 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000921c0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000f75e0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000092230 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000d2980 000000000000005d t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000c4bc0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000922a0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000ebc40 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000dd410 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000b5c90 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000d2920 000000000000005d t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000fcc70 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000dd480 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000aa820 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000f7c80 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000f7740 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000d0ac0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000a8980 0000000000000057 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000dfe00 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000dfaa0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000d1600 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000ae5e0 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+0000000000125790 0000000000000063 t alloc::raw_vec::RawVec<T,A>::grow_one
+00000000000a91b0 000000000000013c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000ddae0 000000000000013c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000a8860 0000000000000087 t alloc::raw_vec::RawVecInner<A>::finish_grow
+0000000000092310 000000000000013c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000a7960 0000000000000078 t alloc::raw_vec::RawVecInner<A>::finish_grow
+0000000000139a10 000000000000006c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000d0470 000000000000013c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000d0010 000000000000006c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000d2850 00000000000000c3 t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000da080 000000000000013c t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000a88f0 0000000000000082 t alloc::raw_vec::RawVecInner<A>::finish_grow
+00000000000b5b10 0000000000000079 t alloc::raw_vec::RawVecInner<A>::try_reserve
+00000000000e0e60 0000000000000081 t alloc::raw_vec::RawVecInner<A>::try_reserve
+00000000000dfbe0 0000000000000071 t alloc::raw_vec::RawVecInner<A>::try_allocate_in
+0000000000092450 000000000000008c t alloc::raw_vec::RawVecInner<A>::try_allocate_in
+00000000000addb0 000000000000006b t alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+00000000000924e0 000000000000007e t alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+00000000001399a0 000000000000006d t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000ddc20 000000000000008b t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000a9130 000000000000007d t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000cffa0 0000000000000065 t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000da1c0 000000000000007d t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000d06c0 0000000000000079 t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+0000000000092560 000000000000007d t alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+00000000000d0080 00000000000000b2 t <litchi_codepage::Error as core::fmt::Display>::fmt
+0000000000139390 0000000000000136 t <serde_json::error::Error as core::fmt::Debug>::fmt
+00000000000925e0 000000000000079f t <litchi_biff::error::Error as core::fmt::Debug>::fmt
+0000000000106950 00000000000005f6 t <litchi_biff::error::Error as core::fmt::Debug>::fmt
+0000000000092d80 0000000000000068 t <A as core::slice::cmp::SlicePartialEq<B>>::equal_same_length
+0000000000092df0 00000000000009c0 t <litchi_cfb::file::OleError as core::fmt::Debug>::fmt
+00000000000937b0 0000000000000b09 t <litchi_odraw::error::Error as core::fmt::Debug>::fmt
+0000000000139540 0000000000000035 t <serde_json::error::Error as core::error::Error>::source
+00000000001394d0 0000000000000063 t <serde_json::error::Error as core::fmt::Display>::fmt
+00000000000a8c30 00000000000002e7 t <litchi_biff::error::Error as core::fmt::Display>::fmt
+00000000000942c0 0000000000001330 t <litchi_ograph::error::Error as core::fmt::Debug>::fmt
+0000000000105460 0000000000001330 t <litchi_ograph::error::Error as core::fmt::Debug>::fmt
+0000000000106f80 000000000000002d t <litchi_biff::error::Resource as core::fmt::Debug>::fmt
+00000000000955f0 0000000000000033 t <litchi_cfb::file::OleError as core::error::Error>::source
+0000000000116b50 0000000000000033 t <litchi_cfb::file::OleError as core::error::Error>::source
+00000000000ae200 00000000000002f7 t <litchi_cfb::file::OleError as core::fmt::Display>::fmt
+00000000000d1110 00000000000004e5 t <litchi_odraw::error::Error as core::fmt::Display>::fmt
+0000000000095630 00000000000000d2 t <smallvec::CollectionAllocErr as core::fmt::Debug>::fmt
+0000000000095710 0000000000000029 t <litchi_ograph::error::Error as core::error::Error>::source
+0000000000116ad0 0000000000000029 t <litchi_ograph::error::Error as core::error::Error>::source
+00000000000d9900 00000000000005a0 t <litchi_ograph::error::Error as core::fmt::Display>::fmt
+00000000000ac0a0 00000000000002ae t <smallvec::SmallVec<A> as core::clone::Clone>::clone
+0000000000095740 00000000000002ae t <smallvec::SmallVec<A> as core::clone::Clone>::clone
+00000000000959f0 0000000000000010 t <alloc::boxed::Box<T,A> as core::fmt::Debug>::fmt
+00000000000c2730 0000000000000078 t <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+00000000000c2fd0 000000000000006b t <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+00000000000fb550 0000000000000139 t <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+000000000010fbf0 00000000000003d4 t <alloc::vec::Vec<T,A> as core::clone::Clone>::clone
+00000000000dfe70 0000000000000e9f t <litchi_ppt::consts::RecordType as core::fmt::Debug>::fmt
+0000000000139580 0000000000000273 t <serde_json::error::ErrorCode as core::fmt::Display>::fmt
+0000000000095a00 000000000000045e t <litchi_odraw::record::RecordKind as core::fmt::Debug>::fmt
+0000000000095e60 0000000000000660 t <litchi_ppt::package::model::Error as core::fmt::Debug>::fmt
+0000000000116350 0000000000000668 t <litchi_ppt::package::model::Error as core::fmt::Debug>::fmt
+00000000000b5220 00000000000001d7 t <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+00000000000da3f0 00000000000001d7 t <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+00000000000964c0 000000000000034b t <litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone
+00000000000ab230 000000000000034b t <litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone
+0000000000096810 00000000000000d2 t <litchi_core::source::SourceVersion as core::fmt::Debug>::fmt
+00000000000c6ab0 00000000000007b6 t <litchi_cfb::writer::layout::PlanCursor as std::io::Read>::read
+00000000000c68c0 0000000000000106 t <litchi_cfb::writer::layout::PlanCursor as std::io::Seek>::seek
+00000000000968f0 0000000000000060 t <litchi_ppt::package::model::Error as core::error::Error>::source
+00000000001169c0 0000000000000060 t <litchi_ppt::package::model::Error as core::error::Error>::source
+00000000000fb280 00000000000002d0 t <litchi_ppt::package::model::Error as core::fmt::Display>::fmt
+000000000010f990 00000000000001af t <litchi_ppt::animation::sound::SoundType as core::clone::Clone>::clone
+0000000000096950 000000000000011a t <serde_json::ser::PrettyFormatter as serde_json::ser::Formatter>::end_object
+00000000000fb690 0000000000000177 t <litchi_ppt::hyperlink::model::Interaction as core::clone::Clone>::clone
+0000000000096a70 00000000000003b6 t <litchi_ppt::writer::core::model::WriteError as core::fmt::Debug>::fmt
+0000000000096e30 000000000000004a t <litchi_ppt::writer::core::model::WriteError as core::error::Error>::source
+000000000012ac90 0000000000000107 t <litchi_ppt::writer::core::model::WriteError as core::fmt::Display>::fmt
+00000000000ad9d0 00000000000000c3 t <litchi_cfb::directory_name::DirectoryNameError as core::fmt::Display>::fmt
+00000000000ddcb0 0000000000000258 t <T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec
+00000000000e1c90 000000000000002c t <litchi_ppt::client_data::model::ClientDataChildKind as core::fmt::Debug>::fmt
+00000000000adad0 0000000000000072 t <litchi_cfb::file::DirectoryNodeColor as core::convert::TryFrom<u8>>::try_from
+0000000000096e80 000000000000008b t smallvec::SmallVec<A>::reserve_one_unchecked
+00000000000ac500 000000000000008b t smallvec::SmallVec<A>::reserve_one_unchecked
+0000000000096f10 00000000000001ad t smallvec::SmallVec<A>::try_grow
+00000000000ac350 00000000000001ad t smallvec::SmallVec<A>::try_grow
+0000000000110090 0000000000000415 t <litchi_ppt::writer::text_format::semantic::Paragraph as core::clone::Clone>::clone
+00000000000970c0 000000000000024b t <serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field
+0000000000097310 0000000000000221 t <serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field
+0000000000097540 0000000000000221 t <serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field
+0000000000097770 0000000000000221 t <serde_json::ser::Compound<W,F> as serde_core::ser::SerializeStruct>::serialize_field
+00000000000979a0 00000000000000cd t <std::io::cursor::Cursor<alloc::vec::Vec<u8,A>> as std::io::Write>::write_all
+0000000000105240 000000000000002c t <litchi_ppt::animation::types::animation::LegacyAnimationEffect as core::fmt::Debug>::fmt
+00000000000e7980 00000000000000ba t hashbrown::map::HashMap<K,V,S,A>::contains_key
+00000000000c1820 00000000000001fd t hashbrown::map::HashMap<K,V,S,A>::get
+00000000000b5d00 0000000000000226 t hashbrown::map::HashMap<K,V,S,A>::get
+0000000000097a70 000000000000039a t hashbrown::map::HashMap<K,V,S,A>::get
+00000000000e8370 00000000000000c2 t hashbrown::map::HashMap<K,V,S,A>::get
+00000000000b6d40 0000000000000393 t hashbrown::map::HashMap<K,V,S,A>::insert
+00000000000b70e0 00000000000001e6 t hashbrown::map::HashMap<K,V,S,A>::insert
+00000000000e7ac0 0000000000000178 t hashbrown::map::HashMap<K,V,S,A>::insert
+00000000000ecee0 000000000000017b t hashbrown::map::HashMap<K,V,S,A>::insert
+00000000000b5a40 00000000000000c2 t hashbrown::map::HashMap<K,V,S,A>::get_mut
+00000000000b72d0 000000000000016a t hashbrown::raw::RawTableInner::fallible_with_capacity
+00000000000e2e40 00000000000001c1 t hashbrown::raw::RawTableInner::fallible_with_capacity
+00000000000da240 00000000000001a2 t hashbrown::raw::RawTableInner::fallible_with_capacity
+00000000000da750 00000000000004ab t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000000dcf50 00000000000004bd t hashbrown::raw::RawTable<T,A>::reserve_rehash
+0000000000116d70 0000000000000514 t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000001129c0 0000000000000599 t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000000b6820 000000000000051c t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000000e7090 00000000000004e2 t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000000ed060 00000000000004b3 t hashbrown::raw::RawTable<T,A>::reserve_rehash
+00000000000b62f0 000000000000052c t hashbrown::raw::RawTable<T,A>::reserve_rehash
+0000000000047790 r __FRAME_END__
+0000000000171300 d __TMC_END__
+0000000000171300 d __TMC_LIST__
+00000000000002fc 0000000000000020 r __abi_tag
+000000000005ba50 t __do_global_dtors_aux
+000000000016bbf0 d __do_global_dtors_aux_fini_array_entry
+0000000000171300 d __dso_handle
+000000000016bc00 d __frame_dummy_init_array_entry
+0000000000044c80 0000000000000022 r __rustc_debug_gdb_scripts_section__
+000000000016aad0 00000000000000be t __udivti3
+000000000016a7e0 00000000000000c5 t __umodti3
+000000000016abac t _fini
+000000000016ab90 t _init
+000000000005b9b0 0000000000000026 T _start
+0000000000171cb0 0000000000000001 b completed.0
+000000000005b9e0 t deregister_tm_clones
+000000000016a5b0 000000000000000d t fmod
+000000000005ba90 t frame_dummy
+0000000000097e10 0000000000000911 T main
+000000000005ba10 t register_tm_clones
+000000000016a530 0000000000000071 t round
+000000000013c800 000000000000059e T rust_eh_personality

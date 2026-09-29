@@ -1,0 +1,934 @@
+{
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "after-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-test-all"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-test-default"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "arithmetic-crosscheck"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-check"
+    },
+    {
+      "exit_code": 101,
+      "label": "before-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-fmt"
+    },
+    {
+      "exit_code": 101,
+      "label": "before-v2-probe-test-all"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-test-default"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-test-all"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v3-probe-test-default"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "compression-current-features"
+    },
+    {
+      "exit_code": 0,
+      "label": "compression-profile-features"
+    },
+    {
+      "exit_code": 0,
+      "label": "interval-crosscheck"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-reader-parity"
+    },
+    {
+      "exit_code": 1,
+      "label": "paired-analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "paired-analysis-v3"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-root-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-many-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-many-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-many-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-many-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-payload-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-payload-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-payload-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-payload-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-rich-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-rich-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-rich-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-rich-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-tiny-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-tiny-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-tiny-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-tiny-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-unicode-lifecycle-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-unicode-lifecycle-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-unicode-write-leg-a"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-unicode-write-leg-b"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-replay-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-preflight"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests-final"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-code-00"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-code-01"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-code-02"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-demangled"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-elf"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-after-raw"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-code-00"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-code-01"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-code-02"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-demangled"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-elf"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-before-raw"
+    }
+  ],
+  "decision": "diagnostic-only-restore-production",
+  "production_changes": 0,
+  "regression_flags": 0,
+  "reports": 156,
+  "samples": 3636,
+  "spread_flags": 0,
+  "status": "pass",
+  "tests": {
+    "after-probe-test-all": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 36
+    },
+    "after-probe-test-default": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 31
+    },
+    "after-test": {
+      "failed": 0,
+      "ignored": 11,
+      "passed": 1287
+    },
+    "before-test": {
+      "failed": 0,
+      "ignored": 11,
+      "passed": 1284
+    },
+    "before-v2-probe-test-all": {
+      "failed": 7,
+      "ignored": 0,
+      "passed": 29
+    },
+    "before-v2-probe-test-default": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 31
+    },
+    "before-v3-probe-test-all": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 36
+    },
+    "before-v3-probe-test-default": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 31
+    }
+  },
+  "workload_runs_replaced": 0
+}
