@@ -1,0 +1,42 @@
+{
+  "binaries": [
+    {
+      "bytes": 68877920,
+      "path": "/home/zhuhe/code/litchi-target-0834/retained/diagnostic/litchi-perf-baseline",
+      "sha256": "9106a3fdd26800c59ac7cbb88ffde7b7940c1d9ffc7263239d54a8b476d30a93"
+    },
+    {
+      "bytes": 69117752,
+      "path": "/home/zhuhe/code/litchi-target-0834/retained/repaired-v2/litchi-perf-baseline",
+      "sha256": "8c3ebf6eb6ec37a720d2da737207d1a77136a63954fbb18a8e6d491dbef00fa8"
+    },
+    {
+      "bytes": 69112496,
+      "path": "/home/zhuhe/code/litchi-target-0834/retained/repaired-v3/litchi-perf-baseline",
+      "sha256": "79cd220bdb5d569f0a7676ffa724d215b8e09763e6ed86df6e77e5c4c14af0d2"
+    }
+  ],
+  "roots": [
+    {
+      "files": 6657,
+      "logical_bytes": 3203973570,
+      "marker": {
+        "bytes": 128,
+        "path": "/home/zhuhe/code/litchi-target-0834/.owner-0834.json",
+        "sha256": "bce9a05fc957df2575efe05b10f71d82c0c1c51cccb725d83063c510c588a2c2"
+      },
+      "path": "/home/zhuhe/code/litchi-target-0834"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "marker": {
+        "bytes": 124,
+        "path": "/home/zhuhe/code/litchi-fs-0834/.owner-0834.json",
+        "sha256": "598a509b7ad6b0a4519d8f4dcf7d10a57a5006827b4e571d4258cd11bded434f"
+      },
+      "path": "/home/zhuhe/code/litchi-fs-0834"
+    }
+  ],
+  "started_unix": 1790648836.196475
+}

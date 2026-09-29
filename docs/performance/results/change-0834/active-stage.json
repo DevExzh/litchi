@@ -1,0 +1,26 @@
+{
+  "stage": "repaired-v2",
+  "previous_stage": "repaired",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/driver_v2.py",
+    "bytes": 7335,
+    "sha256": "8e81ebdd9f6493ed2f1306b93dda20b2c90ec47b228196fac81a8d79e99fca6b"
+  },
+  "source_change": {
+    "path": "tools/perf-baseline/src/filesystem/aligned_zip.rs",
+    "before": "aligned.len() % page_size != 0",
+    "after": "!aligned.len().is_multiple_of(page_size)",
+    "kind": "equivalent divisibility predicate; page size already rejected when zero"
+  },
+  "full_suite": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-test/receipt.json",
+    "bytes": 815,
+    "sha256": "d5e505a3b2f26013c6bf24c6d343b0c7bbd1d3abe18ec2f0d9b7a26a0888b61b"
+  },
+  "failed_clippy": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-clippy/receipt.json",
+    "bytes": 775,
+    "sha256": "07a9b8121aa745576a2de1b4d9895e65c1697477f6bf19848e542a4d74fee27c"
+  },
+  "formal_capture": "deferred until final repaired qualification is admitted"
+}

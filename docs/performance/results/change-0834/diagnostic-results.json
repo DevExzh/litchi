@@ -1,0 +1,31 @@
+{
+  "performance_claim": "none",
+  "rows": [
+    {
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1030,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/diagnostic-pptx-warm/receipt.json",
+        "sha256": "9e6e78086df0a5bc7a2315aa07a5ba606e99013b8649511e35066769b019b9ba"
+      },
+      "report": {
+        "bytes": 34739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/diagnostic-pptx-warm.json",
+        "sha256": "066e58c1c26e4414430344f42baa1e20289a4eddecec0e9e140c2a2831dd345e"
+      },
+      "state": "warm"
+    },
+    {
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "exit_code": 1,
+      "receipt": {
+        "bytes": 1061,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/diagnostic-pptx-cold-verified/receipt.json",
+        "sha256": "e0cef7df9eeaf512a92c27781bb20a30d1a5a075438a9db25a13c53b2a3126f0"
+      },
+      "report": null,
+      "state": "cold-verified"
+    }
+  ]
+}

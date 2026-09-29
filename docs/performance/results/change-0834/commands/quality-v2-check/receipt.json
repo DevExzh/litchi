@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--all-features",
+    "--all-targets"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790646963.5205176,
+  "freeze": {
+    "bytes": 1206213,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired-v2.json",
+    "sha256": "fdcb2b1b59b9e01dbc7b87b69fed032792c6be7a9f915ac1272a6b0c58031812"
+  },
+  "log": {
+    "bytes": 148,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/quality-v2-check/output.log",
+    "sha256": "095383219de1cd2700788db6d6586f0c29dbacfa355d245ba705c83f34f1b67c"
+  },
+  "started_unix": 1790646952.2073035
+}

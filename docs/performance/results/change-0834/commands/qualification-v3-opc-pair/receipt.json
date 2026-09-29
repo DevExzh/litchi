@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0834/retained/repaired-v3/litchi-perf-baseline",
+    "--case",
+    "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--filesystem-cache",
+    "warm,cold-verified",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0834",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-opc-pair.json"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790648579.8119674,
+  "freeze": {
+    "bytes": 1206213,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired-v3.json",
+    "sha256": "0b71333af09b74e254c1648fc4af79b6b4f51cbaf54111e6695e3b71fbd68b80"
+  },
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-opc-pair/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790648572.406462
+}

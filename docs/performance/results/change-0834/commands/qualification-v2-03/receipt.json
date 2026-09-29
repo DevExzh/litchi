@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0834/retained/repaired-v2/litchi-perf-baseline",
+    "--case",
+    "opc_file_source_one_part_atomic_save",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--filesystem-cache",
+    "warm,cold-verified",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0834",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2-03.json"
+  ],
+  "error": null,
+  "exit_code": 1,
+  "finished_unix": 1790647424.1309927,
+  "freeze": {
+    "bytes": 1206213,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-repaired-v2.json",
+    "sha256": "fdcb2b1b59b9e01dbc7b87b69fed032792c6be7a9f915ac1272a6b0c58031812"
+  },
+  "log": {
+    "bytes": 83,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v2-03/output.log",
+    "sha256": "492c12ef8beed964e3370457c9398015c1522aad21b08bf33d149e02d0f6eb75"
+  },
+  "started_unix": 1790647422.9108696
+}

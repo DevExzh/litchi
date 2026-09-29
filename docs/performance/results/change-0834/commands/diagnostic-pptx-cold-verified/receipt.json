@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0834/retained/diagnostic/litchi-perf-baseline",
+    "--case",
+    "pptx_file_source_open_selected_slide_lifecycle",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--filesystem-cache",
+    "cold-verified",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0834",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0834/diagnostic-pptx-cold-verified.json"
+  ],
+  "error": null,
+  "exit_code": 1,
+  "finished_unix": 1790644722.6572132,
+  "freeze": {
+    "bytes": 1206083,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/freeze-diagnostic.json",
+    "sha256": "e7358151d5a8aecb25c5a76422864037b834afecf3637a0e8ac17b6a8da6a09d"
+  },
+  "log": {
+    "bytes": 92656,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/diagnostic-pptx-cold-verified/output.log",
+    "sha256": "851574d97696326dcb3fa7a80646ded7a37cbf4bbc2a4d9393cffb2a0add5568"
+  },
+  "started_unix": 1790644721.1125069
+}

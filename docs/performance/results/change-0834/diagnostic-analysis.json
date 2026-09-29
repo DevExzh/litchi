@@ -1,0 +1,53 @@
+{
+  "child_mode": "verified-prime",
+  "claim": "Failed untimed replay only; no timed cold performance claim.",
+  "log_sha256": "851574d97696326dcb3fa7a80646ded7a37cbf4bbc2a4d9393cffb2a0add5568",
+  "open_read_count": 881,
+  "phases": {
+    "all": {
+      "media_payload_read_bytes": 0,
+      "media_payload_read_calls": 0,
+      "read_bytes": 169707,
+      "read_calls": 883,
+      "selected_slide_payload_read_bytes": 522,
+      "selected_slide_payload_read_calls": 1,
+      "slide_payload_read_bytes": 16752,
+      "slide_payload_read_calls": 2,
+      "unselected_slide_payload_read_bytes": 16230,
+      "unselected_slide_payload_read_calls": 1
+    },
+    "open": {
+      "media_payload_read_bytes": 0,
+      "media_payload_read_calls": 0,
+      "read_bytes": 169092,
+      "read_calls": 881,
+      "selected_slide_payload_read_bytes": 0,
+      "selected_slide_payload_read_calls": 0,
+      "slide_payload_read_bytes": 16230,
+      "slide_payload_read_calls": 1,
+      "unselected_slide_payload_read_bytes": 16230,
+      "unselected_slide_payload_read_calls": 1
+    },
+    "query": {
+      "media_payload_read_bytes": 0,
+      "media_payload_read_calls": 0,
+      "read_bytes": 615,
+      "read_calls": 2,
+      "selected_slide_payload_read_bytes": 522,
+      "selected_slide_payload_read_calls": 1,
+      "slide_payload_read_bytes": 522,
+      "slide_payload_read_calls": 1,
+      "unselected_slide_payload_read_bytes": 0,
+      "unselected_slide_payload_read_calls": 0
+    }
+  },
+  "source_bytes": 17018880,
+  "source_sha256": "6987d620c99cde600b659a88da80ebb16f98bbc2b90633fb113e2a056c13377c",
+  "status": "pass",
+  "tail": {
+    "offset": 16953344,
+    "requested_length": 65536,
+    "returned_length": 65536
+  },
+  "tail_read_index": 1
+}

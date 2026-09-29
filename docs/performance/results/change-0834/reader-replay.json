@@ -1,0 +1,155 @@
+{
+  "diagnostic_warm_sha256": "066e58c1c26e4414430344f42baa1e20289a4eddecec0e9e140c2a2831dd345e",
+  "failed_v2": {
+    "claim_authorized": false,
+    "failed_rows": [
+      {
+        "case": "opc_file_eager_one_part_atomic_save",
+        "diagnostic": "Error: ProofError(\"cold ZIP proof does not accept data-descriptor member framing\")",
+        "diagnostic_sha256": "492c12ef8beed964e3370457c9398015c1522aad21b08bf33d149e02d0f6eb75",
+        "exit_code": 1,
+        "index": 2
+      },
+      {
+        "case": "opc_file_source_one_part_atomic_save",
+        "diagnostic": "Error: ProofError(\"cold ZIP proof does not accept data-descriptor member framing\")",
+        "diagnostic_sha256": "492c12ef8beed964e3370457c9398015c1522aad21b08bf33d149e02d0f6eb75",
+        "exit_code": 1,
+        "index": 3
+      },
+      {
+        "case": "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+        "diagnostic": "Error: ProofError(\"cold ZIP proof does not accept data-descriptor member framing\")",
+        "diagnostic_sha256": "492c12ef8beed964e3370457c9398015c1522aad21b08bf33d149e02d0f6eb75",
+        "exit_code": 1,
+        "index": 6
+      }
+    ],
+    "performance_claim": "none",
+    "qualification_valid": false,
+    "reports": [
+      {
+        "case": "opc_file_eager_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2-00.json",
+        "report_sha256": "326611a1d6125364f21e658815b9c4e8f378811fdfbde046ba16feaa99df3d22"
+      },
+      {
+        "case": "opc_file_source_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2-01.json",
+        "report_sha256": "735e91aa886b1e0d164595938af07a365b1d2e190912f6335ae3b0f5281a3405"
+      },
+      {
+        "case": "pptx_file_eager_open_selected_slide_lifecycle",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2-04.json",
+        "report_sha256": "04d0857f73d578eaf92fa0c6ab164c18c4fce3eb1bc8de532d21d6ecf59a54b5"
+      },
+      {
+        "case": "pptx_file_source_open_selected_slide_lifecycle",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v2-05.json",
+        "report_sha256": "1bc8000277c441b9018c20e2a94bd8f2994f0a2efff8487abf57cf58bbe1151a"
+      }
+    ],
+    "status": "failed",
+    "validated_sample_count": 8
+  },
+  "final_v3": {
+    "claim_authorized": false,
+    "failed_rows": [],
+    "performance_claim": "none",
+    "qualification_valid": true,
+    "reports": [
+      {
+        "case": "opc_file_eager_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-00.json",
+        "report_sha256": "7e331c1b77b7e544942ff2edd17cc5137b3df9afd2bfe40202223b2edbb37ea3"
+      },
+      {
+        "case": "opc_file_source_open",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-01.json",
+        "report_sha256": "05bc913c1d3c61a43fb9c0bfdb5ab440cd532a63d63e0ec64d201bf25524f153"
+      },
+      {
+        "case": "opc_file_eager_one_part_atomic_save",
+        "outputs": {
+          "cold-verified": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-02.json",
+        "report_sha256": "c338b4b3d95ca80d1c89d35f817648fe68e3cbc9ff23170fb87a49a1d01cfbdf"
+      },
+      {
+        "case": "opc_file_source_one_part_atomic_save",
+        "outputs": {
+          "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-03.json",
+        "report_sha256": "cacfb6a523992067a5e7f32ac6f2cf096090e30bfacd36737dadca5a0bdd4b1a"
+      },
+      {
+        "case": "pptx_file_eager_open_selected_slide_lifecycle",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-04.json",
+        "report_sha256": "1d5341a9599e29e9e938e301a215856635df8c4891e0a771c77dc6b304f4acbf"
+      },
+      {
+        "case": "pptx_file_source_open_selected_slide_lifecycle",
+        "outputs": {
+          "cold-verified": null,
+          "warm": null
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-05.json",
+        "report_sha256": "f628b76605da4d5cb67fe2e54427534d3c1bf310e5f893fbec845035d25342bf"
+      },
+      {
+        "case": "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+        "outputs": {
+          "opc_file_eager_one_part_atomic_save": {
+            "cold-verified": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+            "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+          },
+          "opc_file_source_one_part_atomic_save": {
+            "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+            "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+          }
+        },
+        "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-opc-pair.json",
+        "report_sha256": "dd8a94e9ecb668d4208b3f1d995eb66a0f4166925cae3aa5f5106f87c9fa9aad"
+      }
+    ],
+    "status": "pass",
+    "validated_sample_count": 16
+  },
+  "formal_reports": 0,
+  "formal_samples": 0,
+  "reports": 12,
+  "samples": 25,
+  "status": "pass"
+}

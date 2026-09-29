@@ -1,0 +1,110 @@
+{
+  "rows": [
+    {
+      "case": "opc_file_eager_open",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1017,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-00/receipt.json",
+        "sha256": "94ff0162184e42442d1c71dc80136cce989f4205c2487fdebac0b0813cdab776"
+      },
+      "report": {
+        "bytes": 36306,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-00.json",
+        "sha256": "7e331c1b77b7e544942ff2edd17cc5137b3df9afd2bfe40202223b2edbb37ea3"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "opc_file_source_open",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1017,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-01/receipt.json",
+        "sha256": "24436b2ff090f2961cfa3df1703af061786600f201dcb00639eb903d93f51058"
+      },
+      "report": {
+        "bytes": 37393,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-01.json",
+        "sha256": "05bc913c1d3c61a43fb9c0bfdb5ab440cd532a63d63e0ec64d201bf25524f153"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "opc_file_eager_one_part_atomic_save",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1033,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-02/receipt.json",
+        "sha256": "e4783fead25c36ba072caec486abb75d6a440084390198c27e187e4e5b847342"
+      },
+      "report": {
+        "bytes": 37921,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-02.json",
+        "sha256": "c338b4b3d95ca80d1c89d35f817648fe68e3cbc9ff23170fb87a49a1d01cfbdf"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1033,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-03/receipt.json",
+        "sha256": "df29b830da0febe878e53f0200e73c5fcbaf417e102aa82a09e76b1a75768429"
+      },
+      "report": {
+        "bytes": 52479,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-03.json",
+        "sha256": "cacfb6a523992067a5e7f32ac6f2cf096090e30bfacd36737dadca5a0bdd4b1a"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1043,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-04/receipt.json",
+        "sha256": "80c595a4eada729c6b3af5aeeac16c47fc24783ad2733b6914d0c50a8225f5d1"
+      },
+      "report": {
+        "bytes": 36464,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-04.json",
+        "sha256": "1d5341a9599e29e9e938e301a215856635df8c4891e0a771c77dc6b304f4acbf"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1044,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-05/receipt.json",
+        "sha256": "17e7b5f772aa39ea4e31260975f2a8b40690cb5208b8481ee90287e67bcc9f99"
+      },
+      "report": {
+        "bytes": 256485,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-05.json",
+        "sha256": "f628b76605da4d5cb67fe2e54427534d3c1bf310e5f893fbec845035d25342bf"
+      },
+      "state": "warm,cold-verified"
+    },
+    {
+      "case": "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+      "exit_code": 0,
+      "receipt": {
+        "bytes": 1081,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/commands/qualification-v3-opc-pair/receipt.json",
+        "sha256": "bc3a981d4c4d79bb95552eb317219bf0ca57b4b5d23b57e1557f4a37779d5564"
+      },
+      "report": {
+        "bytes": 87371,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0834/qualification-v3-opc-pair.json",
+        "sha256": "dd8a94e9ecb668d4208b3f1d995eb66a0f4166925cae3aa5f5106f87c9fa9aad"
+      },
+      "state": "warm,cold-verified"
+    }
+  ],
+  "status": "commands_pass"
+}
