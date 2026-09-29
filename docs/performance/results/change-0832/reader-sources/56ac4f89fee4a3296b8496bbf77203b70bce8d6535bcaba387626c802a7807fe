@@ -1,0 +1,1478 @@
+#!/usr/bin/env python3
+"""Independent, offline audit of the retained 0832 performance packet.
+
+The driver owns compilation and capture.  This reader only opens retained
+files.  It does not import ``analyze.py`` or its schema helpers; it applies the
+pinned allocation envelope to each raw metrics report and repeats the
+arithmetic independently.  It does not run Git, launch a workload, execute a
+build, or inspect a live target directory.
+The arithmetic below is deliberately repeated from the raw reports so that a
+second reader can detect a stale or accidentally copied analysis result.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import random
+import statistics
+import sys
+from pathlib import Path
+from typing import Any, Iterable
+
+import driver
+
+
+ROOT = Path(driver.ROOT).resolve()
+PACKET = Path(driver.P).resolve()
+BASE = driver.BASE
+# The experiment changes four production files.  Keep their full repository
+# paths explicit so a candidate cannot silently omit a caller or move the
+# allocation boundary.
+SOURCE_PATHS = (
+    "crates/litchi-xlsx/src/column.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+)
+SOURCE = getattr(driver, "PRIMARY_SOURCE", SOURCE_PATHS[-1])
+INPUT = Path(driver.INPUT).resolve()
+REFERENCE = Path(driver.REFERENCE).resolve()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+PLAN_SCHEMA = "litchi.performance.0832.plan.v1"
+AUDIT_SCHEMA = "litchi.performance.0832.independent-audit.v1"
+REPORT_SCHEMA = 1
+REAL_INPUT_BYTES = 8_435
+REAL_INPUT_SHA256 = "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+REAL_OUTPUT_BYTES = 8_521
+REAL_OUTPUT_SHA256 = "0f6902152f1b8c40c47086206023887e87f54ef57f1da417bc91d8494a4d3e68"
+EDIT_OUTCOME_SHA256 = hashlib.sha256(b"admitted").hexdigest()
+OBSERVER_IDENTITY = "ordinary_save_procfs_and_system_allocator_operation_scoped"
+ALLOCATOR_REVISION = "serialized_region_peak_v3"
+ALLOCATION_SCOPE = "operation_global_system_allocator"
+ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
+ALLOCATION_FIELDS = (
+    "allocation_calls", "deallocation_calls", "reallocation_calls",
+    "failed_allocation_calls", "allocated_bytes", "deallocated_bytes",
+    "live_bytes_before", "live_bytes_after", "peak_live_bytes_before",
+    "peak_live_bytes_after", "region_peak_live_bytes",
+)
+OBSERVER_SUMMARY_FIELDS = (
+    "allocation_calls", "allocated_bytes", "region_peak_live_bytes",
+    "peak_live_bytes_after", "net_live_bytes",
+)
+NATIVE_ORDERS = (
+    ("before", "after"), ("after", "before"),
+    ("before", "after"), ("after", "before"),
+    ("before", "after"), ("after", "before"),
+)
+OBSERVER_ORDERS = (("before", "after"), ("after", "before"))
+CASES = (
+    {"id": "real-edit", "case": "xlsx_real_file_ordinary_save_edit", "shape": None, "native_samples": 500},
+    {"id": "real-lifecycle", "case": "xlsx_real_file_ordinary_save_lifecycle", "shape": None, "native_samples": 500},
+    {"id": "one-cell-tiny", "case": "xlsx_one_cell_commit_save", "shape": "tiny", "native_samples": 30},
+    {"id": "one-cell-medium", "case": "xlsx_one_cell_commit_save", "shape": "medium", "native_samples": 30},
+    {"id": "one-cell-dense-wide", "case": "xlsx_one_cell_commit_save", "shape": "dense-wide", "native_samples": 30},
+    {"id": "one-percent-tiny", "case": "xlsx_one_percent_commit_save", "shape": "tiny", "native_samples": 30},
+    {"id": "one-percent-medium", "case": "xlsx_one_percent_commit_save", "shape": "medium", "native_samples": 30},
+    {"id": "one-percent-dense-wide", "case": "xlsx_one_percent_commit_save", "shape": "dense-wide", "native_samples": 30},
+    {"id": "noop-medium", "case": "xlsx_noop_commit_save", "shape": "medium", "native_samples": 500},
+)
+CASE_BY_ID = {row["id"]: row for row in CASES}
+
+
+class AuditError(RuntimeError):
+    """The retained packet is missing, stale, or internally inconsistent."""
+
+
+def fail(message: str) -> None:
+    raise AuditError(message)
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        fail(message)
+
+
+def read_json(path: Path) -> Any:
+    require(path.is_file() and not path.is_symlink(), f"missing JSON evidence: {path}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        fail(f"invalid JSON evidence {path}: {error}")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(block)
+    except OSError as error:
+        fail(f"cannot hash {path}: {error}")
+    return digest.hexdigest()
+
+
+def valid_sha(value: Any) -> bool:
+    return (isinstance(value, str) and len(value) == 64
+            and all(char in "0123456789abcdef" for char in value))
+
+
+def relative(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(PACKET))
+    except ValueError:
+        return str(path)
+
+
+def descriptor(path: Path, label: str) -> dict[str, Any]:
+    require(not any(item.is_symlink() for item in (path, *path.parents)),
+            f"symlink in evidence path: {path}")
+    path = path.resolve(strict=False)
+    require(not path.is_symlink(), f"{label} is a symlink")
+    require(path.is_file(), f"missing {label}: {path}")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path)}
+
+
+def contains_descriptor(value: Any, expected: dict[str, Any]) -> bool:
+    if isinstance(value, dict):
+        if all(value.get(key) == expected.get(key) for key in ("path", "bytes", "sha256")):
+            return True
+        return any(contains_descriptor(item, expected) for item in value.values())
+    if isinstance(value, list):
+        return any(contains_descriptor(item, expected) for item in value)
+    return False
+
+
+def descriptor_value(value: Any, label: str, *, allow_cleanup: bool = False) -> dict[str, Any]:
+    require(isinstance(value, dict), f"{label} descriptor is malformed")
+    raw_path = value.get("path")
+    require(isinstance(raw_path, str) and raw_path, f"{label} descriptor path is missing")
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = PACKET / path
+    require(not any(item.is_symlink() for item in (path, *path.parents)),
+            f"symlink in evidence path: {path}")
+    path = path.resolve(strict=False)
+    require(type(value.get("bytes")) is int and value["bytes"] > 0,
+            f"{label} descriptor bytes are invalid")
+    require(valid_sha(value.get("sha256")), f"{label} descriptor hash is invalid")
+    if path.is_file() and not path.is_symlink():
+        require(path.stat().st_size == value["bytes"], f"{label} descriptor bytes changed")
+        require(sha256(path) == value["sha256"], f"{label} descriptor hash changed")
+    else:
+        require(allow_cleanup, f"missing {label} without cleanup allowance")
+        witness = PACKET / "cleanup.json"
+        require(witness.is_file(), f"missing {label} without cleanup witness")
+        retained = read_json(witness)
+        require(retained.get("status") == "pass", "cleanup witness is not terminal pass")
+        expected = {"path": raw_path, "bytes": value["bytes"], "sha256": value["sha256"]}
+        require(contains_descriptor(retained, expected),
+                f"cleanup witness does not retain removed {label}")
+    return {"path": raw_path, "bytes": value["bytes"], "sha256": value["sha256"]}
+
+
+def expected_capture_argv() -> dict[str, list[str]]:
+    """Reconstruct the frozen quality/build/qualification/capture argv matrix."""
+    result: dict[str, list[str]] = {}
+    for lane, orders, samples, warmup in (
+        ("native", NATIVE_ORDERS, None, 3),
+        ("observer", OBSERVER_ORDERS, 3, 0),
+    ):
+        for block, order in enumerate(orders):
+            for leg in order:
+                for expected in CASES:
+                    count = expected["native_samples"] if samples is None else samples
+                    logical = lane
+                    stem = f"{block:02d}-{leg}-{expected['id']}"
+                    report = PACKET / lane / f"{stem}.json"
+                    binary = driver.TARGET / f"{leg}-{logical}"
+                    argv = ["taskset", "-c", "12", "/usr/bin/time", "-f", "%M",
+                            "-o", str(report.with_suffix(".rss")), str(binary),
+                            "--case", expected["case"], "--warmup", str(warmup),
+                            "--samples", str(count), "--json", str(report),
+                            "--filesystem-root", str(driver.SCRATCH)]
+                    if expected["shape"] is None:
+                        argv += ["--ooxml-file", str(INPUT)]
+                    else:
+                        argv += ["--xlsx-shape", expected["shape"]]
+                    result[f"{lane}-{stem}"] = argv
+    # Quality and build receipts must execute the frozen commands, not merely
+    # carry the expected names and a successful exit status.
+    prefix = ["--offline", "--locked", "-p", "litchi-xlsx"]
+    quality_commands = {
+        "fmt": ["cargo", "fmt", "-p", "litchi-xlsx", "--", "--check"],
+        "check": ["cargo", "check", *prefix, "--all-features", "--all-targets"],
+        "test": ["cargo", "test", *prefix, "--all-features", "--", "--test-threads=2"],
+        "clippy": ["cargo", "clippy", *prefix, "--all-features", "--all-targets", "--", "-D", "warnings"],
+        "doc": ["cargo", "doc", *prefix, "--all-features", "--no-deps"],
+        "boundaries": ["python3", "-B", str(ROOT / "tools/check_crate_boundaries.py")],
+        "oracle": ["cargo", "test", "--offline", "--locked", "--manifest-path", str(driver.ORACLE_MANIFEST)],
+        "harness-test": ["cargo", "test", "--offline", "--locked", "--manifest-path", str(driver.TOOL / "Cargo.toml"),
+                         "--lib", "--features", "allocator-metrics,ordinary-save-process-metrics", "--", "--test-threads=2"],
+    }
+    for leg in ("before", "after"):
+        for gate, argv in quality_commands.items():
+            result[f"quality-{leg}-{gate}"] = argv
+        for logical, binary, features in (
+            ("native", "litchi-perf-baseline", []),
+            ("observer", "litchi-perf-baseline-alloc", ["--features", "allocator-metrics,ordinary-save-process-metrics"]),
+        ):
+            result[f"build-{leg}-{logical}"] = ["cargo", "build", "--offline", "--locked", "--release",
+                "--manifest-path", str(driver.TOOL / "Cargo.toml"), "--bin", binary, *features]
+    # Qualification loops logical before cases in the frozen driver.
+    for leg in ("before", "after"):
+        for logical in ("native", "observer"):
+            for expected in CASES:
+                stem = f"{leg}-{logical}-{expected['id']}"
+                report = PACKET / "qualification" / f"{stem}.json"
+                binary = driver.TARGET / f"{leg}-{logical}"
+                count = 1
+                argv = ["taskset", "-c", "12", "/usr/bin/time", "-f", "%M",
+                        "-o", str(report.with_suffix(".rss")), str(binary),
+                        "--case", expected["case"], "--warmup", "0", "--samples", str(count),
+                        "--json", str(report), "--filesystem-root", str(driver.SCRATCH)]
+                if expected["shape"] is None:
+                    argv += ["--ooxml-file", str(INPUT)]
+                else:
+                    argv += ["--xlsx-shape", expected["shape"]]
+                result[f"qualification-{stem}"] = argv
+    return result
+
+
+def expected_command_names() -> set[str]:
+    names = set()
+    gates = ("fmt", "check", "test", "clippy", "doc", "boundaries", "oracle", "harness-test")
+    for leg in ("before", "after"):
+        names.update(f"quality-{leg}-{gate}" for gate in gates)
+        names.update(f"build-{leg}-{logical}" for logical in ("native", "observer"))
+        names.update(f"qualification-{leg}-{logical}-{expected['id']}"
+                     for logical in ("native", "observer") for expected in CASES)
+    names.update(f"{lane}-{block:02d}-{leg}-{expected['id']}"
+                 for lane, orders in (("native", NATIVE_ORDERS), ("observer", OBSERVER_ORDERS))
+                 for block, order in enumerate(orders) for leg in order for expected in CASES)
+    return names
+
+
+def nearest_rank(values: Iterable[int | float], quantile: float) -> int | float:
+    ordered = sorted(values)
+    require(ordered and 0 < quantile <= 1, "invalid nearest-rank request")
+    return ordered[max(1, math.ceil(len(ordered) * quantile)) - 1]
+
+
+def timing_stats(values: list[int]) -> dict[str, Any]:
+    require(values and all(type(value) is int and value > 0 for value in values),
+            "elapsed vector is invalid")
+    harness_p50 = (values[(len(values) - 1) // 2] + values[len(values) // 2]) // 2
+    return {
+        "count": len(values),
+        "p50_ns": nearest_rank(values, 0.50),
+        "p95_ns": nearest_rank(values, 0.95),
+        "p99_ns": nearest_rank(values, 0.99),
+        "mean_ns": statistics.fmean(values),
+        "min_ns": values[0], "max_ns": values[-1],
+        "harness_reported": {"p50_ns": harness_p50,
+                              "p95_ns": nearest_rank(values, 0.95),
+                              "p99_ns": nearest_rank(values, 0.99)},
+        "quantile_definition": "nearest-rank p50/p95/p99 within each process",
+    }
+
+
+def validate_states(value: Any, label: str, path: str = "") -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            current = f"{path}.{key}" if path else key
+            if (key in {"all_verified", "warmup_verified", "publications_identical",
+                        "edit_outcomes_identical"} or key.endswith("_verified")):
+                require(item is True, f"{label} {current} is not true")
+            validate_states(item, label, current)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            validate_states(item, label, f"{path}[{index}]")
+
+
+def validate_allocation(result: dict[str, Any], count: int, logical: str, label: str) -> dict[str, Any]:
+    metrics = result.get("operation_metrics")
+    require(isinstance(metrics, dict), f"{label} operation metrics are missing")
+    elapsed = result.get("elapsed_ns")
+    order = elapsed.get("sample_order") if isinstance(elapsed, dict) else None
+    require(metrics.get("sample_count") == count and metrics.get("sample_indices") == order
+            and metrics.get("alignment") == ALIGNMENT, f"{label} operation alignment changed")
+    expected_claim = ("comparable_timed_operation" if logical == "native"
+                      else "allocator_instrumented_elapsed_not_latency_claim")
+    require(metrics.get("latency_claim") == expected_claim, f"{label} latency claim changed")
+    allocation = metrics.get("allocation")
+    if logical == "native" and result.get("case") == "xlsx_noop_commit_save":
+        require("allocation" not in metrics, f"{label} native no-op unexpectedly reports allocation")
+        return {"sample_count": count, "latency_claim": metrics["latency_claim"],
+                "allocation_status": "not-recorded"}
+    require(isinstance(allocation, dict) and set(allocation) == {"status", "scope", *ALLOCATION_FIELDS},
+            f"{label} allocation envelope changed")
+    expected_status = "unavailable" if logical == "native" else "measured"
+    require(allocation["status"] == expected_status and allocation["scope"] == ALLOCATION_SCOPE,
+            f"{label} allocation status or scope changed")
+    vectors: dict[str, list[int]] = {}
+    for name in ALLOCATION_FIELDS:
+        metric = allocation[name]
+        expected_keys = {"status", "scope", "values"} if logical == "observer" else {"status", "scope"}
+        require(isinstance(metric, dict) and set(metric) == expected_keys
+                and metric.get("status") == expected_status
+                and metric.get("scope") == ALLOCATION_SCOPE,
+                f"{label} allocation vector {name} changed")
+        if logical == "observer":
+            values = metric.get("values")
+            require(isinstance(values, list) and len(values) == count
+                    and all(type(item) is int and 0 <= item < (1 << 64) for item in values),
+                    f"{label} allocation vector {name} is invalid")
+            vectors[name] = values
+    if logical == "observer":
+        for index in range(count):
+            row = {name: values[index] for name, values in vectors.items()}
+            require(row["failed_allocation_calls"] == 0,
+                    f"{label} observer allocation failure invalidates the measurement")
+            require(row["reallocation_calls"] <= row["allocation_calls"],
+                    f"{label} reallocations exceed allocations")
+            require(row["live_bytes_after"] - row["live_bytes_before"] ==
+                    row["allocated_bytes"] - row["deallocated_bytes"],
+                    f"{label} signed live-byte conservation failed")
+            require(row["peak_live_bytes_before"] >= row["live_bytes_before"]
+                    and row["peak_live_bytes_after"] >= row["peak_live_bytes_before"]
+                    and max(row["live_bytes_before"], row["live_bytes_after"]) <=
+                    row["region_peak_live_bytes"] <= row["peak_live_bytes_after"],
+                    f"{label} live/peak bounds failed")
+    return {"sample_count": count, "allocation_status": expected_status,
+            "latency_claim": expected_claim}
+
+
+def resolve_report_path(raw: Any) -> Path:
+    require(isinstance(raw, str) and raw, "report source path is missing")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve(strict=False)
+
+
+def validate_corpus(result: dict[str, Any], expected: dict[str, Any], label: str) -> dict[str, Any]:
+    corpus = result.get("corpus")
+    require(isinstance(corpus, dict), f"{label} corpus manifest is missing")
+    expected_shape = "real-file" if expected["shape"] is None else expected["shape"]
+    require(corpus.get("shape") == expected_shape and valid_sha(corpus.get("archive_sha256"))
+            and type(corpus.get("archive_bytes")) is int and corpus["archive_bytes"] > 0,
+            f"{label} corpus identity changed")
+    if expected["shape"] is None:
+        require(corpus["archive_bytes"] == REAL_INPUT_BYTES
+                and corpus["archive_sha256"] == REAL_INPUT_SHA256,
+                f"{label} real corpus identity changed")
+    else:
+        require(corpus.get("package_format") == "XLSX/OPC/ZIP"
+                and isinstance(corpus.get("xlsx"), dict),
+                f"{label} synthetic corpus manifest changed")
+    return json.loads(json.dumps(corpus, sort_keys=True))
+
+
+def validate_real_oracle(result: dict[str, Any], expected: dict[str, Any], count: int, label: str) -> dict[str, Any] | None:
+    if expected["shape"] is not None:
+        require(result.get("source") in (None, {}), f"{label} synthetic source oracle changed")
+        return None
+    source = result.get("source")
+    require(isinstance(source, dict) and isinstance(source.get("ordinary_save"), dict),
+            f"{label} ordinary-save source oracle missing")
+    ordinary = source["ordinary_save"]
+    require(ordinary.get("format") == "XLSX" and ordinary.get("origin") == "caller-named-real-file"
+            and ordinary.get("phase") == ("edit" if expected["id"] == "real-edit" else "open+edit+save"),
+            f"{label} ordinary-save phase identity changed")
+    evidence = ordinary.get("corpus")
+    require(isinstance(evidence, dict), f"{label} ordinary-save corpus evidence missing")
+    real_file = evidence.get("real_file")
+    require(isinstance(real_file, dict) and resolve_report_path(real_file.get("path")) == INPUT
+            and real_file.get("bytes") == REAL_INPUT_BYTES
+            and real_file.get("sha256") == REAL_INPUT_SHA256,
+            f"{label} ordinary-save input identity changed")
+    require(evidence.get("source_archive_bytes") == REAL_INPUT_BYTES
+            and evidence.get("source_archive_sha256") == REAL_INPUT_SHA256
+            and evidence.get("published_bytes") == REAL_OUTPUT_BYTES
+            and evidence.get("published_sha256") == REAL_OUTPUT_SHA256
+            and evidence.get("edit_admitted") is True
+            and evidence.get("edit_outcome") == "admitted"
+            and evidence.get("repeated_cycles_identical") is True
+            and evidence.get("repeated_saves_identical") is True
+            and evidence.get("repeated_cycle_sha256") == REAL_OUTPUT_SHA256
+            and evidence.get("repeated_save_sha256") == REAL_OUTPUT_SHA256,
+            f"{label} pinned ordinary-save output oracle changed")
+    require(ordinary.get("publications_identical") is True
+            and ordinary.get("edit_outcomes_identical") is True,
+            f"{label} ordinary-save verification state changed")
+    outcomes = ordinary.get("edit_outcome_sha256")
+    require(isinstance(outcomes, list) and len(outcomes) == count
+            and all(item == EDIT_OUTCOME_SHA256 for item in outcomes),
+            f"{label} edit outcome vector changed")
+    published = ordinary.get("published_sha256")
+    if expected["id"] == "real-lifecycle":
+        require(isinstance(published, list) and len(published) == count
+                and all(item == REAL_OUTPUT_SHA256 for item in published),
+                f"{label} lifecycle publication vector changed")
+    else:
+        require(published == [], f"{label} edit publication vector changed")
+    if result.get("output_sha256") is not None:
+        require(result["output_sha256"] == REAL_OUTPUT_SHA256, f"{label} output hash changed")
+    return {"source_bytes": REAL_INPUT_BYTES, "source_sha256": REAL_INPUT_SHA256,
+            "output_bytes": REAL_OUTPUT_BYTES, "output_sha256": REAL_OUTPUT_SHA256,
+            "edit_outcome": "admitted"}
+
+
+def validate_report(path: Path, expected: dict[str, Any], logical: str, count: int,
+                    warmup: int, binary: dict[str, Any], label: str,
+                    *, expected_revision: str | None = None) -> dict[str, Any]:
+    report = read_json(path)
+    require(isinstance(report, dict), f"{label} report is not an object")
+    require(report.get("schema_version") == REPORT_SCHEMA,
+            f"{label} report schema changed")
+    tool = report.get("tool")
+    require(isinstance(tool, dict) and tool.get("name") == "litchi-perf-baseline"
+            and tool.get("binary") == ("litchi-perf-baseline" if logical == "native"
+                                        else "litchi-perf-baseline-alloc"),
+            f"{label} tool identity changed")
+    if logical == "native":
+        require(tool.get("instrumentation") == "none"
+                and "allocator_counter_revision" not in tool,
+                f"{label} native instrumentation changed")
+    else:
+        require(tool.get("instrumentation") == OBSERVER_IDENTITY
+                and tool.get("allocator_counter_revision") == ALLOCATOR_REVISION,
+                f"{label} observer instrumentation identity changed")
+    identity = report.get("binary_identity")
+    require(isinstance(identity, dict) and identity.get("binary_sha256") == binary["sha256"]
+            and identity.get("binary_bytes") == binary["bytes"]
+            and identity.get("executable") is True and identity.get("profile") == "release",
+            f"{label} binary binding changed")
+    environment = report.get("environment")
+    if isinstance(environment, dict) and environment.get("git_revision") is not None:
+        revision = BASE if expected_revision is None else expected_revision
+        require(environment["git_revision"] == revision, f"{label} build revision changed")
+    configuration = report.get("configuration")
+    require(isinstance(configuration, dict)
+            and configuration.get("samples_per_case") == count
+            and configuration.get("warmup_iterations_per_case") == warmup
+            and configuration.get("cases") == [expected["case"]],
+            f"{label} configuration changed")
+    if expected["shape"] is not None:
+        shapes = configuration.get("xlsx_shapes")
+        require(isinstance(shapes, list) and expected["shape"] in shapes,
+                f"{label} XLSX shape changed")
+    results = report.get("results")
+    require(isinstance(results, list) and len(results) == 1 and isinstance(results[0], dict)
+            and results[0].get("case") == expected["case"], f"{label} result identity changed")
+    result = results[0]
+    elapsed = result.get("elapsed_ns")
+    require(isinstance(elapsed, dict) and elapsed.get("unit") == "ns", f"{label} elapsed schema changed")
+    samples = elapsed.get("samples")
+    order = elapsed.get("sample_order")
+    require(isinstance(samples, list) and len(samples) == count
+            and samples == sorted(samples)
+            and all(type(item) is int and item > 0 for item in samples),
+            f"{label} elapsed samples are not sorted positive integers")
+    require(isinstance(order, list) and len(order) == count
+            and all(type(item) is int and item >= 0 for item in order)
+            and sorted(order) == list(range(count)), f"{label} sample order is not a permutation")
+    require(all(samples[index] != samples[index + 1] or order[index] < order[index + 1]
+                for index in range(count - 1)), f"{label} tied sample order changed")
+    timing = timing_stats(samples)
+    for key, value in (("min", timing["min_ns"]), ("p50", timing["harness_reported"]["p50_ns"]),
+                       ("p95", timing["p95_ns"]), ("p99", timing["p99_ns"]),
+                       ("max", timing["max_ns"])):
+        if key in elapsed:
+            require(elapsed[key] == value, f"{label} stored {key} is stale")
+    if "mean" in elapsed:
+        require(math.isclose(float(elapsed["mean"]), float(timing["mean_ns"]), rel_tol=0.0, abs_tol=1e-6),
+                f"{label} stored mean is stale")
+    require(tool.get("allocator_counter_revision") == ALLOCATOR_REVISION if logical == "observer"
+            else "allocator_counter_revision" not in tool, f"{label} allocator revision changed")
+    metrics = validate_allocation(result, count, logical, label)
+    corpus = validate_corpus(result, expected, label)
+    oracle = validate_real_oracle(result, expected, count, label)
+    validate_states(report, label)
+    optional = {}
+    sink = result.get("sink")
+    if expected["shape"] is None:
+        require(sink is None, f"{label} ordinary-save sink oracle changed")
+    else:
+        require(isinstance(sink, dict), f"{label} synthetic sink oracle is missing")
+        optional["sink"] = json.loads(json.dumps(sink, sort_keys=True))
+    for key in ("output_sha256", "output_bytes", "oracle", "output_oracle"):
+        if key in result and result[key] is not None:
+            optional[key] = json.loads(json.dumps(result[key], sort_keys=True))
+    return {"label": label, "path": relative(path), "bytes": path.stat().st_size,
+            "sha256": sha256(path), "id": expected["id"], "case": expected["case"],
+            "shape": expected["shape"], "logical": logical, "samples": count, "warmup": warmup,
+            "timing": timing, "rss_kib": None, "corpus": corpus, "oracle": oracle,
+            "optional_oracle": optional, "metrics": metrics}
+
+
+def load_report(path: Path, expected: dict[str, Any], logical: str, count: int,
+                warmup: int, binary: dict[str, Any], label: str,
+                *, expected_revision: str | None = None) -> dict[str, Any]:
+    row = validate_report(path, expected, logical, count, warmup, binary, label,
+                          expected_revision=expected_revision)
+    rss_path = path.with_suffix(".rss")
+    require(rss_path.is_file() and not rss_path.is_symlink(), f"{label} RSS is missing")
+    raw = rss_path.read_text(encoding="utf-8").strip()
+    require(raw.isdigit() and int(raw) > 0, f"{label} RSS is invalid")
+    row["rss_kib"] = int(raw)
+    row["rss_artifact"] = {"path": relative(rss_path), "bytes": rss_path.stat().st_size,
+                            "sha256": sha256(rss_path)}
+    return row
+
+
+def oracle_key(row: dict[str, Any]) -> str:
+    return json.dumps({"corpus": row["corpus"], "oracle": row["oracle"],
+                       "optional_oracle": row["optional_oracle"]}, sort_keys=True,
+                      separators=(",", ":"))
+
+
+def load_qualification(builds: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    rows = []
+    identities: dict[str, str] = {}
+    for leg in ("before", "after"):
+        receipt = validate_stage(f"qualification-{leg}")
+        value = read_json(PACKET / f"qualification-{leg}.json")
+        require(value.get("reports") == 18 and value.get("samples") == 18,
+                f"qualification-{leg} cardinality changed")
+        for logical in ("native", "observer"):
+            for expected in CASES:
+                path = PACKET / "qualification" / f"{leg}-{logical}-{expected['id']}.json"
+                row = load_report(path, expected, logical, 1, 0,
+                                  builds[leg]["binaries"][logical],
+                                  f"qualification/{leg}/{logical}/{expected['id']}")
+                rows.append(row)
+                signature = oracle_key(row)
+                if expected["id"] in identities:
+                    require(identities[expected["id"]] == signature,
+                            f"qualification oracle differs for {expected['id']}")
+                else:
+                    identities[expected["id"]] = signature
+    require(len(rows) == 36 and sum(row["samples"] for row in rows) == 36,
+            "qualification report cardinality changed")
+    before = {row["id"]: row for row in rows if row["label"].startswith("qualification/before/")}
+    require(set(before) == set(CASE_BY_ID), "qualification before cases are incomplete")
+    return ({"reports": 36, "samples": 36,
+             "rows": [{key: row[key] for key in ("label", "path", "bytes", "sha256", "id", "logical", "rss_kib")}
+                      for row in rows], "oracle_checked": True,
+             "before_admitted_before_candidate": True}, identities)
+
+
+def load_native(builds: dict[str, Any], qualification_oracles: dict[str, str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    rows = []
+    for block, order in enumerate(NATIVE_ORDERS):
+        for leg in order:
+            for expected in CASES:
+                path = PACKET / "native" / f"{block:02d}-{leg}-{expected['id']}.json"
+                row = load_report(path, expected, "native", expected["native_samples"], 3,
+                                  builds[leg]["binaries"]["native"],
+                                  f"native/{block:02d}/{leg}/{expected['id']}")
+                row["block"] = block
+                require(oracle_key(row) == qualification_oracles[expected["id"]],
+                        f"native fixture/result oracle differs: {expected['id']}")
+                rows.append(row)
+    require(len(rows) == 108 and sum(row["samples"] for row in rows) == 20_160,
+            "native report cardinality changed")
+    return ({"reports": 108, "samples": 20_160,
+             "timing_claim": "descriptive paired native process timing and RSS only",
+             "artifacts": [{"path": row["path"], "bytes": row["bytes"],
+                            "sha256": row["sha256"], "rss": row["rss_artifact"]}
+                           for row in rows]}, rows)
+
+
+def load_observer(builds: dict[str, Any], qualification_oracles: dict[str, str]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    rows = []
+    for block, order in enumerate(OBSERVER_ORDERS):
+        for leg in order:
+            for expected in CASES:
+                path = PACKET / "observer" / f"{block:02d}-{leg}-{expected['id']}.json"
+                row = load_report(path, expected, "observer", 3, 0,
+                                  builds[leg]["binaries"]["observer"],
+                                  f"observer/{block:02d}/{leg}/{expected['id']}")
+                row["block"] = block
+                require(oracle_key(row) == qualification_oracles[expected["id"]],
+                        f"observer fixture/result oracle differs: {expected['id']}")
+                rows.append(row)
+    require(len(rows) == 36 and sum(row["samples"] for row in rows) == 108,
+            "observer report cardinality changed")
+    return ({"reports": 36, "samples": 108,
+             "timing_claim": "allocation and signed live-byte evidence only; no observer latency claim",
+             "artifacts": [{"path": row["path"], "bytes": row["bytes"],
+                            "sha256": row["sha256"], "rss": row["rss_artifact"]}
+                           for row in rows]}, rows)
+
+
+def paired_bootstrap(values: list[float]) -> dict[str, Any]:
+    require(len(values) == 6 and all(math.isfinite(value) and value > 0 for value in values),
+            "paired ratio vector is invalid")
+    rng = random.Random(832832)
+    draws = sorted(statistics.median(rng.choice(values) for _ in values) for _ in range(10_000))
+    return {"estimate": statistics.median(values), "ci_low": draws[250], "ci_high": draws[9749],
+            "seed": 832832, "resamples": 10_000, "low_rank": 250, "high_rank": 9749,
+            "statistic": "median of six paired block ratios"}
+
+
+def spread(values: Iterable[int | float]) -> float:
+    vector = list(values)
+    require(vector and all(math.isfinite(float(item)) and float(item) > 0 for item in vector),
+            "spread vector is invalid")
+    return max(vector) / min(vector)
+
+
+def native_summary(rows: list[dict[str, Any]], expected: dict[str, Any]) -> dict[str, Any]:
+    selected = {(row["block"], row["label"].split("/")[2]): row
+                for row in rows if row["id"] == expected["id"]}
+    require(len(selected) == 12, f"native {expected['id']} block/leg coverage changed")
+    legs = {}
+    for leg in ("before", "after"):
+        leg_rows = [selected[(block, leg)] for block in range(6)]
+        metrics = {}
+        for name in ("p50_ns", "p95_ns", "p99_ns", "mean_ns"):
+            values = [row["timing"][name] for row in leg_rows]
+            metrics[name] = {"block_values": values, "midpoint_median": statistics.median(values),
+                             "spread_ratio": spread(values), "spread_flag": spread(values) > 1.05}
+        rss = [row["rss_kib"] for row in leg_rows]
+        metrics["rss_kib"] = {"block_values": rss, "midpoint_median": statistics.median(rss),
+                               "spread_ratio": spread(rss), "spread_flag": spread(rss) > 1.05}
+        legs[leg] = metrics
+    ratios = {}
+    for metric in ("p50_ns", "p95_ns", "p99_ns", "mean_ns", "rss_kib"):
+        before = legs["before"][metric]["block_values"]
+        after = legs["after"][metric]["block_values"]
+        values = [float(right) / float(left) for left, right in zip(before, after)]
+        interval = paired_bootstrap(values)
+        ratios[metric] = {"block_values": values, "bootstrap": interval,
+                          "increase_over_5pct": interval["estimate"] > 1.05,
+                          "lower_ci_over_5pct": interval["ci_low"] > 1.05}
+    spread_flags = [f"{leg}.{metric}" for leg, metrics in legs.items()
+                    for metric, value in metrics.items() if value["spread_flag"]]
+    tail_flags = [leg for leg in ("before", "after")
+                  if legs[leg]["p99_ns"]["midpoint_median"]
+                  / legs[leg]["p50_ns"]["midpoint_median"] > 1.05]
+    return {"id": expected["id"], "case": expected["case"], "shape": expected["shape"],
+            "blocks": 6, "samples_per_report": expected["native_samples"], "legs": legs,
+            "paired_after_over_before": ratios, "spread_flags": spread_flags,
+            "tail_flags": tail_flags,
+            "timing_claim": "descriptive paired native process timing and RSS only",
+            "quantile_definition": "nearest-rank p50/p95/p99 within each process; midpoint median over six blocks"}
+
+
+def observer_values(row: dict[str, Any]) -> dict[str, Any]:
+    report = read_json(PACKET / row["path"])
+    allocation = report["results"][0]["operation_metrics"]["allocation"]
+    vectors = {name: allocation[name]["values"] for name in ALLOCATION_FIELDS}
+    medians = {name: statistics.median(vectors[name]) for name in ALLOCATION_FIELDS}
+    signed_net = [after - before for after, before in
+                  zip(vectors["live_bytes_after"], vectors["live_bytes_before"])]
+    medians["net_live_bytes"] = statistics.median(signed_net)
+    return medians
+
+
+def observer_summary(rows: list[dict[str, Any]], expected: dict[str, Any]) -> dict[str, Any]:
+    selected = {(row["block"], row["label"].split("/")[2]): row
+                for row in rows if row["id"] == expected["id"]}
+    require(len(selected) == 4, f"observer {expected['id']} block/leg coverage changed")
+    legs = {}
+    for leg in ("before", "after"):
+        leg_rows = [selected[(block, leg)] for block in range(2)]
+        block_values = [{name: observer_values(row)[name] for name in OBSERVER_SUMMARY_FIELDS}
+                        for row in leg_rows]
+        legs[leg] = {"block_values": block_values,
+                     "midpoint_medians": {name: statistics.median([item[name] for item in block_values])
+                                           for name in OBSERVER_SUMMARY_FIELDS},
+                     "rss_kib": [row["rss_kib"] for row in leg_rows]}
+    deltas = {}
+    for name in OBSERVER_SUMMARY_FIELDS:
+        before = [item[name] for item in legs["before"]["block_values"]]
+        after = [item[name] for item in legs["after"]["block_values"]]
+        values = [right - left for left, right in zip(before, after)]
+        deltas[name] = {"block_values": values, "median_delta": statistics.median(values)}
+    return {"id": expected["id"], "case": expected["case"], "shape": expected["shape"],
+            "blocks": 2, "samples_per_report": 3, "legs": legs,
+            "after_minus_before": deltas,
+            "timing_claim": "allocation calls, requested bytes, peaks and signed live-byte deltas only; no observer latency claim"}
+
+
+def native_numeric_projection(value: dict[str, Any]) -> dict[str, Any]:
+    metrics = {}
+    for leg, leg_value in value["legs"].items():
+        metrics[leg] = {}
+        for name, metric in leg_value.items():
+            metrics[leg][name] = {key: metric[key] for key in
+                                  ("block_values", "midpoint_median", "spread_ratio", "spread_flag")}
+    ratios = {}
+    for name, metric in value["paired_after_over_before"].items():
+        bootstrap = metric["bootstrap"]
+        ratios[name] = {
+            "block_values": metric["block_values"],
+            "bootstrap": {key: bootstrap[key] for key in
+                           ("estimate", "ci_low", "ci_high", "seed", "resamples", "low_rank", "high_rank")},
+            "increase_over_5pct": metric["increase_over_5pct"],
+            "lower_ci_over_5pct": metric["lower_ci_over_5pct"],
+        }
+    return {"id": value["id"], "case": value["case"], "shape": value["shape"],
+            "blocks": value["blocks"], "samples_per_report": value["samples_per_report"],
+            "legs": metrics, "paired_after_over_before": ratios,
+            "spread_flags": value["spread_flags"], "tail_flags": value["tail_flags"]}
+
+
+def observer_numeric_projection(value: dict[str, Any]) -> dict[str, Any]:
+    legs = {}
+    for leg, leg_value in value["legs"].items():
+        legs[leg] = {
+            "block_values": leg_value["block_values"],
+            "midpoint_medians": leg_value["midpoint_medians"],
+            "rss_kib": leg_value["rss_kib"],
+        }
+    return {"id": value["id"], "case": value["case"], "shape": value["shape"],
+            "blocks": value["blocks"], "samples_per_report": value["samples_per_report"],
+            "legs": legs, "after_minus_before": value["after_minus_before"]}
+
+
+def decision_projection(value: dict[str, Any]) -> dict[str, Any]:
+    return {key: value[key] for key in
+            ("case", "expected_components", "total_prediction",
+             "observed_after_minus_before", "interpretation")}
+
+
+def same_descriptor(left: Any, right: Any, label: str) -> None:
+    require(isinstance(left, dict) and isinstance(right, dict), f"{label} descriptor is missing")
+    for key in ("path", "bytes", "sha256"):
+        require(left.get(key) == right.get(key), f"{label} {key} differs")
+
+
+def encoded(value: dict[str, Any]) -> bytes:
+    text = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    require(len(text.encode("utf-8")) < 5 * 1024 * 1024,
+            "audit output is unexpectedly large; complete reports must not be embedded")
+    return text.encode("utf-8")
+
+
+def write_or_check(value: dict[str, Any], check: bool) -> None:
+    path = PACKET / "audit.json"
+    content = encoded(value)
+    # The root reader wrapper deliberately invokes audit.py without flags on
+    # every replay, including after cleanup and after the source commit.  The
+    # first invocation creates the retained artifact; later invocations use
+    # the same byte-for-byte check as --check and never overwrite it.
+    if check or path.exists():
+        require(path.is_file() and not path.is_symlink(), "audit.json is missing")
+        require(path.read_bytes() == content, "audit.json does not replay deterministically")
+        return
+    try:
+        with path.open("xb") as stream:
+            stream.write(content)
+    except FileExistsError:
+        fail("refusing to overwrite retained audit.json")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="replay and compare retained audit.json")
+    args = parser.parse_args(argv)
+    try:
+        write_or_check(build_audit(), args.check)
+    except (AuditError, AssertionError, OSError, UnicodeError, ValueError,
+            KeyError, TypeError, IndexError) as error:
+        print(f"0832 independent audit failed: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps({"status": "pass", "reports": 180, "samples": 20_304}, sort_keys=True))
+    return 0
+
+
+
+
+# ---- 0832 independent reader -----------------------------------------------
+# The raw report arithmetic is shared by the two lanes; the functions below
+# own this packet's four-source custody, receipt, and assembly decisions.
+EXPECTED_SOURCES = set(SOURCE_PATHS)
+
+
+def _normalise_declared_sources(raw: Any) -> set[str]:
+    """Extract source paths from a driver's optional multi-source declaration."""
+    if raw is None:
+        return set()
+    if isinstance(raw, dict):
+        keys = {key for key in raw if isinstance(key, str)}
+        if keys <= {"before", "after"}:
+            result: set[str] = set()
+            for value in raw.values():
+                result.update(_normalise_declared_sources(value))
+            return result
+        return {key for key in keys if "/" in key}
+    if isinstance(raw, (list, tuple, set)):
+        return {item for item in raw if isinstance(item, str) and "/" in item}
+    if isinstance(raw, str) and "/" in raw:
+        return {raw}
+    return set()
+
+
+def _check_driver_source_declaration() -> None:
+    declared = set()
+    for name in ("SOURCE_PATHS", "SOURCES", "SOURCE_FILES", "SOURCE_HASHES"):
+        declared.update(_normalise_declared_sources(getattr(driver, name, None)))
+    if declared:
+        require(declared == EXPECTED_SOURCES, "driver source declaration changed")
+    source = getattr(driver, "SOURCE", None)
+    if isinstance(source, str) and "/" in source:
+        require(source in EXPECTED_SOURCES, "driver singular source declaration changed")
+
+
+def candidate_files(leg: str) -> dict[str, Path]:
+    root = PACKET / "candidate" / leg
+    require(root.is_dir() and not root.is_symlink(),
+            f"missing {leg} candidate source directory")
+    files = {}
+    for path in root.rglob("*"):
+        if path.is_file() and not path.is_symlink():
+            rel = str(path.relative_to(root))
+            files[rel] = path
+    require(set(files) == EXPECTED_SOURCES,
+            f"{leg} candidate file set changed")
+    return files
+
+
+def source_hashes(leg: str) -> dict[str, str]:
+    return {source: sha256(path) for source, path in candidate_files(leg).items()}
+
+
+def source_descriptors(leg: str) -> dict[str, dict[str, Any]]:
+    return {source: descriptor(path, f"{leg} candidate {source}")
+            for source, path in candidate_files(leg).items()}
+
+
+def source_binding(row: dict[str, Any], leg: str, label: str) -> None:
+    hashes = source_hashes(leg)
+    packet_hashes = {
+        str(Path("candidate") / leg / source): digest
+        for source, digest in hashes.items()
+    }
+    root_hashes = {source: digest for source, digest in hashes.items()}
+    if isinstance(row.get("source_map"), dict):
+        require(row["source_map"] == root_hashes,
+                f"{label} root source map changed")
+    received = row.get("source_hashes")
+    if received is None:
+        received = row.get("sources_sha256")
+    if received is None and isinstance(row.get("source_sha256"), dict):
+        received = row["source_sha256"]
+    if received is not None:
+        require(received in (hashes, packet_hashes),
+                f"{label} source hash map changed")
+        return
+    digest = row.get("source_sha256")
+    # The driver retains the primary source as a convenient scalar alongside
+    # the complete four-file map.  It is checked against the declared primary
+    # path when that scalar is present.
+    require(digest == hashes[SOURCE], f"{label} primary source hash changed")
+
+
+def source_plan_value(plan: dict[str, Any]) -> Any:
+    for key in ("sources", "source_paths", "source"):
+        if key in plan:
+            return plan[key]
+    return None
+
+
+def source_plan_matches(plan: dict[str, Any]) -> bool:
+    value = source_plan_value(plan)
+    if value == list(SOURCE_PATHS) or value == sorted(SOURCE_PATHS):
+        return True
+    if isinstance(value, dict):
+        return _normalise_declared_sources(value) == EXPECTED_SOURCES
+    return False
+
+
+def validate_plan() -> dict[str, Any]:
+    plan = read_json(PACKET / "plan.json")
+    require(isinstance(plan, dict) and plan.get("schema") == PLAN_SCHEMA,
+            "plan schema changed")
+    require(plan.get("base") == BASE and plan.get("cpu") == 12,
+            "plan identity changed")
+    require(source_plan_matches(plan), "plan source paths changed")
+    require(plan.get("primary_source") == SOURCE and plan.get("source") == SOURCE,
+            "plan primary source changed")
+    require(plan.get("cases") == list(CASES), "plan case matrix changed")
+    require(plan.get("qualification") == {"samples": 1, "warmup": 0, "reports": 36},
+            "qualification plan changed")
+    require(plan.get("native") == {"blocks": 6, "warmup": 3,
+                                   "orders": [list(row) for row in NATIVE_ORDERS]},
+            "native plan changed")
+    require(plan.get("observer") == {"blocks": 2, "samples": 3, "warmup": 0,
+                                     "orders": [list(row) for row in OBSERVER_ORDERS]},
+            "observer plan changed")
+    require(plan.get("expected_reports") == 180 and plan.get("expected_samples") == 20_304,
+            "planned cardinality changed")
+    require(plan.get("expected_fresh_child_commands") == 192,
+            "planned fresh command cardinality changed")
+    require(plan.get("qualification_admission_required_before_capture") is True,
+            "qualification admission requirement changed")
+    require(plan.get("quality", {}).get("gates") ==
+            ["fmt", "check", "test", "clippy", "doc", "boundaries", "oracle", "harness-test"],
+            "quality gate set changed")
+    require(plan.get("statistics") == {
+        "within_process": "nearest-rank", "across_process": "midpoint median",
+        "bootstrap_resamples": 10_000, "seed": 832832, "endpoints": [250, 9749],
+    }, "statistics plan changed")
+    return plan
+
+
+def _verify_root_file(raw_path: str, expected_hash: str, label: str) -> None:
+    require(isinstance(raw_path, str) and not Path(raw_path).is_absolute()
+            and valid_sha(expected_hash), f"invalid {label} entry: {raw_path}")
+    path = ROOT / raw_path
+    require(not any(item.is_symlink() for item in (path, *path.parents)),
+            f"symlink in {label}: {raw_path}")
+    path = path.resolve(strict=False)
+    require(path.is_relative_to(ROOT) and path.is_file() and not path.is_symlink(),
+            f"{label} is missing or escaped: {raw_path}")
+    require(sha256(path) == expected_hash, f"{label} changed: {raw_path}")
+
+
+def validate_custody() -> dict[str, Any]:
+    plan = validate_plan()
+    _check_driver_source_declaration()
+    inputs_path = PACKET / "inputs.json"
+    inputs = read_json(inputs_path)
+    require(isinstance(inputs, dict) and inputs, "inputs manifest is malformed")
+    require(inputs.get("test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx")
+            == REAL_INPUT_SHA256, "real input is not pinned in inputs manifest")
+    require(sha256(INPUT) == REAL_INPUT_SHA256 and INPUT.stat().st_size == REAL_INPUT_BYTES,
+            "real input bytes or hash changed")
+    require(sha256(REFERENCE) == REAL_OUTPUT_SHA256 and REFERENCE.stat().st_size == REAL_OUTPUT_BYTES,
+            "pinned ordinary-save output bytes or hash changed")
+
+    before_hashes = source_hashes("before")
+    after_hashes = source_hashes("after")
+    require(before_hashes.keys() == EXPECTED_SOURCES and after_hashes.keys() == EXPECTED_SOURCES,
+            "candidate source map is incomplete")
+    require(all(inputs.get(source) == digest for source, digest in before_hashes.items()),
+            "frozen before source census is incomplete")
+    for raw_path, expected_hash in inputs.items():
+        if raw_path in EXPECTED_SOURCES:
+            require(expected_hash == before_hashes[raw_path],
+                    f"frozen before source hash changed: {raw_path}")
+        else:
+            _verify_root_file(raw_path, expected_hash, "frozen input")
+    architecture_path = PACKET / "architecture-inputs.json"
+    architecture = read_json(architecture_path)
+    require(isinstance(architecture, dict) and architecture, "normative manifest is malformed")
+    frozen_normative = {name: digest for name, digest in inputs.items()
+                        if name.startswith("docs/adr/") or name in
+                        {"docs/GOAL.md", "docs/CRUD_Scenario_Checklist.md"}}
+    require(architecture == frozen_normative, "normative manifest differs from frozen inventory")
+    normative = {}
+    for raw_path, expected_hash in architecture.items():
+        _verify_root_file(raw_path, expected_hash, "normative")
+        path = ROOT / raw_path
+        normative[raw_path] = {"bytes": path.stat().st_size, "sha256": expected_hash}
+    unrelated = {}
+    for raw_path, expected_hash in driver.UNRELATED.items():
+        _verify_root_file(raw_path, expected_hash, "unrelated input")
+        unrelated[raw_path] = expected_hash
+
+    before = source_descriptors("before")
+    after = source_descriptors("after")
+    production = {}
+    for source in SOURCE_PATHS:
+        path = ROOT / source
+        _verify_root_file(source, after_hashes[source], "production source")
+        production[source] = descriptor(path, f"production source {source}")
+        require(production[source]["sha256"] == after[source]["sha256"]
+                and before[source]["sha256"] != after[source]["sha256"],
+                f"production/candidate binding changed: {source}")
+
+    host_path = PACKET / "host.json"
+    host = read_json(host_path)
+    require(isinstance(host, dict) and isinstance(host.get("affinity"), list)
+            and 12 in host["affinity"], "host receipt is incomplete")
+    prepare_path = PACKET / "prepare.json"
+    prepare = read_json(prepare_path)
+    require(prepare.get("status") == "pass" and prepare.get("base") == BASE,
+            "prepare receipt is not terminal pass")
+    require(prepare.get("plan_sha256") == sha256(PACKET / "plan.json")
+            and prepare.get("inputs_sha256") == sha256(inputs_path)
+            and prepare.get("host_sha256") == sha256(host_path)
+            and valid_sha(prepare.get("baseline_witness_sha256")),
+            "prepare custody hashes do not bind plan/host/inputs")
+    baseline_path = PACKET / "baseline-witness.json"
+    baseline = read_json(baseline_path)
+    require(baseline.get("status") == "verified-reusable"
+            and baseline.get("base") == BASE
+            and baseline.get("packet") == "docs/performance/results/change-0831",
+            "baseline reuse witness changed")
+    require(prepare.get("baseline_witness_sha256") == sha256(baseline_path),
+            "baseline reuse witness hash changed")
+    lock_path = PACKET / "lock-parity.json"
+    lock = read_json(lock_path)
+    require(lock.get("status") == "comparison-complete"
+            and valid_sha(lock.get("root_sha256")) and valid_sha(lock.get("tool_sha256")),
+            "lock parity receipt is incomplete")
+    require(lock["root_sha256"] == sha256(ROOT / "Cargo.lock")
+            and lock["tool_sha256"] == sha256(ROOT / "tools/perf-baseline/Cargo.lock"),
+            "lock parity source changed")
+    require(lock.get("all_external_tool_entries_match_root") == (not bool(lock.get("mismatches"))),
+            "lock parity summary is stale")
+    return {
+        "plan": {"path": relative(PACKET / "plan.json"), "bytes": (PACKET / "plan.json").stat().st_size,
+                 "sha256": sha256(PACKET / "plan.json"), "schema": plan["schema"]},
+        "inputs": {"path": relative(inputs_path), "bytes": inputs_path.stat().st_size,
+                   "sha256": sha256(inputs_path), "entries": len(inputs)},
+        "host": descriptor(host_path, "host receipt"),
+        "prepare": descriptor(prepare_path, "prepare receipt"),
+        "normative": {"manifest": descriptor(architecture_path, "normative manifest"),
+                      "files": normative, "count": len(normative)},
+        "unrelated": {"count": len(unrelated), "sha256": unrelated},
+        "corpus": {"input": {"path": relative(INPUT), "bytes": REAL_INPUT_BYTES,
+                              "sha256": REAL_INPUT_SHA256},
+                   "pinned_output": {"path": relative(REFERENCE), "bytes": REAL_OUTPUT_BYTES,
+                                     "sha256": REAL_OUTPUT_SHA256}},
+        "candidate": {"before": before, "after": after, "production": production},
+        "lock_parity": descriptor(lock_path, "lock parity receipt"),
+        "baseline_witness": descriptor(baseline_path, "baseline reuse witness"),
+    }
+
+
+def expected_source_for_command(name: str) -> tuple[str | None, str | None]:
+    parts = name.split("-")
+    if parts[0] == "quality" and len(parts) >= 2:
+        leg = parts[1]
+        if leg in {"before", "after"}:
+            return leg, None
+    if parts[0] in {"build", "qualification"} and len(parts) >= 2:
+        leg = parts[1]
+        if leg in {"before", "after"}:
+            return leg, leg
+    if parts[0] in {"native", "observer"} and len(parts) >= 3:
+        leg = parts[2]
+        if leg in {"before", "after"}:
+            return "after", leg
+    return None, None
+
+
+def validate_stage(name: str, *, source_leg: str | None = None) -> dict[str, Any]:
+    path = PACKET / f"{name}.json"
+    value = read_json(path)
+    require(value.get("status") == "pass", f"{name} is not terminal pass")
+    if "terminal" in value:
+        require(value["terminal"] in (True, "pass"), f"{name} terminal state changed")
+    if "inputs_sha256" in value:
+        require(value["inputs_sha256"] == sha256(PACKET / "inputs.json"),
+                f"{name} input custody changed")
+    if source_leg is not None:
+        source_binding(value, source_leg, f"{name} stage")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path),
+            "status": "pass"}
+
+
+def load_build(leg: str) -> dict[str, Any]:
+    receipt = read_json(PACKET / f"build-{leg}.json")
+    require(receipt.get("status") == "pass", f"build-{leg} is not terminal pass")
+    source_binding(receipt, leg, f"build-{leg}")
+    require(receipt.get("inputs_sha256") == sha256(PACKET / "inputs.json"),
+            f"build-{leg} input binding changed")
+    binaries = receipt.get("binaries")
+    require(isinstance(binaries, dict) and set(binaries) == {"native", "observer"},
+            f"build-{leg} binary set changed")
+    result = {"path": relative(PACKET / f"build-{leg}.json"),
+              "bytes": (PACKET / f"build-{leg}.json").stat().st_size,
+              "sha256": sha256(PACKET / f"build-{leg}.json"), "status": "pass", "binaries": {}}
+    for logical in ("native", "observer"):
+        row = descriptor_value(binaries[logical], f"build-{leg}/{logical} binary",
+                               allow_cleanup=True)
+        require(Path(row["path"]).name == f"{leg}-{logical}",
+                f"build-{leg}/{logical} binary path is not bound to its leg")
+        result["binaries"][logical] = row
+    return result
+
+
+def decision_input(observer: dict[str, Any]) -> dict[str, Any]:
+    row = next(item for item in observer["cases"] if item["id"] == "real-edit")
+    return {"case": "real-edit",
+            "expected_components": {
+                "dense_assignment_trees": {
+                    "allocation_calls": -2,
+                    "allocated_bytes": -2_097_152,
+                },
+            },
+            "total_prediction": (
+                "not exact: inline raw-range materialization is an additional component"),
+            "observed_after_minus_before": {
+                name: row["after_minus_before"][name]["block_values"]
+                for name in ("allocation_calls", "allocated_bytes")},
+            "interpretation": "review input only; no automatic adoption or rejection decision"}
+
+
+def validate_qualification_admission(qualification: dict[str, Any]) -> dict[str, Any]:
+    path = PACKET / "qualification-admission.json"
+    value = read_json(path)
+    require(value.get("status") == "pass" and value.get("reports") == 36
+            and value.get("samples") == 36,
+            "qualification admission receipt changed")
+    require(value.get("analysis_reader_sha256") == sha256(PACKET / "analyze.py")
+            and value.get("independent_reader_sha256") == sha256(PACKET / "audit.py"),
+            "qualification admission reader identities changed")
+    expected = {row["path"]: row["sha256"] for row in qualification["rows"]}
+    require(value.get("qualified_report_hashes") == expected,
+            "qualification admission report hashes changed")
+    return {"path": relative(path), "bytes": path.stat().st_size, "sha256": sha256(path),
+            "status": "pass", "reports": 36, "samples": 36}
+
+
+def _analysis_sources(value: Any, leg: str) -> dict[str, Any]:
+    if isinstance(value, dict) and isinstance(value.get("sources"), dict):
+        value = value["sources"]
+    require(isinstance(value, dict), f"analysis {leg} candidate sources are missing")
+    result = {}
+    for source in SOURCE_PATHS:
+        item = value.get(source)
+        if item is None:
+            # Permit a map keyed by basename only when unambiguous; the packet
+            # itself remains full-path keyed.
+            item = value.get(Path(source).name)
+        require(item is not None, f"analysis {leg} candidate omitted {source}")
+        result[source] = item
+    return result
+
+
+def validate_analysis(counts: dict[str, int], custody: dict[str, Any],
+                      stages: dict[str, Any], builds: dict[str, Any],
+                      qualification: dict[str, Any], native: dict[str, Any],
+                      observer: dict[str, Any], decision: dict[str, Any],
+                      install: dict[str, Any] | None,
+                      commands: dict[str, Any]) -> dict[str, Any]:
+    path = PACKET / "analysis.json"
+    analysis = read_json(path)
+    require(analysis.get("status") == "pass" and analysis.get("base") == BASE,
+            "analysis is not terminal pass")
+    require(analysis.get("counts") == counts, "analysis counts differ from raw audit")
+    require(analysis.get("plan", {}).get("schema") == PLAN_SCHEMA,
+            "analysis plan identity changed")
+    same_descriptor(analysis.get("plan"), custody["plan"], "analysis plan")
+    same_descriptor(analysis.get("inputs"), custody["inputs"], "analysis inputs")
+    candidate = analysis.get("candidate")
+    require(isinstance(candidate, dict) and candidate.get("source_count") == len(SOURCE_PATHS),
+            "analysis candidate identities are missing")
+    for leg in ("before", "after"):
+        theirs = _analysis_sources(candidate.get(leg), leg)
+        ours = custody["candidate"][leg]
+        for source in SOURCE_PATHS:
+            same_descriptor(theirs[source], ours[source],
+                            f"analysis {leg} candidate {source}")
+    for name, stage in stages.items():
+        same_descriptor(analysis.get("stages", {}).get(name), stage,
+                        f"analysis {name} stage")
+    analysis_commands = analysis.get("commands")
+    require(isinstance(analysis_commands, dict)
+            and analysis_commands.get("fresh_count") == 192
+            and analysis_commands.get("baseline_count") == 8
+            and analysis_commands.get("total_count") == 200,
+            "analysis command custody counts differ")
+    ours_commands = {row["name"]: row for row in commands["rows"] if not row["inherited"]}
+    theirs_commands = {row.get("name"): row for row in analysis_commands.get("fresh", [])
+                       if isinstance(row, dict)}
+    require(set(ours_commands) == set(theirs_commands),
+            "analysis fresh command identities differ")
+    for name, ours_row in ours_commands.items():
+        theirs_row = theirs_commands[name]
+        for key in ("argv", "source_leg", "binary_leg", "exit_code"):
+            require(theirs_row.get(key) == ours_row[key],
+                    f"analysis command {name} {key} differs")
+    for leg in ("before", "after"):
+        analysis_build = analysis.get("builds", {}).get(leg)
+        require(isinstance(analysis_build, dict) and analysis_build.get("status") == "pass",
+                f"analysis build-{leg} identity is missing")
+        for logical in ("native", "observer"):
+            same_descriptor(analysis_build.get("binaries", {}).get(logical),
+                            builds[leg]["binaries"][logical],
+                            f"analysis build-{leg}/{logical}")
+    if install is None:
+        require(analysis.get("install", {}).get("status") == "not-retained",
+                "analysis install identity changed")
+    else:
+        theirs = analysis.get("install")
+        require(isinstance(theirs, dict), "analysis install identity missing")
+        # An install receipt may expose either a scalar source or the full map.
+        if "sources" in theirs:
+            require(_analysis_sources(theirs, "install") == custody["candidate"]["after"],
+                    "analysis install source map changed")
+        else:
+            require(any(theirs.get(key) == value["sha256"]
+                        for value in custody["candidate"]["after"].values()
+                        for key in ("after", "sha256")),
+                    "analysis install identity changed")
+    analysis_rows = analysis.get("qualification", {}).get("rows")
+    require(isinstance(analysis_rows, list), "analysis qualification identities are missing")
+    ours_rows = [{key: row[key] for key in
+                  ("label", "path", "bytes", "sha256", "id", "logical", "rss_kib")}
+                 for row in qualification["rows"]]
+    require(analysis_rows == ours_rows
+            and analysis.get("qualification", {}).get("oracle_checked") is True,
+            "analysis qualification report identities differ")
+    analysis_native = analysis.get("native", {}).get("cases")
+    require(isinstance(analysis_native, list) and len(analysis_native) == len(CASES),
+            "analysis native case summaries are missing")
+    for ours_case in native["cases"]:
+        matches = [item for item in analysis_native
+                   if isinstance(item, dict) and item.get("id") == ours_case["id"]]
+        require(len(matches) == 1
+                and native_numeric_projection(matches[0]) ==
+                native_numeric_projection(ours_case),
+                f"analysis native summary differs: {ours_case['id']}")
+    analysis_observer = analysis.get("observer", {}).get("cases")
+    require(isinstance(analysis_observer, list) and len(analysis_observer) == len(CASES),
+            "analysis observer case summaries are missing")
+    for ours_case in observer["cases"]:
+        matches = [item for item in analysis_observer
+                   if isinstance(item, dict) and item.get("id") == ours_case["id"]]
+        require(len(matches) == 1
+                and observer_numeric_projection(matches[0]) ==
+                observer_numeric_projection(ours_case),
+                f"analysis observer summary differs: {ours_case['id']}")
+    require(decision_projection(analysis.get("decision_input", {})) ==
+            decision_projection(decision), "analysis decision input differs")
+    return {"path": relative(path), "bytes": path.stat().st_size,
+            "sha256": sha256(path), "matched": True,
+            "numeric_case_summaries": len(CASES) * 2,
+            "qualification_identities": len(ours_rows)}
+
+
+def build_audit() -> dict[str, Any]:
+    custody = validate_custody()
+    commands = validate_commands()
+    stages = {}
+    for name in (
+        "prepare", "quality-before", "build-before", "qualification-before",
+        "quality-after", "build-after", "qualification-after", "capture",
+    ):
+        source_leg = ("before" if name.endswith("-before") else
+                      "after" if name.endswith("-after") else None)
+        stages[name] = validate_stage(name, source_leg=source_leg)
+    for leg in ("before", "after"):
+        quality = read_json(PACKET / f"quality-{leg}.json")
+        require(quality.get("gates") == 8, f"quality-{leg} gate count changed")
+        source_binding(quality, leg, f"quality-{leg}")
+    install_path = PACKET / "install.json"
+    install_value = read_json(install_path)
+    require(install_value.get("status") == "pass"
+            and install_value.get("source") == SOURCE,
+            "install receipt changed")
+    install_hashes = install_value.get("sources_sha256")
+    require(install_hashes == source_hashes("after"),
+            "install source hash map changed")
+    install_sources = install_value.get("sources")
+    require(isinstance(install_sources, dict)
+            and set(install_sources) == EXPECTED_SOURCES,
+            "install source descriptor map changed")
+    for source in SOURCE_PATHS:
+        same_descriptor(install_sources[source], source_descriptors("after")[source],
+                        f"install source {source}")
+    install_transitions = install_value.get("transitions")
+    require(isinstance(install_transitions, dict)
+            and set(install_transitions) == EXPECTED_SOURCES,
+            "install source transitions changed")
+    before_hashes = source_hashes("before")
+    after_hashes = source_hashes("after")
+    for source in SOURCE_PATHS:
+        require(install_transitions[source] == {
+            "before": before_hashes[source], "after": after_hashes[source]},
+                f"install source transition changed: {source}")
+    install = descriptor(install_path, "install receipt")
+    builds = {leg: load_build(leg) for leg in ("before", "after")}
+    qualification, oracles = load_qualification(builds)
+    admission = validate_qualification_admission(qualification)
+    native_meta, native_rows = load_native(builds, oracles)
+    observer_meta, observer_rows = load_observer(builds, oracles)
+    native_meta["cases"] = [native_summary(native_rows, expected) for expected in CASES]
+    observer_meta["cases"] = [observer_summary(observer_rows, expected) for expected in CASES]
+    counts = {"qualification_reports": qualification["reports"],
+              "qualification_samples": qualification["samples"],
+              "native_reports": native_meta["reports"],
+              "native_samples": native_meta["samples"],
+              "observer_reports": observer_meta["reports"],
+              "observer_samples": observer_meta["samples"],
+              "reports": 180, "samples": 20_304}
+    require(native_meta["reports"] + observer_meta["reports"] +
+            qualification["reports"] == 180
+            and native_meta["samples"] + observer_meta["samples"] +
+            qualification["samples"] == 20_304,
+            "total cardinality changed")
+    capture = read_json(PACKET / "capture.json")
+    require(capture.get("status") == "pass" and capture.get("reports") == 180
+            and capture.get("samples") == 20_304
+            and capture.get("measured_reports") == 144
+            and capture.get("measured_samples") == 20_268
+            and capture.get("inputs_sha256") == sha256(PACKET / "inputs.json"),
+            "capture receipt changed")
+    require(capture.get("qualification_admission_sha256") ==
+            sha256(PACKET / "qualification-admission.json"),
+            "capture qualification admission binding changed")
+    decision = decision_input(observer_meta)
+    analysis = validate_analysis(counts, custody, stages, builds, qualification,
+                                 native_meta, observer_meta, decision, install,
+                                 commands)
+    return {"schema": AUDIT_SCHEMA, "status": "pass", "base": BASE,
+            "custody": custody, "commands": commands, "stages": stages,
+            "install": install, "builds": builds, "counts": counts,
+            "qualification": qualification, "qualification_admission": admission,
+            "native": native_meta,
+            "observer": observer_meta, "analysis": analysis,
+            "decision_input": decision,
+            "claims": {"native": "descriptive paired process timing and RSS only",
+                       "observer": "allocation calls, requested bytes, peaks and signed live-byte deltas only",
+                       "observer_latency": False, "pooled_latency": False,
+                       "automatic_adoption_decision": False,
+                       "historical_comparison": False,
+                       "full_report_payloads_retained": False}}
+
+
+
+def _inherited_quality_rows(expected_capture: dict[str, list[str]]) -> list[dict[str, Any]]:
+    """Independently verify the eight reused 0831 quality command receipts."""
+    witness_path = PACKET / "baseline-witness.json"
+    witness = read_json(witness_path)
+    commands = witness.get("commands")
+    require(isinstance(commands, dict) and set(commands) == {
+        "fmt", "check", "test", "clippy", "doc", "boundaries", "oracle", "harness-test"},
+        "baseline quality command witness is incomplete")
+    previous_inputs = witness.get("previous_inputs_sha256")
+    require(valid_sha(previous_inputs), "baseline quality input binding is malformed")
+    rows = []
+    intervals = []
+    for gate in sorted(commands):
+        item = commands[gate]
+        require(isinstance(item, dict), f"baseline quality witness {gate} is malformed")
+        terminal_path = ROOT / item["receipt"]
+        started_path = ROOT / item["started"]
+        log_path = ROOT / item["log"]
+        for path, label in ((terminal_path, f"inherited {gate} terminal receipt"),
+                            (started_path, f"inherited {gate} start receipt"),
+                            (log_path, f"inherited {gate} log")):
+            require(path.is_file() and not path.is_symlink(), f"missing {label}")
+        require(valid_sha(item.get("receipt_sha256"))
+                and sha256(terminal_path) == item["receipt_sha256"],
+                f"inherited {gate} receipt hash changed")
+        require(valid_sha(item.get("log_sha256")) and sha256(log_path) == item["log_sha256"],
+                f"inherited {gate} log hash changed")
+        started = read_json(started_path)
+        terminal = read_json(terminal_path)
+        require(isinstance(started, dict) and isinstance(terminal, dict),
+                f"inherited {gate} receipt is malformed")
+        for key in ("argv", "cwd", "source_leg", "source_sha256",
+                    "input_inventory_sha256", "environment", "started_unix"):
+            require(terminal.get(key) == started.get(key),
+                    f"inherited {gate} {key} changed")
+        require(terminal.get("argv") == expected_capture[f"quality-before-{gate}"],
+                f"inherited {gate} argv changed")
+        require(terminal.get("cwd") == str(ROOT)
+                and terminal.get("source_leg") == "after"
+                and terminal.get("source_sha256") == source_hashes("before")[SOURCE]
+                and terminal.get("input_inventory_sha256") == previous_inputs
+                and terminal.get("exit_code") == 0
+                and type(terminal.get("started_unix")) in (int, float)
+                and not isinstance(terminal.get("started_unix"), bool)
+                and math.isfinite(float(terminal["started_unix"]))
+                and type(terminal.get("finished_unix")) in (int, float)
+                and not isinstance(terminal.get("finished_unix"), bool)
+                and math.isfinite(float(terminal["finished_unix"]))
+                and terminal["finished_unix"] >= terminal["started_unix"],
+                f"inherited {gate} terminal state changed")
+        intervals.append((gate, float(terminal["started_unix"]),
+                          float(terminal["finished_unix"])))
+        rows.append({
+            "name": f"quality-before-{gate}",
+            "started": descriptor(started_path, f"inherited {gate} start receipt"),
+            "terminal": descriptor(terminal_path, f"inherited {gate} terminal receipt"),
+            "log": descriptor(log_path, f"inherited {gate} log"),
+            "exit_code": 0, "source_leg": "before", "binary_leg": None,
+            "inherited": True,
+        })
+    intervals.sort(key=lambda row: row[1])
+    for previous, current in zip(intervals, intervals[1:]):
+        require(previous[2] <= current[1],
+                f"inherited quality intervals overlap: {previous[0]} and {current[0]}")
+    return rows
+
+
+def validate_commands() -> dict[str, Any]:
+    command_dir = PACKET / "commands"
+    require(command_dir.is_dir() and not command_dir.is_symlink(), "commands directory is missing")
+    starts = {path.name[:-13]: path for path in command_dir.glob("*.started.json")}
+    terminals = {path.name[:-5]: path for path in command_dir.glob("*.json")
+                 if not path.name.endswith(".started.json")}
+    logs = {path.name[:-4]: path for path in command_dir.glob("*.log")}
+    expected_capture = expected_capture_argv()
+    all_names = expected_command_names()
+    inherited_names = {f"quality-before-{gate}" for gate in
+                       ("fmt", "check", "test", "clippy", "doc", "boundaries", "oracle", "harness-test")}
+    fresh_names = all_names - inherited_names
+    require(set(starts) == set(terminals) == set(logs) == fresh_names,
+            "fresh command started/terminal/log sets do not match")
+    rows = []
+    fresh_intervals = []
+    for name in sorted(fresh_names):
+        started = read_json(starts[name])
+        terminal = read_json(terminals[name])
+        require(isinstance(started, dict) and isinstance(terminal, dict),
+                f"command {name} receipt is malformed")
+        for key in ("argv", "cwd", "source_leg", "input_inventory_sha256", "environment"):
+            require(terminal.get(key) == started.get(key),
+                    f"command {name} {key} changed at termination")
+        for key in ("source_sha256", "source_hashes", "sources_sha256", "source_map"):
+            if key in started or key in terminal:
+                require(terminal.get(key) == started.get(key),
+                        f"command {name} {key} changed at termination")
+        require(type(started.get("started_unix")) in (int, float)
+                and not isinstance(started.get("started_unix"), bool)
+                and math.isfinite(float(started["started_unix"]))
+                and terminal.get("started_unix") == started.get("started_unix")
+                and type(terminal.get("finished_unix")) in (int, float)
+                and not isinstance(terminal.get("finished_unix"), bool)
+                and math.isfinite(float(terminal["finished_unix"]))
+                and terminal["finished_unix"] >= terminal["started_unix"],
+                f"command {name} terminal timing changed")
+        require(terminal.get("cwd") == str(ROOT), f"command {name} ran outside root")
+        require(terminal.get("input_inventory_sha256") == sha256(PACKET / "inputs.json"),
+                f"command {name} input inventory changed")
+        require(isinstance(terminal.get("argv"), list) and terminal["argv"]
+                and terminal["argv"] == expected_capture[name],
+                f"command {name} argv changed")
+        source_leg, binary_leg = expected_source_for_command(name)
+        require(source_leg is not None and terminal.get("source_leg") == source_leg,
+                f"command {name} source leg is wrong")
+        source_binding(terminal, source_leg, f"command {name}")
+        log = logs[name]
+        require(valid_sha(terminal.get("log_sha256")) and sha256(log) == terminal["log_sha256"],
+                f"command {name} log hash changed")
+        if "log_sha256" in started:
+            require(started["log_sha256"] == terminal["log_sha256"],
+                    f"command {name} start log hash changed")
+        require(type(terminal.get("exit_code")) is int and terminal["exit_code"] == 0,
+                f"command {name} did not terminate successfully")
+        fresh_intervals.append((name, float(started["started_unix"]),
+                                float(terminal["finished_unix"])))
+        rows.append({"name": name, "started": descriptor(starts[name], f"{name} start receipt"),
+                     "terminal": descriptor(terminals[name], f"{name} terminal receipt"),
+                     "log": descriptor(log, f"{name} log"), "exit_code": 0,
+                     "argv": terminal["argv"], "source_leg": source_leg,
+                     "binary_leg": binary_leg, "inherited": False})
+    fresh_intervals.sort(key=lambda row: row[1])
+    for previous, current in zip(fresh_intervals, fresh_intervals[1:]):
+        require(previous[2] <= current[1],
+                f"fresh command intervals overlap: {previous[0]} and {current[0]}")
+    inherited = _inherited_quality_rows(expected_capture)
+    rows.extend(inherited)
+    require(len(rows) == 200 and len(fresh_intervals) == 192 and len(inherited) == 8,
+            "command cardinality or inheritance split changed")
+    return {"count": len(rows), "fresh": len(fresh_intervals), "inherited": len(inherited),
+            "rows": rows}
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

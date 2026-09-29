@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/reader.py", line 1000, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/reader.py", line 981, in main
+    admit_qualification()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/reader.py", line 698, in admit_qualification
+    freeze, _manifest, _payloads = verify_freeze()
+                                   ~~~~~~~~~~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/reader.py", line 326, in verify_freeze
+    source: freeze["source_archives"]["before"][source]["sha256"] for source in SOURCES
+                                                                                ^^^^^^^
+NameError: name 'SOURCES' is not defined

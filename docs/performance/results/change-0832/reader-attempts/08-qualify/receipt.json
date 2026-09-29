@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/qualify.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790639976.4796875,
+  "output_sha256": "668a889e3c3adb6509090f326a9950e6604de458d19fad2e030483b600d32f5a",
+  "started_unix": 1790639975.124785
+}

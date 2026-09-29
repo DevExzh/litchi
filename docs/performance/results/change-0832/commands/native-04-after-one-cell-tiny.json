@@ -1,0 +1,56 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/native/04-after-one-cell-tiny.rss",
+    "/home/zhuhe/code/litchi-target-0832/after-native",
+    "--case",
+    "xlsx_one_cell_commit_save",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/native/04-after-one-cell-tiny.json",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0832",
+    "--xlsx-shape",
+    "tiny"
+  ],
+  "binary_leg": "after",
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0832/release",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-D warnings",
+    "TZ": "UTC"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790640250.059926,
+  "input_inventory_sha256": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_leg": "after",
+  "source_map": {
+    "crates/litchi-xlsx/src/column.rs": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91"
+  },
+  "source_sha256": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91",
+  "sources_sha256": {
+    "crates/litchi-xlsx/src/column.rs": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91"
+  },
+  "started_unix": 1790640249.034813
+}

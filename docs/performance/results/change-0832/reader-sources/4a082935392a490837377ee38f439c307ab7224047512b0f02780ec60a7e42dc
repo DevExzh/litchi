@@ -1,0 +1,71 @@
+"""Exercise both guard parsers on retained reports; launch no workloads.
+
+Module-local packet/base bindings are overridden only for historical replay.
+The production guard scripts and reports are never modified.
+"""
+import importlib.util
+from pathlib import Path
+
+import driver as parent
+
+
+def load(name):
+    path = parent.P / "promotion-guard" / (name + ".py")
+    spec = importlib.util.spec_from_file_location("guard_preflight_" + name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def main():
+    parsers = [load("driver"), load("reader")]
+    script_hashes = {name: parent.sha(parent.P / "promotion-guard" / name)
+                     for name in ("driver.py", "reader.py")}
+    reports = {}
+    for packet, historical in ((parent.P, False), (parent.P.parent / "change-0831", True)):
+        seal = parent.read(packet / "seal.json") if historical else None
+        base = seal["base"] if historical else parent.BASE
+        legs = ("before", "after") if historical else ("before",)
+        for leg in legs:
+            build_path = packet / ("build-" + leg + ".json")
+            if historical:
+                assert parent.sha(build_path) == seal["files"][str(build_path.relative_to(parent.ROOT))]
+            build = parent.read(build_path)
+            freeze = {"binaries": {leg: build["binaries"]}, "fixtures": {
+                "reference": {"path": str(parsers[0].ORIGINAL),
+                              "bytes": parsers[0].ORIGINAL_BYTES,
+                              "sha256": parsers[0].ORIGINAL_SHA256}}}
+            for logical in ("native", "observer"):
+                for phase in ("edit", "lifecycle"):
+                    count = (6 if logical == "native" else 2) if historical else 1
+                    samples = (500 if logical == "native" else 3) if historical else 1
+                    warmup = 3 if historical and logical == "native" else 0
+                    for block in range(count):
+                        name = f"{block:02}-{leg}-real-{phase}.json"
+                        path = (packet / logical / name if historical else
+                                packet / "qualification" / f"{leg}-{logical}-real-{phase}.json")
+                        digest = parent.sha(path)
+                        if historical:
+                            assert digest == seal["files"][str(path.relative_to(parent.ROOT))]
+                        for parser in parsers:
+                            old_packet, old_base = parser.P, parser.BASE
+                            try:
+                                parser.P, parser.BASE = packet, base
+                                parser.validate_report(path, variant="reference", phase=phase,
+                                                       leg=leg, logical=logical, samples=samples,
+                                                       warmup=warmup, freeze=freeze)
+                            finally:
+                                parser.P, parser.BASE = old_packet, old_base
+                        reports[str(path.relative_to(parent.ROOT))] = digest
+    assert len(reports) == 68
+    assert script_hashes == {name: parent.sha(parent.P / "promotion-guard" / name)
+                             for name in script_hashes}
+    parent.write(parent.P / "guard-parser-preflight.json", {
+        "status": "pass", "reports": len(reports), "parsers": 2,
+        "script_hashes": script_hashes, "reports_sha256": reports,
+        "scope": "4 current one-sample real-file reports and 64 sealed historical multi-sample reports; no workload rerun"})
+    print("0832 both guard parsers PASS: 68 retained reports, including multi-sample quantiles")
+
+
+if __name__ == "__main__":
+    main()

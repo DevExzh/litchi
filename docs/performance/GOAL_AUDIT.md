@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0832 — first XLSX column record stored inline
+
+[0832](0832-xlsx-inline-column-map.md) Adopted after all eight fresh candidate quality gates, exact-source reuse of the eight baseline gates, and replay of 228 reports / 32,344 samples across parent and promotion matrices. Two frozen guard-reader omissions were repaired by an additive, hash-bound loader before guard capture; original scripts and failure receipts remain intact. No regression flag is triggered; broader CRUD, producer, cold-cache, and concurrency goals remain open.
+
 ## 0831 — unused XLSX column-action map removed
 
 [0831](0831-xlsx-empty-column-actions.md) Both eight-gate quality sequences, four builds, 180 reports/20,304 samples and independent numerical/command audits pass. The three-line guard meets the frozen allocation benefit rule with no regression trigger. Original supervisor/reader failures remain retained; the owned target and scratch are cleaned and replayed before commit. The broader non-iWork goal remains open.

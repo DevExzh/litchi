@@ -1,0 +1,323 @@
+{
+  "base": "7eeaab48c0281b06f53527d4c4f4ea79050d27e7",
+  "generator": {
+    "bytes": 19728,
+    "path": "generate_fixtures.py",
+    "sha256": "cc59a87bc6173c2041862487546994b8daa6b756af065737df8ed77fe7d17db7"
+  },
+  "original": {
+    "bytes": 8435,
+    "cols_fragment_bytes": 70,
+    "cols_fragment_sha256": "fb765b8740dcc94f20b537afd0c62796880bff2923f421ad7a86082d9b726459",
+    "member": "xl/worksheets/sheet1.xml",
+    "members": [
+      {
+        "compressed_bytes": 350,
+        "compressed_sha256": "1cc952da421dad9bc81c25c42046e3fde73fc1e92d503c9434ebd89edfc9118c",
+        "method": 8,
+        "name": "[Content_Types].xml",
+        "payload_bytes": 1168,
+        "payload_sha256": "bfa02ea1994b73dca866ea3b6596340fe00063d19eab5957c7d8e6a5fa10599a"
+      },
+      {
+        "compressed_bytes": 244,
+        "compressed_sha256": "3e4f9cfb1e1af1f288d732cc14042a178543412934e2473256842dbde2ed6777",
+        "method": 8,
+        "name": "_rels/.rels",
+        "payload_bytes": 588,
+        "payload_sha256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497"
+      },
+      {
+        "compressed_bytes": 243,
+        "compressed_sha256": "26d5ba4041a4d1f1859214ed4283b27dfbdd654d7b15d366f1473d565773ec02",
+        "method": 8,
+        "name": "xl/_rels/workbook.xml.rels",
+        "payload_bytes": 698,
+        "payload_sha256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1"
+      },
+      {
+        "compressed_bytes": 618,
+        "compressed_sha256": "f6fac8b09435024c88c0b2d9920ed5ee9e49684e224cc534851bcaef5111fcb6",
+        "method": 8,
+        "name": "xl/workbook.xml",
+        "payload_bytes": 1275,
+        "payload_sha256": "033f58107edff53315c8409a31ceab9000f65a41e46f5cdbb82ae310033f7bf8"
+      },
+      {
+        "compressed_bytes": 178,
+        "compressed_sha256": "d1574b27c5e5c9a4e3205899db7b03f3b2c6a9259aa88196dc9f3f3af75587a0",
+        "method": 8,
+        "name": "xl/sharedStrings.xml",
+        "payload_bytes": 257,
+        "payload_sha256": "f05277367d2f88b2e2245744f9bb8173d69a137b3fd7de53e2564540a83fba14"
+      },
+      {
+        "compressed_bytes": 1691,
+        "compressed_sha256": "2c89b4c89c3c51ffab08094cb8037e2f1a94332f0e5b9bf4e2021a171c372703",
+        "method": 8,
+        "name": "xl/theme/theme1.xml",
+        "payload_bytes": 6798,
+        "payload_sha256": "02f4734632e3247ca161732fa40794123be750669ab8710fa5f32ca2eb0f4a99"
+      },
+      {
+        "compressed_bytes": 691,
+        "compressed_sha256": "86672ce43860c69a1620f91f804928106432cd937287bca46963b3c0f40207ec",
+        "method": 8,
+        "name": "xl/styles.xml",
+        "payload_bytes": 1563,
+        "payload_sha256": "2354ffc6a743a88bf717a77fb9d0816efaff57961cfd8d2f0e2827344c702fbf"
+      },
+      {
+        "compressed_bytes": 675,
+        "compressed_sha256": "cf9187ddd3d746014cb081ca8b3cdbd2cb00f886bd16a7dc1e32532b7ee56662",
+        "method": 8,
+        "name": "xl/worksheets/sheet1.xml",
+        "payload_bytes": 1496,
+        "payload_sha256": "d73849d2d2d96ac61289e88224be3f6933ab5e671c2e29d55e36b1839b3e3ba7"
+      },
+      {
+        "compressed_bytes": 330,
+        "compressed_sha256": "7c3b504f0957c18f536a8aab48ba58c6571a718c6f31689b1f515afb96bff577",
+        "method": 8,
+        "name": "docProps/core.xml",
+        "payload_bytes": 625,
+        "payload_sha256": "0d0b7730c1ad38a08aeb0e7684eb7723e285002ba3460605c00ad9d84ca2d21e"
+      },
+      {
+        "compressed_bytes": 441,
+        "compressed_sha256": "eafa192725a9fc36c2cc87cbd074bc18a15564c570d1d814232f2f498503681b",
+        "method": 8,
+        "name": "docProps/app.xml",
+        "payload_bytes": 836,
+        "payload_sha256": "50dd2656973435a41cdc1335b22aa0c593846e693a17c20ca9a972997c340776"
+      }
+    ],
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4",
+    "sheet_payload_bytes": 1496,
+    "sheet_payload_sha256": "d73849d2d2d96ac61289e88224be3f6933ab5e671c2e29d55e36b1839b3e3ba7"
+  },
+  "preservation_contract": {
+    "archive_copy": "raw ZIP local and central records are copied; only sheet1.xml payload and its CRC/sizes are replaced",
+    "cells": "the pinned eight cell elements, MCE declaration, shared strings, date styles, and autofilter markers remain present",
+    "untouched_member_payloads": "compressed and uncompressed payload bytes must match the original for every member except xl/worksheets/sheet1.xml",
+    "worksheet_outside_cols": "sheet1.xml bytes before and after the cols element remain identical"
+  },
+  "schema": "litchi.performance.0832.column-promotion-fixtures.v1",
+  "variants": [
+    {
+      "archive": {
+        "bytes": 8419,
+        "path": "fixtures/disjoint-two-records.xlsx",
+        "sha256": "9b06b9baf4b0c4e0ed03986428134e7846e9e8b78a71ff5a6a0e294658af745b"
+      },
+      "cols_fragment_bytes": 119,
+      "cols_fragment_sha256": "97a718134a6a065f169a165d00e225179f48f0ac9cb3d81769b820d702833abf",
+      "description": "the pinned record plus one disjoint complete record at column D",
+      "id": "disjoint-two-records",
+      "members": [
+        {
+          "compressed_bytes": 350,
+          "compressed_sha256": "1cc952da421dad9bc81c25c42046e3fde73fc1e92d503c9434ebd89edfc9118c",
+          "method": 8,
+          "name": "[Content_Types].xml",
+          "payload_bytes": 1168,
+          "payload_sha256": "bfa02ea1994b73dca866ea3b6596340fe00063d19eab5957c7d8e6a5fa10599a"
+        },
+        {
+          "compressed_bytes": 244,
+          "compressed_sha256": "3e4f9cfb1e1af1f288d732cc14042a178543412934e2473256842dbde2ed6777",
+          "method": 8,
+          "name": "_rels/.rels",
+          "payload_bytes": 588,
+          "payload_sha256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497"
+        },
+        {
+          "compressed_bytes": 243,
+          "compressed_sha256": "26d5ba4041a4d1f1859214ed4283b27dfbdd654d7b15d366f1473d565773ec02",
+          "method": 8,
+          "name": "xl/_rels/workbook.xml.rels",
+          "payload_bytes": 698,
+          "payload_sha256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1"
+        },
+        {
+          "compressed_bytes": 618,
+          "compressed_sha256": "f6fac8b09435024c88c0b2d9920ed5ee9e49684e224cc534851bcaef5111fcb6",
+          "method": 8,
+          "name": "xl/workbook.xml",
+          "payload_bytes": 1275,
+          "payload_sha256": "033f58107edff53315c8409a31ceab9000f65a41e46f5cdbb82ae310033f7bf8"
+        },
+        {
+          "compressed_bytes": 178,
+          "compressed_sha256": "d1574b27c5e5c9a4e3205899db7b03f3b2c6a9259aa88196dc9f3f3af75587a0",
+          "method": 8,
+          "name": "xl/sharedStrings.xml",
+          "payload_bytes": 257,
+          "payload_sha256": "f05277367d2f88b2e2245744f9bb8173d69a137b3fd7de53e2564540a83fba14"
+        },
+        {
+          "compressed_bytes": 1691,
+          "compressed_sha256": "2c89b4c89c3c51ffab08094cb8037e2f1a94332f0e5b9bf4e2021a171c372703",
+          "method": 8,
+          "name": "xl/theme/theme1.xml",
+          "payload_bytes": 6798,
+          "payload_sha256": "02f4734632e3247ca161732fa40794123be750669ab8710fa5f32ca2eb0f4a99"
+        },
+        {
+          "compressed_bytes": 691,
+          "compressed_sha256": "86672ce43860c69a1620f91f804928106432cd937287bca46963b3c0f40207ec",
+          "method": 8,
+          "name": "xl/styles.xml",
+          "payload_bytes": 1563,
+          "payload_sha256": "2354ffc6a743a88bf717a77fb9d0816efaff57961cfd8d2f0e2827344c702fbf"
+        },
+        {
+          "compressed_bytes": 659,
+          "compressed_sha256": "bf3e54068a3abb48d0828145d15529bd8e45f76d7e60b12f952e4e3bbf142eba",
+          "method": 8,
+          "name": "xl/worksheets/sheet1.xml",
+          "payload_bytes": 1545,
+          "payload_sha256": "44675ca186bb37df033168b961829e0145b7f863e7fe8801ab3bdb1175f5b9a3"
+        },
+        {
+          "compressed_bytes": 330,
+          "compressed_sha256": "7c3b504f0957c18f536a8aab48ba58c6571a718c6f31689b1f515afb96bff577",
+          "method": 8,
+          "name": "docProps/core.xml",
+          "payload_bytes": 625,
+          "payload_sha256": "0d0b7730c1ad38a08aeb0e7684eb7723e285002ba3460605c00ad9d84ca2d21e"
+        },
+        {
+          "compressed_bytes": 441,
+          "compressed_sha256": "eafa192725a9fc36c2cc87cbd074bc18a15564c570d1d814232f2f498503681b",
+          "method": 8,
+          "name": "docProps/app.xml",
+          "payload_bytes": 836,
+          "payload_sha256": "50dd2656973435a41cdc1335b22aa0c593846e693a17c20ca9a972997c340776"
+        }
+      ],
+      "records": 2,
+      "sheet_payload_bytes": 1545,
+      "sheet_payload_sha256": "44675ca186bb37df033168b961829e0145b7f863e7fe8801ab3bdb1175f5b9a3",
+      "untouched_members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "xl/_rels/workbook.xml.rels",
+        "xl/workbook.xml",
+        "xl/sharedStrings.xml",
+        "xl/theme/theme1.xml",
+        "xl/styles.xml",
+        "docProps/core.xml",
+        "docProps/app.xml"
+      ]
+    },
+    {
+      "archive": {
+        "bytes": 9251,
+        "path": "fixtures/overlap-128-wide-complete.xlsx",
+        "sha256": "ef813ad8c558445579d02250e24e9519351578bb0bd85dd7eddb69869e7c5bcd"
+      },
+      "cols_fragment_bytes": 16839,
+      "cols_fragment_sha256": "013c85e908c28d798f84ebb6d309180290fb96750e4300117952bdc74a29c191",
+      "description": "128 valid complete records with nested wide overlap through column XFD",
+      "id": "overlap-128-wide-complete",
+      "members": [
+        {
+          "compressed_bytes": 350,
+          "compressed_sha256": "1cc952da421dad9bc81c25c42046e3fde73fc1e92d503c9434ebd89edfc9118c",
+          "method": 8,
+          "name": "[Content_Types].xml",
+          "payload_bytes": 1168,
+          "payload_sha256": "bfa02ea1994b73dca866ea3b6596340fe00063d19eab5957c7d8e6a5fa10599a"
+        },
+        {
+          "compressed_bytes": 244,
+          "compressed_sha256": "3e4f9cfb1e1af1f288d732cc14042a178543412934e2473256842dbde2ed6777",
+          "method": 8,
+          "name": "_rels/.rels",
+          "payload_bytes": 588,
+          "payload_sha256": "73e5a29f48d5ab979eeda062493bc7e679265c1344ef936978b8becec5549497"
+        },
+        {
+          "compressed_bytes": 243,
+          "compressed_sha256": "26d5ba4041a4d1f1859214ed4283b27dfbdd654d7b15d366f1473d565773ec02",
+          "method": 8,
+          "name": "xl/_rels/workbook.xml.rels",
+          "payload_bytes": 698,
+          "payload_sha256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1"
+        },
+        {
+          "compressed_bytes": 618,
+          "compressed_sha256": "f6fac8b09435024c88c0b2d9920ed5ee9e49684e224cc534851bcaef5111fcb6",
+          "method": 8,
+          "name": "xl/workbook.xml",
+          "payload_bytes": 1275,
+          "payload_sha256": "033f58107edff53315c8409a31ceab9000f65a41e46f5cdbb82ae310033f7bf8"
+        },
+        {
+          "compressed_bytes": 178,
+          "compressed_sha256": "d1574b27c5e5c9a4e3205899db7b03f3b2c6a9259aa88196dc9f3f3af75587a0",
+          "method": 8,
+          "name": "xl/sharedStrings.xml",
+          "payload_bytes": 257,
+          "payload_sha256": "f05277367d2f88b2e2245744f9bb8173d69a137b3fd7de53e2564540a83fba14"
+        },
+        {
+          "compressed_bytes": 1691,
+          "compressed_sha256": "2c89b4c89c3c51ffab08094cb8037e2f1a94332f0e5b9bf4e2021a171c372703",
+          "method": 8,
+          "name": "xl/theme/theme1.xml",
+          "payload_bytes": 6798,
+          "payload_sha256": "02f4734632e3247ca161732fa40794123be750669ab8710fa5f32ca2eb0f4a99"
+        },
+        {
+          "compressed_bytes": 691,
+          "compressed_sha256": "86672ce43860c69a1620f91f804928106432cd937287bca46963b3c0f40207ec",
+          "method": 8,
+          "name": "xl/styles.xml",
+          "payload_bytes": 1563,
+          "payload_sha256": "2354ffc6a743a88bf717a77fb9d0816efaff57961cfd8d2f0e2827344c702fbf"
+        },
+        {
+          "compressed_bytes": 1491,
+          "compressed_sha256": "e5a837bee79dacc6df72e54fe5bf63c737ecd0376cc30a17b21de358e3babc9e",
+          "method": 8,
+          "name": "xl/worksheets/sheet1.xml",
+          "payload_bytes": 18265,
+          "payload_sha256": "f41cac8104589539746565c4a136fa9e14e141ca5dbb5a1054ee8193ee94c567"
+        },
+        {
+          "compressed_bytes": 330,
+          "compressed_sha256": "7c3b504f0957c18f536a8aab48ba58c6571a718c6f31689b1f515afb96bff577",
+          "method": 8,
+          "name": "docProps/core.xml",
+          "payload_bytes": 625,
+          "payload_sha256": "0d0b7730c1ad38a08aeb0e7684eb7723e285002ba3460605c00ad9d84ca2d21e"
+        },
+        {
+          "compressed_bytes": 441,
+          "compressed_sha256": "eafa192725a9fc36c2cc87cbd074bc18a15564c570d1d814232f2f498503681b",
+          "method": 8,
+          "name": "docProps/app.xml",
+          "payload_bytes": 836,
+          "payload_sha256": "50dd2656973435a41cdc1335b22aa0c593846e693a17c20ca9a972997c340776"
+        }
+      ],
+      "records": 128,
+      "sheet_payload_bytes": 18265,
+      "sheet_payload_sha256": "f41cac8104589539746565c4a136fa9e14e141ca5dbb5a1054ee8193ee94c567",
+      "untouched_members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "xl/_rels/workbook.xml.rels",
+        "xl/workbook.xml",
+        "xl/sharedStrings.xml",
+        "xl/theme/theme1.xml",
+        "xl/styles.xml",
+        "docProps/core.xml",
+        "docProps/app.xml"
+      ]
+    }
+  ]
+}

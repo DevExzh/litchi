@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/guard_root_check.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790640897.2038531,
+  "output_sha256": "d354b51eec6e83ff021abce7ca87a2bbb2d2d316e01633e6af501f386b6cf261",
+  "started_unix": 1790640897.0827367
+}

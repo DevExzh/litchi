@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0832 — first XLSX column record stored inline
+
+[0832](0832-xlsx-inline-column-map.md) The matched parent experiment retains 180 reports / 20,304 samples. Real-edit requested bytes fall 2,373,966→276,494 (88.35%); paired native p50 ratio is 0.895998 [0.887658–0.898114]. Lifecycle ratio is 0.990366 [0.981989–0.996211]. A separate 48-report / 12,040-sample promotion guard passes without regression flags; no RSS reduction is claimed.
+
 ## 0831 — unused XLSX column-action map removed
 
 [0831](0831-xlsx-empty-column-actions.md) A matched 180-report/20,304-sample XLSX experiment removes one unused 512 KiB column-action map from the real edit: requested bytes fall 18.09%, and paired native p50 ratio is 0.980416 [0.975937–0.983917]. All nine cases remain visible; lifecycle confidence includes 1.0, and real peak-above-entry/RSS reductions are not claimed.

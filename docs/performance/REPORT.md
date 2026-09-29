@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0832 — first XLSX column record stored inline
+
+[0832](0832-xlsx-inline-column-map.md) Adopted inline first-record column-map storage. Real-edit requested bytes fall 88.35%, allocation calls fall 2,509→2,505, paired native p50 falls 10.40%, and peak above entry falls 1,066,957→26,343 bytes. Full lifecycle paired p50 falls 0.96%. Both controlled promotion fixtures trigger no regression flags; individual cases and descriptive variability remain explicit, with no general XLSX or RSS improvement claim.
+
 ## 0831 — unused XLSX column-action map removed
 
 [0831](0831-xlsx-empty-column-actions.md) Adopted the three-line empty-action return after matched measurement: real-edit allocations fall 2,510→2,509 and requested bytes 2,898,254→2,373,966. Paired p50 ratio is 0.980416 [0.975937–0.983917]. No frozen regression guard is triggered; 20 spread and 10 tail diagnostics remain explicit, and the lifecycle interval includes 1.0.

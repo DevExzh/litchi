@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/preflight.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790638112.3937168,
+  "output_sha256": "93cb8ceec9ecb33833d4ab8f1bb259c978fbe563659650008b96f12c747b8a41",
+  "started_unix": 1790638112.1888306
+}

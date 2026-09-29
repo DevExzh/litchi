@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/generate_fixtures.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790638864.242521,
+  "launcher_sha256": "6c31ce08395358b376e69407cc2205bc77be331b9e77485081c998a3071f5a2d",
+  "output_sha256": "671536ca2d24c699ceefe1d4d9099d257268c3746e873f30eac3fcb8eaebf4f4",
+  "sources_unchanged": true,
+  "started_unix": 1790638864.20815
+}

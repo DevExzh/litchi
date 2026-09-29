@@ -24,9 +24,9 @@ pub(crate) fn write_columns(
     actions: BTreeMap<Column, ColumnAction>,
     sheet: &str,
 ) -> Result<()> {
-    let mut owners = Assignments::new()?;
+    let mut owners = Assignments::new();
     for (index, column) in stored.columns.iter().enumerate() {
-        owners.assign(column.first, column.last, index);
+        owners.assign(column.first, column.last, index)?;
     }
     let mut by_owner = HashMap::<usize, BTreeMap<Column, ColumnAction>>::new();
     let mut implicit = BTreeMap::new();

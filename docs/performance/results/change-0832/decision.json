@@ -1,0 +1,399 @@
+{
+  "adopt": true,
+  "analysis_sha256": "6da3833bc03760e2ca21696d6d0228e881c61bf735e7c7608e0d0308ac819ca6",
+  "audit_sha256": "eb7e991cc60535634a6d01595f1600c67852d518b9c41f514bb948eb5e3469a0",
+  "descriptive_spread_flags": {
+    "noop-medium": [
+      "before.p50_ns",
+      "before.p95_ns",
+      "before.p99_ns",
+      "before.mean_ns",
+      "after.p50_ns",
+      "after.p95_ns",
+      "after.p99_ns",
+      "after.mean_ns"
+    ],
+    "one-cell-dense-wide": [],
+    "one-cell-medium": [],
+    "one-cell-tiny": [
+      "before.p99_ns",
+      "after.p95_ns",
+      "after.p99_ns"
+    ],
+    "one-percent-dense-wide": [],
+    "one-percent-medium": [
+      "before.p99_ns",
+      "after.p99_ns"
+    ],
+    "one-percent-tiny": [
+      "before.p95_ns",
+      "after.p95_ns",
+      "after.p99_ns"
+    ],
+    "real-edit": [
+      "before.p95_ns"
+    ],
+    "real-lifecycle": [
+      "before.p99_ns",
+      "after.p95_ns",
+      "after.p99_ns"
+    ]
+  },
+  "descriptive_tail_flags": {
+    "noop-medium": [
+      "before",
+      "after"
+    ],
+    "one-cell-dense-wide": [],
+    "one-cell-medium": [],
+    "one-cell-tiny": [
+      "before",
+      "after"
+    ],
+    "one-percent-dense-wide": [],
+    "one-percent-medium": [],
+    "one-percent-tiny": [
+      "before",
+      "after"
+    ],
+    "real-edit": [
+      "before",
+      "after"
+    ],
+    "real-lifecycle": [
+      "before"
+    ]
+  },
+  "limits": [
+    "One small real XLSX fixture and fixed synthetic cases; no cross-format speedup claim.",
+    "Full-output byte preservation is checked by separate pinned oracle tests; timed real edits check admitted outcomes.",
+    "Supplemental controlled promotion fixtures do not establish general producer or nonempty-column-action performance.",
+    "Process RSS includes harness setup; observer elapsed times do not support latency claims."
+  ],
+  "peak_diagnostic": {
+    "cases": {
+      "noop-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 280608,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "67027e7cca02ee35658137ecea7c622cc042de20f9bce90c1822b87fc641afdd"
+            },
+            {
+              "entry_live_bytes": 280608,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "6a9955f4454d59105d57439cf8a43f24de661e92121677dfec29e67e2b3ea4b6"
+            }
+          ],
+          "entry_live_bytes": 280608.0,
+          "peak_above_entry_bytes": 0.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 280611,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "b8962ecb337deb5ada546f64a5b568fb4c01570aea2666236852ed6117969c42"
+            },
+            {
+              "entry_live_bytes": 280611,
+              "peak_above_entry_bytes": 0,
+              "report_sha256": "e65950ac5a4ec039300fd5f7097797f96d98078505356dc25279784b7571d01e"
+            }
+          ],
+          "entry_live_bytes": 280611.0,
+          "peak_above_entry_bytes": 0.0
+        }
+      },
+      "one-cell-dense-wide": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6276212,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "54ee9e08769533eefa68c7d78131d815a7dd033d487b17a329abf8cd69564ba5"
+            },
+            {
+              "entry_live_bytes": 6276212,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "69759ee6cf62ed608c7ac7480d2fa44f3fa15ce433f54c6125b0df0b078a6b60"
+            }
+          ],
+          "entry_live_bytes": 6276212.0,
+          "peak_above_entry_bytes": 21210673.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6276215,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "53492a4f8421e9b86e7b2361d1346934e1d2dffc6547a4917728ea4d0275b47f"
+            },
+            {
+              "entry_live_bytes": 6276215,
+              "peak_above_entry_bytes": 21210673,
+              "report_sha256": "0cc7ff83b35b28ecf0ae60e944311a7192a38cbed864a94e7a9b7fb92f56f420"
+            }
+          ],
+          "entry_live_bytes": 6276215.0,
+          "peak_above_entry_bytes": 21210673.0
+        }
+      },
+      "one-cell-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 309715,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "8d527303a0b36157d2c9a0214b2f29073a4907d828b51974e1e62ecc0a456e6c"
+            },
+            {
+              "entry_live_bytes": 309715,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "2da1cbe13be60edfcffb6bf9e6b67fe622451abae88b11af02bc799828f20865"
+            }
+          ],
+          "entry_live_bytes": 309715.0,
+          "peak_above_entry_bytes": 941014.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 309718,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "11245aad923a31a40323a4ad4648bf35f0ce3b37844422271705a4079d85fc01"
+            },
+            {
+              "entry_live_bytes": 309718,
+              "peak_above_entry_bytes": 941014,
+              "report_sha256": "6d4e0e2dbaf548420d220a7f6b61df0bbe202bbfc16c60b17e93968d7d6a25fd"
+            }
+          ],
+          "entry_live_bytes": 309718.0,
+          "peak_above_entry_bytes": 941014.0
+        }
+      },
+      "one-cell-tiny": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 125437,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "77d3eb481f731588700690e0c5c8e23ded7f32e9ca3153d94ee49250f192c03e"
+            },
+            {
+              "entry_live_bytes": 125437,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "1c38c159e89783cd2d74921fbff6d4805cd21a1a6fb4a0376e07a636c2e7fe49"
+            }
+          ],
+          "entry_live_bytes": 125437.0,
+          "peak_above_entry_bytes": 518759.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 125440,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "cdb41b79f1c9b1c9c6a535ae081611f59b9c805b9687f7a6a5eb2dc07106b825"
+            },
+            {
+              "entry_live_bytes": 125440,
+              "peak_above_entry_bytes": 518759,
+              "report_sha256": "2287626996ce987e3de14e49f259a219f7e833268c67e98ee38bf6fd3f375054"
+            }
+          ],
+          "entry_live_bytes": 125440.0,
+          "peak_above_entry_bytes": 518759.0
+        }
+      },
+      "one-percent-dense-wide": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6566743,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "21281854dc0c5306fb5703aa9439a6a68942fbcdf57c9159e0868c4e55197a6b"
+            },
+            {
+              "entry_live_bytes": 6566743,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "845772c81131f96c664d5afc1d786c381dc643f2bff9244d38400f27748909d7"
+            }
+          ],
+          "entry_live_bytes": 6566743.0,
+          "peak_above_entry_bytes": 36443008.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 6566746,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "66159c90d7e6da011ee25716f0992e482850c8e6e73804883e7dac431866c654"
+            },
+            {
+              "entry_live_bytes": 6566746,
+              "peak_above_entry_bytes": 36443008,
+              "report_sha256": "14faad722cea8696a620263c142d130f1d3f520bf050ff14ee7a225d50cae7b7"
+            }
+          ],
+          "entry_live_bytes": 6566746.0,
+          "peak_above_entry_bytes": 36443008.0
+        }
+      },
+      "one-percent-medium": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 314015,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "0b28b248377d288757c6fb5161e104d78a80e5af1a16b13ea72e4701c57fba35"
+            },
+            {
+              "entry_live_bytes": 314015,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "8c99c8a55dc4a01c8ce04a1e477cd161e6785bcb5c27599c8322bcc8fb104780"
+            }
+          ],
+          "entry_live_bytes": 314015.0,
+          "peak_above_entry_bytes": 2340425.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 314018,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "08bb4e3bb8bcb456fcd6c90eebd5048bdcc0860c7442b507a4703442d7b9fd05"
+            },
+            {
+              "entry_live_bytes": 314018,
+              "peak_above_entry_bytes": 2340425,
+              "report_sha256": "728f84d201252af37be76dd42b0d35317d0d61bb1be4a4d75d976234b90570df"
+            }
+          ],
+          "entry_live_bytes": 314018.0,
+          "peak_above_entry_bytes": 2340425.0
+        }
+      },
+      "one-percent-tiny": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 126707,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "acdc6c3f6d70f7428ee73815dd2fbc747d0ae6a951bfd2551e48047297941a9d"
+            },
+            {
+              "entry_live_bytes": 126707,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "ed9abc34e9054b9f6f466b1b64213229175926813df17e993ea4542dba79cfbc"
+            }
+          ],
+          "entry_live_bytes": 126707.0,
+          "peak_above_entry_bytes": 552204.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 126710,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "28a6727714fb19c7ffdd728f28f84275b915a36f0fa844fc58201aebd69e8e37"
+            },
+            {
+              "entry_live_bytes": 126710,
+              "peak_above_entry_bytes": 552204,
+              "report_sha256": "b9601bf2f34dd1733ba5b0ce35b8c966e3d2d97e5757353052af4ab9228a89b6"
+            }
+          ],
+          "entry_live_bytes": 126710.0,
+          "peak_above_entry_bytes": 552204.0
+        }
+      },
+      "real-edit": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 63261,
+              "peak_above_entry_bytes": 26343,
+              "report_sha256": "c262ddf4ab739da2637b358369c4ba905172dbcb5e639ba5fcda064a75f85172"
+            },
+            {
+              "entry_live_bytes": 63261,
+              "peak_above_entry_bytes": 26343,
+              "report_sha256": "b97013514158634c4253c4c230194edeb33d3b912cb6358b7b966d9a0bf53990"
+            }
+          ],
+          "entry_live_bytes": 63261.0,
+          "peak_above_entry_bytes": 26343.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 63264,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "997d3cd0714ed80afe898bb381e93825de5eae1b90dcd75c1f376d1108c75826"
+            },
+            {
+              "entry_live_bytes": 63264,
+              "peak_above_entry_bytes": 1066957,
+              "report_sha256": "473a329f1011e4315bb22502590056bd4bcaf9b3251f7db971cfae669f9794bc"
+            }
+          ],
+          "entry_live_bytes": 63264.0,
+          "peak_above_entry_bytes": 1066957.0
+        }
+      },
+      "real-lifecycle": {
+        "after": {
+          "blocks": [
+            {
+              "entry_live_bytes": 27193,
+              "peak_above_entry_bytes": 602311,
+              "report_sha256": "ff4c55faa3a3f3044199e3dfbf09a2ea15b55518c8ffa4358580d029f50416ce"
+            },
+            {
+              "entry_live_bytes": 27193,
+              "peak_above_entry_bytes": 602311,
+              "report_sha256": "b9f46009e33de19def6bf9a64c44e5e4db83cbc6ad42a71c24c6e3c9cd6a6184"
+            }
+          ],
+          "entry_live_bytes": 27193.0,
+          "peak_above_entry_bytes": 602311.0
+        },
+        "before": {
+          "blocks": [
+            {
+              "entry_live_bytes": 27196,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "2447ef6dd90855efcf45ba67b0de50d722d9b1b2615d05d100ca6cacabacfe7e"
+            },
+            {
+              "entry_live_bytes": 27196,
+              "peak_above_entry_bytes": 1103104,
+              "report_sha256": "17d019373248264cb8cfde4cd44647b1ff004bdd213f5307cb5f383b74b1ac29"
+            }
+          ],
+          "entry_live_bytes": 27196.0,
+          "peak_above_entry_bytes": 1103104.0
+        }
+      }
+    },
+    "derivation": "Within each observer process, median of region_peak_live_bytes minus live_bytes_before; midpoint median across two processes."
+  },
+  "promotion_guard": {
+    "analysis_sha256": "7998bb1a7a9095bbc71a61c31f492d1726e7d4a6acae2fb98b71e5e713c3da3b",
+    "corrected_analysis_sha256": "611564c76b873b733d59e8863b9eefb4de592fe7c96de4b35fd15ff64ffbdc17",
+    "reader_correction_sha256": "7dfc31a329b6ecb5c2205153b052a889664d256df9309d5133312d42624d8c77",
+    "regression_flags": []
+  },
+  "real_edit_requested_bytes": {
+    "after": 276494.0,
+    "before": 2373966.0,
+    "reduction_bytes": 2097472.0,
+    "reduction_fraction": 0.8835307666579892
+  },
+  "reason": "Adopt inline first-record storage only if the frozen 50% requested-byte gate passes with preserved output and no unresolved regression flag.",
+  "regression_flags": [],
+  "schema": "litchi.performance.0832.root-decision.v1"
+}

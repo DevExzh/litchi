@@ -1013,7 +1013,7 @@ impl<'c> Parser<'c> {
             return Err(invalid("worksheet cols appears after sheetData"));
         }
         self.seen_columns = true;
-        self.columns = Some(Assignments::new()?);
+        self.columns = Some(Assignments::new());
         Ok(())
     }
 
@@ -1072,7 +1072,7 @@ impl<'c> Parser<'c> {
                     outline,
                     flags,
                 },
-            );
+            )?;
         self.column_records = self
             .column_records
             .checked_add(1)

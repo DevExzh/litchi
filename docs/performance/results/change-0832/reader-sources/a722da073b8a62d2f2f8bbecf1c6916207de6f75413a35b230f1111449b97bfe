@@ -1,0 +1,46 @@
+"""Retain offline reader attempts and content-addressed source snapshots."""
+import subprocess
+import sys
+import time
+
+import driver as d
+
+
+def main():
+    script = sys.argv[1]
+    extra = sys.argv[2:]
+    assert script in ("analyze.py", "audit.py", "preflight.py", "qualify.py",
+                      "qualification_preflight.py", "custody_preflight.py", "decision.py",
+                      "guard_preflight.py")
+    assert not extra or (script in ("analyze.py", "audit.py") and extra == ["--check"])
+    root = d.P / "reader-attempts"
+    root.mkdir(exist_ok=True)
+    folder = root / f"{len(list(root.iterdir())):02}-{script.removesuffix('.py')}"
+    folder.mkdir()
+    snapshots = d.P / "reader-sources"
+    snapshots.mkdir(exist_ok=True)
+    sources = {p.name: d.sha(p) for p in d.P.glob("*.py")}
+    for name, digest in sources.items():
+        destination = snapshots / digest
+        if destination.exists():
+            assert d.sha(destination) == digest
+        else:
+            with destination.open("xb") as stream:
+                stream.write((d.P / name).read_bytes())
+    d.write(folder / "sources.json", sources)
+    row = {"argv": ["python3", "-B", str(d.P / script), *extra],
+           "cwd": str(d.ROOT), "started_unix": time.time()}
+    d.write(folder / "started.json", row)
+    with (folder / "output.log").open("xb") as log:
+        child = subprocess.run(row["argv"], cwd=d.ROOT, stdout=log,
+                               stderr=subprocess.STDOUT)
+    row.update(exit_code=child.returncode, finished_unix=time.time(),
+               output_sha256=d.sha(folder / "output.log"))
+    d.write(folder / "receipt.json", row)
+    assert all(d.sha(d.P / n) == h for n, h in sources.items())
+    print(folder.name, child.returncode, flush=True)
+    assert child.returncode == 0
+
+
+if __name__ == "__main__":
+    main()

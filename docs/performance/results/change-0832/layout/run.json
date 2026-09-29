@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "/home/zhuhe/code/litchi-target-0832/layout-probe"
+  ],
+  "binary": {
+    "bytes": 4337368,
+    "path": "/home/zhuhe/code/litchi-target-0832/layout-probe",
+    "sha256": "d181965d134e3e7394f9950a2d9e739bad98e3899456c35782512d22a84179c1"
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790638358.197077,
+  "output_sha256": "a83369534b872db93a2c638e81b071a04bf0110c2c23572d6564f53da97d9d06",
+  "started_unix": 1790638358.196262
+}

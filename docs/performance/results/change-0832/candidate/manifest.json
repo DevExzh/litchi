@@ -1,0 +1,18 @@
+{
+  "crates/litchi-xlsx/src/column.rs": {
+    "after": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36",
+    "before": "c78029bd2601b4458c138efefd3ff0fdcf7004e50954410d85ad26d5cc2a08ea"
+  },
+  "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+    "after": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6",
+    "before": "6b6a237cd40a5030bb4640b9ecd193f3c1e490011fe88e13ac1bb0c52ddbcd7c"
+  },
+  "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": {
+    "after": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972",
+    "before": "30af260466ed443a6663752a21cda64327ff4b6d9a592e059466f5fab0b40ca6"
+  },
+  "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": {
+    "after": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91",
+    "before": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5"
+  }
+}

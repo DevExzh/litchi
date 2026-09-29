@@ -1,0 +1,9 @@
+{
+  "inputs_sha256": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda",
+  "measured_reports": 144,
+  "measured_samples": 20268,
+  "qualification_admission_sha256": "2b19e8bfb652ef858398b6f7c0fd20466971c468e0bdc01dfea66adacdddc16b",
+  "reports": 180,
+  "samples": 20304,
+  "status": "pass"
+}

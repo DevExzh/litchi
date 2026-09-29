@@ -68,10 +68,10 @@ pub(super) fn validate_column_actions(
     if actions.is_empty() {
         return Ok(());
     }
-    let mut owners = Assignments::new()?;
+    let mut owners = Assignments::new();
     if let Some(stored) = &layout.columns {
         for (index, column) in stored.columns.iter().enumerate() {
-            owners.assign(column.first, column.last, index);
+            owners.assign(column.first, column.last, index)?;
         }
     }
     for (column, action) in actions {

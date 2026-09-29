@@ -1,0 +1,464 @@
+--- a/crates/litchi-xlsx/src/column.rs
++++ b/crates/litchi-xlsx/src/column.rs
+@@ -403,34 +403,68 @@
+     Split,
+ }
+ 
+-/// Fixed-grid lazy range assignment map.
++/// Lazy range assignment map with a bounded dense representation.
+ ///
+-/// Assignments are `O(log COLUMNS)` even for a full-width record. This keeps
+-/// maliciously overlapping `<col>` records from multiplying parser work by
+-/// the width of every range.
++/// The first record is kept inline. A second record pays one bounded
++/// `O(COLUMNS)` promotion, after which each assignment is `O(log COLUMNS)`
++/// even for a full-width record. This keeps maliciously overlapping `<col>`
++/// records from multiplying parser work by the width of every range.
+ #[derive(Debug)]
+ pub(crate) struct Assignments<T> {
+     nodes: Vec<Node<T>>,
++    first: Option<Assigned<T>>,
+ }
+ 
+ impl<T> Assignments<T>
+ where
+     T: Copy + Eq,
+ {
+-    pub(crate) fn new() -> Result<Self> {
+-        let capacity = (COLUMNS as usize)
+-            .checked_mul(2)
+-            .ok_or_else(|| invalid("column interval-map capacity overflow"))?;
+-        let mut nodes = Vec::new();
+-        nodes
+-            .try_reserve_exact(capacity)
+-            .map_err(|source| allocation("column interval map", source))?;
+-        nodes.resize(capacity, Node::Unset);
+-        Ok(Self { nodes })
+-    }
+-
+-    pub(crate) fn assign(&mut self, first: Index, last: Index, value: T) {
+-        self.assign_node(
++    /// Create an empty assignment map without allocating the dense grid.
++    pub(crate) fn new() -> Self {
++        Self {
++            nodes: Vec::new(),
++            first: None,
++        }
++    }
++
++    /// Apply one complete-record assignment.
++    ///
++    /// The first record stays inline. A second record fallibly promotes the
++    /// map to the fixed grid, which costs one bounded O(COLUMNS) setup.
++    /// Once promoted, each later assignment remains O(log COLUMNS), even
++    /// when the record covers the full worksheet width.
++    pub(crate) fn assign(&mut self, first: Index, last: Index, value: T) -> Result<()> {
++        if self.nodes.is_empty() {
++            if let Some(previous) = self.first {
++                let mut nodes = Self::dense_nodes()?;
++                Self::assign_node(
++                    &mut nodes,
++                    1,
++                    0,
++                    COLUMNS,
++                    previous.first.get(),
++                    previous.last.get().saturating_add(1),
++                    previous.value,
++                );
++                Self::assign_node(
++                    &mut nodes,
++                    1,
++                    0,
++                    COLUMNS,
++                    first.get(),
++                    last.get().saturating_add(1),
++                    value,
++                );
++                self.nodes = nodes;
++                self.first = None;
++            } else {
++                self.first = Some(Assigned { first, last, value });
++            }
++            return Ok(());
++        }
++
++        Self::assign_node(
++            &mut self.nodes,
+             1,
+             0,
+             COLUMNS,
+@@ -438,9 +472,17 @@
+             last.get().saturating_add(1),
+             value,
+         );
++        Ok(())
+     }
+ 
+     pub(crate) fn get(&self, index: Index) -> Option<T> {
++        if self.nodes.is_empty() {
++            return self
++                .first
++                .filter(|assigned| assigned.first <= index && index <= assigned.last)
++                .map(|assigned| assigned.value);
++        }
++
+         let mut node = 1usize;
+         let mut first = 0u32;
+         let mut last = COLUMNS;
+@@ -463,6 +505,17 @@
+     }
+ 
+     pub(crate) fn into_ranges(self) -> Result<Box<[Assigned<T>]>> {
++        if self.nodes.is_empty() {
++            let mut ranges = Vec::new();
++            if let Some(first) = self.first {
++                ranges
++                    .try_reserve_exact(1)
++                    .map_err(|source| allocation("column ranges", source))?;
++                ranges.push(first);
++            }
++            return Ok(ranges.into_boxed_slice());
++        }
++
+         let mut raw = Vec::new();
+         self.collect(1, 0, COLUMNS, &mut raw)?;
+         let mut ranges = Vec::new();
+@@ -479,8 +532,20 @@
+         Ok(ranges.into_boxed_slice())
+     }
+ 
++    fn dense_nodes() -> Result<Vec<Node<T>>> {
++        let capacity = (COLUMNS as usize)
++            .checked_mul(2)
++            .ok_or_else(|| invalid("column interval-map capacity overflow"))?;
++        let mut nodes = Vec::new();
++        nodes
++            .try_reserve_exact(capacity)
++            .map_err(|source| allocation("column interval map", source))?;
++        nodes.resize(capacity, Node::Unset);
++        Ok(nodes)
++    }
++
+     fn assign_node(
+-        &mut self,
++        nodes: &mut [Node<T>],
+         node: usize,
+         first: u32,
+         last: u32,
+@@ -489,7 +554,7 @@
+         value: T,
+     ) {
+         if assigned_first <= first && last <= assigned_last {
+-            if let Some(slot) = self.nodes.get_mut(node) {
++            if let Some(slot) = nodes.get_mut(node) {
+                 *slot = Node::Value(value);
+             }
+             return;
+@@ -497,24 +562,40 @@
+         let middle = first + (last - first) / 2;
+         let left = node.saturating_mul(2);
+         let right = left.saturating_add(1);
+-        let current = self.nodes.get(node).copied().unwrap_or(Node::Unset);
++        let current = nodes.get(node).copied().unwrap_or(Node::Unset);
+         if current != Node::Split {
+-            if let Some(slot) = self.nodes.get_mut(left) {
++            if let Some(slot) = nodes.get_mut(left) {
+                 *slot = current;
+             }
+-            if let Some(slot) = self.nodes.get_mut(right) {
++            if let Some(slot) = nodes.get_mut(right) {
+                 *slot = current;
+             }
+         }
+         if assigned_first < middle {
+-            self.assign_node(left, first, middle, assigned_first, assigned_last, value);
++            Self::assign_node(
++                nodes,
++                left,
++                first,
++                middle,
++                assigned_first,
++                assigned_last,
++                value,
++            );
+         }
+         if middle < assigned_last {
+-            self.assign_node(right, middle, last, assigned_first, assigned_last, value);
+-        }
+-        let left_value = self.nodes.get(left).copied().unwrap_or(Node::Unset);
+-        let right_value = self.nodes.get(right).copied().unwrap_or(Node::Unset);
+-        if let Some(slot) = self.nodes.get_mut(node) {
++            Self::assign_node(
++                nodes,
++                right,
++                middle,
++                last,
++                assigned_first,
++                assigned_last,
++                value,
++            );
++        }
++        let left_value = nodes.get(left).copied().unwrap_or(Node::Unset);
++        let right_value = nodes.get(right).copied().unwrap_or(Node::Unset);
++        if let Some(slot) = nodes.get_mut(node) {
+             *slot = if left_value == right_value {
+                 left_value
+             } else {
+@@ -621,6 +702,128 @@
+     }
+ 
+     #[test]
++    fn empty_and_single_assignments_avoid_dense_storage() {
++        let assignments = Assignments::<u8>::new();
++        assert!(assignments.nodes.is_empty());
++        assert_eq!(assignments.nodes.capacity(), 0);
++        assert!(assignments.first.is_none());
++        assert_eq!(assignments.get(Index::FIRST), None);
++        assert_eq!(assignments.get(Index::LAST), None);
++        assert!(assignments.into_ranges().expect("empty ranges").is_empty());
++
++        let mut assignments = Assignments::new();
++        let first = Index::new(10).expect("first");
++        let last = Index::new(20).expect("last");
++        assignments.assign(first, last, 7).expect("assign");
++        assert!(assignments.nodes.is_empty());
++        assert_eq!(assignments.nodes.capacity(), 0);
++        assert_eq!(
++            assignments.first,
++            Some(Assigned {
++                first,
++                last,
++                value: 7,
++            })
++        );
++        assert_eq!(assignments.get(first), Some(7));
++        assert_eq!(assignments.get(last), Some(7));
++        assert_eq!(assignments.get(Index::FIRST), None);
++        assert_eq!(assignments.get(Index::LAST), None);
++
++        let ranges = assignments.into_ranges().expect("single range");
++        assert_eq!(
++            &*ranges,
++            &[Assigned {
++                first,
++                last,
++                value: 7,
++            }]
++        );
++    }
++
++    #[test]
++    fn promotion_preserves_overlap_disjointness_and_equal_range_compaction() {
++        let mut assignments = Assignments::new();
++        let first = Index::new(2).expect("first");
++        let second = Index::new(4).expect("second");
++        assignments
++            .assign(first, Index::new(3).expect("last"), 7)
++            .expect("assign");
++        assignments
++            .assign(second, Index::new(5).expect("last"), 7)
++            .expect("promote");
++        assert!(!assignments.nodes.is_empty());
++        assert!(assignments.first.is_none());
++
++        let ranges = assignments.into_ranges().expect("equal ranges");
++        assert_eq!(
++            &*ranges,
++            &[Assigned {
++                first,
++                last: Index::new(5).expect("last"),
++                value: 7,
++            }]
++        );
++
++        let mut assignments = Assignments::new();
++        assignments
++            .assign(
++                Index::new(2).expect("first"),
++                Index::new(5).expect("last"),
++                7,
++            )
++            .expect("assign");
++        assignments
++            .assign(
++                Index::new(3).expect("first"),
++                Index::new(4).expect("last"),
++                9,
++            )
++            .expect("promote");
++        let ranges = assignments.into_ranges().expect("overlap ranges");
++        assert_eq!(
++            &*ranges,
++            &[
++                Assigned {
++                    first: Index::new(2).expect("first"),
++                    last: Index::new(2).expect("last"),
++                    value: 7,
++                },
++                Assigned {
++                    first: Index::new(3).expect("first"),
++                    last: Index::new(4).expect("last"),
++                    value: 9,
++                },
++                Assigned {
++                    first: Index::new(5).expect("first"),
++                    last: Index::new(5).expect("last"),
++                    value: 7,
++                },
++            ]
++        );
++    }
++
++    #[test]
++    fn repeated_full_width_assignments_keep_one_maximal_range() {
++        let mut assignments = Assignments::new();
++        for value in [1_u8, 2, 3, 4] {
++            assignments
++                .assign(Index::FIRST, Index::LAST, value)
++                .expect("assign");
++        }
++        assert!(!assignments.nodes.is_empty());
++        let ranges = assignments.into_ranges().expect("full-width range");
++        assert_eq!(
++            &*ranges,
++            &[Assigned {
++                first: Index::FIRST,
++                last: Index::LAST,
++                value: 4,
++            }]
++        );
++    }
++
++    #[test]
+     fn later_ranges_replace_the_complete_effective_column_record() {
+         let hidden = Properties {
+             width: Width::new(20.0).ok(),
+@@ -634,13 +837,17 @@
+             outline: Outline::NONE,
+             flags: Flags::CUSTOM_WIDTH,
+         };
+-        let mut assignments = Assignments::new().expect("interval map");
+-        assignments.assign(Index::new(1).expect("B"), Index::new(3).expect("D"), hidden);
+-        assignments.assign(
+-            Index::new(2).expect("C"),
+-            Index::new(2).expect("C"),
+-            visible,
+-        );
++        let mut assignments = Assignments::new();
++        assignments
++            .assign(Index::new(1).expect("B"), Index::new(3).expect("D"), hidden)
++            .expect("assign");
++        assignments
++            .assign(
++                Index::new(2).expect("C"),
++                Index::new(2).expect("C"),
++                visible,
++            )
++            .expect("assign");
+ 
+         let stored = resolve(Some(assignments)).expect("stored ranges");
+         assert_eq!(stored.len(), 3);
+@@ -676,19 +883,31 @@
+ 
+     #[test]
+     fn bounded_assignment_tree_matches_a_naive_grid_oracle() {
+-        let mut assignments = Assignments::new().expect("interval map");
++        let mut assignments = Assignments::new();
+         let mut expected = vec![None; COLUMNS as usize];
+         for step in 0..1_000u32 {
+             let first = step.wrapping_mul(7_919) % COLUMNS;
+             let width = step.wrapping_mul(104_729) % 257;
+             let last = first.saturating_add(width).min(COLUMNS - 1);
+             let value = (step % 11) as u8;
+-            assignments.assign(
+-                Index::new(first).expect("first"),
+-                Index::new(last).expect("last"),
+-                value,
+-            );
++            assignments
++                .assign(
++                    Index::new(first).expect("first"),
++                    Index::new(last).expect("last"),
++                    value,
++                )
++                .expect("assign");
+             expected[first as usize..=last as usize].fill(Some(value));
++            if step % 101 == 0 {
++                for raw in [0, first, last, COLUMNS - 1] {
++                    let index = Index::new(raw).expect("checkpoint index");
++                    assert_eq!(
++                        assignments.get(index),
++                        expected[raw as usize],
++                        "checkpoint column {raw} at step {step}"
++                    );
++                }
++            }
+         }
+         for (raw, expected) in expected.iter().copied().enumerate() {
+             let index = Index::new(raw as u32).expect("grid index");
+@@ -696,6 +915,16 @@
+         }
+ 
+         let ranges = assignments.into_ranges().expect("compact ranges");
++        for window in ranges.windows(2) {
++            let previous = window[0];
++            let next = window[1];
++            assert!(previous.last < next.first);
++            assert!(
++                previous.last.get().saturating_add(1) != next.first.get()
++                    || previous.value != next.value,
++                "adjacent equal ranges were not compacted"
++            );
++        }
+         let mut actual = vec![None; COLUMNS as usize];
+         for range in ranges {
+             actual[range.first.get() as usize..=range.last.get() as usize].fill(Some(range.value));
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1013,7 +1013,7 @@
+             return Err(invalid("worksheet cols appears after sheetData"));
+         }
+         self.seen_columns = true;
+-        self.columns = Some(Assignments::new()?);
++        self.columns = Some(Assignments::new());
+         Ok(())
+     }
+ 
+@@ -1072,7 +1072,7 @@
+                     outline,
+                     flags,
+                 },
+-            );
++            )?;
+         self.column_records = self
+             .column_records
+             .checked_add(1)
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs
+@@ -24,9 +24,9 @@
+     actions: BTreeMap<Column, ColumnAction>,
+     sheet: &str,
+ ) -> Result<()> {
+-    let mut owners = Assignments::new()?;
++    let mut owners = Assignments::new();
+     for (index, column) in stored.columns.iter().enumerate() {
+-        owners.assign(column.first, column.last, index);
++        owners.assign(column.first, column.last, index)?;
+     }
+     let mut by_owner = HashMap::<usize, BTreeMap<Column, ColumnAction>>::new();
+     let mut implicit = BTreeMap::new();
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs
+@@ -68,10 +68,10 @@
+     if actions.is_empty() {
+         return Ok(());
+     }
+-    let mut owners = Assignments::new()?;
++    let mut owners = Assignments::new();
+     if let Some(stored) = &layout.columns {
+         for (index, column) in stored.columns.iter().enumerate() {
+-            owners.assign(column.first, column.last, index);
++            owners.assign(column.first, column.last, index)?;
+         }
+     }
+     for (column, action) in actions {
