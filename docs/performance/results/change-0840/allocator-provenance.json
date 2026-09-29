@@ -1,0 +1,30 @@
+{
+  "boundary": "Native main forbids unsafe; separate allocation binary installs copied System observer; unit-test build explicitly exercises wrapper without globally installing it.",
+  "files": [
+    {
+      "current": {
+        "bytes": 61932,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe/allocation_metrics.rs",
+        "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+      },
+      "prior": {
+        "bytes": 61932,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/allocator/allocation_metrics.rs",
+        "sha256": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5"
+      }
+    },
+    {
+      "current": {
+        "bytes": 11574,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe/counting_allocator.rs",
+        "sha256": "3fb335d1dc457df007367bb5a2743287b3f1ba3e6e272f1e22dc1baa6875b838"
+      },
+      "prior": {
+        "bytes": 11574,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0839/allocator/counting_allocator.rs",
+        "sha256": "3fb335d1dc457df007367bb5a2743287b3f1ba3e6e272f1e22dc1baa6875b838"
+      }
+    }
+  ],
+  "status": "pass"
+}

@@ -1,0 +1,31 @@
+[package]
+name = "litchi-perf-cfb-emission"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "cfb-emission-probe"
+path = "main.rs"
+
+[[bin]]
+name = "cfb-emission-probe-alloc"
+path = "allocation_main.rs"
+
+[dependencies]
+litchi-cfb = { path = "../../../../../crates/litchi-cfb", features = ["write"] }
+litchi-doc = { path = "../../../../../crates/litchi-doc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+# This is a self-contained evidence project.  The normal workspace does not
+# include it; the performance driver materializes and invokes this manifest.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+incremental = false

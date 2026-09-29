@@ -1,0 +1,55 @@
+{
+  "schema": "litchi.execution-cfb-emission.v1",
+  "mode": "timed",
+  "config": {
+    "case": "cfb-difat",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "output_verification": "outside wall timer: reopen, semantic projection, hashes, and inventory"
+  },
+  "input": {
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "case": "cfb-difat",
+    "format": "CFB/OLE2",
+    "sector_size": 512,
+    "paragraph_count": null,
+    "stream_count": 1,
+    "logical_input_bytes": 8388608,
+    "input_sha256": "112e3b2853b92488c9b124be73048c215f87c1052cca44d52e3c941205f24585",
+    "members": [
+      {
+        "name": "DifatPayload",
+        "bytes": 8388608,
+        "sha256": "7d1f51f14286163b028fb092f68e9c22b9d82caa5aab49aa79439517527edaf5"
+      }
+    ],
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "wall_ns": 2948232,
+      "output_bytes": 8456704,
+      "output_sha256": "ff4cf1762f79c24beb1dd61a81fc3220dee155bd2b0f9a6b161e7f60bad1ef0c",
+      "verification": {
+        "valid_output": true,
+        "output_bytes": 8456704,
+        "output_sha256": "ff4cf1762f79c24beb1dd61a81fc3220dee155bd2b0f9a6b161e7f60bad1ef0c",
+        "semantic_sha256": "112e3b2853b92488c9b124be73048c215f87c1052cca44d52e3c941205f24585",
+        "logical_output_bytes": 8388608,
+        "member_or_paragraph_count": 1,
+        "exact_input_match": true
+      }
+    }
+  ],
+  "final_verification": {
+    "valid_output": true,
+    "output_bytes": 8456704,
+    "output_sha256": "ff4cf1762f79c24beb1dd61a81fc3220dee155bd2b0f9a6b161e7f60bad1ef0c",
+    "semantic_sha256": "112e3b2853b92488c9b124be73048c215f87c1052cca44d52e3c941205f24585",
+    "logical_output_bytes": 8388608,
+    "member_or_paragraph_count": 1,
+    "exact_input_match": true
+  }
+}

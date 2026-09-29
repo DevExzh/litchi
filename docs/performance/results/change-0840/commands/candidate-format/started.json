@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "/home/zhuhe/code/litchi/crates/litchi-cfb/tests/writer_emission_order.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0840",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790694581.2020411
+}

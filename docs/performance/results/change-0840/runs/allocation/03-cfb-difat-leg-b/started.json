@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/03-cfb-difat-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0840/retained/leg-b/allocation/cfb-emission-probe",
+    "--case",
+    "cfb-difat",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/03-cfb-difat-leg-b/report.json"
+  ],
+  "binary": {
+    "bytes": 15009360,
+    "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-b/allocation/cfb-emission-probe",
+    "sha256": "7623c8fcdfe5fcff0bad679b857b03226100674ec224bc334296a51e91aa776b"
+  },
+  "block": 3,
+  "build": {
+    "bytes": 689,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/build-after-allocation.json",
+    "sha256": "5a9d96b3d7f8cd2efdf986a0f4046dab3e8f9b22af6209038ed19dbaa8509244"
+  },
+  "case": "cfb-difat",
+  "lane": "allocation",
+  "leg": "after",
+  "started_unix": 1790695059.7780106
+}

@@ -1,0 +1,31 @@
+{
+  "exit_code": 0,
+  "files": [
+    {
+      "bytes": 22116,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/04-cfb-large-only-leg-b/report.json",
+      "sha256": "95720ab7a3a6d55b1273e57676571979d511fbc70661180905a7d66537eea4c8"
+    },
+    {
+      "bytes": 1101,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/04-cfb-large-only-leg-b/started.json",
+      "sha256": "1b55105cd0616d701df7ed515cd9897126a12a2ebb158d52328b65e3fdcf3cd6"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/04-cfb-large-only-leg-b/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/04-cfb-large-only-leg-b/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 15,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation/04-cfb-large-only-leg-b/time.txt",
+      "sha256": "cf66e55b9bcc3ca3f5179311784f7dc06e0e03cb921e4aa1964d14decf63c166"
+    }
+  ],
+  "finished_unix": 1790695067.1442225
+}

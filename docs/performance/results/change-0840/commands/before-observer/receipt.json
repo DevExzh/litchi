@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/capture.py",
+    "observer",
+    "before"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790694289.088267,
+  "log": {
+    "bytes": 303,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-observer/output.log",
+    "sha256": "678f9d2f8c78d91b4e51b490067f977709df786f98e8b90d199bb212b9c56e07"
+  },
+  "started_unix": 1790694288.2435806
+}

@@ -1,0 +1,315 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "focused writer tests use panic-on-failure assertions"
+)]
+//! Regression coverage for fresh mixed MiniFAT/FAT emission.
+//!
+//! The allocator reserves regular stream sectors before the regular-sector
+//! ministream.  A seekable sink should therefore receive the large payload
+//! immediately after the header; emitting the ministream first makes a fresh
+//! `Cursor<Vec<u8>>` zero-initialize the large-payload gap.
+
+use litchi_cfb::{OleError, OleFile, OleWriter};
+use std::io::{self, Cursor, Seek, SeekFrom, Write};
+
+const TINY_LEN: usize = 127;
+const LARGE_LEN: usize = 8 * 1024 + 1;
+const REUSED_BYTE: u8 = 0xA5;
+
+fn payload(tag: u8, length: usize) -> Vec<u8> {
+    (0..length)
+        .map(|index| tag.wrapping_add(u8::try_from(index % 251).unwrap()))
+        .collect()
+}
+
+fn tiny_payload() -> Vec<u8> {
+    payload(0x11, TINY_LEN)
+}
+
+fn large_payload() -> Vec<u8> {
+    payload(0x77, LARGE_LEN)
+}
+
+fn mixed_writer(sector_size: usize, reverse_insertion: bool) -> OleWriter {
+    mixed_writer_with_tiny_len(sector_size, reverse_insertion, TINY_LEN)
+}
+
+fn mixed_writer_with_tiny_len(
+    sector_size: usize,
+    reverse_insertion: bool,
+    tiny_len: usize,
+) -> OleWriter {
+    let tiny = payload(0x11, tiny_len);
+    let large = large_payload();
+    let mut writer = OleWriter::with_sector_size(sector_size).unwrap();
+    if reverse_insertion {
+        writer.create_stream(&["Large"], &large).unwrap();
+        writer.create_stream(&["Tiny"], &tiny).unwrap();
+    } else {
+        writer.create_stream(&["Tiny"], &tiny).unwrap();
+        writer.create_stream(&["Large"], &large).unwrap();
+    }
+    writer
+}
+
+#[derive(Debug)]
+struct CountingCursor {
+    cursor: Cursor<Vec<u8>>,
+    seek_calls: usize,
+    write_calls: usize,
+    gap_writes: usize,
+    gap_bytes: u64,
+}
+
+impl CountingCursor {
+    fn new(initial: Vec<u8>) -> Self {
+        Self {
+            cursor: Cursor::new(initial),
+            seek_calls: 0,
+            write_calls: 0,
+            gap_writes: 0,
+            gap_bytes: 0,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.cursor.into_inner()
+    }
+}
+
+impl Seek for CountingCursor {
+    fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+        self.seek_calls += 1;
+        self.cursor.seek(from)
+    }
+}
+
+impl Write for CountingCursor {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.write_calls += 1;
+        let position = self.cursor.position();
+        let current_len = u64::try_from(self.cursor.get_ref().len()).unwrap();
+        if position > current_len {
+            self.gap_writes += 1;
+            self.gap_bytes += position - current_len;
+        }
+        self.cursor.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.cursor.flush()
+    }
+}
+
+#[derive(Debug)]
+struct ShortInterruptedCursor {
+    cursor: Cursor<Vec<u8>>,
+    short_next: bool,
+    interrupt_next: bool,
+    short_writes: usize,
+    interrupted_writes: usize,
+}
+
+impl ShortInterruptedCursor {
+    fn new() -> Self {
+        Self {
+            cursor: Cursor::new(Vec::new()),
+            short_next: true,
+            interrupt_next: true,
+            short_writes: 0,
+            interrupted_writes: 0,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.cursor.into_inner()
+    }
+}
+
+impl Seek for ShortInterruptedCursor {
+    fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+        self.cursor.seek(from)
+    }
+}
+
+impl Write for ShortInterruptedCursor {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
+        }
+        if self.short_next {
+            self.short_next = false;
+            self.short_writes += 1;
+            let count = bytes.len().min(13);
+            self.cursor.write(&bytes[..count])
+        } else if self.interrupt_next {
+            self.interrupt_next = false;
+            self.interrupted_writes += 1;
+            Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "injected retryable mixed CFB interruption",
+            ))
+        } else {
+            self.cursor.write(bytes)
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.cursor.flush()
+    }
+}
+
+#[derive(Debug)]
+struct FailingCursor {
+    cursor: Cursor<Vec<u8>>,
+    remaining: usize,
+}
+
+impl FailingCursor {
+    fn after(bytes: usize) -> Self {
+        Self {
+            cursor: Cursor::new(Vec::new()),
+            remaining: bytes,
+        }
+    }
+}
+
+impl Seek for FailingCursor {
+    fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+        self.cursor.seek(from)
+    }
+}
+
+impl Write for FailingCursor {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.remaining == 0 {
+            return Err(io::Error::other("injected mixed CFB sink failure"));
+        }
+        let accepted = bytes.len().min(self.remaining);
+        self.cursor.write_all(&bytes[..accepted])?;
+        self.remaining -= accepted;
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.cursor.flush()
+    }
+}
+
+fn serialize(sector_size: usize, reverse_insertion: bool) -> Vec<u8> {
+    let mut writer = mixed_writer(sector_size, reverse_insertion);
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn assert_round_trip(bytes: &[u8]) {
+    let mut file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    assert_eq!(file.open_stream(&["Tiny"]).unwrap(), tiny_payload());
+    assert_eq!(file.open_stream(&["Large"]).unwrap(), large_payload());
+}
+
+fn serialize_with_tiny_len(
+    sector_size: usize,
+    tiny_len: usize,
+    reverse_insertion: bool,
+) -> Vec<u8> {
+    let mut writer = mixed_writer_with_tiny_len(sector_size, reverse_insertion, tiny_len);
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn assert_round_trip_with_tiny_len(bytes: &[u8], tiny_len: usize) {
+    let mut file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    assert_eq!(
+        file.open_stream(&["Tiny"]).unwrap(),
+        payload(0x11, tiny_len)
+    );
+    assert_eq!(file.open_stream(&["Large"]).unwrap(), large_payload());
+}
+
+#[test]
+fn mixed_zero_and_cutoff_streams_round_trip_for_v3_and_v4() {
+    for &sector_size in &[512, 4096] {
+        for &tiny_len in &[0, 4095, 4096] {
+            for &reverse_insertion in &[false, true] {
+                let output = serialize_with_tiny_len(sector_size, tiny_len, reverse_insertion);
+                assert_round_trip_with_tiny_len(&output, tiny_len);
+            }
+        }
+    }
+}
+
+#[test]
+fn mixed_v3_and_v4_emission_has_no_fresh_cursor_gap_before_a_write() {
+    for &sector_size in &[512, 4096] {
+        let golden = serialize(sector_size, false);
+        let reverse = serialize(sector_size, true);
+        assert_eq!(
+            reverse, golden,
+            "changing Tiny/Large insertion order changed v{sector_size} output"
+        );
+        assert_round_trip(&golden);
+
+        let mut writer = mixed_writer(sector_size, false);
+        let mut counted = CountingCursor::new(Vec::new());
+        writer.write_to(&mut counted).unwrap();
+        assert!(counted.seek_calls > 0, "the sink must exercise Seek");
+        assert!(counted.write_calls > 0, "the sink must exercise Write");
+        assert_eq!(
+            counted.gap_writes, 0,
+            "v{sector_size} emission sought past the current Cursor end"
+        );
+        assert_eq!(
+            counted.gap_bytes, 0,
+            "v{sector_size} emission zero-initialized a large-payload gap"
+        );
+        assert_eq!(counted.into_inner(), golden);
+    }
+}
+
+#[test]
+fn mixed_v3_and_v4_retry_short_and_interrupted_seekable_writes() {
+    for &sector_size in &[512, 4096] {
+        let golden = serialize(sector_size, false);
+        let mut writer = mixed_writer(sector_size, false);
+        let mut sink = ShortInterruptedCursor::new();
+        writer.write_to(&mut sink).unwrap();
+        assert_eq!(sink.short_writes, 1);
+        assert_eq!(sink.interrupted_writes, 1);
+        assert_eq!(sink.into_inner(), golden);
+    }
+}
+
+#[test]
+fn mixed_v3_and_v4_overwrite_a_nonzero_reused_sink_to_the_golden_bytes() {
+    for &sector_size in &[512, 4096] {
+        let golden = serialize(sector_size, false);
+        let mut writer = mixed_writer(sector_size, false);
+        let mut reused = CountingCursor::new(vec![REUSED_BYTE; golden.len()]);
+        writer.write_to(&mut reused).unwrap();
+        assert_eq!(reused.into_inner(), golden);
+    }
+}
+
+#[test]
+fn mixed_sink_failure_is_reported_as_the_typed_io_error() {
+    for &sector_size in &[512, 4096] {
+        let mut writer = mixed_writer(sector_size, false);
+        let mut sink = FailingCursor::after(sector_size * 2);
+        let result = writer.write_to(&mut sink);
+        match result {
+            Err(OleError::Io(error)) => {
+                assert_eq!(error.kind(), io::ErrorKind::Other);
+                assert!(
+                    error
+                        .to_string()
+                        .contains("injected mixed CFB sink failure")
+                );
+            },
+            other => panic!("expected injected sink IO error, got {other:?}"),
+        }
+    }
+}

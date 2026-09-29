@@ -1,0 +1,31 @@
+{
+  "exit_code": 0,
+  "files": [
+    {
+      "bytes": 18744,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-cfb-difat-leg-a/report.json",
+      "sha256": "5a28b41d87fc1db637f0dbfb71703d6aecc70954d47dff47d170156721e31ede"
+    },
+    {
+      "bytes": 1060,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-cfb-difat-leg-a/started.json",
+      "sha256": "7f08f362208ff6e535223e56f30072342320fb2fe760e7d1d6953226272373e9"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-cfb-difat-leg-a/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-cfb-difat-leg-a/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 15,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-cfb-difat-leg-a/time.txt",
+      "sha256": "ad933e609bcaab287b1c78031121d8022fdbf810bf0e478867dbc6903b3cc49e"
+    }
+  ],
+  "finished_unix": 1790694974.6673267
+}

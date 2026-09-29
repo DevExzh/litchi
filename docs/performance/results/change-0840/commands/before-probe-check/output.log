@@ -1,0 +1,91 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Checking litchi-perf-cfb-emission v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe)
+warning: function `identity_for_case` is never used
+   --> main.rs:554:15
+    |
+554 | pub(crate) fn identity_for_case(case: Case, input: &Prepared) -> InputIdentity {
+    |               ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `prepare_case` is never used
+   --> main.rs:583:15
+    |
+583 | pub(crate) fn prepare_case(case: Case) -> AnyResult<Prepared> {
+    |               ^^^^^^^^^^^^
+
+warning: function `write_case` is never used
+   --> main.rs:588:15
+    |
+588 | pub(crate) fn write_case(input: &Prepared) -> AnyResult<Vec<u8>> {
+    |               ^^^^^^^^^^
+
+warning: function `verify_case` is never used
+   --> main.rs:595:15
+    |
+595 | pub(crate) fn verify_case(input: &Prepared, bytes: &[u8]) -> AnyResult<()> {
+    |               ^^^^^^^^^^^
+
+warning: `litchi-perf-cfb-emission` (bin "cfb-emission-probe") generated 4 warnings
+warning: `litchi-perf-cfb-emission` (bin "cfb-emission-probe" test) generated 4 warnings (4 duplicates)
+warning: type `DocInput` is more private than the item `Prepared::Doc::0`
+   --> main.rs:125:9
+    |
+125 |     Doc(DocInput),
+    |         ^^^^^^^^ field `Prepared::Doc::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `DocInput` is only usable at visibility `pub(self)`
+   --> main.rs:107:1
+    |
+107 | struct DocInput {
+    | ^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `CfbInput` is more private than the item `Prepared::Cfb::0`
+   --> main.rs:126:9
+    |
+126 |     Cfb(CfbInput),
+    |         ^^^^^^^^ field `Prepared::Cfb::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `CfbInput` is only usable at visibility `pub(self)`
+   --> main.rs:118:1
+    |
+118 | struct CfbInput {
+    | ^^^^^^^^^^^^^^^
+
+warning: `litchi-perf-cfb-emission` (bin "cfb-emission-probe-alloc") generated 2 warnings
+warning: type `DocInput` is more private than the item `probe::Prepared::Doc::0`
+   --> main.rs:125:9
+    |
+125 |     Doc(DocInput),
+    |         ^^^^^^^^ field `probe::Prepared::Doc::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `DocInput` is only usable at visibility `pub(self)`
+   --> main.rs:107:1
+    |
+107 | struct DocInput {
+    | ^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `CfbInput` is more private than the item `probe::Prepared::Cfb::0`
+   --> main.rs:126:9
+    |
+126 |     Cfb(CfbInput),
+    |         ^^^^^^^^ field `probe::Prepared::Cfb::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `CfbInput` is only usable at visibility `pub(self)`
+   --> main.rs:118:1
+    |
+118 | struct CfbInput {
+    | ^^^^^^^^^^^^^^^
+
+warning: `litchi-perf-cfb-emission` (bin "cfb-emission-probe-alloc" test) generated 2 warnings
+    Finished `dev` profile [unoptimized] target(s) in 6.72s

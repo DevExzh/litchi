@@ -1,0 +1,3247 @@
+/// OLE file writer implementation
+///
+/// This module provides functionality to create and modify OLE2 structured storage files.
+/// It supports creating new files, adding/updating/deleting streams and storages,
+/// and properly managing the FAT (File Allocation Table) and directory structure.
+///
+/// # Architecture
+///
+/// The writer accumulates a complete logical model in memory before serialization.
+/// `write_to` writes directly to its sink and can leave partial output after a sink
+/// failure. `save` stages the serialized bytes in a sibling temporary file and
+/// atomically replaces its destination only after serialization succeeds.
+///
+/// # Stream Allocation vs Directory Ordering
+///
+/// **IMPORTANT**: This is a critical distinction for Microsoft Office compatibility!
+///
+/// 1. **Stream ALLOCATION order** determines which sector each stream is written to:
+///    - Streams are allocated sectors in the order they are added via `create_stream()`
+///    - For DOC files, `WordDocument` MUST be added first to get sector 0
+///    - This is enforced in the FAT allocation logic (see lines 345-358)
+///
+/// 2. **Directory ENTRY order** determines how entries appear in the directory tree:
+///    - Directory entries are sorted using Apache POI's `PropertyComparator` rules
+///    - Entries are organized into a balanced binary search tree
+///    - This happens during directory generation (see `DirectoryBuilder`)
+///
+/// ## Example: DOC File Structure
+///
+/// ```text
+/// Stream creation order:
+///   1. create_stream(["WordDocument"], ...) → allocated to sector 0
+///   2. create_stream(["1Table"], ...)       → allocated to sector 8
+///
+/// Directory tree (after sorting by name length):
+///   Root Entry (SID 0)
+///       └─ WordDocument (SID 1, sector 0)  [midpoint]
+///            └─ 1Table (SID 2, sector 8)   [left child]
+/// ```
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use litchi_cfb::writer::OleWriter;
+///
+/// // Create a new OLE file
+/// let mut writer = OleWriter::new();
+///
+/// // Add a stream
+/// writer.create_stream(&["MyStream"], b"Hello, World!")?;
+///
+/// // Create a storage and add a stream inside it
+/// writer.create_storage(&["MyStorage"])?;
+/// writer.create_stream(&["MyStorage", "NestedStream"], b"Nested content")?;
+///
+/// // Save to file
+/// writer.save("output.ole")?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+use super::super::consts::{
+    DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
+    STGTY_ROOT,
+};
+use super::super::directory_name::{MAX_DIRECTORY_NAME_CODE_UNITS, directory_name_data};
+use super::super::file::OleError;
+use super::difat::DifatBuilder;
+use super::directory::DirectoryBuilder;
+use super::fat::FatBuilder;
+use super::header::HeaderBuilder;
+use super::layout::{
+    ModelInputs, ModelMetadata, Outcome, SectorLayoutFallback, SectorLayoutPolicy,
+    SectorLayoutReport, SourceLayout, StreamInput, plan_reuse,
+};
+use super::minifat::MiniFatBuilder;
+use super::{PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged};
+use litchi_core::Durability;
+use smallvec::SmallVec;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ffi::OsString;
+use std::fs::{self, File};
+use std::hash::Hash;
+use std::io::{self, ErrorKind, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const V3_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_TEMP_FILE_ATTEMPTS: usize = 128;
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(windows)]
+const MOVEFILE_REPLACE_EXISTING: u32 = 0x0000_0001;
+#[cfg(windows)]
+const MOVEFILE_WRITE_THROUGH: u32 = 0x0000_0008;
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn MoveFileExW(existing_file_name: *const u16, new_file_name: *const u16, flags: u32) -> i32;
+}
+
+/// A registered stream's bytes, owned outright or shared with its producer.
+///
+/// Sharing lets a caller that already holds a stream's bytes behind an
+/// [`Arc`] register them without a copy, which is what
+/// [`OleWriter::create_stream_shared`] exists for.
+#[derive(Debug, Clone)]
+enum StreamPayload {
+    Owned(Vec<u8>),
+    Shared(Arc<[u8]>),
+}
+
+impl StreamPayload {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(bytes) => bytes,
+        }
+    }
+}
+
+impl PartialEq for StreamPayload {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes() == other.bytes()
+    }
+}
+
+impl Eq for StreamPayload {}
+
+impl std::ops::Deref for StreamPayload {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        self.bytes()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StreamPlan {
+    index: usize,
+    start_sector: u32,
+}
+
+/// Work limits for one storage move or rename.
+///
+/// A move scans the writer's complete path index so that it can reject CFB
+/// case-insensitive name collisions before changing any state. Descendants are
+/// the explicitly registered storages and streams whose paths begin at the
+/// source storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageMoveLimits {
+    max_entries_scanned: usize,
+    max_descendants: usize,
+    max_path_components: usize,
+}
+
+impl StorageMoveLimits {
+    /// Creates nonzero limits for storage moves.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] if any limit is zero.
+    pub fn new(
+        max_entries_scanned: usize,
+        max_descendants: usize,
+        max_path_components: usize,
+    ) -> Result<Self, OleError> {
+        if max_entries_scanned == 0 || max_descendants == 0 || max_path_components == 0 {
+            return Err(OleError::InvalidData(
+                "CFB storage move limits must be nonzero".to_string(),
+            ));
+        }
+        Ok(Self {
+            max_entries_scanned,
+            max_descendants,
+            max_path_components,
+        })
+    }
+
+    /// Maximum number of stream and storage paths inspected by one move.
+    #[must_use]
+    pub const fn max_entries_scanned(self) -> usize {
+        self.max_entries_scanned
+    }
+
+    /// Maximum number of stream and storage paths changed by one move.
+    #[must_use]
+    pub const fn max_descendants(self) -> usize {
+        self.max_descendants
+    }
+
+    /// Maximum number of components in any source, destination, or moved path.
+    #[must_use]
+    pub const fn max_path_components(self) -> usize {
+        self.max_path_components
+    }
+}
+
+impl Default for StorageMoveLimits {
+    fn default() -> Self {
+        Self {
+            max_entries_scanned: 65_536,
+            max_descendants: 4_096,
+            max_path_components: 64,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StoragePathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct StreamPathMove {
+    index: usize,
+    old: Vec<String>,
+    new: Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct ClsidPathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    clsid: [u8; 16],
+}
+
+#[derive(Debug)]
+struct MetadataPathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    metadata: DirectoryMetadata,
+}
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+struct CanonicalPath(Vec<(usize, SmallVec<[u16; 32]>)>);
+
+#[derive(Debug)]
+struct IndexedStorage<'a> {
+    path: &'a Vec<String>,
+    canonical: CanonicalPath,
+}
+
+#[derive(Debug)]
+struct IndexedStream<'a> {
+    index: usize,
+    path: &'a Vec<String>,
+    canonical: CanonicalPath,
+}
+
+/// Represents a pending stream write operation
+#[derive(Debug, Clone)]
+#[allow(dead_code, reason = "reserved for future implementation")]
+struct StreamWrite {
+    /// Path to the stream
+    path: Vec<String>,
+    /// Stream data
+    data: Vec<u8>,
+}
+
+/// Represents a pending storage creation operation  
+#[derive(Debug, Clone)]
+#[allow(dead_code, reason = "reserved for future implementation")]
+struct StorageCreate {
+    /// Path to the storage
+    path: Vec<String>,
+}
+
+/// Directory entry for writing
+#[derive(Debug, Clone)]
+#[allow(dead_code, reason = "reserved for future implementation")]
+struct WriteDirectoryEntry {
+    /// Entry name
+    name: String,
+    /// Entry type (stream, storage, root)
+    entry_type: u8,
+    /// Left sibling SID
+    sid_left: u32,
+    /// Right sibling SID
+    sid_right: u32,
+    /// Child SID
+    sid_child: u32,
+    /// CLSID (16 bytes)
+    clsid: [u8; 16],
+    /// State bits
+    state_bits: u32,
+    /// Creation time (FILETIME)
+    creation_time: u64,
+    /// Modified time (FILETIME)
+    modified_time: u64,
+    /// Starting sector
+    start_sector: u32,
+    /// Stream size
+    stream_size: u64,
+}
+
+/// Raw state bits and FILETIME fields of one directory entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) struct DirectoryMetadata {
+    pub(super) state_bits: u32,
+    pub(super) creation_time: u64,
+    pub(super) modified_time: u64,
+}
+
+/// OLE file writer
+///
+/// Provides methods to create and modify OLE2 structured storage files.
+/// All operations are buffered in memory until `save()` is called.
+pub struct OleWriter {
+    /// Sector size (512 or 4096 bytes)
+    sector_size: usize,
+    /// Mini sector size (typically 64 bytes)
+    mini_sector_size: usize,
+    /// Mini stream cutoff size (typically 4096 bytes)
+    mini_stream_cutoff: u32,
+    /// Directory entries
+    entries: Vec<WriteDirectoryEntry>,
+    /// Stream data in insertion order (path, data)
+    /// Using Vec instead of `HashMap` to preserve insertion order for directory entries
+    streams: Vec<(Vec<String>, StreamPayload)>,
+    /// Storages indexed by path
+    storages: HashSet<Vec<String>>,
+    /// Explicit CLSIDs assigned to individual storages, including clears.
+    storage_clsids: HashMap<Vec<String>, [u8; 16]>,
+    /// Whether the root CLSID was explicitly supplied, including an explicit
+    /// all-zero clear for a source-backed layout.
+    root_clsid_set: bool,
+    /// Where the next serialization places its sectors.
+    sector_layout_policy: SectorLayoutPolicy,
+    /// Bounded metadata of the artifact this writer republishes, if adopted.
+    source_layout: Option<Box<SourceLayout>>,
+    /// What the most recent serialization did with that layout.
+    last_sector_layout: Option<SectorLayoutReport>,
+    /// Non-default state and FILETIME values assigned to storages.
+    storage_metadata: HashMap<Vec<String>, DirectoryMetadata>,
+    /// Raw state and FILETIME fields retained for streams from a lossless
+    /// source edit. Fresh streams omit this entry and serialize all zeroes.
+    stream_metadata: HashMap<Vec<String>, DirectoryMetadata>,
+    /// Whether the caller supplied any directory state or FILETIME value.
+    ///
+    /// Supplied metadata makes the writer's model authoritative for every
+    /// entry, as the from-scratch serializer publishes it: an entry without a
+    /// supplied value is written with the all-zero default. A reused source
+    /// layout carries the source's directory values instead, so it is
+    /// declined whenever they differ from this model. A caller that supplies
+    /// none keeps the source's values under a reused layout.
+    directory_metadata_supplied: bool,
+}
+
+impl OleWriter {
+    /// Create a new empty OLE writer with default settings (512-byte sectors)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use litchi_cfb::writer::OleWriter;
+    ///
+    /// let writer = OleWriter::new();
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self::with_valid_sector_size(512)
+    }
+
+    /// Create a new OLE writer with specified sector size
+    ///
+    /// # Arguments
+    ///
+    /// * `sector_size` - Sector size in bytes (512 or 4096)
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `sector_size` is not 512 or 4096 bytes.
+    pub fn with_sector_size(sector_size: usize) -> Result<Self, OleError> {
+        if !matches!(sector_size, 512 | 4096) {
+            return Err(OleError::InvalidData(format!(
+                "sector size must be 512 or 4096 bytes, got {sector_size}"
+            )));
+        }
+        Ok(Self::with_valid_sector_size(sector_size))
+    }
+
+    fn with_valid_sector_size(sector_size: usize) -> Self {
+        let mut writer = Self {
+            sector_size,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            entries: Vec::new(),
+            streams: Vec::new(),
+            storages: HashSet::new(),
+            storage_clsids: HashMap::new(),
+            root_clsid_set: false,
+            sector_layout_policy: SectorLayoutPolicy::default(),
+            source_layout: None,
+            last_sector_layout: None,
+            storage_metadata: HashMap::new(),
+            stream_metadata: HashMap::new(),
+            directory_metadata_supplied: false,
+        };
+
+        // Initialize with root entry
+        writer.entries.push(WriteDirectoryEntry {
+            name: "Root Entry".to_string(),
+            entry_type: STGTY_ROOT,
+            sid_left: NOSTREAM,
+            sid_right: NOSTREAM,
+            sid_child: NOSTREAM,
+            clsid: [0; 16],
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            start_sector: 0, // Will be updated when writing ministream
+            stream_size: 0,  // Will be updated when writing ministream
+        });
+
+        writer
+    }
+
+    /// Selects where the next serialization places its sectors.
+    ///
+    /// The default is [`SectorLayoutPolicy::Reuse`]. It has an effect only
+    /// once a source artifact has been adopted with
+    /// [`Self::adopt_source_layout`]; without one there is no layout to reuse
+    /// and both policies serialize from scratch.
+    pub const fn set_sector_layout_policy(&mut self, policy: SectorLayoutPolicy) {
+        self.sector_layout_policy = policy;
+    }
+
+    /// The policy the next serialization will apply.
+    #[must_use]
+    pub const fn sector_layout_policy(&self) -> SectorLayoutPolicy {
+        self.sector_layout_policy
+    }
+
+    /// Adopts the artifact this writer republishes, so that
+    /// [`SectorLayoutPolicy::Reuse`] can keep its sector assignment.
+    ///
+    /// `source` is parsed through the ordinary validating CFB parser and only
+    /// its container metadata is retained — the header sector, the FAT, the
+    /// MiniFAT, the directory image, the packed mini stream, and one record
+    /// per directory entry. The packed mini stream is retained because it
+    /// contains the source's mini-sector image; regular stream payloads and a
+    /// second full copy of `source` are not retained by the layout object.
+    /// The retained bytes are bounded by the artifact's sector count.
+    ///
+    /// Adopting a source never changes what the writer publishes logically.
+    /// It changes only where the bytes land, and only while the writer's
+    /// stream and storage set still matches the adopted artifact's.
+    ///
+    /// Returns `true` when the artifact was adopted. A source that the parser
+    /// rejects, or whose layout cannot be represented, is simply not adopted
+    /// and the writer serializes from scratch: `false` is returned rather than
+    /// an error, because the from-scratch path is always available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::Allocation`] when the bounded metadata cannot be
+    /// reserved.
+    pub fn adopt_source_layout(&mut self, source: &[u8]) -> Result<bool, OleError> {
+        self.source_layout = None;
+        match SourceLayout::parse(source) {
+            Ok(layout) => {
+                let layout = Box::new(layout);
+                // Source adoption is also the preservation boundary for a
+                // from-scratch fallback: callers that only reproduce the
+                // directory shape should retain source CLSIDs unless they
+                // explicitly set a replacement (including an all-zero clear).
+                if !self.root_clsid_set {
+                    if let Some(root) = self.entries.first_mut() {
+                        root.clsid = layout.root_class_id();
+                        self.root_clsid_set = true;
+                    }
+                }
+                for path in layout.storage_paths() {
+                    if self.storage_clsids.contains_key(path) {
+                        continue;
+                    }
+                    let class_id = layout.storage_class_id(path).unwrap_or([0; 16]);
+                    reserve_hash_map_entry(
+                        &mut self.storage_clsids,
+                        path,
+                        1,
+                        "source storage CLSID table",
+                    )?;
+                    self.storage_clsids.insert(path.clone(), class_id);
+                }
+                self.source_layout = Some(layout);
+                Ok(true)
+            },
+            Err(error @ OleError::Allocation { .. }) => Err(error),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Whether an artifact has been adopted for layout reuse.
+    #[must_use]
+    pub const fn has_adopted_source_layout(&self) -> bool {
+        self.source_layout.is_some()
+    }
+
+    /// What the most recent [`Self::write_to`] or [`Self::save`] did with the
+    /// adopted source's sectors, or `None` before the first serialization.
+    #[must_use]
+    pub const fn last_sector_layout(&self) -> Option<SectorLayoutReport> {
+        self.last_sector_layout
+    }
+
+    fn stream_inputs(&self) -> Result<Vec<StreamInput<'_>>, OleError> {
+        let mut inputs = Vec::new();
+        inputs
+            .try_reserve_exact(self.streams.len())
+            .map_err(|source| OleError::allocation("stream layout inputs", source))?;
+        for (path, data) in &self.streams {
+            inputs.push(StreamInput {
+                path,
+                bytes: data.bytes(),
+            });
+        }
+        Ok(inputs)
+    }
+
+    /// Every storage the serialized directory will contain: the ones the
+    /// caller declared and the ancestors every path implies.
+    fn effective_storages(&self) -> BTreeSet<Vec<String>> {
+        let mut storages: BTreeSet<Vec<String>> = BTreeSet::new();
+        for path in &self.storages {
+            for length in 1..=path.len() {
+                storages.insert(path[..length].to_vec());
+            }
+        }
+        for (path, _) in &self.streams {
+            for length in 1..path.len() {
+                storages.insert(path[..length].to_vec());
+            }
+        }
+        storages
+    }
+
+    fn plan_sector_layout(&self) -> Result<Outcome, OleError> {
+        if self.sector_layout_policy == SectorLayoutPolicy::Rewrite {
+            return Ok(Outcome::Declined(SectorLayoutFallback::PolicySelected));
+        }
+        let Some(source) = self.source_layout.as_deref() else {
+            return Ok(Outcome::Declined(SectorLayoutFallback::NoAdoptedSource));
+        };
+        let streams = self.stream_inputs()?;
+        let storages = self.effective_storages();
+        let mut storage_class_ids: BTreeMap<Vec<String>, [u8; 16]> = BTreeMap::new();
+        for (path, class_id) in &self.storage_clsids {
+            storage_class_ids.insert(path.clone(), *class_id);
+        }
+        let root_class_id = self
+            .root_clsid_set
+            .then(|| self.entries.first().map_or([0u8; 16], |entry| entry.clsid));
+        let directory_metadata = self.directory_metadata_supplied.then(|| ModelMetadata {
+            root: self
+                .entries
+                .first()
+                .map_or_else(DirectoryMetadata::default, |root| DirectoryMetadata {
+                    state_bits: root.state_bits,
+                    creation_time: root.creation_time,
+                    modified_time: root.modified_time,
+                }),
+            storages: &self.storage_metadata,
+            streams: &self.stream_metadata,
+        });
+        plan_reuse(
+            source,
+            &ModelInputs {
+                sector_size: self.sector_size,
+                mini_sector_size: self.mini_sector_size,
+                mini_stream_cutoff: self.mini_stream_cutoff,
+                streams: &streams,
+                storages: &storages,
+                storage_class_ids: &storage_class_ids,
+                root_class_id,
+                directory_metadata,
+            },
+        )
+    }
+
+    /// Set the CLSID (Class ID) for the root entry
+    ///
+    /// This is required for Microsoft Office to recognize the document type.
+    /// For Word 97-2003 documents, use: `{00020906-0000-0000-C000-000000000046}`
+    ///
+    /// # Arguments
+    ///
+    /// * `clsid` - 16-byte CLSID in little-endian format
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use litchi_cfb::writer::OleWriter;
+    /// let mut writer = OleWriter::new();
+    /// // Word 97-2003 Document CLSID: {00020906-0000-0000-C000-000000000046}
+    /// let word_clsid = [0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ///                   0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46];
+    /// writer.set_root_clsid(word_clsid);
+    /// # Ok::<(), litchi_cfb::OleError>(())
+    /// ```
+    pub fn set_root_clsid(&mut self, clsid: [u8; 16]) {
+        // Update the root entry (always at index 0)
+        if !self.entries.is_empty() {
+            self.entries[0].clsid = clsid;
+            self.root_clsid_set = true;
+        }
+    }
+
+    /// Sets the root storage's user-defined state bits.
+    pub fn set_root_state_bits(&mut self, state_bits: u32) {
+        if let Some(root) = self.entries.first_mut() {
+            root.state_bits = state_bits;
+        }
+        self.directory_metadata_supplied = true;
+    }
+
+    /// Sets the root storage's raw modification FILETIME.
+    pub fn set_root_modified_time(&mut self, modified_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.modified_time = modified_time;
+        }
+        self.directory_metadata_supplied = true;
+    }
+
+    /// Sets the root storage's creation FILETIME for a fresh artifact.
+    ///
+    /// The CFB root directory entry has no creation timestamp. Existing
+    /// source values, including nonconforming ones, can be replayed through
+    /// [`Self::set_root_creation_time_from_source`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] when `creation_time` is nonzero.
+    pub fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero; use set_root_creation_time_from_source for source replay".to_string(),
+            ));
+        }
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = 0;
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Replays the exact root creation FILETIME captured from an existing
+    /// source package.
+    ///
+    /// This explicit source-preservation operation may retain a malformed
+    /// nonzero value. Fresh authoring should use
+    /// [`Self::set_root_creation_time`], which accepts only zero.
+    pub fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = creation_time;
+        }
+        self.directory_metadata_supplied = true;
+    }
+
+    /// Create a new stream at the specified path
+    ///
+    /// If a stream already exists at this path, it will be overwritten.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path components (e.g., `&["MyStorage", "MyStream"]`)
+    /// * `data` - Stream contents
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), OleError>` - Success or error
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use litchi_cfb::writer::OleWriter;
+    /// let mut writer = OleWriter::new();
+    /// writer.create_stream(&["MyStream"], b"Hello, World!")?;
+    /// # Ok::<(), litchi_cfb::OleError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the payload cannot be
+    /// reserved.
+    pub fn create_stream(&mut self, path: &[&str], data: &[u8]) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(data.len())
+            .map_err(|source| OleError::allocation("stream payload", source))?;
+        owned.extend_from_slice(data);
+        self.create_stream_owned(path, owned)
+    }
+
+    /// Create or replace a stream by taking ownership of its payload allocation.
+    ///
+    /// Unlike [`Self::create_stream`], this method never clones `data`. The
+    /// allocation remains owned by the writer after this call and is reused by
+    /// subsequent [`Self::write_to`] calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the stream table cannot
+    /// grow.
+    pub fn create_stream_owned(&mut self, path: &[&str], data: Vec<u8>) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+
+        self.put_payload(path, StreamPayload::Owned(data))
+    }
+
+    /// Create or replace a stream from a payload shared with its producer.
+    ///
+    /// Unlike [`Self::create_stream`], this method never copies `data`: the
+    /// writer retains the same allocation the caller holds and writes through
+    /// it at serialization time. It is the entry point for a caller that
+    /// already owns the bytes behind an [`Arc`], such as a package editor
+    /// republishing streams it captured.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the stream table cannot
+    /// grow.
+    pub fn create_stream_shared(&mut self, path: &[&str], data: Arc<[u8]>) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        self.put_payload(path, StreamPayload::Shared(data))
+    }
+
+    fn put_payload(&mut self, path: &[&str], data: StreamPayload) -> Result<(), OleError> {
+        if let Some(position) = self.stream_position(path) {
+            self.streams[position].1 = data;
+            return Ok(());
+        }
+
+        let owned_path = own_path(path, "stream path", "stream path component")?;
+        self.streams
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("stream table", source))?;
+        self.streams.push((owned_path, data));
+        Ok(())
+    }
+
+    /// Creates or replaces a stream while assigning its raw directory fields.
+    ///
+    /// This is the source-replay form of [`Self::create_stream`]. The stream
+    /// path is admitted and the metadata is attached in one operation, so a
+    /// caller replaying a package does not perform a second metadata lookup or
+    /// canonicalization pass after creating each stream. It retains the exact
+    /// path matching behavior of [`Self::create_stream`]. Zero values are
+    /// deterministic and omit the metadata side table.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the payload or a table
+    /// cannot grow.
+    pub fn create_stream_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: &[u8],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        let mut owned_data = Vec::new();
+        owned_data
+            .try_reserve_exact(data.len())
+            .map_err(|source| OleError::allocation("stream payload", source))?;
+        owned_data.extend_from_slice(data);
+        self.put_payload_with_metadata(
+            path,
+            StreamPayload::Owned(owned_data),
+            DirectoryMetadata {
+                state_bits,
+                creation_time,
+                modified_time,
+            },
+        )
+    }
+
+    /// Creates or replaces a stream from a payload shared with its producer
+    /// while assigning its raw directory fields.
+    ///
+    /// This is to [`Self::create_stream_with_metadata`] what
+    /// [`Self::create_stream_shared`] is to [`Self::create_stream`]: the
+    /// writer retains the caller's allocation instead of copying it, and the
+    /// path matching and metadata semantics are otherwise identical.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if a table cannot grow.
+    pub fn create_stream_shared_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: Arc<[u8]>,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        self.put_payload_with_metadata(
+            path,
+            StreamPayload::Shared(data),
+            DirectoryMetadata {
+                state_bits,
+                creation_time,
+                modified_time,
+            },
+        )
+    }
+
+    fn put_payload_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: StreamPayload,
+        metadata: DirectoryMetadata,
+    ) -> Result<(), OleError> {
+        let owned_path = own_path(path, "stream path", "stream path component")?;
+
+        if let Some(position) = self
+            .streams
+            .iter()
+            .position(|(candidate, _)| candidate == &owned_path)
+        {
+            if metadata != DirectoryMetadata::default()
+                && !self.stream_metadata.contains_key(&owned_path)
+            {
+                self.stream_metadata
+                    .try_reserve(1)
+                    .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            }
+            self.streams[position].1 = data;
+            if metadata == DirectoryMetadata::default() {
+                self.stream_metadata.remove(&owned_path);
+            } else {
+                self.stream_metadata.insert(owned_path, metadata);
+            }
+            self.directory_metadata_supplied = true;
+            return Ok(());
+        }
+
+        self.streams
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("stream table", source))?;
+        let metadata_path = if metadata == DirectoryMetadata::default() {
+            None
+        } else {
+            self.stream_metadata
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            Some(try_clone_path(&owned_path, "stream metadata path")?)
+        };
+        self.streams.push((owned_path, data));
+        if let Some(metadata_path) = metadata_path {
+            self.stream_metadata.insert(metadata_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Update an existing stream
+    ///
+    /// This is an alias for `create_stream` since both create and update operations
+    /// have the same behavior (overwrite if exists).
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path components
+    /// * `data` - New stream contents
+    ///
+    /// # Errors
+    ///
+    /// Same error conditions as [`Self::create_stream`].
+    pub fn update_stream(&mut self, path: &[&str], data: &[u8]) -> Result<(), OleError> {
+        self.create_stream(path, data)
+    }
+
+    fn stream_position(&self, path: &[&str]) -> Option<usize> {
+        self.streams.iter().position(|(candidate, _)| {
+            candidate.len() == path.len()
+                && candidate
+                    .iter()
+                    .zip(path)
+                    .all(|(owned, borrowed)| owned == borrowed)
+        })
+    }
+
+    fn resolve_storage_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "storage path", "storage path component")?;
+        if self.storages.contains(&requested) {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for candidate in &self.storages {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous storage paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "storage path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {requested:?} does not exist"))
+        })
+    }
+
+    fn resolve_stream_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "stream path", "stream path component")?;
+        if self.stream_position(path).is_some() {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for (candidate, _) in &self.streams {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous stream paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "stream path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB stream path {requested:?} does not exist"))
+        })
+    }
+
+    /// Delete a stream
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path components
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), OleError>` - Success or error if stream doesn't exist
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::StreamNotFound` if no stream exists at `path`, or
+    /// `OleError::InvalidData` if `path` contains an invalid component.
+    pub fn delete_stream(&mut self, path: &[&str]) -> Result<(), OleError> {
+        let owned_path = own_path(path, "stream path", "stream path component")?;
+
+        if let Some(pos) = self.streams.iter().position(|(p, _)| p == &owned_path) {
+            self.streams.remove(pos);
+            self.stream_metadata.remove(&owned_path);
+            Ok(())
+        } else {
+            Err(OleError::StreamNotFound)
+        }
+    }
+
+    /// Create a new storage (directory) at the specified path
+    ///
+    /// Parent storages are created automatically if they don't exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path components (e.g., `&["MyStorage"]`)
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use litchi_cfb::writer::OleWriter;
+    /// let mut writer = OleWriter::new();
+    /// writer.create_storage(&["MyStorage"])?;
+    /// writer.create_stream(&["MyStorage", "MyStream"], b"data")?;
+    /// # Ok::<(), litchi_cfb::OleError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the storage table cannot
+    /// grow.
+    pub fn create_storage(&mut self, path: &[&str]) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+
+        let owned_path = own_path(path, "storage path", "storage path component")?;
+        reserve_hash_set_entry(&mut self.storages, &owned_path, 1, "storage table")?;
+        self.storages.insert(owned_path);
+
+        Ok(())
+    }
+
+    /// Assign a CLSID to an explicitly created storage.
+    ///
+    /// `path` must identify a storage previously registered with
+    /// [`Self::create_storage`]. CLSIDs are encoded in CFB byte order.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` contains an invalid component
+    /// or does not identify a previously created storage.
+    pub fn set_storage_clsid(&mut self, path: &[&str], clsid: [u8; 16]) -> Result<(), OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        reserve_hash_map_entry(
+            &mut self.storage_clsids,
+            &owned_path,
+            1,
+            "storage CLSID table",
+        )?;
+        self.storage_clsids.insert(owned_path, clsid);
+        Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing storage.
+    ///
+    /// Values are retained as unsigned wire values.  No clock lookup or time
+    /// zone conversion is performed.  Newly created storages retain the
+    /// deterministic all-zero defaults until this method is called.
+    pub fn set_storage_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.storage_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.storage_metadata,
+                &owned_path,
+                1,
+                "storage metadata table",
+            )?;
+            self.storage_metadata.insert(owned_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing storage.
+    pub fn set_storage_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing storage.
+    pub fn set_storage_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing storage.
+    pub fn set_storage_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing stream.
+    ///
+    /// New streams default to all zeroes. This setter is intended for
+    /// source-preserving rewrites and therefore retains legacy producer values
+    /// exactly, even when a producer wrote nonzero stream timestamp fields.
+    pub fn set_stream_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.stream_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.stream_metadata,
+                &owned_path,
+                1,
+                "stream metadata table",
+            )?;
+            self.stream_metadata.insert(owned_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Sets raw state bits for an existing stream. CFB producers normally
+    /// write zero state bits for streams, but source values are retained.
+    pub fn set_stream_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing stream.
+    pub fn set_stream_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing stream.
+    pub fn set_stream_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    fn stream_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        Ok(self
+            .stream_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
+    }
+
+    fn storage_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        Ok(self
+            .storage_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
+    }
+
+    /// Delete a storage and all its contents
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path components
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), OleError>` - Success or error if storage doesn't exist
+    ///
+    /// The root entry is represented by an empty path and cannot be deleted.
+    /// A successful deletion removes the target storage and every stream,
+    /// storage, and storage CLSID whose full path is beneath it.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty (the root entry
+    /// cannot be deleted) or contains an invalid component, or
+    /// `OleError::InvalidFormat` if no storage exists at `path`.
+    pub fn delete_storage(&mut self, path: &[&str]) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+
+        let owned_path = own_path(path, "storage path", "storage path component")?;
+
+        // Validate the complete operation before mutating any table. The
+        // retain calls below are infallible, so a failed lookup leaves the
+        // writer unchanged.
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidFormat("Storage not found".to_string()));
+        }
+
+        self.streams
+            .retain(|(candidate, _)| !candidate.starts_with(owned_path.as_slice()));
+        self.storages
+            .retain(|candidate| !candidate.starts_with(owned_path.as_slice()));
+        self.storage_clsids
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.storage_metadata
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.stream_metadata
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+
+        Ok(())
+    }
+
+    /// Moves an explicitly registered storage and its complete subtree.
+    ///
+    /// Supplying a destination under the same parent renames the storage. CFB
+    /// sibling names are compared case-insensitively, but a case-only rename of
+    /// the source itself is accepted and updates the stored spelling. The
+    /// destination parent must already be an explicitly registered storage, or
+    /// the root when `destination` contains one component.
+    ///
+    /// The operation validates and allocates every replacement path before it
+    /// mutates the writer. Stream payload allocations and stream insertion
+    /// order are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] for an invalid path, a root or
+    /// self-descendant move, a missing destination parent, a CFB
+    /// case-insensitive destination collision, or a limit violation. Returns
+    /// [`OleError::InvalidFormat`] when `source` is not an explicitly
+    /// registered storage. Allocation failures are returned as
+    /// [`OleError::Allocation`].
+    pub fn move_storage(&mut self, source: &[&str], destination: &[&str]) -> Result<(), OleError> {
+        self.move_storage_with_limits(source, destination, StorageMoveLimits::default())
+    }
+
+    /// Moves a storage with explicit bounds on all inspected and changed paths.
+    ///
+    /// See [`Self::move_storage`] for the semantic closure and error behavior.
+    pub fn move_storage_with_limits(
+        &mut self,
+        source: &[&str],
+        destination: &[&str],
+        limits: StorageMoveLimits,
+    ) -> Result<(), OleError> {
+        if source.is_empty() || destination.is_empty() {
+            return Err(OleError::InvalidData(
+                "CFB storage move cannot target the root entry".to_string(),
+            ));
+        }
+        if source.len() > limits.max_path_components
+            || destination.len() > limits.max_path_components
+        {
+            return Err(storage_move_limit_error("path components"));
+        }
+
+        let requested_source = own_valid_cfb_path(source, "storage move source")?;
+        let requested_destination = own_valid_cfb_path(destination, "storage move destination")?;
+        let source_canonical = canonical_cfb_path(&requested_source)?;
+        let destination_canonical = canonical_cfb_path(&requested_destination)?;
+        if requested_destination.len() > requested_source.len()
+            && canonical_path_starts_with(&destination_canonical, &source_canonical)
+        {
+            return Err(OleError::InvalidData(
+                "CFB storage cannot be moved into its own subtree".to_string(),
+            ));
+        }
+
+        let entries_scanned = self
+            .streams
+            .len()
+            .checked_add(self.storages.len())
+            .ok_or_else(|| storage_move_limit_error("entries scanned"))?;
+        if entries_scanned > limits.max_entries_scanned {
+            return Err(storage_move_limit_error("entries scanned"));
+        }
+
+        // Read each registered path exactly once into a canonical index. Every
+        // subsequent planning pass uses this bounded snapshot rather than
+        // rescanning the writer tables.
+        let mut indexed_storages = Vec::new();
+        indexed_storages
+            .try_reserve_exact(self.storages.len())
+            .map_err(|error| OleError::allocation("storage move index", error))?;
+        for path in &self.storages {
+            if path.len() > limits.max_path_components {
+                return Err(storage_move_limit_error("path components"));
+            }
+            indexed_storages.push(IndexedStorage {
+                path,
+                canonical: canonical_cfb_path(path)?,
+            });
+        }
+        let mut indexed_streams = Vec::new();
+        indexed_streams
+            .try_reserve_exact(self.streams.len())
+            .map_err(|error| OleError::allocation("stream move index", error))?;
+        for (index, (path, _)) in self.streams.iter().enumerate() {
+            if path.len() > limits.max_path_components {
+                return Err(storage_move_limit_error("path components"));
+            }
+            indexed_streams.push(IndexedStream {
+                index,
+                path,
+                canonical: canonical_cfb_path(path)?,
+            });
+        }
+
+        // Refuse an already ambiguous writer model rather than choosing one of
+        // two entries with the same logical CFB path.
+        let mut existing_paths = HashSet::new();
+        existing_paths
+            .try_reserve(entries_scanned)
+            .map_err(|error| OleError::allocation("storage move source index", error))?;
+        for canonical in indexed_storages
+            .iter()
+            .map(|entry| &entry.canonical)
+            .chain(indexed_streams.iter().map(|entry| &entry.canonical))
+        {
+            if !existing_paths.insert(canonical) {
+                return Err(OleError::InvalidData(
+                    "CFB writer contains an ambiguous case-insensitive path".to_string(),
+                ));
+            }
+        }
+
+        let source = indexed_storages
+            .iter()
+            .find(|entry| entry.canonical == source_canonical)
+            .ok_or_else(|| {
+                OleError::InvalidFormat(format!(
+                    "CFB source storage {requested_source:?} does not exist"
+                ))
+            })?;
+        let source = try_clone_path(source.path, "storage move resolved source")?;
+
+        let requested_parent =
+            &requested_destination[..requested_destination.len().saturating_sub(1)];
+        let mut destination = if requested_parent.is_empty() {
+            Vec::new()
+        } else {
+            let parent_canonical = canonical_cfb_path(requested_parent)?;
+            let parent = indexed_storages
+                .iter()
+                .find(|entry| entry.canonical == parent_canonical)
+                .ok_or_else(|| {
+                    OleError::InvalidData(format!(
+                        "CFB destination parent {requested_parent:?} does not exist"
+                    ))
+                })?;
+            try_clone_path(parent.path, "storage move resolved destination parent")?
+        };
+        destination
+            .try_reserve_exact(1)
+            .map_err(|error| OleError::allocation("storage move destination path", error))?;
+        destination.push(try_clone_string(
+            requested_destination
+                .last()
+                .ok_or_else(|| OleError::InvalidData("empty destination path".to_string()))?,
+            "storage move destination component",
+        )?);
+
+        let storage_descendants = indexed_storages
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .count();
+        let stream_descendants = indexed_streams
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .count();
+        let descendants = storage_descendants
+            .checked_add(stream_descendants)
+            .ok_or_else(|| storage_move_limit_error("descendants"))?;
+        if descendants > limits.max_descendants {
+            return Err(storage_move_limit_error("descendants"));
+        }
+
+        let mut storage_moves = Vec::new();
+        storage_moves
+            .try_reserve_exact(storage_descendants)
+            .map_err(|error| OleError::allocation("storage move plan", error))?;
+        for entry in indexed_storages
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+        {
+            let new = rebase_path(
+                entry.path,
+                source.len(),
+                &destination,
+                limits.max_path_components,
+            )?;
+            storage_moves.push(StoragePathMove {
+                old: try_clone_path(entry.path, "storage move source path")?,
+                canonical: canonical_cfb_path(&new)?,
+                new,
+            });
+        }
+
+        let mut stream_moves = Vec::new();
+        stream_moves
+            .try_reserve_exact(stream_descendants)
+            .map_err(|error| OleError::allocation("stream move plan", error))?;
+        for entry in indexed_streams
+            .iter()
+            .filter(|entry| canonical_path_starts_with(&entry.canonical, &source_canonical))
+        {
+            let new = rebase_path(
+                entry.path,
+                source.len(),
+                &destination,
+                limits.max_path_components,
+            )?;
+            {
+                stream_moves.push(StreamPathMove {
+                    index: entry.index,
+                    old: try_clone_path(entry.path, "stream move source path")?,
+                    canonical: canonical_cfb_path(&new)?,
+                    new,
+                });
+            }
+        }
+
+        let mut clsid_moves = Vec::new();
+        clsid_moves
+            .try_reserve_exact(storage_moves.len())
+            .map_err(|error| OleError::allocation("storage CLSID move plan", error))?;
+        for path_move in &storage_moves {
+            if let Some(clsid) = self.storage_clsids.get(&path_move.old) {
+                clsid_moves.push(ClsidPathMove {
+                    old: try_clone_path(&path_move.old, "storage CLSID source path")?,
+                    new: try_clone_path(&path_move.new, "storage CLSID destination path")?,
+                    clsid: *clsid,
+                });
+            }
+        }
+
+        let mut metadata_moves = Vec::new();
+        metadata_moves
+            .try_reserve_exact(storage_moves.len())
+            .map_err(|error| OleError::allocation("storage metadata move plan", error))?;
+        for path_move in &storage_moves {
+            if let Some(metadata) = self.storage_metadata.get(&path_move.old) {
+                metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "storage metadata source path")?,
+                    new: try_clone_path(&path_move.new, "storage metadata destination path")?,
+                    metadata: *metadata,
+                });
+            }
+        }
+
+        let mut stream_metadata_moves = Vec::new();
+        stream_metadata_moves
+            .try_reserve_exact(stream_descendants)
+            .map_err(|error| OleError::allocation("stream metadata move plan", error))?;
+        for path_move in &stream_moves {
+            if let Some(metadata) = self.stream_metadata.get(&path_move.old) {
+                stream_metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "stream metadata source path")?,
+                    new: try_clone_path(&path_move.new, "stream metadata destination path")?,
+                    metadata: *metadata,
+                });
+            }
+        }
+
+        // Build the complete post-move path index before changing any table.
+        // The canonical keys use the exact MS-CFB sibling comparison rule.
+        let mut occupied = HashSet::new();
+        occupied
+            .try_reserve(entries_scanned)
+            .map_err(|error| OleError::allocation("storage move collision index", error))?;
+        for canonical in indexed_storages
+            .iter()
+            .filter(|entry| !canonical_path_starts_with(&entry.canonical, &source_canonical))
+            .map(|entry| &entry.canonical)
+            .chain(
+                indexed_streams
+                    .iter()
+                    .filter(|entry| {
+                        !canonical_path_starts_with(&entry.canonical, &source_canonical)
+                    })
+                    .map(|entry| &entry.canonical),
+            )
+        {
+            insert_unique_canonical(&mut occupied, canonical)?;
+        }
+        for canonical in storage_moves
+            .iter()
+            .map(|path_move| &path_move.canonical)
+            .chain(stream_moves.iter().map(|path_move| &path_move.canonical))
+        {
+            insert_unique_canonical(&mut occupied, canonical)?;
+        }
+
+        // Release all borrows into the writer before applying the infallible
+        // path swaps below.
+        drop(occupied);
+        drop(existing_paths);
+        drop(indexed_streams);
+        drop(indexed_storages);
+
+        // All fallible work is complete. Removing and reinserting the same
+        // number of hash entries stays within the tables' existing capacity.
+        for path_move in &storage_moves {
+            let removed = self.storages.remove(&path_move.old);
+            debug_assert!(removed);
+        }
+        for path_move in storage_moves {
+            let inserted = self.storages.insert(path_move.new);
+            debug_assert!(inserted);
+        }
+        for path_move in stream_moves {
+            self.streams[path_move.index].0 = path_move.new;
+        }
+        for path_move in &clsid_moves {
+            let removed = self.storage_clsids.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.clsid));
+        }
+        for path_move in clsid_moves {
+            let replaced = self.storage_clsids.insert(path_move.new, path_move.clsid);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &metadata_moves {
+            let removed = self.storage_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in metadata_moves {
+            let replaced = self
+                .storage_metadata
+                .insert(path_move.new, path_move.metadata);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &stream_metadata_moves {
+            let removed = self.stream_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in stream_metadata_moves {
+            let replaced = self
+                .stream_metadata
+                .insert(path_move.new, path_move.metadata);
+            debug_assert!(replaced.is_none());
+        }
+
+        Ok(())
+    }
+
+    /// Save the OLE file to a writer
+    ///
+    /// This writes all buffered changes to the output writer in OLE2 format.
+    ///
+    /// # Arguments
+    ///
+    /// * `writer` - Output writer (must implement Write + Seek)
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), OleError>` - Success or error
+    ///
+    /// # Implementation Notes
+    ///
+    /// The write process follows these steps:
+    /// 1. Classify streams as small (< 4096 bytes) or large (>= 4096 bytes)
+    /// 2. Allocate mini sectors for small streams and build `MiniFAT`
+    /// 3. Allocate regular sectors for large streams and build FAT
+    /// 4. Build directory structure with proper sector references
+    /// 5. Generate and write header, FAT, `MiniFAT`, directory, and data sectors
+    ///
+    /// This is based on Apache POI's `POIFSFileSystem.writeFilesystem()` method.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OleError` if a stream fails CFB validation (oversized,
+    /// too many sectors), if an allocation cannot grow, or if writing to
+    /// `writer` fails.
+    pub fn write_to<W: Write + Seek>(&mut self, writer: &mut W) -> Result<(), OleError> {
+        for (_, data) in &self.streams {
+            validate_stream_size(self.sector_size, data.len(), "user stream")?;
+        }
+
+        // The reused layout is planned and reopened through the ordinary CFB
+        // reader's composed view before a byte reaches the caller's sink. A
+        // structural mismatch declines to the established from-scratch
+        // writer, so no partial output is published by the failed plan.
+        let declined = match self.plan_sector_layout()? {
+            Outcome::Planned(plan) => {
+                let report = plan.report();
+                let inputs = self.stream_inputs()?;
+                match plan.validate(&inputs) {
+                    Ok(()) => {
+                        writer.seek(SeekFrom::Start(0))?;
+                        plan.emit(&inputs, writer)?;
+                        writer.flush()?;
+                        self.last_sector_layout = Some(report);
+                        return Ok(());
+                    },
+                    Err(error) if plan_validation_declines(&error) => {
+                        SectorLayoutFallback::PlanRejected
+                    },
+                    Err(error) => return Err(error),
+                }
+            },
+            Outcome::Declined(fallback) => fallback,
+        };
+
+        // Initialize builders
+        let mut fat = FatBuilder::new_with_size(self.sector_size)?;
+        let mut minifat = MiniFatBuilder::new(self.mini_sector_size);
+
+        // Classify by insertion-order index. Plans retain only compact metadata;
+        // stream paths and payload allocations stay in `self.streams`.
+        let mut small_streams = Vec::new();
+        let mut large_streams = Vec::new();
+        let small_count = self
+            .streams
+            .iter()
+            .filter(|(_, data)| data.len() < self.mini_stream_cutoff as usize)
+            .count();
+        let large_count = self.streams.len().checked_sub(small_count).ok_or_else(|| {
+            OleError::InvalidData("CFB stream classification underflow".to_string())
+        })?;
+        small_streams
+            .try_reserve_exact(small_count)
+            .map_err(|source| OleError::allocation("small-stream plan", source))?;
+        large_streams
+            .try_reserve_exact(large_count)
+            .map_err(|source| OleError::allocation("large-stream plan", source))?;
+
+        for (index, (_, data)) in self.streams.iter().enumerate() {
+            if data.len() < self.mini_stream_cutoff as usize {
+                small_streams.push(StreamPlan {
+                    index,
+                    start_sector: ENDOFCHAIN,
+                });
+            } else {
+                large_streams.push(StreamPlan {
+                    index,
+                    start_sector: ENDOFCHAIN,
+                });
+            }
+        }
+
+        // Allocate mini sectors for small streams and track their start sectors
+        for plan in &mut small_streams {
+            let data = &self.streams[plan.index].1;
+            plan.start_sector = minifat.allocate_mini_chain(data)?;
+        }
+
+        // CRITICAL: Allocate large streams FIRST to ensure WordDocument gets sector 0
+        // Microsoft Word requires WordDocument at sector 0!
+
+        // Add large streams to directory (using FAT) - BEFORE ministream
+        for plan in &mut large_streams {
+            let data = &self.streams[plan.index].1;
+            plan.start_sector = if data.is_empty() {
+                ENDOFCHAIN
+            } else {
+                fat.allocate_chain(data.len())?
+            };
+        }
+
+        // NOW allocate ministream (after large streams)
+        let (ministream_start, ministream_size) = if minifat.is_empty() {
+            (ENDOFCHAIN, 0u64)
+        } else {
+            let ministream_data = minifat.ministream_data();
+            validate_stream_size(self.sector_size, ministream_data.len(), "mini stream")?;
+            let start = fat.allocate_chain(ministream_data.len())?;
+            (start, minifat.ministream_size()?)
+        };
+
+        // Initialize directory builder with ministream info
+        let mut directory = DirectoryBuilder::new(ministream_start, ministream_size);
+
+        // Set root CLSID if specified (e.g., for Word documents)
+        if !self.entries.is_empty() && self.root_clsid_set {
+            directory.set_root_clsid(self.entries[0].clsid);
+        }
+        if let Some(root) = self.entries.first() {
+            directory.set_root_state_bits(root.state_bits);
+            // `OleWriter` can replay a captured source root explicitly. The
+            // ordinary public setter only admits zero, while this publication
+            // path preserves the value selected by that source operation.
+            directory.set_root_creation_time_from_source(root.creation_time);
+            directory.set_root_modified_time(root.modified_time);
+        }
+
+        // Pre-create storages declared explicitly by the caller. `storages` and
+        // `storage_clsids` are hash tables whose iteration order Rust seeds per
+        // process, so visiting them directly would assign directory SIDs — and
+        // therefore emit bytes — that differ between runs over the same
+        // document. Both are visited in `storage_directory_order` instead.
+        let mut ordered_storages: Vec<&Vec<String>> = Vec::new();
+        ordered_storages
+            .try_reserve_exact(self.storages.len())
+            .map_err(|source| OleError::allocation("storage directory order", source))?;
+        for storage_path in &self.storages {
+            ordered_storages.push(storage_path);
+        }
+        ordered_storages.sort_unstable_by(|left, right| {
+            storage_directory_order(left.as_slice(), right.as_slice())
+        });
+
+        let mut ordered_clsids: Vec<(&Vec<String>, &[u8; 16])> = Vec::new();
+        let effective_storages = self.effective_storages();
+        ordered_clsids
+            .try_reserve_exact(self.storage_clsids.len())
+            .map_err(|source| OleError::allocation("storage CLSID order", source))?;
+        for entry in &self.storage_clsids {
+            if effective_storages.contains(entry.0) {
+                ordered_clsids.push(entry);
+            }
+        }
+        ordered_clsids.sort_unstable_by(|(left, _), (right, _)| {
+            storage_directory_order(left.as_slice(), right.as_slice())
+        });
+
+        for storage_path in ordered_storages {
+            directory.add_storage_path(storage_path)?;
+        }
+        for (storage_path, clsid) in ordered_clsids {
+            directory.set_storage_clsid(storage_path, *clsid)?;
+        }
+        for (storage_path, metadata) in &self.storage_metadata {
+            directory.set_storage_metadata(
+                storage_path,
+                metadata.state_bits,
+                metadata.creation_time,
+                metadata.modified_time,
+            )?;
+        }
+
+        // Add large streams to directory using full path
+        for plan in &large_streams {
+            let (path, data) = &self.streams[plan.index];
+            let size = u64::try_from(data.len()).map_err(|_err| {
+                OleError::InvalidData("CFB stream size does not fit u64".to_string())
+            })?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
+        }
+
+        // Add small streams to directory (using MiniFAT) with full path
+        for plan in &small_streams {
+            let (path, data) = &self.streams[plan.index];
+            let size = u64::try_from(data.len()).map_err(|_err| {
+                OleError::InvalidData("CFB stream size does not fit u64".to_string())
+            })?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
+        }
+
+        // Generate directory stream
+        let dir_stream = directory.generate_directory_stream()?;
+        validate_stream_size(self.sector_size, dir_stream.len(), "directory stream")?;
+        let dir_sector_count =
+            sector_count(dir_stream.len(), self.sector_size, "directory stream")?;
+        let dir_start_sector = fat.allocate_chain(dir_stream.len())?;
+
+        // Generate MiniFAT sectors (if needed)
+        let minifat_sectors = if minifat.is_empty() {
+            Vec::new()
+        } else {
+            minifat.generate_minifat_sectors(self.sector_size)?
+        };
+        let num_minifat_sectors = u32::try_from(minifat_sectors.len())
+            .map_err(|_err| OleError::InvalidData("too many MiniFAT sectors".to_string()))?;
+        let minifat_bytes = minifat_sectors
+            .len()
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::InvalidData("MiniFAT size overflows usize".to_string()))?;
+        let minifat_start_sector = if minifat_bytes == 0 {
+            ENDOFCHAIN
+        } else {
+            fat.allocate_chain(minifat_bytes)?
+        };
+
+        // === Compute FAT/DIFAT sectors requirement iteratively ===
+        let n_used = fat.total_sectors();
+        let (n_fat, n_difat) = allocation_table_sector_counts(n_used, self.sector_size)?;
+
+        // Reserve DIFAT sectors then FAT sectors
+        let difat_start_sector = if n_difat > 0 {
+            fat.allocate_special(n_difat, DIFSECT)?
+        } else {
+            ENDOFCHAIN
+        };
+        let fat_start_sector = if n_fat > 0 {
+            fat.allocate_special(n_fat, FATSECT)?
+        } else {
+            ENDOFCHAIN
+        };
+        fat.finalize_range_lock()?;
+        validate_output_size(self.sector_size, fat.total_sectors())?;
+
+        // Prepare FAT sector data now that reservations are included
+        let fat_sectors_data = fat.generate_fat_sectors()?;
+        let num_fat_sectors = n_fat;
+        let generated_fat_count = u32::try_from(fat_sectors_data.len())
+            .map_err(|_err| OleError::InvalidData("too many serialized FAT sectors".to_string()))?;
+        if generated_fat_count != num_fat_sectors {
+            return Err(OleError::InvalidData(format!(
+                "CFB FAT planning mismatch: planned {num_fat_sectors}, generated {generated_fat_count}"
+            )));
+        }
+
+        // Validate FAT
+        fat.validate()?;
+
+        // Build header
+        let mut header_builder = HeaderBuilder::new(self.sector_size)?;
+        header_builder.set_first_dir_sector(dir_start_sector);
+        header_builder.set_num_dir_sectors(dir_sector_count);
+        header_builder.set_minifat(minifat_start_sector, num_minifat_sectors);
+
+        // Handle DIFAT if needed (> 109 FAT sectors)
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
+
+        let (num_difat_sectors, difat_sectors) = if num_fat_sectors > 109 {
+            let mut difat = DifatBuilder::new(self.sector_size)?;
+            difat.set_fat_sectors(&fat_sector_ids)?;
+            let num_difat = difat.calculate_difat_sector_count()?;
+            if num_difat != n_difat {
+                return Err(OleError::InvalidData(format!(
+                    "CFB DIFAT planning mismatch: planned {n_difat}, generated {num_difat}"
+                )));
+            }
+            let sectors = if num_difat > 0 {
+                difat.generate_difat_sectors(difat_start_sector)?
+            } else {
+                Vec::new()
+            };
+            (num_difat, sectors)
+        } else {
+            (0, Vec::new())
+        };
+
+        // Add first 109 FAT sector IDs to header
+        header_builder.set_fat_sectors(&fat_sector_ids)?;
+
+        // Set DIFAT info in header
+        if num_difat_sectors > 0 {
+            header_builder.set_difat(difat_start_sector, num_difat_sectors);
+        }
+
+        let header = header_builder.generate()?;
+
+        // === Write the file ===
+
+        // All sector offsets are absolute from the CFB header, so normalize a
+        // caller-provided seekable sink before emitting any bytes.
+        writer.seek(SeekFrom::Start(0))?;
+        writer.write_all(&header)?;
+
+        // Clear the reserved hole even when the caller reuses a nonzero sink.
+        if let Some(lock) = fat.range_lock_sector()
+            && lock < fat.total_sectors()
+        {
+            writer.seek(SeekFrom::Start(sector_offset(lock, self.sector_size)?))?;
+            writer.write_all(&[0; SECTOR_SIZE_V4])?;
+        }
+
+        // Write ministream data (if any)
+        if !minifat.is_empty() && ministream_start != ENDOFCHAIN {
+            let ministream_data = minifat.ministream_data();
+            write_chain_aligned(
+                writer,
+                ministream_data,
+                ministream_start,
+                fat.fat(),
+                self.sector_size,
+            )?;
+        }
+
+        // Write large stream data sectors
+        for plan in &large_streams {
+            if plan.start_sector == ENDOFCHAIN {
+                continue;
+            }
+            let data = &self.streams[plan.index].1;
+
+            write_chain_aligned(writer, data, plan.start_sector, fat.fat(), self.sector_size)?;
+        }
+
+        // Write directory stream
+        write_chain_aligned(
+            writer,
+            &dir_stream,
+            dir_start_sector,
+            fat.fat(),
+            self.sector_size,
+        )?;
+
+        // Write MiniFAT sectors (if any)
+        if minifat_start_sector != ENDOFCHAIN {
+            let minifat_ids =
+                fat.allocation_sector_ids(minifat_start_sector, num_minifat_sectors)?;
+            for (current_sector, minifat_sector_data) in
+                minifat_ids.into_iter().zip(minifat_sectors.iter())
+            {
+                let position = sector_offset(current_sector, self.sector_size)?;
+                writer.seek(SeekFrom::Start(position))?;
+                writer.write_all(minifat_sector_data)?;
+            }
+        }
+
+        // Write FAT sectors
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
+        for (sector_id, fat_sector_data) in fat_sector_ids.into_iter().zip(fat_sectors_data.iter())
+        {
+            let position = sector_offset(sector_id, self.sector_size)?;
+            writer.seek(SeekFrom::Start(position))?;
+            writer.write_all(fat_sector_data)?;
+        }
+
+        // Write DIFAT sectors (if any)
+        if !difat_sectors.is_empty() {
+            let difat_ids = fat.allocation_sector_ids(difat_start_sector, num_difat_sectors)?;
+            for (current_sector, difat_sector_data) in
+                difat_ids.into_iter().zip(difat_sectors.iter())
+            {
+                let position = sector_offset(current_sector, self.sector_size)?;
+                writer.seek(SeekFrom::Start(position))?;
+                writer.write_all(difat_sector_data)?;
+            }
+        }
+
+        writer.flush()?;
+
+        self.last_sector_layout =
+            Some(SectorLayoutReport::declined(declined).with_output_sectors(fat.total_sectors()));
+
+        Ok(())
+    }
+
+    /// Save the OLE file to a file path
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Output file path
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), OleError>` - Success or error
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use litchi_cfb::writer::OleWriter;
+    /// let mut writer = OleWriter::new();
+    /// writer.create_stream(&["Test"], b"Hello")?;
+    /// writer.save("output.ole")?;
+    /// # Ok::<(), litchi_cfb::OleError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an `OleError` if the file cannot be written, synced, or
+    /// atomically moved into place; see [`Self::write_to`] for the
+    /// serialization errors. If the destination was already replaced but its
+    /// parent directory could not be synchronized, the error is
+    /// [`OleError::Committed`].
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OleError> {
+        self.save_with_durability(path, Durability::Full)
+    }
+
+    /// Save the OLE file to a file path at a caller-chosen [`Durability`].
+    ///
+    /// [`Self::save`] is this method at [`Durability::Full`]. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic replacement; a weaker level only skips the temporary-file
+    /// synchronization ([`Durability::NoSync`]) or the parent-directory
+    /// synchronization ([`Durability::FileOnly`] and [`Durability::NoSync`]),
+    /// with the crash guarantees [`Durability`] states.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`], except that only [`Durability::Full`] synchronizes
+    /// the parent directory and can therefore return [`OleError::Committed`],
+    /// and [`Durability::NoSync`] cannot fail to synchronize the file.
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<(), OleError> {
+        self.save_with_steps(path.as_ref(), durability, &mut SystemSteps)
+    }
+
+    #[cfg(test)]
+    fn save_with_parent_sync<P, S>(&mut self, path: P, sync_parent: S) -> Result<(), OleError>
+    where
+        P: AsRef<Path>,
+        S: FnOnce(&Path) -> io::Result<()>,
+    {
+        self.save_with_steps(
+            path.as_ref(),
+            Durability::Full,
+            &mut super::testing::HookSteps::new(atomic_replace, sync_parent),
+        )
+    }
+
+    pub(crate) fn save_with_steps<S: PublishSteps>(
+        &mut self,
+        path: &Path,
+        durability: Durability,
+        steps: &mut S,
+    ) -> Result<(), OleError> {
+        publish_staged(
+            path,
+            durability,
+            TemporaryIdentity::Unchecked,
+            steps,
+            |staging| self.write_to(staging),
+            |_staged_file, ()| Ok(()),
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) | PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, .. }
+            | PublishFailure::SyncFile { source, .. }
+            | PublishFailure::Identity { source, .. }
+            | PublishFailure::Replace { source, .. } => OleError::Io(source),
+            PublishFailure::Committed { source, .. } => OleError::Committed { source },
+        })
+    }
+}
+
+impl Default for OleWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub(crate) fn parent_directory(path: &Path) -> &Path {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+}
+
+pub(crate) fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), OleError> {
+    let file_name = path.file_name().ok_or_else(|| {
+        OleError::Io(io::Error::new(
+            ErrorKind::InvalidInput,
+            "CFB output path must name a file",
+        ))
+    })?;
+    let parent = parent_directory(path);
+
+    for _ in 0..MAX_TEMP_FILE_ATTEMPTS {
+        let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut temporary_name = OsString::from(".");
+        temporary_name.push(file_name);
+        temporary_name.push(format!(".litchi-cfb-{}-{counter}.tmp", std::process::id()));
+        let temporary_path = parent.join(temporary_name);
+
+        match fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&temporary_path)
+        {
+            Ok(file) => return Ok((temporary_path, file)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {},
+            Err(error) => return Err(error.into()),
+        }
+    }
+
+    Err(OleError::Io(io::Error::new(
+        ErrorKind::AlreadyExists,
+        "could not allocate a unique sibling temporary file for CFB output",
+    )))
+}
+
+#[cfg(not(windows))]
+pub(crate) fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+    fs::rename(temporary_path, destination)
+}
+
+#[cfg(unix)]
+pub(crate) fn sync_parent(parent: &Path) -> io::Result<()> {
+    match File::open(parent).and_then(|directory| directory.sync_all()) {
+        Ok(()) => Ok(()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                ErrorKind::InvalidInput | ErrorKind::Unsupported
+            ) =>
+        {
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
+}
+
+// MoveFileExW is requested with MOVEFILE_WRITE_THROUGH above. Windows does
+// not provide the same portable directory-handle fsync contract as Unix, so
+// there is no separate parent-directory failure to report on this target.
+#[cfg(not(unix))]
+pub(crate) fn sync_parent(_parent: &Path) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(windows)]
+pub(crate) fn atomic_replace(temporary_path: &Path, destination: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let temporary_path: Vec<u16> = temporary_path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let destination: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+    // MoveFileExW replaces an existing file on the same volume without the
+    // remove-then-rename gap that would make an overwrite non-atomic.
+    let replaced = unsafe {
+        MoveFileExW(
+            temporary_path.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if replaced == 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+fn own_path(
+    path: &[&str],
+    path_resource: &'static str,
+    component_resource: &'static str,
+) -> Result<Vec<String>, OleError> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(path.len())
+        .map_err(|source| OleError::allocation(path_resource, source))?;
+    for component in path {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(component.len())
+            .map_err(|source| OleError::allocation(component_resource, source))?;
+        value.push_str(component);
+        owned.push(value);
+    }
+    Ok(owned)
+}
+
+fn own_valid_cfb_path(path: &[&str], resource: &'static str) -> Result<Vec<String>, OleError> {
+    // Reject oversized untrusted input before cloning it. Once the UTF-16
+    // length is at most 31, the UTF-8 byte length is also tightly bounded.
+    for component in path {
+        if component
+            .encode_utf16()
+            .take(MAX_DIRECTORY_NAME_CODE_UNITS + 1)
+            .count()
+            > MAX_DIRECTORY_NAME_CODE_UNITS
+        {
+            return Err(OleError::InvalidData(format!(
+                "CFB directory entry name exceeds {MAX_DIRECTORY_NAME_CODE_UNITS} UTF-16 code units"
+            )));
+        }
+        directory_name_data(component).map_err(|error| OleError::InvalidData(error.to_string()))?;
+    }
+    let owned = own_path(path, resource, "storage move path component")?;
+    Ok(owned)
+}
+
+fn try_clone_string(value: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut cloned = String::new();
+    cloned
+        .try_reserve_exact(value.len())
+        .map_err(|error| OleError::allocation(resource, error))?;
+    cloned.push_str(value);
+    Ok(cloned)
+}
+
+fn try_clone_path(path: &[String], resource: &'static str) -> Result<Vec<String>, OleError> {
+    let mut cloned = Vec::new();
+    cloned
+        .try_reserve_exact(path.len())
+        .map_err(|error| OleError::allocation(resource, error))?;
+    for component in path {
+        cloned.push(try_clone_string(component, resource)?);
+    }
+    Ok(cloned)
+}
+
+fn rebase_path(
+    path: &[String],
+    source_len: usize,
+    destination: &[String],
+    max_path_components: usize,
+) -> Result<Vec<String>, OleError> {
+    let suffix = path.get(source_len..).ok_or_else(|| {
+        OleError::InvalidData("CFB storage move source is not a path prefix".to_string())
+    })?;
+    let component_count = destination
+        .len()
+        .checked_add(suffix.len())
+        .ok_or_else(|| storage_move_limit_error("path components"))?;
+    if component_count > max_path_components {
+        return Err(storage_move_limit_error("path components"));
+    }
+
+    let mut rebased = Vec::new();
+    rebased
+        .try_reserve_exact(component_count)
+        .map_err(|error| OleError::allocation("storage move destination path", error))?;
+    for component in destination.iter().chain(suffix) {
+        rebased.push(try_clone_string(
+            component,
+            "storage move destination component",
+        )?);
+    }
+    Ok(rebased)
+}
+
+/// Canonical serialization order for explicitly registered storage paths.
+///
+/// [`OleWriter`] keeps its storages in hash tables, whose iteration order Rust
+/// seeds per process, so `write_to` has to impose an order of its own before it
+/// assigns directory SIDs. Ordering by depth and then by the stored path
+/// components makes the emitted directory a function of the writer's content
+/// rather than of the caller's declaration order or of the process's hash seed,
+/// which is the determinism ADR 0006 requires of serialization. Shallowest
+/// first keeps every ancestor ahead of its descendants, so
+/// `DirectoryBuilder::add_storage_path` never has to create a parent implicitly
+/// out of order, and the comparison is total over the distinct keys of a
+/// `HashSet`, so the sort needs no stability guarantee. It is also the order
+/// `litchi-ole-common`'s package renderer already computes before it calls
+/// [`OleWriter::create_storage`], so the writer now preserves the only
+/// canonical storage order the tree already had.
+fn storage_directory_order(left: &[String], right: &[String]) -> std::cmp::Ordering {
+    left.len().cmp(&right.len()).then_with(|| left.cmp(right))
+}
+
+fn canonical_cfb_path(path: &[String]) -> Result<CanonicalPath, OleError> {
+    let mut canonical = Vec::new();
+    canonical
+        .try_reserve_exact(path.len())
+        .map_err(|error| OleError::allocation("storage move canonical path", error))?;
+    for component in path {
+        if component
+            .encode_utf16()
+            .take(MAX_DIRECTORY_NAME_CODE_UNITS + 1)
+            .count()
+            > MAX_DIRECTORY_NAME_CODE_UNITS
+        {
+            return Err(OleError::InvalidData(format!(
+                "CFB directory entry name exceeds {MAX_DIRECTORY_NAME_CODE_UNITS} UTF-16 code units"
+            )));
+        }
+        let name = directory_name_data(component)
+            .map_err(|error| OleError::InvalidData(error.to_string()))?;
+        canonical.push((name.utf16.len(), name.comparison));
+    }
+    Ok(CanonicalPath(canonical))
+}
+
+fn canonical_path_starts_with(path: &CanonicalPath, prefix: &CanonicalPath) -> bool {
+    path.0.starts_with(&prefix.0)
+}
+
+fn insert_unique_canonical<'a>(
+    occupied: &mut HashSet<&'a CanonicalPath>,
+    canonical: &'a CanonicalPath,
+) -> Result<(), OleError> {
+    if !occupied.insert(canonical) {
+        return Err(OleError::InvalidData(
+            "CFB storage move destination collides with an existing logical path".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn storage_move_limit_error(limit: &str) -> OleError {
+    OleError::InvalidData(format!("CFB storage move exceeds the {limit} limit"))
+}
+
+fn reserve_hash_set_entry<T>(
+    set: &mut HashSet<T>,
+    key: &T,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), OleError>
+where
+    T: Eq + Hash,
+{
+    if set.contains(key) {
+        return Ok(());
+    }
+    set.try_reserve(additional)
+        .map_err(|source| OleError::allocation(resource, source))
+}
+
+fn reserve_hash_map_entry<K, V>(
+    map: &mut HashMap<K, V>,
+    key: &K,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), OleError>
+where
+    K: Eq + Hash,
+{
+    if map.contains_key(key) {
+        return Ok(());
+    }
+    map.try_reserve(additional)
+        .map_err(|source| OleError::allocation(resource, source))
+}
+
+fn validate_stream_size(
+    sector_size: usize,
+    size: usize,
+    resource: &'static str,
+) -> Result<(), OleError> {
+    checked_sector_size(sector_size)?;
+    if sector_size != 512 {
+        return Ok(());
+    }
+    let size_u64 = u64::try_from(size)
+        .map_err(|_err| OleError::InvalidData("CFB stream size does not fit u64".to_string()))?;
+    if size_u64 >= V3_MAX_FILE_BYTES {
+        return Err(OleError::InvalidData(format!(
+            "version 3 CFB {resource} must be smaller than 2 GiB"
+        )));
+    }
+    Ok(())
+}
+
+pub(super) fn plan_validation_declines(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::InvalidFormat(_)
+            | OleError::InvalidData(_)
+            | OleError::NotOleFile
+            | OleError::CorruptedFile(_)
+            | OleError::StreamNotFound
+            // `PlanCursor` has no external I/O source: an I/O error from the
+            // validation reader can only mean that the composed plan exposed
+            // an invalid positional view. Keep allocation and other typed
+            // resource failures on the error path above.
+            | OleError::Io(_)
+            // The validation reader's only limits are the plan's own output
+            // and directory lengths (`OleFileLimits::for_writer`). Exceeding
+            // one means the planned view describes more than the plan built,
+            // such as a directory chain its FAT runs past the planned
+            // directory image: a plan defect, not a caller's resource limit.
+            // The allocation-table ceiling is writer-owned too: `for_writer`
+            // sets it to the reader's hard maximum, which a plan of at most
+            // 109 FAT sectors and no DIFAT can exceed only by describing
+            // tables it did not build.
+            // Only those plan-derived resources decline; any other limit
+            // stays on the error path, so a future caller-set limit cannot be
+            // mistaken for a plan defect.
+            | OleError::LimitExceeded {
+                resource: "input bytes" | "directory bytes" | "allocation table bytes",
+                ..
+            }
+    )
+}
+
+pub(super) fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
+    let sector_size_u64 = checked_sector_size(sector_size)?;
+    // MS-CFB 2.9 caps the complete file at MAXREGSECT sectors, including
+    // its header. The count here covers only sectors following the header.
+    if sector_count >= MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB output exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    let bytes = u64::from(sector_count)
+        .checked_add(1)
+        .and_then(|count| count.checked_mul(sector_size_u64))
+        .ok_or_else(|| OleError::InvalidData("CFB output size overflows u64".to_string()))?;
+    if sector_size == 512 && bytes > V3_MAX_FILE_BYTES {
+        return Err(OleError::InvalidData(
+            "version 3 CFB output cannot exceed 2 GiB".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn sector_count(
+    byte_len: usize,
+    sector_size: usize,
+    resource: &'static str,
+) -> Result<u32, OleError> {
+    checked_sector_size(sector_size)?;
+    let count = byte_len.div_ceil(sector_size);
+    let count_u32 = u32::try_from(count)
+        .map_err(|_err| OleError::InvalidData(format!("CFB {resource} has too many sectors")))?;
+    if count_u32 > MAXREGSECT {
+        return Err(OleError::InvalidData(format!(
+            "CFB {resource} exceeds MAXREGSECT"
+        )));
+    }
+    Ok(count_u32)
+}
+
+fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32, u32), OleError> {
+    checked_sector_size(sector_size)?;
+    let entries_per_fat_sector = u32::try_from(sector_size / 4)
+        .map_err(|_err| OleError::InvalidData("CFB FAT geometry exceeds u32".to_string()))?;
+    let ids_per_difat_sector = entries_per_fat_sector
+        .checked_sub(1)
+        .ok_or_else(|| OleError::InvalidData("CFB DIFAT sector has no ID slots".to_string()))?;
+    let mut fat = 0u32;
+    let mut difat = 0u32;
+    for _ in 0..32 {
+        let mut total = used
+            .checked_add(fat)
+            .and_then(|value| value.checked_add(difat))
+            .ok_or_else(|| OleError::InvalidData("CFB sector count overflows u32".to_string()))?;
+        // `used` already includes any hole crossed by payload allocations.
+        // Metadata can be the first allocation to cross it, adding one FAT entry.
+        if sector_size == SECTOR_SIZE_V4
+            && used <= RANGE_LOCK_SECTOR_V4
+            && total > RANGE_LOCK_SECTOR_V4
+        {
+            total = total.checked_add(1).ok_or_else(|| {
+                OleError::InvalidData("CFB range-lock sector overflows u32".to_string())
+            })?;
+        }
+        if total > MAXREGSECT {
+            return Err(OleError::InvalidData(
+                "CFB sector count exceeds MAXREGSECT".to_string(),
+            ));
+        }
+        let new_fat = total.div_ceil(entries_per_fat_sector);
+        let new_difat = new_fat.saturating_sub(109).div_ceil(ids_per_difat_sector);
+        if new_fat == fat && new_difat == difat {
+            return Ok((fat, difat));
+        }
+        fat = new_fat;
+        difat = new_difat;
+    }
+    Err(OleError::InvalidData(
+        "CFB FAT/DIFAT planning did not converge".to_string(),
+    ))
+}
+
+fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OleError> {
+    let sector_size_u64 = checked_sector_size(sector_size)?;
+    if sector >= MAXREGSECT {
+        return Err(OleError::InvalidData(
+            "CFB sector index exceeds MAXREGSECT".to_string(),
+        ));
+    }
+    (u64::from(sector) + 1)
+        .checked_mul(sector_size_u64)
+        .ok_or_else(|| OleError::InvalidData("CFB sector offset overflows u64".to_string()))
+}
+
+fn checked_sector_size(sector_size: usize) -> Result<u64, OleError> {
+    if !matches!(sector_size, 512 | 4096) {
+        return Err(OleError::InvalidData(format!(
+            "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+        )));
+    }
+    u64::try_from(sector_size)
+        .map_err(|_err| OleError::InvalidData("CFB sector size does not fit u64".to_string()))
+}
+
+/// Write a payload through the exact FAT chain assigned by the allocator.
+///
+/// Version 4 files reserve one physical sector for the range lock.  A chain
+/// that crosses that fixed hole is therefore not physically contiguous even
+/// though its logical allocation was requested as one stream.
+fn write_chain_aligned<W: Write + Seek>(
+    writer: &mut W,
+    data: &[u8],
+    start_sector: u32,
+    fat: &[u32],
+    sector_size: usize,
+) -> Result<(), OleError> {
+    if data.is_empty() {
+        return Ok(());
+    }
+    checked_sector_size(sector_size)?;
+    let mut current = start_sector;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let run_start = current;
+        let mut run_end = offset;
+        loop {
+            if current == RANGE_LOCK_SECTOR_V4 && sector_size == 4096 {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain points to the range-lock sector".to_string(),
+                ));
+            }
+            let current_index = usize::try_from(current).map_err(|_err| {
+                OleError::InvalidData("CFB FAT sector index does not fit usize".to_string())
+            })?;
+            let next = *fat.get(current_index).ok_or_else(|| {
+                OleError::InvalidData("CFB stream chain exceeds the FAT".to_string())
+            })?;
+            run_end += (data.len() - run_end).min(sector_size);
+            if run_end == data.len() {
+                if next != ENDOFCHAIN {
+                    return Err(OleError::InvalidData(
+                        "CFB stream chain continues beyond its payload".to_string(),
+                    ));
+                }
+                break;
+            }
+            if next >= MAXREGSECT {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain ends before its payload".to_string(),
+                ));
+            }
+            let contiguous = current.checked_add(1) == Some(next);
+            current = next;
+            if !contiguous {
+                break;
+            }
+        }
+        // Keep ordinary payloads in one write. Only an actual physical hole
+        // splits the contiguous run; FAT traversal does not fragment sink I/O.
+        writer.seek(SeekFrom::Start(sector_offset(run_start, sector_size)?))?;
+        write_sector_aligned(writer, &data[offset..run_end], sector_size)?;
+        offset = run_end;
+    }
+    Ok(())
+}
+
+fn write_sector_aligned<W: Write>(
+    writer: &mut W,
+    data: &[u8],
+    sector_size: usize,
+) -> Result<(), OleError> {
+    if !matches!(sector_size, 512 | 4096) {
+        return Err(OleError::InvalidData(format!(
+            "CFB sector size must be 512 or 4096 bytes, got {sector_size}"
+        )));
+    }
+    writer.write_all(data)?;
+    let remainder = data.len() % sector_size;
+    if remainder != 0 {
+        const ZEROES: [u8; 4096] = [0; 4096];
+        let padding = sector_size - remainder;
+        let bytes = ZEROES.get(..padding).ok_or_else(|| {
+            OleError::InvalidData("CFB sector padding exceeds 4096 bytes".to_string())
+        })?;
+        writer.write_all(bytes)?;
+    }
+    Ok(())
+}
+
+/// Encode a string to UTF-16LE bytes (padded to 64 bytes)
+///
+/// This is used for directory entry names in OLE files.
+///
+/// # Arguments
+///
+/// * `name` - The string to encode (max 31 characters)
+///
+/// # Returns
+///
+/// * `[u8; 64]` - UTF-16LE encoded bytes with null terminator
+///
+/// # Implementation Notes
+///
+/// All core helper functions have been implemented:
+/// - ✅ UTF-16LE encoding (this function)
+/// - ✅ FAT chain building (`FatBuilder`)
+/// - ✅ `MiniFAT` allocation (`MiniFatBuilder`)
+/// - ✅ DIFAT handling (`DifatBuilder`)
+/// - ✅ Directory tree building (`DirectoryBuilder`)
+/// - Future: Balanced red-black tree (planned enhancement)
+#[allow(dead_code, reason = "reserved for future implementation")]
+fn encode_name_utf16le(name: &str) -> [u8; 64] {
+    let mut result = [0u8; 64];
+    let mut max_chars = 0;
+    for (i, ch) in name.encode_utf16().take(31).enumerate() {
+        let bytes = ch.to_le_bytes();
+        result[i * 2] = bytes[0];
+        result[i * 2 + 1] = bytes[1];
+        max_chars = i + 1;
+    }
+
+    // Null terminator
+    if max_chars < 32 {
+        result[max_chars * 2] = 0;
+        result[max_chars * 2 + 1] = 0;
+    }
+
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+    use super::*;
+    use crate::consts::MAGIC;
+    use crate::file::OleFile;
+    use std::error::Error as _;
+    use std::io::Cursor;
+
+    #[test]
+    fn metadata_crossing_range_lock_expands_fat_capacity() {
+        // Without the reserved hole, 512 FAT sectors appear to fit exactly.
+        // The metadata allocations cross the hole and need a 513th FAT sector.
+        let used = 512 * 1024 - 512 - 1;
+        assert_eq!(
+            allocation_table_sector_counts(used - 1, 4096).unwrap(),
+            (512, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used, 4096).unwrap(),
+            (513, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used + 1, 4096).unwrap(),
+            (513, 1)
+        );
+    }
+
+    #[test]
+    fn test_create_writer() {
+        let writer = OleWriter::new();
+        assert_eq!(writer.sector_size, 512);
+        assert_eq!(writer.mini_sector_size, 64);
+        assert_eq!(writer.mini_stream_cutoff, 4096);
+        assert_eq!(writer.entries.len(), 1); // Root entry
+    }
+
+    #[test]
+    fn test_create_stream() {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Test"], b"Hello").unwrap();
+        assert_eq!(writer.streams.len(), 1);
+    }
+
+    #[test]
+    fn owned_stream_retains_payload_allocation_through_write() {
+        let mut writer = OleWriter::new();
+        let data = vec![0x5a; 5_003];
+        let pointer = data.as_ptr();
+
+        writer
+            .create_stream_owned(&["Owned"], data)
+            .expect("move stream payload");
+        assert_eq!(writer.streams[0].1.as_ptr(), pointer);
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("write owned stream");
+        assert_eq!(writer.streams[0].1.as_ptr(), pointer);
+    }
+
+    #[test]
+    fn serialization_normalizes_the_sink_position() {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Test"], b"payload").unwrap();
+        let mut output = Cursor::new(Vec::new());
+        output.set_position(17);
+
+        writer.write_to(&mut output).unwrap();
+
+        assert_eq!(&output.into_inner()[..MAGIC.len()], MAGIC);
+    }
+
+    #[test]
+    fn save_preserves_existing_destination_when_serialization_fails() {
+        let destination = std::env::temp_dir().join(format!(
+            "litchi-cfb-serialization-failure-{}-{}.ole",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let original = b"keep this destination intact";
+        fs::write(&destination, original).unwrap();
+
+        let mut writer = OleWriter::new();
+        // Bypass the public path validation to exercise a serialization error
+        // after save has already created its sibling temporary file.
+        writer
+            .streams
+            .push((Vec::new(), StreamPayload::Owned(Vec::new())));
+
+        let error = writer.save(&destination).unwrap_err();
+        assert!(error.to_string().contains("stream path must not be empty"));
+        assert_eq!(fs::read(&destination).unwrap(), original);
+
+        let temporary_prefix = format!(
+            ".{}.litchi-cfb-",
+            destination.file_name().unwrap().to_string_lossy()
+        );
+        let temporary_exists = fs::read_dir(destination.parent().unwrap())
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(&temporary_prefix)
+            });
+        assert!(!temporary_exists);
+
+        fs::remove_file(destination).unwrap();
+    }
+
+    #[test]
+    fn save_reports_committed_when_parent_sync_fails() {
+        let directory = std::env::temp_dir().join(format!(
+            "litchi-cfb-committed-save-{}-{}",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&directory).unwrap();
+        let destination = directory.join("document.ole");
+        fs::write(&destination, b"old destination").unwrap();
+
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Document"], b"new contents")
+            .unwrap();
+        let result = writer.save_with_parent_sync(&destination, |parent| {
+            assert_eq!(parent, directory.as_path());
+            Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "injected parent directory sync failure",
+            ))
+        });
+
+        assert!(matches!(
+            result,
+            Err(OleError::Committed { source })
+                if source.kind() == ErrorKind::PermissionDenied
+        ));
+        assert_ne!(fs::read(&destination).unwrap(), b"old destination");
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_create_storage() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Storage"]).unwrap();
+        assert_eq!(writer.storages.len(), 1);
+    }
+
+    #[test]
+    fn chain_publication_coalesces_contiguous_sectors_and_splits_at_the_lock() {
+        #[derive(Default)]
+        struct Sink {
+            position: u64,
+            writes: Vec<(u64, Vec<u8>)>,
+            seeks: usize,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes.push((self.position, bytes.to_vec()));
+                self.position += bytes.len() as u64;
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        impl Seek for Sink {
+            fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+                let SeekFrom::Start(position) = from else {
+                    panic!("absolute seeks only")
+                };
+                self.position = position;
+                self.seeks += 1;
+                Ok(position)
+            }
+        }
+        for sector_size in [512, 4096] {
+            let mut allocator = FatBuilder::new_with_size(sector_size).unwrap();
+            let data = vec![0xA5; 64 * 1024];
+            let start = allocator.allocate_chain(data.len()).unwrap();
+            let mut sink = Sink::default();
+            write_chain_aligned(&mut sink, &data, start, allocator.fat(), sector_size).unwrap();
+            assert_eq!(sink.seeks, 1);
+            assert_eq!(sink.writes, vec![(sector_size as u64, data)]);
+        }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let mut fat = vec![crate::consts::FREESECT; lock as usize + 2];
+        fat[lock as usize - 1] = lock + 1;
+        fat[lock as usize + 1] = ENDOFCHAIN;
+        let data = vec![0x5A; 2 * 4096];
+        let mut sink = Sink::default();
+        write_chain_aligned(&mut sink, &data, lock - 1, &fat, 4096).unwrap();
+        assert_eq!(sink.seeks, 2);
+        assert_eq!(sink.writes.len(), 2);
+        assert_eq!(
+            sink.writes[0],
+            (u64::from(lock) * 4096, data[..4096].to_vec())
+        );
+        assert_eq!(
+            sink.writes[1],
+            (u64::from(lock + 2) * 4096, data[4096..].to_vec())
+        );
+    }
+
+    #[test]
+    fn explicit_storage_order_is_deterministic_across_writer_instances() {
+        let mut expected = None;
+        for reverse in [false, true].into_iter().cycle().take(16) {
+            let mut writer = OleWriter::new();
+            let mut paths = [["Pool", "Alpha"], ["Pool", "Beta"], ["Other", "Child"]];
+            if reverse {
+                paths.reverse();
+            }
+            for path in paths {
+                writer.create_storage(&path).unwrap();
+            }
+            writer
+                .create_stream(&["Pool", "Alpha", "Payload"], b"stable")
+                .unwrap();
+            let mut output = Cursor::new(Vec::new());
+            writer.write_to(&mut output).unwrap();
+            let bytes = output.into_inner();
+            if let Some(expected) = &expected {
+                assert!(bytes == *expected, "storage emission must be deterministic");
+            } else {
+                expected = Some(bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn delete_storage_removes_descendants_and_clsids_without_prefix_collisions() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Root"]).unwrap();
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer.create_storage(&["Root", "Nested", "Deep"]).unwrap();
+        writer.create_storage(&["Root", "Sibling"]).unwrap();
+        writer.create_storage(&["RootSibling"]).unwrap();
+
+        let root_clsid = [0x11; 16];
+        let nested_clsid = [0x22; 16];
+        let deep_clsid = [0x33; 16];
+        let removed_sibling_clsid = [0x44; 16];
+        let sibling_clsid = [0x55; 16];
+        writer.set_storage_clsid(&["Root"], root_clsid).unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested"], nested_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested", "Deep"], deep_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Sibling"], removed_sibling_clsid)
+            .unwrap();
+        writer
+            .set_storage_clsid(&["RootSibling"], sibling_clsid)
+            .unwrap();
+
+        writer
+            .create_stream(&["Root", "Nested", "Removed"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Deep", "AlsoRemoved"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["Root", "Sibling", "Removed"], b"removed")
+            .unwrap();
+        writer
+            .create_stream(&["RootSibling", "Preserved"], b"preserved")
+            .unwrap();
+        writer
+            .set_storage_metadata(
+                &["Root", "Nested"],
+                0x1122_3344,
+                0x5566_7788_99AA_BBCC,
+                0xDDEE_FF00_0102_0304,
+            )
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Root", "Nested", "Removed"],
+                0x5566_7788,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+
+        writer.delete_storage(&["Root"]).unwrap();
+
+        let root = vec!["Root".to_string()];
+        let nested = vec!["Root".to_string(), "Nested".to_string()];
+        let deep = vec!["Root".to_string(), "Nested".to_string(), "Deep".to_string()];
+        let nested_sibling = vec!["Root".to_string(), "Sibling".to_string()];
+        let root_sibling = vec!["RootSibling".to_string()];
+
+        assert!(!writer.storages.contains(&root));
+        assert!(!writer.storages.contains(&nested));
+        assert!(!writer.storages.contains(&deep));
+        assert!(!writer.storages.contains(&nested_sibling));
+        assert!(writer.storages.contains(&root_sibling));
+
+        assert!(!writer.storage_clsids.contains_key(&root));
+        assert!(!writer.storage_clsids.contains_key(&nested));
+        assert!(!writer.storage_clsids.contains_key(&deep));
+        assert!(!writer.storage_clsids.contains_key(&nested_sibling));
+        assert_eq!(
+            writer.storage_clsids.get(&root_sibling),
+            Some(&sibling_clsid)
+        );
+
+        assert!(
+            writer
+                .streams
+                .iter()
+                .all(|(path, _)| !path.starts_with(root.as_slice()))
+        );
+        assert!(writer.storage_metadata.is_empty());
+        assert!(writer.stream_metadata.is_empty());
+        assert!(writer.streams.iter().any(|(path, data)| {
+            path == &["RootSibling".to_string(), "Preserved".to_string()]
+                && data.bytes() == b"preserved"
+        }));
+
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Fresh"], b"fresh")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let fresh = ole
+            .list_directory_entries(&["Root", "Nested"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Fresh")
+            .unwrap();
+        assert_eq!(fresh.state_bits, 0);
+        assert_eq!(fresh.creation_time, 0);
+        assert_eq!(fresh.modified_time, 0);
+    }
+
+    #[test]
+    fn delete_storage_rejects_root_and_missing_paths_atomically() {
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Root"]).unwrap();
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Stream"], b"payload")
+            .unwrap();
+        writer
+            .set_storage_clsid(&["Root", "Nested"], [0x55; 16])
+            .unwrap();
+
+        let streams_before = writer.streams.clone();
+        let storages_before = writer.storages.clone();
+        let clsids_before = writer.storage_clsids.clone();
+
+        assert!(matches!(
+            writer.delete_storage(&[]),
+            Err(OleError::InvalidData(message)) if message == "Empty path"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
+
+        assert!(matches!(
+            writer.delete_storage(&["Missing"]),
+            Err(OleError::InvalidFormat(message)) if message == "Storage not found"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
+
+        assert!(matches!(
+            writer.delete_storage(&["Root", "Nested", "Stream"]),
+            Err(OleError::InvalidFormat(message)) if message == "Storage not found"
+        ));
+        assert_eq!(writer.streams, streams_before);
+        assert_eq!(writer.storages, storages_before);
+        assert_eq!(writer.storage_clsids, clsids_before);
+    }
+
+    #[test]
+    fn move_storage_retains_stream_payload_allocations_and_insertion_order() {
+        let first = vec![0x41; 5_003];
+        let second = vec![0x42; 97];
+        let mut writer = OleWriter::new();
+        writer.create_storage(&["Source"]).unwrap();
+        writer.create_storage(&["Source", "Nested"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Source", "Nested"],
+                0xCAFE_BABE,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .set_storage_state_bits(&["source", "nested"], 0xFACE_CAFE)
+            .unwrap();
+        writer
+            .create_stream_owned(&["Source", "First"], first)
+            .unwrap();
+        writer
+            .create_stream_owned(&["Source", "Second"], second)
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Source", "First"],
+                0xDEAD_BEEF,
+                0x2122_2324_2526_2728,
+                0x3132_3334_3536_3738,
+            )
+            .unwrap();
+        writer
+            .set_stream_modified_time(&["source", "first"], 0x4142_4344_4546_4748)
+            .unwrap();
+        writer
+            .set_stream_state_bits(&["Source", "Second"], 0xABCD_1234)
+            .unwrap();
+
+        let before = writer
+            .streams
+            .iter()
+            .map(|(path, payload)| {
+                (
+                    path.last().unwrap().clone(),
+                    payload.as_ptr(),
+                    payload.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+        writer.move_storage(&["source"], &["Renamed"]).unwrap();
+        let after = writer
+            .streams
+            .iter()
+            .map(|(path, payload)| {
+                (
+                    path.last().unwrap().clone(),
+                    payload.as_ptr(),
+                    payload.len(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(after, before);
+        assert!(
+            writer
+                .streams
+                .iter()
+                .all(|(path, _)| path.first().is_some_and(|name| name == "Renamed"))
+        );
+        let renamed_nested = vec!["Renamed".to_string(), "Nested".to_string()];
+        let renamed_first = vec!["Renamed".to_string(), "First".to_string()];
+        let renamed_second = vec!["Renamed".to_string(), "Second".to_string()];
+        assert_eq!(
+            writer.storage_metadata.get(&renamed_nested),
+            Some(&DirectoryMetadata {
+                state_bits: 0xFACE_CAFE,
+                creation_time: 0x0102_0304_0506_0708,
+                modified_time: 0x1112_1314_1516_1718,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_first),
+            Some(&DirectoryMetadata {
+                state_bits: 0xDEAD_BEEF,
+                creation_time: 0x2122_2324_2526_2728,
+                modified_time: 0x4142_4344_4546_4748,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_second),
+            Some(&DirectoryMetadata {
+                state_bits: 0xABCD_1234,
+                creation_time: 0,
+                modified_time: 0,
+            })
+        );
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let nested = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Nested")
+            .unwrap();
+        assert_eq!(nested.state_bits, 0xFACE_CAFE);
+        assert_eq!(nested.creation_time, 0x0102_0304_0506_0708);
+        assert_eq!(nested.modified_time, 0x1112_1314_1516_1718);
+        let first = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "First")
+            .unwrap();
+        assert_eq!(first.creation_time, 0x2122_2324_2526_2728);
+        assert_eq!(first.modified_time, 0x4142_4344_4546_4748);
+    }
+
+    #[test]
+    fn test_encode_name() {
+        let encoded = encode_name_utf16le("Test");
+        // Verify UTF-16LE encoding: 'T' = 0x0054, 'e' = 0x0065, etc.
+        assert_eq!(encoded[0], 0x54); // 'T' low byte
+        assert_eq!(encoded[1], 0x00); // 'T' high byte
+        assert_eq!(encoded[2], 0x65); // 'e' low byte
+        assert_eq!(encoded[3], 0x00); // 'e' high byte
+    }
+
+    #[test]
+    fn version_three_limits_are_checked_without_large_allocations() {
+        let last_stream_byte = usize::try_from(V3_MAX_FILE_BYTES - 1).unwrap();
+        let first_invalid_stream = usize::try_from(V3_MAX_FILE_BYTES).unwrap();
+        assert!(validate_stream_size(512, last_stream_byte, "test stream").is_ok());
+        assert!(validate_stream_size(512, first_invalid_stream, "test stream").is_err());
+        assert!(validate_stream_size(4096, first_invalid_stream, "test stream").is_ok());
+
+        let maximum_v3_sectors = u32::try_from(V3_MAX_FILE_BYTES / 512).unwrap();
+        assert!(validate_output_size(512, maximum_v3_sectors - 1).is_ok());
+        assert!(validate_output_size(512, maximum_v3_sectors).is_err());
+        assert!(validate_output_size(4096, maximum_v3_sectors).is_ok());
+    }
+
+    #[test]
+    fn version_four_size_limit_includes_the_header_sector() {
+        assert!(validate_output_size(4096, MAXREGSECT - 1).is_ok());
+        assert!(validate_output_size(4096, MAXREGSECT).is_err());
+        assert!(validate_output_size(4096, MAXREGSECT + 1).is_err());
+    }
+
+    #[test]
+    fn allocation_table_planning_is_checked_and_converges() {
+        assert_eq!(allocation_table_sector_counts(1, 512).unwrap(), (1, 0));
+        assert_eq!(allocation_table_sector_counts(128, 512).unwrap(), (2, 0));
+        assert!(allocation_table_sector_counts(MAXREGSECT, 512).is_err());
+        assert!(allocation_table_sector_counts(1, 0).is_err());
+    }
+
+    #[test]
+    fn allocation_errors_preserve_resource_and_source() {
+        let mut probe = Vec::<u8>::new();
+        let source = probe.try_reserve(usize::MAX).unwrap_err();
+        let error = OleError::allocation("test buffer", source);
+        assert!(matches!(
+            &error,
+            OleError::Allocation {
+                resource: "test buffer",
+                ..
+            }
+        ));
+        assert!(error.source().is_some());
+    }
+
+    #[test]
+    fn path_table_reservation_reports_overflow_without_mutation() {
+        let mut table = HashMap::<Vec<String>, usize>::new();
+        let key = vec!["Storage".to_string()];
+
+        let error =
+            reserve_hash_map_entry(&mut table, &key, usize::MAX, "test path table").unwrap_err();
+
+        assert!(matches!(
+            error,
+            OleError::Allocation {
+                resource: "test path table",
+                ..
+            }
+        ));
+        assert!(table.is_empty());
+        assert!(!table.contains_key(&key));
+    }
+}

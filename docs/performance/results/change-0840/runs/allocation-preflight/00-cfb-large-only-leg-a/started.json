@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation-preflight/00-cfb-large-only-leg-a/time.txt",
+    "/home/zhuhe/code/litchi-target-0840/retained/leg-a/allocation/cfb-emission-probe",
+    "--case",
+    "cfb-large-only",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/allocation-preflight/00-cfb-large-only-leg-a/report.json"
+  ],
+  "binary": {
+    "bytes": 15009352,
+    "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-a/allocation/cfb-emission-probe",
+    "sha256": "08babfbf9edfb75acb50c7289b6b9df1926f9e7bf462f739d8a7f99feb216256"
+  },
+  "block": 0,
+  "build": {
+    "bytes": 691,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/build-before-allocation.json",
+    "sha256": "1809b54cd081578fa20abf486da9b2979e748d64313613332af2de331b170afb"
+  },
+  "case": "cfb-large-only",
+  "lane": "allocation-preflight",
+  "leg": "before",
+  "started_unix": 1790694289.5208046
+}

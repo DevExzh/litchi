@@ -1,0 +1,141 @@
+{
+  "raw_quantile_rows": [
+    {
+      "case": "doc-tiny",
+      "estimate": 1.0030177304479775,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "doc-tiny",
+      "estimate": 1.0050263004091176,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "doc-tiny",
+      "estimate": 0.9937988030778,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "doc-large",
+      "estimate": 0.9675390655143437,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "doc-large",
+      "estimate": 0.9152210752805141,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "doc-large",
+      "estimate": 0.9036753972333398,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "doc-payload",
+      "estimate": 0.9014435720061893,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "doc-payload",
+      "estimate": 0.9014010416923002,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "doc-payload",
+      "estimate": 0.8877453289628222,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-tiny",
+      "estimate": 0.9755349393984738,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-tiny",
+      "estimate": 0.9831301974227131,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-tiny",
+      "estimate": 0.9783916531039294,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-large",
+      "estimate": 0.9511216453685374,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-large",
+      "estimate": 0.9405988619783899,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-large",
+      "estimate": 0.9552534553971705,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-large-only",
+      "estimate": 1.0011064996666816,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-large-only",
+      "estimate": 0.9995880481967627,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-large-only",
+      "estimate": 0.9924168620487481,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-mini-only",
+      "estimate": 1.0157253666222277,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-mini-only",
+      "estimate": 0.9874551971326165,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-mini-only",
+      "estimate": 0.9799742686133021,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-v4",
+      "estimate": 0.9528601663383021,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-v4",
+      "estimate": 0.964362382950206,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-v4",
+      "estimate": 0.9653960888502866,
+      "metric": "p99_ns"
+    },
+    {
+      "case": "cfb-difat",
+      "estimate": 1.0029369639425214,
+      "metric": "p50_ns"
+    },
+    {
+      "case": "cfb-difat",
+      "estimate": 1.0026724489075787,
+      "metric": "p95_ns"
+    },
+    {
+      "case": "cfb-difat",
+      "estimate": 1.0071523207922368,
+      "metric": "p99_ns"
+    }
+  ],
+  "scope": "Independent raw native nearest-rank and paired-point recomputation; bootstrap covered by frozen reader statistical tests.",
+  "status": "pass"
+}

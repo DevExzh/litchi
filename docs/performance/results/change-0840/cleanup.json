@@ -1,0 +1,37 @@
+{
+  "removed": [
+    {
+      "files": 7836,
+      "logical_bytes": 1983388452,
+      "path": "/home/zhuhe/code/litchi-target-0840"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0840"
+    }
+  ],
+  "status": "pass",
+  "verified_binaries": [
+    {
+      "bytes": 14819680,
+      "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-a/native/cfb-emission-probe",
+      "sha256": "c8d977f5d8439c7a15dfc163811ae62d2f9016c269c354fdf20caab63dd5bbb9"
+    },
+    {
+      "bytes": 15009352,
+      "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-a/allocation/cfb-emission-probe",
+      "sha256": "08babfbf9edfb75acb50c7289b6b9df1926f9e7bf462f739d8a7f99feb216256"
+    },
+    {
+      "bytes": 14819656,
+      "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-b/native/cfb-emission-probe",
+      "sha256": "536f3b1b7b4d2ed0b4af4dfc44d84c215598d248884af5e715c2a7383f59420e"
+    },
+    {
+      "bytes": 15009360,
+      "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-b/allocation/cfb-emission-probe",
+      "sha256": "7623c8fcdfe5fcff0bad679b857b03226100674ec224bc334296a51e91aa776b"
+    }
+  ]
+}

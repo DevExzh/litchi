@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/capture.py",
+    "allocation"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790695073.614081,
+  "log": {
+    "bytes": 3798,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/capture-allocation/output.log",
+    "sha256": "9eb2e11657a9ac48da87706e918c57c339d43948e926a6f3abd5b5085814006e"
+  },
+  "started_unix": 1790695045.8795345
+}

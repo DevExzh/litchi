@@ -1,0 +1,125 @@
+{
+  "schema": "litchi.execution-cfb-emission.v1",
+  "mode": "observe",
+  "config": {
+    "case": "cfb-mini-only",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "output_verification": "outside wall timer: reopen, semantic projection, hashes, and inventory"
+  },
+  "input": {
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "case": "cfb-mini-only",
+    "format": "CFB/OLE2",
+    "sector_size": 512,
+    "paragraph_count": null,
+    "stream_count": 3,
+    "logical_input_bytes": 4864,
+    "input_sha256": "a9c9c8ef3ebecfc15c4ff0710512e4498cac2f4ec52fed54574feb85d6e86f33",
+    "members": [
+      {
+        "name": "MiniPayloadA",
+        "bytes": 256,
+        "sha256": "340676fe766c69699d0a09dd949da23ae877f1abf002a4bbacc18c3738e668c6"
+      },
+      {
+        "name": "MiniPayloadB",
+        "bytes": 1536,
+        "sha256": "454014b177288b24ab4926909c6ec1660fd3622c65ee699f893622204fa94cef"
+      },
+      {
+        "name": "MiniPayloadC",
+        "bytes": 3072,
+        "sha256": "694ef32e9bc2373f75cfc4b066f87ad8f27dad7b76bd4a56cde429da753185df"
+      }
+    ],
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation"
+  },
+  "verification": {
+    "valid_output": true,
+    "output_bytes": 7168,
+    "output_sha256": "a4d7ca2c5dd9d7e4baa59e8d552841021c3f4243fbbe4078b45dbc27bcd8c7e9",
+    "semantic_sha256": "a9c9c8ef3ebecfc15c4ff0710512e4498cac2f4ec52fed54574feb85d6e86f33",
+    "logical_output_bytes": 4864,
+    "member_or_paragraph_count": 3,
+    "exact_input_match": true
+  },
+  "observer": {
+    "write_calls": 6,
+    "write_bytes": 7168,
+    "seek_calls": 5,
+    "backward_seek_calls": 0,
+    "backward_seek_bytes": 0,
+    "gap_events": 0,
+    "zero_filled_gap_bytes": 0,
+    "largest_gap_bytes": 0,
+    "output_bytes": 7168,
+    "output_sha256": "a4d7ca2c5dd9d7e4baa59e8d552841021c3f4243fbbe4078b45dbc27bcd8c7e9",
+    "events_recorded": 11,
+    "events_truncated": false,
+    "events": [
+      {
+        "kind": "seek",
+        "from": 0,
+        "to": 0
+      },
+      {
+        "kind": "write",
+        "at": 0,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 512,
+        "to": 512
+      },
+      {
+        "kind": "write",
+        "at": 512,
+        "bytes": 4864,
+        "gap_before": 0
+      },
+      {
+        "kind": "write",
+        "at": 5376,
+        "bytes": 256,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 5632,
+        "to": 5632
+      },
+      {
+        "kind": "write",
+        "at": 5632,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 6144,
+        "to": 6144
+      },
+      {
+        "kind": "write",
+        "at": 6144,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 6656,
+        "to": 6656
+      },
+      {
+        "kind": "write",
+        "at": 6656,
+        "bytes": 512,
+        "gap_before": 0
+      }
+    ]
+  }
+}

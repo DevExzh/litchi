@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 14819656,
+    "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-b/native/cfb-emission-probe",
+    "sha256": "536f3b1b7b4d2ed0b4af4dfc44d84c215598d248884af5e715c2a7383f59420e"
+  },
+  "freeze": {
+    "bytes": 1202927,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/freeze-after-native.json",
+    "sha256": "c933b533e932909c9956746e979cec41d624d64ab8b13404dbbd16ff6a50cf78"
+  },
+  "receipt": {
+    "bytes": 603,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/build-after-native/receipt.json",
+    "sha256": "8e18428dcfea2cecf9a9241b23b411bcaf8a856e23394f115bba36c6ed0d5a1c"
+  }
+}

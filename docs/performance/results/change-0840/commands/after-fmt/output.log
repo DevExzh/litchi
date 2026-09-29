@@ -1,0 +1,13 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-cfb/tests/writer_emission_order.rs:303:
+         match result {
+             Err(OleError::Io(error)) => {
+                 assert_eq!(error.kind(), io::ErrorKind::Other);
+[31m-                assert!(error.to_string().contains("injected mixed CFB sink failure"));
+[m[32m+                assert!(
+[m[32m+                    error
+[m[32m+                        .to_string()
+[m[32m+                        .contains("injected mixed CFB sink failure")
+[m[32m+                );
+[m             },
+             other => panic!("expected injected sink IO error, got {other:?}"),
+         }

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790694536.2017188,
+  "log": {
+    "bytes": 649,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/after-fmt/output.log",
+    "sha256": "3bc6f49500a7accbd5be5e8b3e66348e2a1e77343b71dbaa646add2ce95a787e"
+  },
+  "started_unix": 1790694514.9089813
+}

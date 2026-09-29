@@ -1,0 +1,24 @@
+{
+  "admission": {
+    "bytes": 1214924,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/admission.json",
+    "sha256": "8ea0f25074d91c4f2cd1cbde94a5dfede396a2115c2a56cddc6f9522124c606a"
+  },
+  "change": "Remove duplicate before/after reader fields before constructing the summary; retain original raw block vectors. Add analyzer identity to result. No metric, threshold, bootstrap, sample, case or raw artifact changes.",
+  "corrected": {
+    "bytes": 3364,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/analyze-v2.py",
+    "sha256": "f2a8d2c9f3e8d24cd7830cb35d0bc42b60342f9db2cec90fa52e24b40ccc4a7e"
+  },
+  "failed_receipt": {
+    "bytes": 481,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/paired-analysis/receipt.json",
+    "sha256": "0cc4b81010a9908aa1309289219ef96580e712541788a71069dbd616bb35e4af"
+  },
+  "original": {
+    "bytes": 3244,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/analyze.py",
+    "sha256": "a456b7044579c672df7a359a2357a84a8f5345b628bb2b91e0f9748098bd63dd"
+  },
+  "reason": "Frozen analyzer duplicated before/after keyword fields already returned by the independently tested bootstrap reader. The first replay terminated before writing analysis.json."
+}

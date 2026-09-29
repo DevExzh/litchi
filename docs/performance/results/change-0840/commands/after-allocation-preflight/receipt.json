@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/capture.py",
+    "allocation-preflight",
+    "after"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790694811.332337,
+  "log": {
+    "bytes": 402,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/after-allocation-preflight/output.log",
+    "sha256": "dc3500b005ff3afd60e93240a9dfe80a6b4cb57605a40670249e142890e1cebf"
+  },
+  "started_unix": 1790694810.5025308
+}

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0840 — fresh CFB emission avoids large payload gap initialization
+
+[0840](0840-cfb-fresh-emission-order.md) adopts the byte-identical ministream emission reorder. DOC payload p50 improves 9.86%; mixed large CFB improves 4.7–4.9%. All 270 reports / 6,534 samples validate with zero frozen guard flags. The 512-paragraph DOC RSS increase of 4.80%, tiny DOC's extra allocation call, and mini-only CFB's 1.57% p50 increase remain explicit. Both source gates and exact artifact checks pass; broader OLE2/OOXML work remains open.
+
 ## 0839 — cached Part reads avoid private workers
 
 [0839](0839-cached-part-scheduling-requalification.md) adopts the cache-ready private scheduling path after fresh current-source qualification: sixteen cached cases improve paired p50 by 96.68–98.99%, with no frozen native RSS/latency, phase-residency or operation-allocation regression flag. All 1,414 reports / 28,450 samples and six separate thread-census reports validate. Resource/source/error semantics and explicit caller workers remain intact. Five uncertain tail point estimates remain visible; no whole-Office speedup is claimed. Historical 0787 remains rejected, and the broad goal stays active.

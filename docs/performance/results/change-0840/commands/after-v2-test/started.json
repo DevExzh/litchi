@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-cfb",
+    "-p",
+    "litchi-doc",
+    "--all-features"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0840",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790694624.0906465
+}

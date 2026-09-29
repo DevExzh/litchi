@@ -1,0 +1,808 @@
+{
+  "schema": "litchi.execution-cfb-emission.v1",
+  "mode": "observe",
+  "config": {
+    "case": "cfb-large-only",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "output_verification": "outside wall timer: reopen, semantic projection, hashes, and inventory"
+  },
+  "input": {
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "case": "cfb-large-only",
+    "format": "CFB/OLE2",
+    "sector_size": 512,
+    "paragraph_count": null,
+    "stream_count": 1,
+    "logical_input_bytes": 4194304,
+    "input_sha256": "028ca3159e2992895561d5d9409bddec1de807cded7c68a35c8a484e2f1b3362",
+    "members": [
+      {
+        "name": "LargePayload",
+        "bytes": 4194304,
+        "sha256": "e2c5217ee991477f8e6a83c7910d0adf72220b8021023c45f79ab40182b5a4aa"
+      }
+    ],
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation"
+  },
+  "verification": {
+    "valid_output": true,
+    "output_bytes": 4228608,
+    "output_sha256": "99f2b185094090db06f3284d88ec707d6dc78ec2df0394b1e8b19f89b3eed27a",
+    "semantic_sha256": "028ca3159e2992895561d5d9409bddec1de807cded7c68a35c8a484e2f1b3362",
+    "logical_output_bytes": 4194304,
+    "member_or_paragraph_count": 1,
+    "exact_input_match": true
+  },
+  "observer": {
+    "write_calls": 69,
+    "write_bytes": 4228608,
+    "seek_calls": 68,
+    "backward_seek_calls": 0,
+    "backward_seek_bytes": 0,
+    "gap_events": 0,
+    "zero_filled_gap_bytes": 0,
+    "largest_gap_bytes": 0,
+    "output_bytes": 4228608,
+    "output_sha256": "99f2b185094090db06f3284d88ec707d6dc78ec2df0394b1e8b19f89b3eed27a",
+    "events_recorded": 137,
+    "events_truncated": false,
+    "events": [
+      {
+        "kind": "seek",
+        "from": 0,
+        "to": 0
+      },
+      {
+        "kind": "write",
+        "at": 0,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 512,
+        "to": 512
+      },
+      {
+        "kind": "write",
+        "at": 512,
+        "bytes": 4194304,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4194816,
+        "to": 4194816
+      },
+      {
+        "kind": "write",
+        "at": 4194816,
+        "bytes": 256,
+        "gap_before": 0
+      },
+      {
+        "kind": "write",
+        "at": 4195072,
+        "bytes": 256,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4195328,
+        "to": 4195328
+      },
+      {
+        "kind": "write",
+        "at": 4195328,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4195840,
+        "to": 4195840
+      },
+      {
+        "kind": "write",
+        "at": 4195840,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4196352,
+        "to": 4196352
+      },
+      {
+        "kind": "write",
+        "at": 4196352,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4196864,
+        "to": 4196864
+      },
+      {
+        "kind": "write",
+        "at": 4196864,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4197376,
+        "to": 4197376
+      },
+      {
+        "kind": "write",
+        "at": 4197376,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4197888,
+        "to": 4197888
+      },
+      {
+        "kind": "write",
+        "at": 4197888,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4198400,
+        "to": 4198400
+      },
+      {
+        "kind": "write",
+        "at": 4198400,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4198912,
+        "to": 4198912
+      },
+      {
+        "kind": "write",
+        "at": 4198912,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4199424,
+        "to": 4199424
+      },
+      {
+        "kind": "write",
+        "at": 4199424,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4199936,
+        "to": 4199936
+      },
+      {
+        "kind": "write",
+        "at": 4199936,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4200448,
+        "to": 4200448
+      },
+      {
+        "kind": "write",
+        "at": 4200448,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4200960,
+        "to": 4200960
+      },
+      {
+        "kind": "write",
+        "at": 4200960,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4201472,
+        "to": 4201472
+      },
+      {
+        "kind": "write",
+        "at": 4201472,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4201984,
+        "to": 4201984
+      },
+      {
+        "kind": "write",
+        "at": 4201984,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4202496,
+        "to": 4202496
+      },
+      {
+        "kind": "write",
+        "at": 4202496,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4203008,
+        "to": 4203008
+      },
+      {
+        "kind": "write",
+        "at": 4203008,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4203520,
+        "to": 4203520
+      },
+      {
+        "kind": "write",
+        "at": 4203520,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4204032,
+        "to": 4204032
+      },
+      {
+        "kind": "write",
+        "at": 4204032,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4204544,
+        "to": 4204544
+      },
+      {
+        "kind": "write",
+        "at": 4204544,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4205056,
+        "to": 4205056
+      },
+      {
+        "kind": "write",
+        "at": 4205056,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4205568,
+        "to": 4205568
+      },
+      {
+        "kind": "write",
+        "at": 4205568,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4206080,
+        "to": 4206080
+      },
+      {
+        "kind": "write",
+        "at": 4206080,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4206592,
+        "to": 4206592
+      },
+      {
+        "kind": "write",
+        "at": 4206592,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4207104,
+        "to": 4207104
+      },
+      {
+        "kind": "write",
+        "at": 4207104,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4207616,
+        "to": 4207616
+      },
+      {
+        "kind": "write",
+        "at": 4207616,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4208128,
+        "to": 4208128
+      },
+      {
+        "kind": "write",
+        "at": 4208128,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4208640,
+        "to": 4208640
+      },
+      {
+        "kind": "write",
+        "at": 4208640,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4209152,
+        "to": 4209152
+      },
+      {
+        "kind": "write",
+        "at": 4209152,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4209664,
+        "to": 4209664
+      },
+      {
+        "kind": "write",
+        "at": 4209664,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4210176,
+        "to": 4210176
+      },
+      {
+        "kind": "write",
+        "at": 4210176,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4210688,
+        "to": 4210688
+      },
+      {
+        "kind": "write",
+        "at": 4210688,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4211200,
+        "to": 4211200
+      },
+      {
+        "kind": "write",
+        "at": 4211200,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4211712,
+        "to": 4211712
+      },
+      {
+        "kind": "write",
+        "at": 4211712,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4212224,
+        "to": 4212224
+      },
+      {
+        "kind": "write",
+        "at": 4212224,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4212736,
+        "to": 4212736
+      },
+      {
+        "kind": "write",
+        "at": 4212736,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4213248,
+        "to": 4213248
+      },
+      {
+        "kind": "write",
+        "at": 4213248,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4213760,
+        "to": 4213760
+      },
+      {
+        "kind": "write",
+        "at": 4213760,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4214272,
+        "to": 4214272
+      },
+      {
+        "kind": "write",
+        "at": 4214272,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4214784,
+        "to": 4214784
+      },
+      {
+        "kind": "write",
+        "at": 4214784,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4215296,
+        "to": 4215296
+      },
+      {
+        "kind": "write",
+        "at": 4215296,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4215808,
+        "to": 4215808
+      },
+      {
+        "kind": "write",
+        "at": 4215808,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4216320,
+        "to": 4216320
+      },
+      {
+        "kind": "write",
+        "at": 4216320,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4216832,
+        "to": 4216832
+      },
+      {
+        "kind": "write",
+        "at": 4216832,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4217344,
+        "to": 4217344
+      },
+      {
+        "kind": "write",
+        "at": 4217344,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4217856,
+        "to": 4217856
+      },
+      {
+        "kind": "write",
+        "at": 4217856,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4218368,
+        "to": 4218368
+      },
+      {
+        "kind": "write",
+        "at": 4218368,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4218880,
+        "to": 4218880
+      },
+      {
+        "kind": "write",
+        "at": 4218880,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4219392,
+        "to": 4219392
+      },
+      {
+        "kind": "write",
+        "at": 4219392,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4219904,
+        "to": 4219904
+      },
+      {
+        "kind": "write",
+        "at": 4219904,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4220416,
+        "to": 4220416
+      },
+      {
+        "kind": "write",
+        "at": 4220416,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4220928,
+        "to": 4220928
+      },
+      {
+        "kind": "write",
+        "at": 4220928,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4221440,
+        "to": 4221440
+      },
+      {
+        "kind": "write",
+        "at": 4221440,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4221952,
+        "to": 4221952
+      },
+      {
+        "kind": "write",
+        "at": 4221952,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4222464,
+        "to": 4222464
+      },
+      {
+        "kind": "write",
+        "at": 4222464,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4222976,
+        "to": 4222976
+      },
+      {
+        "kind": "write",
+        "at": 4222976,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4223488,
+        "to": 4223488
+      },
+      {
+        "kind": "write",
+        "at": 4223488,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4224000,
+        "to": 4224000
+      },
+      {
+        "kind": "write",
+        "at": 4224000,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4224512,
+        "to": 4224512
+      },
+      {
+        "kind": "write",
+        "at": 4224512,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4225024,
+        "to": 4225024
+      },
+      {
+        "kind": "write",
+        "at": 4225024,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4225536,
+        "to": 4225536
+      },
+      {
+        "kind": "write",
+        "at": 4225536,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4226048,
+        "to": 4226048
+      },
+      {
+        "kind": "write",
+        "at": 4226048,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4226560,
+        "to": 4226560
+      },
+      {
+        "kind": "write",
+        "at": 4226560,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4227072,
+        "to": 4227072
+      },
+      {
+        "kind": "write",
+        "at": 4227072,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4227584,
+        "to": 4227584
+      },
+      {
+        "kind": "write",
+        "at": 4227584,
+        "bytes": 512,
+        "gap_before": 0
+      },
+      {
+        "kind": "seek",
+        "from": 4228096,
+        "to": 4228096
+      },
+      {
+        "kind": "write",
+        "at": 4228096,
+        "bytes": 512,
+        "gap_before": 0
+      }
+    ]
+  }
+}

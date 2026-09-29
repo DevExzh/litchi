@@ -1,0 +1,644 @@
+{
+  "schema": "litchi.execution-allocation-observer.v1",
+  "scope": "global system allocator callbacks around the same fresh public writer operation; no wall or CPU timing",
+  "config": {
+    "case": "cfb-large",
+    "samples": 30,
+    "warmup": 3,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "verification": "outside allocation region: reopen, semantic projection, hashes, and inventory"
+  },
+  "corpus": {
+    "case": "cfb-large",
+    "format": "CFB/OLE2",
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "input_sha256": "3c1d44845a2a2e48924f6803f1c30e6693aee7a47dc8d1422a5834732373c09a",
+    "logical_input_bytes": 4196352,
+    "members": [
+      {
+        "bytes": 2048,
+        "name": "MiniPayload",
+        "sha256": "7eb899b0d52b8e28c3f025f78a9fed8e1e95ee07b155b4949039811dc5bff16e"
+      },
+      {
+        "bytes": 4194304,
+        "name": "LargePayload",
+        "sha256": "e2c5217ee991477f8e6a83c7910d0adf72220b8021023c45f79ab40182b5a4aa"
+      }
+    ],
+    "paragraph_count": null,
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation",
+    "sector_size": 512,
+    "stream_count": 2
+  },
+  "metrics": {
+    "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+    "counter_revision": "serialized_region_peak_v3",
+    "instrumentation_identity": "system_allocator_operation_scoped",
+    "timing": "not measured by this binary"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206320,
+        "live_bytes_after": 12595952,
+        "peak_live_bytes_before": 21103187,
+        "peak_live_bytes_after": 21103187,
+        "region_peak_live_bytes": 16866578
+      }
+    },
+    {
+      "sample": 1,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206384,
+        "live_bytes_after": 12596016,
+        "peak_live_bytes_before": 21103187,
+        "peak_live_bytes_after": 21103187,
+        "region_peak_live_bytes": 16866642
+      }
+    },
+    {
+      "sample": 2,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206448,
+        "live_bytes_after": 12596080,
+        "peak_live_bytes_before": 21103251,
+        "peak_live_bytes_after": 21103251,
+        "region_peak_live_bytes": 16866706
+      }
+    },
+    {
+      "sample": 3,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206512,
+        "live_bytes_after": 12596144,
+        "peak_live_bytes_before": 21103315,
+        "peak_live_bytes_after": 21103315,
+        "region_peak_live_bytes": 16866770
+      }
+    },
+    {
+      "sample": 4,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206576,
+        "live_bytes_after": 12596208,
+        "peak_live_bytes_before": 21103379,
+        "peak_live_bytes_after": 21103379,
+        "region_peak_live_bytes": 16866834
+      }
+    },
+    {
+      "sample": 5,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206640,
+        "live_bytes_after": 12596272,
+        "peak_live_bytes_before": 21103443,
+        "peak_live_bytes_after": 21103443,
+        "region_peak_live_bytes": 16866898
+      }
+    },
+    {
+      "sample": 6,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206704,
+        "live_bytes_after": 12596336,
+        "peak_live_bytes_before": 21103507,
+        "peak_live_bytes_after": 21103507,
+        "region_peak_live_bytes": 16866962
+      }
+    },
+    {
+      "sample": 7,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206768,
+        "live_bytes_after": 12596400,
+        "peak_live_bytes_before": 21103571,
+        "peak_live_bytes_after": 21103571,
+        "region_peak_live_bytes": 16867026
+      }
+    },
+    {
+      "sample": 8,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206832,
+        "live_bytes_after": 12596464,
+        "peak_live_bytes_before": 21103635,
+        "peak_live_bytes_after": 21103635,
+        "region_peak_live_bytes": 16867090
+      }
+    },
+    {
+      "sample": 9,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206896,
+        "live_bytes_after": 12596528,
+        "peak_live_bytes_before": 21103699,
+        "peak_live_bytes_after": 21103699,
+        "region_peak_live_bytes": 16867154
+      }
+    },
+    {
+      "sample": 10,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4206960,
+        "live_bytes_after": 12596592,
+        "peak_live_bytes_before": 21103763,
+        "peak_live_bytes_after": 21103763,
+        "region_peak_live_bytes": 16867218
+      }
+    },
+    {
+      "sample": 11,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207024,
+        "live_bytes_after": 12596656,
+        "peak_live_bytes_before": 21103827,
+        "peak_live_bytes_after": 21103827,
+        "region_peak_live_bytes": 16867282
+      }
+    },
+    {
+      "sample": 12,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207088,
+        "live_bytes_after": 12596720,
+        "peak_live_bytes_before": 21103891,
+        "peak_live_bytes_after": 21103891,
+        "region_peak_live_bytes": 16867346
+      }
+    },
+    {
+      "sample": 13,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207152,
+        "live_bytes_after": 12596784,
+        "peak_live_bytes_before": 21103955,
+        "peak_live_bytes_after": 21103955,
+        "region_peak_live_bytes": 16867410
+      }
+    },
+    {
+      "sample": 14,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207216,
+        "live_bytes_after": 12596848,
+        "peak_live_bytes_before": 21104019,
+        "peak_live_bytes_after": 21104019,
+        "region_peak_live_bytes": 16867474
+      }
+    },
+    {
+      "sample": 15,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207280,
+        "live_bytes_after": 12596912,
+        "peak_live_bytes_before": 21104083,
+        "peak_live_bytes_after": 21104083,
+        "region_peak_live_bytes": 16867538
+      }
+    },
+    {
+      "sample": 16,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207344,
+        "live_bytes_after": 12596976,
+        "peak_live_bytes_before": 21104147,
+        "peak_live_bytes_after": 21104147,
+        "region_peak_live_bytes": 16867602
+      }
+    },
+    {
+      "sample": 17,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207408,
+        "live_bytes_after": 12597040,
+        "peak_live_bytes_before": 21104211,
+        "peak_live_bytes_after": 21104211,
+        "region_peak_live_bytes": 16867666
+      }
+    },
+    {
+      "sample": 18,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207472,
+        "live_bytes_after": 12597104,
+        "peak_live_bytes_before": 21104275,
+        "peak_live_bytes_after": 21104275,
+        "region_peak_live_bytes": 16867730
+      }
+    },
+    {
+      "sample": 19,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207536,
+        "live_bytes_after": 12597168,
+        "peak_live_bytes_before": 21104339,
+        "peak_live_bytes_after": 21104339,
+        "region_peak_live_bytes": 16867794
+      }
+    },
+    {
+      "sample": 20,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207600,
+        "live_bytes_after": 12597232,
+        "peak_live_bytes_before": 21104403,
+        "peak_live_bytes_after": 21104403,
+        "region_peak_live_bytes": 16867858
+      }
+    },
+    {
+      "sample": 21,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207664,
+        "live_bytes_after": 12597296,
+        "peak_live_bytes_before": 21104467,
+        "peak_live_bytes_after": 21104467,
+        "region_peak_live_bytes": 16867922
+      }
+    },
+    {
+      "sample": 22,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207728,
+        "live_bytes_after": 12597360,
+        "peak_live_bytes_before": 21104531,
+        "peak_live_bytes_after": 21104531,
+        "region_peak_live_bytes": 16867986
+      }
+    },
+    {
+      "sample": 23,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207792,
+        "live_bytes_after": 12597424,
+        "peak_live_bytes_before": 21104595,
+        "peak_live_bytes_after": 21104595,
+        "region_peak_live_bytes": 16868050
+      }
+    },
+    {
+      "sample": 24,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207856,
+        "live_bytes_after": 12597488,
+        "peak_live_bytes_before": 21104659,
+        "peak_live_bytes_after": 21104659,
+        "region_peak_live_bytes": 16868114
+      }
+    },
+    {
+      "sample": 25,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207920,
+        "live_bytes_after": 12597552,
+        "peak_live_bytes_before": 21104723,
+        "peak_live_bytes_after": 21104723,
+        "region_peak_live_bytes": 16868178
+      }
+    },
+    {
+      "sample": 26,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4207984,
+        "live_bytes_after": 12597616,
+        "peak_live_bytes_before": 21104787,
+        "peak_live_bytes_after": 21104787,
+        "region_peak_live_bytes": 16868242
+      }
+    },
+    {
+      "sample": 27,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4208048,
+        "live_bytes_after": 12597680,
+        "peak_live_bytes_before": 21104851,
+        "peak_live_bytes_after": 21104851,
+        "region_peak_live_bytes": 16868306
+      }
+    },
+    {
+      "sample": 28,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4208112,
+        "live_bytes_after": 12597744,
+        "peak_live_bytes_before": 21104915,
+        "peak_live_bytes_after": 21104915,
+        "region_peak_live_bytes": 16868370
+      }
+    },
+    {
+      "sample": 29,
+      "output_bytes": 4231168,
+      "output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 108,
+        "deallocation_calls": 100,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16987106,
+        "deallocated_bytes": 8597474,
+        "live_bytes_before": 4208176,
+        "live_bytes_after": 12597808,
+        "peak_live_bytes_before": 21104979,
+        "peak_live_bytes_after": 21104979,
+        "region_peak_live_bytes": 16868434
+      }
+    }
+  ],
+  "final_output_sha256": "5928922279b57084f18b660de4089470e09db9b81b84c0f73cb776f238753bae",
+  "final_output_bytes": 4231168
+}

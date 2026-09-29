@@ -1,0 +1,8 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+   Compiling litchi-perf-cfb-emission v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 52.85s

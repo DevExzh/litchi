@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "rustfmt",
+    "--edition",
+    "2024",
+    "/home/zhuhe/code/litchi/crates/litchi-cfb/tests/writer_emission_order.rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790694581.2225764,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/candidate-format/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790694581.2020411
+}

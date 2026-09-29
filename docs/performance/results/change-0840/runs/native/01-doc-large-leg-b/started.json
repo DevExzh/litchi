@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-doc-large-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0840/retained/leg-b/native/cfb-emission-probe",
+    "--case",
+    "doc-large",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/runs/native/01-doc-large-leg-b/report.json"
+  ],
+  "binary": {
+    "bytes": 14819656,
+    "path": "/home/zhuhe/code/litchi-target-0840/retained/leg-b/native/cfb-emission-probe",
+    "sha256": "536f3b1b7b4d2ed0b4af4dfc44d84c215598d248884af5e715c2a7383f59420e"
+  },
+  "block": 1,
+  "build": {
+    "bytes": 677,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/build-after-native.json",
+    "sha256": "460dc60c50cb719f59a35edd88b5cdee6591d010628d5d489bc55f12f1622ae2"
+  },
+  "case": "doc-large",
+  "lane": "native",
+  "leg": "after",
+  "started_unix": 1790694977.3854525
+}

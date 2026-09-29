@@ -1,0 +1,5073 @@
+{
+  "analyzer": {
+    "bytes": 3364,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/analyze-v2.py",
+    "sha256": "f2a8d2c9f3e8d24cd7830cb35d0bc42b60342f9db2cec90fa52e24b40ccc4a7e"
+  },
+  "counts": {
+    "allocation": 108,
+    "allocation-preflight": 18,
+    "native": 108,
+    "observer": 18,
+    "qualification": 18
+  },
+  "decision": "adopt",
+  "qualifier": {
+    "bytes": 3270,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/qualify.py",
+    "sha256": "1d7b311c3b8c93bc439be6353013f57fc3f13f8a96ee899312943bea25b84f57"
+  },
+  "readers": {
+    "bytes": 45121,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/readers.py",
+    "sha256": "7771347c1840f9be7997762a0e6d05657550dce5ceed358da0f3c396e3f302af"
+  },
+  "regression_flags": [],
+  "reports": 270,
+  "samples": 6534,
+  "status": "pass",
+  "summary": [
+    {
+      "after": [
+        6580.0,
+        6560.0,
+        6660.0,
+        6630.0,
+        6680.0,
+        6650.0
+      ],
+      "after_median": 6640.0,
+      "before": [
+        6700.0,
+        6610.0,
+        6630.0,
+        6620.0,
+        6560.0,
+        6620.0
+      ],
+      "before_median": 6620.0,
+      "block_ratios": [
+        0.982089552238806,
+        0.9924357034795764,
+        1.004524886877828,
+        1.001510574018127,
+        1.0182926829268293,
+        1.0045317220543806
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0030177304479775,
+        "lower": 0.9872626278591912,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.011412202490605
+      },
+      "case": "doc-tiny",
+      "ci95_high": 1.011412202490605,
+      "ci95_low": 0.9872626278591912,
+      "estimate": 1.0030177304479775,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.982089552238806,
+        0.9924357034795764,
+        1.004524886877828,
+        1.001510574018127,
+        1.0182926829268293,
+        1.0045317220543806
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        7230.0,
+        7240.0,
+        7200.0,
+        7200.0,
+        7330.0,
+        7140.0
+      ],
+      "after_median": 7215.0,
+      "before": [
+        7310.0,
+        7070.0,
+        7250.0,
+        7080.0,
+        7130.0,
+        7220.0
+      ],
+      "before_median": 7175.0,
+      "block_ratios": [
+        0.9890560875512996,
+        1.024045261669024,
+        0.993103448275862,
+        1.0169491525423728,
+        1.0280504908835906,
+        0.9889196675900277
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0050263004091176,
+        "lower": 0.9889878775706636,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0260478762763072
+      },
+      "case": "doc-tiny",
+      "ci95_high": 1.0260478762763072,
+      "ci95_low": 0.9889878775706636,
+      "estimate": 1.0050263004091176,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9890560875512996,
+        1.024045261669024,
+        0.993103448275862,
+        1.0169491525423728,
+        1.0280504908835906,
+        0.9889196675900277
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        7270.0,
+        7240.0,
+        7200.0,
+        7230.0,
+        13010.0,
+        7220.0
+      ],
+      "after_median": 7235.0,
+      "before": [
+        20611.0,
+        7390.0,
+        7260.0,
+        7220.0,
+        7170.0,
+        7250.0
+      ],
+      "before_median": 7255.0,
+      "block_ratios": [
+        0.35272427344621804,
+        0.979702300405954,
+        0.9917355371900827,
+        1.0013850415512466,
+        1.814504881450488,
+        0.9958620689655172
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9937988030778,
+        "lower": 0.666213286926086,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.4079449615008675
+      },
+      "case": "doc-tiny",
+      "ci95_high": 1.4079449615008675,
+      "ci95_low": 0.666213286926086,
+      "estimate": 0.9937988030778,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        0.35272427344621804,
+        0.979702300405954,
+        0.9917355371900827,
+        1.0013850415512466,
+        1.814504881450488,
+        0.9958620689655172
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        4204,
+        4208,
+        4108,
+        4112,
+        4124,
+        4176
+      ],
+      "after_median": 4150.0,
+      "before": [
+        4044,
+        4244,
+        4148,
+        4048,
+        4292,
+        4124
+      ],
+      "before_median": 4136.0,
+      "block_ratios": [
+        1.0395647873392682,
+        0.9915174363807728,
+        0.9903567984570878,
+        1.0158102766798418,
+        0.9608574091332712,
+        1.0126091173617846
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0020632768712787,
+        "lower": 0.9756071037951795,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0276875320095549
+      },
+      "case": "doc-tiny",
+      "ci95_high": 1.0276875320095549,
+      "ci95_low": 0.9756071037951795,
+      "estimate": 1.0020632768712787,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.0395647873392682,
+        0.9915174363807728,
+        0.9903567984570878,
+        1.0158102766798418,
+        0.9608574091332712,
+        1.0126091173617846
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        165,
+        160,
+        163,
+        165,
+        162,
+        163
+      ],
+      "after_median": 163.0,
+      "before": [
+        165,
+        167,
+        167,
+        167,
+        165,
+        167
+      ],
+      "before_median": 167.0,
+      "block_ratios": [
+        1.0,
+        0.9580838323353293,
+        0.9760479041916168,
+        0.9880239520958084,
+        0.9818181818181818,
+        0.9760479041916168
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9789330430048993,
+        "lower": 0.9670658682634731,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9940119760479043
+      },
+      "case": "doc-tiny",
+      "ci95_high": 0.9940119760479043,
+      "ci95_low": 0.9670658682634731,
+      "estimate": 0.9789330430048993,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        0.9580838323353293,
+        0.9760479041916168,
+        0.9880239520958084,
+        0.9818181818181818,
+        0.9760479041916168
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "doc-tiny",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0
+      ],
+      "after_median": 166.0,
+      "before": [
+        165.0,
+        165.0,
+        165.0,
+        165.0,
+        165.0,
+        165.0
+      ],
+      "before_median": 165.0,
+      "block_ratios": [
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.006060606060606,
+        "lower": 1.006060606060606,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.006060606060606
+      },
+      "case": "doc-tiny",
+      "ci95_high": 1.006060606060606,
+      "ci95_low": 1.006060606060606,
+      "estimate": 1.006060606060606,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606,
+        1.006060606060606
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        73305.0,
+        73305.0,
+        73305.0,
+        73305.0,
+        73305.0,
+        73305.0
+      ],
+      "after_median": 73305.0,
+      "before": [
+        80025.0,
+        80025.0,
+        80025.0,
+        80025.0,
+        80025.0,
+        80025.0
+      ],
+      "before_median": 80025.0,
+      "block_ratios": [
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9160262417994377,
+        "lower": 0.9160262417994377,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9160262417994377
+      },
+      "case": "doc-tiny",
+      "ci95_high": 0.9160262417994377,
+      "ci95_low": 0.9160262417994377,
+      "estimate": 0.9160262417994377,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377,
+        0.9160262417994377
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        40193.0,
+        40193.0,
+        40193.0,
+        40193.0,
+        40193.0,
+        40193.0
+      ],
+      "after_median": 40193.0,
+      "before": [
+        47745.0,
+        47745.0,
+        47745.0,
+        47745.0,
+        47745.0,
+        47745.0
+      ],
+      "before_median": 47745.0,
+      "block_ratios": [
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.841826369253325,
+        "lower": 0.841826369253325,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.841826369253325
+      },
+      "case": "doc-tiny",
+      "ci95_high": 0.841826369253325,
+      "ci95_low": 0.841826369253325,
+      "estimate": 0.841826369253325,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325,
+        0.841826369253325
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0
+      ],
+      "after_median": 18432.0,
+      "before": [
+        25984.0,
+        25984.0,
+        25984.0,
+        25984.0,
+        25984.0,
+        25984.0
+      ],
+      "before_median": 25984.0,
+      "block_ratios": [
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.7093596059113301,
+        "lower": 0.7093596059113301,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.7093596059113301
+      },
+      "case": "doc-tiny",
+      "ci95_high": 0.7093596059113301,
+      "ci95_low": 0.7093596059113301,
+      "estimate": 0.7093596059113301,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301,
+        0.7093596059113301
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        126481.0,
+        125490.0,
+        125401.0,
+        127481.0,
+        126590.0,
+        126570.0
+      ],
+      "after_median": 126525.5,
+      "before": [
+        129110.0,
+        130351.0,
+        130021.0,
+        131341.0,
+        129201.0,
+        131761.0
+      ],
+      "before_median": 130186.0,
+      "block_ratios": [
+        0.9796375183951669,
+        0.9627083796825494,
+        0.964467278362726,
+        0.9706108526659611,
+        0.9797911780868569,
+        0.9606029098139813
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9675390655143437,
+        "lower": 0.9616556447482654,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9797143482410119
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9797143482410119,
+      "ci95_low": 0.9616556447482654,
+      "estimate": 0.9675390655143437,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9796375183951669,
+        0.9627083796825494,
+        0.964467278362726,
+        0.9706108526659611,
+        0.9797911780868569,
+        0.9606029098139813
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        135481.0,
+        132500.0,
+        134431.0,
+        137410.0,
+        135401.0,
+        134691.0
+      ],
+      "after_median": 135046.0,
+      "before": [
+        148471.0,
+        151221.0,
+        144710.0,
+        149301.0,
+        147601.0,
+        147510.0
+      ],
+      "before_median": 148036.0,
+      "block_ratios": [
+        0.912508166577985,
+        0.8762010567315386,
+        0.9289682813903669,
+        0.9203555234057375,
+        0.9173447334367654,
+        0.9130974171242627
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9152210752805141,
+        "lower": 0.8943546116547618,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9246619023980522
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9246619023980522,
+      "ci95_low": 0.8943546116547618,
+      "estimate": 0.9152210752805141,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.912508166577985,
+        0.8762010567315386,
+        0.9289682813903669,
+        0.9203555234057375,
+        0.9173447334367654,
+        0.9130974171242627
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        138390.0,
+        133731.0,
+        136210.0,
+        139691.0,
+        136931.0,
+        135530.0
+      ],
+      "after_median": 136570.5,
+      "before": [
+        148791.0,
+        154851.0,
+        150211.0,
+        150520.0,
+        152051.0,
+        156970.0
+      ],
+      "before_median": 151285.5,
+      "block_ratios": [
+        0.9300965784220819,
+        0.8636108258906949,
+        0.906791113833208,
+        0.9280560722827531,
+        0.9005596806334717,
+        0.8634133910938396
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9036753972333398,
+        "lower": 0.8635121084922672,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9290763253524175
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9290763253524175,
+      "ci95_low": 0.8635121084922672,
+      "estimate": 0.9036753972333398,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9300965784220819,
+        0.8636108258906949,
+        0.906791113833208,
+        0.9280560722827531,
+        0.9005596806334717,
+        0.8634133910938396
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        7820,
+        8104,
+        8212,
+        8152,
+        8232,
+        8124
+      ],
+      "after_median": 8138.0,
+      "before": [
+        7816,
+        7740,
+        7828,
+        7956,
+        7844,
+        7684
+      ],
+      "before_median": 7822.0,
+      "block_ratios": [
+        1.0005117707267144,
+        1.0470284237726097,
+        1.0490546755237609,
+        1.0246354952237304,
+        1.0494645588985212,
+        1.0572618427902134
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0480415496481852,
+        "lower": 1.0125736329752224,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0533632008443674
+      },
+      "case": "doc-large",
+      "ci95_high": 1.0533632008443674,
+      "ci95_low": 1.0125736329752224,
+      "estimate": 1.0480415496481852,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.0005117707267144,
+        1.0470284237726097,
+        1.0490546755237609,
+        1.0246354952237304,
+        1.0494645588985212,
+        1.0572618427902134
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        17373,
+        17374,
+        17377,
+        17375,
+        17376,
+        17372
+      ],
+      "after_median": 17374.5,
+      "before": [
+        17883,
+        17881,
+        17882,
+        17881,
+        17883,
+        17882
+      ],
+      "before_median": 17882.0,
+      "block_ratios": [
+        0.9714812950847174,
+        0.9716458811028466,
+        0.9717593110390337,
+        0.9717018063866674,
+        0.9716490521724543,
+        0.971479700257242
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9716474666376504,
+        "lower": 0.9714804976709797,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9717305587128505
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9717305587128505,
+      "ci95_low": 0.9714804976709797,
+      "estimate": 0.9716474666376504,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        0.9714812950847174,
+        0.9716458811028466,
+        0.9717593110390337,
+        0.9717018063866674,
+        0.9716490521724543,
+        0.971479700257242
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "doc-large",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0
+      ],
+      "after_median": 2798.0,
+      "before": [
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0,
+        2798.0
+      ],
+      "before_median": 2798.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "doc-large",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1367378.0,
+        1367378.0,
+        1367378.0,
+        1367378.0,
+        1367378.0,
+        1367378.0
+      ],
+      "after_median": 1367378.0,
+      "before": [
+        1404818.0,
+        1404818.0,
+        1404818.0,
+        1404818.0,
+        1404818.0,
+        1404818.0
+      ],
+      "before_median": 1404818.0,
+      "block_ratios": [
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9733488608488786,
+        "lower": 0.9733488608488786,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9733488608488786
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9733488608488786,
+      "ci95_low": 0.9733488608488786,
+      "estimate": 0.9733488608488786,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786,
+        0.9733488608488786
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        776286.0,
+        776286.0,
+        776286.0,
+        776286.0,
+        776286.0,
+        776286.0
+      ],
+      "after_median": 776286.0,
+      "before": [
+        801246.0,
+        801246.0,
+        801246.0,
+        801246.0,
+        801246.0,
+        801246.0
+      ],
+      "before_median": 801246.0,
+      "block_ratios": [
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9688485184325413,
+        "lower": 0.9688485184325413,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9688485184325413
+      },
+      "case": "doc-large",
+      "ci95_high": 0.9688485184325413,
+      "ci95_low": 0.9688485184325413,
+      "estimate": 0.9688485184325413,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413,
+        0.9688485184325413
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        164864.0,
+        164864.0,
+        164864.0,
+        164864.0,
+        164864.0,
+        164864.0
+      ],
+      "after_median": 164864.0,
+      "before": [
+        189824.0,
+        189824.0,
+        189824.0,
+        189824.0,
+        189824.0,
+        189824.0
+      ],
+      "before_median": 189824.0,
+      "block_ratios": [
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.868509777478085,
+        "lower": 0.868509777478085,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.868509777478085
+      },
+      "case": "doc-large",
+      "ci95_high": 0.868509777478085,
+      "ci95_low": 0.868509777478085,
+      "estimate": 0.868509777478085,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085,
+        0.868509777478085
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        636102.0,
+        628743.0,
+        622403.0,
+        621153.0,
+        624062.0,
+        622822.0
+      ],
+      "after_median": 623442.0,
+      "before": [
+        704843.0,
+        697483.0,
+        690453.0,
+        687273.0,
+        701273.0,
+        695393.0
+      ],
+      "before_median": 696438.0,
+      "block_ratios": [
+        0.9024733167528087,
+        0.9014456266317602,
+        0.9014415173806183,
+        0.9037936889707583,
+        0.8898987983281832,
+        0.8956403069918737
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9014435720061893,
+        "lower": 0.8927695526600284,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9031335028617835
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9031335028617835,
+      "ci95_low": 0.8927695526600284,
+      "estimate": 0.9014435720061893,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9024733167528087,
+        0.9014456266317602,
+        0.9014415173806183,
+        0.9037936889707583,
+        0.8898987983281832,
+        0.8956403069918737
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        682323.0,
+        649513.0,
+        650513.0,
+        663133.0,
+        655942.0,
+        677652.0
+      ],
+      "after_median": 659537.5,
+      "before": [
+        743794.0,
+        761974.0,
+        747793.0,
+        717493.0,
+        740803.0,
+        724963.0
+      ],
+      "before_median": 742298.5,
+      "block_ratios": [
+        0.9173548052283294,
+        0.8524083498912036,
+        0.8699105233667606,
+        0.9242361946388327,
+        0.885447278156271,
+        0.9347401177715277
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9014010416923002,
+        "lower": 0.8611594366289821,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9294881562051802
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9294881562051802,
+      "ci95_low": 0.8611594366289821,
+      "estimate": 0.9014010416923002,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9173548052283294,
+        0.8524083498912036,
+        0.8699105233667606,
+        0.9242361946388327,
+        0.885447278156271,
+        0.9347401177715277
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        684504.0,
+        663593.0,
+        659553.0,
+        681594.0,
+        677513.0,
+        693233.0
+      ],
+      "after_median": 679553.5,
+      "before": [
+        764554.0,
+        768283.0,
+        750483.0,
+        725973.0,
+        769733.0,
+        747443.0
+      ],
+      "before_median": 757518.5,
+      "block_ratios": [
+        0.8952984354277134,
+        0.8637351080265996,
+        0.8788380283097685,
+        0.9388696273828365,
+        0.880192222497931,
+        0.9274727303620477
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.8877453289628222,
+        "lower": 0.8712865681681841,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9331711788724422
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9331711788724422,
+      "ci95_low": 0.8712865681681841,
+      "estimate": 0.8877453289628222,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        0.8952984354277134,
+        0.8637351080265996,
+        0.8788380283097685,
+        0.9388696273828365,
+        0.880192222497931,
+        0.9274727303620477
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        80256,
+        80320,
+        80092,
+        80004,
+        80072,
+        80412
+      ],
+      "after_median": 80174.0,
+      "before": [
+        80168,
+        79864,
+        80008,
+        79936,
+        80128,
+        80140
+      ],
+      "before_median": 80068.0,
+      "block_ratios": [
+        1.0010976948408343,
+        1.0057097065010518,
+        1.001049895010499,
+        1.0008506805444355,
+        0.9993011182108626,
+        1.00339406039431
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0010737949256665,
+        "lower": 1.000075899377649,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.004551883447681
+      },
+      "case": "doc-payload",
+      "ci95_high": 1.004551883447681,
+      "ci95_low": 1.000075899377649,
+      "estimate": 1.0010737949256665,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.0010976948408343,
+        1.0057097065010518,
+        1.001049895010499,
+        1.0008506805444355,
+        0.9993011182108626,
+        1.00339406039431
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        387439,
+        387437,
+        387439,
+        387440,
+        387438,
+        387438
+      ],
+      "after_median": 387438.5,
+      "before": [
+        387441,
+        387444,
+        387440,
+        387441,
+        387442,
+        387442
+      ],
+      "before_median": 387441.5,
+      "block_ratios": [
+        0.9999948379237097,
+        0.9999819328728797,
+        0.999997418955193,
+        0.9999974189618548,
+        0.9999896758740663,
+        0.9999896758740663
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9999922568988879,
+        "lower": 0.9999858043734731,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9999974189585239
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9999974189585239,
+      "ci95_low": 0.9999858043734731,
+      "estimate": 0.9999922568988879,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        0.9999948379237097,
+        0.9999819328728797,
+        0.999997418955193,
+        0.9999974189618548,
+        0.9999896758740663,
+        0.9999896758740663
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "doc-payload",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        915.0,
+        915.0,
+        915.0,
+        915.0,
+        915.0,
+        915.0
+      ],
+      "after_median": 915.0,
+      "before": [
+        915.0,
+        915.0,
+        915.0,
+        915.0,
+        915.0,
+        915.0
+      ],
+      "before_median": 915.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "doc-payload",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        23672438.0,
+        23672438.0,
+        23672438.0,
+        23672438.0,
+        23672438.0,
+        23672438.0
+      ],
+      "after_median": 23672438.0,
+      "before": [
+        23697590.0,
+        23697590.0,
+        23697590.0,
+        23697590.0,
+        23697590.0,
+        23697590.0
+      ],
+      "before_median": 23697590.0,
+      "block_ratios": [
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.998938626248492,
+        "lower": 0.998938626248492,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.998938626248492
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.998938626248492,
+      "ci95_low": 0.998938626248492,
+      "estimate": 0.998938626248492,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492,
+        0.998938626248492
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        18166168.0,
+        18166168.0,
+        18166168.0,
+        18166168.0,
+        18166168.0,
+        18166168.0
+      ],
+      "after_median": 18166168.0,
+      "before": [
+        18182936.0,
+        18182936.0,
+        18182936.0,
+        18182936.0,
+        18182936.0,
+        18182936.0
+      ],
+      "before_median": 18182936.0,
+      "block_ratios": [
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9990778166958295,
+        "lower": 0.9990778166958295,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9990778166958295
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9990778166958295,
+      "ci95_low": 0.9990778166958295,
+      "estimate": 0.9990778166958295,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295,
+        0.9990778166958295
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        10257408.0,
+        10257408.0,
+        10257408.0,
+        10257408.0,
+        10257408.0,
+        10257408.0
+      ],
+      "after_median": 10257408.0,
+      "before": [
+        10274176.0,
+        10274176.0,
+        10274176.0,
+        10274176.0,
+        10274176.0,
+        10274176.0
+      ],
+      "before_median": 10274176.0,
+      "block_ratios": [
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9983679469769644,
+        "lower": 0.9983679469769644,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9983679469769644
+      },
+      "case": "doc-payload",
+      "ci95_high": 0.9983679469769644,
+      "ci95_low": 0.9983679469769644,
+      "estimate": 0.9983679469769644,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644,
+        0.9983679469769644
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1590.0,
+        1600.0,
+        1600.0,
+        1570.0,
+        1570.0,
+        1590.0
+      ],
+      "after_median": 1590.0,
+      "before": [
+        1630.0,
+        1610.0,
+        1640.0,
+        1650.0,
+        1650.0,
+        1610.0
+      ],
+      "before_median": 1635.0,
+      "block_ratios": [
+        0.9754601226993865,
+        0.9937888198757764,
+        0.975609756097561,
+        0.9515151515151515,
+        0.9515151515151515,
+        0.9875776397515528
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9755349393984738,
+        "lower": 0.9515151515151515,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9906832298136645
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 0.9906832298136645,
+      "ci95_low": 0.9515151515151515,
+      "estimate": 0.9755349393984738,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9754601226993865,
+        0.9937888198757764,
+        0.975609756097561,
+        0.9515151515151515,
+        0.9515151515151515,
+        0.9875776397515528
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1730.0,
+        1790.0,
+        1760.0,
+        1700.0,
+        1730.0,
+        1770.0
+      ],
+      "after_median": 1745.0,
+      "before": [
+        1780.0,
+        1750.0,
+        1770.0,
+        1780.0,
+        1790.0,
+        1740.0
+      ],
+      "before_median": 1775.0,
+      "block_ratios": [
+        0.9719101123595506,
+        1.022857142857143,
+        0.9943502824858758,
+        0.9550561797752809,
+        0.9664804469273743,
+        1.0172413793103448
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9831301974227131,
+        "lower": 0.9607683133513276,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0200492610837437
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 1.0200492610837437,
+      "ci95_low": 0.9607683133513276,
+      "estimate": 0.9831301974227131,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9719101123595506,
+        1.022857142857143,
+        0.9943502824858758,
+        0.9550561797752809,
+        0.9664804469273743,
+        1.0172413793103448
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1960.0,
+        1840.0,
+        1860.0,
+        1790.0,
+        1790.0,
+        1830.0
+      ],
+      "after_median": 1835.0,
+      "before": [
+        1850.0,
+        1870.0,
+        1870.0,
+        1910.0,
+        1840.0,
+        1890.0
+      ],
+      "before_median": 1870.0,
+      "block_ratios": [
+        1.0594594594594595,
+        0.983957219251337,
+        0.9946524064171123,
+        0.93717277486911,
+        0.9728260869565217,
+        0.9682539682539683
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9783916531039294,
+        "lower": 0.9527133715615391,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.027055932938286
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 1.027055932938286,
+      "ci95_low": 0.9527133715615391,
+      "estimate": 0.9783916531039294,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0594594594594595,
+        0.983957219251337,
+        0.9946524064171123,
+        0.93717277486911,
+        0.9728260869565217,
+        0.9682539682539683
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        3392,
+        3316,
+        3384,
+        3420,
+        3448,
+        3216
+      ],
+      "after_median": 3388.0,
+      "before": [
+        3388,
+        3364,
+        3316,
+        3084,
+        3348,
+        3388
+      ],
+      "before_median": 3356.0,
+      "block_ratios": [
+        1.001180637544274,
+        0.985731272294887,
+        1.020506634499397,
+        1.1089494163424125,
+        1.0298685782556751,
+        0.9492325855962219
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0108436360218356,
+        "lower": 0.9674819289455545,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.069408997299044
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 1.069408997299044,
+      "ci95_low": 0.9674819289455545,
+      "estimate": 1.0108436360218356,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.001180637544274,
+        0.985731272294887,
+        1.020506634499397,
+        1.1089494163424125,
+        1.0298685782556751,
+        0.9492325855962219
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        140,
+        139,
+        140,
+        140,
+        138,
+        138
+      ],
+      "after_median": 139.5,
+      "before": [
+        141,
+        139,
+        136,
+        137,
+        137,
+        137
+      ],
+      "before_median": 137.0,
+      "block_ratios": [
+        0.9929078014184397,
+        1.0,
+        1.0294117647058822,
+        1.0218978102189782,
+        1.0072992700729928,
+        1.0072992700729928
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0072992700729928,
+        "lower": 0.9964539007092199,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0256547874624302
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 1.0256547874624302,
+      "ci95_low": 0.9964539007092199,
+      "estimate": 1.0072992700729928,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        0.9929078014184397,
+        1.0,
+        1.0294117647058822,
+        1.0218978102189782,
+        1.0072992700729928,
+        1.0072992700729928
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-tiny",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        44.0,
+        44.0,
+        44.0,
+        44.0,
+        44.0,
+        44.0
+      ],
+      "after_median": 44.0,
+      "before": [
+        44.0,
+        44.0,
+        44.0,
+        44.0,
+        44.0,
+        44.0
+      ],
+      "before_median": 44.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        40594.0,
+        40594.0,
+        40594.0,
+        40594.0,
+        40594.0,
+        40594.0
+      ],
+      "after_median": 40594.0,
+      "before": [
+        42130.0,
+        42130.0,
+        42130.0,
+        42130.0,
+        42130.0,
+        42130.0
+      ],
+      "before_median": 42130.0,
+      "block_ratios": [
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9635414194160931,
+        "lower": 0.9635414194160931,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9635414194160931
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 0.9635414194160931,
+      "ci95_low": 0.9635414194160931,
+      "estimate": 0.9635414194160931,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931,
+        0.9635414194160931
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        30710.0,
+        30710.0,
+        30710.0,
+        30710.0,
+        30710.0,
+        30710.0
+      ],
+      "after_median": 30710.0,
+      "before": [
+        31734.0,
+        31734.0,
+        31734.0,
+        31734.0,
+        31734.0,
+        31734.0
+      ],
+      "before_median": 31734.0,
+      "block_ratios": [
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9677317703409593,
+        "lower": 0.9677317703409593,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9677317703409593
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 0.9677317703409593,
+      "ci95_low": 0.9677317703409593,
+      "estimate": 0.9677317703409593,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593,
+        0.9677317703409593
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        17408.0,
+        17408.0,
+        17408.0,
+        17408.0,
+        17408.0,
+        17408.0
+      ],
+      "after_median": 17408.0,
+      "before": [
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0,
+        18432.0
+      ],
+      "before_median": 18432.0,
+      "block_ratios": [
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9444444444444444,
+        "lower": 0.9444444444444444,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9444444444444444
+      },
+      "case": "cfb-tiny",
+      "ci95_high": 0.9444444444444444,
+      "ci95_low": 0.9444444444444444,
+      "estimate": 0.9444444444444444,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444,
+        0.9444444444444444
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        607933.0,
+        621593.0,
+        623513.0,
+        620153.0,
+        613402.0,
+        625962.0
+      ],
+      "after_median": 620873.0,
+      "before": [
+        643132.0,
+        667603.0,
+        642312.0,
+        640673.0,
+        643043.0,
+        660062.0
+      ],
+      "before_median": 643087.5,
+      "block_ratios": [
+        0.9452694003719299,
+        0.9310817956180545,
+        0.9707322920948075,
+        0.9679711803057097,
+        0.9539051043242831,
+        0.9483381864127916
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9511216453685374,
+        "lower": 0.9381755979949922,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9693517362002586
+      },
+      "case": "cfb-large",
+      "ci95_high": 0.9693517362002586,
+      "ci95_low": 0.9381755979949922,
+      "estimate": 0.9511216453685374,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9452694003719299,
+        0.9310817956180545,
+        0.9707322920948075,
+        0.9679711803057097,
+        0.9539051043242831,
+        0.9483381864127916
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        642652.0,
+        639773.0,
+        630313.0,
+        630072.0,
+        653763.0,
+        645022.0
+      ],
+      "after_median": 641212.5,
+      "before": [
+        671133.0,
+        682223.0,
+        671793.0,
+        677423.0,
+        653833.0,
+        684052.0
+      ],
+      "before_median": 674608.0,
+      "block_ratios": [
+        0.9575628079680183,
+        0.937776943902507,
+        0.93825478979388,
+        0.9301012808835838,
+        0.9998929390226556,
+        0.9429429341628999
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9405988619783899,
+        "lower": 0.9339391123930454,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.978727873495337
+      },
+      "case": "cfb-large",
+      "ci95_high": 0.978727873495337,
+      "ci95_low": 0.9339391123930454,
+      "estimate": 0.9405988619783899,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9575628079680183,
+        0.937776943902507,
+        0.93825478979388,
+        0.9301012808835838,
+        0.9998929390226556,
+        0.9429429341628999
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        737993.0,
+        650683.0,
+        636833.0,
+        636313.0,
+        659873.0,
+        668623.0
+      ],
+      "after_median": 655278.0,
+      "before": [
+        671303.0,
+        689533.0,
+        674123.0,
+        806313.0,
+        655312.0,
+        692283.0
+      ],
+      "before_median": 681828.0,
+      "block_ratios": [
+        1.0993441113774256,
+        0.9436575189294784,
+        0.9446836853215215,
+        0.789163761467321,
+        1.0069600434602144,
+        0.9658232254728196
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9552534553971705,
+        "lower": 0.8664106401983998,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.05315207741882
+      },
+      "case": "cfb-large",
+      "ci95_high": 1.05315207741882,
+      "ci95_low": 0.8664106401983998,
+      "estimate": 0.9552534553971705,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0993441113774256,
+        0.9436575189294784,
+        0.9446836853215215,
+        0.789163761467321,
+        1.0069600434602144,
+        0.9658232254728196
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        23620,
+        23856,
+        23712,
+        23756,
+        23948,
+        23880
+      ],
+      "after_median": 23806.0,
+      "before": [
+        23708,
+        23840,
+        23752,
+        23832,
+        23992,
+        23832
+      ],
+      "before_median": 23832.0,
+      "block_ratios": [
+        0.9962881727686856,
+        1.0006711409395974,
+        0.9983159312899966,
+        0.9968110104061766,
+        0.9981660553517839,
+        1.002014098690836
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9982409933208902,
+        "lower": 0.9965495915874312,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0013426198152167
+      },
+      "case": "cfb-large",
+      "ci95_high": 1.0013426198152167,
+      "ci95_low": 0.9965495915874312,
+      "estimate": 0.9982409933208902,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        0.9962881727686856,
+        1.0006711409395974,
+        0.9983159312899966,
+        0.9968110104061766,
+        0.9981660553517839,
+        1.002014098690836
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        103379,
+        103379,
+        103380,
+        103375,
+        103376,
+        103378
+      ],
+      "after_median": 103378.5,
+      "before": [
+        103376,
+        103375,
+        103379,
+        103377,
+        103379,
+        103377
+      ],
+      "before_median": 103377.0,
+      "block_ratios": [
+        1.0000290202754991,
+        1.0000386940749697,
+        1.000009673144449,
+        0.9999806533368157,
+        0.9999709805666528,
+        1.0000096733315922
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0000096732380206,
+        "lower": 0.9999758169517343,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0000338571752345
+      },
+      "case": "cfb-large",
+      "ci95_high": 1.0000338571752345,
+      "ci95_low": 0.9999758169517343,
+      "estimate": 1.0000096732380206,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        1.0000290202754991,
+        1.0000386940749697,
+        1.000009673144449,
+        0.9999806533368157,
+        0.9999709805666528,
+        1.0000096733315922
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-large",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        108.0,
+        108.0,
+        108.0,
+        108.0,
+        108.0,
+        108.0
+      ],
+      "after_median": 108.0,
+      "before": [
+        108.0,
+        108.0,
+        108.0,
+        108.0,
+        108.0,
+        108.0
+      ],
+      "before_median": 108.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-large",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        16987106.0,
+        16987106.0,
+        16987106.0,
+        16987106.0,
+        16987106.0,
+        16987106.0
+      ],
+      "after_median": 16987106.0,
+      "before": [
+        16993250.0,
+        16993250.0,
+        16993250.0,
+        16993250.0,
+        16993250.0,
+        16993250.0
+      ],
+      "before_median": 16993250.0,
+      "block_ratios": [
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9996384446765627,
+        "lower": 0.9996384446765627,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9996384446765627
+      },
+      "case": "cfb-large",
+      "ci95_high": 0.9996384446765627,
+      "ci95_low": 0.9996384446765627,
+      "estimate": 0.9996384446765627,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627,
+        0.9996384446765627
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        12660258.0,
+        12660258.0,
+        12660258.0,
+        12660258.0,
+        12660258.0,
+        12660258.0
+      ],
+      "after_median": 12660258.0,
+      "before": [
+        12664354.0,
+        12664354.0,
+        12664354.0,
+        12664354.0,
+        12664354.0,
+        12664354.0
+      ],
+      "before_median": 12664354.0,
+      "block_ratios": [
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9996765725279,
+        "lower": 0.9996765725279,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9996765725279
+      },
+      "case": "cfb-large",
+      "ci95_high": 0.9996765725279,
+      "ci95_low": 0.9996765725279,
+      "estimate": 0.9996765725279,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279,
+        0.9996765725279
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0
+      ],
+      "after_median": 8389632.0,
+      "before": [
+        8393728.0,
+        8393728.0,
+        8393728.0,
+        8393728.0,
+        8393728.0,
+        8393728.0
+      ],
+      "before_median": 8393728.0,
+      "block_ratios": [
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9995120165914358,
+        "lower": 0.9995120165914358,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9995120165914358
+      },
+      "case": "cfb-large",
+      "ci95_high": 0.9995120165914358,
+      "ci95_low": 0.9995120165914358,
+      "estimate": 0.9995120165914358,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358,
+        0.9995120165914358
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        601002.0,
+        615733.0,
+        618203.0,
+        609762.0,
+        607582.0,
+        620583.0
+      ],
+      "after_median": 612747.5,
+      "before": [
+        604233.0,
+        615462.0,
+        608813.0,
+        608683.0,
+        611822.0,
+        619192.0
+      ],
+      "before_median": 610317.5,
+      "block_ratios": [
+        0.994652725024949,
+        1.0004403196298066,
+        1.0154234551496109,
+        1.0017726797035567,
+        0.9930698798016416,
+        1.0022464760526621
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0011064996666816,
+        "lower": 0.9938613024132953,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0088349656011366
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0088349656011366,
+      "ci95_low": 0.9938613024132953,
+      "estimate": 1.0011064996666816,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.994652725024949,
+        1.0004403196298066,
+        1.0154234551496109,
+        1.0017726797035567,
+        0.9930698798016416,
+        1.0022464760526621
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        614543.0,
+        626143.0,
+        631323.0,
+        636203.0,
+        623733.0,
+        639393.0
+      ],
+      "after_median": 628733.0,
+      "before": [
+        616353.0,
+        629672.0,
+        629992.0,
+        626123.0,
+        630292.0,
+        632943.0
+      ],
+      "before_median": 629832.0,
+      "block_ratios": [
+        0.99706337115257,
+        0.9943954947972913,
+        1.0021127252409554,
+        1.0160990731853006,
+        0.9895937121207313,
+        1.010190491086875
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9995880481967627,
+        "lower": 0.9919946034590112,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.013144782136088
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.013144782136088,
+      "ci95_low": 0.9919946034590112,
+      "estimate": 0.9995880481967627,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.99706337115257,
+        0.9943954947972913,
+        1.0021127252409554,
+        1.0160990731853006,
+        0.9895937121207313,
+        1.010190491086875
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        629813.0,
+        627093.0,
+        632963.0,
+        641472.0,
+        628302.0,
+        649283.0
+      ],
+      "after_median": 631388.0,
+      "before": [
+        617603.0,
+        630533.0,
+        743974.0,
+        647833.0,
+        634463.0,
+        649372.0
+      ],
+      "before_median": 641148.0,
+      "block_ratios": [
+        1.0197699816872652,
+        0.9945442982365713,
+        0.8507864522147279,
+        0.9901811114901525,
+        0.9902894258609249,
+        0.9998629445063846
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9924168620487481,
+        "lower": 0.9204837818524403,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.009816463096825
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.009816463096825,
+      "ci95_low": 0.9204837818524403,
+      "estimate": 0.9924168620487481,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0197699816872652,
+        0.9945442982365713,
+        0.8507864522147279,
+        0.9901811114901525,
+        0.9902894258609249,
+        0.9998629445063846
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        23856,
+        23852,
+        23928,
+        23628,
+        23924,
+        23676
+      ],
+      "after_median": 23854.0,
+      "before": [
+        23664,
+        23600,
+        23720,
+        23912,
+        23564,
+        23604
+      ],
+      "before_median": 23634.0,
+      "block_ratios": [
+        1.0081135902636917,
+        1.010677966101695,
+        1.008768971332209,
+        0.9881231180996989,
+        1.0152775420132405,
+        1.0030503304524656
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0084412807979504,
+        "lower": 0.9955867242760823,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0129777540574678
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0129777540574678,
+      "ci95_low": 0.9955867242760823,
+      "estimate": 1.0084412807979504,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.0081135902636917,
+        1.010677966101695,
+        1.008768971332209,
+        0.9881231180996989,
+        1.0152775420132405,
+        1.0030503304524656
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        103172,
+        103169,
+        103168,
+        103170,
+        103169,
+        103171
+      ],
+      "after_median": 103169.5,
+      "before": [
+        103170,
+        103170,
+        103169,
+        103171,
+        103171,
+        103171
+      ],
+      "before_median": 103170.5,
+      "block_ratios": [
+        1.0000193854802752,
+        0.9999903072598624,
+        0.9999903071659122,
+        0.9999903073538107,
+        0.9999806147076213,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9999903073068366,
+        "lower": 0.9999854609367668,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0000096927401376
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0000096927401376,
+      "ci95_low": 0.9999854609367668,
+      "estimate": 0.9999903073068366,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        1.0000193854802752,
+        0.9999903072598624,
+        0.9999903071659122,
+        0.9999903073538107,
+        0.9999806147076213,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-large-only",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        96.0,
+        96.0,
+        96.0,
+        96.0,
+        96.0,
+        96.0
+      ],
+      "after_median": 96.0,
+      "before": [
+        96.0,
+        96.0,
+        96.0,
+        96.0,
+        96.0,
+        96.0
+      ],
+      "before_median": 96.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0
+      ],
+      "after_median": 16916500.0,
+      "before": [
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0,
+        16916500.0
+      ],
+      "before_median": 16916500.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0
+      ],
+      "after_median": 12655288.0,
+      "before": [
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0,
+        12655288.0
+      ],
+      "before_median": 12655288.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0
+      ],
+      "after_median": 8389632.0,
+      "before": [
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0,
+        8389632.0
+      ],
+      "before_median": 8389632.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-large-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2320.0,
+        2290.0,
+        2270.0,
+        2280.0,
+        2250.0,
+        2230.0
+      ],
+      "after_median": 2275.0,
+      "before": [
+        2270.0,
+        2220.0,
+        2230.0,
+        2250.0,
+        2220.0,
+        2210.0
+      ],
+      "before_median": 2225.0,
+      "block_ratios": [
+        1.0220264317180616,
+        1.0315315315315314,
+        1.0179372197309418,
+        1.0133333333333334,
+        1.0135135135135136,
+        1.009049773755656
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0157253666222277,
+        "lower": 1.0111915535444949,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0267789816247965
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0267789816247965,
+      "ci95_low": 1.0111915535444949,
+      "estimate": 1.0157253666222277,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0220264317180616,
+        1.0315315315315314,
+        1.0179372197309418,
+        1.0133333333333334,
+        1.0135135135135136,
+        1.009049773755656
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2810.0,
+        2840.0,
+        2670.0,
+        2750.0,
+        2700.0,
+        2810.0
+      ],
+      "after_median": 2780.0,
+      "before": [
+        2790.0,
+        2670.0,
+        2840.0,
+        2960.0,
+        2790.0,
+        2760.0
+      ],
+      "before_median": 2790.0,
+      "block_ratios": [
+        1.007168458781362,
+        1.0636704119850187,
+        0.9401408450704225,
+        0.9290540540540541,
+        0.967741935483871,
+        1.0181159420289856
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9874551971326165,
+        "lower": 0.9345974495622382,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.040893177007002
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.040893177007002,
+      "ci95_low": 0.9345974495622382,
+      "estimate": 0.9874551971326165,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        1.007168458781362,
+        1.0636704119850187,
+        0.9401408450704225,
+        0.9290540540540541,
+        0.967741935483871,
+        1.0181159420289856
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2940.0,
+        2900.0,
+        3020.0,
+        3060.0,
+        2900.0,
+        2960.0
+      ],
+      "after_median": 2950.0,
+      "before": [
+        3030.0,
+        2850.0,
+        2870.0,
+        15550.0,
+        2950.0,
+        3030.0
+      ],
+      "before_median": 2990.0,
+      "block_ratios": [
+        0.9702970297029703,
+        1.0175438596491229,
+        1.0522648083623694,
+        0.1967845659163987,
+        0.9830508474576272,
+        0.976897689768977
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9799742686133021,
+        "lower": 0.5835407978096845,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0349043340057462
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0349043340057462,
+      "ci95_low": 0.5835407978096845,
+      "estimate": 0.9799742686133021,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9702970297029703,
+        1.0175438596491229,
+        1.0522648083623694,
+        0.1967845659163987,
+        0.9830508474576272,
+        0.976897689768977
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        3352,
+        3392,
+        3352,
+        3392,
+        3360,
+        3392
+      ],
+      "after_median": 3376.0,
+      "before": [
+        3284,
+        3300,
+        3416,
+        3384,
+        3276,
+        3308
+      ],
+      "before_median": 3304.0,
+      "block_ratios": [
+        1.020706455542022,
+        1.0278787878787878,
+        0.9812646370023419,
+        1.0023640661938533,
+        1.0256410256410255,
+        1.0253929866989118
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0230497211204668,
+        "lower": 0.9918143515980976,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0267599067599067
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0267599067599067,
+      "ci95_low": 0.9918143515980976,
+      "estimate": 1.0230497211204668,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.020706455542022,
+        1.0278787878787878,
+        0.9812646370023419,
+        1.0023640661938533,
+        1.0256410256410255,
+        1.0253929866989118
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        141,
+        138,
+        139,
+        139,
+        140,
+        141
+      ],
+      "after_median": 139.5,
+      "before": [
+        140,
+        138,
+        141,
+        139,
+        142,
+        138
+      ],
+      "before_median": 139.5,
+      "block_ratios": [
+        1.0071428571428571,
+        1.0,
+        0.9858156028368794,
+        1.0,
+        0.9859154929577465,
+        1.0217391304347827
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 0.985865547897313,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.01444099378882
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.01444099378882,
+      "ci95_low": 0.985865547897313,
+      "estimate": 1.0,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        1.0071428571428571,
+        1.0,
+        0.9858156028368794,
+        1.0,
+        0.9859154929577465,
+        1.0217391304347827
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-mini-only",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        50.0,
+        50.0,
+        50.0,
+        50.0,
+        50.0,
+        50.0
+      ],
+      "after_median": 50.0,
+      "before": [
+        50.0,
+        50.0,
+        50.0,
+        50.0,
+        50.0,
+        50.0
+      ],
+      "before_median": 50.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0
+      ],
+      "after_median": 33628.0,
+      "before": [
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0,
+        33628.0
+      ],
+      "before_median": 33628.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0
+      ],
+      "after_median": 25004.0,
+      "before": [
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0,
+        25004.0
+      ],
+      "before_median": 25004.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0
+      ],
+      "after_median": 10752.0,
+      "before": [
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0,
+        10752.0
+      ],
+      "before_median": 10752.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-mini-only",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        609012.0,
+        605963.0,
+        634303.0,
+        596883.0,
+        600393.0,
+        632372.0
+      ],
+      "after_median": 607487.5,
+      "before": [
+        651233.0,
+        649973.0,
+        649853.0,
+        626733.0,
+        629773.0,
+        654693.0
+      ],
+      "before_median": 649913.0,
+      "block_ratios": [
+        0.9351675974651161,
+        0.9322894951021042,
+        0.976071511557229,
+        0.9523720627444223,
+        0.9533482699321819,
+        0.9659061575425428
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9528601663383021,
+        "lower": 0.9337285462836102,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9709888345498859
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.9709888345498859,
+      "ci95_low": 0.9337285462836102,
+      "estimate": 0.9528601663383021,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9351675974651161,
+        0.9322894951021042,
+        0.976071511557229,
+        0.9523720627444223,
+        0.9533482699321819,
+        0.9659061575425428
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1023075.0,
+        1020875.0,
+        1020124.0,
+        1014025.0,
+        1036354.0,
+        1021014.0
+      ],
+      "after_median": 1020944.5,
+      "before": [
+        1057444.0,
+        1060305.0,
+        1056125.0,
+        1060854.0,
+        1071335.0,
+        1066415.0
+      ],
+      "before_median": 1060579.5,
+      "block_ratios": [
+        0.9674980424495292,
+        0.9628125869443226,
+        0.9659121789560895,
+        0.9558572621680269,
+        0.9673482150774501,
+        0.957426517819048
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.964362382950206,
+        "lower": 0.9566418899935374,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9674231287634896
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.9674231287634896,
+      "ci95_low": 0.9566418899935374,
+      "estimate": 0.964362382950206,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9674980424495292,
+        0.9628125869443226,
+        0.9659121789560895,
+        0.9558572621680269,
+        0.9673482150774501,
+        0.957426517819048
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        1038065.0,
+        1025044.0,
+        1021515.0,
+        1026864.0,
+        1066744.0,
+        1026314.0
+      ],
+      "after_median": 1026589.0,
+      "before": [
+        1058614.0,
+        1063715.0,
+        1056215.0,
+        1068975.0,
+        1072304.0,
+        1069285.0
+      ],
+      "before_median": 1066345.0,
+      "block_ratios": [
+        0.9805887698443436,
+        0.9636453373318982,
+        0.9671468403686749,
+        0.9606061881709114,
+        0.9948149032363957,
+        0.9598133332086394
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9653960888502866,
+        "lower": 0.9602097606897754,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9877018365403696
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.9877018365403696,
+      "ci95_low": 0.9602097606897754,
+      "estimate": 0.9653960888502866,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9805887698443436,
+        0.9636453373318982,
+        0.9671468403686749,
+        0.9606061881709114,
+        0.9948149032363957,
+        0.9598133332086394
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        23728,
+        23808,
+        23652,
+        23704,
+        23904,
+        23864
+      ],
+      "after_median": 23768.0,
+      "before": [
+        23832,
+        23608,
+        23548,
+        23724,
+        23840,
+        23908
+      ],
+      "before_median": 23778.0,
+      "block_ratios": [
+        0.995636119503189,
+        1.008471704506947,
+        1.0044165109563445,
+        0.9991569718428596,
+        1.0026845637583892,
+        0.9981596118454074
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0009207678006244,
+        "lower": 0.9968978656742982,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0064441077316457
+      },
+      "case": "cfb-v4",
+      "ci95_high": 1.0064441077316457,
+      "ci95_low": 0.9968978656742982,
+      "estimate": 1.0009207678006244,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        0.995636119503189,
+        1.008471704506947,
+        1.0044165109563445,
+        0.9991569718428596,
+        1.0026845637583892,
+        0.9981596118454074
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        114386,
+        114385,
+        114389,
+        114386,
+        114388,
+        114385
+      ],
+      "after_median": 114386.0,
+      "before": [
+        114389,
+        114386,
+        114386,
+        114387,
+        114389,
+        114387
+      ],
+      "before_median": 114387.0,
+      "block_ratios": [
+        0.9999737737020168,
+        0.9999912576713934,
+        1.00002622698582,
+        0.9999912577478209,
+        0.9999912579006722,
+        0.999982515495642
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9999912577096072,
+        "lower": 0.9999781445988294,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0000087424432462
+      },
+      "case": "cfb-v4",
+      "ci95_high": 1.0000087424432462,
+      "ci95_low": 0.9999781445988294,
+      "estimate": 0.9999912577096072,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        0.9999737737020168,
+        0.9999912576713934,
+        1.00002622698582,
+        0.9999912577478209,
+        0.9999912579006722,
+        0.999982515495642
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-v4",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        45.0,
+        45.0,
+        45.0,
+        45.0,
+        45.0,
+        45.0
+      ],
+      "after_median": 45.0,
+      "before": [
+        45.0,
+        45.0,
+        45.0,
+        45.0,
+        45.0,
+        45.0
+      ],
+      "before_median": 45.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-v4",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        16837594.0,
+        16837594.0,
+        16837594.0,
+        16837594.0,
+        16837594.0,
+        16837594.0
+      ],
+      "after_median": 16837594.0,
+      "before": [
+        16843738.0,
+        16843738.0,
+        16843738.0,
+        16843738.0,
+        16843738.0,
+        16843738.0
+      ],
+      "before_median": 16843738.0,
+      "block_ratios": [
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9996352353616519,
+        "lower": 0.9996352353616519,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9996352353616519
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.9996352353616519,
+      "ci95_low": 0.9996352353616519,
+      "estimate": 0.9996352353616519,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519,
+        0.9996352353616519
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        12618302.0,
+        12618302.0,
+        12618302.0,
+        12618302.0,
+        12618302.0,
+        12618302.0
+      ],
+      "after_median": 12618302.0,
+      "before": [
+        12622398.0,
+        12622398.0,
+        12622398.0,
+        12622398.0,
+        12622398.0,
+        12622398.0
+      ],
+      "before_median": 12622398.0,
+      "block_ratios": [
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.9996754974767869,
+        "lower": 0.9996754974767869,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.9996754974767869
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.9996754974767869,
+      "ci95_low": 0.9996754974767869,
+      "estimate": 0.9996754974767869,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869,
+        0.9996754974767869
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        8396800.0,
+        8396800.0,
+        8396800.0,
+        8396800.0,
+        8396800.0,
+        8396800.0
+      ],
+      "after_median": 8396800.0,
+      "before": [
+        8400896.0,
+        8400896.0,
+        8400896.0,
+        8400896.0,
+        8400896.0,
+        8400896.0
+      ],
+      "before_median": 8400896.0,
+      "block_ratios": [
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 0.999512432959532,
+        "lower": 0.999512432959532,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 0.999512432959532
+      },
+      "case": "cfb-v4",
+      "ci95_high": 0.999512432959532,
+      "ci95_low": 0.999512432959532,
+      "estimate": 0.999512432959532,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532,
+        0.999512432959532
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2473441.0,
+        2468421.0,
+        2522521.0,
+        2510201.0,
+        2496850.0,
+        2481730.0
+      ],
+      "after_median": 2489290.0,
+      "before": [
+        2476761.0,
+        2464841.0,
+        2494711.0,
+        2499151.0,
+        2484880.0,
+        2560031.0
+      ],
+      "before_median": 2489795.5,
+      "block_ratios": [
+        0.9986595396164587,
+        1.001452426343119,
+        1.0111475838283472,
+        1.0044215015419236,
+        1.0048171340265928,
+        0.9694140422518321
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0029369639425214,
+        "lower": 0.9840367909341454,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0079823589274701
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0079823589274701,
+      "ci95_low": 0.9840367909341454,
+      "estimate": 1.0029369639425214,
+      "guarded": true,
+      "lane": "native",
+      "metric": "p50_ns",
+      "name": "ratio",
+      "ratios": [
+        0.9986595396164587,
+        1.001452426343119,
+        1.0111475838283472,
+        1.0044215015419236,
+        1.0048171340265928,
+        0.9694140422518321
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2652272.0,
+        2535881.0,
+        2805063.0,
+        2658941.0,
+        2580761.0,
+        2549450.0
+      ],
+      "after_median": 2616516.5,
+      "before": [
+        2543911.0,
+        2650052.0,
+        2747642.0,
+        2604601.0,
+        2621441.0,
+        2730971.0
+      ],
+      "before_median": 2635746.5,
+      "block_ratios": [
+        1.0425962229024521,
+        0.9569174491670353,
+        1.0208982829640834,
+        1.0208630803720031,
+        0.9844818174431543,
+        0.9335324322374716
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0026724489075787,
+        "lower": 0.9452249407022535,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0317472529332679
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0317472529332679,
+      "ci95_low": 0.9452249407022535,
+      "estimate": 1.0026724489075787,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p95_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0425962229024521,
+        0.9569174491670353,
+        1.0208982829640834,
+        1.0208630803720031,
+        0.9844818174431543,
+        0.9335324322374716
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        2759992.0,
+        2718822.0,
+        2825102.0,
+        2764292.0,
+        2766901.0,
+        2754091.0
+      ],
+      "after_median": 2762142.0,
+      "before": [
+        2726141.0,
+        2744822.0,
+        2796832.0,
+        2793452.0,
+        2717521.0,
+        2742581.0
+      ],
+      "before_median": 2743701.5,
+      "block_ratios": [
+        1.0124171860516387,
+        0.9905276189129932,
+        1.0101078648985709,
+        0.9895613026463315,
+        1.0181709727358133,
+        1.0041967766859028
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0071523207922368,
+        "lower": 0.9900444607796623,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.015294079393726
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.015294079393726,
+      "ci95_low": 0.9900444607796623,
+      "estimate": 1.0071523207922368,
+      "guarded": false,
+      "lane": "native",
+      "metric": "p99_ns",
+      "name": "ratio",
+      "ratios": [
+        1.0124171860516387,
+        0.9905276189129932,
+        1.0101078648985709,
+        0.9895613026463315,
+        1.0181709727358133,
+        1.0041967766859028
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        44572,
+        44276,
+        44416,
+        44496,
+        44544,
+        44500
+      ],
+      "after_median": 44498.0,
+      "before": [
+        44544,
+        44472,
+        44440,
+        44248,
+        44220,
+        44436
+      ],
+      "before_median": 44438.0,
+      "block_ratios": [
+        1.000628591954023,
+        0.9955927325058463,
+        0.9994599459945994,
+        1.0056047730970892,
+        1.007327001356852,
+        1.0014402736519938
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0010344328030083,
+        "lower": 0.9975263392502229,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0064658872269705
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0064658872269705,
+      "ci95_low": 0.9975263392502229,
+      "estimate": 1.0010344328030083,
+      "guarded": true,
+      "lane": "native",
+      "metric": "rss_kib",
+      "name": "ratio",
+      "ratios": [
+        1.000628591954023,
+        0.9955927325058463,
+        0.9994599459945994,
+        1.0056047730970892,
+        1.007327001356852,
+        1.0014402736519938
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        262937,
+        262938,
+        262941,
+        262936,
+        262937,
+        262937
+      ],
+      "after_median": 262937.0,
+      "before": [
+        262938,
+        262935,
+        262939,
+        262939,
+        262936,
+        262936
+      ],
+      "before_median": 262937.0,
+      "block_ratios": [
+        0.9999961968220645,
+        1.0000114096639854,
+        1.0000076063269427,
+        0.9999885905095859,
+        1.000003803206864,
+        1.000003803206864
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.000003803206864,
+        "lower": 0.9999923936658253,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.000009507995464
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.000009507995464,
+      "ci95_low": 0.9999923936658253,
+      "estimate": 1.000003803206864,
+      "guarded": false,
+      "lane": "native",
+      "metric": "minor_faults",
+      "name": "ratio",
+      "ratios": [
+        0.9999961968220645,
+        1.0000114096639854,
+        1.0000076063269427,
+        0.9999885905095859,
+        1.000003803206864,
+        1.000003803206864
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "absolute_increase": false,
+      "after": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "after_median": 0.0,
+      "before": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "before_median": 0.0,
+      "case": "cfb-difat",
+      "ci95_high": null,
+      "ci95_low": null,
+      "estimate": null,
+      "guarded": false,
+      "lane": "native",
+      "metric": "major_faults",
+      "regression_flag": false
+    },
+    {
+      "after": [
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0
+      ],
+      "after_median": 166.0,
+      "before": [
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0,
+        166.0
+      ],
+      "before_median": 166.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocation_calls",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0
+      ],
+      "after_median": 33893988.0,
+      "before": [
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0,
+        33893988.0
+      ],
+      "before_median": 33893988.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "allocated_bytes",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0
+      ],
+      "after_median": 25307304.0,
+      "before": [
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0,
+        25307304.0
+      ],
+      "before_median": 25307304.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "region_peak_live_bytes_minus_entry",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    },
+    {
+      "after": [
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0
+      ],
+      "after_median": 16778240.0,
+      "before": [
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0,
+        16778240.0
+      ],
+      "before_median": 16778240.0,
+      "block_ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "bootstrap": {
+        "confidence": 0.95,
+        "endpoint_indexes": [
+          249,
+          9749
+        ],
+        "estimate": 1.0,
+        "lower": 1.0,
+        "resamples": 10000,
+        "seed": 840084,
+        "statistic": "median",
+        "upper": 1.0
+      },
+      "case": "cfb-difat",
+      "ci95_high": 1.0,
+      "ci95_low": 1.0,
+      "estimate": 1.0,
+      "guarded": true,
+      "lane": "allocation",
+      "metric": "retained_live_bytes_delta",
+      "name": "ratio",
+      "ratios": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "raw_distributions_retained": true,
+      "regression_flag": false
+    }
+  ],
+  "tail_observations": [],
+  "target_benefit": true
+}

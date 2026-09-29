@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/capture.py",
+    "native"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790694993.184433,
+  "log": {
+    "bytes": 3366,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/capture-native/output.log",
+    "sha256": "9a425e6cf857d53724054ef1fd99394b1f34a26d688dcca3c7614d23030b1e66"
+  },
+  "started_unix": 1790694969.4786088
+}
