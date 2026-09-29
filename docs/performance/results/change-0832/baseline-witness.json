@@ -1,0 +1,67 @@
+{
+  "base": "7eeaab48c0281b06f53527d4c4f4ea79050d27e7",
+  "commands": {
+    "boundaries": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-boundaries.log",
+      "log_sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-boundaries.json",
+      "receipt_sha256": "2fb6ee0c40d289f33cf91929b484b768ecc57d7632af3e90c1af73c68e3092c1",
+      "started": "docs/performance/results/change-0831/commands/quality-after-boundaries.started.json"
+    },
+    "check": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-check.log",
+      "log_sha256": "afe3dfeac63fe0e291056e09687048d7be20eecaa2286d4345aca6f470e27d78",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-check.json",
+      "receipt_sha256": "abb3f124a80cfc89591cb9d12ec512eb8033cd887877b32154823f332937160b",
+      "started": "docs/performance/results/change-0831/commands/quality-after-check.started.json"
+    },
+    "clippy": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-clippy.log",
+      "log_sha256": "a42e8804aa42902ea5eeba348c85b4ad09fdd728e508266a7072cd9ea4947352",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-clippy.json",
+      "receipt_sha256": "b6975bc0c1c63abf901aa8f89559369867405f162c839c7dc42ec3de2c59d059",
+      "started": "docs/performance/results/change-0831/commands/quality-after-clippy.started.json"
+    },
+    "doc": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-doc.log",
+      "log_sha256": "14a66e7c191b1af2f42f5bb09c098046648346620faa17dfdd894dc6cbec8bb3",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-doc.json",
+      "receipt_sha256": "ac3fc605d0d2997f0d2ca2deaf185a17f2bc3ab70d8a44777842dc60b8c99dd2",
+      "started": "docs/performance/results/change-0831/commands/quality-after-doc.started.json"
+    },
+    "fmt": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-fmt.json",
+      "receipt_sha256": "6e1e193e5e479df17b0112b230c000f80cc904386a07b8982f115f14e608771e",
+      "started": "docs/performance/results/change-0831/commands/quality-after-fmt.started.json"
+    },
+    "harness-test": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-harness-test.log",
+      "log_sha256": "e501762948aa66096641d791d1135dfa9c38a432e9c52e0862a8c910af3bb1e8",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-harness-test.json",
+      "receipt_sha256": "6d268220686d08f4d233a1915c9e117147c4d4d7e20115983820b9033440c3bf",
+      "started": "docs/performance/results/change-0831/commands/quality-after-harness-test.started.json"
+    },
+    "oracle": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-oracle.log",
+      "log_sha256": "86d488fb0bae2d89d8b882b09b0c52ada4ee63e3145fa22fad7923d0a43f92af",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-oracle.json",
+      "receipt_sha256": "ff4641fcd8a97e2e4e9c70ed25d07b930cab93212fb5840c8abc89be0de1d654",
+      "started": "docs/performance/results/change-0831/commands/quality-after-oracle.started.json"
+    },
+    "test": {
+      "log": "docs/performance/results/change-0831/commands/quality-after-test.log",
+      "log_sha256": "6ea68974ac7a1b1453448e4ae00158dfdb56100533127e630a01ddaf924da8c5",
+      "receipt": "docs/performance/results/change-0831/commands/quality-after-test.json",
+      "receipt_sha256": "99ead506802dea0c61227eba19d33a9ed0307b896a9cb3b360c9134328e00c25",
+      "started": "docs/performance/results/change-0831/commands/quality-after-test.started.json"
+    }
+  },
+  "normalized_input_rule": "0831 packet paths omitted; sole validation source replaced with 0831 after archive",
+  "packet": "docs/performance/results/change-0831",
+  "previous_inputs_sha256": "a36cf8f3b1f8fafd83cc6ed80ceceb4aca37810bb82d115a89f22860e7a66459",
+  "quality": "docs/performance/results/change-0831/quality-after.json",
+  "quality_sha256": "f62b7fd8c9bf72243bb7fa5e7f7a467a302ed4b05caf6d07142e288361302a4e",
+  "status": "verified-reusable"
+}

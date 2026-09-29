@@ -1,0 +1,156 @@
+{
+  "adoption": {
+    "peak_review": "Review region peak after subtracting each leg's entry baseline; retain raw peak, entry, peak-above-entry, and net-live diagnostics.",
+    "primary": "at least 50% reduction in real-edit requested allocated bytes with identical output",
+    "regression_flags": "paired native p50 lower CI above 1.05; paired RSS above 1.05; any allocation call/bytes/region-peak increase",
+    "review": "Review every flag; keep every case visible; observer latency is descriptive only."
+  },
+  "base": "7eeaab48c0281b06f53527d4c4f4ea79050d27e7",
+  "cases": [
+    {
+      "case": "xlsx_real_file_ordinary_save_edit",
+      "id": "real-edit",
+      "native_samples": 500,
+      "shape": null
+    },
+    {
+      "case": "xlsx_real_file_ordinary_save_lifecycle",
+      "id": "real-lifecycle",
+      "native_samples": 500,
+      "shape": null
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-tiny",
+      "native_samples": 30,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-medium",
+      "native_samples": 30,
+      "shape": "medium"
+    },
+    {
+      "case": "xlsx_one_cell_commit_save",
+      "id": "one-cell-dense-wide",
+      "native_samples": 30,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-tiny",
+      "native_samples": 30,
+      "shape": "tiny"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-medium",
+      "native_samples": 30,
+      "shape": "medium"
+    },
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "id": "one-percent-dense-wide",
+      "native_samples": 30,
+      "shape": "dense-wide"
+    },
+    {
+      "case": "xlsx_noop_commit_save",
+      "id": "noop-medium",
+      "native_samples": 500,
+      "shape": "medium"
+    }
+  ],
+  "cpu": 12,
+  "custody": "Every child receipt contains source_leg, binary_leg, primary source hash, and all four source hashes.",
+  "expected_fresh_child_commands": 192,
+  "expected_reports": 180,
+  "expected_samples": 20304,
+  "native": {
+    "blocks": 6,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "warmup": 3
+  },
+  "observer": {
+    "blocks": 2,
+    "identity": "ordinary_save_procfs_and_system_allocator_operation_scoped",
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 3,
+    "warmup": 0
+  },
+  "primary_source": "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+  "qualification": {
+    "reports": 36,
+    "samples": 1,
+    "warmup": 0
+  },
+  "qualification_admission_required_before_capture": true,
+  "quality": {
+    "after": "fresh eight-gate XLSX quality run",
+    "before": "verified reuse of 0831 after quality receipts and normalized full input census",
+    "gates": [
+      "fmt",
+      "check",
+      "test",
+      "clippy",
+      "doc",
+      "boundaries",
+      "oracle",
+      "harness-test"
+    ],
+    "locks": "Root and standalone harness locks differ and remain fixed independently."
+  },
+  "schema": "litchi.performance.0832.plan.v1",
+  "source": "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+  "sources": [
+    "crates/litchi-xlsx/src/column.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs"
+  ],
+  "statistics": {
+    "across_process": "midpoint median",
+    "bootstrap_resamples": 10000,
+    "endpoints": [
+      250,
+      9749
+    ],
+    "seed": 832832,
+    "within_process": "nearest-rank"
+  }
+}

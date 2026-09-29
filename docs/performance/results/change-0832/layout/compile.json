@@ -1,0 +1,46 @@
+{
+  "argv": [
+    "rustc",
+    "--edition",
+    "2024",
+    "-C",
+    "opt-level=3",
+    "-C",
+    "debuginfo=0",
+    "-L",
+    "dependency=/home/zhuhe/code/litchi-target-0832/release/release/deps",
+    "--extern",
+    "litchi_xlsx=/home/zhuhe/code/litchi-target-0832/release/release/deps/liblitchi_xlsx-7e31121e031e7a2d.rlib",
+    "--extern",
+    "bitflags=/home/zhuhe/code/litchi-target-0832/release/release/deps/libbitflags-7ec92213b84d00b5.rlib",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/layout/declarations.rs",
+    "-o",
+    "/home/zhuhe/code/litchi-target-0832/layout-probe"
+  ],
+  "baseline_build_sha256": "ad0882b5a3265b0b7ceb2e9edcd51b86e7374d35613263dc352bb6e83809a448",
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790638358.1358087,
+  "input_inventory_sha256": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda",
+  "libraries": {
+    "bitflags": {
+      "bytes": 326168,
+      "path": "/home/zhuhe/code/litchi-target-0832/release/release/deps/libbitflags-7ec92213b84d00b5.rlib",
+      "sha256": "a15607cd1c4a3666d08042c9ea84306f4c01302690cc29b57092c789cef6aa69"
+    },
+    "litchi_xlsx": {
+      "bytes": 108765464,
+      "path": "/home/zhuhe/code/litchi-target-0832/release/release/deps/liblitchi_xlsx-7e31121e031e7a2d.rlib",
+      "sha256": "2996cb912046fa9cacbf27f5084ae2b153dc11c6baff932857dba89b83c9140a"
+    }
+  },
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "script_sha256": "c5f34903c8f0aff04e8a08cd6ae9a9f9dedef4270fc6e43ca99f6be547ba3e77",
+  "source": {
+    "bytes": 3823,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0832/layout/declarations.rs",
+    "sha256": "40dd828be850236daa315eec6d695c031841ae0e7074bce6d6780558c9bbb853"
+  },
+  "started_unix": 1790638357.9824913
+}

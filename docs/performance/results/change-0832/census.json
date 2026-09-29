@@ -1,0 +1,4599 @@
+{
+  "archives": [
+    {
+      "bytes": 13397,
+      "path": "test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx",
+      "sha256": "7c725dda9da6f571ea58824f603bf6eff7bc6c49d122ac4322cc0d6129fa7f92",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2097,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "ae500d32f790e3bdfda3fc0c6e0b878b2dc7de9712015ea10ba8b9c204e2e54d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 18486,
+      "path": "test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx",
+      "sha256": "2d254ad988119103b65903d6d5f45bfda7d09985401b4a59376a91edd0c8a40e",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1669,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "9c5a121dcf65ce355adeceea2fc59a58eb9e96e4e40b4255c57f31d2631446c9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 27708,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx",
+      "sha256": "b10c917495578a5f0238ec4f4c0d8cd457d8afda602cd23edc3642be6b0ee577",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 19886,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "ec53f80ddf7b34efe638308f6a623f983c3542e256a9e64e76b294f97fe737df",
+          "status": "counted"
+        },
+        {
+          "bytes": 24208,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "468139e5bc6e31a1259c72a305107d34c59f6fd673f53348c52a57fd0ce7d312",
+          "status": "counted"
+        },
+        {
+          "bytes": 30678,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 17,
+          "sha256": "742f87c81b85b395fec7538a60f33b2f80ba4ae1c61db4eca0915b976e593812",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 29373,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx",
+      "sha256": "d9ff4c00f55a219d9d9ed9cbfd4b5f038d4797078bb9e0b250557a99daa95011",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2956,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "566a7a75637e845af8b3f13c8199452ebbb69da6a5cc6415e8f27d85590dd835",
+          "status": "counted"
+        },
+        {
+          "bytes": 16006,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "4e74cef306aefb077535608004e98a0a802efa4c8ca0fe5801df6ef75d0006dd",
+          "status": "counted"
+        },
+        {
+          "bytes": 5303,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 5,
+          "sha256": "97576518b32edfb6b52de602f6f9b6e2fd90aab88ad9096bccb92412185e5e0e",
+          "status": "counted"
+        },
+        {
+          "bytes": 5302,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 5,
+          "sha256": "5e7faafb25e4422486ddcb8da0aa6f1c6d0a34f888ed949b1eab2d90abd3ed54",
+          "status": "counted"
+        },
+        {
+          "bytes": 5391,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 5,
+          "sha256": "2cccf455b2c6d141d5ac3405b3e66b30eb3086859158bc95ef7e5581d187db02",
+          "status": "counted"
+        },
+        {
+          "bytes": 4543,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 5,
+          "sha256": "3b525eec4eda1d370923a6e2e7c7bd591229eba3a78fef422dce66986372dc40",
+          "status": "counted"
+        },
+        {
+          "bytes": 5949,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet7.xml",
+          "records": 5,
+          "sha256": "13c4762efe7426d6a04fccb8fdbc701d00ebf9373f47960322fa0956d4677b48",
+          "status": "counted"
+        },
+        {
+          "bytes": 5272,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet8.xml",
+          "records": 5,
+          "sha256": "500a175419b8cfda2a16d66e06af5fc5a257925046ae03324531f2a1d0257401",
+          "status": "counted"
+        },
+        {
+          "bytes": 3743,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet9.xml",
+          "records": 5,
+          "sha256": "bb908da76ecc0c6dd61e913118e7841091ba9e297aca823f9eb89a8924e197f2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9494,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx",
+      "sha256": "896f863f92dc5fc05ce7b038272261106a0d40f6fb77abff7bc149880346eaef",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2203,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "48a408b0c50d9c96d58b034f8f29038f672605a03ea6a68d35f8a38db4a03c68",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9964,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx",
+      "sha256": "c1e17e7d0d8b8f1cae95461eb9145e025a9a151efc52718f72596283b5da20b0",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2790,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "863cea3b3bb2ac695d4a19aa702e5ca6bfbc8cf062fd4aff6f7598030da4c24b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12433,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx",
+      "sha256": "021ad659a782b7dd04cac6b056e897cbc87aecf61fda91a3f6ca37da36ac6b1d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1573,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "b89d5a4da9b1fae2e077ea5420f8b9903800a94e5b750eaed87f6b9865c9493d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8367,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx",
+      "sha256": "98a94083b29c8b3d03c3eead5709b64532df60c2a18b164f7431c8f165f75859",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1448,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "f99dc805bce715998e0956fdd8538e84700e926fa78548a5b8f4a13ea7e511b9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11268,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx",
+      "sha256": "bf7a53b6cd5aeced5bfb3241cf802a23759210c10447aeb62a9ab075cdb258e3",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1921,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "b34b6a12a43fab2a02aec1913a897add7ed0105659e6994ae466c2523abbefdd",
+          "status": "counted"
+        },
+        {
+          "bytes": 1413,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "e6ef54186a3b144c72d3643c6e6e46ea0eabe9079d48af9201a7ccd77e1b4094",
+          "status": "counted"
+        },
+        {
+          "bytes": 1730,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "623a3d0696ba8a08d61196c439da71f2eecc13bd8fcb6a03b4be09a9618b0a8f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8435,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+      "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1496,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "d73849d2d2d96ac61289e88224be3f6933ab5e671c2e29d55e36b1839b3e3ba7",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8483,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx",
+      "sha256": "2a8151eb9653172e350c214c755f820b6d9670b155f9593d41c1b258655bcd44",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2133,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8ce0e63f47e7686713a56b656863c69bb40704c7cf77baa327eb4790b650fe0e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 5479,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx",
+      "sha256": "df95da8e166e2aa039dc83eabd4906a329d6f71ce4ec7e1e44e941702fa78d87",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2358,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "6581c650af8417d5e43d15c68c8df5b861f0c4d905a28dfe2772ba21c7b5624f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9172,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx",
+      "sha256": "80cd967dad7b889a5b6d0f07ed38961a19aafe8f6c4442fae3277cae264c6c26",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 847,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "dd1272866634246d43f1569aabf6daf86cd3ed299833c5f41063855f2d40e97b",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7730,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx",
+      "sha256": "a1252dc9e87a593026d4bac29b26b2eca6d88129d903ee6bd24293f07b0aee19",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4007,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "330a15cd531e6bce8b033928d5427524b3c7533a7bb973d3e360665951e6877c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 16883,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx",
+      "sha256": "a7d58ac6d867f570c63cb104cdca1c601bdb40f87250232552ad78946adfe765",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4719,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "43c658b3eaba100fe27b092fba946dc83ae14155d037328614170d1b0ff81799",
+          "status": "counted"
+        },
+        {
+          "bytes": 20562,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 4,
+          "sha256": "737fc830d2239325896fbc28959c37d9ad8a080044f408a412575ed4cb2ad396",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 4243,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx",
+      "sha256": "d56bb58e86002d3498ecb845231c8306b5f282998d6b559d231805f7aadcb770",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1755,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "3287cd8bcca012ef291eb2c057abbed056de690de2abe60568fcf01af4d0945f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8580,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx",
+      "sha256": "b665ed05b9ed01d98ca6b01c080d91a9cbe1b9bf805cc53ef640bb95c89f64ce",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 424,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8ba91bd41e70236b6ae36fbd510498ea427c3f8f001bf17c1b347fe791269082",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9455,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx",
+      "sha256": "5da77691d9c554727e0cc0e47397822ae892d65a85b012c47375860ab5a551f6",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 828,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "37115d6b9ed84048d08e2b62ae4faf6c7c61ce4511a6813dc8a8dc5ece7c2a5a",
+          "status": "counted"
+        },
+        {
+          "bytes": 1952,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "eb7ca75353db1276d009b7bdd1c5ac45a1f0ab77ee00a3797726031f0c1b32ae",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8984,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx",
+      "sha256": "7ec5305479c3ef38868406985f97f9220054ac847892d36f40511f2ceca12105",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 2471,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "3caf245f0b8192874bf84cefbd4d3ad32123a71065df0eebd997fa5f51730d63",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8671,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx",
+      "sha256": "d2fc65e90db1b8cdcdfef2dbef35f0b5ddf81a0b5238189dd995b0944dc01464",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1447,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "bb6d6e0d70bcf0bfd817faf34c6b269ddc590b941cbafe69d86b92ad3cb676a4",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8576,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx",
+      "sha256": "59bc94d6166701b7f3f947d9e054805f4b9efb40deab6308b84288627b57708f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 911,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "0d4af6511299411982e7ef28a87cebcce93a3056b9ab1192e85ccb1104c04ead",
+          "status": "counted"
+        },
+        {
+          "bytes": 1686,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "f29ebee483734451de49131b01e73efd05d940e4e8171181ecd68f54558ff024",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8408,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx",
+      "sha256": "5501d6ae93866d0425aadbab74443bee6146533182b7ceb90c620ab6de55d39f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 536,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 0,
+          "sha256": "779912f589cfbb7a9b9c3b399af8d52f7ec6e8bf26f7c34e09f47c96d6445cb3",
+          "status": "counted"
+        },
+        {
+          "bytes": 484,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "00a89972a9ea033050238ef74c8ef3d9c1a77fca9c38ad99b34a652be8495a2a",
+          "status": "counted"
+        },
+        {
+          "bytes": 484,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b3ee981e46e767159f2554b601da62a6dc673859d6e1c94b9f58145271ed180d",
+          "status": "counted"
+        },
+        {
+          "bytes": 500,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "2f18d626722334df0568f9a54ba88402ff11f4a70159a875b7b734149fadbda9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10111,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx",
+      "sha256": "115274cee60bf5f660601790a342382383cba164d2dc62b6e88b03c1d77b4c0d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 5064,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "828e9132a06597d2a3cd4f386003895516c33969fa1a335686a80139a411e10e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 18756,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx",
+      "sha256": "8efb54cb804b713ff5c2d8af2f730f1583b3fa06ea932a3f853a8385d806ea78",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 72386,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 10,
+          "sha256": "f9b922b164ca286980b5d7ac97166fe3804660c8fe555972c4ba038c7d7526bc",
+          "status": "counted"
+        },
+        {
+          "bytes": 3580,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "aa2365ab951353e95ee5eb5276a9887e8bb94108eb915f7b3c9e1214fc73997b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7015,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx",
+      "sha256": "a505455dbb26c09db9e531d8753db06e55a1741247bae6be5a37b4e86582e10d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 572,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "bff461d365f60ffb3395ea38e6f294d54435d1bef2f084406d3a4c8cf736df36",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 20005,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx",
+      "sha256": "78067fa92760a582e9674148029bfd2d9088cb964d2042fbdde2e5037bc30d00",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 953,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e634e44c639f666a58bd76e684770eef8df73f6524c8edf4e5deaed89e427fa7",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 15192,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx",
+      "sha256": "f92e4bc58e4ff1f7858e5399cc2150ccd33364b7da0f094b43db32b8b7524a0b",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1432,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "21eaf5283f47a116e7d5071c7b89ecb1c91b8b8644c6ea30f2b0ea7ab9362ea1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 5288,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx",
+      "sha256": "8c11bcd48ca97ac96a086df242ee3d5d822402fa011331e4133ff7081a3d2564",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4480,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "0d07198dd151578bbf221b0dab8a80aeea72a62a94a362b82bf3a24932797ef8",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9421,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx",
+      "sha256": "a54981b736aa27d4783a7d4ba33a124bbc23d7a9d0ce355fa3492b1e39b998c2",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1350,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "0fe2e4f4558d2aff70c62e8df130ec32a50557fc996fded3781ace5068d85b64",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 15723,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
+      "sha256": "42d2513d9cb37c6d154fccdcde4e59321eddc6934e6498690203af494fbd8a58",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "013e87b2a69fab0c85b2e832148f79c26482aa1dc016fcd17f5bb47463dff7b7",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9415,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx",
+      "sha256": "cf343db1cfa0cb758627bfd530696cea994e1e644b61ca3b6926cc61e8a6e16e",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2081,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "906e6f00850c1324e395a46e92007c7942fe98101f4d3349861591d7064768d1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 6042,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx",
+      "sha256": "2abae7581d4305a8457b69088a977fe81116bfc93e1d7296fa2021c93aa34105",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1374,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "c75ab684dd359a662ffd6975fefdfc0cc8e3d3dfe4abbf0982afe945a7d60709",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 17056,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx",
+      "sha256": "ac94c7a84898f60db85020afd984be0e2ede5ace8617f17c009ab4d8f0526377",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3658,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 5,
+          "sha256": "762bc59eb8790e86d7eb5f41b2ac416248b5728c09eb4e19eb826e851b50260f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8400,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx",
+      "sha256": "464b1d54cd89e08ae6a3a85eb65639103a4aabfa0eee76d702bc8b0e09fe7861",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "a21789a64177cf68672eaafcbde36e9951474433157be7702fc4b8ae551f63bb",
+          "status": "counted"
+        },
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "a21789a64177cf68672eaafcbde36e9951474433157be7702fc4b8ae551f63bb",
+          "status": "counted"
+        },
+        {
+          "bytes": 843,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "6444c7165d849064dc02f9fcd86e8ca0b7b9261fc2628dd36f8902800cb3f96c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9244,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx",
+      "sha256": "7d6695701649fb184137e9014c1b56577afefce766b5dca43292ad9336e7cf75",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1668,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "a8ac1a0124bb9253dbe4599fc23bdfae7de81278fa8c7168e126ec00708070a9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11360,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx",
+      "sha256": "8eb9e4265c2f2d8edacf403c75382118a1722bac87a45bbaa66615943efa032c",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3970,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "02d3ef5f60bf4c08b4d69b8483e5d0fa3d473e7223fc18a81fb0501de75b1bc2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 15414,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx",
+      "sha256": "f4169bab78cf219c9619de70e22f79c28a383a76debe8dba096c2637449daa8e",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 972,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "47b931677c612b9a3e6ecc4303eb893b268b75414cb8818e1663c258e7aa5570",
+          "status": "counted"
+        },
+        {
+          "bytes": 972,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "47b931677c612b9a3e6ecc4303eb893b268b75414cb8818e1663c258e7aa5570",
+          "status": "counted"
+        },
+        {
+          "bytes": 1647,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "c28790c66db5aa31eb5c3956f4a06c768e95de2e0be41577a1d038e1be1782ee",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7311,
+      "path": "test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx",
+      "sha256": "ade103f651e3f7cac423cd6b01d4d5a004d03470667723234105ba39672bc74d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2978,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "0c2672977f05c90656204a2d7d9d5d47bfca93bc14fa641ecf6ade3e3ae2b38a",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 6604,
+      "path": "test-data/office-interop/litchi-changed/date-autofilter-litchi.xlsx",
+      "sha256": "0f1c13c528c75b5293b18f4342d5fa95024fcc604af81c1b66c058a06575bac9",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1562,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "e172ded50b3450446f28b4cfe4b20f6e624b2485502a755577eed404d212f307",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 654688,
+      "path": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+      "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 28807,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 324,
+          "sha256": "1fed42fc9851c9e429cd77b9476be8f4729ec16fb0f978e62b44111abd51cb8d",
+          "status": "counted"
+        },
+        {
+          "bytes": 28684,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 320,
+          "sha256": "fce34e425ee862ac88710e8f2d5695cfb88994c7532bf288fe47884a851b8fd7",
+          "status": "counted"
+        },
+        {
+          "bytes": 29535,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 325,
+          "sha256": "bf2a909af50234fc7ab4ef7e6bb12598d1f0ca166cc9b4ac3de6d172d2752dc3",
+          "status": "counted"
+        },
+        {
+          "bytes": 4381,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "40f945c16aeba08c6482cef8e57151b902d479337e2fc57f1004ec5ddddf4993",
+          "status": "counted"
+        },
+        {
+          "bytes": 10318,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet18.xml",
+          "records": 10,
+          "sha256": "8fb1b883bfddd98e32a08bf8aea5318194f713d2e116b2132050e6cf9b1a704d",
+          "status": "counted"
+        },
+        {
+          "bytes": 29485,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet17.xml",
+          "records": 323,
+          "sha256": "6d20ff17acdfcf27370e595d712fb0224eb865fa5e74259d9f359458b14902ec",
+          "status": "counted"
+        },
+        {
+          "bytes": 3662,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet9.xml",
+          "records": 4,
+          "sha256": "e868438d4593c47b3664be11c92d4ce6cc60fe22def23a15074fa01c8e10b3a9",
+          "status": "counted"
+        },
+        {
+          "bytes": 3997,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet8.xml",
+          "records": 2,
+          "sha256": "88fb269917d6188f959c366b3aec224873a61036ca5a66fc7bf7862eb43eedf3",
+          "status": "counted"
+        },
+        {
+          "bytes": 28171,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet7.xml",
+          "records": 284,
+          "sha256": "cf011a5c51b392d9976a2f9b48df9ea4f8fafd1655ee26134c57dddb67eb4a66",
+          "status": "counted"
+        },
+        {
+          "bytes": 7990,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 8,
+          "sha256": "93f18c43ec36cdcc23a3bdc0d139618c7ecd866ad47ed017d16b736924c41e7b",
+          "status": "counted"
+        },
+        {
+          "bytes": 4127,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 6,
+          "sha256": "0765d0c8400d9bff15779eb1de1921050432ec5127f0b216f0e802bb0eb3b325",
+          "status": "counted"
+        },
+        {
+          "bytes": 2884,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet10.xml",
+          "records": 2,
+          "sha256": "a03e943bcac3bc34b960aca56b57b7235ccea7828fb79375916c32de3e00a528",
+          "status": "counted"
+        },
+        {
+          "bytes": 2896,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet11.xml",
+          "records": 2,
+          "sha256": "d8d28ecb30ede6f06ae10260c25285f6eec0c3628f4e61e46d1bb06576e0f87c",
+          "status": "counted"
+        },
+        {
+          "bytes": 2854,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet12.xml",
+          "records": 2,
+          "sha256": "d9ff9de8e9d6c65c5188fc7210e1d6c9bbee2363d4be56c1d64a0d98f05b9418",
+          "status": "counted"
+        },
+        {
+          "bytes": 9768,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet16.xml",
+          "records": 7,
+          "sha256": "c5c59a332bc2a78c667cf9135f997dec64096f49c6c88a4973cf7a26d8a2554f",
+          "status": "counted"
+        },
+        {
+          "bytes": 13756,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet15.xml",
+          "records": 10,
+          "sha256": "8747d42a7cdfbbd05ed3953579d558e11d0901da25a7530ef276a2bb8310a10c",
+          "status": "counted"
+        },
+        {
+          "bytes": 12157,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet14.xml",
+          "records": 7,
+          "sha256": "8eb1e052c3f57ae6daef89550d448b366ff4b697a1fbbf3f74900932c67998e5",
+          "status": "counted"
+        },
+        {
+          "bytes": 16674,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet13.xml",
+          "records": 9,
+          "sha256": "c60c85013cb37e22607259dcb4e72e9494bb0972ed7f64bf0146eb7978df16ab",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 14979,
+      "path": "test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx",
+      "sha256": "04455b63ab8f8fd3d879b63a7d2bacc5518821ede0c933a2799354a9adaf4b68",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1836,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 2,
+          "sha256": "7ef328a23d9c5c8ab2a5d83f01536535413b58ec646caa78f23db891db7d1701",
+          "status": "counted"
+        },
+        {
+          "bytes": 680,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "e094ebc89fd1ea01ea80b2677543bb84f7e77f165541246ed3ba63e174e8ff64",
+          "status": "counted"
+        },
+        {
+          "bytes": 3502,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "c8039357f71805da3261fd5f0a82e85196743b9895a9152c67eabf682d55960d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9906,
+      "path": "test-data/ooxml/xlsx/CustomXMLMappings.xlsx",
+      "sha256": "6a5fbb160c7c9c2add5125ac07ceaf3f841d40e03d5c75025ab71946d49af289",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 1455,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "9935d8d8dac93a8f6f3e6a3e584f255f7a41f892d14871227ba5207d80441b1b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9915,
+      "path": "test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx",
+      "sha256": "acbba8c672a3977e24813f017c276986d06909760835a5a3a12899e2a8816c87",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 1455,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "9935d8d8dac93a8f6f3e6a3e584f255f7a41f892d14871227ba5207d80441b1b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13679,
+      "path": "test-data/ooxml/xlsx/DataValidationEvaluations.xlsx",
+      "sha256": "ea5706d9afc031a8c2afef880559483bad30ab2c18e2857aca5f3cfaa74decf4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 10392,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "2fded8107603ba277f13191249359d7450faabe2d63d707bf965df276125faa2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 3286,
+      "path": "test-data/ooxml/xlsx/DataValidationListTooLong.xlsx",
+      "sha256": "25785bbdbfe495db4bddbdb578b0239faa1715d40ede2b6003776e0a75a9a15a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 862,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "907f83978554bc27efa7353efb4b562ce5a7e668be18848f2fc2a3a145ac24d9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10981,
+      "path": "test-data/ooxml/xlsx/DateFormatNumberTests.xlsx",
+      "sha256": "d18aade6ad10435baa4be3ac1c4ba4c15e48248bc24b91926920f3dec0aca033",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2272,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "32310fd0102b0aa02daacc415e6566f7ccb8228a0555cfeb36b2085f960e4362",
+          "status": "counted"
+        },
+        {
+          "bytes": 4571,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "bdf666cc76f5a6216e864760800b5cdcc758234ab88025183e70214cf61540ba",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12394,
+      "path": "test-data/ooxml/xlsx/DateFormatTests.xlsx",
+      "sha256": "16445dc0deba00671ee4315015a970d415ce9886da59c974532d946e99276c66",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2160,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "aece2ea175ab023121eba91aff8fefc9031a51ed63d6b436f63770e950898538",
+          "status": "counted"
+        },
+        {
+          "bytes": 11994,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "e1ebcfe55e8132a09f10790ee5c6168f0e560d370cc164072c395299cd4ef110",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 19460,
+      "path": "test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx",
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2002,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "bfd0b14a3d3e9a17197a8675cb29921649b42b13a493c73b6846806e35f34c62",
+          "status": "counted"
+        },
+        {
+          "bytes": 2112,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 4,
+          "sha256": "98f69bc7850c284840f9e78e374e361c83cbaa74beb97ab8347c0bfcd05a69be",
+          "status": "counted"
+        },
+        {
+          "bytes": 1772,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 2,
+          "sha256": "57424cb42a3cd19bff70a260427e8043ed37b9320e8aaf48425b7b0ecdca755d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9457,
+      "path": "test-data/ooxml/xlsx/ExcelTables.xlsx",
+      "sha256": "1e43011440eb39000d1751abaf9ded42d37b26f91b4f586a94bf91ce8ecbe9e5",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1907,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "7b1c38ccf3bb7b7969d82a6777b04758bfc89de07b14088abc8d9d1e3a2e3e39",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 46589,
+      "path": "test-data/ooxml/xlsx/FormatChoiceTests.xlsx",
+      "sha256": "c8a86eedc7da9b9f421210cd42bb1164df4d068f39c1b10768f8e780f4f58852",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 23598,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "05289d49c3d781651fc2896c51f64eed5e0065defc11ae9ffc2eb8b2f14338b6",
+          "status": "counted"
+        },
+        {
+          "bytes": 1846,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "d44da599a0df64049fc943dff73744a80fcd36f0b21c355541e11859e84a1835",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 14577,
+      "path": "test-data/ooxml/xlsx/FormatConditionTests.xlsx",
+      "sha256": "96afa10c8f1f633fc2eaebf21a0883c96a8be2cc5f38fc8c2e826b5d9c140d4f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2272,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "76ee3587f2e6f5cc5f1a8e2ed57eb7ece4a59e26c7b6029f8fdc37e9ec53a827",
+          "status": "counted"
+        },
+        {
+          "bytes": 33801,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "d2775597a7fe139bc5bc7b835461f5637874560e67d5c186e2f7ee417d3d5b18",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8847,
+      "path": "test-data/ooxml/xlsx/Formatting.xlsx",
+      "sha256": "5a0aa7c36c53b22cd26e3eeb2ee49bf16f7e4101aafa8b1503a0778f4010ddbc",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 1814,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "13090396089078b3c417b14716f1f52184e63830c87d7b71c86329567bdaac30",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9543,
+      "path": "test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx",
+      "sha256": "70828c7e2e8b0068410009e7ab5054e475d1195ad6c6f4303e03732ab8f7ca9c",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "c62900baa5ac5a68824a3993ae36fde282b14da551b4a4eb02afff9c6e175d52",
+          "status": "counted"
+        },
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "c62900baa5ac5a68824a3993ae36fde282b14da551b4a4eb02afff9c6e175d52",
+          "status": "counted"
+        },
+        {
+          "bytes": 1098,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "67dbe2a3b49320910e66749136b12d91c99f08823d31ba0edca80cbf548b1b56",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8401,
+      "path": "test-data/ooxml/xlsx/InlineString.xlsx",
+      "sha256": "c92383b48d5141248c7fb37e077b1aa02f716a995d57b779c357758b8afb5478",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 562,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "25f113a5de93f2741536627622dcfab4a4baf2f67bf66b6559e1ec73a5c41dc2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7843,
+      "path": "test-data/ooxml/xlsx/InlineStrings.xlsx",
+      "sha256": "bdfd54e82e7eec3a16bc12708dd2fbb8ebee12921215f6ed78fd32a84bfbfd74",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4581,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "338361470d2ff467a3f338b130d88cce866675d9d502006be03be279735fda99",
+          "status": "counted"
+        },
+        {
+          "bytes": 1666,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 1,
+          "sha256": "cf0fef0213ffc1068118158e3f718d2a986a8c7d2a2fbfa46b16d7c2f865108b",
+          "status": "counted"
+        },
+        {
+          "bytes": 1666,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "cf0fef0213ffc1068118158e3f718d2a986a8c7d2a2fbfa46b16d7c2f865108b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 14875,
+      "path": "test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx",
+      "sha256": "12f1dcef889c20fe54a09857790ba9803a7b061cc9fc5b85d0038cd6c86faa79",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 29758,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "d95e1eec9d4a6b4cff5940361e80ab7cbee63be0d3d92fb5c5aa500c02777460",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13378,
+      "path": "test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx",
+      "sha256": "1e97af3b87636bd0a759c25439a21b928c2ff3b9a3c57ca49ae24cb1ccdb7e2f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 23336,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "d7d5fc35433f6e7e57c8abd7c3a71e802ad89747b3b2e0117e41e420977cfe48",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8935,
+      "path": "test-data/ooxml/xlsx/NewlineInFormulas.xlsx",
+      "sha256": "3ec9c0c59a6e3f1ec66ca023c4a4ba0235c8047a41bf859fd223f352146637de",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1700,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "f70b3ce0df14637de3682f6057cbb5a6fbd717471b532871d0cd491b9efbb43b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12707,
+      "path": "test-data/ooxml/xlsx/Pivot1_Row.xlsx",
+      "sha256": "20bc9d2d0d6ce374c8bd9474b71c8b8b5834f6211c796536a9facebfa3ce019d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1961,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "97e79cd71d24b774ac8a3ab82525b85c62367fd8a44b9ceccd1a84410bca0973",
+          "status": "counted"
+        },
+        {
+          "bytes": 2325,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "3d727fee10ee2f2ec0ee5c16763e21532c4deb0a362db39b97e9543f3a13674c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12709,
+      "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx",
+      "sha256": "f164de0ab220dd90f93881b34f544280de31d0d5210957f682fdfd72853edf18",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1961,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "97e79cd71d24b774ac8a3ab82525b85c62367fd8a44b9ceccd1a84410bca0973",
+          "status": "counted"
+        },
+        {
+          "bytes": 2399,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "3589063be7dc8c5997cea6d6150fd5a63b74221f9a610a62505c6eec01cd6134",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12845,
+      "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx",
+      "sha256": "8b79786249227e34d695411ad110c90c7424ebf4dfcbd56693b26366aff6eaf1",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1961,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "97e79cd71d24b774ac8a3ab82525b85c62367fd8a44b9ceccd1a84410bca0973",
+          "status": "counted"
+        },
+        {
+          "bytes": 2870,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "71525281342a68d639e8713b73628bfa467868a249a27322c85f5bf89a665c7c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12590,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row.xlsx",
+      "sha256": "95570d3eb7d3b8dcb3ee8f4e6005100d257210b5a480808a68aaa5f306caff96",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1826,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 3,
+          "sha256": "5a7421506c49664dc4509c858c0c5dddf1951296f1a80338618aca78e0d7148c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12877,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx",
+      "sha256": "e9481b8149b30637de37ae04c8ea8180a10e127d0af03f5277a421651a73980d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2126,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "31969e5e79345f3728cbd99f711d04890aa0e837c1df263c5d103a3e434e6420",
+          "status": "counted"
+        },
+        {
+          "bytes": 2163,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 2,
+          "sha256": "1cccfc63f570563778bda7a309de34522dbd7815a8ed6e0ca3475ddc222c8785",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12615,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx",
+      "sha256": "8957ceaf8f5054435fa88bcd1d78699a3702681346fb63fbfc01f6fb694bba1d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1914,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 3,
+          "sha256": "49007b613cf79cec569d5e551357d5ffc4a9a7e20f3493078587e91e27c4528e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12670,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx",
+      "sha256": "25e8f5ab83fe4b0b01a783421232647c1f2f9aaba09cc627ab0ac9748fa13c8a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 2189,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 3,
+          "sha256": "da2e26b239e4003c8780a2527563a14d0044b6d307679b389e0d61d0371b8721",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12656,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx",
+      "sha256": "b8d8de7ad06f91e71a5b30db40e33ba857cd6787d3e070fb35a69184b136245f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 2100,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 3,
+          "sha256": "0f941b23c4f3f03edcacaa29634641ac3776da6d5389810552f1b0615d037819",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12677,
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx",
+      "sha256": "5730cf1ae3db9d5a528dcb875a085360d267a9975035a4a5faa8b654356c7a0b",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 2113,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 3,
+          "sha256": "6f6de1f4e60591f76606b242006ad88a3b1322f4a5ad9d39079439545b200719",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12716,
+      "path": "test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx",
+      "sha256": "4d5821b12415636f340bb541f6d9eea20ffc6885c9484e8f4a648d8cc6f66749",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 2404,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "0cf78fe9e433e23425b8049b299d6096153a11f15b1cc4720dca2a174ba0c9c0",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12734,
+      "path": "test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx",
+      "sha256": "70bc07b95094138b97ff41b6e39ba2b349d9473a2d4c8a4c9f70c7f5a30b0eab",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1964,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e94bf62d2e03676ab3d2ccc7ef7331c8ac30ea515545e7fcb43ff80d36ce7ab7",
+          "status": "counted"
+        },
+        {
+          "bytes": 2402,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 9,
+          "sha256": "c43829de21960e6b229cad0008b69bca1d24fd4d100848dc660125c88e7caf41",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8123,
+      "path": "test-data/ooxml/xlsx/SimpleMultiCell.xlsx",
+      "sha256": "119b6e70c5bbca6ca3e46f981e0719c154d87203adb4b5b61210d726deab9f7a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 1079,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "4f422d480807dd190c9292c579e516eb98e264fcdc3b0675348201671a619939",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8871,
+      "path": "test-data/ooxml/xlsx/SimpleNormal.xlsx",
+      "sha256": "6b300c76d7b6ba32e45c40086f5c8cea4b269946f7786a73e0d6f08c3acfe1e4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1341,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "cff50d2197232e95130c0851b293e1b83599b228618aa94a9c330515dbb60ba7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1192,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "91d2fd094fda5389603f0722d24c4d73434ef36e4f10eaa4f630c235ca41135e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 18278,
+      "path": "test-data/ooxml/xlsx/SimpleScatterChart.xlsx",
+      "sha256": "c3024ac94d6d42cbe48d20a798eda98b06d8dba6e2ed2b1fcda10659883c7be4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1034,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e58a46cb45335baaa48101b99d768e7ed8bcf83cddf468ae8bcbea7d48983bb4",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9225,
+      "path": "test-data/ooxml/xlsx/SimpleStrict.xlsx",
+      "sha256": "dd6d2142e4c440c5cfaa241aa48883bfc0a76742b4531102dd41aea2f7a4d2ad",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1368,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "35793efe6923cdda1761b44ced7e01b6977303b21a6172898c7758a34e603120",
+          "status": "counted"
+        },
+        {
+          "bytes": 1208,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "5d9ea0f1e701b107c6c972e2decb8c59cfc05e499104f963723a794f981f7c1f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10060,
+      "path": "test-data/ooxml/xlsx/SimpleWithComments.xlsx",
+      "sha256": "d7d337b3436e863487d26439a57ef749950c599862325d7bce7e830acf1df0ba",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 518,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b836d2ad2b45582c035dbb74124f5e3976bc4079ad29f13e9e16ed9087f5bfbf",
+          "status": "counted"
+        },
+        {
+          "bytes": 865,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "f0cae6f33968d2fe7a8bf9cb592737e6427bbbf4a71df84e955740b4dbca3154",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9486,
+      "path": "test-data/ooxml/xlsx/SingleCellTable.xlsx",
+      "sha256": "81703720d256b69aebfeefac6134e81fd1b014104408db752f0ff24d46e4ba61",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1189,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "773094e3f29b8ef20690f3110f01464a662bb2e4a6d7929c71dad22adc88a376",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13356,
+      "path": "test-data/ooxml/xlsx/Sparklines.xlsx",
+      "sha256": "9847a0015185459e126b3f60d09d4dbd4492d9a39644971118c67e38666d5b16",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2912,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "5e7014b4548182686cf7d214efeb8f2f286ed62889ae9cdda895aabd21b8ade6",
+          "status": "counted"
+        },
+        {
+          "bytes": 4674,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "68c3d2dd4650a540882d83f1fd99954aa000b48fc71ef7779a0dba7d5575f748",
+          "status": "counted"
+        },
+        {
+          "bytes": 9386,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "9f3dbf4be6c6f0f3642279fdeaf8cd24c2fe61abcc6f908e7bc5a26883658fb5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10459,
+      "path": "test-data/ooxml/xlsx/StructuredReferences.xlsx",
+      "sha256": "a746e336176f8157c50a0a3b017c4633b7b1d546bd1b8af0f8165a48d1bacc56",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2191,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 2,
+          "sha256": "8ffaaffa927adc8e6da4c9558a4e20ac1bb1c5b9de4256342a52fbe279ce59c6",
+          "status": "counted"
+        },
+        {
+          "bytes": 1029,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "ceef458ca952848377e2ce847a66d640cf30eacfb19122d048cdddd3ec58a492",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 325446,
+      "path": "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 7848,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 1,
+          "sha256": "aed9087a39fad1b0b327de8455be9a732978d23495a9ee5b625f2f6f2ba3a744",
+          "status": "counted"
+        },
+        {
+          "bytes": 1558391,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 14,
+          "sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+          "status": "counted"
+        },
+        {
+          "bytes": 455209,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 8,
+          "sha256": "1727aa57c9c3c621347e47f7e31cbaeb51b5ce4a75203df47647aed3dcb9f77b",
+          "status": "counted"
+        },
+        {
+          "bytes": 40610,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 5,
+          "sha256": "fbb1565b99e115984b59555730b173211b7e31f04309a5f68c8d0a1714726644",
+          "status": "counted"
+        },
+        {
+          "bytes": 252504,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 19,
+          "sha256": "0b8f7f61be8d1603ce481e27623bead2bb916c7987b8155f3c325d329c76797e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 54387,
+      "path": "test-data/ooxml/xlsx/Tables.xlsx",
+      "sha256": "3402bd6406a6ef32c3b88c45decb820f0ca797a8d971007f869b5ad3743bcbc8",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 10614,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 11,
+          "sha256": "2372a9fd4de843e5fe3316819bbf1c333eb5523ced8f7150536a600853c4e27b",
+          "status": "counted"
+        },
+        {
+          "bytes": 14573,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 14,
+          "sha256": "677b1545a16f35ece4cb3c6915de8c162af7d7c987e1c7a88297ada2a784ee97",
+          "status": "counted"
+        },
+        {
+          "bytes": 14833,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 13,
+          "sha256": "38fe42cb126eee9321f61da27bbe328e89433fd87e4954c7bcf368b19aad0e43",
+          "status": "counted"
+        },
+        {
+          "bytes": 10085,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 11,
+          "sha256": "cca249f7cac7a36712aba57eee40ddb1c3a53148ee86cb1bbe0d802d4a03ac6d",
+          "status": "counted"
+        },
+        {
+          "bytes": 9256,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet12.xml",
+          "records": 10,
+          "sha256": "888572130e11db23e649abddc62dea97ffa8324ac2509df74c7197644237574a",
+          "status": "counted"
+        },
+        {
+          "bytes": 11797,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet11.xml",
+          "records": 12,
+          "sha256": "32e970f779b7ea539711bfc4bf7e91c1a59252a1cffca2a63adf76780d137c86",
+          "status": "counted"
+        },
+        {
+          "bytes": 10558,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet10.xml",
+          "records": 11,
+          "sha256": "82eef85fe3e1ab6bea1daac75d1eb67ff28b18e439aea9355480dea75aa952e9",
+          "status": "counted"
+        },
+        {
+          "bytes": 9470,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet9.xml",
+          "records": 10,
+          "sha256": "b6aa969fed2a8bd36ec890307e9cf2770dea278ff3eeae4cea5bf04e13c533d3",
+          "status": "counted"
+        },
+        {
+          "bytes": 9901,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet8.xml",
+          "records": 10,
+          "sha256": "0e9a5fdc699bc3aea0c36f8c2ffda81d56a1cc93430065e2b578bf64496ab4e4",
+          "status": "counted"
+        },
+        {
+          "bytes": 10328,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 10,
+          "sha256": "c007e1807ab1ee58a95fd1762ece3b31fe655d536fb473a82a07baebabd3c9cc",
+          "status": "counted"
+        },
+        {
+          "bytes": 15315,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 14,
+          "sha256": "aa89b54f5fb28717202275d00f95372c1862e5e97e9d073fd06a3e2572d57cee",
+          "status": "counted"
+        },
+        {
+          "bytes": 14394,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet7.xml",
+          "records": 13,
+          "sha256": "5310937e9bd8b4e020b8b9d728a77553e0e22e5da5375054d82f75b003f2bfef",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11359,
+      "path": "test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx",
+      "sha256": "bf6ac00bcc85e46c38eec0e643727fc8d3e55b2cc7c8e37e5972fa9f1c1373be",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 954,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "19d51f2e4bbc09662bd27a693a62c17187776735084cc3d0b7fc7cb99f7c5715",
+          "status": "counted"
+        },
+        {
+          "bytes": 1152,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 1,
+          "sha256": "52a61371233910c12bafd02df1c1dd7797bae5c60fc420d8b71110354f3a2474",
+          "status": "counted"
+        },
+        {
+          "bytes": 954,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "14572d896f95ad8822d5cadaf0449cd9dbb8ab6b4b7e345cc43f1955ba0be18f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9531,
+      "path": "test-data/ooxml/xlsx/TextColor.xlsx",
+      "sha256": "6be1ba592a6492f48b01f4aca3cb1ed66b24d6875da7dee5e25fe3eaf4826bdf",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 919,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "ae55294401238ee2209aa01ef26fcd4965aafd0fa1e84a56cfb16542d357f31c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7938,
+      "path": "test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx",
+      "sha256": "62f83686811614842efe4606d07669fd3c70b8ed8c8ff1459c2c329c802a2e59",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 636,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "996cf299f52c4a0440e91dd74010b977d1779d5d5d2be52085534a564cbdc091",
+          "status": "counted"
+        },
+        {
+          "bytes": 652,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8e9059613ec9086bdceeb6769117b1198996fc37e52256ea41d16e2a86f98724",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7962,
+      "path": "test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx",
+      "sha256": "3e9749837cac5a19a7628d7e60c1a1c6d0ff7657f27fa7904b217b96e0dc534f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 652,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "0ed167749837a9cf245ee854be123a815b1629af3268b09d7c0a923f6476da17",
+          "status": "counted"
+        },
+        {
+          "bytes": 636,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "a54c00701d9ceafacc1229089d36a81ab028004e17f410ee9db5856523998bbe",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10750,
+      "path": "test-data/ooxml/xlsx/autofilter-colors-fg.xlsx",
+      "sha256": "9bc60d29e03245b0ec94233986eccf0cf6a78d898fbfcd3685024fb445ee5424",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2645,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "6a5f063689418214500630cae76acc95a7c91be7320423a3a20838e67f981b2e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10708,
+      "path": "test-data/ooxml/xlsx/autofilter-colors.xlsx",
+      "sha256": "cf1d66e64140eae397debf0c0adc78a4a27dea23c83df8e5cf71bdc6461fd6dd",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2606,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "47f9a875f12b49d4852b641a0d58c6b78ea9075fd9790670b2335bdbdd25ecad",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 6299,
+      "path": "test-data/ooxml/xlsx/autofilter.xlsx",
+      "sha256": "fcd5b6599e2c25cbe5aa7f89f44ffeaaf72e6240b51be0d4bd4c22ae0bcde7f4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3053,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "9fa80f65f960bbd4af2fd537ced68ea9658d13b9dc9d449859cdfc47693bc3c9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9685,
+      "path": "test-data/ooxml/xlsx/autofilternamedrange.xlsx",
+      "sha256": "8f7a17a5dfbd6cbf6b1045288d5fcfead31e84ca74329bd7e7cd6e74b4db6e44",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1913,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "79adec7ab5df9f2ff998a8d6b85b8ea083dfbab83a02446d219a735a4423da15",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 20972,
+      "path": "test-data/ooxml/xlsx/cell-borders.xlsx",
+      "sha256": "edd882ecf3faaea2950c95d347a22b907918e6e2f883891cdfac8945778c4df7",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 681,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "c3d5e34ac7be2063f708acc776fa090ff85159c6608eb0d823ddfe18bcf0dd43",
+          "status": "counted"
+        },
+        {
+          "bytes": 681,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "1f17a4c4f7e3c574d8e037f87c9fab260f493e3aaa73ff451b1752c78ee06a04",
+          "status": "counted"
+        },
+        {
+          "bytes": 3027,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "1f27c0a37929dca55c6f72201a4bc77c2cefab86e137bd0751f20380bd072344",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9144,
+      "path": "test-data/ooxml/xlsx/cell-multi-line.xlsx",
+      "sha256": "22fde6cac256b6755e2eca37f43c46b2ea04e86a5bbeef589d966f5ba2799575",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1001,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "f3d28b92d5bcabbb4dc9819b750498cd91a8fa32cea88b200d94333a516b6199",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 21564,
+      "path": "test-data/ooxml/xlsx/chart_hyperlink.xlsx",
+      "sha256": "b6dc58cd4e3d357e429ffc1cf16cdea1bf909593f1fc8d939f0a5fbac8218b08",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "c62900baa5ac5a68824a3993ae36fde282b14da551b4a4eb02afff9c6e175d52",
+          "status": "counted"
+        },
+        {
+          "bytes": 1107,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e29f325af8a39cd479cbee0f36752705cbe12308762eb48de31b90b58eeed20b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 4646,
+      "path": "test-data/ooxml/xlsx/column_style.xlsx",
+      "sha256": "205c5f18325c6e804dba44958d2beddd5557d558f0d44a260f11092d57b79e84",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1722,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "fca9a5d3274f5f3e7182bee00ad43cc1aae04287c77e8f4b892585a4802ab389",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9347,
+      "path": "test-data/ooxml/xlsx/condFormat_cellis.xlsx",
+      "sha256": "fba4a6b3e19e77be3fd85882f280994b38296a162f181809cc9e5c274aaa43d4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 840,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "5ad380d8340aeff7bc60a41ed96f16610ef2455fb2f1a6eab85e208183bc74da",
+          "status": "counted"
+        },
+        {
+          "bytes": 1622,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "2c25cfed0d44a9d3c7857296cf16c8a2ca32f2b513b8137d41279ff8254f371b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8052,
+      "path": "test-data/ooxml/xlsx/condformat_databar.xlsx",
+      "sha256": "1fc73ba3547ddfde691bf7008c23d5c205107b0a44e173ce2e56f2c345ae87ec",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1722,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "48b8ecf94473d10da22641e79cfaa2af7951e77c9b259a9b2e099cccf7013b78",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8937,
+      "path": "test-data/ooxml/xlsx/condformat_theme_color.xlsx",
+      "sha256": "523f4157ea1103f5e24d10acb55fce729eb59da2d39aeba8f299ceb031436430",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1412,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "37d31ac4a3e9097aafb26a26d3bb4a76fe412a3c459f28db18e2580d2350e37f",
+          "status": "counted"
+        },
+        {
+          "bytes": 2224,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "4f3260079ce7c1c9ca9a12cb6ebe8d6132e314f4c3d25f3c11696d5d63237217",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10682,
+      "path": "test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx",
+      "sha256": "21e644459edc86e2d6c260d367a2cd42fca89b2f83da7a1b3a92115ff18368d7",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1140,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "4530b539f42fd4a4dd6e23216fc9bd8342fcf6b8a8ce7ecac88575de30500c04",
+          "status": "counted"
+        },
+        {
+          "bytes": 2551,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "147cdd75ef045b38872132274b475883251e4330856ad8d6f98849e4dd9a3a32",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9705,
+      "path": "test-data/ooxml/xlsx/conditional_fmt_origin.xlsx",
+      "sha256": "12a3a7241e225299181a7e3de9721015ee4adf319b144f5158dcef507d0af116",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1590,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "7d8343baadf9f02860635db523ec6c74c4baac3fe025d8e5270251555e43df67",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9487,
+      "path": "test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx",
+      "sha256": "2ee236b3134d0494f44fc122b59ba883762a87415a332a3bd1cb972f7e0fcb0d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1980,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "c9f16ce2ab6584b486df6daa4bf59a8f5fec4ba2ac08c7e1788c99d8edab4e31",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13282,
+      "path": "test-data/ooxml/xlsx/customxml.xlsx",
+      "sha256": "2ebad8b30f7c50d60cb511aa652faf968b90588ad52f0ef76d8135cc432f5168",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 23068,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "e8eacf9419091aa9bc5657f8139223723aeecbf8b9287e430657dc71e5d05bba",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9677,
+      "path": "test-data/ooxml/xlsx/decimal-format.xlsx",
+      "sha256": "077dc9ab231d3c1d29c2a3db305d3b499643d7cdf4c58cf8ecd75bcfe1dd2da7",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1045,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "085859067ec0d924242adb68c86353867956ac00ce45b19b49f6a2a789c86812",
+          "status": "counted"
+        },
+        {
+          "bytes": 873,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "840db8c5e0ec41856b9325839dc2764c73241c164024203818e1be8e129b39b4",
+          "status": "counted"
+        },
+        {
+          "bytes": 873,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "840db8c5e0ec41856b9325839dc2764c73241c164024203818e1be8e129b39b4",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 18756,
+      "path": "test-data/ooxml/xlsx/duplicate-defined-names.xlsx",
+      "sha256": "8efb54cb804b713ff5c2d8af2f730f1583b3fa06ea932a3f853a8385d806ea78",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 72386,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 10,
+          "sha256": "f9b922b164ca286980b5d7ac97166fe3804660c8fe555972c4ba038c7d7526bc",
+          "status": "counted"
+        },
+        {
+          "bytes": 3580,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "aa2365ab951353e95ee5eb5276a9887e8bb94108eb915f7b3c9e1214fc73997b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 5221,
+      "path": "test-data/ooxml/xlsx/empty.xlsx",
+      "sha256": "b8eb7e2482679660a4c10e39fd670a107658af56b6c83ef978dfd1db6950c0b9",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1617,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "a077fdb02b932537500ac7af29a23bf475e39a280d22460cf26ee069eef42a5b",
+          "status": "counted"
+        },
+        {
+          "bytes": 1772,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "69e3c5b30c57cd6b25d86e8e1dd2f3beef1e5d3077cff2e22814a883b1d5a5f5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8483,
+      "path": "test-data/ooxml/xlsx/enhanced-protection.xlsx",
+      "sha256": "2a8151eb9653172e350c214c755f820b6d9670b155f9593d41c1b258655bcd44",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2133,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8ce0e63f47e7686713a56b656863c69bb40704c7cf77baa327eb4790b650fe0e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 44267,
+      "path": "test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx",
+      "sha256": "0b81c9c80a7d1c72634bed36b596da7f0059c109fe1f44e00b56562307423217",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4552,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 15,
+          "sha256": "4bbcf8b296a2b080cfde48669a3e76733bfca4bd28f9ce5039fb331381e151f3",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 15018,
+      "path": "test-data/ooxml/xlsx/external-link-path-missing.xlsx",
+      "sha256": "f8b6bc5bec25f6c75ffb42f47c17390a29a001de5acb0bbc6f3c44c2d891b720",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1586,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "c9a75005269cce75e3527afaa15310fc1dbeb728f7cab9808fd9b60a49d01e9b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11076,
+      "path": "test-data/ooxml/xlsx/external-link-path-startup.xlsx",
+      "sha256": "e06155747da482bfb7c1ac5f0ab3a80cbe5b510e664926709c356ba6b59e9bc4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 7467,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 20,
+          "sha256": "59be58ed4f0b641998b638591a780919047da035af8ae557ac2d2f994545d994",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9883,
+      "path": "test-data/ooxml/xlsx/fontSize.xlsx",
+      "sha256": "45aed8b5b012ef17cf540772af6c6face2e5dd7561738ead84ec585bdbb58539",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 673,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "2936f9c166990424abd831e31c4a40d266323866eaed228044038efd912257e9",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 779,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "ad0eac932345eeadef718810add6b50c5ad20114ee0d8d047e1b6257bb2d0052",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9295,
+      "path": "test-data/ooxml/xlsx/formats.xlsx",
+      "sha256": "7bc3a117aa8f74fa1093376581fec69a0128415f60474455ae27c5ad2440f3f3",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3272,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "73bd4f6b6f35266019f24e82908f09f072bc6fb1ff302b3e03701b53211a9583",
+          "status": "counted"
+        },
+        {
+          "bytes": 3736,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 1,
+          "sha256": "fdb73380cd9e311ae6c9c758b92e0f7f3328e143d470387e7c3e375b7f221a37",
+          "status": "counted"
+        },
+        {
+          "bytes": 1838,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 1,
+          "sha256": "55ee430aacdb580293d55a2db4375924f83c9e13225800d5987c233d647bf87d",
+          "status": "counted"
+        },
+        {
+          "bytes": 2957,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "2ad4bc22f637b3c3cfd33421bb60c92c86e6cff094fcfbeb69cf289d640eb519",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 27484,
+      "path": "test-data/ooxml/xlsx/headerFooterTest.xlsx",
+      "sha256": "db7483ac7bc96d071db57ec6239d2c1b8593a5ef3c7f5b7418df0309753c1fe2",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1520,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "9131c15356e8408d14b329f9e8e7e1208fc94aab8db99656a8b85849f1347fa8",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9833,
+      "path": "test-data/ooxml/xlsx/hyperlink.xlsx",
+      "sha256": "8693ab165bdfa767f071596ff29368ccc4771c5f0c1ef1a1fe81aa4f9524e2d6",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 680,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "32b3879e7c4980cef0843e2dd75f205cc25c63c327404a93991d4bf1a11605e2",
+          "status": "counted"
+        },
+        {
+          "bytes": 718,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "3dab25814e82d823303efd568ca19edd79b9aa7e6be47eeb0e76ba3ce2e68ae5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9100,
+      "path": "test-data/ooxml/xlsx/hyperlink_export.xlsx",
+      "sha256": "86709af721efb7b0d8293359032435dcb48b4a330d2d17b60f1bf079853b0c80",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1156,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "ae396a206e63c3ad1f4570cd98f2ee6fa40176f16e5a026e2c11d2631bd2cc1a",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9472,
+      "path": "test-data/ooxml/xlsx/hyperlink_formula.xlsx",
+      "sha256": "b274b5c39ef21247ea0c4076c5f9f15153428e0b134f6e28fdb3074a96c2fb3a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1349,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "1d7fc8b1a0caae2aaec66ce0de8e606ae22bd88afc16557e7b0445ccf4363063",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9068,
+      "path": "test-data/ooxml/xlsx/hyperlinks.xlsx",
+      "sha256": "246be6934c5bf339f3d2fafd253347b1eca963fe137af17442049dcff6f30061",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 517,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "4b6023516bed9e53f82a968ee77da2495ab4cebe88bce30a06303066b3602848",
+          "status": "counted"
+        },
+        {
+          "bytes": 1513,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "1399e65dcd42d5228b280ad80a2b015bd0f53089eb266f351eecde892ed783ca",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 5664,
+      "path": "test-data/ooxml/xlsx/named-ranges-global.xlsx",
+      "sha256": "8fe1f4a558fe51bf5807aff77c0fe6c6f6581bad395a9ee1f01d1fe016e87bfa",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2950,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 2,
+          "sha256": "5ddb0dc5ff23d2b1593a58f59b51eed17e8cf3e2185a4086064e883fa2f755fc",
+          "status": "counted"
+        },
+        {
+          "bytes": 2725,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "89dc98ebfd5ec80d61117f6767d177f14057ed14020b8fb2e2292c4057ed5a20",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8959,
+      "path": "test-data/ooxml/xlsx/named-ranges-hidden.xlsx",
+      "sha256": "b75f70ff0effa118fa3d4648369fb7167b20db35e5599fd52bddb238fefe5190",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1345,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "27a69918ef9c295f6ac27ae78e4bb9079b5fcf430bf6b85c725b71bc031ea7c5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7820,
+      "path": "test-data/ooxml/xlsx/noSharedStringTable.xlsx",
+      "sha256": "2aa358a1ab04cfffca6d13d827e4a5e12aea8376cdefc3a6e93575ce365d8ab6",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 882,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "90bdab079d7d7b17b45af80ef8b218a4d623729e2ed7d1dc164097e0186f2a46",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12348,
+      "path": "test-data/ooxml/xlsx/sample.xlsx",
+      "sha256": "7c88883ea9ff72d8f90239cb1a5f5d9744014b611d9b1588a090ba7629a381de",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 985,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "0a2681fdfbf2374c601b49bf3d799e3c7b53a3aa0e6bc339614305b1be457436",
+          "status": "counted"
+        },
+        {
+          "bytes": 486,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3877e4e3ecd8fa3905135c592405fe5603aa38a2bd0ad62a8296d7855bcc4375",
+          "status": "counted"
+        },
+        {
+          "bytes": 1348,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e7981917160ee5ca468ebeffccc65b18faf9df84882c13f73638edf9feab3e85",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 6266,
+      "path": "test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx",
+      "sha256": "c3c025bed1736a240e0e91960aaaaebd795d95b54a7b977c2e451406aa1f9462",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2736,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "bb04dfc6e1d6803d46b616ae4ff48b7a6a57654c4e363424809bd8921b111df5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10137,
+      "path": "test-data/ooxml/xlsx/shared_formulas.xlsx",
+      "sha256": "31612d513b5ea5aaa69764779f87ac52588687770f3ccbf4b420ec21bc70561f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 5854,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "c8bd13341f5784129db54093e37c8b26430bc31c552584fdf78bc78c6352372e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9080,
+      "path": "test-data/ooxml/xlsx/sharedhyperlink.xlsx",
+      "sha256": "91329edc5d293926c0294b6443449d90b3ac9d53a174c2f5c4d9e59ecea8fc73",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1801,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "2bd0c15e693d25533cf67e22befb3bb0468c77616df0250e4dd446609c96ccb1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9425,
+      "path": "test-data/ooxml/xlsx/sheet-names.xlsx",
+      "sha256": "e768518ed6161ec4698e6a24506fc71ce2ebf56b0a2fa5d9dd352b2dfb5f47ec",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 644,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 0,
+          "sha256": "017691e691072a3fbc78493f238643a83377d949e2107babd0083995dad93a15",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 26753,
+      "path": "test-data/ooxml/xlsx/sheet-state-show.xlsx",
+      "sha256": "fa968f9b8a2f80254699ebde87f59b61c3fa746834e711570f233d43952dc163",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 91187,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "39959ce22e796e051a422a826e1518d797d13383eefc368c0e1e22a48593065f",
+          "status": "counted"
+        },
+        {
+          "bytes": 31394,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 17,
+          "sha256": "9d6878f3bf6f7a09eddf8a3d57a04187355182d93e693c38f14720f18bc08edd",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8408,
+      "path": "test-data/ooxml/xlsx/sheet-tab-color.xlsx",
+      "sha256": "5501d6ae93866d0425aadbab74443bee6146533182b7ceb90c620ab6de55d39f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 536,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 0,
+          "sha256": "779912f589cfbb7a9b9c3b399af8d52f7ec6e8bf26f7c34e09f47c96d6445cb3",
+          "status": "counted"
+        },
+        {
+          "bytes": 484,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "00a89972a9ea033050238ef74c8ef3d9c1a77fca9c38ad99b34a652be8495a2a",
+          "status": "counted"
+        },
+        {
+          "bytes": 484,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b3ee981e46e767159f2554b601da62a6dc673859d6e1c94b9f58145271ed180d",
+          "status": "counted"
+        },
+        {
+          "bytes": 500,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "2f18d626722334df0568f9a54ba88402ff11f4a70159a875b7b734149fadbda9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7871,
+      "path": "test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx",
+      "sha256": "ea89db75ac2ab78d1dced2ccd6f57d8ad200f015ac9e49b988f1a9df2fc36d83",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 555,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "81b5cb7b1ef96cf9cf55eddbe200901814da358f969b9611d97ce5256a178b93",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 28728,
+      "path": "test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx",
+      "sha256": "36d855f2915a60424c9d38dc8f53ab7021664f10672c66c79777d4b7ee78484a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1182,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "dad735d107bed984f07ae00398912eb1716fe861668199a5881621a8f581a498",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8993,
+      "path": "test-data/ooxml/xlsx/sortconditionref.xlsx",
+      "sha256": "40accc003c5b305b3adef414f8b13a9ec6b1ecb0f97d54305e00005480f81c0c",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1579,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "ef058328cc33c69a22fbb5b0779d408f8ee98815aeb7531ced678e96f48cc991",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 14816,
+      "path": "test-data/ooxml/xlsx/sortconditionref2.xlsx",
+      "sha256": "fe574ac4fe70f4edbd355b6042c0945e23df112f3de0db51588c6e3e7db72944",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 20951,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "c0f84ce31b74541fbecd07a3cb6331a1ef88ff00ad826a5868e15bc9a140f105",
+          "status": "counted"
+        },
+        {
+          "bytes": 21128,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 6,
+          "sha256": "aa6f6c9701f8f89645e99edf786bb1cca1f833a1d8aa8e305d2d680def660e13",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10103,
+      "path": "test-data/ooxml/xlsx/style-alternate-content.xlsx",
+      "sha256": "43dd13d6bd6c4683aeea8f5baee8d0abb75e788986819a3debf3690e9d1b26ad",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 6420,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 9,
+          "sha256": "58065a92fa0f9ab64e7e9658b70ed7b75bd0c1cb432c0f9b39144ab36bed2e9f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9309,
+      "path": "test-data/ooxml/xlsx/styles.xlsx",
+      "sha256": "4b544c197c391a8eb1711e9c6a962fd6371a96815dded21aa2461d71e27a046c",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 651,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "0dee27eec24f0a6b9efe8c292424e7d95d7e070440b8a7fcd521cfb90dbec926",
+          "status": "counted"
+        },
+        {
+          "bytes": 651,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 1,
+          "sha256": "0dee27eec24f0a6b9efe8c292424e7d95d7e070440b8a7fcd521cfb90dbec926",
+          "status": "counted"
+        },
+        {
+          "bytes": 2014,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "dfdad51edcc2cc1cd1adfd854f7cdbc7cb5e5c7753a572eb187451894e0b6c87",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10595,
+      "path": "test-data/ooxml/xlsx/table-sample.xlsx",
+      "sha256": "d43a2c85e8f91c100a62f0ed0006789604ff818f017dd3be90e10a1af2093462",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2931,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "0b383e5639bd5f6b2dcb67f9587180927f4210920bb9685e67a144ab212a6f6f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10899,
+      "path": "test-data/ooxml/xlsx/tableStyle.xlsx",
+      "sha256": "494f76f9c9fa63f1980b7a250bbfcf6f8df7fb0b1cd5528307deef1b0b5b6cb8",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2022,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "c8396d3755dedbb5e17f7fd851ca2f8781f89b35fd3bac780eef722e691d86f4",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10203,
+      "path": "test-data/ooxml/xlsx/test_conditional_formatting.xlsx",
+      "sha256": "dca9ea05ea5cf2a52941e10c1e1ce44ee2416b309771b5e93ae6fdb625010ebe",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2162,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "18aeac8c25f10dfcb5937513f34bb460388ab95faff764a799a16e6cce9e35c0",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 7296,
+      "path": "test-data/ooxml/xlsx/universal-content.xlsx",
+      "sha256": "2ea90a5abfba7b6fb4f46a9dfdacef244dff1809620d6064a7e08314f6d09a18",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1553,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "2548861700fa4828e489cbd6a3c11dc9b297d000f698a85a159a36b9abb6ae5b",
+          "status": "counted"
+        },
+        {
+          "bytes": 2496,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "19d94cbd96847043e55411eedcfad85f1510c80479e1381f262eb68058202c95",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13583,
+      "path": "test-data/poi/test-data/openxml4j/50154.xlsx",
+      "sha256": "7c3f5f0907f198561933d05eb7c4fea1a8298e39fa7855b16e10d0e83ee1c399",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 442,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 0,
+          "sha256": "b2532be43b63e75e3cc369ccf113231cb2377d7a5b24b14919d1bd5be29369d2",
+          "status": "counted"
+        },
+        {
+          "bytes": 442,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "b2532be43b63e75e3cc369ccf113231cb2377d7a5b24b14919d1bd5be29369d2",
+          "status": "counted"
+        },
+        {
+          "bytes": 889,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "7fb471e38d7b3d6c2b8475659d3955fe18e4fe2c97de9dbc5e5000c401d129a7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1347,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "98c76fd8199f6fa77ecaad6b05b7e695b4ca5948000ab2e34492059122d9a195",
+          "status": "counted"
+        },
+        {
+          "bytes": 442,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 0,
+          "sha256": "b2532be43b63e75e3cc369ccf113231cb2377d7a5b24b14919d1bd5be29369d2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11483,
+      "path": "test-data/poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx",
+      "sha256": "ef6f55efd603dab8e762dcd35c695854ff4acce3ca1cf94e4dc6687617b81a5e",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1348,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e7981917160ee5ca468ebeffccc65b18faf9df84882c13f73638edf9feab3e85",
+          "status": "counted"
+        },
+        {
+          "bytes": 486,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3877e4e3ecd8fa3905135c592405fe5603aa38a2bd0ad62a8296d7855bcc4375",
+          "status": "counted"
+        },
+        {
+          "bytes": 486,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3877e4e3ecd8fa3905135c592405fe5603aa38a2bd0ad62a8296d7855bcc4375",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 40213,
+      "path": "test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx",
+      "sha256": "f1096655276b5cb2301c830f190017499b4e5a6aefb113cff434868b85178e7a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 9827,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 6,
+          "sha256": "ef62d1b2efe8d3af2e0cda6eacdbb78766bc380ab17bc6444c5b3051b8d7da2e",
+          "status": "counted"
+        },
+        {
+          "bytes": 9149,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 6,
+          "sha256": "c4315a75d48d763d4f0c94e6b76e1d5b83d89fe8024880fd0a4999c4c529509c",
+          "status": "counted"
+        },
+        {
+          "bytes": 3120,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 4,
+          "sha256": "39cfce8e55192646948f71ca253cee79aa6186a3d7598ae8ec61f166ab4970ea",
+          "status": "counted"
+        },
+        {
+          "bytes": 6128,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "edc08eeba7f5f3764e8d25d74b76cb56c4dcafdd870abb6dfa3b5ddb9860594c",
+          "status": "counted"
+        },
+        {
+          "bytes": 10848,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 8,
+          "sha256": "c4203ceb373f3b2e94f24738a20af338926f93259707f08018e0d9de2972ed7c",
+          "status": "counted"
+        },
+        {
+          "bytes": 3484,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 4,
+          "sha256": "d778066c3089b1649aea76ecc8b3fd1afb83f2bd36898add91bf983b820c4871",
+          "status": "counted"
+        },
+        {
+          "bytes": 4403,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet7.xml",
+          "records": 7,
+          "sha256": "3667099b9f72aa93b0cdd190ff6cddaab17f037e36f2f4f0862c6a1ede2b6808",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 57465,
+      "path": "test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx",
+      "sha256": "6b462fff66e6228e590cec586077886b5aa81e6908612dfab79218d027ab7989",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 29035,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 12,
+          "sha256": "9d0b6fbb5cac81cd8a419a79bd24177cb7bb54a0c2744d57c86f56626c76ce57",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 57471,
+      "path": "test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx",
+      "sha256": "5e9a5cc4f70614fa4db4b8d87718f0e1bf6110e26046af251db8dc62a22ae7eb",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 29035,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 12,
+          "sha256": "88616e7473a8c3356d0b3b92425ead9bbeab46a18947d35311f57c247d37386b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 3555,
+      "path": "test-data/poi/test-data/spreadsheet/47889.xlsx",
+      "sha256": "a6d7f8a056622201862c354bd508820f7e57a84c5e2531e4e4da20180615f312",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1681,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "4c75edc195c375ad4161771691237425e0b5f904eea471f606c134ce7da2bff7",
+          "status": "counted"
+        },
+        {
+          "bytes": 781,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "f0e4f581ac151f278dfbe7543eebc274afe6079815b3b31607d8e879e48862e5",
+          "status": "counted"
+        },
+        {
+          "bytes": 781,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "f0e4f581ac151f278dfbe7543eebc274afe6079815b3b31607d8e879e48862e5",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 50260,
+      "path": "test-data/poi/test-data/spreadsheet/48962.xlsx",
+      "sha256": "58a34dbdf0233db433aec6b8ddfacc47f4a5e59ecc2013e8ec56a7b8dd2d2044",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 4889,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 6,
+          "sha256": "ca976d38d38b4cab555fbb520fd9b6b797b88112b3c7c97f637f39a9b001b4d4",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 105424,
+      "path": "test-data/poi/test-data/spreadsheet/49609.xlsx",
+      "sha256": "4237e7a06cfba518904fac9d2085bc38c4912290c9c698acd38234b86691c546",
+      "status": "inspected",
+      "worksheets": []
+    },
+    {
+      "bytes": 9150,
+      "path": "test-data/poi/test-data/spreadsheet/54071.xlsx",
+      "sha256": "627e4e6c512bf12a66856749070d03f1ea51936192d57b9077568bbf9c9c09a1",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2897,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8523ad62c5fad9807b1e09916d25815618e9ecbd044330f9244a02e3ba474f37",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10345,
+      "path": "test-data/poi/test-data/spreadsheet/56169.xlsx",
+      "sha256": "58321b693403c75286a8898b0427dd2b672f9a4cc29bb5972fae3a926e104278",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "5c9600c3d103adec98f391f54a5c19e1474e03ecb6c784399c173355ba0ca7a2",
+          "status": "counted"
+        },
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "5c9600c3d103adec98f391f54a5c19e1474e03ecb6c784399c173355ba0ca7a2",
+          "status": "counted"
+        },
+        {
+          "bytes": 941,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "fc91a8bb824fc06d0b35dc636ef8c537d5513c46654f3c0faf95f7646bc133d1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9111,
+      "path": "test-data/poi/test-data/spreadsheet/58106.xlsx",
+      "sha256": "88c0e478f174b166190abfd0cf416a033d03252049a998441b98f9841613761f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 3597,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "1ae7e3207c42eaffaceda189fb81f120fbedc7853d0ec20f57ee61fa22980ac7",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8570,
+      "path": "test-data/poi/test-data/spreadsheet/60289.xlsx",
+      "sha256": "1b9826bf19b72647a212be454a8ad9808c71df82b026d1cdc9247544386a7ece",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 758,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "f99b035838b8c91e21a47cf6c6e69a464db167999adb6ead5ab649a939a8517d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8224,
+      "path": "test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx",
+      "sha256": "9d57919aa4f6036fb922daba5d1dc913a8847581fd9a3dd3c4d79bca7d28bdb8",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1521,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "c18d3518144b7fa44e70f54bd5b2a2f8f31064d8e6a17abcb9b6ef4b25fe879c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9629,
+      "path": "test-data/poi/test-data/spreadsheet/62834.xlsx",
+      "sha256": "e6984c58eba3d0746303c64fc4db73462ea1b6e5a4960e3c3dc550b64ddb0b42",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1874,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "3b87ba86859729ccf1391f19f835e1e504b369dc0340237a65be3e81cdee812f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 4753,
+      "path": "test-data/poi/test-data/spreadsheet/66365.xlsx",
+      "sha256": "244452f8198102b2191646cca864afdf243620c95988869f31c82ac2fc8be6b8",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1150,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "10b82380f7e7ee92b211b4f40ceedfc99b97bf1cd6ab1cea76c7695120ae1c4a",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9480,
+      "path": "test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx",
+      "sha256": "8996c5807a831043b6b457d6de6f748e46fdf66aa434a5b6a92ef0d87343db1d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "c62900baa5ac5a68824a3993ae36fde282b14da551b4a4eb02afff9c6e175d52",
+          "status": "counted"
+        },
+        {
+          "bytes": 630,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "c62900baa5ac5a68824a3993ae36fde282b14da551b4a4eb02afff9c6e175d52",
+          "status": "counted"
+        },
+        {
+          "bytes": 914,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "47c96910aadc9e517827f65331cef7cf78acc34ff29bb6cfc9897c768b782524",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 654688,
+      "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx",
+      "sha256": "8dfa997a642c00a1da8c0750c371f204553a98c537ca046028b052f9b424a074",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 28807,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 324,
+          "sha256": "1fed42fc9851c9e429cd77b9476be8f4729ec16fb0f978e62b44111abd51cb8d",
+          "status": "counted"
+        },
+        {
+          "bytes": 28684,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 320,
+          "sha256": "fce34e425ee862ac88710e8f2d5695cfb88994c7532bf288fe47884a851b8fd7",
+          "status": "counted"
+        },
+        {
+          "bytes": 29535,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 325,
+          "sha256": "bf2a909af50234fc7ab4ef7e6bb12598d1f0ca166cc9b4ac3de6d172d2752dc3",
+          "status": "counted"
+        },
+        {
+          "bytes": 4381,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "40f945c16aeba08c6482cef8e57151b902d479337e2fc57f1004ec5ddddf4993",
+          "status": "counted"
+        },
+        {
+          "bytes": 10318,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet18.xml",
+          "records": 10,
+          "sha256": "8fb1b883bfddd98e32a08bf8aea5318194f713d2e116b2132050e6cf9b1a704d",
+          "status": "counted"
+        },
+        {
+          "bytes": 29485,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet17.xml",
+          "records": 323,
+          "sha256": "6d20ff17acdfcf27370e595d712fb0224eb865fa5e74259d9f359458b14902ec",
+          "status": "counted"
+        },
+        {
+          "bytes": 3662,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet9.xml",
+          "records": 4,
+          "sha256": "e868438d4593c47b3664be11c92d4ce6cc60fe22def23a15074fa01c8e10b3a9",
+          "status": "counted"
+        },
+        {
+          "bytes": 3997,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet8.xml",
+          "records": 2,
+          "sha256": "88fb269917d6188f959c366b3aec224873a61036ca5a66fc7bf7862eb43eedf3",
+          "status": "counted"
+        },
+        {
+          "bytes": 28171,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet7.xml",
+          "records": 284,
+          "sha256": "cf011a5c51b392d9976a2f9b48df9ea4f8fafd1655ee26134c57dddb67eb4a66",
+          "status": "counted"
+        },
+        {
+          "bytes": 7990,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 8,
+          "sha256": "93f18c43ec36cdcc23a3bdc0d139618c7ecd866ad47ed017d16b736924c41e7b",
+          "status": "counted"
+        },
+        {
+          "bytes": 4127,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 6,
+          "sha256": "0765d0c8400d9bff15779eb1de1921050432ec5127f0b216f0e802bb0eb3b325",
+          "status": "counted"
+        },
+        {
+          "bytes": 2884,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet10.xml",
+          "records": 2,
+          "sha256": "a03e943bcac3bc34b960aca56b57b7235ccea7828fb79375916c32de3e00a528",
+          "status": "counted"
+        },
+        {
+          "bytes": 2896,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet11.xml",
+          "records": 2,
+          "sha256": "d8d28ecb30ede6f06ae10260c25285f6eec0c3628f4e61e46d1bb06576e0f87c",
+          "status": "counted"
+        },
+        {
+          "bytes": 2854,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet12.xml",
+          "records": 2,
+          "sha256": "d9ff9de8e9d6c65c5188fc7210e1d6c9bbee2363d4be56c1d64a0d98f05b9418",
+          "status": "counted"
+        },
+        {
+          "bytes": 9768,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet16.xml",
+          "records": 7,
+          "sha256": "c5c59a332bc2a78c667cf9135f997dec64096f49c6c88a4973cf7a26d8a2554f",
+          "status": "counted"
+        },
+        {
+          "bytes": 13756,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet15.xml",
+          "records": 10,
+          "sha256": "8747d42a7cdfbbd05ed3953579d558e11d0901da25a7530ef276a2bb8310a10c",
+          "status": "counted"
+        },
+        {
+          "bytes": 12157,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet14.xml",
+          "records": 7,
+          "sha256": "8eb1e052c3f57ae6daef89550d448b366ff4b697a1fbbf3f74900932c67998e5",
+          "status": "counted"
+        },
+        {
+          "bytes": 16674,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet13.xml",
+          "records": 9,
+          "sha256": "c60c85013cb37e22607259dcb4e72e9494bb0972ed7f64bf0146eb7978df16ab",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9906,
+      "path": "test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx",
+      "sha256": "6a5fbb160c7c9c2add5125ac07ceaf3f841d40e03d5c75025ab71946d49af289",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 1455,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "9935d8d8dac93a8f6f3e6a3e584f255f7a41f892d14871227ba5207d80441b1b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13679,
+      "path": "test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx",
+      "sha256": "ea5706d9afc031a8c2afef880559483bad30ab2c18e2857aca5f3cfaa74decf4",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 10392,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "2fded8107603ba277f13191249359d7450faabe2d63d707bf965df276125faa2",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 3286,
+      "path": "test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx",
+      "sha256": "25785bbdbfe495db4bddbdb578b0239faa1715d40ede2b6003776e0a75a9a15a",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 862,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "907f83978554bc27efa7353efb4b562ce5a7e668be18848f2fc2a3a145ac24d9",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10705,
+      "path": "test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx",
+      "sha256": "8066b12c878d74aa35b55b22dc9daba9a56e91332a35cf96c4fc0f6af6bd3bd1",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 15597,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "8448fd24a5bbf2f12725814f0de6b8bed8d87da3ae417a1c4d47b991aa46cdbe",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 19460,
+      "path": "test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx",
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2002,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "bfd0b14a3d3e9a17197a8675cb29921649b42b13a493c73b6846806e35f34c62",
+          "status": "counted"
+        },
+        {
+          "bytes": 2112,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 4,
+          "sha256": "98f69bc7850c284840f9e78e374e361c83cbaa74beb97ab8347c0bfcd05a69be",
+          "status": "counted"
+        },
+        {
+          "bytes": 1772,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 2,
+          "sha256": "57424cb42a3cd19bff70a260427e8043ed37b9320e8aaf48425b7b0ecdca755d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 47318,
+      "path": "test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx",
+      "sha256": "e9c4515c22be30487a9ce3c081e74cf58b5143aa42b6dc07e891aa261066fa98",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 209931,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 7,
+          "sha256": "5eb91ac80d41a18a7c0910c378261a1ec319a1160cac4fce1fc04e02ef862b29",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 11590,
+      "path": "test-data/poi/test-data/spreadsheet/FormatKM.xlsx",
+      "sha256": "ab5b08e968898f40477c2599dab9285c4557e6f212f3b942011e6588018244e0",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 4252,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 4,
+          "sha256": "79fd262b6728a091af605b76dbd8b4bf807ede5cefa222a0fe572bc633cfad0b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 325446,
+      "path": "test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx",
+      "sha256": "09af82b9abae2ffcff04777b69cbb23dfd15df788426153bcfa1e9359c3552be",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 7848,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 1,
+          "sha256": "aed9087a39fad1b0b327de8455be9a732978d23495a9ee5b625f2f6f2ba3a744",
+          "status": "counted"
+        },
+        {
+          "bytes": 1558391,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 14,
+          "sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+          "status": "counted"
+        },
+        {
+          "bytes": 455209,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 8,
+          "sha256": "1727aa57c9c3c621347e47f7e31cbaeb51b5ce4a75203df47647aed3dcb9f77b",
+          "status": "counted"
+        },
+        {
+          "bytes": 40610,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 5,
+          "sha256": "fbb1565b99e115984b59555730b173211b7e31f04309a5f68c8d0a1714726644",
+          "status": "counted"
+        },
+        {
+          "bytes": 252504,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 19,
+          "sha256": "0b8f7f61be8d1603ce481e27623bead2bb916c7987b8155f3c325d329c76797e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8527,
+      "path": "test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx",
+      "sha256": "21f222c39b70fee2aad244b70a06123aa3bbd2e99ba29cfbc2ed157bcae095cd",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1523,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "af2875dcbb2e4b72785587912a7ea376d2d2a4d74febecfe689b1815054ef47b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 30333,
+      "path": "test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx",
+      "sha256": "792b9f21afdb6b8b1f82345864ee15d55c17a1b54d71c250e82c87304385d362",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3240,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet4.xml",
+          "records": 3,
+          "sha256": "ffeb185bf16bebf6108389417252d6808e0835374fd9f91c32b4a51bb8dc8876",
+          "status": "counted"
+        },
+        {
+          "bytes": 2387,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "2cad73f10e656336c697a5c1aaaa33c8a166864a70b6285d181036764186bc0e",
+          "status": "counted"
+        },
+        {
+          "bytes": 2998,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 9,
+          "sha256": "39a3b368295d78ab7d7c62ae7a8bc6a2859f3e0d6f0698f5846af83e4b6f99ef",
+          "status": "counted"
+        },
+        {
+          "bytes": 2805,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 3,
+          "sha256": "56390c04364dbc7f113178a80723cf2a2921800d4582c5b6f98c5e51c49f2363",
+          "status": "counted"
+        },
+        {
+          "bytes": 1944,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet6.xml",
+          "records": 3,
+          "sha256": "108e7b2d694b42c88c9722f8d5a94bdac5b4efb45f2f84d02107404ea4df9dda",
+          "status": "counted"
+        },
+        {
+          "bytes": 3437,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet5.xml",
+          "records": 3,
+          "sha256": "ccf44e3368ab781dd7c82b36a5421a397147637bdb2e2ec1cd1441a70aa0c3a6",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 23668,
+      "path": "test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx",
+      "sha256": "2bdaa7dbae4e739a5b1dc2654ccaeb15fe4d6a62cd47ab742db78100a7dcf9de",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 906,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "61e5dbbc3be3a3486bc6ea2334228da960518cc03d3c9eb2fd19a7d7a963898d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 49746,
+      "path": "test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx",
+      "sha256": "50a8f8c88c7308dd4a0b4eb61cd58fa34063243e62a22af7ffd5a59d34180f5b",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2495,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "4c49f0fadd6fe4d51065a5f4ba1a26e32be14934b7407b06c4434169bcadb5dc",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10795,
+      "path": "test-data/poi/test-data/spreadsheet/chart_sheet.xlsx",
+      "sha256": "93e2d8663bc1a6b7d961f2a74440953ecdaadb1a3f171960129b730f7c935d3e",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 780,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "1693b12b8c4be1284bede9d4098f93935a3241ab7599fce80586d7d1e658e914",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 19534,
+      "path": "test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx",
+      "sha256": "6f9372b9c67e932e79aec95dae15fcd05877eac289895537aee80ce9c2bd8b00",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3255,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 5,
+          "sha256": "0041f01acfb014ef6276754a99ff70ac476dfb77158a77fc0e85426f2e2d0ff5",
+          "status": "counted"
+        },
+        {
+          "bytes": 771,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "7d37248723007134fd3f5637cdd64e103a7eedf924ace32e06adfb508e6b5d83",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 116554,
+      "path": "test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx",
+      "sha256": "2a41971477de7c0af993a6a8bc3082145230ef04d087170797d167e563da84da",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 387968,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 27,
+          "sha256": "228ab448865100fe909c88a6248b68cc72f856b6aec8b63113e5db31e48ab021",
+          "status": "counted"
+        },
+        {
+          "bytes": 24756,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 14,
+          "sha256": "2edf730a69e17eeacf44f8374b7d7188fe6be4de93d69676e8c751a2262ac050",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 27484,
+      "path": "test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx",
+      "sha256": "db7483ac7bc96d071db57ec6239d2c1b8593a5ef3c7f5b7418df0309753c1fe2",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1520,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "9131c15356e8408d14b329f9e8e7e1208fc94aab8db99656a8b85849f1347fa8",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 4080,
+      "path": "test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx",
+      "sha256": "6e0e5c2aa3bf870cfeba03cb2350c312c639f2875b6501029d0bc134916b2361",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 480,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "a94d88287505e4bec2e338b6fa2d2609cad8e6af773ea91987eb8ab9c5703d5d",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 672414,
+      "path": "test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx",
+      "sha256": "53403358038a3c62ae2d1c4994a03a7c236015a1fcaad67e222588d6f43dec14",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 3382556,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 10,
+          "sha256": "41725c20c792bcc019c127f3c7620269efc9ab4899649721b6dbf550366e1ee1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 14478,
+      "path": "test-data/poi/test-data/spreadsheet/right-to-left.xlsx",
+      "sha256": "419ef388b20501009a8c546f20ca0371abac168389b556ba47c52f48f0e7f3b0",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1480,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "acff76957ed374e6ff89fbe309cf67d6ca3582c348fa0e1120161ffd4eaa69f7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1458,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 1,
+          "sha256": "54b5f7b4ae5a9ca353a9ed70af0a919c8c7b0ec170fc9a6c1b24569ac7a82449",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12348,
+      "path": "test-data/poi/test-data/spreadsheet/sample.xlsx",
+      "sha256": "7c88883ea9ff72d8f90239cb1a5f5d9744014b611d9b1588a090ba7629a381de",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 985,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "0a2681fdfbf2374c601b49bf3d799e3c7b53a3aa0e6bc339614305b1be457436",
+          "status": "counted"
+        },
+        {
+          "bytes": 486,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3877e4e3ecd8fa3905135c592405fe5603aa38a2bd0ad62a8296d7855bcc4375",
+          "status": "counted"
+        },
+        {
+          "bytes": 1348,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "e7981917160ee5ca468ebeffccc65b18faf9df84882c13f73638edf9feab3e85",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10137,
+      "path": "test-data/poi/test-data/spreadsheet/shared_formulas.xlsx",
+      "sha256": "31612d513b5ea5aaa69764779f87ac52588687770f3ccbf4b420ec21bc70561f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 5854,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "c8bd13341f5784129db54093e37c8b26430bc31c552584fdf78bc78c6352372e",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 10103,
+      "path": "test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx",
+      "sha256": "43dd13d6bd6c4683aeea8f5baee8d0abb75e788986819a3debf3690e9d1b26ad",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 6420,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 9,
+          "sha256": "58065a92fa0f9ab64e7e9658b70ed7b75bd0c1cb432c0f9b39144ab36bed2e9f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12428,
+      "path": "test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx",
+      "sha256": "95c54e12bc9a7a80191fe1c9e2df866f029913d4b0cf8136fc0f5a65a63758c6",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 14546,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 5,
+          "sha256": "b1da3bdf72d8de9fa0ace1d285b1d04a21b7d4397ef33bf2ed5c8421ac859769",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8889,
+      "path": "test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx",
+      "sha256": "c32169723f04c099700eca384550728a547aea1e969ff0cd50ff6071eaa847c0",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 1696,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "dac3d89293d30635a72a3a4085fcbfa26b242a88d9be1222be2a0f5ccb597a46",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9196,
+      "path": "test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx",
+      "sha256": "829b200dfdb5047764edd88201e565036ddeb45b70f0796e4b45dad5ada2666f",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1111,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 1,
+          "sha256": "77c275d9f83985a6dd50b8e50d634399348713bdc26de0025f70a04cda19dd8f",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 8171,
+      "path": "test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx",
+      "sha256": "0ca1ab7d0e90087316072f89d181067c91c170f0718b109a8ee20867b23c58c2",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 785,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "d4fa8e7fad62b5971f6630ab708e88cfa9b8c00e8db1dc6609189d02ae3e1c2b",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12468,
+      "path": "test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx",
+      "sha256": "257afc6f7b67869647569d8fda3285351e1a496741a3409a5ab28983ddfbc737",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 645,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "c899c6b9b9c1f52339551c3cee362a64a246efc996ce6358526b79c8a07576d9",
+          "status": "counted"
+        },
+        {
+          "bytes": 645,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "c899c6b9b9c1f52339551c3cee362a64a246efc996ce6358526b79c8a07576d9",
+          "status": "counted"
+        },
+        {
+          "bytes": 698,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "39bc6d18e7d6434cf3116712b3e7f1c3478d55391d76b004fc68f7442c02863c",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12031,
+      "path": "test-data/poi/test-data/spreadsheet/xlookup.xlsx",
+      "sha256": "4d8fd3db6469df14f280964b3a447e0be027eda0e2195ca62693e92d8d353910",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 2679,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "e5378e7f7bcfe9be2d91565b78481a1b160c6c7363a547277e7d31cd2e8eee86",
+          "status": "counted"
+        },
+        {
+          "bytes": 2503,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "0cd80d48b9ca7123df4f2ffed777fbffb8ae0bd21ed93a8993c3b85b5da7348f",
+          "status": "counted"
+        },
+        {
+          "bytes": 1922,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 2,
+          "sha256": "4a5188d8461bb73e1b32e30ad314b539713dda7b1b3c0f4f81eb49c3c5837463",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 9801,
+      "path": "test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx",
+      "sha256": "95dc84089f255d5878d89fdc1826edd112a9addd88b25a444f323aadc870c79d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 1200,
+          "cols_elements": 1,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 2,
+          "sha256": "4d2a54babe4cef81ec584fc942ee3d01677f0c69922ee65a815be32254e81d15",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 13072,
+      "path": "test-data/poi/test-data/xmldsign/hello-world-signed.xlsx",
+      "sha256": "22e2d0f6f1a413d011fbdeba4c386ce842570f1cffc66c4f85956137d86a8f1d",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 439,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "ad7fb391a2c913467e23c42feb13811e83d11db7f93622ef9d70c3be52e5b3bf",
+          "status": "counted"
+        },
+        {
+          "bytes": 600,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "188f2e5a9e5b8173e515058c044ccc7ae937f6e016c480a0138e4ff08df22dd1",
+          "status": "counted"
+        }
+      ]
+    },
+    {
+      "bytes": 12180,
+      "path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx",
+      "sha256": "4cbd8cbe613f036b7a0c779ffaaec7c5838710896c6ef26b3f27410d25d5ce45",
+      "status": "inspected",
+      "worksheets": [
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet2.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 628,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet3.xml",
+          "records": 0,
+          "sha256": "3aaec863906ad81c73cbacd5caaddb8797bd83a8a8df13df5daa9576b66817b7",
+          "status": "counted"
+        },
+        {
+          "bytes": 816,
+          "cols_elements": 0,
+          "member": "xl/worksheets/sheet1.xml",
+          "records": 0,
+          "sha256": "661241bae1a0467d48393d07c7bd00b2a3bc4e16fb0db8049da6314264fd4e4b",
+          "status": "counted"
+        }
+      ]
+    }
+  ],
+  "base": "7eeaab48c0281b06f53527d4c4f4ea79050d27e7",
+  "limits": {
+    "archive_bytes": 16777216,
+    "xml_bytes": 16777216,
+    "xml_bytes_per_archive": 67108864
+  },
+  "record_count_distribution": {
+    "0": 187,
+    "1": 43,
+    "10": 11,
+    "11": 3,
+    "12": 3,
+    "13": 2,
+    "14": 5,
+    "15": 1,
+    "17": 2,
+    "19": 2,
+    "2": 28,
+    "20": 1,
+    "27": 1,
+    "284": 2,
+    "3": 14,
+    "320": 2,
+    "323": 2,
+    "324": 2,
+    "325": 2,
+    "4": 17,
+    "5": 19,
+    "6": 11,
+    "7": 13,
+    "8": 5,
+    "9": 11
+  },
+  "schema": "litchi.performance.0832.column-census.v1",
+  "scope": "All test-data/**/*.xlsx paths; physical direct cols/col only; no MCE processing, parser admission, producer frequency, or performance inference.",
+  "script_sha256": "08d0b6a8b6caac362a5a4e7bce46057f2f1926b18949975a9c523c8d0580d78c",
+  "totals": {
+    "archives_inspected": 180,
+    "worksheets_counted": 389,
+    "worksheets_multiple_records": 159,
+    "worksheets_one_record": 43,
+    "worksheets_with_cols": 202,
+    "worksheets_zero_records": 187
+  }
+}

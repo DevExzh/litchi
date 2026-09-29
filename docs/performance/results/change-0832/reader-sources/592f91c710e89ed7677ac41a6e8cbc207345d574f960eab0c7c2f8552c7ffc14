@@ -1,0 +1,522 @@
+#!/usr/bin/env python3
+"""Capture the bounded XLSX column-assignment promotion guard.
+
+``prepare`` is a read-only freeze and must run after the parent 0832 packet
+has built both binary legs but before its comparative capture.  ``qualification``
+and ``capture`` use those already-built binaries only.  The driver never
+imports or edits the parent experiment driver and never invokes Cargo or Git.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+from typing import Any
+
+
+P = Path(__file__).resolve().parent
+MAIN = P.parent
+ROOT = P.parents[4]
+BASE = "7eeaab48c0281b06f53527d4c4f4ea79050d27e7"
+ORIGINAL = ROOT / "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx"
+ORIGINAL_BYTES = 8_435
+ORIGINAL_SHA256 = "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+SHEET_MEMBER = "xl/worksheets/sheet1.xml"
+SCRATCH = ROOT.parent / "litchi-fs-0832-promotion-guard"
+SOURCES = (
+    "crates/litchi-xlsx/src/column.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+)
+VARIANTS = (
+    "disjoint-two-records",
+    "overlap-128-wide-complete",
+)
+PHASES = ("lifecycle", "edit")
+LOGICALS = ("native", "observer")
+NATIVE_ORDERS = (
+    ("before", "after"),
+    ("after", "before"),
+    ("before", "after"),
+    ("after", "before"),
+    ("before", "after"),
+    ("after", "before"),
+)
+OBSERVER_ORDERS = (("before", "after"), ("after", "before"))
+NATIVE_SAMPLES = 500
+NATIVE_WARMUP = 3
+OBSERVER_SAMPLES = 3
+OBSERVER_WARMUP = 0
+CASE = "xlsx_real_file_ordinary_save_{}"
+FIXTURE_MANIFEST = P / "fixture-manifest.json"
+FREEZE = P / "freeze.json"
+QUALIFICATION_RECEIPT = P / "qualification.json"
+CAPTURE_RECEIPT = P / "capture.json"
+
+
+class GuardError(RuntimeError):
+    """The supplement is stale, incomplete, or about to overwrite evidence."""
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise GuardError(message)
+
+
+def sha(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def read(path: Path) -> Any:
+    require(path.is_file() and not path.is_symlink(), f"missing evidence: {path}")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise GuardError(f"invalid JSON evidence {path}: {error}") from error
+
+
+def write_once(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            json.dump(value, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+    except FileExistsError as error:
+        raise GuardError(f"refusing to overwrite retained evidence: {path}") from error
+
+
+def regular(path: Path, label: str) -> None:
+    require(path.is_file() and not path.is_symlink(), f"{label} is not a regular file: {path}")
+    require(not any(parent.is_symlink() for parent in (path, *path.parents)),
+            f"symlink in {label} path: {path}")
+
+
+def descriptor(path: Path, label: str, *, relative_to: Path | None = None) -> dict[str, Any]:
+    regular(path, label)
+    base = ROOT if relative_to is None else relative_to
+    try:
+        display = str(path.relative_to(base))
+    except ValueError:
+        display = str(path)
+    return {"path": display, "bytes": path.stat().st_size, "sha256": sha(path)}
+
+
+def descriptor_matches(value: Any, path: Path, label: str) -> None:
+    require(isinstance(value, dict), f"{label} descriptor is malformed")
+    regular(path, label)
+    require(value.get("bytes") == path.stat().st_size and value.get("sha256") == sha(path),
+            f"{label} changed after freeze")
+
+
+def fixture_rows() -> dict[str, dict[str, Any]]:
+    manifest = read(FIXTURE_MANIFEST)
+    require(manifest.get("schema") == "litchi.performance.0832.column-promotion-fixtures.v1",
+            "fixture manifest schema changed")
+    require(manifest.get("base") == BASE, "fixture manifest base changed")
+    generator = P / "generate_fixtures.py"
+    require(manifest.get("generator", {}).get("sha256") == sha(generator),
+            "fixture generator changed after fixture creation")
+    original = manifest.get("original")
+    require(isinstance(original, dict), "fixture manifest original descriptor is missing")
+    require(original.get("sha256") == ORIGINAL_SHA256 and original.get("bytes") == ORIGINAL_BYTES,
+            "fixture manifest original descriptor changed")
+    regular(ORIGINAL, "original fixture")
+    require(sha(ORIGINAL) == ORIGINAL_SHA256 and ORIGINAL.stat().st_size == ORIGINAL_BYTES,
+            "original fixture changed")
+    rows = {str(row.get("id")): row for row in manifest.get("variants", [])}
+    require(set(rows) == set(VARIANTS), "fixture variant set changed")
+    for variant in VARIANTS:
+        row = rows[variant]
+        archive = row.get("archive")
+        require(isinstance(archive, dict), f"{variant} archive descriptor is missing")
+        path = P / str(archive.get("path"))
+        descriptor_matches(archive, path, f"{variant} fixture")
+        require(isinstance(row.get("members"), list)
+                and SHEET_MEMBER in [member.get("name") for member in row["members"]],
+                f"{variant} member payload census is missing sheet1")
+    return rows
+
+
+def source_descriptors(leg: str) -> dict[str, dict[str, Any]]:
+    require(leg in ("before", "after"), f"unknown source leg {leg}")
+    result = {}
+    for source in SOURCES:
+        path = MAIN / "candidate" / leg / source
+        result[source] = descriptor(path, f"{leg} archived source {source}")
+    return result
+
+
+def binary_descriptors(leg: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    receipt_path = MAIN / f"build-{leg}.json"
+    receipt = read(receipt_path)
+    require(receipt.get("status") == "pass", f"parent {leg} build is not a pass")
+    result = {}
+    for logical in LOGICALS:
+        binding = receipt.get("binaries", {}).get(logical)
+        require(isinstance(binding, dict), f"parent {leg} build has no {logical} binary")
+        path = Path(str(binding.get("path")))
+        descriptor_matches(binding, path, f"parent {leg} {logical} binary")
+        result[logical] = {
+            "path": str(path),
+            "bytes": path.stat().st_size,
+            "sha256": sha(path),
+        }
+    return result, descriptor(receipt_path, f"parent {leg} build receipt")
+
+
+def main_packet_descriptors() -> dict[str, dict[str, Any]]:
+    paths = (
+        "driver.py", "plan.json", "inputs.json", "prepare.json",
+        "architecture-inputs.json", "census.py", "census.json",
+        "design.md", "source-review.md", "unrelated.json",
+        "candidate/manifest.json", "candidate/candidate.patch",
+        "candidate/pre-freeze-correction.json",
+    )
+    return {name: descriptor(MAIN / name, f"parent packet {name}") for name in paths}
+
+
+def script_descriptors() -> dict[str, dict[str, Any]]:
+    return {
+        name: descriptor(P / name, f"guard script {name}", relative_to=P)
+        for name in ("generate_fixtures.py", "driver.py", "reader.py")
+    }
+
+
+def prepare() -> None:
+    require(not FREEZE.exists(), "freeze.json already exists; prepare is single-use")
+    require(not QUALIFICATION_RECEIPT.exists() and not CAPTURE_RECEIPT.exists(),
+            "guard receipts already exist before prepare")
+    rows = fixture_rows()
+    binaries: dict[str, dict[str, dict[str, Any]]] = {}
+    build_receipts: dict[str, dict[str, Any]] = {}
+    sources: dict[str, dict[str, dict[str, Any]]] = {}
+    for leg in ("before", "after"):
+        binaries[leg], build_receipts[leg] = binary_descriptors(leg)
+        sources[leg] = source_descriptors(leg)
+    require(not SCRATCH.exists(), f"guard scratch already exists: {SCRATCH}")
+    SCRATCH.mkdir()
+    (SCRATCH / ".owner").write_text("litchi-performance-0832-promotion-guard-owned\n", encoding="utf-8")
+    manifest_descriptor = descriptor(FIXTURE_MANIFEST, "fixture manifest")
+    freeze = {
+        "schema": "litchi.performance.0832.column-promotion-guard.freeze.v1",
+        "status": "pass",
+        "base": BASE,
+        "scope": "two generated XLSX real-file ordinary-save lifecycle/edit fixtures; edit timing only",
+        "scripts": script_descriptors(),
+        "parent_packet": main_packet_descriptors(),
+        "build_receipts": build_receipts,
+        "source_archives": sources,
+        "binaries": binaries,
+        "original": descriptor(ORIGINAL, "original fixture"),
+        "fixture_manifest": manifest_descriptor,
+        "fixtures": {
+            variant: rows[variant]["archive"] for variant in VARIANTS
+        },
+        "protocol": {
+            "cpu": 12,
+            "qualification": {"reports": 16, "samples": 16, "phases": list(PHASES),
+                               "samples_per_report": 1, "warmup": 0},
+            "native": {"reports": 24, "samples": 12000, "blocks": 6,
+                        "samples_per_report": NATIVE_SAMPLES, "warmup": NATIVE_WARMUP,
+                        "orders": [list(order) for order in NATIVE_ORDERS]},
+            "observer": {"reports": 8, "samples": 24, "blocks": 2,
+                          "samples_per_report": OBSERVER_SAMPLES, "warmup": OBSERVER_WARMUP,
+                          "orders": [list(order) for order in OBSERVER_ORDERS]},
+            "total": {"reports": 48, "samples": 12040},
+            "case": "xlsx_real_file_ordinary_save_edit",
+            "lifecycle_oracle_case": "xlsx_real_file_ordinary_save_lifecycle",
+        },
+        "fixture_contract": {
+            "member": SHEET_MEMBER,
+            "untouched_members_must_match_compressed_and_uncompressed_payloads": True,
+            "output_oracle": "qualification lifecycle top-level output_sha256 equality across both legs and both binaries",
+            "limitation": "The lifecycle publication is checked by the harness and deleted; this supplement does not independently compare an Office-produced output archive or output member payloads.",
+        },
+    }
+    write_once(FREEZE, freeze)
+    print("promotion guard prepare PASS", flush=True)
+
+
+def verify_freeze() -> dict[str, Any]:
+    freeze = read(FREEZE)
+    require(freeze.get("schema") == "litchi.performance.0832.column-promotion-guard.freeze.v1",
+            "freeze schema changed")
+    require(freeze.get("status") == "pass" and freeze.get("base") == BASE,
+            "freeze status/base changed")
+    fixture_rows()
+    for name, binding in freeze.get("scripts", {}).items():
+        descriptor_matches(binding, P / name, f"frozen guard script {name}")
+    for name, binding in freeze.get("parent_packet", {}).items():
+        descriptor_matches(binding, MAIN / name, f"frozen parent packet {name}")
+    descriptor_matches(freeze["original"], ORIGINAL, "frozen original fixture")
+    descriptor_matches(freeze["fixture_manifest"], FIXTURE_MANIFEST, "frozen fixture manifest")
+    for variant in VARIANTS:
+        path = P / str(freeze["fixtures"][variant]["path"])
+        descriptor_matches(freeze["fixtures"][variant], path, f"frozen {variant} fixture")
+    for leg in ("before", "after"):
+        for source, binding in freeze["source_archives"][leg].items():
+            descriptor_matches(binding, MAIN / "candidate" / leg / source,
+                               f"frozen {leg} source {source}")
+        for logical, binding in freeze["binaries"][leg].items():
+            descriptor_matches(binding, Path(binding["path"]), f"frozen {leg} {logical} binary")
+        descriptor_matches(freeze["build_receipts"][leg], MAIN / f"build-{leg}.json",
+                           f"frozen {leg} build receipt")
+    require(SCRATCH.is_dir() and not SCRATCH.is_symlink(), "guard scratch is missing")
+    owner = SCRATCH / ".owner"
+    require(owner.is_file() and owner.read_text(encoding="utf-8")
+            == "litchi-performance-0832-promotion-guard-owned\n", "guard scratch owner changed")
+    return freeze
+
+
+def output_paths(lane: str, variant: str, phase: str, block: int, leg: str, logical: str) -> tuple[Path, Path, str]:
+    if lane == "qualification":
+        stem = f"{variant}-{phase}-{leg}-{logical}"
+        report = P / "qualification" / f"{stem}.json"
+        name = f"qualification-{stem}"
+    else:
+        require(phase == "edit", "comparative capture is edit-only")
+        stem = f"{block:02d}-{leg}"
+        report = P / lane / variant / f"{stem}.json"
+        name = f"{lane}-{variant}-{stem}"
+    return report, report.with_suffix(".rss"), name
+
+
+def binary_binding(freeze: dict[str, Any], leg: str, logical: str) -> dict[str, Any]:
+    binding = freeze["binaries"][leg][logical]
+    descriptor_matches(binding, Path(binding["path"]), f"{leg} {logical} binary")
+    return binding
+
+
+def run_command(name: str, argv: list[str], *, source_leg: str, binary_leg: str,
+                variant: str, phase: str, lane: str, logical: str,
+                freeze: dict[str, Any]) -> None:
+    verify_freeze()
+    commands = P / "commands"
+    commands.mkdir(exist_ok=True)
+    started = commands / f"{name}.started.json"
+    terminal = commands / f"{name}.json"
+    log = commands / f"{name}.log"
+    require(all(not path.exists() and not path.is_symlink()
+                for path in (started, terminal, log)), f"command evidence already exists: {name}")
+    row: dict[str, Any] = {
+        "argv": [str(part) for part in argv],
+        "cwd": str(ROOT),
+        "source_leg": source_leg,
+        "binary_leg": binary_leg,
+        "variant": variant,
+        "phase": phase,
+        "lane": lane,
+        "logical": logical,
+        "freeze_sha256": sha(FREEZE),
+        "driver_sha256": sha(P / "driver.py"),
+        "started_unix": time.time(),
+    }
+    write_once(started, row)
+    environment = dict(os.environ)
+    environment.update({"LC_ALL": "C", "TZ": "UTC", "PYTHONDONTWRITEBYTECODE": "1"})
+    try:
+        with log.open("xb") as stream:
+            child = subprocess.run(argv, cwd=ROOT, env=environment,
+                                   stdout=stream, stderr=subprocess.STDOUT)
+        row.update(exit_code=child.returncode, finished_unix=time.time(), log_sha256=sha(log))
+    except BaseException as error:
+        row.update(exit_code=None, finished_unix=time.time(),
+                   log_sha256=sha(log) if log.exists() else None,
+                   exception_type=type(error).__name__, exception=str(error))
+        write_once(terminal, row)
+        raise
+    write_once(terminal, row)
+    require(row["exit_code"] == 0, f"workload command failed: {name}")
+
+
+def validate_report(path: Path, *, variant: str, phase: str, leg: str,
+                    logical: str, samples: int, warmup: int,
+                    freeze: dict[str, Any]) -> dict[str, Any]:
+    report = read(path)
+    require(report.get("schema_version") == 1, f"{path} report schema changed")
+    expected_binary = "litchi-perf-baseline" if logical == "native" else "litchi-perf-baseline-alloc"
+    require(report.get("tool", {}).get("binary") == expected_binary, f"{path} binary identity changed")
+    expected_instrumentation = "none" if logical == "native" else {
+        "system_allocator_operation_scoped",
+        "ordinary_save_procfs_and_system_allocator_operation_scoped",
+    }
+    instrumentation = report.get("tool", {}).get("instrumentation")
+    require(instrumentation == expected_instrumentation if isinstance(expected_instrumentation, str)
+            else instrumentation in expected_instrumentation, f"{path} instrumentation changed")
+    binary = freeze["binaries"][leg][logical]
+    identity = report.get("binary_identity", {})
+    require(identity.get("binary_sha256") == binary["sha256"]
+            and identity.get("binary_bytes") == binary["bytes"], f"{path} binary bytes changed")
+    environment = report.get("environment")
+    require(isinstance(environment, dict) and environment.get("git_revision") == BASE,
+            f"{path} parent base identity changed")
+    configuration = report.get("configuration", {})
+    require(configuration.get("samples_per_case") == samples
+            and configuration.get("warmup_iterations_per_case") == warmup
+            and configuration.get("cases") == [CASE.format(phase)],
+            f"{path} protocol changed")
+    result_rows = report.get("results")
+    require(isinstance(result_rows, list) and len(result_rows) == 1, f"{path} result count changed")
+    result = result_rows[0]
+    require(result.get("case") == CASE.format(phase), f"{path} case changed")
+    elapsed = result.get("elapsed_ns", {})
+    values = elapsed.get("samples")
+    order = elapsed.get("sample_order")
+    require(elapsed.get("unit") == "ns" and isinstance(values, list)
+            and len(values) == samples and values == sorted(values)
+            and all(type(value) is int and value > 0 for value in values),
+            f"{path} elapsed vector changed")
+    require(isinstance(order, list) and len(order) == samples and sorted(order) == list(range(samples)),
+            f"{path} elapsed sample order changed")
+    corpus = result.get("corpus", {})
+    fixture = freeze["fixtures"][variant]
+    require(corpus.get("archive_sha256") == fixture["sha256"]
+            and corpus.get("archive_bytes") == fixture["bytes"], f"{path} fixture oracle changed")
+    source = result.get("source", {}).get("ordinary_save")
+    require(isinstance(source, dict) and source.get("format") == "XLSX"
+            and source.get("origin") == "caller-named-real-file"
+            and source.get("phase") == ("open+edit+save" if phase == "lifecycle" else "edit"),
+            f"{path} ordinary-save source oracle changed")
+    evidence = source.get("corpus", {})
+    real_file = evidence.get("real_file", {})
+    require(real_file.get("bytes") == fixture["bytes"]
+            and real_file.get("sha256") == fixture["sha256"], f"{path} real-file oracle changed")
+    require(evidence.get("edit_admitted") is True and evidence.get("edit_outcome") == "admitted",
+            f"{path} edit admission changed")
+    outcomes = source.get("edit_outcome_sha256")
+    admitted_sha = hashlib.sha256(b"admitted").hexdigest()
+    require(isinstance(outcomes, list) and len(outcomes) == samples
+            and all(value == admitted_sha for value in outcomes), f"{path} edit outcome vector changed")
+    require(source.get("publications_identical") is True
+            and source.get("edit_outcomes_identical") is True, f"{path} publication flags changed")
+    if phase == "lifecycle":
+        publications = source.get("published_sha256")
+        output = result.get("output_sha256")
+        require(isinstance(publications, list) and len(publications) == samples
+                and all(isinstance(value, str) and len(value) == 64 for value in publications)
+                and isinstance(output, str) and len(output) == 64
+                and all(value == output for value in publications),
+                f"{path} lifecycle output oracle changed")
+    else:
+        require(source.get("published_sha256") == [] and result.get("output_sha256") is None,
+                f"{path} edit publication scope changed")
+    return {"path": str(path.relative_to(P)), "sha256": sha(path), "bytes": path.stat().st_size,
+            "report": report}
+
+
+def run_case(lane: str, variant: str, phase: str, block: int, leg: str, logical: str,
+             samples: int, warmup: int, freeze: dict[str, Any]) -> dict[str, Any]:
+    report, rss, name = output_paths(lane, variant, phase, block, leg, logical)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    require(not report.exists() and not report.is_symlink()
+            and not rss.exists() and not rss.is_symlink(), f"case evidence already exists: {report}")
+    fixture = freeze["fixtures"][variant]
+    binary = binary_binding(freeze, leg, logical)
+    argv = [
+        "taskset", "-c", "12", "/usr/bin/time", "-f", "%M", "-o", str(rss),
+        binary["path"], "--case", CASE.format(phase), "--warmup", str(warmup),
+        "--samples", str(samples), "--json", str(report), "--filesystem-root", str(SCRATCH),
+        "--ooxml-file", str(P / fixture["path"]),
+    ]
+    run_command(name, argv, source_leg=leg, binary_leg=leg, variant=variant,
+                phase=phase, lane=lane, logical=logical, freeze=freeze)
+    regular(rss, f"{name} RSS")
+    rss_text = rss.read_text(encoding="utf-8").strip()
+    require(rss_text.isdigit() and int(rss_text) > 0, f"{name} RSS output is invalid")
+    return validate_report(report, variant=variant, phase=phase, leg=leg, logical=logical,
+                           samples=samples, warmup=warmup, freeze=freeze)
+
+
+def qualification() -> None:
+    freeze = verify_freeze()
+    require(not QUALIFICATION_RECEIPT.exists(), "qualification receipt already exists")
+    reports = []
+    for variant in VARIANTS:
+        for phase in PHASES:
+            for leg in ("before", "after"):
+                for logical in LOGICALS:
+                    row = run_case("qualification", variant, phase, 0, leg, logical,
+                                   1, 0, freeze)
+                    reports.append(row)
+    require(len(reports) == 16, "qualification cardinality changed")
+    lifecycle = {
+        f"{variant}/{leg}/{logical}": next(
+            item["report"]["results"][0]["output_sha256"]
+            for item in reports
+            if item["report"]["results"][0]["case"] == CASE.format("lifecycle")
+            and item["path"] == f"qualification/{variant}-lifecycle-{leg}-{logical}.json"
+        )
+        for variant in VARIANTS for leg in ("before", "after") for logical in LOGICALS
+    }
+    write_once(QUALIFICATION_RECEIPT, {
+        "schema": "litchi.performance.0832.column-promotion-guard.qualification.v1",
+        "status": "pass", "reports": 16, "samples": 16,
+        "freeze_sha256": sha(FREEZE),
+        "reports_sha256": {row["path"]: row["sha256"] for row in reports},
+        "lifecycle_output_sha256": lifecycle,
+    })
+    print("promotion guard qualification PASS", flush=True)
+
+
+def capture() -> None:
+    freeze = verify_freeze()
+    qualification_receipt = read(QUALIFICATION_RECEIPT)
+    require(qualification_receipt.get("status") == "pass"
+            and qualification_receipt.get("reports") == 16
+            and qualification_receipt.get("freeze_sha256") == sha(FREEZE),
+            "qualification admission is missing or stale")
+    require(not CAPTURE_RECEIPT.exists(), "capture receipt already exists")
+    reports = []
+    for lane, orders, samples, warmup in (
+        ("native", NATIVE_ORDERS, NATIVE_SAMPLES, NATIVE_WARMUP),
+        ("observer", OBSERVER_ORDERS, OBSERVER_SAMPLES, OBSERVER_WARMUP),
+    ):
+        for variant in VARIANTS:
+            for block, order in enumerate(orders):
+                for leg in order:
+                    row = run_case(lane, variant, "edit", block, leg, lane,
+                                   samples, warmup, freeze)
+                    reports.append(row)
+    require(len(reports) == 32, "comparative capture cardinality changed")
+    write_once(CAPTURE_RECEIPT, {
+        "schema": "litchi.performance.0832.column-promotion-guard.capture.v1",
+        "status": "pass", "reports": 32, "samples": 12024,
+        "qualification_reports": 16, "total_reports": 48, "total_samples": 12040,
+        "freeze_sha256": sha(FREEZE),
+        "qualification_sha256": sha(QUALIFICATION_RECEIPT),
+        "reports_sha256": {row["path"]: row["sha256"] for row in reports},
+    })
+    print("promotion guard capture PASS", flush=True)
+
+
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    require(len(argv) == 1 and argv[0] in {"prepare", "qualification", "capture"},
+            "usage: driver.py {prepare|qualification|capture}")
+    stage = argv[0]
+    if stage == "prepare":
+        prepare()
+    elif stage == "qualification":
+        qualification()
+    else:
+        capture()
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (GuardError, OSError, UnicodeError, ValueError, KeyError, TypeError) as error:
+        print(f"promotion guard failed: {error}", file=sys.stderr)
+        raise SystemExit(1)

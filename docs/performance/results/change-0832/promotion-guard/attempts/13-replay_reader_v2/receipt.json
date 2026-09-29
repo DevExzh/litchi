@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/replay_reader_v2.py",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790640805.8063643,
+  "launcher_sha256": "3607e59a864a77f93b07eb46867831e6d653e887785b0898dbe14e19f62d0306",
+  "output_sha256": "cdc6a236849c6bd3859f5f4f35f9a5b8c4249bc855bc723073d6ecce502c0585",
+  "sources_unchanged": true,
+  "started_unix": 1790640804.7547038
+}

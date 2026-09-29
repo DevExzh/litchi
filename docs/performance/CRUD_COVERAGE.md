@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0832 — first XLSX column record stored inline
+
+[0832](0832-xlsx-inline-column-map.md) Covers one real XLSX public edit and default-save lifecycle, six synthetic commit/save scale cases, a no-op control, and two controlled multi-record worksheets. Full-output and cross-leg lifecycle oracles pass. Empty/single-record storage, overlapping promotion, complete-property replacement, and the existing parser/writer grid and transaction tests pass; general multi-record and nonempty-column-action performance remain unmeasured.
+
 ## 0831 — unused XLSX column-action map removed
 
 [0831](0831-xlsx-empty-column-actions.md) Covers one real XLSX public edit and default-save lifecycle, one-cell and one-percent commit/save at tiny/medium/dense-wide scales, and a medium no-op control. Fresh full XLSX quality and pinned byte-oracle checks pass on both legs. The empty-column-action guard is adopted; nonempty column-action latency and broader producer/cold/range coverage remain unmeasured.

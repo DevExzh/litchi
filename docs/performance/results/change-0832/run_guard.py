@@ -1,0 +1,62 @@
+"""Root-owned retained launcher for supplemental scripts; never rerun workloads."""
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+P = Path(__file__).resolve().parent
+G = P / "promotion-guard"
+ROOT = P.parents[3]
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write(path, value):
+    with path.open("x") as stream:
+        json.dump(value, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+
+
+def main():
+    script, *args = sys.argv[1:]
+    assert script in ("generate_fixtures.py", "driver.py", "reader.py", "replay_reader.py", "replay_reader_v2.py")
+    if script == "driver.py" and args == ["capture"]:
+        admission = json.loads((G / "corrected-admission.json").read_text())
+        assert admission["status"] == "pass"
+        assert admission["admission_sha256"] == sha(G / "qualification-admission.json")
+        assert admission["correction_sha256"] == sha(G / "reader-correction-v2.json")
+        correction = json.loads((G / "reader-correction-v2.json").read_text())
+        assert correction["loader_sha256"] == sha(G / "replay_reader_v2.py")
+        assert correction["previous_loader_sha256"] == sha(G / "replay_reader.py")
+    attempts = G / "attempts"
+    attempts.mkdir(exist_ok=True)
+    folder = attempts / (f"{len(list(attempts.iterdir())):02d}-" + script.removesuffix(".py"))
+    folder.mkdir()
+    sources = {}
+    for source in sorted(G.glob("*.py")):
+        digest = sha(source)
+        sources[source.name] = digest
+        archive = P / "reader-sources" / digest
+        if not archive.exists():
+            archive.write_bytes(source.read_bytes())
+    write(folder / "sources.json", sources)
+    row = {"argv": ["python3", "-B", str(G / script), *args],
+           "cwd": str(ROOT), "started_unix": time.time(),
+           "launcher_sha256": sha(Path(__file__))}
+    write(folder / "started.json", row)
+    with (folder / "output.log").open("xb") as log:
+        child = subprocess.run(row["argv"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+    row.update(exit_code=child.returncode, finished_unix=time.time(),
+               output_sha256=sha(folder / "output.log"),
+               sources_unchanged=all(sha(G / name) == digest for name, digest in sources.items()))
+    write(folder / "receipt.json", row)
+    print(folder.name, row["exit_code"], (folder / "output.log").read_text(), flush=True)
+    assert row["sources_unchanged"] and child.returncode == 0
+
+
+if __name__ == "__main__":
+    main()

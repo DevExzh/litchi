@@ -1,0 +1,9 @@
+{
+  "reason": "Initial root before-archive comparison rejected extra terminal newlines. Before archives recopied byte-exact from current production before any build or freeze. Candidate archives formatted by root.",
+  "corrected_before_paths": [
+    "crates/litchi-xlsx/src/column.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs"
+  ]
+}

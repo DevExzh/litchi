@@ -1,0 +1,345 @@
+{
+  "base": "7eeaab48c0281b06f53527d4c4f4ea79050d27e7",
+  "binaries": {
+    "after": {
+      "native": {
+        "bytes": 273971840,
+        "path": "/home/zhuhe/code/litchi-target-0832/after-native",
+        "sha256": "e0e6c866f6d9a63e6406e273ecfc3baae4ce50c45976299b8c2395aad8f1ed3a"
+      },
+      "observer": {
+        "bytes": 276973688,
+        "path": "/home/zhuhe/code/litchi-target-0832/after-observer",
+        "sha256": "da866b06e49266596a36f5bbe9014764e44b03162b9aeafa49d1eb92ac8a5c4b"
+      }
+    },
+    "before": {
+      "native": {
+        "bytes": 273972056,
+        "path": "/home/zhuhe/code/litchi-target-0832/before-native",
+        "sha256": "a95c4fc752f7c01929cdf438cc126b9754a3f93c5c13a8ac9c2427b7d17322de"
+      },
+      "observer": {
+        "bytes": 276970480,
+        "path": "/home/zhuhe/code/litchi-target-0832/before-observer",
+        "sha256": "ea7092605e9add3248fcfd188c78972bc4a37363400696017c2f1d8292c4a201"
+      }
+    }
+  },
+  "build_receipts": {
+    "after": {
+      "bytes": 1683,
+      "path": "docs/performance/results/change-0832/build-after.json",
+      "sha256": "cf6da398994d17c21c7cb633b148864837d4573347687095c0a1c6f90fe1cfaa"
+    },
+    "before": {
+      "bytes": 1685,
+      "path": "docs/performance/results/change-0832/build-before.json",
+      "sha256": "ad0882b5a3265b0b7ceb2e9edcd51b86e7374d35613263dc352bb6e83809a448"
+    }
+  },
+  "fixture_contract": {
+    "limitation": "The lifecycle publication is checked by the harness and deleted; this supplement does not independently compare an Office-produced output archive or output member payloads.",
+    "member": "xl/worksheets/sheet1.xml",
+    "output_oracle": "qualification lifecycle top-level output_sha256 equality across both legs and both binaries",
+    "untouched_members_must_match_compressed_and_uncompressed_payloads": true
+  },
+  "fixture_manifest": {
+    "bytes": 13480,
+    "path": "docs/performance/results/change-0832/promotion-guard/fixture-manifest.json",
+    "sha256": "b317a62afd3512bc39ac0c1c4342015e974f84f5d5581d110ab1de8b3bcd5b33"
+  },
+  "fixtures": {
+    "disjoint-two-records": {
+      "bytes": 8419,
+      "path": "fixtures/disjoint-two-records.xlsx",
+      "sha256": "9b06b9baf4b0c4e0ed03986428134e7846e9e8b78a71ff5a6a0e294658af745b"
+    },
+    "overlap-128-wide-complete": {
+      "bytes": 9251,
+      "path": "fixtures/overlap-128-wide-complete.xlsx",
+      "sha256": "ef813ad8c558445579d02250e24e9519351578bb0bd85dd7eddb69869e7c5bcd"
+    }
+  },
+  "original": {
+    "bytes": 8435,
+    "path": "test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx",
+    "sha256": "d7ab3dbb59388d245ee779bf8547748dc6bac70f3c7216e673e0d97dbbbd6bc4"
+  },
+  "parent_input_custody": {
+    "baseline-witness.json": "d3bd5a4039b5502dcc81791587e83b070733b0a456bd6ef55b12a9b551d01ee9",
+    "host.json": "c613366727ca7ae6e6fd2bf0a8cdc759dfb685ece8d962f934c4333718b85fa0",
+    "inputs.json": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda",
+    "plan.json": "5feb7e5001440b088b27b49e5c85af3c62259519cfb80e76ee50bc9c4f6235fa"
+  },
+  "parent_packet": {
+    "architecture-inputs.json": {
+      "bytes": 4009,
+      "path": "docs/performance/results/change-0832/architecture-inputs.json",
+      "sha256": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10"
+    },
+    "baseline-witness.json": {
+      "bytes": 4383,
+      "path": "docs/performance/results/change-0832/baseline-witness.json",
+      "sha256": "d3bd5a4039b5502dcc81791587e83b070733b0a456bd6ef55b12a9b551d01ee9"
+    },
+    "build-after.json": {
+      "bytes": 1683,
+      "path": "docs/performance/results/change-0832/build-after.json",
+      "sha256": "cf6da398994d17c21c7cb633b148864837d4573347687095c0a1c6f90fe1cfaa"
+    },
+    "build-before.json": {
+      "bytes": 1685,
+      "path": "docs/performance/results/change-0832/build-before.json",
+      "sha256": "ad0882b5a3265b0b7ceb2e9edcd51b86e7374d35613263dc352bb6e83809a448"
+    },
+    "candidate/candidate.patch": {
+      "bytes": 16613,
+      "path": "docs/performance/results/change-0832/candidate/candidate.patch",
+      "sha256": "f9968255e9a7211d619cafa4853b69bd3bb7c491ffdb71d04d03cda2079c77b7"
+    },
+    "candidate/manifest.json": {
+      "bytes": 908,
+      "path": "docs/performance/results/change-0832/candidate/manifest.json",
+      "sha256": "0e868ad43faefe014529cc861400ad030bfc1ecd33e8a5e1a98566877e9914ac"
+    },
+    "candidate/pre-freeze-correction.json": {
+      "bytes": 488,
+      "path": "docs/performance/results/change-0832/candidate/pre-freeze-correction.json",
+      "sha256": "690c5103fa9f44e792c991a9443b016f5e93d8642340650389606b5b8ff78211"
+    },
+    "census.json": {
+      "bytes": 149394,
+      "path": "docs/performance/results/change-0832/census.json",
+      "sha256": "bd3fdce3c69c564764a2c40358918d32a4eb0eaaf0288728233ca42dd8afba9f"
+    },
+    "census.py": {
+      "bytes": 5504,
+      "path": "docs/performance/results/change-0832/census.py",
+      "sha256": "08d0b6a8b6caac362a5a4e7bce46057f2f1926b18949975a9c523c8d0580d78c"
+    },
+    "design.md": {
+      "bytes": 3876,
+      "path": "docs/performance/results/change-0832/design.md",
+      "sha256": "44d13bc48460a4261f5463811c8c725eda74c92120a2206ce8a09a01843c355c"
+    },
+    "driver.py": {
+      "bytes": 27983,
+      "path": "docs/performance/results/change-0832/driver.py",
+      "sha256": "87034b7c82d461234525dac1506c7e8e13db0f58e54f80549d9c412c31d17480"
+    },
+    "host.json": {
+      "bytes": 52361,
+      "path": "docs/performance/results/change-0832/host.json",
+      "sha256": "c613366727ca7ae6e6fd2bf0a8cdc759dfb685ece8d962f934c4333718b85fa0"
+    },
+    "inputs.json": {
+      "bytes": 1190213,
+      "path": "docs/performance/results/change-0832/inputs.json",
+      "sha256": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda"
+    },
+    "install.json": {
+      "bytes": 2640,
+      "path": "docs/performance/results/change-0832/install.json",
+      "sha256": "aa0b42089ef7fdc9fa3c4910bfce1c47fa8dcd1cfab160ec5ed4d9f5b0029158"
+    },
+    "plan.json": {
+      "bytes": 3942,
+      "path": "docs/performance/results/change-0832/plan.json",
+      "sha256": "5feb7e5001440b088b27b49e5c85af3c62259519cfb80e76ee50bc9c4f6235fa"
+    },
+    "prepare.json": {
+      "bytes": 431,
+      "path": "docs/performance/results/change-0832/prepare.json",
+      "sha256": "121a9192883598638570653cce8dacb449cd8e6b147bb3a7fb3f327ef74b4db9"
+    },
+    "qualification-admission.json": {
+      "bytes": 4777,
+      "path": "docs/performance/results/change-0832/qualification-admission.json",
+      "sha256": "2b19e8bfb652ef858398b6f7c0fd20466971c468e0bdc01dfea66adacdddc16b"
+    },
+    "qualification-after.json": {
+      "bytes": 1210,
+      "path": "docs/performance/results/change-0832/qualification-after.json",
+      "sha256": "89a99212c62bfdd509d8f896fd886280dc454cc57b84ed7250c06cfe4bb1a4f8"
+    },
+    "qualification-before.json": {
+      "bytes": 1210,
+      "path": "docs/performance/results/change-0832/qualification-before.json",
+      "sha256": "815fab82123429f90a6eaf7fe254e72568f745480692b1bbbd09d5b54312001b"
+    },
+    "quality-after.json": {
+      "bytes": 1296,
+      "path": "docs/performance/results/change-0832/quality-after.json",
+      "sha256": "18cd117b8dadb4cd1169a8f22766c8b663a7e2827a16ec587aeee3aaee0c3705"
+    },
+    "quality-before.json": {
+      "bytes": 1440,
+      "path": "docs/performance/results/change-0832/quality-before.json",
+      "sha256": "2737cb3ab86893e909f3c83065eb30f84799d4a01cea2ce48d2145b5378d0186"
+    },
+    "source-review.md": {
+      "bytes": 3749,
+      "path": "docs/performance/results/change-0832/source-review.md",
+      "sha256": "5b59e5d458a356f9c94364140507999445f6649098a2bca0d98d297c5f98891e"
+    },
+    "unrelated.json": {
+      "bytes": 311,
+      "path": "docs/performance/results/change-0832/unrelated.json",
+      "sha256": "4753997e71de062dc81bd711f9947302b806ac87a15887ba95bcf97923d12e91"
+    }
+  },
+  "parent_source_transitions": {
+    "crates/litchi-xlsx/src/column.rs": {
+      "after": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36",
+      "before": "c78029bd2601b4458c138efefd3ff0fdcf7004e50954410d85ad26d5cc2a08ea"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+      "after": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6",
+      "before": "6b6a237cd40a5030bb4640b9ecd193f3c1e490011fe88e13ac1bb0c52ddbcd7c"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": {
+      "after": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972",
+      "before": "30af260466ed443a6663752a21cda64327ff4b6d9a592e059466f5fab0b40ca6"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": {
+      "after": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91",
+      "before": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5"
+    }
+  },
+  "protocol": {
+    "case": "xlsx_real_file_ordinary_save_edit",
+    "cpu": 12,
+    "lifecycle_oracle_case": "xlsx_real_file_ordinary_save_lifecycle",
+    "native": {
+      "blocks": 6,
+      "orders": [
+        [
+          "before",
+          "after"
+        ],
+        [
+          "after",
+          "before"
+        ],
+        [
+          "before",
+          "after"
+        ],
+        [
+          "after",
+          "before"
+        ],
+        [
+          "before",
+          "after"
+        ],
+        [
+          "after",
+          "before"
+        ]
+      ],
+      "reports": 24,
+      "samples": 12000,
+      "samples_per_report": 500,
+      "warmup": 3
+    },
+    "observer": {
+      "blocks": 2,
+      "orders": [
+        [
+          "before",
+          "after"
+        ],
+        [
+          "after",
+          "before"
+        ]
+      ],
+      "reports": 8,
+      "samples": 24,
+      "samples_per_report": 3,
+      "warmup": 0
+    },
+    "qualification": {
+      "phases": [
+        "lifecycle",
+        "edit"
+      ],
+      "reports": 16,
+      "samples": 16,
+      "samples_per_report": 1,
+      "warmup": 0
+    },
+    "total": {
+      "reports": 48,
+      "samples": 12040
+    }
+  },
+  "schema": "litchi.performance.0832.column-promotion-guard.freeze.v1",
+  "scope": "two generated XLSX real-file ordinary-save lifecycle/edit fixtures; edit timing only",
+  "scripts": {
+    "driver.py": {
+      "bytes": 34163,
+      "path": "driver.py",
+      "sha256": "e49769d76e227d21dfc8259fb987d48b34c18dfe2407ad72222012d2bdb687b8"
+    },
+    "generate_fixtures.py": {
+      "bytes": 19728,
+      "path": "generate_fixtures.py",
+      "sha256": "cc59a87bc6173c2041862487546994b8daa6b756af065737df8ed77fe7d17db7"
+    },
+    "reader.py": {
+      "bytes": 53009,
+      "path": "reader.py",
+      "sha256": "77770e42f2a79dbd61f133adca0ff4e245baa4e377157dafb8acf898a433d3de"
+    }
+  },
+  "source_archives": {
+    "after": {
+      "crates/litchi-xlsx/src/column.rs": {
+        "bytes": 28999,
+        "path": "docs/performance/results/change-0832/candidate/after/crates/litchi-xlsx/src/column.rs",
+        "sha256": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+        "bytes": 60497,
+        "path": "docs/performance/results/change-0832/candidate/after/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "sha256": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": {
+        "bytes": 8383,
+        "path": "docs/performance/results/change-0832/candidate/after/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+        "sha256": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": {
+        "bytes": 9385,
+        "path": "docs/performance/results/change-0832/candidate/after/crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+        "sha256": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91"
+      }
+    },
+    "before": {
+      "crates/litchi-xlsx/src/column.rs": {
+        "bytes": 21508,
+        "path": "docs/performance/results/change-0832/candidate/before/crates/litchi-xlsx/src/column.rs",
+        "sha256": "c78029bd2601b4458c138efefd3ff0fdcf7004e50954410d85ad26d5cc2a08ea"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+        "bytes": 60497,
+        "path": "docs/performance/results/change-0832/candidate/before/crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+        "sha256": "6b6a237cd40a5030bb4640b9ecd193f3c1e490011fe88e13ac1bb0c52ddbcd7c"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": {
+        "bytes": 8383,
+        "path": "docs/performance/results/change-0832/candidate/before/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+        "sha256": "30af260466ed443a6663752a21cda64327ff4b6d9a592e059466f5fab0b40ca6"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": {
+        "bytes": 9385,
+        "path": "docs/performance/results/change-0832/candidate/before/crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs",
+        "sha256": "8ed77db7652b86e26ecc5d7f0ee3ffdf0b269126a215f8607ce0d1a7bf695df5"
+      }
+    }
+  },
+  "status": "pass"
+}

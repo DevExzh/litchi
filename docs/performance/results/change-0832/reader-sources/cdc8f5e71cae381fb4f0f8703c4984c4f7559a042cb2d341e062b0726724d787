@@ -1,0 +1,54 @@
+"""Remove only the isolated 0832 target and marked filesystem scratch."""
+import shutil
+import driver as d
+
+
+def main():
+    d.check("after" if d.read(d.P / "decision.json")["adopt"] else "before")
+    assert d.read(d.P / "capture.json")["status"] == "pass"
+    assert d.read(d.P / "analysis.json")["status"] == "pass"
+    guard = d.P / "promotion-guard"
+    assert d.read(guard / "analysis.json")["status"] == "pass"
+    guard_attempts = sorted(p for p in (guard / "attempts").iterdir() if p.name.endswith("-reader"))
+    assert guard_attempts and d.read(guard_attempts[-1] / "receipt.json")["exit_code"] == 0
+    guard_scratch = d.ROOT.parent / "litchi-fs-0832-promotion-guard"
+    assert guard_scratch.is_dir() and not guard_scratch.is_symlink()
+    assert (guard_scratch / ".owner").read_text() == "litchi-performance-0832-promotion-guard-owned\n"
+    attempts = list((d.P / "reader-attempts").iterdir())
+    for reader in ("analyze", "audit"):
+        matches = sorted(p for p in attempts if p.name.endswith("-" + reader))
+        assert matches and d.read(matches[-1] / "receipt.json")["exit_code"] == 0
+    assert d.TARGET == d.ROOT.parent / "litchi-target-0832"
+    assert d.SCRATCH == d.ROOT.parent / "litchi-fs-0832"
+    assert d.TARGET.is_dir() and not d.TARGET.is_symlink()
+    assert d.SCRATCH.is_dir() and not d.SCRATCH.is_symlink()
+    assert (d.SCRATCH / ".owner").read_text() == "litchi-performance-0832-owned-scratch\n"
+    assert not (d.P / "cleanup.json").exists()
+    binaries = {leg: d.read(d.P / ("build-" + leg + ".json"))["binaries"] for leg in ("before", "after")}
+    for logical in binaries.values():
+        for row in logical.values():
+            assert not d.Path(row["path"]).is_symlink()
+            assert d.sha(row["path"]) == row["sha256"]
+            assert d.Path(row["path"]).stat().st_size == row["bytes"]
+    layout = d.read(d.P / "layout/run.json")["binary"]
+    assert d.Path(layout["path"]) == d.TARGET / "layout-probe"
+    assert d.sha(layout["path"]) == layout["sha256"]
+    assert d.Path(layout["path"]).stat().st_size == layout["bytes"]
+    removed = []
+    for directory in (d.TARGET, d.SCRATCH, guard_scratch):
+        files = [p for p in directory.rglob("*") if p.is_file()]
+        removed.append({"path": str(directory), "files": len(files), "bytes": sum(p.stat().st_size for p in files),
+                        "removed": True,
+                        "owner": (directory / ".owner").read_text() if (directory / ".owner").is_file() else None})
+        shutil.rmtree(directory)
+        assert not directory.exists()
+    d.check("after" if d.read(d.P / "decision.json")["adopt"] else "before")
+    d.write(d.P / "cleanup.json", {"status": "pass", "removed": removed,
+            "binaries": binaries, "layout_probe": layout,
+            "layout_consumed_baseline_libraries": d.read(d.P / "layout/compile.json")["libraries"],
+            "layout_library_note": "These libraries were hashed before and after the layout diagnostic; subsequent candidate builds may replace them at the same target paths."})
+    print("0832 cleanup PASS", removed)
+
+
+if __name__ == "__main__":
+    main()

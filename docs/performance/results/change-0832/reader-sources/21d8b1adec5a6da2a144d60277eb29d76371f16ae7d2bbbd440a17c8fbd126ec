@@ -1,0 +1,28 @@
+"""Admit the complete frozen qualification matrix before comparative capture."""
+import analyze as a
+import audit as independent
+import driver as d
+
+
+def main():
+    d.check("after")
+    a.require_plan()
+    a.require_inputs()
+    for leg in ("before", "after"):
+        a.require_stage("quality-" + leg)
+        a.require_stage("qualification-" + leg)
+    builds = {leg: a.load_build(leg) for leg in ("before", "after")}
+    qualification, identities = a.load_qualification(builds)
+    independent.load_qualification(builds)
+    assert qualification["reports"] == 36 and qualification["samples"] == 36
+    assert len(identities) == 9
+    d.write(d.P / "qualification-admission.json", {"status": "pass", "reports": 36, "samples": 36,
+        "analysis_reader_sha256": d.sha(d.P / "analyze.py"),
+        "independent_reader_sha256": d.sha(d.P / "audit.py"),
+        "qualified_report_hashes": {row["path"]: row["sha256"] for row in qualification["rows"]}})
+    print("0832 independent qualification PASS: 36 reports, 9 cross-leg oracles")
+
+
+if __name__ == "__main__":
+    main()
+

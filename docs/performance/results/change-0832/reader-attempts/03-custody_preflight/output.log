@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/custody_preflight.py", line 19, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/custody_preflight.py", line 12, in main
+    independent.validate_plan()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/audit.py", line 907, in validate_plan
+    require(plan.get("observer") == {"blocks": 2, "samples": 3, "warmup": 0,
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                     "orders": [list(row) for row in OBSERVER_ORDERS]},
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            "observer plan changed")
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/audit.py", line 98, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0832/audit.py", line 93, in fail
+    raise AuditError(message)
+audit.AuditError: observer plan changed

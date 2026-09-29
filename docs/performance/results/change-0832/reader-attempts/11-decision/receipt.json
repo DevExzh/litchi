@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/decision.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790640808.925107,
+  "output_sha256": "af381e2f6d66ca1d5a68667f42f9489f76ff5f7220219edb6abb7f5956953f2f",
+  "started_unix": 1790640808.8880405
+}

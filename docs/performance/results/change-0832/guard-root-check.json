@@ -1,0 +1,18 @@
+{
+  "analysis_sha256": "7998bb1a7a9095bbc71a61c31f492d1726e7d4a6acae2fb98b71e5e713c3da3b",
+  "cases": {
+    "disjoint-two-records": {
+      "native_reports": 12,
+      "observer_reports": 4,
+      "statistics_match": true
+    },
+    "overlap-128-wide-complete": {
+      "native_reports": 12,
+      "observer_reports": 4,
+      "statistics_match": true
+    }
+  },
+  "scope": "All 32 comparative reports: independent quantiles, paired bootstrap, RSS, allocator medians and signed peak deltas.",
+  "script_sha256": "0f73e3b43f9856d34d035a01846a98b7c8ba94493c1413f7a24421c5e79a874d",
+  "status": "pass"
+}

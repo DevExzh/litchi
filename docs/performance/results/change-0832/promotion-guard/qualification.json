@@ -1,0 +1,35 @@
+{
+  "freeze_sha256": "311d92f1ef3d77bbb7a6318ec0e94709b308effa547364d1ccff95b57ffa850d",
+  "lifecycle_output_sha256": {
+    "disjoint-two-records/after/native": "785c924300549de8a72a9bbc08cc54d63ec26ca4a637325a06e5d2c91c9782fc",
+    "disjoint-two-records/after/observer": "785c924300549de8a72a9bbc08cc54d63ec26ca4a637325a06e5d2c91c9782fc",
+    "disjoint-two-records/before/native": "785c924300549de8a72a9bbc08cc54d63ec26ca4a637325a06e5d2c91c9782fc",
+    "disjoint-two-records/before/observer": "785c924300549de8a72a9bbc08cc54d63ec26ca4a637325a06e5d2c91c9782fc",
+    "overlap-128-wide-complete/after/native": "adfc359c926c6faf3a9f8bdeb83c5170e701cf0b7b87dfcbb412778606b5109b",
+    "overlap-128-wide-complete/after/observer": "adfc359c926c6faf3a9f8bdeb83c5170e701cf0b7b87dfcbb412778606b5109b",
+    "overlap-128-wide-complete/before/native": "adfc359c926c6faf3a9f8bdeb83c5170e701cf0b7b87dfcbb412778606b5109b",
+    "overlap-128-wide-complete/before/observer": "adfc359c926c6faf3a9f8bdeb83c5170e701cf0b7b87dfcbb412778606b5109b"
+  },
+  "reports": 16,
+  "reports_sha256": {
+    "qualification/disjoint-two-records-edit-after-native.json": "4bfd0e2f82d556365e300f78d89c694811701bf32a38bb37c9dd7b7e33a11bf8",
+    "qualification/disjoint-two-records-edit-after-observer.json": "e02b64b63c6e7a74751bcfe478d74b19aeb3fc06c563aff03e281ed43cc88c9e",
+    "qualification/disjoint-two-records-edit-before-native.json": "ee1cfb59d77604a309988665783c558b3e2429fd05797fa282e3d8a6259b3962",
+    "qualification/disjoint-two-records-edit-before-observer.json": "2ba51d488ce4a6737596af4b17ae1765f8c74cf192b3428bbcf971a164498d70",
+    "qualification/disjoint-two-records-lifecycle-after-native.json": "5db1c0d072620b9179fb5d129ab4ed40f34c23a77056a6ec6ef3ec4908f3d8ae",
+    "qualification/disjoint-two-records-lifecycle-after-observer.json": "81941efd616c23fabeacaca06a3dbb1ac11f7843c5eb30a6a4ca269d8e57bbd4",
+    "qualification/disjoint-two-records-lifecycle-before-native.json": "c1726a47b24172451b7c6f6f13e3d537d3b6874a058d2834853f5ef205ce8271",
+    "qualification/disjoint-two-records-lifecycle-before-observer.json": "e9297e7713ad7e466baef26411ec8f423a4ad2b21df388b5b5d2381436f09b0c",
+    "qualification/overlap-128-wide-complete-edit-after-native.json": "5cfdce9c459ba7d0b2c5eaa0ce720f4808c721ee10db1948e5850a3ff5b9dd09",
+    "qualification/overlap-128-wide-complete-edit-after-observer.json": "a3e3342f0ac74796b684b88b87e249f6d3daffdb83dd1f53a10911cec4f8e854",
+    "qualification/overlap-128-wide-complete-edit-before-native.json": "68a8cb0a844f41f2f925324fd1399fb8187bd2b98f0a900c9ec1486a02e63fa7",
+    "qualification/overlap-128-wide-complete-edit-before-observer.json": "75c57dd1249e1345be1a8701ae7460d1a0449d1f5e887e9262f93497afc3b47d",
+    "qualification/overlap-128-wide-complete-lifecycle-after-native.json": "6732d7cec93f62a66b8efbde527e3377d51931248b42da4f0978b1e43e20d94c",
+    "qualification/overlap-128-wide-complete-lifecycle-after-observer.json": "2153d28ee7ed1ad3ea2e9e11ba2cb74b13b149e419d4516cc8bb532136634c2d",
+    "qualification/overlap-128-wide-complete-lifecycle-before-native.json": "1eada63801e570aa6093cd1a98f1d7aa937f72c5fe8a8d2024a53aa86636779a",
+    "qualification/overlap-128-wide-complete-lifecycle-before-observer.json": "396713eb4f68d6bf558042a56ccab88f740a0f6d40fbe633ac42744855cdbc05"
+  },
+  "samples": 16,
+  "schema": "litchi.performance.0832.column-promotion-guard.qualification.v1",
+  "status": "pass"
+}

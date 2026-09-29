@@ -1,0 +1,70 @@
+{
+  "binaries": {
+    "after": {
+      "native": {
+        "bytes": 273971840,
+        "path": "/home/zhuhe/code/litchi-target-0832/after-native",
+        "sha256": "e0e6c866f6d9a63e6406e273ecfc3baae4ce50c45976299b8c2395aad8f1ed3a"
+      },
+      "observer": {
+        "bytes": 276973688,
+        "path": "/home/zhuhe/code/litchi-target-0832/after-observer",
+        "sha256": "da866b06e49266596a36f5bbe9014764e44b03162b9aeafa49d1eb92ac8a5c4b"
+      }
+    },
+    "before": {
+      "native": {
+        "bytes": 273972056,
+        "path": "/home/zhuhe/code/litchi-target-0832/before-native",
+        "sha256": "a95c4fc752f7c01929cdf438cc126b9754a3f93c5c13a8ac9c2427b7d17322de"
+      },
+      "observer": {
+        "bytes": 276970480,
+        "path": "/home/zhuhe/code/litchi-target-0832/before-observer",
+        "sha256": "ea7092605e9add3248fcfd188c78972bc4a37363400696017c2f1d8292c4a201"
+      }
+    }
+  },
+  "layout_consumed_baseline_libraries": {
+    "bitflags": {
+      "bytes": 326168,
+      "path": "/home/zhuhe/code/litchi-target-0832/release/release/deps/libbitflags-7ec92213b84d00b5.rlib",
+      "sha256": "a15607cd1c4a3666d08042c9ea84306f4c01302690cc29b57092c789cef6aa69"
+    },
+    "litchi_xlsx": {
+      "bytes": 108765464,
+      "path": "/home/zhuhe/code/litchi-target-0832/release/release/deps/liblitchi_xlsx-7e31121e031e7a2d.rlib",
+      "sha256": "2996cb912046fa9cacbf27f5084ae2b153dc11c6baff932857dba89b83c9140a"
+    }
+  },
+  "layout_library_note": "These libraries were hashed before and after the layout diagnostic; subsequent candidate builds may replace them at the same target paths.",
+  "layout_probe": {
+    "bytes": 4337368,
+    "path": "/home/zhuhe/code/litchi-target-0832/layout-probe",
+    "sha256": "d181965d134e3e7394f9950a2d9e739bad98e3899456c35782512d22a84179c1"
+  },
+  "removed": [
+    {
+      "bytes": 8433756939,
+      "files": 11275,
+      "owner": null,
+      "path": "/home/zhuhe/code/litchi-target-0832",
+      "removed": true
+    },
+    {
+      "bytes": 38,
+      "files": 1,
+      "owner": "litchi-performance-0832-owned-scratch\n",
+      "path": "/home/zhuhe/code/litchi-fs-0832",
+      "removed": true
+    },
+    {
+      "bytes": 46,
+      "files": 1,
+      "owner": "litchi-performance-0832-promotion-guard-owned\n",
+      "path": "/home/zhuhe/code/litchi-fs-0832-promotion-guard",
+      "removed": true
+    }
+  ],
+  "status": "pass"
+}

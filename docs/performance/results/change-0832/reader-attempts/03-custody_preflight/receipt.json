@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/custody_preflight.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790638077.103377,
+  "output_sha256": "1593794af40ae5c1a73fa33f69f694e8081d13d1cdeaf56b2ea97d09dca1cf30",
+  "started_unix": 1790638076.292383
+}

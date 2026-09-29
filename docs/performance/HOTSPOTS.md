@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0832 — first XLSX column record stored inline
+
+[0832](0832-xlsx-inline-column-map.md) Keeping the first complete column record inline removes two dense parser maps and intermediate range buffers on the pinned worksheet: 2,097,472 fewer requested bytes and four fewer calls per edit. The corpus census finds 43 single-record and 159 multi-record worksheets. Both multi-record guards retain allocation totals and entry-adjusted peaks; required parser passes and bounded overlap handling remain intact.
+
 ## 0831 — unused XLSX column-action map removed
 
 [0831](0831-xlsx-empty-column-actions.md) The unused validator map is eliminated for empty column actions, reducing real-edit requested bytes by 524,288 (18.09%) with a 1.96% paired p50 reduction on the pinned fixture. The two bounded parser maps remain; this result authorizes no parser bypass, unbounded overlap scan or general full-save speedup.

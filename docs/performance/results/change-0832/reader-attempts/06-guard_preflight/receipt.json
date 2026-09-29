@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/guard_preflight.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790639780.5559409,
+  "output_sha256": "e1e4ae8489dafde0c6275bf7075a1462d7937056804313e9c9869ee4f7a28c22",
+  "started_unix": 1790639780.4556465
+}

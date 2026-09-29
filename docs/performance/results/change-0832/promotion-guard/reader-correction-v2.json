@@ -1,0 +1,25 @@
+{
+  "failure_log_sha256": "5a8edc4c8dfbf26d58eebe3b30a364573fa90db08ef34a3c60bb83796ea809fa",
+  "failure_receipt_sha256": "9e8a9aab5a85be48b7ac75ae8b95da5cbaf578f4f1ec2d85eff4e3cca57605dc",
+  "freeze_sha256": "311d92f1ef3d77bbb7a6318ec0e94709b308effa547364d1ccff95b57ffa850d",
+  "loader_sha256": "5bfbe0df01fb9ce67d89c1dffa0451619f4b0ee6e4afeb1080e25ecdeaca4285",
+  "missing_globals": [
+    "SOURCES",
+    "write_once"
+  ],
+  "previous_correction_sha256": "1fba9389686f029e0592aa1b6fa98ba96b8b392ef81181450caece1285ee9613",
+  "previous_loader_sha256": "b05d244eb7a550b31047aed3531d3269c2bec081bdd5fb47363204d298e1cf10",
+  "qualification_sha256": "a94a0e1482ac73b0a4b18223e39a09edec9b7c97f3637527339ba95581db394c",
+  "reader_sha256": "77770e42f2a79dbd61f133adca0ff4e245baa4e377157dafb8acf898a433d3de",
+  "reason": "Supply only missing SOURCES and write_once globals; frozen validation/statistics remain unchanged.",
+  "schema": "litchi.performance.0832.promotion-reader-correction.v2",
+  "second_failure_log_sha256": "5b5f7fb7ce5ea8875e58645d27cff69de2adff4c232eae786a383ff87f5ba092",
+  "second_failure_receipt_sha256": "f777295adb8a6e19779218db6801b9fb351a02d56017f28655fdcc7ec7a234a4",
+  "sources": [
+    "crates/litchi-xlsx/src/column.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs"
+  ],
+  "status": "pass"
+}

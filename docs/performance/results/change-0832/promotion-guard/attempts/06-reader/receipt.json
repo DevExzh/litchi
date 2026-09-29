@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/reader.py",
+    "--admit"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790640520.4980116,
+  "launcher_sha256": "6c31ce08395358b376e69407cc2205bc77be331b9e77485081c998a3071f5a2d",
+  "output_sha256": "5a8edc4c8dfbf26d58eebe3b30a364573fa90db08ef34a3c60bb83796ea809fa",
+  "sources_unchanged": true,
+  "started_unix": 1790640520.4289167
+}

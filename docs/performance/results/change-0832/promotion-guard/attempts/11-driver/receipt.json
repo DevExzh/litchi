@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0832/promotion-guard/driver.py",
+    "capture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790640797.3175893,
+  "launcher_sha256": "3607e59a864a77f93b07eb46867831e6d653e887785b0898dbe14e19f62d0306",
+  "output_sha256": "7c5aed4129ba8728172c45150a493bbf351bcfdee1a6f70f56af0178b9fec231",
+  "sources_unchanged": true,
+  "started_unix": 1790640714.8073814
+}
