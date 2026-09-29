@@ -1,0 +1,21 @@
+{
+  "analysis": {
+    "bytes": 74705137,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/analysis.json",
+    "sha256": "f21e9af10c3c65ab27c361bfa276f223de5b039ecac2084b019330e0e5d5e76f"
+  },
+  "attribution": {
+    "bytes": 17089,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/attribution.json",
+    "sha256": "1b44449eedd59734fc05527114540993ee59bc129718e80d4cc9596551625566"
+  },
+  "decision": "diagnostic-only",
+  "goal_complete": false,
+  "next": "Investigate bounded Part-name index construction/reuse with unchanged validation, controlled native and allocation comparison.",
+  "production_changed": false,
+  "reports": 72,
+  "samples": 1464,
+  "separate_preflight_reports": 2,
+  "spread_flags": 0,
+  "status": "complete-batch"
+}

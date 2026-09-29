@@ -1,0 +1,192 @@
+{
+  "checks": [
+    "zip-crc-payload-and-raw-metadata",
+    "untouched-compressed-span-proof",
+    "qualification-report-valid",
+    "native-identities-bind-to-qualification",
+    "callgrind-owner-and-cost-conservation",
+    "callgrind-file-source-attribution",
+    "callgrind-command-normalization",
+    "retained-qualification-reports"
+  ],
+  "mutation_count": 32,
+  "mutations": [
+    {
+      "error": "ReaderError",
+      "name": "expected-source-logical",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "expected-output-logical",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "qualification-without-archives",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-schema",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-unknown-top-level",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-mode",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-timing-description",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-generator-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-generator-pattern",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-warmup",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-sample-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-sample-elapsed",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-output-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-source-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-output-witness",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-logical-witness",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-artifact-role",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-source-artifact-identity",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "report-legacy-sample-fields",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "output-byte-corruption",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "target-not-changed",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "untouched-span-mutation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "untouched-local-span-mutation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-duplicate-events",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-zero-summary",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-owner-call-count",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-negative-cost",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-terminal-nonzero",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-command-mismatch",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-missing-source-attribution",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-self-cost-conservation",
+      "rejected": true
+    },
+    {
+      "error": "ReaderError",
+      "name": "callgrind-unexpected-second-dump",
+      "rejected": true
+    }
+  ],
+  "qualification_reports_checked": 8,
+  "reader": {
+    "bytes": 57450,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/reader.py",
+    "sha256": "0a822ca6286a4ded3ba0723570437c925b3d2f57aa73359f05b94002e209fad9"
+  },
+  "receipt": {
+    "bytes": 460,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/reader-tests/receipt.json",
+    "sha256": "1d29e8c974d52f3a6551f174d56dec0acd6ff1a8523ecdcc9e6b9a9866475251"
+  },
+  "status": "pass",
+  "test_source": {
+    "bytes": 16179,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/reader_tests.py",
+    "sha256": "256b4729fe36ad456d6c96e508a4ae05e3d58077ef315e64678abf7ced8b7e01"
+  }
+}

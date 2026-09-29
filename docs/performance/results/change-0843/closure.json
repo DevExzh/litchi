@@ -1,0 +1,423 @@
+{
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "ancestor-allocation"
+    },
+    {
+      "exit_code": 0,
+      "label": "attribution"
+    },
+    {
+      "exit_code": 0,
+      "label": "crosscheck"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-qualification-reader"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "heaptrack-version"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-archive-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-target-metadata-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "observer-preflight-heap"
+    },
+    {
+      "exit_code": 0,
+      "label": "observer-preflight-profiles"
+    },
+    {
+      "exit_code": 0,
+      "label": "observer-preflight-validation"
+    },
+    {
+      "exit_code": 101,
+      "label": "probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 101,
+      "label": "probe-v2-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v3-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v3-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v3-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v3-release"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v3-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "production-evidence-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-00-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "profiles-01-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-0004-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-0004-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-0064-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-0064-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-1024-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-1024-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-4096-lifecycle"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-4096-publish"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-demangled"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-elf"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-owner-code"
+    },
+    {
+      "exit_code": 0,
+      "label": "symbols-raw"
+    },
+    {
+      "exit_code": 0,
+      "label": "tables"
+    }
+  ],
+  "production_changed": false,
+  "reports": 72,
+  "samples": 1464,
+  "separate_observer_preflight_reports": 2,
+  "separate_observer_preflight_samples": 2,
+  "spread_flags": 0,
+  "status": "pass"
+}

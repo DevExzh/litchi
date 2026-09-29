@@ -1,0 +1,496 @@
+{
+  "analysis": {
+    "bytes": 74705137,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/analysis.json",
+    "sha256": "f21e9af10c3c65ab27c361bfa276f223de5b039ecac2084b019330e0e5d5e76f"
+  },
+  "reducer": {
+    "bytes": 1736,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/attribution.py",
+    "sha256": "37bc2a63c202d662fd484007e9d19a8728959b7a5f83e764d1a2d823dd70bb87"
+  },
+  "rows": [
+    {
+      "owner_ir": 1081656,
+      "row": {
+        "block": 0,
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 21121,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.01952654078561021,
+          "self_ir": 1718
+        },
+        "layout": {
+          "inclusive_ir": 1944,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.001797244225520868,
+          "self_ir": 1124
+        },
+        "part_name_insert": {
+          "inclusive_ir": 15243,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.014092280725110387,
+          "self_ir": 3696
+        },
+        "physical_lookup": {
+          "inclusive_ir": 7964,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.007362784471218206,
+          "self_ir": 1018
+        },
+        "prepare": {
+          "inclusive_ir": 785746,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.7264287351986214,
+          "self_ir": 1060
+        },
+        "topology": {
+          "inclusive_ir": 115862,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.10711538603770515,
+          "self_ir": 2057
+        },
+        "topology_limits": {
+          "inclusive_ir": 13048,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.012062984904627719,
+          "self_ir": 1340
+        },
+        "write_to": {
+          "inclusive_ir": 863609,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.7984137285791416,
+          "self_ir": 747
+        }
+      }
+    },
+    {
+      "owner_ir": 2172678,
+      "row": {
+        "block": 0,
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 219682,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.10111116327407926,
+          "self_ir": 15698
+        },
+        "layout": {
+          "inclusive_ir": 16472,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.0075814271603983656,
+          "self_ir": 9704
+        },
+        "part_name_insert": {
+          "inclusive_ir": 246378,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.11339830384438007,
+          "self_ir": 60126
+        },
+        "physical_lookup": {
+          "inclusive_ir": 96308,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.044326862977394715,
+          "self_ir": 9898
+        },
+        "prepare": {
+          "inclusive_ir": 794216,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.36554703458128635,
+          "self_ir": 9015
+        },
+        "topology": {
+          "inclusive_ir": 783491,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.36061073016802303,
+          "self_ir": 10577
+        },
+        "topology_limits": {
+          "inclusive_ir": 141724,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.06523009852357321,
+          "self_ir": 9020
+        },
+        "write_to": {
+          "inclusive_ir": 969148,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.44606149645736737,
+          "self_ir": 6027
+        }
+      }
+    },
+    {
+      "owner_ir": 19786337,
+      "row": {
+        "block": 0,
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 3502607,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.17702149720789653,
+          "self_ir": 239378
+        },
+        "layout": {
+          "inclusive_ir": 253656,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.012819755369576491,
+          "self_ir": 146984
+        },
+        "part_name_insert": {
+          "inclusive_ir": 3885146,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.1963549898093821,
+          "self_ir": 962386
+        },
+        "physical_lookup": {
+          "inclusive_ir": 1481014,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.07485033738180039,
+          "self_ir": 153471
+        },
+        "prepare": {
+          "inclusive_ir": 950346,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.04803041614018805,
+          "self_ir": 136215
+        },
+        "topology": {
+          "inclusive_ir": 11349051,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.5735801932414272,
+          "self_ir": 146957
+        },
+        "topology_limits": {
+          "inclusive_ir": 2200980,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.11123736546082279,
+          "self_ir": 132270
+        },
+        "write_to": {
+          "inclusive_ir": 2818506,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.14244708356074193,
+          "self_ir": 90507
+        }
+      }
+    },
+    {
+      "owner_ir": 75998450,
+      "row": {
+        "block": 0,
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 13983140,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.1839924366878535,
+          "self_ir": 955154
+        },
+        "layout": {
+          "inclusive_ir": 1009376,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.013281534031286164,
+          "self_ir": 586280
+        },
+        "part_name_insert": {
+          "inclusive_ir": 15540349,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.20448244668147839,
+          "self_ir": 3849814
+        },
+        "physical_lookup": {
+          "inclusive_ir": 5919120,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.07788474633364233,
+          "self_ir": 614891
+        },
+        "prepare": {
+          "inclusive_ir": 1450461,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.019085402399654203,
+          "self_ir": 543255
+        },
+        "topology": {
+          "inclusive_ir": 45095280,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.5933710490148154,
+          "self_ir": 583397
+        },
+        "topology_limits": {
+          "inclusive_ir": 8792282,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.11569028052545809,
+          "self_ir": 526782
+        },
+        "write_to": {
+          "inclusive_ir": 8851878,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.11647445441321501,
+          "self_ir": 360843
+        }
+      }
+    },
+    {
+      "owner_ir": 1080990,
+      "row": {
+        "block": 1,
+        "mode": "publish",
+        "parts": 4,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 21037,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.019460864577840683,
+          "self_ir": 1718
+        },
+        "layout": {
+          "inclusive_ir": 1944,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.0017983515111148114,
+          "self_ir": 1124
+        },
+        "part_name_insert": {
+          "inclusive_ir": 14596,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.013502437580366147,
+          "self_ir": 3696
+        },
+        "physical_lookup": {
+          "inclusive_ir": 8084,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.007478330049306654,
+          "self_ir": 1018
+        },
+        "prepare": {
+          "inclusive_ir": 785746,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.7268762893273758,
+          "self_ir": 1060
+        },
+        "topology": {
+          "inclusive_ir": 115626,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.106963061637943,
+          "self_ir": 2057
+        },
+        "topology_limits": {
+          "inclusive_ir": 13048,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.012070416932626574,
+          "self_ir": 1340
+        },
+        "write_to": {
+          "inclusive_ir": 863307,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.7986262592623429,
+          "self_ir": 747
+        }
+      }
+    },
+    {
+      "owner_ir": 2173213,
+      "row": {
+        "block": 1,
+        "mode": "publish",
+        "parts": 64,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 219294,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.10090773430860206,
+          "self_ir": 15698
+        },
+        "layout": {
+          "inclusive_ir": 16510,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.007597046400882012,
+          "self_ir": 9704
+        },
+        "part_name_insert": {
+          "inclusive_ir": 247549,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.11390922104736168,
+          "self_ir": 60096
+        },
+        "physical_lookup": {
+          "inclusive_ir": 96385,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.04435138203204196,
+          "self_ir": 10052
+        },
+        "prepare": {
+          "inclusive_ir": 794536,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.36560429189407573,
+          "self_ir": 9015
+        },
+        "topology": {
+          "inclusive_ir": 784840,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.36114269517069886,
+          "self_ir": 10577
+        },
+        "topology_limits": {
+          "inclusive_ir": 141748,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.06522508378147931,
+          "self_ir": 9020
+        },
+        "write_to": {
+          "inclusive_ir": 969635,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.4461757775238782,
+          "self_ir": 6027
+        }
+      }
+    },
+    {
+      "owner_ir": 19891812,
+      "row": {
+        "block": 1,
+        "mode": "publish",
+        "parts": 1024,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 3502192,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.17606198972723047,
+          "self_ir": 239378
+        },
+        "layout": {
+          "inclusive_ir": 253566,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.01274725500120351,
+          "self_ir": 146984
+        },
+        "part_name_insert": {
+          "inclusive_ir": 3886190,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.19536631454188286,
+          "self_ir": 962706
+        },
+        "physical_lookup": {
+          "inclusive_ir": 1483201,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.07456339321928038,
+          "self_ir": 154432
+        },
+        "prepare": {
+          "inclusive_ir": 950286,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.04777272176109446,
+          "self_ir": 136215
+        },
+        "topology": {
+          "inclusive_ir": 11353476,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.5707612760466467,
+          "self_ir": 146957
+        },
+        "topology_limits": {
+          "inclusive_ir": 2201312,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.11066422706991198,
+          "self_ir": 132270
+        },
+        "write_to": {
+          "inclusive_ir": 2919532,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.14677054056211672,
+          "self_ir": 90507
+        }
+      }
+    },
+    {
+      "owner_ir": 76205742,
+      "row": {
+        "block": 1,
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "warmup": 0
+      },
+      "symbols": {
+        "index": {
+          "inclusive_ir": 13984963,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy",
+          "owner_fraction": 0.18351586944721304,
+          "self_ir": 955154
+        },
+        "layout": {
+          "inclusive_ir": 1009362,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout",
+          "owner_fraction": 0.013245222387572843,
+          "self_ir": 586280
+        },
+        "part_name_insert": {
+          "inclusive_ir": 15540912,
+          "name": "litchi_opc::members::PartNameIndex::insert",
+          "owner_fraction": 0.20393360909733022,
+          "self_ir": 3849139
+        },
+        "physical_lookup": {
+          "inclusive_ir": 5918005,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup",
+          "owner_fraction": 0.07765825572566434,
+          "self_ir": 614256
+        },
+        "prepare": {
+          "inclusive_ir": 1450576,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::prepare_with",
+          "owner_fraction": 0.019034996076804814,
+          "self_ir": 543255
+        },
+        "topology": {
+          "inclusive_ir": 45096378,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state",
+          "owner_fraction": 0.5917713917148133,
+          "self_ir": 583397
+        },
+        "topology_limits": {
+          "inclusive_ir": 8791686,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits",
+          "owner_fraction": 0.11536776323232965,
+          "self_ir": 526782
+        },
+        "write_to": {
+          "inclusive_ir": 9059669,
+          "name": "soapberry_zip::preserve::PreservationIndex<R>::write_to",
+          "owner_fraction": 0.11888433551372021,
+          "self_ir": 360843
+        }
+      }
+    }
+  ],
+  "scope": "Inclusive costs overlap; topology contains insert/limits/lookup, and write_to contains prepare/layout. Do not sum these rows or infer elapsed phase times.",
+  "status": "pass"
+}

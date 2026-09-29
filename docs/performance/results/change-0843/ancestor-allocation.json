@@ -1,0 +1,67 @@
+{
+  "analysis": {
+    "bytes": 74705137,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/analysis.json",
+    "sha256": "f21e9af10c3c65ab27c361bfa276f223de5b039ecac2084b019330e0e5d5e76f"
+  },
+  "reducer": {
+    "bytes": 1222,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/ancestor_allocation.py",
+    "sha256": "02ddbe8c28c30f2a047948efbbe730babde4fb59abdc2fdb62df964aa59098cd"
+  },
+  "rows": [
+    {
+      "row": {
+        "block": 0,
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "warmup": 0
+      },
+      "stacks": [
+        {
+          "allocation_events": 4096,
+          "allocation_info_index": 575,
+          "line": 201,
+          "requested_bytes": 98304
+        },
+        {
+          "allocation_events": 4096,
+          "allocation_info_index": 576,
+          "line": 209,
+          "requested_bytes": 32768
+        }
+      ]
+    },
+    {
+      "row": {
+        "block": 1,
+        "mode": "publish",
+        "parts": 4096,
+        "samples": 1,
+        "warmup": 0
+      },
+      "stacks": [
+        {
+          "allocation_events": 4096,
+          "allocation_info_index": 575,
+          "line": 201,
+          "requested_bytes": 98304
+        },
+        {
+          "allocation_events": 4096,
+          "allocation_info_index": 576,
+          "line": 209,
+          "requested_bytes": 32768
+        }
+      ]
+    }
+  ],
+  "scope": "Allocation attribution only; no native speedup prediction or production candidate.",
+  "source": {
+    "bytes": 13300,
+    "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/members.rs",
+    "sha256": "fdc830dc2792646d0c02300fc0b192931309cd2a3cf12b4085b1417619c8e133"
+  },
+  "status": "pass"
+}

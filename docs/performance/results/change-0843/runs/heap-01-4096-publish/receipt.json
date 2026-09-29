@@ -1,0 +1,39 @@
+{
+  "artifacts": [
+    {
+      "bytes": 1991,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-4096-publish/report.json",
+      "sha256": "d98b534ea11d0284277ed2f21a19b9431bae37ba63b5adabf0f35938180639f4"
+    },
+    {
+      "bytes": 1219,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-4096-publish/started.json",
+      "sha256": "43fc80e26d6e81e281dd7aa909816723ef7ce98e15469f1e532b8c2b9ba668e5"
+    },
+    {
+      "bytes": 15,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-4096-publish/time.txt",
+      "sha256": "d2e231373364ae43dd00d9aead901a54acf291dbb032a654781688bf960e0fc0"
+    },
+    {
+      "bytes": 53250,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-4096-publish/trace.zst",
+      "sha256": "3411273852c07f3c5c34823e13ddcfbbdc09527ee398319e43c0ab5ec88a8124"
+    }
+  ],
+  "command": {
+    "bytes": 1008,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/heap-01-4096-publish/receipt.json",
+    "sha256": "89eab92568c7baa4b9cb989c4e20426c33260eb9237e264183afec3029314ec7"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790704641.9318867,
+  "lane": "heap",
+  "row": {
+    "block": 1,
+    "mode": "publish",
+    "parts": 4096,
+    "samples": 1,
+    "warmup": 0
+  }
+}

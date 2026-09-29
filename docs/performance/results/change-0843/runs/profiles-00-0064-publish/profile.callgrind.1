@@ -1,0 +1,18610 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 3865907
+cmd:  /home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe --parts 64 --mode publish --samples 1 --warmup 0 --output /home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-0064-publish/report.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 38777961
+desc: Trigger: --dump-after=opc_preservation_probe::profile_publish
+
+positions: line
+events: Ir
+summary: 2172678
+
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+fn=(712) __memcpy_avx_unaligned_erms
+255 1259
++1 1259
++6 1259
++1 1259
++2 700
++1 700
++1 700
++3 199
++1 199
++1 199
++3 398
++30 559
++1 559
++2 158
++1 158
++2 155
++4 155
++1 20
++1 20
++1 12
++1 12
++1 6
++1 6
++2 6
++2 6
+-2 6
++2 14
++6 135
++1 135
++1 135
++1 135
++1 135
++7 401
++1 401
++1 401
++1 401
++2 401
++17 3
++1 3
++1 3
++1 3
++1 3
++7 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 2
++5 501
++1 501
++5 501
++1 501
++2 346
++1 346
++1 346
++2 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 345
++1 690
++4 155
++1 155
++4 155
++2 155
++4 155
++1 155
++11 155
++3 155
++2 155
++2 155
++4 155
++1 155
++9 144
++1 144
++2 144
++2 144
++1 144
++1 144
++3 144
++2 144
++2 144
++2 288
++6 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
++1 144
+-11 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++1 400
++2 144
++1 144
++1 144
++1 144
++2 144
++4 288
++13 11
++1 11
++2 11
++1 11
++1 11
++2 11
++2 11
++2 22
++6 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
++1 11
+-11 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++2 11
++1 11
++1 11
++1 11
++2 11
++1 22
+
+fl=(165) ./csu/../csu/libc-start.c
+fn=(566) __libc_start_main@@GLIBC_2.34
+cfi=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(588) (below main)
+calls=0 30 
+360 2172678
+
+fl=(290) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+fn=(1086) __memcmp_avx2_movbe
+73 1313
++7 1313
++1 1313
++3 1
++1 1
++1 1
++4 1
++1 1
++65 139
++10 139
++1 139
++1 139
++3 278
+401 1312
++1 1312
++5 536
++1 536
++1 536
++1 536
++1 536
++3 512
++1 512
++1 512
++1 512
++3 512
++1 512
++1 384
++1 768
++6 24
++1 24
++2 1
++1 1
++2 1
++1 1
++2 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++2 1
++2 1
++4 776
++1 776
++1 776
++1 776
++2 776
++53 23
++1 23
++1 23
++1 23
++1 23
++4 13
++1 13
++1 13
++1 13
++1 13
++1 13
++2 13
++2 13
+
+fl=(168)
+fn=(588)
+cob=(6) /home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe
+cfi=(164) ???
+cfn=(596) main
+calls=0 0 
+59 2172678
+
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(792) calloc
+3739 3
++3 12
+1269 6
++19 3
+3751 3
+1288 9
+3751 6
++29 6
+cfn=(794) __libc_calloc2
+calls=278 3645 
+* 132156
+
+fn=(716) _int_free_merge_chunk
+4407 6928
++7 4330
+-6 866
++9 2598
++5 2598
++4 1732
+-1 1732
++1 1732
+1895 2598
+4433 1732
++2 427
++2 427
++1 1708
++2 427
+-4 427
++4 427
+cfn=(778) unlink_chunk.isra.0
+calls=2586 1592 
+* 8206
++18 1732
++6 1730
++4 547
++4 1730
++9 48
+-1 48
++2 96
++2 144
++7 1634
++1 3268
++1 817
++2 1634
++3 4902
++4 817
+-1 817
++2 817
++1 817
++2 2451
++1 817
+-61 817
+-1 1634
++1 4902
+-1 817
+cfn=(718) _int_free_maybe_trim
+calls=4381 +83 
+* 19608
++57 48
+-1 48
++2 48
++1 48
++2 144
++1 48
+-61 48
+-1 96
++1 288
+-1 48
+cfn=(718)
+calls=841 +83 
+* 1192
++1 1
+-1 2
++1 6
+-1 1
+cfn=(718)
+calls=8 +83 
+* 34
++70 1
++1 3
++1 2
+-52 318
++1 318
+-1 318
+cfn=(778)
+calls=1802 1592 
+* 6144
++1 318
+-49 4330
+
+fn=(634) malloc
+3283 557
+1269 1114
++19 557
+3287 557
+1288 1601
+3287 974
++2 1425
++2 950
++2 3270
+3030 430
++4 860
++4 215
++1 215
+3294 215
+-7 140
++19 342
+cfn=(636) __libc_malloc2
+calls=4343 -59 
+* 60305
+-17 140
+
+fn=(636)
+3247 2052
++4 684
++28 1710
+-26 1026
+cfn=(638) _int_malloc
+calls=4344 3790 
+* 52439
++1 1710
+fi=(154) ./malloc/./malloc/arena.c
+151 684
+fe=(155)
+
+fn=(718)
+4528 9548
++3 1736
++2 24
++3 36
++14 9548
+
+fn=(2032) posix_memalign
+5366 4
++6 2
+-1 2
++1 2
+-1 2
++1 2
++1 8
+-7 4
++11 2
+-11 8
++11 2
+cfn=(2034) _mid_memalign
+calls=275 3558 
+* 820
+* 2
++8 2
+-6 4
++2 2
++1 2
++4 6
+
+fn=(2034)
+3558 2
++5 4
++4 4
+-9 10
+1269 4
++19 8
+3104 4
+3594 4
++24 10
+-46 6
++8 4
++16 8
+cfn=(2036) _int_memalign
+calls=275 4688 
+* 734
++1 10
+fi=(154)
+151 4
+fe=(155)
+3618 4
+
+fn=(2036)
+4688 6
+-3 2
+1288 4
+4685 4
+1288 2
+4685 2
+1288 4
+4685 6
+1288 4
+4699 4
+cfn=(638)
+calls=275 3790 
+* 378
++2 4
++5 2
+-2 2
++2 2
+1440 4
+4706 4
++12 4
++2 2
++2 1
+-2 1
++5 1
+-5 1
++1 1
++1 1
+-1 1
++4 1
+-3 1
++3 1
++2 1
+-2 1
++1 5
++1 1
++1 3
++1 1
+-1 2
++1 3
+cfn=(716)
+calls=272 4407 
+* 100
++1 2
++4 8
++12 2
+-1 2
++1 10
+-8 2
+-2 2
++1 2
++1 6
++2 2
+-1 4
+4458 4
++6 2
++8 2
++9 1
+-1 1
++2 2
++2 2
++18 1
+-1 1
++2 1
++1 1
++2 3
++1 1
+4741 3
+cfn=(718)
+calls=269 4528 
+* 24
+* 3
+cfn=(718)
+calls=5 4528 
+* 34
+* 4
+4515 1
++1 3
++1 4
+-52 1
+cfn=(778)
+calls=269 1592 
+* 22
++1 4
+
+fn=(704) realloc
+3380 12
++7 12
+-7 54
++11 12
+4837 6
++1 6
+-1 6
++1 6
+-1 12
++2 18
+3425 6
+-22 6
++22 30
++4 12
+1288 36
+3436 12
+fi=(154)
+151 18
+fe=(155)
+3469 12
+4840 6
+3411 12
++90 54
+-30 24
+cfn=(708) _int_realloc
+calls=172 4559 
+* 3927
+* 6
++1 30
+fi=(154)
+151 18
+fe=(155)
+3472 12
+
+fn=(708)
+4559 24
++11 72
++8 12
++2 6
++1 18
++1 24
++4 12
++89 24
+-79 12
++12 10
++12 35
+cfn=(638)
+calls=136 3790 
+* 1294
+* 5
++1 10
++3 5
++6 15
+-20 5
+-1 10
++29 5
+fi=(214) ./malloc/../string/bits/string_fortified.h
+29 5
+fe=(155)
+4637 5
+fi=(214)
+29 10
+fe=(155)
+4638 10
+fi=(214)
+29 5
+cob=(3) ???
+cfi=(152) ???
+cfn=(710) 0x0000000004a9f680
+calls=136 -29 
+* 1559
+fe=(155)
+4642 30
+cfn=(714) _int_free_chunk
+calls=136 4351 
+* 675
++2 10
+-47 1
++1 1
+-2 2
++4 4
++2 1
+-2 1
++2 1
+-2 4
++1 2
++1 1
++2 2
+
+fn=(638)
+3790 3168
++32 704
+1288 2045
+3831 570
++16 570
++54 105
++18 352
+-1 352
++12 704
+-11 704
+-1 1056
++12 704
+-6 310
++5 310
+-7 310
++2 620
++9 620
++3 620
+-3 14
++3 14
++1 951
+-3 317
++5 317
++1 1268
++2 1268
+-10 317
++12 634
++1 634
++2 634
++11 1218
++29 31
++1 31
++4 62
++31 62
++8 104
++1 6
++1 6
+-1 6
++4 12
+-4 14
++1 14
+-1 14
++4 28
++5 16
+-2 4
++3 8
++6 9
++3 9
++2 6
++33 6
++9 3
+-9 12
++1 3
++1 3
++1 3
++1 3
++6 6
+-10 138
++9 69
+-9 276
++1 69
++1 69
++1 69
++1 69
++6 138
+3053 13
+-27 13
++27 13
+-27 13
++4 26
++4 52
++4 13
++1 13
+4113 13
+3831 268
+1288 67
+3850 67
++2 67
+-2 67
++2 134
+-2 264
++2 264
+-2 264
++2 528
+4340 3168
+3901 428
+-52 1584
+4105 216
+3930 255
+4111 312
++13 107
+-2 214
++2 42
++3 21
+-3 21
++3 42
++1 10
++3 6
++1 15
++6 6
++5 3
++1 6
+-1 12
++1 3
+cfn=(778)
+calls=281 1592 
+* 93
++3 18
++13 2
++1 4
++3 2
+-8 2
++8 4
++1 2
++1 2
++1 4
+4277 24
++3 96
++2 36
++1 12
+1888 12
+4286 12
+1888 24
+4280 512
++2 192
++1 64
+1888 64
+4286 64
+1888 154
+4286 26
+1888 52
+3994 13
++1 13
+-1 13
++1 26
+2919 26
+3998 39
++4 26
++1 39
+3003 13
+3981 13
+3015 13
+4006 13
+3003 13
++4 52
++1 13
++7 13
+4007 13
++24 117
++52 16
+-51 16
++51 48
+3959 584
++2 286
+-1 572
++27 54
++1 54
++4 108
++31 205
++2 82
++1 123
++1 41
+-1 41
++1 41
+-2 22
++1 33
++1 11
+-1 11
++1 16
++4 20
++26 3
++1 2
++6 1
++7 1
+-1 3
++2 2
++2 1
++1 3
++2 1
++1 2
+-47 36
+4195 104
++1 104
++1 104
+-1 104
++1 104
++1 208
++1 312
++5 520
++16 648
++2 1296
+-4 1624
++8 164
++3 328
++2 130
++1 65
++1 65
+-2 65
+-27 65
++4 39
++3 32
++97 10
++1 15
++2 10
++3 20
++5 5
+-2 5
++2 10
+-2 5
++7 5
+-8 5
++3 5
++2 5
+-3 5
++1 20
++2 5
+1888 15
+4208 8
++5 32
++1 16
++24 198
++3 198
++2 99
++3 198
+-3 396
++3 99
+cfn=(778)
+calls=1190 1592 
+* 2049
++3 594
++15 74
++1 148
++3 74
+-9 74
++9 148
++1 74
++1 74
++3 148
++1 61
++1 158
+-23 26
+-1 26
++1 52
+3965 232
++3 232
+-4 464
++3 232
+-1 232
++1 464
++1 464
++1 464
++6 232
++6 232
+-6 1624
++2 696
++5 232
+-4 232
++4 464
+cfn=(646) alloc_perturb
+calls=1867 1887 
+* 1160
++1 232
+
+fn=(646)
+1887 232
++1 696
++2 232
+
+fn=(714)
+4351 3460
++8 865
+-3 865
++3 865
+-3 1730
++6 1730
++6 865
+cfn=(716)
+calls=4958 +39 
+* 105291
++5 1730
++27 2595
+
+fn=(746) free
+3319 1102
++3 2204
++15 2204
+-4 3306
++8 3306
++6 3228
++6 1076
+-3 2152
++3 1076
+-3 1076
++1 2152
++2 3228
+3007 242
++8 242
+-12 242
++4 726
++1 242
++7 242
+3354 242
++10 2502
+-34 860
++40 1720
+fi=(154)
+151 2580
+fe=(155)
+3374 2580
+cfn=(714)
+calls=4813 4351 
+* 119321
+
+fn=(778)
+1592 848
++2 2544
+-2 848
++2 1696
++3 848
++3 1696
+-2 848
++2 1696
++3 848
++1 848
++1 1864
++2 52
++1 78
++3 52
++14 26
++1 26
++3 1696
+
+fn=(794)
+3645 24
++7 6
++10 3
++1 9
++21 9
+cfn=(638)
+calls=278 3790 
+* 829
+* 3
++2 18
++40 3
+-12 3
++12 6
++3 15
++4 3
+fi=(443) ./malloc/../sysdeps/generic/calloc-clear-memory.h
+25 6
++2 6
+fe=(155)
+3686 3
+fi=(154)
+151 6
+fe=(155)
+3686 9
++3 9
++46 3
+fi=(214)
+59 6
+fe=(155)
+3735 15
+fi=(214)
+59 3
+cob=(3)
+cfi=(152)
+cfn=(782) 0x0000000004a9f710
+calls=278 -59 
+* 131159
+fe=(155)
+
+fl=(219) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+fn=(784) __memset_avx2_unaligned_erms
+198 224
++1 448
++5 224
++1 224
++1 153
++1 153
++1 153
++2 66
++1 66
++1 132
++17 87
++1 87
++6 73
++1 73
++12 73
++3 73
++1 73
++12 73
++1 73
++13 73
++1 73
++2 73
++3 69
++3 69
++3 69
++1 69
++1 69
++1 69
++1 69
++1 69
++1 69
+-6 200
++1 200
++1 200
++1 200
++1 200
++1 200
++1 269
++3 69
++1 69
++1 69
++1 69
++3 138
+-6 4
++1 4
++1 4
++1 4
++3 8
++15 14
++1 14
++1 14
++1 14
++1 14
++1 760169
++5 14
++2 28
++8 71
++9 71
++1 71
++5 2
++1 2
++1 1
++1 1
++1 1
++1 1
++1 1
++3 1
++17 69
++1 69
++1 69
++9 1
++1 1
++5 1
+
+fl=(422) ./misc/../sysdeps/unix/sysv/linux/x86_64/syscall.S
+fn=(4222) syscall
+29 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
+
+ob=(6)
+fl=(388) /home/zhuhe/code/litchi/crates/soapberry-zip/src/locator.rs
+fn=(4732) soapberry_zip::locator::ZipLocator::locate_in_byte_slice
+398 11
+fi=(254) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/uint_macros.rs
+2345 3
+fi=(273) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/index.rs
+573 2
+fi=(254)
+3928 7
+923 1
+fi=(444) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/double_ended.rs
+237 1
+fi=(254)
+923 18
+fi=(444)
+237 18
+fi=(323) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter.rs
+0 19
+fi=(254)
+923 19
+fi=(260) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs
+154 19
+fi=(444)
++84 19
+fi=(260)
+-84 19
+fi=(444)
++84 19
+fe=(388)
+0 2
+fi=(257) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs
+1164 1
+fe=(388)
+401 2
+fi=(257)
+1342 1
+cfi=(225) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs
+cfn=(3710) core::ptr::drop_in_place<soapberry_zip::errors::ErrorKind>
+calls=4 805 
+* 15
+fi=(273)
+568 3
+89 2
+fe=(388)
+449 1
+cfn=(2606) soapberry_zip::locator::EndOfCentralDirectoryRecordFixed::parse
+calls=4 1369 
+* 23
+fi=(237) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs
+0 1
+2173 2
++1 4
+fe=(388)
+461 1
+1402 14
+451 1
+fi=(254)
+769 2
+fe=(388)
+465 2
+0 1
+455 1
+1144 9
++10 1
+cfn=(2614) soapberry_zip::locator::EndOfCentralDirectory::validate
+calls=4 +22 
+* 28
+fi=(237)
+2173 2
+0 1
+fe=(388)
+1155 6
+32 6
+472 8
+fi=(237)
+2174 6
+fe=(388)
+403 4
++3 2
+cfn=(4742) soapberry_zip::locator::EndOfCentralDirectory::validate_source
+calls=4 1206 
+* 24
+fi=(237)
+2173 2
+fe=(388)
+415 1
+fi=(254)
+923 2
+fi=(257)
+1583 1
+fi=(254)
+923 2
+fe=(388)
+418 1
+cfi=(380) /home/zhuhe/code/litchi/crates/soapberry-zip/src/archive.rs
+cfn=(4438) soapberry_zip::archive::ZipFileHeaderFixed::parse
+calls=4 3972 
+* 33
+fi=(287) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/macros/mod.rs
++15 1
+fi=(225)
+805 1
+fe=(388)
+0 8
+442 9
+
+fn=(2606)
+1369 4
++1 2
+fi=(387) /home/zhuhe/code/litchi/crates/soapberry-zip/src/utils.rs
+8 1
+fe=(388)
+1385 2
+fi=(387)
+13 1
+fe=(388)
+1392 1
+fi=(387)
+8 1
+fe=(388)
+1392 1
+fi=(387)
+13 1
+fe=(388)
+1392 3
++1 1
+0 1
+1393 4
+
+fn=(2614)
+1176 3
++4 1
+fi=(254)
+769 1
+fi=(300) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/intrinsics/mod.rs
+457 1
+fe=(388)
+0 1
+1255 3
+-66 6
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(388)
+1198 2
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 1
+fe=(388)
+1204 4
+
+fn=(4742)
+1206 3
++5 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(388)
+1213 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fe=(388)
+1216 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(257)
+1042 2
+fe=(388)
+1219 4
+0 1
+1227 4
+
+fl=(361) /home/zhuhe/code/litchi/crates/soapberry-zip/src/extra_fields.rs
+fn=(2106) soapberry_zip::extra_fields::ExtraFieldsContainer::write_extra_fields
+221 18
++1 4
+0 1
+222 3
+0 1
+225 2
+0 2
+235 16
+
+fl=(291) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/mod.rs
+fn=(1238) core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks
+1345 512
+fi=(309) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/ascii.rs
+135 512
++1 640
+0 128
+fi=(258) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/mod.rs
+670 128
+817 768
+670 256
+817 768
+670 128
+fi=(309)
+126 384
++10 128
+0 128
+159 128
+fe=(291)
+
+fn=(4540) core::slice::<impl [T]>::binary_search_by
+2970 520
++5 130
+0 65
+2975 65
++47 520
+-52 1320
++5 264
+0 132
+2975 264
+fi=(273)
+272 396
+fi=(423) /home/zhuhe/code/litchi/crates/soapberry-zip/src/preserve.rs
+139 132
++1 132
+fi=(273)
+438 264
+0 660
+89 264
+fi=(260)
+317 396
++8 264
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=264 73 
+* 2906
+* 132
++1 264
+fe=(291)
+3011 264
++5 390
+0 2
+3022 1320
+-52 660
++5 132
++47 660
+
+fn=(4458) core::slice::<impl [T]>::sort_unstable_by_key
+3240 3
++5 1
+fi=(313) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/sort/unstable/mod.rs
+34 1
+fi=(300)
+434 1
+fi=(313)
+50 1
+fi=(300)
+434 1
+fe=(291)
+0 1
+fi=(313)
+55 1
+cfn=(1306) core::slice::sort::unstable::ipnsort
+calls=2 +59 
+* 991
+fe=(291)
+3246 2
+
+fl=(296) /rust/deps/hashbrown-0.16.1/src/map.rs
+fn=(4030) hashbrown::map::HashMap<K,V,S,A>::contains_key
+1420 640
+fi=(303) /rust/deps/hashbrown-0.16.1/src/raw/mod.rs
+0 320
+fe=(296)
+1426 640
+
+fn=(4228) hashbrown::map::HashMap<K,V,S,A>::remove
+2005 5
+258 4
+cfi=(297) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/mod.rs
+cfn=(1166) core::hash::BuildHasher::hash_one
+calls=2 694 
+* 147
+fi=(301) /rust/deps/hashbrown-0.16.1/src/control/tag.rs
+48 3
+fi=(303)
+2492 8
+0 1
+fi=(225)
+547 1
+fi=(302) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/sse2.rs
+1563 3
+fi=(307) /rust/deps/hashbrown-0.16.1/src/control/bitmask.rs
+50 2
+fi=(306) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/nonzero.rs
+641 1
+fi=(303)
+2073 2
+fi=(231) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mut_ptr.rs
+1072 3
+fi=(351) /home/zhuhe/code/litchi/crates/soapberry-zip/src/office.rs
+1255 1
+fi=(300)
+434 1
+fi=(303)
+0 1
+fi=(299) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/const_ptr.rs
+619 5
+fi=(254)
+2494 1
+fi=(303)
+3254 1
+fi=(225)
+547 1
+fi=(302)
+914 1
+1563 2
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(254)
+154 2
++24 2
+fi=(303)
+3297 4
++3 2
+2634 1
++1 1
+3305 1
+fi=(225)
+1717 3
+fe=(296)
+2014 5
+-9 585
+258 325
+cfi=(297)
+cfn=(1166)
+calls=130 694 
+* 13926
+fi=(301)
+48 195
+fi=(303)
+2492 520
+0 65
+fi=(225)
+547 65
+fi=(302)
+1563 195
+fi=(307)
+50 130
+fi=(302)
+1563 130
+fi=(300)
+434 195
+fe=(296)
+2012 65
++2 520
+
+fn=(3962) hashbrown::map::HashMap<K,V,S,A>::get
+1309 2
+0 9
+258 7
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 221
+fi=(301)
+48 3
+fi=(303)
+2492 8
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+-50 5
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 2
+fi=(260)
+20 2
+fi=(303)
+1236 2
+fi=(260)
+154 3
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=2 -81 
+* 19
+* 1
+fi=(300)
+434 1
+fi=(303)
+1251 10
+fe=(296)
++67 1
+-9 130
+fi=(303)
+0 65
+fe=(296)
+1318 65
+-9 128
+0 256
+258 384
+cfi=(297)
+cfn=(1166)
+calls=128 694 
+* 9408
+fi=(301)
+48 192
+fi=(303)
+2492 448
+0 64
+fi=(225)
+547 64
+fi=(302)
+1563 192
+fi=(307)
+50 128
+fi=(306)
+641 2
+fi=(303)
+2073 4
+fi=(231)
+1072 6
+fi=(228) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs
+1878 2
+fi=(300)
+434 2
+fi=(306)
++65 1
+fi=(307)
+50 3
+-50 1
+fi=(302)
+1563 2
+fi=(300)
+434 2
+fi=(302)
+1563 124
+fi=(300)
+434 124
+fe=(296)
+0 63
+fi=(303)
+1251 378
+fe=(296)
++67 63
+fi=(303)
+-67 6
+fe=(296)
++67 1
+
+fn=(2712) hashbrown::map::HashMap<K,V,S,A>::insert
+1841 1280
+258 896
+cfi=(297)
+cfn=(1166)
+calls=386 694 
+* 27520
+* 128
+fi=(303)
+956 128
+fi=(300)
+457 128
+0 128
+fi=(303)
+1179 256
+fi=(301)
+48 1280
+fi=(303)
+-48 128
+fi=(225)
+547 128
+fi=(302)
+1563 384
+fi=(307)
+50 256
+-50 40
+fi=(306)
+641 5
+fi=(303)
+1863 10
+fi=(231)
+1072 20
+fi=(260)
+20 10
+fi=(303)
+1179 10
+fi=(260)
+154 5
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=15 -81 
+* 111
+* 5
+fi=(300)
+434 5
+fi=(306)
++65 5
+fi=(307)
+50 60
+fi=(287)
+433 128
+fi=(300)
++1 128
+fi=(302)
+1563 128
+fi=(307)
+50 256
+fi=(306)
+641 128
+fi=(303)
+1793 256
+fi=(302)
+1563 256
+fi=(300)
+434 256
+fi=(303)
+2687 128
+fi=(300)
+457 384
+fi=(301)
+30 128
+fi=(254)
+2494 128
+fi=(303)
+2631 128
++3 128
++1 128
+2499 768
+fi=(231)
+1072 384
+fi=(225)
+1917 896
+fe=(296)
+-65 1152
+-11 8
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(303)
+956 1
+fi=(300)
+457 1
+fi=(303)
+1179 2
+fi=(301)
+48 9
+fi=(303)
+-48 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(287)
+433 1
+fi=(300)
++1 1
+fi=(302)
+1563 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+1793 2
+fi=(302)
+1563 2
+fi=(300)
+434 2
+fi=(303)
+2687 1
+fi=(300)
+457 2
+fi=(301)
+30 1
+fi=(254)
+2494 1
+fi=(303)
+2631 1
++3 1
++1 1
+2499 6
+fi=(231)
+1072 4
+fi=(225)
+1917 2
+fi=(231)
+1072 1
+fe=(296)
+0 1
+1852 6
+
+fl=(363) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/mod.rs
+fn=(2124) zlib_rs::deflate::algorithm::run
+30 27
++2 12
+-1 15
++5 42
+cfi=(364) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs
+cfn=(2126) zlib_rs::deflate::algorithm::medium::deflate_medium
+calls=204 -24 
+* 298625
+
+fl=(395) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/deflate/read.rs
+fn=(3022) flate2::deflate::read::DeflateDecoder<R>::new
+170 6
+fi=(236) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs
+36 3
+cob=(2)
+cfi=(155)
+cfn=(792)
+calls=6 3739 
+* 33043
+fi=(244) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs
+468 2
+fi=(396) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/bufreader.rs
+46 19
+fi=(399) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/deflate/bufread.rs
+181 1
+cfi=(354) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/mem.rs
+cfn=(3028) flate2::mem::Decompress::new
+calls=6 404 
+* 15515
+-2 5
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 +76 
+* 30
+* 5
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 +76 
+* 30
+* 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 +76 
+* 65
+fe=(395)
+-7 5
+
+fl=(383) /home/zhuhe/code/litchi/crates/litchi-core/src/source.rs
+fn=(2590) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at
+178 334
+fi=(251) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/non_null.rs
+444 334
+fi=(245) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs
+1815 334
+fi=(254)
+923 668
+fi=(273)
+89 334
+fi=(228)
+1076 668
+fi=(225)
+547 1002
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=810 255 
+* 8179
+fe=(383)
+180 1336
+
+fn=(2796) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version
+182 963
++1 2889
++1 963
+
+fl=(298) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hash/sip.rs
+fn=(1168) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+256 1761
++2 1761
++4 5283
+0 843
+263 843
+fi=(228)
+1076 2529
+fe=(298)
+126 1686
+0 3522
+132 3372
++5 1686
++2 4215
+265 3372
++1 1686
++1 716
+0 716
+300 1432
+0 127
+270 127
+76 254
+fi=(254)
+2457 381
+fi=(300)
+2029 127
+fe=(298)
+78 127
+fi=(300)
+2029 254
+fe=(298)
+79 127
+fi=(254)
+2457 127
+fi=(300)
+2029 127
+fi=(254)
+2457 127
+fe=(298)
+79 127
+fi=(300)
+2029 127
+fe=(298)
+79 127
+-1 127
+fi=(300)
+2029 127
+fe=(298)
+78 127
++14 127
+272 254
++6 127
++1 381
++3 254
+-4 918
++1 2754
++3 1836
+0 3950
+fi=(225)
+547 790
+fe=(298)
+288 790
+fi=(254)
+2457 790
+fi=(300)
+2029 790
+fi=(254)
+2457 790
+fe=(298)
+78 790
+fi=(300)
+2029 790
+fe=(298)
+79 790
+fi=(300)
+2029 790
+fi=(254)
+2457 1580
+fi=(300)
+2029 790
+fe=(298)
+79 790
+fi=(300)
+2029 1580
+fe=(298)
+78 790
+290 790
++2 790
+-10 1580
+fi=(225)
+547 709
+fe=(298)
+288 709
+fi=(254)
+2457 709
+fi=(300)
+2029 709
+fi=(254)
+2457 709
+fe=(298)
+78 709
+fi=(300)
+2029 709
+fe=(298)
+79 709
+fi=(300)
+2029 709
+fi=(254)
+2457 1418
+fi=(300)
+2029 709
+fe=(298)
+79 709
+fi=(300)
+2029 1418
+fe=(298)
+78 709
+290 709
++2 709
+-10 1418
+0 3160
+126 2090
+fi=(225)
+547 254
+fe=(298)
+132 508
+0 1836
+132 3672
+fi=(299)
+863 458
+fi=(225)
+547 458
+fe=(298)
+134 1374
++1 458
++2 2090
++2 3144
+298 524
+0 524
+300 1048
+-2 521
+0 521
+300 1042
+
+fl=(225)
+fn=(4576) core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<soapberry_zip::preserve::RegeneratedEntry>>
+805 4
+fi=(262) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/into_iter.rs
+514 2
+fi=(299)
+729 2
+fe=(225)
++76 2
+fi=(244)
+632 2
+fe=(225)
+805 4
+
+fn=(3670) core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>
+805 12
+fi=(244)
+632 3
+fe=(225)
+805 192
+fi=(244)
+632 128
+fe=(225)
+805 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=258 3319 
+* 9828
+* 64
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+* 129
+fi=(303)
+2697 1
+2312 3
+-59 3
+0 1
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 256
+3851 64
+fi=(307)
+50 128
+-50 7
+fi=(302)
+1320 7
+fi=(231)
+1072 7
+fi=(299)
+863 7
+fi=(307)
+113 14
+-63 7
+fi=(306)
+641 64
+fi=(231)
+1072 192
+fi=(244)
+632 128
+fi=(231)
+1400 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=258 3319 
+* 12497
+* 64
+fi=(254)
+3051 3
+fi=(304) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs
+200 3
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+* 129
+fi=(303)
+2697 1
+2312 2
+-59 3
+0 1
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 4
+3851 1
+fi=(307)
+50 2
+-50 1
+fi=(302)
+1320 1
+fi=(231)
+1072 1
+fi=(299)
+863 1
+fi=(307)
+113 2
+-63 1
+fi=(306)
+641 1
+fi=(231)
+1072 3
+fi=(244)
+632 2
+fi=(231)
+1400 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+* 203
+* 1
+fi=(254)
+3051 3
+fi=(304)
+200 3
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+* 194
+fe=(225)
+
+fn=(4294) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::relationships_plan::RelationshipPreflight>>
+805 10
+fi=(244)
+632 2
+fe=(225)
+805 6
+
+fn=(4932) core::ptr::drop_in_place<litchi_opc::source_backed::SourceSnapshot>
+805 12
+fi=(251)
+444 3
+fi=(234) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/sync/atomic.rs
+3942 3
+fi=(382) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/sync.rs
+2811 3
++43 3
+cfn=(2498) alloc::sync::Arc<T,A>::drop_slow
+calls=2 2109 
+* 485
+fi=(251)
+444 3
+fi=(234)
+3942 3
+fi=(382)
+2811 3
+fi=(251)
+444 2
+fi=(234)
+3942 2
+fi=(382)
+2811 2
+fe=(225)
+805 6
+fi=(382)
+2854 2
+cfn=(2498)
+calls=2 3327 
+* 158
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2498)
+calls=2 3327 
+* 180
+fe=(225)
+805 32
+
+fn=(5008) core::ptr::drop_in_place<hashbrown::raw::RawTable<(alloc::string::String,litchi_opc::rel::Relationship)>>
+805 455
+fi=(303)
+2697 65
+2312 130
+fe=(225)
+805 520
+
+fn=(5064) core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>
+805 30
+fi=(244)
+632 6
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 175
+fe=(225)
+805 12
+
+fn=(4958) core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>
+805 10
+0 3
+805 332
+cfn=(4960) core::ptr::drop_in_place<soapberry_zip::preserve::RegeneratedEntry>
+calls=2 * 
+* 53
+* 1
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 154
+fe=(225)
+805 5
+fi=(244)
+632 2
+fe=(225)
+805 6
+
+fn=(5034) core::ptr::drop_in_place<std::collections::hash::map::HashMap<soapberry_zip::office::EntryId,litchi_opc::source_backed::PendingPublication>>
+805 7
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+fi=(254)
+3051 1
+769 1
+fi=(303)
+224 1
++1 1
+fi=(304)
+-25 3
+fi=(303)
+3173 1
+fi=(231)
+1072 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+
+fn=(4282) core::ptr::drop_in_place<core::iter::adapters::enumerate::Enumerate<alloc::vec::into_iter::IntoIter<litchi_opc::source_backed::TopologyRelationshipPublication>>>
+805 4
+fi=(262)
+514 2
+fi=(299)
+729 4
+fi=(262)
+514 1
+cfi=(225)
+cfn=(4284) core::ptr::drop_in_place<[litchi_opc::source_backed::TopologyRelationshipPublication]>
+calls=2 805 
+* 19
+fi=(244)
+632 2
+fe=(225)
+805 4
+
+fn=(4350) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyReplacement>>
+805 12
+fi=(244)
+632 3
+fe=(225)
+805 3
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 175
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 2
+fi=(244)
+632 2
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 151
+fe=(225)
+
+fn=(4914) core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::preserve::PreparedEntry>>
+805 11
+0 1
+805 2
+cfn=(4916) core::ptr::drop_in_place<soapberry_zip::preserve::PreparedEntry>
+calls=2 * 
+* 29
+* 130
+cfn=(4916)
+calls=130 * 
+* 2067
+* 198
+fi=(244)
+632 2
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 160
+fe=(225)
+
+fn=(5050) core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::EffectiveTopologyData>>
+805 8
+0 2
+805 8
+0 1
+805 2
+cfn=(5052) core::ptr::drop_in_place<litchi_opc::source_backed::PreparedPart>
+calls=2 * 
+* 14
+* 126
+cfn=(5052)
+calls=126 * 
+* 1113
+* 192
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 204
+fe=(225)
+805 2
+cfn=(5062) core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>
+calls=2 * 
+* 18
+* 4
+fi=(244)
+632 2
+fe=(225)
+805 6
+
+fn=(4256) core::ptr::drop_in_place<litchi_opc::source_backed::LoadFlightUnwindGuard>
+805 3
+fi=(249) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/mem/mod.rs
++96 1
++1 1
+fi=(348) /home/zhuhe/code/litchi/crates/litchi-opc/src/source_backed.rs
+5235 2
+fe=(225)
+805 4
+
+fn=(4302) core::ptr::drop_in_place<alloc::vec::Vec<(litchi_opc::packuri::PackURI,alloc::string::String)>>
+805 10
+fi=(244)
+632 2
+fe=(225)
+805 6
+
+fn=(4346) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyRelationshipChange>>
+805 10
+fi=(244)
+632 2
+fe=(225)
+805 6
+
+fn=(4778) core::ptr::drop_in_place<alloc::vec::into_iter::IntoIter<core::option::Option<soapberry_zip::preserve::PreparedEntry>>>
+805 4
+fi=(262)
+514 2
+fe=(225)
+805 3
+fi=(299)
+-76 1
+fe=(225)
++76 2
+fi=(244)
+632 2
+fi=(262)
+506 1
+fi=(236)
+48 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 163
+fe=(225)
+
+fn=(4960)
+805 2
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+805 9
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 2
+
+fn=(5010) core::ptr::drop_in_place<litchi_opc::source_backed::CatalogPart>
+805 128
+fi=(244)
+632 128
+fe=(225)
+805 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 10559
+fi=(244)
+632 128
+fe=(225)
+805 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 12083
+fi=(244)
+632 128
+fe=(225)
+805 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 10244
+fe=(225)
+805 192
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 11196
+fe=(225)
+805 128
+cfn=(5008)
+calls=128 * 
+* 1152
+* 320
+
+fn=(5048) core::ptr::drop_in_place<core::option::Option<litchi_opc::source_backed::WritePermits>>
+805 10
+
+fn=(3222) core::ptr::drop_in_place<litchi_opc::error::OpcError>
+805 8000
+
+fn=(4284)
+805 19
+
+fn=(4288) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::SourceSnapshot>>
+805 12
+0 1
+805 2
+fi=(244)
+632 2
+fe=(225)
+805 8
+
+fn=(4324) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::PendingOverlay>>
+805 12
+fi=(382)
+2811 2
+fe=(225)
+805 3
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 2
+fi=(244)
+632 2
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+
+fn=(4916)
+805 924
+0 66
+805 198
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 330
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 7
+cfn=(2498)
+calls=2 2109 
+* 175
+fe=(225)
+805 390
+
+fn=(2456) core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::writer::FileHeader>>
+805 20
+fi=(244)
+632 2
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+* 33
+fe=(225)
+
+fn=(2464) core::ptr::drop_in_place<core::option::Option<alloc::boxed::Box<soapberry_zip::writer::ReusableDeflateState>>>
+805 9
+
+fn=(4708) core::ptr::drop_in_place<soapberry_zip::writer::ReusableDeflateState>
+805 6
+cfi=(370) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/stable.rs
+cfn=(2466) <zlib_rs::stable::Deflate as core::ops::drop::Drop>::drop
+calls=2 413 
+* 159
+fi=(238) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/boxed.rs
+1920 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 156
+fi=(244)
+632 2
+fe=(225)
+805 4
+
+fn=(4930) core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut alloc::vec::Vec<u8>>>>>
+805 6
+cfn=(4932)
+calls=2 * 
+* 26
+* 2
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 4
+
+fn=(4976) core::ptr::drop_in_place<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>
+805 10
+cfn=(4932)
+calls=2 * 
+* 855
+* 6
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2498)
+calls=2 2109 
+* 56
+fe=(225)
+805 337
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 129
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 264
+3851 66
+fi=(307)
+50 132
+-50 7
+fi=(302)
+1320 7
+fi=(231)
+1072 7
+fi=(299)
+863 7
+fi=(307)
+113 14
+-63 7
+fi=(306)
+641 66
+fi=(231)
+1072 198
+fi=(244)
+632 132
+fi=(231)
+1400 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 10153
+* 66
+-48 1
+fi=(254)
+3051 3
+fi=(304)
+200 2
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 163
+fe=(225)
+805 4
+fi=(244)
+632 3
+fe=(225)
+805 198
+fi=(244)
+632 132
+fe=(225)
+805 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 11206
+fi=(244)
+632 132
+fe=(225)
+805 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 12794
+* 66
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 154
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+fi=(236)
+0 1
+fi=(254)
+3051 4
+fi=(304)
+200 2
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 129
+-48 1
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+805 5
+fi=(390) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/sync/once/futex.rs
+87 5
+fe=(225)
+805 8
+
+fn=(5062)
+805 18
+
+fn=(5076) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::TopologyPartAddition>>
+805 16
+fi=(244)
+632 2
+fe=(225)
+805 8
+
+fn=(4192) core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>
+805 16
+fi=(251)
+444 4
+fi=(234)
+3942 4
+fi=(382)
+2811 4
++43 2
+cfn=(2498)
+calls=2 2109 
+* 199
+fe=(225)
+805 40
+
+fn=(4306) core::ptr::drop_in_place<std::collections::hash::map::HashMap<alloc::string::String,soapberry_zip::office::EntryId>>
+805 7
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+0 1
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 256
+3851 64
+fi=(307)
+50 128
+-50 7
+fi=(302)
+1320 7
+fi=(231)
+1072 7
+fi=(299)
+863 7
+fi=(307)
+113 14
+-63 7
+fi=(306)
+641 64
+fi=(231)
+1072 192
+fi=(244)
+632 128
+fi=(231)
+1400 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 9012
+* 64
+fi=(254)
+3051 3
+fi=(304)
+200 3
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 129
+fe=(225)
+
+fn=(4912) core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>
+805 2
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 129
+fe=(225)
+805 4
+
+fn=(4974) core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>
+805 10
+cfn=(4932)
+calls=2 * 
+* 26
+* 2
+cfn=(4976)
+calls=2 * 
+* 38006
+* 3
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 153
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 153
+fe=(225)
+805 4
+cfn=(5008)
+calls=2 * 
+* 18
+* 8
+0 1
+805 2
+cfn=(5010)
+calls=2 * 
+* 683
+* 126
+cfn=(5010)
+calls=126 * 
+* 46151
+* 192
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 182
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 4
+3851 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(231)
+1072 3
+fi=(244)
+632 2
+fi=(303)
+0 1
+fi=(231)
+1400 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 203
+* 1
+-48 1
+fi=(254)
+3051 4
+fi=(304)
+200 2
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 256
+3851 64
+fi=(307)
+50 128
+-50 7
+fi=(302)
+1320 7
+fi=(231)
+1072 7
+fi=(299)
+863 7
+fi=(307)
+113 14
+-63 7
+fi=(306)
+641 64
+fi=(231)
+1072 192
+fi=(244)
+632 128
+fi=(231)
+1400 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=128 3319 
+* 12649
+* 64
+-48 1
+fi=(254)
+3051 3
+fi=(304)
+200 2
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 163
+fe=(225)
+805 6
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 163
+fe=(225)
+805 2
+cfn=(5024) core::ptr::drop_in_place<litchi_opc::source_backed::PartCache>
+calls=2 * 
+* 681
+* 11
+
+fn=(3710)
+805 15
+
+fn=(4254) core::ptr::drop_in_place<litchi_opc::source_backed::LoadFlight>
+805 8
+cfn=(4192)
+calls=2 * 
+* 17
+* 13
+
+fn=(4298) core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::packuri::PackURI>>
+805 20
+fi=(244)
+632 4
+fe=(225)
+805 12
+
+fn=(4946) core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_opc::source_backed::CacheStateInner>>
+805 1
+fi=(394) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/poison.rs
+129 2
+fi=(234)
+3890 1
+fi=(241) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/panicking.rs
+464 3
+0 1
+fi=(234)
+3908 1
+fi=(240) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/sync/mutex/futex.rs
+90 2
+fe=(225)
+805 2
+
+fn=(5052)
+805 576
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2498)
+calls=2 2109 
+* 227
+fe=(225)
+805 320
+
+fn=(4292) core::ptr::drop_in_place<std::collections::hash::map::HashMap<litchi_opc::packuri::PackURI,litchi_opc::rel::Relationships>>
+805 7
+fi=(303)
+2697 1
+2312 2
+fe=(225)
+805 8
+
+fn=(4334) core::ptr::drop_in_place<litchi_opc::source_backed::PhysicalMemberLookup>
+805 7
+fi=(303)
+2697 1
+2312 2
+0 1
+2253 3
+0 1
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 4
+0 264
+3851 66
+fi=(307)
+50 132
+-50 7
+fi=(302)
+1320 7
+fi=(231)
+1072 7
+fi=(299)
+863 7
+fi=(307)
+113 14
+-63 7
+fi=(306)
+641 66
+fi=(231)
+1072 132
+fi=(244)
+632 132
+fi=(303)
+0 66
+fi=(231)
+1400 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 11512
+* 66
+fi=(254)
+3051 1
+769 1
+fi=(303)
+224 1
++1 1
+fi=(304)
+-25 3
+fi=(303)
+3173 1
+fi=(231)
+1072 1
+fi=(236)
+48 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 154
+fe=(225)
+
+fn=(4968) core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>
+805 10
+fi=(244)
+632 3
+fe=(225)
+805 198
+fi=(244)
+632 132
+fe=(225)
+805 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 9080
+* 66
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 163
+fi=(244)
+632 2
+fe=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fi=(244)
+632 2
+fe=(225)
+805 9
+
+fn=(5024)
+805 8
+fi=(303)
+2697 1
+2312 2
+-59 3
+2479 1
+fi=(302)
+1320 1
+fi=(299)
+863 1
+fi=(303)
+3595 2
+0 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(231)
+1072 2
+fe=(225)
+805 3
+cfn=(4192)
+calls=2 * 
+* 218
+fi=(306)
+499 1
+fi=(307)
+38 2
+fi=(303)
+3851 2
+fi=(254)
+3051 1
+769 1
+fi=(303)
+224 1
++1 1
+fi=(304)
+-25 2
+fi=(303)
+3173 1
+fi=(231)
+1072 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+805 2
+cfn=(5034)
+calls=2 * 
+* 64
+fi=(303)
+2697 1
+2312 2
+-59 3
+fi=(254)
+3051 3
+fi=(304)
+200 2
+fi=(303)
+3173 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(225)
+805 2
+cfn=(5040) core::ptr::drop_in_place<litchi_opc::source_backed::CacheCounters>
+calls=2 * 
+* 34
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2498)
+calls=2 3327 
+* 203
+fe=(225)
+805 6
+cfn=(5048)
+calls=2 * 
+* 10
+* 14
+
+fn=(5040)
+805 2
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(225)
+805 2
+
+fl=(294) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/thread_local/native/lazy.rs
+fn=(3774) std::thread::local::LocalKey<T>::with
+59 6
+fi=(279) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cell.rs
+555 6
+fi=(254)
+2457 6
+fi=(249)
+902 3
+fi=(445) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/thread/local.rs
+481 3
+fe=(294)
+
+fl=(243) /home/zhuhe/code/litchi/docs/performance/results/change-0843/probe/src/main.rs
+fn=(910) opc_preservation_probe::run
+cfn=(5418) opc_preservation_probe::run_one
+calls=0 281 
+212 2172678
+
+fn=(844) opc_preservation_probe::main
+cfn=(910)
+calls=0 184 
+167 2172678
+
+fn=(5418)
+cfn=(5440) opc_preservation_probe::profile_publish
+calls=1 173 
+299 2172678
+
+fn=(5440)
+173 6
++5 2
+cfi=(348)
+cfn=(3838) litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+calls=1 9872 
+* 2172663
+fi=(244)
+612 1
+fi=(446) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/hint.rs
+491 2
+fe=(243)
+182 4
+
+fl=(385) /home/zhuhe/code/litchi/crates/soapberry-zip/src/reader_at.rs
+fn=(3000) soapberry_zip::reader_at::ReaderAt::read_exact_at
+47 792
++2 198
+-49 66
+fi=(254)
+769 132
+fi=(300)
+457 66
+fi=(273)
+101 66
+fe=(385)
+-43 198
+cfi=(348)
+cfn=(2572) <litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at
+calls=132 3644 
+* 16304
+fi=(237)
+2173 132
+0 132
+fe=(385)
+11 132
++50 132
+fi=(254)
+769 66
+fe=(385)
+49 198
+-49 132
+75 594
+-28 15
++2 3
+-49 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+fi=(273)
+101 1
+fi=(254)
+923 3
+fi=(245)
+1815 1
+fi=(254)
+923 2
+fi=(273)
+89 1
+fi=(228)
+1076 2
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 255 
+* 11
+* 2
+fi=(237)
+2173 2
+0 2
+fe=(385)
+11 2
++50 2
+fi=(254)
+769 1
+fe=(385)
+49 4
+-49 1
+49 1
++26 9
+
+fn=(4392) <T as soapberry_zip::reader_at::ReaderAtExt>::read_at_least_at
+124 16
++6 4
+fi=(238)
+0 10
+fe=(385)
+99 8
+fi=(254)
+769 4
+fi=(300)
+457 2
+fi=(273)
+585 4
+101 2
+fe=(385)
++7 6
+cfi=(348)
+cfn=(2572)
+calls=4 3644 
+* 1322
+fi=(237)
+2173 4
+0 4
+fe=(385)
+11 4
+111 4
+fi=(254)
+769 2
+fi=(300)
+457 2
+fe=(385)
+0 2
+136 2
++5 18
+
+fl=(311) /home/zhuhe/code/litchi/crates/xml-minifier/src/audit.rs
+fn=(1272) xml_minifier::audit::package::is_xml_part
+3024 11
+fi=(288) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/mod.rs
+1755 11
+fi=(289) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/iter.rs
+551 1
+cfn=(1274) core::str::iter::SplitInternal<P>::next_back
+calls=66 699 
+* 245
+* 2
+fi=(257)
+1042 3
+fi=(309)
+61 2
+fi=(286) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/pattern.rs
+572 9
+fi=(288)
+1993 1
+cfi=(286)
+cfn=(1122) <core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back
+calls=66 499 
+* 150
+fi=(257)
+2766 2
++1 1
+fi=(293) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/traits.rs
+211 1
+fi=(299)
+863 1
+fi=(309)
+61 4
+fi=(258)
+670 1
+817 4
+670 1
+fi=(309)
+91 5
+fe=(311)
+-91 5
+fi=(254)
+927 2
+fi=(273)
+89 1
+fi=(265) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/memchr.rs
+-62 2
+fi=(225)
+2292 2
+fi=(265)
+71 2
+-71 2
+91 2
+-91 1
+85 1
++4 2
+-70 4
++71 1
+-71 3
++72 4
++4 1
+-14 3
+-42 2
+-39 1
+40 4
+-40 1
+40 16
++4 8
+-5 17
+fi=(257)
+1229 3
+fi=(231)
+961 1
+fi=(251)
+1720 1
+fi=(274) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/iter/macros.rs
+180 1
+0 6
+fi=(253) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/validations.rs
+37 1
++1 2
+-38 1
+38 1
+fi=(289)
+189 3
+fi=(284) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/char/methods.rs
+894 5
++2 2
+fi=(251)
+1720 2
+0 2
+fi=(274)
+0 1
+fi=(253)
+84 3
+-84 1
+fi=(284)
+894 6
++2 2
+fi=(312) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/unicode/unicode_data.rs
+0 2
+fi=(293)
+211 1
+fi=(299)
+863 1
+fi=(309)
+61 4
+-61 1
+fi=(254)
+2345 3
+fi=(288)
+382 5
+fi=(258)
+1183 1
+fi=(293)
+508 1
+fi=(299)
+863 5
+fi=(257)
+662 4
+fi=(258)
++8 1
+817 4
+670 1
++25 1
+fi=(309)
+91 1
+fi=(258)
+-91 1
+fe=(311)
+3026 8
+
+fl=(415) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sync/poison/mutex.rs
+fn=(4940) std::sync::poison::mutex::Mutex<T>::lock
+490 4
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3890 1
+fi=(394)
+123 3
+0 3
+fe=(415)
+495 4
+
+fl=(303)
+fn=(4320) core::ptr::drop_in_place<std::collections::hash::set::HashSet<usize>>
+2312 2
+fi=(225)
+805 1
+fe=(303)
+
+fn=(1188) hashbrown::raw::RawTableInner::fallible_with_capacity
+1653 72
+110 16
++33 28
+fi=(254)
+3051 8
+fi=(300)
+457 4
+fi=(254)
+3051 8
+fe=(303)
+158 28
+fi=(254)
+3778 4
++5 4
++1 12
++23 4
+3051 8
+fi=(300)
+457 4
+fi=(254)
+3051 8
+fi=(300)
+457 4
+fi=(254)
+769 8
+fi=(300)
+457 8
+fi=(254)
+769 8
+fe=(303)
+224 8
++1 8
+fi=(254)
+769 48
+fi=(300)
+457 16
+fi=(304)
+186 16
+0 16
+95 8
+fi=(236)
+-82 8
++1 16
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=53 3283 
+* 1509
+* 16
+fi=(447) /rust/deps/hashbrown-0.16.1/src/raw/alloc.rs
++5 16
+fi=(231)
+961 8
+fe=(303)
+1642 8
+185 56
+fi=(225)
+709 32
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=53 198 
+* 148
+fe=(303)
+1678 40
++3 64
+
+fn=(1426) <hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+3851 195
+fi=(296)
+0 65
+3228 65
+fe=(303)
+
+fn=(1184) hashbrown::raw::RawTable<T,A>::reserve_rehash
+999 21
+2794 3
+fi=(254)
+769 3
+fi=(300)
+457 3
+0 6
+fe=(303)
+2798 6
+185 27
+2799 12
++27 3
+fi=(228)
+1037 6
+fe=(303)
+2738 15
+cfn=(1188)
+calls=10 1653 
+* 1382
+fi=(237)
+2173 3
+0 6
+2173 6
+0 6
+fe=(303)
+2665 6
+3986 9
+fi=(305) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/step_by.rs
+0 6
+fe=(303)
+2981 6
+fi=(225)
+1435 9
+fe=(303)
+2747 6
+1026 24
+-27 8
+2794 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 2
+fe=(303)
+2798 2
+185 9
+2799 4
++27 1
+fi=(228)
+1037 2
+fe=(303)
+2738 5
+cfn=(1188)
+calls=2 1653 
+* 113
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(303)
+0 3
+2665 2
+3986 3
+fi=(305)
+0 2
+fe=(303)
+2981 2
+fi=(225)
+1435 3
+fe=(303)
+2747 2
+1026 8
+-27 8
+2794 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 2
+fe=(303)
+2798 2
+185 9
+2799 4
++27 1
+fi=(228)
+1037 2
+fe=(303)
+2738 5
+cfn=(1188)
+calls=2 1653 
+* 113
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(303)
+0 3
+2665 2
+3986 3
+fi=(305)
+0 2
+fe=(303)
+2981 2
+fi=(225)
+1435 3
+fe=(303)
+2747 2
+1026 8
+-27 8
+2794 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 2
+fe=(303)
+2798 2
+185 9
+2799 4
++27 1
+fi=(228)
+1037 2
+fe=(303)
+2738 5
+cfn=(1188)
+calls=2 1653 
+* 113
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(303)
+0 3
+2665 2
+3986 3
+fi=(305)
+0 2
+fe=(303)
+2981 2
+fi=(225)
+1435 3
+fe=(303)
+2747 2
+1026 8
+-27 7
+2794 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+0 2
+fe=(303)
+2798 2
+185 9
+2799 4
++27 1
+fi=(228)
+1037 2
+fe=(303)
+2738 5
+cfn=(1188)
+calls=2 1653 
+* 113
+fi=(237)
+2173 1
+0 2
+2173 2
+0 2
+fe=(303)
+2665 2
+3986 3
+fi=(305)
+0 2
+fe=(303)
+2981 2
+fi=(225)
+1435 3
+fe=(303)
+2747 2
+1026 8
+-27 7
+2794 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+0 2
+fe=(303)
+2798 2
+185 9
+2799 4
++27 1
+fi=(228)
+1037 2
+fe=(303)
+2738 5
+cfn=(1188)
+calls=2 1653 
+* 443
+fi=(237)
+2173 1
+0 2
+2173 2
+0 2
+fe=(303)
+2665 2
+3986 3
+fi=(305)
+0 2
+fe=(303)
+2981 2
+fi=(225)
+1435 3
+fe=(303)
+2747 2
+1026 8
+
+fl=(364)
+fn=(2126)
+12 27
++4 24
++23 1021
+-39 768
+40 512
+cfi=(356) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs
+cfn=(2128) zlib_rs::deflate::fill_window
+calls=17044 1776 
+* 9321
++2 1536
++4 510
+-46 253
+64 506
+-64 253
+65 253
+fi=(366) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/weak_slice.rs
+-15 253
+fi=(273)
+568 759
+438 506
+fi=(366)
+42 253
+fi=(254)
+2533 253
+fi=(366)
+85 253
+fi=(365) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/hash_calc.rs
+-53 253
++19 253
++1 506
+fi=(356)
+1420 252
+fi=(366)
+38 252
+fi=(356)
+1420 252
+fi=(365)
+54 756
+fi=(366)
+-16 252
+fi=(365)
++16 252
++1 504
+fe=(364)
++13 1012
++8 253
+-76 3
+76 2
+-76 1
+76 4
++6 2
+cfi=(367) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs
+cfn=(2150) zlib_rs::deflate::longest_match::longest_match
+calls=72 -75 
+* 113
++4 3
+-3 1
++6 2
++11 1
+212 3
+-56 253
+16 253
++87 253
++1 506
+0 253
+156 253
++37 506
++1 252
+fi=(366)
+50 252
+fi=(273)
+568 756
+0 252
+fi=(254)
+923 252
+fi=(251)
+1720 252
+fi=(274)
+180 252
+0 504
+fi=(357) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/sym_buf.rs
+45 756
+-45 504
+fe=(364)
+195 252
+fi=(356)
+0 252
+fi=(357)
+45 252
++2 504
+fi=(356)
+1485 504
+fi=(357)
+24 504
+fi=(251)
+1720 252
+fi=(274)
+180 252
+fe=(364)
++25 252
+-46 252
++2 756
+fi=(366)
+38 1
+fi=(357)
++14 1
+fi=(273)
+580 3
+451 2
+fe=(364)
+156 8
+0 3
+fi=(366)
+38 1
+fi=(225)
+547 1
+fi=(357)
+64 1
++2 2
+fi=(356)
+1509 1
+fi=(254)
+2301 4
+fi=(356)
+1509 1
++1 2
+-86 2
++88 2
++2 4
++1 1
+-14 5
++1 4
++15 1
+fi=(357)
+24 1
+fe=(364)
+205 1
+-46 1
+fi=(357)
+24 1
+fe=(364)
+161 2
+0 1
+42 1
+166 2
+fi=(228)
+1076 6
+fe=(364)
+166 2
++2 4
+fi=(363)
+18 3
+cfi=(356)
+cfn=(2216) zlib_rs::deflate::flush_block_only
+calls=68 2436 
+* 50202
++2 2
+fe=(364)
++4 2
+173 2
+0 1
+fi=(363)
+18 3
+cfi=(356)
+cfn=(2216)
+calls=68 2436 
+* 215774
++2 2
+-20 1
+fe=(364)
+178 27
+
+fl=(274)
+fn=(4092) <core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next
+161 67
+fi=(251)
+1720 67
+fe=(274)
+180 67
+fi=(251)
+659 66
+fe=(274)
+185 66
+fi=(351)
+1588 132
+fi=(245)
+1815 66
+fi=(273)
+272 132
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(244)
+612 66
+fi=(392) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/enumerate.rs
+81 66
++1 132
++1 132
++1 66
+fi=(257)
+2781 1
+fi=(392)
+84 1
+fe=(274)
+
+fn=(1462) <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any
+326 9
+fi=(251)
+1720 1
+fe=(274)
+180 1
+0 7
+fi=(251)
+659 1
+1720 1
+fe=(274)
+180 1
+0 1
+180 1
+0 1
+185 1
+337 8
+
+fl=(352) /home/zhuhe/code/litchi/crates/soapberry-zip/src/accounting.rs
+fn=(2300) soapberry_zip::accounting::AccountingWriteKind::add
+243 196
++5 980
+0 3
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(352)
+214 2
++40 2
+0 585
+fi=(254)
+769 195
+fi=(300)
+457 195
+fe=(352)
+214 390
++40 390
+
+fn=(3054) <soapberry_zip::accounting::CountingReader<R> as std::io::Read>::read
+309 16
+fi=(385)
++77 6
+fi=(254)
+2345 4
+fi=(228)
+1076 4
+fi=(385)
+417 2
+fi=(351)
+1511 4
+fi=(385)
+417 1
+fi=(257)
+745 2
+fi=(254)
+923 3
+fi=(245)
+1815 1
+fi=(254)
+923 2
+fi=(273)
+89 1
+fi=(228)
+1076 2
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 255 
+* 53
+* 3
+fi=(237)
+2173 2
+fi=(351)
+1512 1
+0 2
+cfi=(348)
+cfn=(2572)
+calls=6 3644 
+0 192
+0 1
+fi=(237)
+2173 2
+0 4
+fi=(385)
+11 4
+fi=(254)
+769 2
+fi=(300)
+457 2
+fi=(385)
+-37 2
+fe=(352)
+311 4
+0 2
+fi=(254)
+769 2
+fi=(300)
+457 2
+fe=(352)
+317 4
++9 16
+
+fn=(4858) soapberry_zip::accounting::write_all_counted
+258 1773
++6 197
+0 1764
+fi=(348)
+4262 784
+cfn=(4862) <litchi_opc::source_backed::ContextCheckedSink<W> as std::io::Write>::write
+calls=392 4017 
+* 33084
+* 196
+fe=(352)
+265 392
++5 392
++6 392
+0 392
+282 392
+cfn=(2300)
+calls=392 -39 
+* 2940
+fi=(237)
+2173 392
+fi=(273)
+89 588
+fe=(352)
+264 196
+0 394
+fi=(238)
+289 1576
+fe=(352)
+
+fl=(413) /home/zhuhe/code/litchi/crates/litchi-opc/src/members.rs
+fn=(3526) litchi_opc::members::PartNameIndex::try_with_capacity
+125 7
+fi=(245)
+464 4
+fi=(244)
+765 1
+-42 1
+fi=(279)
+555 2
+fi=(254)
+2457 1
+fi=(249)
+902 1
+fi=(321) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/map.rs
+363 6
+fi=(244)
+765 1
+fi=(303)
+980 1
+fe=(413)
+148 4
++1 6
++1 8
+-3 17
++5 6
+0 1
+fi=(244)
+798 6
+cfn=(1256) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=4 542 
+* 300
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 1
+fi=(294)
+59 2
+fe=(413)
+-59 2
+fi=(303)
+983 3
+cfn=(1184)
+calls=4 +16 
+* 503
+0 1
+fi=(237)
+966 2
+fi=(294)
+59 2
+fi=(249)
+902 1
+fi=(321)
+363 8
+fi=(303)
+983 3
+cfn=(1184)
+calls=4 +16 
+* 469
+fi=(237)
+-17 2
+fi=(279)
+555 2
+fi=(254)
+2457 2
+fe=(413)
+
+fn=(3598) litchi_opc::members::PartNameIndex::insert
+155 512
+fi=(244)
+612 128
+fi=(245)
+1815 64
+fi=(255) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs
+438 192
+fi=(244)
+765 256
+-77 64
+0 64
+fe=(413)
+156 192
+fi=(303)
+1365 256
+fi=(296)
+-56 320
+258 189
+cfi=(297)
+cfn=(1166)
+calls=254 694 
+* 13545
+fi=(301)
+48 189
+fi=(303)
+2492 567
+0 63
+fi=(225)
+547 63
+fi=(302)
+1563 189
+fi=(307)
+50 126
+-50 12
+fi=(306)
+641 3
+fi=(303)
+2073 6
+fi=(231)
+1072 9
+fi=(260)
+20 6
+fi=(303)
+1236 3
+fi=(260)
+154 9
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=11 -81 
+* 67
+* 3
+fi=(300)
+434 3
+fi=(306)
++65 3
+fi=(307)
+50 30
+-50 3
+fi=(302)
+1563 6
+fi=(300)
+434 6
+fi=(302)
+1563 120
+fi=(300)
+434 120
+fe=(413)
+0 256
+173 945
+0 2
+173 15
+0 63
+fi=(225)
+547 63
+fi=(302)
+1563 189
+fi=(307)
+50 126
+fi=(302)
+1563 189
+fi=(300)
+434 189
+fi=(259) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/adapters/skip.rs
+41 128
+fi=(300)
+457 64
+fi=(259)
+41 64
+fi=(300)
+457 64
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436) <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+calls=258 432 
+* 6784
+fi=(259)
+0 320
+fi=(288)
+382 128
++4 128
+fi=(258)
+1183 64
+fi=(293)
+439 64
+fi=(296)
+1309 128
+0 126
+258 189
+cfi=(297)
+cfn=(1166)
+calls=254 694 
+* 13356
+* 63
+fi=(301)
+48 441
+fi=(249)
+902 64
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8064
+fi=(257)
+1164 128
+fi=(250) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs
+2469 128
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8000
+* 64
+0 64
+fi=(296)
+1309 128
+0 63
+258 315
+cfi=(297)
+cfn=(1166)
+calls=254 694 
+* 13545
+fi=(301)
+48 189
+fi=(303)
+2492 441
+0 63
+fi=(225)
+547 63
+fi=(302)
+1563 189
+fi=(307)
+50 126
+fi=(302)
+1563 126
+fi=(300)
+434 189
+fi=(245)
++30 192
+fi=(259)
+28 640
+fi=(289)
+1061 128
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8064
+* 64
+fi=(257)
+1164 128
+fi=(259)
+78 576
+-78 64
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8000
+* 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 6784
+fi=(257)
+1164 256
+fi=(250)
+232 64
+2646 64
+fi=(244)
+0 128
+765 128
+-42 64
+fe=(413)
+0 128
+206 832
+fi=(231)
+961 128
+fi=(225)
+1917 192
+fi=(245)
+1034 128
+fi=(259)
+41 128
+fi=(300)
+457 64
+fi=(259)
+41 64
+fi=(300)
+457 64
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 6784
+fi=(259)
+0 320
+fi=(244)
+765 64
+-77 64
+fi=(228)
+1037 192
+fi=(244)
+527 320
+cfn=(1850) <alloc::raw_vec::RawVecInner>::finish_grow
+calls=258 +15 
+* 13238
+fi=(237)
+2173 128
++1 64
+fi=(288)
+386 128
+0 64
+fi=(258)
+1183 64
+fi=(293)
+439 64
+fi=(225)
+547 192
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=258 255 
+* 960
+fi=(245)
+1028 128
+fi=(249)
+902 64
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8064
+fi=(257)
+1164 128
+fi=(250)
+2469 128
+fi=(289)
+1061 192
+cfi=(286)
+cfn=(1436)
+calls=258 432 
+* 8000
+* 64
+0 128
+fi=(244)
+765 128
+-77 64
+fi=(303)
+980 256
+fi=(245)
+2997 256
+fi=(244)
+459 192
+fi=(236)
+14 128
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=258 3283 
+* 11970
+fi=(244)
+468 128
+fi=(248) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/slice.rs
+0 64
+fi=(225)
+547 256
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=258 255 
+* 704
+0 64
+fi=(245)
+1028 128
+fi=(244)
+612 128
+fi=(231)
+961 64
+fi=(225)
+1917 192
+fi=(245)
+1034 128
+fe=(413)
+239 64
+fi=(231)
+961 192
+fe=(413)
+239 320
+fi=(251)
+1720 64
+fi=(262)
+223 64
+0 448
+fi=(228)
+1037 256
+fi=(244)
+527 256
+cfn=(1850)
+calls=258 +15 
+* 4056
+fi=(237)
+2173 128
++1 64
+fi=(244)
+774 64
++1 128
+fi=(231)
+961 256
+fi=(284)
+1917 1152
+fi=(255)
+1424 1152
+fi=(245)
+2168 1152
+fi=(251)
+1720 1152
+fi=(274)
+180 1152
+0 1152
+fi=(253)
+37 1152
++1 2304
+-38 1152
+38 1152
+fi=(284)
+1483 6912
+1845 2304
+fi=(244)
+617 1152
+fi=(254)
+2494 3456
+fi=(244)
+765 1152
+-94 1152
+fi=(284)
+1845 2304
+fe=(413)
+280 384
+fi=(236)
+0 64
+fi=(244)
+798 384
+cfn=(1256)
+calls=258 542 
+* 6667
+fi=(237)
+2173 128
++1 128
+fi=(244)
+774 64
++1 128
+fi=(306)
+641 1
+fi=(303)
+1793 2
+2687 1
+fi=(300)
+457 2
+fi=(254)
+2494 1
+fi=(303)
+2631 1
++3 1
++1 1
+fi=(231)
+1072 3
+fi=(301)
+30 1
+fi=(231)
+1072 2
+fi=(225)
+1917 7
+fi=(303)
+1120 6
+fi=(251)
+1720 1
+fi=(262)
+223 1
+fi=(251)
+1720 63
+fi=(262)
+223 63
+0 64
+fi=(251)
+659 64
+fi=(225)
+1717 64
+fe=(413)
+239 128
+0 64
+239 128
+fi=(296)
++19 320
+cfi=(297)
+cfn=(1166)
+calls=258 694 
+* 13568
+* 64
+fi=(301)
+48 192
+fi=(303)
+2492 448
+0 64
+fi=(225)
+547 64
+fi=(302)
+1563 192
+fi=(307)
+50 128
+-50 252
+fi=(306)
+641 63
+fi=(303)
+2073 126
+fi=(231)
+1072 252
+fi=(260)
+20 126
+fi=(303)
+1236 126
+fi=(260)
+154 63
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=252 -81 
+* 1205
+* 63
+fi=(300)
+434 63
+fi=(302)
+1563 3
+fi=(300)
+434 2
+fi=(244)
+632 189
+0 63
+fi=(236)
+48 63
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=252 3319 
+* 2919
+* 63
+-48 1
+fi=(303)
+956 1
+fi=(300)
+457 1
+fi=(303)
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 1
+fi=(307)
+50 2
+fi=(236)
+-50 64
+fi=(262)
+227 64
+fi=(244)
+632 128
+0 64
+fi=(236)
+48 64
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=258 3319 
+* 2472
+-48 192
+fi=(321)
+1296 64
+cfi=(296)
+cfn=(2712)
+calls=258 1841 
+* 19436
+* 64
+fe=(413)
+245 192
++1 512
+
+fl=(257)
+fn=(3044) core::option::Option<T>::insert
+1722 5
+fi=(225)
+805 2
+fe=(257)
+1726 7
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 255 
+* 65
+
+fl=(251)
+fn=(4980) core::ptr::drop_in_place<litchi_core::source::OwnedSource>
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2499) alloc::sync::Arc<T,A>::drop_slow'2
+calls=2 2109 
+* 295
+fe=(251)
+
+fl=(423)
+fn=(4562) soapberry_zip::preserve::PreservationPlan::push
+367 330
+fi=(245)
+1025 66
++3 132
+fi=(244)
+612 66
+fi=(231)
+961 66
+fi=(225)
+1917 660
+fi=(245)
+1034 132
+fe=(423)
+369 264
+
+fn=(4832) soapberry_zip::preserve::prepare_zip32_tail
+1605 4
+fi=(427) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/num.rs
+297 8
+fe=(423)
+0 1
+1627 4
+-1 8
+
+fn=(4370) soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy
+594 10
++6 1
++6 1
+-2 1
+fi=(257)
+1042 3
+fi=(388)
+1255 1
+fe=(423)
+607 1
+fi=(380)
+1942 1
+-58 2
++58 4
+fe=(423)
+608 7
+0 4
+615 3
+fi=(380)
+1724 3
+fi=(385)
+49 2
+-49 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+fi=(273)
+585 2
+101 2
+fi=(385)
+-43 3
+cfi=(348)
+cfn=(2572)
+calls=2 3644 
+* 247
+fi=(237)
+2173 2
+0 2
+fi=(385)
+11 2
++50 2
+fi=(254)
+769 1
+fi=(385)
+49 3
+fi=(387)
+-41 1
+fi=(388)
+1385 2
+fi=(387)
+13 2
+fe=(423)
+2877 2
+886 8
+2878 2
+620 1
+0 1
+fi=(254)
+923 1
+fi=(257)
+1367 1
+0 3
+fe=(423)
+641 4
+0 2
+fi=(287)
+433 1
+fe=(423)
+649 1
++18 3
+fi=(254)
+769 2
+fi=(300)
+457 1
+fe=(423)
+680 3
+0 1
+688 4
+fi=(254)
+2301 4
+fe=(423)
+689 3
+fi=(228)
+1076 2
+fi=(388)
+1245 2
+fi=(380)
+1777 21
+fe=(423)
+703 3
+cfi=(380)
+cfn=(4386) soapberry_zip::archive::ZipEntries<R>::next_entry
+calls=2 2837 
+* 1079
+* 198
+cfi=(380)
+cfn=(4386)
+calls=132 2837 
+* 20441
+fi=(237)
+966 201
+fe=(423)
+0 66
+fi=(237)
+966 132
+fe=(423)
+702 396
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=132 255 
+* 1980
+fi=(380)
+3593 132
+3853 396
+fe=(423)
+713 66
++2 132
+fi=(291)
+282 132
+fe=(423)
+0 66
+fi=(228)
+1878 66
+fe=(423)
+723 66
+fi=(254)
++46 66
+fi=(300)
+457 66
+fi=(254)
+769 66
+fe=(423)
+-42 132
+0 66
+736 264
+cfn=(4412) soapberry_zip::preserve::central_record_span
+calls=132 2810 
+* 1650
+fi=(237)
+2173 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+fi=(238)
+0 1
+fe=(423)
+742 2
+0 1
+fi=(254)
+3051 1
+fi=(300)
+457 1
+fi=(254)
+2301 4
+769 1
+fi=(300)
+457 1
+0 1
+fe=(423)
+764 4
+cfn=(4418) soapberry_zip::preserve::read_vec
+calls=2 2800 
+* 33
+* 2
+fi=(237)
+2173 1
+0 2
+2173 2
+fi=(243)
+0 1
+fi=(237)
+2174 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418) alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+calls=2 717 
+* 384
+* 1
+fi=(237)
+966 4
+0 1
+fi=(380)
+1777 20
+fe=(423)
+776 3
+cfi=(380)
+cfn=(4386)
+calls=2 2837 
+* 1079
+* 198
+cfi=(380)
+cfn=(4386)
+calls=132 2837 
+* 20441
+fi=(237)
+966 201
+fe=(423)
+0 66
+fi=(237)
+966 132
+fe=(423)
+775 396
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=132 255 
+* 1980
+fi=(380)
+3592 66
++1 198
+3853 396
+fe=(423)
+0 594
+788 264
+cfn=(4412)
+calls=132 2810 
+* 1650
+fi=(237)
+2173 132
++1 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+0 66
+fe=(423)
+793 132
+0 198
+801 264
+cfn=(4418)
+calls=132 2800 
+* 37745
+fi=(237)
+2173 66
+0 66
+2173 264
++1 66
+fe=(423)
+803 330
+cfi=(380)
+cfn=(4438)
+calls=132 3972 
+* 2178
+fi=(237)
+2173 132
++1 132
+fe=(423)
+804 528
+cfn=(4442) soapberry_zip::preserve::central_local_header_offset_patch
+calls=132 2831 
+* 1386
+* 66
+fi=(237)
+2173 66
+0 132
+2173 132
+fi=(245)
+2997 66
+fi=(427)
+297 198
+fe=(423)
+0 396
+822 132
+cfi=(380)
+cfn=(2728) soapberry_zip::archive::CompressionMethodId::as_method
+calls=132 3128 
+* 726
+-7 2376
+fi=(245)
+992 198
+cfn=(3802) alloc::vec::Vec<T,A>::push_mut
+calls=132 +31 
+* 3300
+* 66
+fi=(237)
+0 1
+fe=(423)
+827 2
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 6
+fe=(423)
+833 132
++3 66
+fi=(251)
+1720 132
+fi=(274)
+180 66
+fe=(423)
+838 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 109
+fi=(237)
+966 2
+0 2
+fi=(421) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/spec_extend.rs
+27 1
+cfi=(245)
+cfn=(4102) alloc::vec::Vec<T,A>::extend_trusted
+calls=2 3988 
+* 171
+fi=(244)
+612 1
+fi=(245)
+1851 4
+fe=(423)
+847 1
+cfi=(291)
+cfn=(4458)
+calls=2 3240 
+* 1003
+fi=(245)
+2997 1
+fe=(423)
+848 10
+fi=(291)
+156 2
+0 1
+fe=(423)
+851 1
+fi=(273)
+272 2
+fi=(244)
+612 1
+fi=(273)
+272 3
+fe=(423)
+852 2
+0 1
+fi=(246) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/range.rs
+772 7
+0 1
+fe=(423)
+858 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(246)
+0 65
+fe=(423)
+858 65
+fi=(245)
+1815 65
+fi=(273)
+272 130
+fi=(244)
+612 66
+fi=(273)
+272 198
+fe=(423)
+859 132
+fi=(273)
+219 132
+0 65
+fi=(257)
+1165 65
+fi=(273)
+272 260
+fe=(423)
+866 65
+0 65
+868 130
+0 1
+868 134
+0 66
+873 330
+cfn=(4464) soapberry_zip::preserve::validate_local_span
+calls=132 2654 
+* 106402
+fi=(237)
+2173 132
++1 66
+fe=(423)
+874 66
+fi=(245)
+1851 66
+fi=(273)
+278 132
+fi=(244)
+612 66
+fe=(423)
+875 132
+fi=(228)
+1916 264
+fi=(246)
+772 66
+fe=(423)
+880 4
++1 4
++2 11
+-5 20
+fi=(244)
+632 4
+fe=(423)
+
+fn=(4554) soapberry_zip::preserve::PreservationPlan::try_reserve_exact
+372 6
+fi=(244)
+617 1
+fi=(245)
+1556 1
+fi=(254)
+2494 2
+fi=(244)
+765 1
+-42 1
+fi=(254)
++46 1
+fi=(300)
+457 1
+fe=(423)
+-80 5
+0 2
+fi=(244)
+798 6
+cfn=(1256)
+calls=2 542 
+* 366
+fi=(237)
+2173 2
++1 1
+fi=(244)
+774 1
++1 3
+fe=(423)
+
+fn=(4800) soapberry_zip::preserve::validate_prepared_local
+2228 198
++1 856
++2 325
+fi=(251)
+444 1
+fe=(423)
+0 1
+fi=(245)
+1815 1
+fe=(423)
+0 1
+fi=(254)
+923 5
+fe=(423)
+2229 2
+fi=(254)
+923 2
+fe=(423)
+2245 2
+fi=(254)
+923 12
+0 66
+fe=(423)
+2287 264
+
+fn=(4442)
+2831 264
++7 528
+fi=(257)
+2262 132
+fe=(423)
+2870 132
++3 66
++1 264
+
+fn=(4818) soapberry_zip::preserve::PreparedCentral::checked_bytes
+1823 660
++1 660
++2 130
+fi=(273)
+219 260
++2 260
+fi=(244)
+612 260
+fe=(423)
+1831 4
+fi=(254)
+923 6
+fe=(423)
+0 2
+fi=(254)
+923 4
+fi=(273)
+89 2
+fi=(257)
+1368 4
++3 2
+fe=(423)
+0 260
+1850 660
+
+fn=(4846) soapberry_zip::preserve::write_prepared_local
+2690 594
++12 856
+0 65
+2704 390
++74 390
+fi=(228)
+1076 195
+fi=(385)
+49 195
+fi=(254)
+769 130
+fi=(300)
+457 65
+fi=(273)
+101 65
+fi=(385)
+-43 195
+cfi=(348)
+cfn=(2572)
+calls=130 3644 
+* 19532
+fi=(237)
+2173 130
+0 130
+fi=(385)
+11 130
++50 130
+fi=(254)
+769 65
+fi=(385)
+49 260
+fi=(237)
+-49 65
+fe=(423)
+2787 325
+cfi=(352)
+cfn=(4858)
+calls=130 258 
+* 20813
+fi=(237)
+2173 130
+fi=(254)
+769 195
+fi=(300)
+457 65
+fi=(238)
+0 1
+fi=(251)
+444 1
+fe=(423)
+0 2
+2702 2
+fi=(245)
+1815 1
+fi=(254)
+923 3
+fi=(273)
+438 2
+0 1
+fe=(423)
+2713 1
+fi=(254)
+923 3
+fe=(423)
+2718 1
+fi=(254)
+923 3
+0 1
+923 1
+0 5
+fe=(423)
+2723 2
+cfi=(359) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/mod.rs
+cfn=(2452) std::io::Write::write_all
+calls=2 1875 
+* 169
+fi=(237)
+2173 2
+fe=(423)
+2764 528
+fi=(254)
+923 4
++4 3
+fi=(273)
+89 2
+fe=(423)
+2724 6
+cfi=(352)
+cfn=(4858)
+calls=2 258 
+* 244
+fi=(237)
+2173 2
+0 1
+fi=(273)
+573 1
+89 1
+fe=(423)
+2730 3
+cfi=(359)
+cfn=(2452)
+calls=2 1875 
+* 168
+fi=(237)
+2173 2
+0 66
+2173 66
+fe=(423)
+
+fn=(4582) soapberry_zip::preserve::PreservationIndex<R>::write_to
+903 8
+fi=(424) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/error/repr_bitpacked.rs
+0 69
+fi=(352)
+19 6
+fe=(423)
+926 1
++90 7
+cfn=(4586) soapberry_zip::preserve::PreservationIndex<R>::prepare_with
+calls=2 +68 
+* 794216
+fi=(237)
+2173 1
+0 1
+2173 3
+fi=(243)
+0 1
+fi=(237)
+2174 1
+fe=(423)
+1016 4
++1 4
+cfn=(4788) soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout
+calls=2 1196 
+* 16472
+0 1
+fi=(237)
+2173 1
+0 1
+2173 2
+fi=(225)
+0 4
+fi=(237)
+2174 13
+fe=(423)
+1017 4
++2 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=2 198 
+* 65555
+fi=(245)
+1815 3
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 6
+fi=(251)
+1720 132
+fi=(274)
+180 66
+fe=(423)
+1020 66
+fi=(273)
+272 396
+fe=(423)
+1021 132
+0 66
+fi=(257)
+745 132
+0 132
+fe=(423)
+1024 325
+cfn=(4846)
+calls=130 2690 
+* 45740
+fi=(257)
+0 1
+fe=(423)
+1024 5
+cfn=(4846)
+calls=2 2690 
+* 668
+fi=(237)
+2173 132
+fi=(231)
+961 5
+fi=(259)
+41 1
+fi=(300)
+457 1
+fi=(274)
+230 1
+fe=(423)
+1033 1
+fi=(245)
+1815 1
+fi=(231)
+961 3
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 66
+fi=(274)
+180 66
+0 66
+fi=(251)
+659 66
+fi=(274)
+349 132
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(423)
+1052 264
+cfn=(4892) soapberry_zip::preserve::PreparedCentral::bytes
+calls=132 1809 
+* 993
+* 66
+0 66
+1053 66
++1 198
+fi=(237)
+0 132
+fe=(423)
+1053 66
+1474 66
+0 65
+fi=(254)
+923 65
+0 130
+fe=(423)
+1475 260
+cfi=(352)
+cfn=(4858)
+calls=130 258 
+* 12415
+fi=(237)
+2173 130
+0 4
+fe=(423)
+1482 2
+cfi=(359)
+cfn=(2452)
+calls=2 1875 
+* 169
+fi=(237)
+2173 2
+0 198
+fe=(423)
+1484 132
+fi=(254)
+923 66
+fe=(423)
+1484 264
+cfi=(359)
+cfn=(2452)
+calls=132 1875 
+* 11352
+fi=(237)
+2173 132
+0 264
+fe=(423)
+1485 132
+1053 132
+fi=(273)
+568 66
+fe=(423)
+1494 66
+fi=(273)
+568 2
+89 2
+fe=(423)
+1502 2
+cfi=(359)
+cfn=(2452)
+calls=2 1875 
+* 168
+fi=(237)
+2173 2
+fi=(273)
+568 130
+89 130
+fe=(423)
+1495 260
+cfi=(352)
+cfn=(4858)
+calls=130 258 
+* 12352
+fi=(237)
+2173 130
+fe=(423)
+1550 3
+0 2
+1551 3
+fi=(359)
+1876 2
+fi=(228)
+1076 4
+fi=(348)
+4262 2
+cfn=(4862)
+calls=2 4017 
+* 125
+fi=(359)
+1877 4
+fi=(273)
+568 3
+89 3
+fi=(237)
+-89 1
+fi=(244)
+612 1
+fi=(245)
+1815 3
+fe=(423)
+1070 2
+cfi=(352)
+cfn=(4858)
+calls=2 258 
+* 20
+* 4
+fi=(237)
+2173 2
+0 1
+fe=(423)
+1076 1
+cfi=(348)
+cfn=(4908) <litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush
+calls=2 4265 
+* 79
+fi=(237)
+2173 2
+fe=(423)
+909 8
+1077 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 51
+* 1
++1 1
+cfi=(225)
+cfn=(4912)
+calls=2 805 
+* 139
+* 2
+cfi=(225)
+cfn=(4914)
+calls=2 805 
+* 2607
+* 1
+
+fn=(4586)
+1084 10
++5 2
+0 2
+fi=(244)
+612 2
+fi=(245)
+2997 1
+fi=(231)
+961 2
+fi=(251)
+1720 3
+fi=(274)
+180 1
+0 2
+fi=(245)
+3022 6
+fi=(251)
+1720 132
+fi=(274)
+180 66
+fe=(423)
+1096 530
+0 1
+fi=(273)
+219 2
++2 2
+fe=(423)
+1109 1
+fi=(273)
+272 3
+fe=(423)
+1109 1
+139 1
++1 1
+fi=(273)
+438 2
+fe=(423)
+1109 1
+fi=(260)
+20 2
+-20 1
+fe=(423)
+1109 1
+fi=(273)
+89 4
+fi=(260)
++65 1
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=2 -81 
+* 19
+* 6
+fe=(423)
+1109 1
+0 65
+fi=(273)
+219 130
++2 130
+fe=(423)
+1105 65
++3 65
++6 7
++9 8
++11 2
+fi=(245)
+464 3
+fi=(251)
+1720 1
+fi=(244)
+723 1
+fi=(245)
+464 5
+fi=(244)
+765 1
+-42 1
+fi=(231)
+961 4
+fe=(423)
+1185 4
+fi=(251)
+1720 1
+fi=(262)
+223 1
+0 5
+fi=(244)
+0 66
+fi=(225)
+1917 330
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=132 255 
+* 1980
+fi=(245)
+1034 132
+fi=(251)
+1720 264
+fi=(262)
+223 66
+fi=(251)
+659 66
+fi=(225)
+1717 66
+fe=(423)
+1185 396
+fi=(225)
+1717 66
+fe=(423)
+1187 1188
+fi=(245)
+1028 132
+fi=(237)
+0 2
+fi=(262)
+227 2
+fe=(423)
+1189 1
+cfi=(225)
+cfn=(4778)
+calls=2 805 
+* 182
+fi=(225)
+805 2
+fi=(251)
+1720 2
+fi=(274)
+180 1
+fe=(423)
+1193 5
+fi=(225)
+805 4
+fe=(423)
+1194 8
+0 3
+fi=(244)
+798 6
+cfn=(1256)
+calls=2 542 
+* 321
+fi=(237)
+2173 2
+fe=(423)
+0 2
+fi=(244)
+798 6
+cfn=(1256)
+calls=2 542 
+* 253
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 1
++1 1
+fi=(425) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/sources/repeat_with.rs
+113 4
+fi=(237)
+2174 2
+fi=(244)
+774 1
++1 3
+fi=(425)
+113 10
+fi=(225)
+1917 8
+fi=(420) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/set_len_on_drop.rs
+19 1
+fi=(425)
++94 3
+fi=(225)
+1917 56
+fi=(420)
+19 7
+fi=(425)
++94 27
+0 5
+113 14
+0 15
+fi=(225)
+1917 8
+fi=(245)
+0 138
+fe=(423)
+1156 1650
+fi=(251)
+1720 198
+fi=(274)
+180 66
+fe=(423)
+1143 596
+0 332
+fi=(273)
+219 132
++53 330
+fi=(257)
+636 66
+fe=(423)
+1152 66
+0 198
+47 66
+1152 66
+0 198
+1156 132
++8 132
+0 1
+fi=(257)
+767 2
+0 3
+fe=(423)
+1171 2
+cfi=(380)
+cfn=(4604) soapberry_zip::preserve::take_prepared_entry
+calls=2 3160 
+* 782446
+fi=(237)
+2173 1
+0 1
+2173 2
++1 23
+fi=(225)
+805 2
+0 6
+fe=(423)
+1166 260
++4 65
+0 3
+fi=(274)
+180 1
+fe=(423)
+
+fn=(4608) soapberry_zip::preserve::generated_entry
+2457 9
++5 11
+fi=(380)
+3160 1
+fe=(423)
+2481 1
+fi=(251)
+444 1
+fi=(245)
+2997 4
+fi=(254)
++54 1
+fe=(423)
+2525 2
+fi=(254)
+769 2
+fi=(257)
+1545 1
+fi=(254)
+769 1
+fi=(257)
+1367 1
+fe=(423)
+2652 8
+fi=(238)
+0 1
+fi=(244)
+798 6
+cfn=(1256)
+calls=2 542 
+* 402
+fi=(237)
+2173 2
++1 1
+fi=(350) /home/zhuhe/code/litchi/crates/soapberry-zip/src/writer.rs
+519 15
+fe=(423)
+2539 5
+0 3
+2311 2
+fi=(254)
+769 3
+fe=(423)
+2319 2
+fi=(254)
+769 1
+fe=(423)
+2317 1
+fi=(254)
+769 3
+fe=(423)
+2332 3
+0 1
+fi=(350)
+2599 2
+cfn=(4622) soapberry_zip::writer::ReusableDeflateState::with_level
+calls=2 +3 
+* 477084
+0 1
+fi=(244)
+612 1
+fi=(361)
+261 4
+fi=(350)
+1046 15
+fe=(423)
+2558 2
+cfi=(350)
+cfn=(4630) soapberry_zip::writer::ZipFileBuilder<W>::start
+calls=2 1240 
+* 1362
+fi=(237)
+2173 1
+0 1
+2173 3
+0 2
+fe=(423)
+2572 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
+* 3
+cfi=(350)
+cfn=(4714) soapberry_zip::writer::ZipArchiveWriter<W>::finish
+calls=2 2107 
+* 928
+fi=(237)
+2173 1
+0 1
+2173 3
++1 18
+fe=(423)
+2554 3
+fi=(350)
+1000 1
+0 1
+3473 10
+fe=(423)
+2561 2
+cfn=(4664) soapberry_zip::preserve::RegeneratedPayload::as_slice
+calls=2 165 
+* 15
+0 1
+2561 2
+cfi=(359)
+cfn=(2452)
+calls=2 1875 
+* 732
+fi=(237)
+2173 2
++1 1
+fe=(423)
+2572 4
+fi=(388)
+557 3
+cfn=(4732)
+calls=2 398 
+* 412
+* 1
+0 1
+557 2
++1 4
+fi=(237)
+2174 6
+fe=(423)
+2574 2
++1 2
+fi=(388)
+1255 2
+fe=(423)
+2578 1
++6 6
++2 2
+0 2
+2562 1
+cfi=(350)
+cfn=(4678) soapberry_zip::writer::ZipDataWriter<W>::finish
+calls=2 3496 
+* 249017
+fi=(237)
+2173 1
+0 1
+2173 2
++1 4
+fe=(423)
+2563 1
+cfi=(350)
+cfn=(4688) soapberry_zip::writer::ReusedDeflateEncoder<W>::finish
+calls=2 2945 
+* 50830
+fi=(237)
+2173 2
+fi=(238)
+0 2
+fe=(423)
+2564 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
+* 3
+cfi=(350)
+cfn=(4694) soapberry_zip::writer::ZipEntryWriter<W>::finish
+calls=2 2263 
+* 230
+fi=(237)
+2173 2
+fi=(257)
+0 1
+fe=(423)
+2565 1
+cfi=(225)
+cfn=(4708)
+calls=2 805 
+* 331
+* 1
+0 3
+2590 2
+cfi=(380)
+cfn=(4752) soapberry_zip::archive::ZipSliceArchive<T>::entries
+calls=2 128 
+* 31
+* 1
++2 2
+cfi=(380)
+cfn=(4754) soapberry_zip::archive::ZipSliceEntries::next_entry
+calls=2 1598 
+* 246
+fi=(237)
+2173 3
+fi=(257)
+1367 2
+fe=(423)
+0 23
+2594 1
+cfi=(380)
+cfn=(4754)
+calls=2 1598 
+* 21
+fi=(237)
+2173 3
+fi=(257)
+636 1
+fe=(423)
+2594 1
+0 1
+fi=(380)
+3624 3
+fi=(254)
+769 3
+fi=(300)
+457 1
+0 3
+fe=(423)
+2608 4
+fi=(380)
+3583 16
+fi=(261) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/mod.rs
+718 2
+fi=(287)
+433 6
+fi=(380)
+249 1
+cfn=(4762) soapberry_zip::archive::slice_entry
+calls=2 429 
+* 310
+fi=(237)
+2173 1
+0 2
+2174 2
+fi=(254)
+2301 4
++44 2
+-44 3
+fe=(423)
+2617 1
+fi=(238)
+286 1
+cfn=(2554) alloc::boxed::box_new_uninit
+calls=2 -39 
+* 37
++3 5
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+0 1
+fe=(423)
+2628 6
++4 4
++6 4
+0 2
+2627 27
+
+fn=(4788)
+1196 8
+fi=(245)
+2997 2
+fe=(423)
+1200 2
+0 3
+fi=(244)
+765 1
+-42 1
+612 1
+fi=(245)
+1815 1
+fi=(231)
+961 8
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(423)
+1209 66
++1 132
+fi=(251)
+659 66
+fe=(423)
+1210 330
+0 66
+1213 198
+cfn=(4800)
+calls=132 2228 
+* 1736
+fi=(237)
+2173 132
+fi=(273)
+278 132
+0 66
+fe=(423)
+1214 66
++2 198
+cfn=(4806) soapberry_zip::preserve::PreparedLocal::len
+calls=132 2181 
+* 1390
+* 132
+fi=(237)
+2173 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+fe=(423)
+0 1
+fi=(231)
+961 10
+fi=(259)
+41 1
+fi=(300)
+457 1
+fi=(299)
+729 5
+fi=(274)
+230 1
+fi=(392)
+0 1
+fi=(244)
+765 1
+fi=(274)
+180 1
+0 76
+fi=(392)
+82 66
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(423)
+1236 132
+fi=(273)
+272 132
+fe=(423)
+1236 198
+0 1
+fi=(274)
+284 4
+0 1
+284 4
+0 1
+279 1
+fe=(423)
+1788 1
+fi=(448) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/accum.rs
+53 1
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 2
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(254)
+844 1
+fi=(274)
+284 3
+-5 15
+fe=(423)
+1788 15
+fi=(448)
+53 15
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(448)
+53 30
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(448)
+53 15
+fi=(254)
+844 15
+fi=(274)
+284 56
+0 1
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(274)
+284 3
+-5 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(274)
+284 3
+0 71
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(423)
+1258 132
++3 330
+cfn=(4818)
+calls=132 1823 
+* 1587
+fi=(237)
+2173 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+fe=(423)
+0 3
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(423)
+0 1
+fi=(254)
+769 2
+fi=(257)
+1367 1
+fi=(238)
+0 1
+fi=(257)
+636 3
+fe=(423)
+1284 1
+fi=(300)
+0 4
+fe=(423)
+1285 2
++1 4
+0 1
+fi=(244)
+765 1
+fi=(274)
+25 1
+284 4
+fi=(244)
+765 1
+632 1
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+-48 3
+fi=(244)
+798 7
+cfn=(1256)
+calls=2 542 
+* 75
+fi=(237)
+2173 2
++1 2
+fi=(228)
+1916 1
+fi=(246)
+772 2
+fi=(225)
+1917 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=2 198 
+* 50
+fi=(246)
+772 2
+fi=(225)
+1917 4
+fi=(274)
+0 1
+284 4
+-5 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 2
+fi=(274)
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(254)
+844 1
+fi=(274)
+284 3
+-5 15
+fe=(423)
+1788 15
+fi=(448)
+53 15
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(448)
+53 30
+fi=(274)
+279 15
+fe=(423)
+1788 15
+fi=(448)
+53 15
+fi=(254)
+844 15
+fi=(274)
+284 56
+0 1
+279 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(274)
+284 3
+-5 1
+fe=(423)
+1788 1
+fi=(448)
+53 1
+fi=(274)
+284 3
+fe=(423)
+1288 5
++3 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fi=(257)
+1367 1
+fi=(245)
+464 3
+fi=(244)
+765 1
+-42 1
+0 1
+fi=(257)
+636 5
+fe=(423)
+1393 6
+fi=(257)
+636 1
+fe=(423)
+1400 1
++8 3
+fi=(237)
+0 1
+fe=(423)
+1417 5
+cfn=(4832)
+calls=2 1605 
+* 25
+fi=(237)
+2173 2
++1 12
+fe=(423)
+1417 7
++7 2
++1 3
+-1 2
++1 2
+-1 17
+0 1
+fi=(244)
+798 6
+cfn=(1256)
+calls=2 542 
+* 285
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 2
++1 9
+0 66
+fi=(231)
+961 264
+fi=(225)
+1917 462
+fi=(245)
+1034 198
+fi=(392)
+0 66
+82 66
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(423)
+1304 132
++3 330
+cfn=(4818)
+calls=132 1823 
+* 1587
+fi=(237)
+2173 132
++1 66
+fe=(423)
+1308 264
+0 66
+fi=(273)
+272 132
+0 66
+fe=(423)
+1318 264
++4 132
++54 2
+-68 130
++3 65
+fi=(273)
+272 325
+fe=(423)
+1310 65
++8 130
++6 65
+fi=(273)
+272 325
+fe=(423)
+1324 130
+fi=(273)
+0 65
+272 130
+0 65
+fe=(423)
+1326 65
+fi=(427)
+297 195
+0 528
+fi=(245)
+1028 132
+fe=(423)
+
+fn=(4560) soapberry_zip::preserve::PreservationPlan::try_reserve_appended
+380 6
+fi=(244)
+617 1
+fi=(245)
+1556 1
+fi=(254)
+2494 2
+fi=(244)
+765 1
+-42 1
+fe=(423)
+385 5
+
+fn=(4566) soapberry_zip::preserve::RegeneratedEntry::new_shared
+188 8
+fi=(244)
+459 2
+0 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+* 30
+fi=(244)
+468 2
+fi=(248)
+0 1
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 11
+* 1
+fe=(423)
+189 6
++5 6
+
+fn=(4892)
+1809 66
++1 330
++1 195
+fi=(244)
+612 195
+fi=(245)
+1815 65
+fe=(423)
++6 130
+fi=(251)
+444 1
+fe=(423)
+1813 2
+fi=(245)
++2 1
+fi=(254)
+923 5
+fi=(273)
+89 1
+fe=(423)
+1821 2
+
+fn=(4412)
+2810 528
+fi=(380)
+3758 132
+3624 132
++1 132
++1 132
+-2 132
+fi=(254)
+769 528
+fi=(300)
+457 132
+fe=(423)
+2825 264
++3 528
+0 132
+2829 528
+
+fn=(4464)
+2654 594
++10 132
+fi=(273)
+272 198
+0 66
+fe=(423)
+2664 66
+139 132
++1 66
+fi=(273)
+438 132
+0 198
+fe=(423)
+2664 792
+fi=(380)
+2050 66
+-2 66
+985 66
+cfn=(4468) soapberry_zip::archive::validate_borrowed_wayfinder_metadata
+calls=132 1191 
+* 1188
+* 66
+fi=(237)
+2173 132
+0 198
+fi=(380)
+986 132
+fi=(238)
+0 66
+fe=(423)
+2664 132
+fi=(380)
+0 330
+1015 198
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=132 198 
+* 3762
+fi=(228)
++61 330
+fi=(254)
+2345 528
+fi=(380)
+1016 132
+fi=(228)
+2025 330
+fi=(385)
+99 132
+fi=(254)
+769 132
+fi=(300)
+457 66
+fi=(273)
+585 132
+101 132
+fi=(385)
++7 198
+cfi=(348)
+cfn=(2572)
+calls=132 3644 
+* 16368
+fi=(237)
+2173 132
+0 132
+fi=(385)
+11 132
+111 132
+fi=(254)
+769 66
+fi=(385)
+99 132
+-99 132
+fi=(380)
+1047 132
+cfn=(4482) soapberry_zip::archive::ZipLocalFileHeaderFixed::parse
+calls=132 3879 
+* 1782
+fi=(237)
+2173 132
+fi=(418) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs
+0 66
+fe=(423)
+2678 528
+fi=(237)
+2174 858
+fi=(380)
+1047 858
+3909 66
+fi=(254)
+769 264
+fi=(300)
+457 66
+0 66
+fi=(380)
+1057 132
+0 66
+fi=(245)
+464 198
+fi=(380)
+1066 132
+0 66
+fi=(244)
+383 330
+cfn=(1418)
+calls=132 717 
+* 7194
+* 66
+fi=(237)
+966 198
+0 66
+fi=(380)
+1079 132
+cfi=(245)
+cfn=(4490) alloc::vec::Vec<T,A>::resize
+calls=132 3465 
+* 3170
+0 66
+fi=(254)
+769 66
+fi=(300)
+457 66
+fi=(254)
+769 66
+fi=(244)
+612 66
+fi=(245)
+1851 66
+fi=(380)
+1085 264
+cfi=(385)
+cfn=(3000)
+calls=132 47 
+* 19340
+0 66
+fi=(237)
+2173 132
+fi=(273)
+0 66
+fi=(380)
+3117 66
+1090 66
++5 132
+0 66
+fi=(254)
+923 66
+fi=(385)
+0 198
+fi=(260)
+20 132
+154 198
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=132 -81 
+* 1260
+* 132
+fi=(273)
+-65 198
+fi=(380)
+1113 330
+cfn=(4500) soapberry_zip::archive::resolve_local_entry_size_framing
+calls=132 1354 
+* 3498
+fi=(237)
+2173 264
++1 132
+fi=(380)
+1114 132
+0 198
+1114 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+fi=(380)
+1141 132
++3 132
++1 660
+cfn=(4502) soapberry_zip::archive::DataDescriptor::parse_complete_at
+calls=132 2698 
+* 29700
+fi=(237)
+2173 132
+fi=(254)
+769 66
+fi=(300)
+457 66
+fi=(380)
+1161 132
+fi=(244)
+632 132
+0 66
+fi=(236)
+48 66
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=132 3319 
+* 2178
+-48 132
+fe=(423)
+2666 132
++8 132
+0 66
+2677 132
++1 66
+
+fn=(4664)
+165 9
+fi=(251)
+444 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(423)
+172 1
+
+fn=(4806)
+2181 198
++1 660
++1 65
+fi=(254)
+923 130
+fe=(423)
+2189 1
+fi=(254)
+923 3
+fe=(423)
+2189 1
+fi=(254)
+923 2
+fi=(245)
+0 66
+fe=(423)
+2225 264
+
+fn=(4418)
+2800 603
+fi=(244)
+765 201
+-42 67
+0 3
+fi=(385)
+49 3
+fi=(244)
+-49 66
+fi=(385)
+49 198
+-49 66
+fi=(254)
+769 132
+fi=(300)
+457 66
+fi=(273)
+101 66
+fi=(385)
+-43 198
+cfi=(348)
+cfn=(2572)
+calls=132 3644 
+* 16378
+fi=(237)
+2173 132
+0 132
+fi=(385)
+11 132
++50 132
+fi=(254)
+769 66
+fi=(385)
+49 264
+fi=(237)
+-49 134
+fe=(423)
+2807 268
+fi=(236)
+0 198
+fi=(244)
+798 330
+cfn=(1256)
+calls=132 542 
+* 15691
+fi=(237)
+2173 132
+fe=(423)
+2808 536
+fi=(237)
+2174 132
+fi=(228)
+1916 66
+fi=(246)
+772 132
+fi=(225)
+1917 198
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=132 198 
+* 792
+fi=(246)
+772 132
+fi=(225)
+1917 132
+fe=(423)
+
+fl=(372) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.1/src/lib.rs
+fn=(2194) crc32fast::Hasher::internal_new_specialized
+112 9
+fi=(234)
+3890 3
+fi=(328) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std_detect/src/detect/cache.rs
+92 6
+202 3
+fi=(373) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.1/src/specialized/pclmulqdq.rs
+67 3
+fi=(234)
+3890 3
+fi=(328)
+92 6
+202 3
+fi=(373)
+69 3
+fi=(234)
+3890 3
+fi=(328)
+92 6
+202 3
+fi=(373)
+70 3
+fi=(234)
+3890 3
+fi=(328)
+92 6
+202 3
+fi=(373)
+74 3
+fi=(234)
+3890 3
+fi=(328)
+92 9
+fi=(373)
+-15 3
+-77 3
+fi=(234)
+3890 3
+fi=(328)
+92 12
+-92 3
+fe=(372)
+115 18
++7 12
+
+fl=(354)
+fn=(2118) flate2::mem::Compress::compress
+350 36
+fi=(370)
+-73 12
+fi=(228)
+1076 8
+fi=(370)
+349 4
+fi=(228)
+1076 8
+fi=(370)
+349 4
++1 4
++3 4
++1 4
++5 8
+cfi=(356)
+cfn=(2120) zlib_rs::deflate::deflate
+calls=272 2489 
+* 299416
+253 20
+0 8
+361 8
++4 2
+-4 6
++5 2
++2 2
++1 2
+fi=(371) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/ffi/zlib_rs.rs
+199 2
+fi=(370)
+361 6
+fi=(371)
+199 6
++3 4
+fi=(370)
+0 2
+361 8
++4 2
+-4 6
++5 2
++2 2
++1 2
+fi=(371)
+199 2
+fi=(370)
+361 6
+fi=(371)
+199 6
++3 4
++1 12
+0 4
+fe=(354)
+357 24
+
+fn=(2030) flate2::mem::Compress::new
+199 8
+fi=(449) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/c_api.rs
+76 10
++33 2
++1 2
+fi=(397) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/metadata.rs
++23 2
+fi=(236)
+-50 3
+cob=(2)
+cfi=(155)
+cfn=(2032)
+calls=3 5366 
+* 292
++1 1
+fi=(356)
+325 4
+fi=(254)
+3692 2
+fi=(231)
+961 4
+fi=(225)
+709 4
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=3 198 
+* 262163
+1917 43
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=3 255 
+* 245
+* 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=3 255 
+* 53
+* 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=3 255 
+* 30
+fi=(356)
+429 2
++9 1
+cfn=(2050) zlib_rs::deflate::reset
+calls=3 745 
+* 181106
+139 14
+fi=(225)
+1917 1
+fi=(371)
+173 3
+fe=(354)
++27 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=3 +55 
+* 30
++3 8
+
+fn=(3028)
+404 7
+fi=(449)
+76 3
+fi=(398) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/inflate.rs
+468 4
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=272 198 
+* 5347
+fi=(397)
+133 2
+fi=(236)
+-50 3
+cob=(2)
+cfi=(155)
+cfn=(2032)
+calls=272 5366 
+* 584
++1 1
+fi=(398)
+2267 4
+fi=(254)
+3692 2
+fi=(231)
+961 1
+fi=(225)
+1917 36
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=272 255 
+* 533
+* 4
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=272 198 
+* 8947
+fi=(398)
+2285 1
++1 1
+fi=(405) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/inflate/window.rs
+75 2
+fi=(398)
+2353 2
++6 1
++1 1
++2 2
++2 1
++1 1
++1 1
++2 1
+149 6
+fi=(225)
+1917 1
+fe=(354)
+405 11
++3 5
+
+fl=(238)
+fn=(2554)
+247 2
+fi=(236)
+14 1
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+* 356
+fe=(238)
+248 2
++4 2
+-5 2
+fi=(236)
+14 1
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=4 3283 
+* 30
+fe=(238)
+248 2
++4 2
+-5 1
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+* 30
+fe=(238)
+248 2
++4 2
+
+fl=(373)
+fn=(2206) crc32fast::specialized::pclmulqdq::calculate
+154 6
+cfi=(407) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.1/src/baseline.rs
+cfn=(3182) crc32fast::baseline::update_fast_16
+calls=272 30 
+* 17
+0 4
+fi=(450) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/simd.rs
+152 2
+fe=(373)
++8 4
+fi=(273)
+573 2
+89 2
+fi=(225)
+547 8
+fi=(302)
+902 8
+0 2
+fi=(374) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/x86/pclmulqdq.rs
+33 8
+fi=(225)
+547 2
+fi=(302)
+902 4
+fi=(225)
+547 6
+fi=(374)
+33 4
+fi=(302)
+902 2
+fi=(374)
+33 2
+fi=(302)
+902 2
+fi=(374)
+33 4
+fi=(302)
+902 2
+fi=(374)
+33 2
+fi=(302)
+902 2
+fi=(374)
+33 4
+fi=(302)
+902 2
+fi=(374)
+33 2
+fi=(302)
+902 2
+fi=(273)
+89 2
+573 2
+fe=(373)
+176 4
+fi=(374)
+33 16
+fi=(225)
+547 4
+fi=(302)
+902 8
+fi=(225)
+547 12
+fi=(374)
+33 8
+fi=(302)
+902 4
+fi=(374)
+33 4
+fi=(302)
+902 4
+fi=(374)
+33 8
+fi=(302)
+902 4
+fi=(374)
+33 4
+fi=(302)
+902 4
+fi=(374)
+33 8
+fi=(302)
+902 4
+fi=(374)
+33 4
+fi=(302)
+902 4
+fi=(273)
+89 4
+573 4
+fe=(373)
+176 8
+0 2
+fi=(374)
+33 10
+fi=(302)
+902 4
+fi=(374)
+33 6
+fi=(302)
+902 4
+fi=(374)
+33 6
+fi=(302)
+902 4
+fe=(373)
+335 4
++9 4
+fi=(302)
+0 2
+fi=(374)
+33 2
+fi=(302)
+751 2
+902 2
+-39 8
+fi=(374)
+33 4
+fi=(451) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/../../stdarch/crates/core_arch/src/macros.rs
+157 2
+fi=(302)
+902 2
+-39 4
+fi=(374)
+33 2
+fi=(302)
+863 4
+fi=(374)
+33 4
+fi=(302)
+902 2
+fi=(451)
+173 2
+fe=(373)
+412 2
+189 4
+
+fl=(367)
+fn=(2150)
+7 7
++14 1
+fi=(366)
++29 1
+fi=(273)
+568 3
+fe=(367)
+0 2
+fi=(366)
+34 1
+fi=(273)
+699 2
+fe=(367)
+57 5
++8 9
+fi=(273)
+568 2
+fi=(356)
+1424 2
+fi=(254)
+2345 3
+fe=(367)
+134 1
+fi=(273)
+568 2
+0 1
+fe=(367)
+137 2
+fi=(254)
+2345 3
+fe=(367)
+137 2
+0 11
+fi=(273)
+89 3
+fe=(367)
+-12 13
++65 3
++56 2
+fi=(237)
+1718 1
+0 1
+fe=(367)
+205 1
+fi=(237)
+1718 1
+fe=(367)
+209 2
+-1 1
+fi=(254)
+-30 1
+fe=(367)
++37 1
++1 2
+0 1
+253 3
++4 2
++5 3
+0 2
+262 1
+0 1
+9 8
+
+fl=(380)
+fn=(3148) soapberry_zip::archive::DataDescriptor::read_at
+2781 9
+-75 3
+fi=(318) /home/zhuhe/code/litchi/crates/litchi-opc/src/lib.rs
+0 4
+fe=(380)
+2709 2
+fi=(300)
+457 3
+fi=(228)
+1076 2
+fe=(380)
+2723 3
++1 2
++3 7
+cfn=(3164) soapberry_zip::archive::DataDescriptor::parse_complete_with_width
+calls=6 2624 
+* 132
+* 1
+0 5
+fi=(385)
+49 3
+fi=(254)
+769 2
+fi=(300)
+457 1
+fi=(273)
+101 2
+fi=(254)
+923 3
+fi=(245)
+1815 1
+fi=(254)
+923 2
+fi=(273)
+89 1
+fi=(228)
+1076 2
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=6 255 
+* 11
+* 2
+fi=(237)
+2173 2
+0 2
+fi=(385)
+11 2
++50 2
+fi=(254)
+769 1
+fi=(385)
+49 4
+fe=(380)
+2800 8
+
+fn=(3164)
+2624 612
++6 1088
+fi=(273)
+369 204
+fi=(228)
+1878 68
+fe=(380)
+2644 136
++1 68
+0 68
+2646 68
++1 204
+0 612
+fi=(251)
+1720 68
+fi=(274)
+180 68
+fi=(257)
+2126 544
+0 136
+fe=(380)
+2665 544
++1 68
+0 136
+fi=(251)
+1720 68
+fi=(274)
+180 68
+fi=(257)
+2126 68
+fi=(254)
+769 136
+fi=(300)
+457 68
+fi=(254)
+769 136
+fi=(300)
+457 68
+fi=(387)
+8 68
+fe=(380)
+2735 272
+0 68
+fi=(273)
+369 68
+fi=(387)
+8 136
+fe=(380)
+2741 68
+fi=(387)
+0 68
+fi=(254)
+923 68
+0 272
+fi=(251)
+1720 68
+fi=(274)
+180 68
+0 136
+fi=(257)
+745 544
+fi=(251)
+1720 68
+fi=(274)
+180 68
+0 68
+fe=(380)
+2683 136
++1 68
+fi=(257)
+969 136
+fe=(380)
+0 136
+fi=(257)
+970 408
+fi=(426) /home/zhuhe/code/litchi/crates/soapberry-zip/src/lib.rs
+0 68
+fe=(380)
+0 68
+2696 544
+
+fn=(2662) soapberry_zip::archive::parse_zip64_extra_values
+3333 1064
++5 133
+-1 133
++2 133
++1 133
+-2 133
++4 931
++5 266
+3456 1064
+
+fn=(4502)
+2698 528
++8 198
+fi=(243)
+0 330
+fe=(380)
+2709 132
+fi=(300)
+457 198
+fi=(228)
+1076 132
+fe=(380)
+2723 198
++1 132
++3 462
+cfn=(3164)
+calls=132 2624 
+* 8712
+* 66
+0 132
+fi=(385)
+49 198
+-49 66
+fi=(254)
+769 132
+fi=(300)
+457 66
+fi=(273)
+101 132
+fi=(385)
+-43 198
+cfi=(348)
+cfn=(2572)
+calls=132 3644 
+* 16302
+fi=(237)
+2173 132
+0 132
+fi=(385)
+11 132
++50 132
+fi=(254)
+769 66
+fi=(385)
+49 264
+fe=(380)
+2728 528
+
+fn=(4468)
+1191 198
++1 264
++5 132
++5 264
+0 66
+1208 264
+
+fn=(4500)
+1354 402
++6 737
++1 134
+0 67
+1366 134
+0 201
+1379 536
++5 201
++2 134
++38 268
+-5 268
+0 67
+1430 402
+
+fn=(4752)
+128 1
+fi=(388)
+1274 2
+fi=(254)
+2301 3
+fi=(388)
+1255 1
+fi=(257)
+1042 2
+fi=(388)
+1255 1
+fi=(228)
+1076 2
+fi=(254)
+923 13
+fi=(388)
+1245 1
+fe=(380)
+139 4
++5 1
+
+fn=(4482)
+3879 268
++1 134
+fi=(387)
+8 67
+fe=(380)
+3898 134
+fi=(387)
+8 67
++5 67
+fe=(380)
+3905 67
+fi=(387)
+8 67
+fe=(380)
+3905 134
+fi=(387)
+13 67
+fe=(380)
+3905 134
+fi=(387)
+13 67
+fe=(380)
+3905 134
++1 67
+0 67
+3906 268
+
+fn=(4604)
+3160 2
+fi=(423)
+316 6
+2372 2
+cfn=(4608)
+calls=2 +85 
+* 782436
+fe=(380)
+
+fn=(4754)
+1598 16
++1 6
+0 1
+1603 5
+cfn=(4438)
+calls=134 3972 
+* 33
+fi=(237)
+2173 2
+fe=(380)
+1600 2
+fi=(237)
+2174 5
+fe=(380)
+1603 5
+fi=(273)
+568 2
+fe=(380)
+0 2
+fi=(273)
+573 1
+fe=(380)
+4009 2
+0 2
+4014 2
+0 1
+1605 1
+4019 2
+1624 16
+0 6
+1605 2
+0 1
+1615 2
+3482 2
++4 2
++4 1
++6 4
+-6 2
++4 4
++1 2
++2 5
++6 2
++2 3
++6 3
+cfn=(2662)
+calls=134 3333 
+* 30
+fi=(237)
+2173 3
+fe=(380)
+3504 2
+fi=(237)
+2174 13
+fe=(380)
+3511 5
+0 5
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(380)
+1621 6
+0 3
+1622 2
++1 39
+0 1
+1623 8
++1 1
+
+fn=(4762)
+429 8
++6 1
+fi=(228)
+1076 4
+fe=(380)
+440 7
+0 2
+fi=(273)
+89 2
+fe=(380)
+444 3
+cfn=(4482)
+calls=268 3879 
+* 27
+fi=(237)
+2173 2
+fe=(380)
+489 8
+fi=(237)
+2174 9
+fe=(380)
+444 8
+fi=(254)
+769 2
+fi=(273)
+369 2
+89 4
+fe=(380)
+457 2
+cfn=(4500)
+calls=268 1354 
+* 53
+fi=(237)
+2173 3
+fi=(426)
+0 1
+fi=(254)
+2829 5
+fe=(380)
+462 2
++6 2
+0 1
+fi=(299)
+863 1
+fe=(380)
+469 6
+cfn=(3164)
+calls=268 2624 
+* 132
+fi=(237)
+2173 2
++1 3
+fe=(380)
+3828 1
+480 7
+
+fn=(2442) soapberry_zip::archive::CompressionMethod::as_id
+3191 2
++1 4
++26 2
+
+fn=(3178) soapberry_zip::archive::ZipVerification::valid_with_crc_policy
+2402 3
++1 2
+0 2
+2411 3
++8 4
+
+fn=(3050) <soapberry_zip::archive::ZipVerifier<Decompressor,Reader> as std::io::Read>::read
+2453 20
++1 4
+fi=(352)
+310 2
+fi=(396)
+100 2
+-4 6
+-96 2
+96 4
++1 8
+cfi=(352)
+cfn=(3054)
+calls=12 309 
+* 352
+* 2
+fi=(237)
+2173 4
+fi=(396)
+97 2
++1 2
++2 4
+-4 2
+-96 2
+fi=(254)
+923 6
+0 2
+fi=(273)
+89 2
+fi=(291)
++48 10
+fi=(401) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.10/src/zio.rs
+-3 4
++9 4
+-2 16
+cfn=(3070) <flate2::mem::Decompress as flate2::zio::Ops>::run
+calls=12 -69 
+* 1035
+* 6
++1 2
+fi=(396)
+-38 2
+fi=(228)
+1076 4
+fi=(396)
+104 2
+fi=(401)
++43 4
+0 2
+147 10
+0 4
+fi=(352)
+311 4
+fe=(380)
+2509 18
+0 4
+fi=(254)
+769 2
+fi=(300)
+457 2
+0 2
+fi=(352)
+317 4
+fe=(380)
+2455 4
+fi=(372)
+97 4
+cfn=(2194)
+calls=12 +15 
+* 90
+fi=(257)
+1065 8
+0 4
+fi=(372)
+127 10
+fi=(373)
+-30 10
+cfn=(2206)
+calls=12 +57 
+* 170
+* 2
+fe=(380)
+2455 4
+fi=(254)
+769 4
+fi=(300)
+457 2
+0 2
+fe=(380)
+2462 2
++7 14
+0 1
+2373 1
+fi=(257)
++54 4
+fe=(380)
+-54 4
+2481 2
+0 2
+2484 1
++1 1
++2 1
++1 1
+-6 6
+cfn=(3148)
+calls=6 2781 
+* 228
+* 1
+fi=(237)
+835 2
++1 2
+fe=(380)
+2395 5
+cfn=(3178)
+calls=6 +7 
+* 14
+fi=(237)
+966 2
+fe=(380)
+2505 6
+
+fn=(4438)
+3972 264
++1 132
+fi=(387)
+8 66
+fe=(380)
+3997 132
+fi=(387)
+13 66
+-5 66
+fe=(380)
+4004 792
+fi=(387)
+13 66
+fe=(380)
+4004 198
++1 66
+0 66
+4005 264
+-33 8
++1 4
+fi=(387)
+8 2
+fe=(380)
+3997 4
+fi=(387)
+13 2
+-5 2
+fe=(380)
+4004 24
+fi=(387)
+13 2
+fe=(380)
+4004 6
++1 2
+0 2
+4005 8
+
+fn=(2660) soapberry_zip::archive::ZipFileHeaderRecord::from_parts
+3473 1320
++16 132
++1 264
+-1 660
++1 264
++4 660
++3 528
+-16 264
++1 264
++15 132
+-4 264
++2 264
++1 528
++15 528
+cfn=(2662)
+calls=264 3333 
+* 3960
+fi=(237)
+2173 396
+0 132
+fe=(380)
+3504 264
+fi=(237)
+2174 1716
+fe=(380)
+3511 528
+0 1452
+3551 4356
+0 132
+3551 792
++1 1056
+
+fn=(2728)
+3128 66
++1 132
+0 132
+3129 198
+0 66
+3154 132
+
+fn=(4654) soapberry_zip::archive::ZipLocalFileHeaderFixed::write
+3912 4
++6 1
+fi=(225)
+547 1
+fe=(380)
+3919 1
+fi=(225)
+547 1
+fe=(380)
+3923 1
+fi=(225)
+547 1
+fe=(380)
+3924 1
+fi=(225)
+547 1
+fe=(380)
+3926 1
+fi=(225)
+547 1
+fe=(380)
+3927 1
+fi=(225)
+547 2
+fi=(432) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/impls.rs
+78 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 52
+fi=(237)
+2173 2
+fe=(380)
+0 1
+3931 4
+
+fn=(4386)
+2837 1206
++1 536
+0 134
+2839 268
++1 12
++8 4
+fi=(273)
+1020 4
++11 4
+0 2
+fe=(380)
+2848 2
+fi=(231)
+961 2
+fi=(225)
+638 8
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=4 255 
+* 26
+* 2
+fe=(380)
+2856 2
++1 4
++17 260
+-1 520
+fi=(254)
+923 130
+fe=(380)
+2873 8
+fi=(254)
+923 266
+fe=(380)
+3973 264
+fi=(387)
+8 132
+fe=(380)
+3997 264
+fi=(387)
+13 132
+-5 264
+fe=(380)
+2875 396
+fi=(387)
+8 132
+fe=(380)
+2875 132
+fi=(387)
+13 264
+fe=(380)
+3957 132
+fi=(387)
+13 396
+fe=(380)
+2875 528
+fi=(387)
+13 132
+fe=(380)
+2875 264
++1 264
+3957 924
+fi=(254)
+769 132
+fi=(300)
+457 132
+fe=(380)
+2892 396
+-51 4
++1 2
+-1 2
+2997 1072
+0 2
+fi=(273)
+580 4
+fe=(380)
+2863 4
+fi=(228)
+1076 4
+fi=(273)
+101 2
+fe=(380)
+2863 8
+cfi=(385)
+cfn=(4392)
+calls=4 124 
+* 1420
+fi=(237)
+2173 4
+fe=(380)
+0 264
+2900 132
++7 264
+-39 4
++1 2
++1 12
+-31 2
+2957 396
+fi=(254)
+923 660
+0 132
+fe=(380)
+4009 264
++5 528
+0 132
+fi=(299)
+863 396
+fe=(380)
+2984 1188
+cfn=(2660)
+calls=264 3473 
+* 20856
+* 132
+fi=(237)
+2173 132
+0 132
+2173 264
++1 2508
+fi=(254)
+769 132
+fi=(300)
+457 132
+fe=(380)
+2995 264
++1 2772
++1 132
+
+fl=(417) /rust/deps/hashbrown-0.16.1/src/set.rs
+fn=(3998) <hashbrown::set::HashSet<T,S,A> as core::iter::traits::collect::Extend<T>>::extend
+1307 9
+fi=(299)
+729 3
+fi=(296)
+4655 4
+fi=(303)
+956 1
+fi=(300)
+457 1
+fi=(251)
+1720 1
+fi=(274)
+25 1
+fe=(417)
+1309 8
+
+fl=(245)
+fn=(4102)
+3988 3
+fi=(244)
+617 1
+fe=(245)
+1446 1
+fi=(254)
+2494 1
+fi=(244)
+765 1
+-94 1
+fi=(228)
+1916 1
+fi=(246)
+772 1
+fi=(244)
+612 1
+fi=(246)
+772 2
+0 2
+772 8
+0 3
+fi=(225)
+1917 3
+fi=(246)
+772 3
+0 30
+fi=(225)
+1917 45
+fi=(246)
+772 45
+0 2
+fi=(225)
+1917 2
+fi=(254)
+844 2
+fi=(420)
+19 2
+fi=(246)
+772 6
+fi=(420)
+31 1
+fe=(245)
+4017 4
+-29 12
+fi=(257)
+812 9
+fi=(244)
+617 3
+fe=(245)
+1446 3
+fi=(254)
+2494 3
+fi=(244)
+765 3
+-94 3
+fi=(250)
+2646 6
+fi=(420)
+31 3
+fe=(245)
+4017 12
+-29 7
+fi=(299)
+729 3
+fi=(244)
+617 1
+fe=(245)
+1446 1
+fi=(254)
+2494 1
+fi=(244)
+765 2
+-94 1
+fi=(251)
+1720 1
+fi=(274)
+25 1
+-25 1
+fi=(420)
+31 1
+fe=(245)
+4017 8
+
+fn=(3802)
+1023 330
++2 66
++3 132
+fi=(231)
+-67 198
+fi=(225)
+1917 198
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=132 255 
+* 1980
+fe=(245)
+1034 132
++4 264
+-15 5
++2 1
++3 2
+fi=(244)
+612 1
+fi=(231)
+961 2
+fi=(225)
+1917 6
+fe=(245)
+1034 2
++4 4
+-15 320
++2 64
++3 128
+fi=(231)
+-67 128
+fi=(225)
+1917 192
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=128 255 
+* 1920
+fe=(245)
+1034 128
++4 256
+-15 5
++2 1
++3 2
+fi=(231)
+-67 2
+fi=(225)
+1917 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 77
+fe=(245)
+1034 2
++4 4
+
+fn=(4278) alloc::vec::Vec<T,A>::extend_desugared
+3961 11
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(245)
+3983 8
+
+fn=(4490)
+3465 10
+2997 2
+3468 6
+fi=(244)
+617 1
+fi=(254)
+2494 1
+fi=(244)
+765 1
+-94 1
+-59 1
+fi=(231)
+961 1
+fi=(228)
+1916 1
+fi=(246)
+772 1
+fi=(225)
+1917 1
+fi=(420)
+19 2
+fe=(245)
+-19 1
+3473 6
+0 1
+3473 6
+-8 330
+2997 66
+3468 198
+fi=(244)
+617 66
+fi=(254)
+2494 66
+fi=(244)
+765 66
+-94 66
+-59 66
+fi=(231)
+961 66
+fi=(228)
+1916 66
+fi=(246)
+772 198
+fi=(225)
+1917 198
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=132 198 
+* 728
+* 66
+fi=(246)
+772 264
+fi=(225)
+1917 66
+fi=(420)
+19 132
+fe=(245)
+-19 66
+3473 396
+
+fl=(370)
+fn=(3198) <zlib_rs::stable::Inflate as core::ops::drop::Drop>::drop
+218 2
+fi=(398)
+2651 1
+-1 2
++1 1
++1 1
+fi=(225)
+1436 4
+fi=(249)
+902 3
+fi=(381) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/allocate.rs
+385 2
++3 3
++1 2
+0 2
+fi=(237)
+1231 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=272 3319 
+* 195
+fe=(370)
+
+fn=(2466)
+413 2
+fi=(356)
+729 1
++3 1
+-2 1
++1 1
++1 1
+fi=(249)
+902 3
+fi=(381)
+388 3
++1 2
+0 2
+fi=(237)
+1231 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+* 139
+fe=(370)
+
+fl=(313)
+fn=(4034) core::slice::<impl [T]>::sort_unstable_by
+34 1
+fi=(300)
+434 1
+fi=(291)
+3193 1
+fe=(313)
+34 1
+fi=(300)
+434 1
+fi=(291)
+3193 1
+fe=(313)
+34 1
+fi=(300)
+434 1
+fi=(291)
+3193 1
+fe=(313)
+34 1
+fi=(300)
+434 1
+fi=(291)
+3193 1
+fe=(313)
+34 1
+fi=(300)
+434 1
+fi=(291)
+3193 1
+fe=(313)
+
+fn=(1306)
+114 4
+fi=(314) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/sort/shared/mod.rs
+-80 2
+fi=(291)
+3245 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(314)
+34 1
+fi=(273)
+272 2
+fi=(244)
+612 1
+fi=(273)
+272 2
+fi=(423)
+847 1
+fi=(273)
+272 2
+fi=(423)
+847 3
+fi=(228)
+1916 1
+fi=(314)
+35 1
++5 64
+fi=(273)
+272 384
+fi=(423)
+847 64
+fi=(228)
+1916 64
+fi=(314)
+40 64
++2 192
+-2 129
+fi=(228)
+1916 1
+fe=(313)
+125 1
++13 4
+
+fl=(286)
+fn=(1436)
+432 7488
+fi=(254)
+923 2304
+0 1152
+fe=(286)
+438 2304
+0 2880
+fi=(265)
+27 3456
+fi=(254)
+927 1152
+fi=(273)
+89 576
+fi=(265)
+-62 1152
++12 384
+-39 384
+40 3840
++4 1920
+-5 4032
+fi=(225)
+2292 768
+fi=(265)
+71 768
+-71 768
+91 192
+-91 384
+89 192
+-70 768
++71 192
+-71 576
++72 768
+-91 384
+40 2688
++4 1152
+-5 3456
+-39 192
+40 768
+-40 192
+40 384
++64 192
+fe=(286)
+457 576
++1 1344
+-1 576
++1 1344
+fi=(273)
+89 1152
+fi=(260)
++65 1152
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=3946 -81 
+* 3840
+* 2304
+fe=(286)
+461 384
+0 384
+462 1536
++6 192
+0 576
+472 1536
+0 768
+472 3072
+
+fn=(1122)
+499 3160
++1 1185
+fi=(254)
+923 2370
+0 5925
+927 790
+fe=(286)
+507 1580
+cfi=(265)
+cfn=(1126) core::slice::memchr::memrchr
+calls=4983 111 
+* 37179
+* 790
++3 392
++8 1568
++2 1960
+fi=(254)
+923 784
+0 392
+fi=(273)
+89 1568
+fi=(260)
++65 392
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=4707 -81 
+* 3920
+* 1176
+fe=(286)
+521 392
++2 784
++1 1960
++17 3
+0 12
+546 24
+0 1176
+546 3136
+
+fl=(382)
+fn=(2498)
+2109 5
++11 2
+fi=(225)
+805 2
+fe=(382)
+2120 4
+fi=(225)
+805 1
+cfi=(251)
+cfn=(4980)
+calls=2 444 
+* 300
+fe=(382)
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(249)
+429 7
+fi=(304)
+200 2
+fi=(236)
+48 5
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 153
+fe=(382)
+3327 6
+fi=(234)
+3942 3
+fe=(382)
+3479 3
+fi=(236)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=7 3319 
+* 526
+fe=(382)
+2109 6
+fi=(225)
+805 4
+fi=(244)
+632 2
+fe=(382)
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(236)
+48 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(382)
+2109 4
++11 2
+cfi=(225)
+cfn=(4254)
+calls=2 805 
+* 38
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(236)
+48 5
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(382)
+2109 2
+fi=(244)
+632 2
+fe=(382)
+2120 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+* 33
+fe=(382)
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(236)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+* 33
+fe=(382)
+2109 1
+fi=(225)
+805 3
+fe=(382)
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fe=(382)
+2109 6
+fi=(244)
+632 6
+fi=(225)
+805 3
+fi=(236)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=70 3319 
+* 195
+fe=(382)
+3327 6
+fi=(234)
+3942 3
+fe=(382)
+3479 3
+fi=(236)
+48 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=70 3319 
+* 367
+fe=(382)
+
+fn=(2499)
+2109 2
+fi=(244)
+632 2
+fi=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 129
+fe=(382)
+3327 2
+fi=(234)
+3942 1
+fe=(382)
+3479 1
+fi=(236)
+48 3
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 153
+fe=(382)
+
+fl=(250)
+fn=(1060) core::iter::traits::iterator::Iterator::try_fold
+2461 9
+fi=(323)
+1357 2
+0 1
+1357 1
+fe=(250)
+2472 8
+-11 9
+fi=(323)
+1357 2
+0 1
+1357 1
+fe=(250)
+2472 8
+-11 7
+fi=(323)
+1357 2
+0 2
+fe=(250)
+2472 6
+-11 130
+fi=(303)
+3851 260
+0 130
+fe=(250)
+2472 130
+
+fl=(265)
+fn=(1126)
+111 2370
+fi=(225)
+2292 790
++1 1185
+fi=(291)
+4511 790
+2053 790
+4465 395
+fe=(265)
+128 790
+fi=(273)
+568 395
+0 395
+fi=(299)
+729 790
+fi=(274)
+405 790
+0 395
+fi=(251)
+1720 395
+fi=(274)
+25 395
+fi=(251)
+1720 806
+fi=(274)
+25 806
+406 1002
+fe=(265)
+132 1002
+fi=(274)
+407 2004
+fe=(265)
+133 392
+0 398
+fi=(258)
+1433 597
+0 398
+fe=(265)
+142 398
+fi=(258)
+0 3
+fe=(265)
+142 6
++4 392
++4 196
+19 784
+151 196
+19 588
+152 784
+0 199
+fi=(254)
+923 199
+0 199
+fi=(251)
+1720 199
+fi=(274)
+25 199
+fi=(251)
+1720 1739
+fi=(274)
+25 1739
+406 1935
+fe=(265)
+160 3870
+fi=(274)
+407 1935
+0 784
+fe=(265)
+161 2765
+
+fl=(362) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/pending.rs
+fn=(2308) zlib_rs::deflate::pending::Pending::pending
+22 1
+fi=(366)
++12 1
+fe=(362)
+-11 1
+fi=(273)
+568 3
+fe=(362)
+23 2
+fi=(254)
+923 1
+fi=(273)
+89 1
+fe=(362)
+-63 3
+
+fl=(348)
+fn=(4236) litchi_opc::source_backed::remove_flight
+6336 7
+fi=(303)
+1365 2
+fi=(296)
+-56 2
+0 3
+258 6
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 3
+fi=(303)
+2492 7
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 3
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fi=(225)
+2444 1
+fe=(348)
+6337 1
++7 8
+0 1
+fi=(296)
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 8
+fi=(303)
+-48 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+-50 1
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 4
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fi=(254)
+2494 1
+fi=(303)
+3254 1
+fi=(225)
+547 1
+fi=(302)
+914 1
+1563 2
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(254)
+154 2
++24 2
+fi=(303)
+3297 4
++3 2
+2634 1
++1 2
+3305 2
+fi=(225)
+1717 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(348)
+
+fn=(2556) <litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone
+3676 1
+fi=(251)
+444 2
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(383)
+20 1
+fe=(348)
+3680 1
+fi=(251)
+444 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(251)
+444 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(257)
+2262 10
+fe=(348)
+3676 19
+
+fn=(2572)
+3644 3674
++5 1002
+fi=(386) /home/zhuhe/code/litchi/crates/litchi-opc/src/source_backed/read_ahead.rs
+1081 668
+fi=(234)
+3891 333
+fi=(386)
+1081 666
+fe=(348)
+3654 1002
+fi=(257)
+745 1002
+0 334
+fe=(348)
+3656 1670
+0 1336
+cfn=(2580) litchi_opc::source_backed::read_source_at_with_context
+calls=808 13350 
+0 69861
+0 334
+fi=(237)
+966 1002
++1 334
+0 668
+fe=(348)
+3673 3006
+
+fn=(2580)
+13350 4342
++7 668
++3 668
+cfn=(2582) litchi_opc::source_backed::SourceSnapshot::ensure_current_io_if_monitored
+calls=810 3852 
+* 15310
+fi=(237)
+2173 668
+0 334
+fe=(348)
+13362 5344
+-5 668
++73 2672
+fi=(382)
+0 1336
+fe=(348)
+13397 1002
+cfi=(383)
+cfn=(2590)
+calls=810 178 
+* 13189
+* 1002
+0 2004
+13433 668
+fi=(237)
+0 334
+fe=(348)
+13416 668
+-59 334
++66 334
++4 668
+cfn=(2582)
+calls=810 3852 
+* 15310
+0 334
+fi=(237)
+966 668
+fe=(348)
+13429 1002
++1 334
+
+fn=(3838)
+9872 13
+7990 2
+cfn=(3840) litchi_opc::source_backed::SourceBackedPackage::prepare_topology_state
+calls=2 +38 
+* 783491
+0 1
+fi=(237)
+2173 2
+0 8
+2173 2
++1 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 65
+fe=(348)
+7990 8
++2 1
+fi=(237)
+0 8
+2173 2
+fe=(348)
+9878 8
+0 1
+7992 2
+9877 2
+fi=(237)
+2174 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 197
+* 14
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 77
+fe=(348)
+9877 9
+2746 3
++3 22
++15 7
+cfn=(4360) litchi_opc::source_backed::publish_prepared_topology
+calls=2 +52 
+* 1386722
+* 1
++8 2
+cfi=(225)
+cfn=(5050)
+calls=2 805 
+* 1706
+* 2
+cfi=(225)
+cfn=(5064)
+calls=2 805 
+* 194
+* 2
+cfi=(225)
+cfn=(5064)
+calls=2 805 
+* 18
+0 1
+2772 1
+cfi=(225)
+cfn=(5064)
+calls=2 805 
+* 18
+fi=(225)
+805 4
+fi=(244)
+632 2
+fi=(225)
+805 4
+0 1
+805 2
+fi=(244)
+632 2
+fi=(236)
+0 1
+fe=(348)
+2772 1
+cfi=(225)
+cfn=(5076)
+calls=2 805 
+* 26
+* 1
+
+fn=(3850) litchi_opc::source_backed::is_signature_member_path
+13496 266
+fi=(231)
+961 665
+0 1
+fi=(251)
+1720 1
+fi=(289)
+658 1
+0 536
+fi=(251)
+1720 134
+fi=(274)
+180 134
+fi=(289)
+0 1644
+fi=(251)
+1720 822
+fi=(274)
+180 822
+fi=(253)
+37 954
++1 1908
+-38 954
+38 954
+fi=(289)
+189 3816
+fi=(286)
++60 3816
+fe=(348)
+13498 265
+0 8
+13498 536
+0 133
+13500 399
+
+fn=(3880) litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure
+11498 16
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fi=(250)
+2468 4
+0 2
+fi=(251)
+1720 2
+fi=(274)
+180 2
+fi=(251)
+1720 132
+fi=(274)
+180 132
+fi=(351)
+1588 132
+fi=(245)
+1815 132
+fi=(273)
+272 264
+fi=(244)
+612 132
+fi=(273)
+272 132
+fi=(244)
+612 132
+fi=(245)
+1815 132
+fi=(418)
+166 132
+cfi=(348)
+cfn=(3850)
+calls=264 13496 
+* 18606
+fi=(250)
+2469 396
+fi=(303)
++10 2
+2676 2
+fi=(299)
+863 4
+fi=(302)
+1320 2
+1563 4
+fi=(303)
+2210 2
+fi=(321)
+544 2
+fi=(299)
+863 2
+fi=(321)
+544 10
+fi=(250)
+2875 2
+cfn=(1060)
+calls=4 2461 
+* 10
+* 2
+fe=(348)
+11505 4
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fi=(274)
+331 10
+0 128
+fi=(303)
+2479 128
+2676 128
+fi=(299)
+863 256
+fi=(302)
+1320 128
+1563 256
+fi=(303)
+2210 128
+fi=(321)
+544 128
+fi=(299)
+863 128
+fi=(321)
+544 512
+fi=(250)
+2875 256
+cfn=(1060)
+calls=256 2461 
+* 640
+fi=(274)
+332 512
+fi=(251)
+1720 130
+fi=(274)
+180 130
+fi=(273)
+369 256
+fi=(244)
+612 128
+fi=(309)
+73 512
+cfi=(291)
+cfn=(1238)
+calls=256 1345 
+* 4608
+fe=(348)
+11510 256
+fi=(245)
+1815 384
+fe=(348)
+11511 128
+fi=(309)
+61 768
+-61 2
+fe=(348)
+11517 18
+
+fn=(3906) litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup
+11560 10
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 8
+fi=(351)
+1588 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(351)
+1588 65
+fi=(245)
+1815 65
+fi=(273)
+272 130
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(245)
+1815 66
+fe=(348)
+11565 132
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 2
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+fi=(257)
+745 2
+fi=(254)
++24 66
+fi=(300)
+457 66
+fi=(392)
+82 66
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fi=(254)
+3051 3
+fi=(300)
+457 1
+0 1
+fi=(254)
+3051 1
+fi=(300)
+457 2
+fi=(257)
+1367 1
+0 1
+fe=(348)
+11581 2
+cfn=(3928) litchi_opc::source_backed::SourceBackedPackage::reserve_topology_memory
+calls=2 +51 
+* 18
+fi=(237)
+2173 1
+0 1
+2173 4
+0 1
+fi=(294)
+59 2
+fi=(279)
+555 2
+fi=(254)
+2457 1
+fi=(249)
+902 1
+fi=(321)
+363 6
+fi=(245)
+2997 1
+fi=(303)
+980 2
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 75
+fi=(225)
+547 66
+fi=(302)
+1563 198
+fi=(307)
+50 132
+fi=(287)
+433 198
+fi=(300)
++1 66
+fi=(302)
+1563 66
+fi=(307)
+50 132
+fi=(306)
+641 66
+fi=(303)
+1793 132
+fi=(302)
+1563 198
+fi=(300)
+434 132
+fe=(348)
+0 132
+fi=(251)
+1720 198
+fi=(274)
+180 66
+fi=(351)
+1588 66
+fi=(245)
+1815 66
+fi=(273)
+272 132
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(244)
+612 66
+fi=(245)
+1815 66
+fe=(348)
+11590 132
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 2
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+fi=(257)
+745 2
+fe=(348)
+11593 396
+cfn=(3938) litchi_opc::source_backed::folded_ascii_name
+calls=132 12547 
+* 22395
+fi=(237)
+2173 66
+0 330
+2173 132
+fe=(348)
+11594 264
+cfi=(351)
+cfn=(2810) soapberry_zip::office::IndexedArchive<R>::entry_id
+calls=132 4373 
+* 35332
+fi=(257)
+1367 132
+0 66
+fi=(296)
+1457 66
+258 198
+1457 66
+0 195
+258 130
+cfi=(297)
+cfn=(1166)
+calls=130 694 
+* 13961
+* 65
+fi=(301)
+48 130
+fi=(303)
+2492 390
+0 65
+fi=(225)
+547 65
+fi=(302)
+1563 195
+fi=(307)
+50 130
+fi=(302)
+1563 195
+fi=(300)
+434 260
+fi=(303)
+0 66
+fi=(296)
+258 132
+cfi=(297)
+cfn=(1166)
+calls=132 694 
+* 14182
+* 66
+fi=(303)
+956 66
+fi=(300)
+457 66
+fi=(303)
+1179 132
+fi=(301)
+48 594
+fi=(303)
+2687 66
+fi=(300)
+457 132
+fi=(301)
+30 66
+fi=(254)
+2494 66
+fi=(303)
+2631 66
++3 66
++1 66
+2499 396
+fi=(231)
+1072 198
+fi=(225)
+1917 528
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
+fe=(348)
+11608 8
+fi=(237)
+2174 2
+fi=(383)
+20 8
+fi=(257)
+745 2
+fe=(348)
+11607 11
+fi=(249)
+0 1
+fi=(303)
+983 3
+cfn=(1184)
+calls=2 +16 
+* 507
+0 1
+fi=(237)
+966 2
+fe=(348)
+
+fn=(3928)
+11632 10
+fi=(257)
+745 4
+fe=(348)
+11634 10
++9 12
+
+fn=(3938)
+12547 1048
+fi=(255)
+438 393
+fi=(244)
+765 131
+-77 131
+fe=(348)
+12554 786
++1 1048
+0 524
+fi=(228)
+1037 655
+fi=(244)
+527 524
+cfn=(1850)
+calls=262 +15 
+* 28277
+fi=(237)
+2173 262
++1 131
+fi=(244)
+774 131
++1 131
+fi=(225)
+547 655
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=262 255 
+* 1443
+fi=(245)
+2886 131
+fi=(309)
+198 655
+0 131
+198 131
+0 917
+fi=(258)
+670 131
+817 786
+670 131
++77 131
+fi=(309)
+201 131
+-3 262
+fi=(258)
+670 130
+817 780
+670 130
++77 130
+fi=(309)
+201 130
+-3 391
+fi=(258)
+670 201
+817 804
+670 201
++77 201
+fi=(309)
+201 201
+-3 795
+fe=(348)
+
+fn=(3972) litchi_opc::source_backed::SourceBackedPackage::part_index
+7412 10
+fi=(296)
+1309 2
+258 5
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 215
+fi=(301)
+48 3
+fi=(303)
+2492 8
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+-50 6
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 2
+fi=(260)
+20 2
+fi=(303)
+1236 1
+fi=(260)
+154 3
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=2 -81 
+* 19
+* 1
+fi=(300)
+434 1
+fi=(257)
+2126 2
+fi=(309)
+90 1
+fe=(348)
+7428 9
+
+fn=(4110) litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture
+12173 10
+fi=(257)
+745 2
+fi=(273)
+219 2
+fe=(348)
+12190 2
++96 8
+fi=(244)
+612 1
+fi=(273)
+221 2
+fe=(348)
+12193 1
+fi=(257)
+636 1
+fe=(348)
+12194 1
+fi=(318)
+0 2
+fe=(348)
+12194 1
+fi=(382)
+0 12
+fi=(257)
+745 3
+fi=(234)
+3975 3
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 2
+0 1
+fi=(234)
+3890 1
+fe=(348)
+5595 1
+fi=(254)
+2457 1
+fe=(348)
+5595 1
+fi=(296)
+1309 2
+1457 2
+fi=(257)
+745 3
+fi=(382)
+0 2
+fi=(257)
+745 1
+fi=(237)
+0 1
+fe=(348)
+5610 3
+cfn=(4130) litchi_opc::source_backed::PartCache::reserve_object_for_load
+calls=2 +29 
+* 10
+fi=(237)
+2173 1
+0 1
+2173 2
+0 1
+fi=(303)
+980 4
+fe=(348)
+5627 3
+cfn=(4130)
+calls=2 +12 
+* 10
+fi=(237)
+2173 1
+0 1
+2173 2
+fi=(257)
+745 3
+fi=(303)
+983 4
+cfn=(1184)
+calls=2 +16 
+* 179
+fi=(237)
+-17 4
+fi=(303)
++17 4
+cfn=(1184)
+calls=2 +16 
+* 179
+fi=(237)
+-17 4
+fe=(348)
+12252 5
++10 3
+-5 6
+cfn=(4148) litchi_opc::source_backed::SourceBackedPackage::load_part_with_accounting
+calls=2 +31 
+* 55239
+* 1
++11 3
+fi=(249)
+902 1
+fi=(225)
+-97 2
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 1
+cfn=(2498)
+calls=2 2109 
+* 86
+0 1
+fe=(348)
+5230 1
+cfi=(225)
+cfn=(4256)
+calls=2 805 
+* 11
+12269 8
+fi=(318)
+0 1
+fi=(382)
+422 12
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+* 30
+fi=(238)
+248 2
+0 1
+289 12
+fi=(234)
+3923 2
+fi=(382)
+2405 1
+fi=(296)
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+* 1
+fi=(303)
+956 1
+fi=(300)
+457 1
+fi=(303)
+1179 2
+fi=(301)
+48 9
+fi=(303)
+-48 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(287)
+433 1
+fi=(300)
++1 1
+fi=(302)
+1563 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+1793 2
+fi=(302)
+1563 2
+fi=(300)
+434 2
+fi=(303)
+2687 1
+fi=(300)
+457 2
+fi=(301)
+30 1
+fi=(254)
+2494 1
+fi=(303)
+2631 1
++3 1
++1 1
+2499 6
+fi=(231)
+1072 5
+fi=(225)
+1917 2
+fi=(234)
+3890 1
+fi=(254)
+769 1
+fi=(234)
+3386 1
+fi=(300)
+457 1
+fi=(234)
+4031 1
+3387 2
+fi=(394)
+129 2
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3908 1
+fi=(240)
+90 2
+fe=(348)
+12214 7
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fe=(348)
+
+fn=(4044) litchi_opc::source_backed::SourceBackedPackage::validate_topology_relationship_graph_nodes
+11371 26
++8 8
+cfi=(285) /home/zhuhe/code/litchi/crates/litchi-opc/src/packuri.rs
+cfn=(1038) litchi_opc::packuri::PackURI::new
+calls=4 43 
+* 312
+fi=(237)
+0 6
+966 4
+fi=(318)
+0 4
+fi=(303)
+1365 4
+fi=(296)
+-56 14
+fi=(303)
+0 2
+fi=(296)
+1309 2
+fe=(348)
+11382 2
+fi=(257)
+1042 4
+fi=(294)
+59 4
+fi=(279)
+555 4
+fi=(254)
+2457 2
+fi=(249)
+902 2
+fi=(416) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/collections/hash/set.rs
+1247 12
+fi=(245)
+464 6
+fi=(303)
+2210 2
+3851 4
+fi=(237)
+0 2
+fi=(303)
+3851 2
+fi=(225)
+0 2
+fe=(348)
+11421 4
+fi=(244)
+632 4
+fi=(303)
+2697 2
+2312 4
+fi=(244)
+632 4
+0 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+* 66
+fe=(348)
+11422 16
+
+fn=(4058) litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits
+10959 14
+fi=(245)
+1815 1
+fi=(251)
+-95 2
+fi=(274)
+180 1
+0 139
+fi=(392)
+82 65
+fi=(251)
+1720 65
+fi=(274)
+180 65
+0 66
+fi=(351)
+1588 66
+fi=(245)
+1815 66
+fi=(273)
+272 132
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(244)
+612 66
+fi=(245)
+1815 66
+fe=(348)
+10972 132
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 2
+fe=(348)
+10975 396
+cfi=(351)
+cfn=(2920) soapberry_zip::office::IndexedArchive<R>::metadata
+calls=132 4384 
+* 36454
+fi=(237)
+2173 132
++1 66
+fe=(348)
+10980 66
+12830 330
+fi=(254)
+769 66
+fi=(300)
+457 66
+0 66
+fi=(257)
+1342 132
+cfi=(225)
+cfn=(3222)
+calls=132 805 
+* 1320
+fe=(348)
+10982 198
+cfn=(2896) litchi_opc::source_backed::is_relationship_member_name
+calls=132 12530 
+* 27140
+* 132
+0 1
+10987 1
+12830 5
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 2
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fi=(303)
+2210 1
+3851 2
+2479 1
+fi=(302)
+1320 1
+fi=(321)
+639 2
+fi=(299)
+863 2
+0 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(231)
+1072 3
+fe=(348)
+10996 1
+fi=(254)
+769 1
+fe=(348)
+12830 5
+fi=(300)
+457 1
+fi=(306)
++42 1
+fi=(307)
+38 1
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 2
+fi=(303)
+3851 2
+0 2
+fi=(251)
+1720 3
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 13
+fe=(348)
+11058 128
+0 3
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 6
+fe=(348)
+11064 128
+fi=(273)
+219 128
+fi=(244)
+612 64
+fi=(273)
+221 64
+fe=(348)
+11067 64
+fi=(254)
+769 64
+fe=(348)
+12830 320
+fi=(300)
+457 64
+fi=(257)
+1342 128
+cfi=(225)
+cfn=(3222)
+calls=128 805 
+* 1280
+* 64
+fi=(251)
+1720 64
+fi=(392)
+82 64
+fi=(251)
+1720 64
+fi=(274)
+180 64
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 2
+0 1
+fi=(231)
+961 1
+fi=(251)
+1720 2
+fi=(274)
+180 1
+0 11
+fe=(348)
+11090 2
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 2
+fi=(251)
+444 1
+fi=(245)
+2997 1
+fe=(348)
+11098 1
+fi=(319) /home/zhuhe/code/litchi/crates/litchi-opc/src/limits.rs
+291 2
+fe=(348)
+11103 1
+fi=(319)
+291 2
+0 1
+fe=(348)
+11107 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(244)
+612 1
+fi=(273)
+272 2
+fe=(348)
+11107 6
+cfi=(351)
+cfn=(4080) soapberry_zip::office::IndexedArchive<R>::metadata_for
+calls=2 4398 
+* 20
+fi=(237)
+2173 2
++1 1
+fe=(348)
+11114 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+fe=(348)
+12847 6
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 1
+fe=(348)
+11121 2
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+0 1
+fe=(348)
+12847 5
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 1
+fi=(251)
+1720 2
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 2
+fi=(231)
+961 4
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fe=(348)
+11178 3
+fi=(304)
+0 3
+fi=(231)
+961 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(237)
+0 2
+fe=(348)
+11299 1
+fi=(319)
+291 2
+fe=(348)
+11369 8
+-65 2
+fi=(319)
+291 2
+fe=(348)
+11309 1
+fi=(319)
+291 2
+fe=(348)
+11314 1
+fi=(319)
+291 2
+fe=(348)
+11317 1
+fi=(251)
+1720 3
+0 4
+fe=(348)
+11319 2
++1 3
+cfn=(3874) litchi_opc::source_backed::SourceBackedPackage::check_topology_progress
+calls=2 11627 
+* 43
+fi=(237)
+2173 2
+0 2
+fi=(251)
+444 1
+fi=(245)
+2997 1
+fi=(254)
++54 1
+769 1
+fi=(300)
+457 1
+fi=(251)
+1720 1
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(318)
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+11360 2
++8 3
++1 1
+10959 14
+fi=(245)
+1815 1
+fi=(251)
+-95 2
+fi=(274)
+180 1
+0 139
+fi=(392)
+82 65
+fi=(251)
+1720 65
+fi=(274)
+180 65
+0 66
+fi=(351)
+1588 66
+fi=(245)
+1815 66
+fi=(273)
+272 132
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(244)
+612 66
+fi=(245)
+1815 66
+fe=(348)
+10972 132
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 2
+fe=(348)
+10975 396
+cfi=(351)
+cfn=(2920)
+calls=132 4384 
+* 36454
+fi=(237)
+2173 132
++1 66
+fe=(348)
+10980 66
+12830 330
+fi=(254)
+769 66
+fi=(300)
+457 66
+0 66
+fi=(257)
+1342 132
+cfi=(225)
+cfn=(3222)
+calls=132 805 
+* 1320
+fe=(348)
+10982 198
+cfn=(2896)
+calls=132 12530 
+* 27140
+* 132
+0 1
+10987 1
+12830 5
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 2
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fi=(303)
+2210 1
+3851 2
+2479 1
+fi=(302)
+1320 1
+fi=(321)
+639 2
+fi=(299)
+863 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(231)
+1072 3
+fe=(348)
+10996 2
+fi=(254)
+769 1
+fe=(348)
+12830 5
+fi=(300)
+457 1
+0 1
+fi=(306)
+499 1
+fi=(307)
+38 1
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 2
+fi=(303)
+3851 2
+0 1
+fi=(251)
+1720 3
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 13
+fe=(348)
+11058 128
+0 3
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 6
+fe=(348)
+11064 128
+fi=(273)
+219 128
+fi=(244)
+612 64
+fi=(273)
+221 64
+fe=(348)
+11067 64
+fi=(254)
+769 64
+fe=(348)
+12830 320
+fi=(300)
+457 64
+fi=(257)
+1342 128
+cfi=(225)
+cfn=(3222)
+calls=128 805 
+* 1280
+* 64
+fi=(251)
+1720 64
+fi=(392)
+82 64
+fi=(251)
+1720 64
+fi=(274)
+180 64
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 2
+0 1
+fi=(231)
+961 1
+fi=(251)
+1720 2
+fi=(274)
+180 1
+0 11
+fe=(348)
+11090 2
+fi=(251)
+444 2
+fi=(382)
+2422 5
+fe=(348)
+3841 3
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+-20 1
+fi=(257)
+745 2
+fi=(251)
+444 1
+fi=(245)
+2997 1
+fe=(348)
+11098 1
+fi=(319)
+291 2
+fe=(348)
+11103 1
+fi=(319)
+291 2
+0 1
+fe=(348)
+11107 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(244)
+612 1
+fi=(273)
+272 2
+fe=(348)
+11107 6
+cfi=(351)
+cfn=(4080)
+calls=2 4398 
+* 20
+fi=(237)
+2173 2
++1 1
+fe=(348)
+11114 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+fe=(348)
+12847 6
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 1
+fe=(348)
+11121 2
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+0 1
+fe=(348)
+12847 5
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 1
+fi=(251)
+1720 2
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 2
+fi=(231)
+961 4
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(304)
+0 2
+fe=(348)
+11178 3
+fi=(318)
+0 3
+fi=(231)
+961 4
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(318)
+0 2
+fe=(348)
+11299 1
+fi=(319)
+291 2
+fe=(348)
+11369 8
+0 1
+11304 2
+fi=(319)
+291 2
+fe=(348)
+11309 1
+fi=(319)
+291 2
+fe=(348)
+11314 1
+fi=(319)
+291 2
+fi=(318)
+0 1
+fe=(348)
+11317 1
+fi=(251)
+1720 2
+0 3
+fe=(348)
+11319 2
++1 3
+cfn=(3874)
+calls=2 11627 
+* 43
+fi=(237)
+2173 2
+0 2
+fi=(251)
+444 1
+fi=(245)
+2997 1
+fi=(254)
++54 1
+769 1
+fi=(300)
+457 1
+fi=(251)
+1720 1
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(318)
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+11360 2
++8 3
++1 1
+
+fn=(4862)
+4017 2403
++1 267
+cfn=(4864) litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write
+calls=534 -17 
+* 4806
+* 534
+fi=(237)
+2173 534
+fe=(348)
+4019 267
+4157 267
+cfn=(2582)
+calls=534 3852 
+* 12282
+fi=(237)
+2173 534
+fe=(348)
+3957 267
+fi=(244)
+617 267
+fi=(245)
+1446 267
+fi=(254)
+2494 267
+fi=(244)
+765 267
+-94 267
+0 267
+fi=(231)
+961 267
+fi=(225)
+547 801
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=534 255 
+* 6803
+fi=(245)
+2886 534
+fe=(348)
+3967 534
+fi=(254)
+2301 801
+fe=(348)
+3967 267
+fi=(257)
+767 534
+fe=(348)
+0 267
+4020 267
+0 534
+4031 1869
+fi=(244)
+673 42
+cfn=(1690) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+calls=14 -14 
+* 4928
+fi=(245)
+2997 14
+fe=(348)
+
+fn=(4196) litchi_opc::source_backed::PartCache::commit_pending_with_observer
+5942 12
++10 2
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3890 1
+fi=(296)
+1309 2
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 3
+fi=(303)
+2492 7
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 3
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fi=(225)
+2444 2
+fi=(296)
+1309 3
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 3
+fi=(303)
+2492 7
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 2
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fe=(348)
+5958 1
+fi=(225)
+2444 1
+fe=(348)
+5959 1
+fi=(296)
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 3
+fi=(303)
+2492 7
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 2
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fe=(348)
+0 1
+fi=(382)
+2144 1
+fi=(225)
+2444 2
+fe=(348)
+5965 3
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(257)
+2262 7
+fe=(348)
+5009 3
+fi=(382)
+2422 2
+fe=(348)
+5983 1
+cfn=(4214) litchi_opc::source_backed::LoadFlight::finish_success_with_observer
+calls=2 5165 
+* 81
++1 2
+fi=(321)
+1355 3
+cfi=(296)
+cfn=(4228)
+calls=2 2005 
+* 219
+fi=(225)
+805 2
+fe=(348)
+5990 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(348)
+5991 4
+cfn=(4236)
+calls=2 6336 
+* 407
+fi=(234)
+3890 1
+0 1
+fi=(254)
+769 1
+fi=(234)
+3386 1
+fi=(300)
+457 1
+fi=(234)
+4031 1
+3387 2
+fi=(382)
+2144 1
+fi=(225)
+2444 2
+fi=(296)
+1309 2
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3908 1
+fi=(240)
+90 2
+fe=(348)
+5994 8
+-1 5
+fi=(394)
+129 2
+fe=(348)
+
+fn=(2582)
+3852 5622
+fi=(251)
+444 937
+fi=(234)
+3891 937
+fe=(348)
+-38 1874
+0 933
+fi=(251)
+444 1866
+fi=(382)
+2422 5598
+fe=(348)
+3856 933
+cfi=(383)
+cfn=(2796)
+calls=1866 182 
+* 4665
+fi=(237)
+2173 1866
++1 1866
+fi=(383)
+20 7464
+-20 1874
+fe=(348)
+3865 6559
+
+fn=(2794) litchi_opc::source_backed::SourceSnapshot::ensure_current
+3840 28
+fi=(251)
+444 8
+fi=(382)
+2422 24
+fe=(348)
+3841 4
+cfi=(383)
+cfn=(2796)
+calls=12 182 
+* 20
+fi=(237)
+2173 8
++1 8
+fi=(383)
+20 32
+fe=(348)
+3843 12
++7 20
+
+fn=(3874)
+11627 70
+fi=(251)
+444 20
+fi=(382)
+2422 60
+fe=(348)
+3841 10
+cfi=(383)
+cfn=(2796)
+calls=20 182 
+* 50
+fi=(237)
+2173 20
++1 20
+fi=(383)
+20 80
+fi=(257)
+745 20
+fe=(348)
+11630 50
+fi=(237)
+967 30
+fe=(348)
+
+fn=(4002) litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits
+10672 10
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(418)
+310 1
+fi=(245)
+2997 1
+fe=(348)
+10686 1
+fi=(319)
+291 2
+fi=(251)
+659 1
+fe=(348)
+10691 1
+fi=(319)
+291 2
+fi=(318)
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 2
+fi=(274)
+180 1
+0 6
+fe=(348)
+10700 2
+fi=(273)
+219 2
+fe=(348)
+10700 126
+fi=(273)
+219 126
+fi=(244)
+612 64
+fi=(273)
+221 64
+fe=(348)
+10706 64
+fi=(254)
+769 64
+fe=(348)
+12830 320
+fi=(300)
+457 64
+fi=(257)
+1342 128
+cfi=(225)
+cfn=(3222)
+calls=128 805 
+* 1280
+fi=(251)
+1720 128
+fi=(274)
+180 64
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 7
+fi=(351)
+1588 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(274)
+0 65
+fi=(351)
+1588 65
+fi=(245)
+1815 65
+fi=(273)
+272 130
+fi=(244)
+612 66
+fi=(273)
+272 66
+fi=(244)
+612 66
+fi=(245)
+1815 66
+fe=(348)
+10712 198
+cfi=(351)
+cfn=(2920)
+calls=132 4384 
+* 36454
+fi=(237)
+2173 132
+fi=(254)
+769 66
+fe=(348)
+10714 66
+12830 330
+fi=(300)
+457 66
+fi=(257)
+1342 132
+cfi=(225)
+cfn=(3222)
+calls=132 805 
+* 1320
+fi=(251)
+1720 132
+fi=(274)
+180 66
+0 1
+fi=(251)
+1720 2
+0 2
+fi=(418)
+310 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fe=(348)
+0 2
+fi=(244)
+612 1
+fi=(273)
+272 2
+fe=(348)
+10722 2
+fi=(273)
+219 2
+fi=(244)
+612 1
+fi=(273)
+221 1
+fi=(351)
+4402 1
+fe=(348)
+10730 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+0 1
+fe=(348)
+12847 5
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+fe=(348)
+10737 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+fe=(348)
+12847 5
+fi=(257)
+1342 2
+cfi=(225)
+cfn=(3222)
+calls=2 805 
+* 20
+* 1
+fi=(251)
+1720 3
+fi=(274)
+180 1
+fe=(348)
+10743 1
+fi=(319)
+291 2
+fe=(348)
+10748 1
+fi=(319)
+291 2
+fi=(318)
+0 1
+fe=(348)
+10750 3
++1 8
+
+fn=(4908)
+4265 6
+4034 2
+cfn=(4864)
+calls=4 -33 
+* 36
+fi=(237)
+2173 4
+fe=(348)
+4267 6
+4035 2
+4162 2
+cfn=(2582)
+calls=4 3852 
+* 92
+fi=(237)
+594 2
+fe=(348)
+4036 6
+
+fn=(3840)
+8028 11
++1 1
+cfn=(3842) litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication
+calls=2 7060 
+* 23
+0 1
+fi=(237)
+2173 3
+fi=(245)
+2997 2
+fe=(348)
+2455 2
+fi=(244)
+612 1
+fi=(274)
+331 2
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+659 1
+fi=(274)
+332 2
+fe=(348)
+2464 1
+cfn=(3850)
+calls=2 13496 
+* 163
+fi=(274)
+332 4
+fi=(237)
+0 3
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+fi=(309)
+0 1
+fi=(245)
+1815 2
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 3
+180 1
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(257)
+745 2
+fi=(388)
+1263 1
++21 1
+fi=(380)
+1884 2
++58 3
+fe=(348)
+7804 2
+8050 2
+9867 8
+0 1
+8058 4
++1 4
++1 4
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(257)
+745 2
+fi=(313)
+34 1
+fi=(300)
+434 1
+fi=(244)
+612 2
+fi=(245)
+1851 2
+fi=(313)
+34 1
+fi=(300)
+434 1
+fi=(244)
+612 2
+fi=(245)
+1851 2
+fi=(313)
+34 1
+fi=(300)
+434 1
+fi=(244)
+612 2
+fi=(245)
+1851 2
+fi=(313)
+34 1
+fi=(300)
+434 1
+0 4
+fi=(231)
+961 3
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+0 2
+8086 2
+cfn=(3874)
+calls=2 11627 
+* 43
+* 1
+fi=(237)
+2173 3
+fe=(348)
+8087 2
+cfn=(3880)
+calls=2 11498 
+* 15597
+0 1
+8088 3
+fi=(251)
+1720 1
+fe=(348)
+8091 3
+fi=(383)
+0 1
+fe=(348)
+8119 2
+cfn=(3906)
+calls=2 11560 
+* 96308
+fi=(237)
+2173 1
+0 7
+2173 2
+0 4
+fe=(348)
+8119 6
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(348)
+8120 4
+cfn=(3938)
+calls=2 12547 
+* 334
+fi=(237)
+2173 1
+0 4
+2173 2
+0 3
+fi=(321)
+1002 1
+cfi=(296)
+cfn=(3962)
+calls=2 1309 
+* 306
+fi=(257)
+1229 2
+fe=(348)
+8128 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 109
+fi=(237)
+966 5
+fe=(348)
+2455 1
+fi=(274)
+180 1
+0 7
+180 2
+fe=(348)
+8145 2
++1 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+0 1
+fe=(348)
+8149 4
+cfn=(3972)
+calls=2 7412 
+* 300
+fi=(257)
+1367 2
+0 2
+745 2
+0 1
+fi=(251)
+444 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+0 1
+fe=(348)
+8161 7
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 77
+fi=(245)
+992 3
+cfn=(3802)
+calls=2 +31 
+* 96
+fi=(251)
+1720 1
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(277) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/hash/random.rs
+71 1
+cfi=(294)
+cfn=(3774)
+calls=2 -12 
+* 8
+fi=(321)
+363 6
+fi=(245)
+2997 1
+fi=(303)
+980 2
+fi=(244)
+612 1
+fi=(231)
+961 6
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+8176 1
+fi=(321)
+1296 4
+cfi=(296)
+cfn=(2712)
+calls=2 1841 
+* 219
+fi=(392)
+82 1
+fi=(251)
+659 1
+fe=(348)
+8175 3
+fi=(318)
+0 2
+fe=(348)
+8101 2
+fi=(318)
+0 5
+fe=(348)
+8101 1
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(277)
+71 1
+cfi=(294)
+cfn=(3774)
+calls=2 -12 
+* 8
+fi=(416)
+1247 6
+fi=(245)
+2997 2
+fi=(303)
+980 2
+0 1
+fi=(244)
+612 1
+fi=(231)
+961 3
+fi=(416)
+1201 1
+cfi=(417)
+cfn=(3998)
+calls=2 1307 
+* 28
+0 2
+fe=(348)
+8211 3
+cfn=(4002)
+calls=2 10672 
+* 42205
+0 1
+fi=(237)
+2173 2
+0 1
+fi=(245)
+2997 1
+fi=(254)
+923 2
+769 2
+fe=(348)
+8229 1
+fi=(319)
+291 2
+fi=(236)
+0 1
+fe=(348)
+8231 2
+cfi=(413)
+cfn=(3526)
+calls=2 125 
+* 1380
+fi=(237)
+2173 1
+0 8
+2173 3
++1 6
+fe=(348)
+8231 10
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 72
+fi=(392)
+82 64
+fi=(251)
+1720 64
+fi=(274)
+180 64
+fe=(348)
+8233 128
++1 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+fi=(417)
+866 192
+cfi=(296)
+cfn=(4030)
+calls=128 1420 
+* 320
+fe=(348)
+8236 128
++1 256
+cfi=(413)
+cfn=(3598)
+calls=128 155 
+* 246378
+0 64
+fi=(237)
+2173 128
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(277)
+71 1
+cfi=(294)
+cfn=(3774)
+calls=2 -12 
+* 8
+fi=(321)
+363 6
+fi=(303)
+980 2
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 9
+fi=(251)
+1720 64
+fi=(392)
+82 64
+fi=(251)
+1720 64
+fi=(274)
+180 64
+fi=(417)
+866 192
+cfi=(296)
+cfn=(4030)
+calls=128 1420 
+* 320
+fe=(348)
+8274 128
++3 128
+12541 256
+cfn=(3938)
+calls=128 +6 
+* 21172
+fi=(237)
+2173 64
+0 256
+2173 128
+fe=(348)
+8277 256
+fi=(321)
+1296 256
+cfi=(296)
+cfn=(2712)
+calls=128 1841 
+* 19378
+fe=(348)
+8278 128
+fi=(274)
+0 1
+fi=(245)
+2997 2
+0 3
+fe=(348)
+8285 5
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+0 2
+fi=(303)
+983 3
+cfn=(1184)
+calls=2 +16 
+* 177
+0 1
+fi=(237)
+966 2
+fi=(318)
+0 1
+fi=(274)
+180 1
+fi=(245)
+0 1
+fe=(348)
+8346 1
+cfi=(313)
+cfn=(4034)
+calls=2 34 
+* 3
+* 2
++6 1
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+0 1
+fe=(348)
+8368 2
+fi=(303)
+2479 1
+2676 1
+fi=(299)
+863 1
+fi=(302)
+1320 1
+1563 2
+fi=(303)
+2210 3
+fe=(348)
+8368 1
+fi=(299)
+863 1
+fe=(348)
+8368 10
+fi=(321)
+2078 2
+cfi=(303)
+cfn=(1426)
+calls=2 3851 
+* 5
+fi=(257)
+1164 2
+fi=(318)
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 138
+fi=(251)
+1720 64
+fi=(274)
+180 64
+fi=(417)
+866 192
+cfi=(296)
+cfn=(4030)
+calls=128 1420 
+* 320
+fe=(348)
+8386 128
+fi=(303)
+2479 64
+2676 64
+fi=(299)
+863 128
+fi=(302)
+1320 64
+1563 128
+fi=(303)
+2210 64
+fe=(348)
+8389 64
+fi=(299)
+863 64
+fe=(348)
+8389 256
+fi=(321)
+2078 128
+cfi=(303)
+cfn=(1426)
+calls=128 3851 
+* 320
+fi=(257)
+1164 128
+fi=(245)
+2997 2
+fe=(348)
+8422 2
+fi=(236)
+0 6
+fe=(348)
+8421 13
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(244)
+612 2
+fe=(348)
+8422 1
+fi=(274)
+180 1
+fi=(244)
+612 1
+fi=(245)
+1851 1
+fe=(348)
+8495 2
+cfi=(313)
+cfn=(4034)
+calls=2 34 
+* 3
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(257)
+745 2
+fi=(244)
+612 1
+fi=(245)
+1851 6
+fe=(348)
+8525 3
+cfi=(313)
+cfn=(4034)
+calls=2 34 
+* 3
+0 4
+8526 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+fe=(348)
+8527 2
++1 2
+0 2
+fi=(303)
+983 3
+cfn=(1184)
+calls=2 +16 
+* 602
+0 1
+fi=(237)
+966 2
+fe=(348)
+8530 8
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fe=(348)
+8573 2
+fi=(236)
+0 5
+fe=(348)
+8653 1
+cfi=(419) /home/zhuhe/code/litchi/crates/litchi-opc/src/source_backed/relationships_plan.rs
+cfn=(4038) litchi_opc::source_backed::relationships_plan::plan_relationship_publications
+calls=2 66 
+* 52
+fi=(237)
+2173 2
+0 1
+2174 10
+fe=(348)
+8653 11
++5 4
+cfn=(4044)
+calls=2 11371 
+* 342
+* 1
+0 1
+fi=(237)
+2173 2
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(244)
+612 2
+fe=(348)
+8672 5
+-5 11
+cfn=(4058)
+calls=2 10959 
+* 70860
+* 1
+0 1
+fi=(237)
+2173 2
+fe=(348)
+8674 6
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fe=(348)
+8573 1
+8683 1
+fi=(244)
+612 1
+fi=(245)
+1851 1
+fe=(348)
+9223 3
+cfi=(313)
+cfn=(4034)
+calls=2 34 
+* 3
+* 1
+fi=(323)
+1339 5
+fi=(250)
+2875 1
+cfn=(1060)
+calls=2 2461 
+* 17
+fe=(348)
+9224 2
+fi=(244)
+612 1
+fi=(245)
+1815 7
+fe=(348)
+9233 5
+cfn=(4044)
+calls=2 11371 
+* 192
+* 1
+0 1
+fi=(237)
+2173 2
+fi=(244)
+612 2
+fi=(245)
+1815 1
+fi=(231)
+961 3
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+0 3
+fi=(251)
+1720 1
+fi=(274)
+25 1
+-25 1
+25 1
+-25 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 1
+fi=(245)
+2997 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+0 1
+fe=(348)
+9283 1
+fi=(319)
+291 2
+fi=(257)
+0 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(231)
+961 1
+fe=(348)
+9286 10
+cfi=(274)
+cfn=(4092)
+calls=2 161 
+* 19
+* 198
+cfi=(274)
+cfn=(4092)
+calls=132 161 
+* 1240
+* 267
++1 132
++1 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+fe=(348)
+9290 198
+cfn=(2896)
+calls=132 12530 
+* 27140
+* 132
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fe=(348)
+9290 1
+fi=(254)
+923 2
+769 1
+fi=(300)
+457 1
+0 1
+fe=(348)
+9306 1
+fi=(319)
+291 2
+fe=(348)
+9308 4
+cfi=(285)
+cfn=(1038)
+calls=2 43 
+* 81
+fi=(237)
+0 5
+966 2
+0 1
+fi=(321)
+1002 3
+cfi=(296)
+cfn=(3962)
+calls=2 1309 
+* 4
+* 1
+fi=(257)
+1229 2
+fe=(348)
+9311 2
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(231)
+961 4
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 64
+fi=(274)
+180 64
+fe=(348)
+9313 128
++1 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+fe=(348)
+0 128
+fi=(417)
+866 192
+cfi=(296)
+cfn=(4030)
+calls=128 1420 
+* 320
+fe=(348)
+9316 192
+fi=(321)
+1002 256
+cfi=(296)
+cfn=(3962)
+calls=128 1309 
+* 256
+fe=(348)
+9321 128
+fi=(257)
+1229 128
+fi=(254)
+769 64
+fi=(300)
+457 64
+fi=(257)
+0 1
+fi=(231)
+961 3
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fe=(348)
+9338 1
+fi=(319)
+291 2
+fe=(348)
+0 1
+fi=(231)
+961 9
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(249)
+902 5
+fe=(348)
+9351 2
+fi=(245)
+464 3
+fi=(257)
+636 3
+fi=(254)
+769 4
+fi=(244)
+383 4
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+0 4
+fi=(421)
+27 1
+cfi=(245)
+cfn=(4102)
+calls=2 3988 
+* 19
+-27 3
+27 1
+cfi=(245)
+cfn=(4102)
+calls=2 3988 
+* 19
+-27 4
+27 1
+cfi=(245)
+cfn=(4102)
+calls=2 3988 
+* 19
+fi=(257)
+745 2
+fi=(237)
+0 2
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(348)
+9400 14
+cfn=(4058)
+calls=2 10959 
+* 70864
+* 1
+0 1
+fi=(237)
+2173 2
+fi=(245)
+464 5
+fi=(254)
+769 4
+fi=(244)
+383 4
+cfn=(1418)
+calls=2 717 
+* 109
+fi=(237)
+966 2
+0 1
+fi=(254)
+3051 1
+fe=(348)
+9436 5
+fi=(244)
+383 3
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(245)
+464 3
+fi=(251)
+1720 1
+fi=(274)
+25 1
+284 2
+0 2
+284 1
+0 1
+284 5
+fi=(448)
+53 2
+fi=(274)
+284 3
+fi=(251)
+1720 1
+fi=(274)
+25 1
+-25 1
+25 1
+fi=(254)
+769 2
+fi=(244)
+383 4
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(251)
+1720 3
+fe=(348)
+9464 2
+0 3
+fi=(274)
+180 1
+fe=(348)
+9466 3
+cfn=(3874)
+calls=2 11627 
+* 43
+0 1
+fi=(237)
+2173 2
+fe=(348)
+9467 1
+12170 6
+cfn=(4110)
+calls=2 +3 
+* 56151
+fi=(237)
+2173 2
+0 4
+2173 2
+fe=(348)
+9467 4
++5 1
+fi=(245)
+1815 1
+fi=(251)
+444 1
+fi=(260)
+20 2
+fi=(244)
+612 2
+fi=(260)
+154 1
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=2 -81 
+* 14
+* 1
+fe=(348)
+9472 1
+0 1
+fi=(245)
+1815 1
+fi=(273)
+272 2
+fi=(257)
+636 3
+fe=(348)
+9476 1
+0 1
+fi=(244)
+612 1
+fi=(273)
+272 2
+fe=(348)
+9482 2
++1 2
+-2 1
+cfi=(311)
+cfn=(1272)
+calls=2 3024 
+* 631
+* 2
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+0 1
+fe=(348)
+9491 4
+fi=(245)
+992 3
+cfn=(3802)
+calls=2 +31 
+* 23
+fi=(257)
+636 1
+745 1
+fi=(225)
++60 2
+cfn=(4192)
+calls=2 * 
+* 17
+fi=(251)
+1720 2
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(257)
+745 1
+fe=(348)
+9517 1
+fi=(245)
+464 4
+fi=(254)
+3051 2
+fi=(244)
+383 4
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fe=(348)
+9544 6
+fi=(236)
+0 1
+fe=(348)
+9565 2
+0 1
+9570 2
+0 1
+9575 1
+cfn=(3880)
+calls=2 11498 
+* 15597
+* 2
+fi=(257)
+745 2
+fe=(348)
+9587 13
++2 4
+cfi=(285)
+cfn=(1038)
+calls=2 43 
+* 443
+fi=(237)
+0 5
+966 2
+fe=(348)
+0 3
+fi=(321)
+1355 1
+cfi=(296)
+cfn=(4228)
+calls=2 2005 
+* 212
+* 1
+fi=(245)
+2997 1
+fi=(254)
+923 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 3
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(257)
+0 1
+fi=(254)
+3051 2
+fi=(300)
+457 1
+fe=(348)
+0 1
+fi=(254)
+3051 1
+769 1
+fi=(300)
+457 1
+0 2
+fi=(254)
+3051 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fi=(257)
+1545 1
+fi=(254)
+769 1
+fi=(257)
+1367 1
+fi=(254)
+3051 1
+fi=(300)
+457 1
+fi=(254)
+3051 1
+769 1
+fi=(300)
+457 1
+fi=(245)
++7 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 238
+fi=(237)
+966 2
+0 2
+fe=(348)
+9641 2
+cfn=(3928)
+calls=2 11632 
+* 18
+fi=(237)
+2173 1
+0 1
+2173 2
+fe=(348)
+9640 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 394
+fi=(237)
+966 2
+0 1
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 7
+fi=(417)
+866 3
+cfi=(296)
+cfn=(4030)
+calls=2 1420 
+* 5
+* 189
+cfi=(296)
+cfn=(4030)
+calls=126 1420 
+* 315
+fe=(348)
+9655 128
+fi=(321)
+1002 192
+cfi=(296)
+cfn=(3962)
+calls=128 1309 
+* 12048
+fi=(257)
+1164 128
++1 1
+fi=(273)
+272 4
+fi=(251)
+444 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+0 63
+fi=(321)
+1355 315
+cfi=(296)
+cfn=(4228)
+calls=126 2005 
+* 16443
+* 5
+cfi=(296)
+cfn=(4228)
+calls=2 2005 
+* 261
+fe=(348)
+9664 384
+fi=(245)
+992 192
+cfn=(3802)
+calls=128 +31 
+* 3136
+fi=(251)
+1720 64
+fi=(392)
+82 64
+fi=(251)
+1720 64
+fi=(274)
+180 64
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+9684 2
+fi=(245)
+464 3
+2997 2
+fi=(254)
+769 1
+fi=(300)
+457 1
+0 1
+fi=(244)
+383 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(244)
+612 2
+fi=(231)
+961 3
+fi=(421)
+27 2
+cfi=(245)
+cfn=(4102)
+calls=2 3988 
+* 28
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(231)
+961 5
+fi=(421)
+18 1
+cfi=(245)
+cfn=(4278)
+calls=2 3961 
+* 21
+fe=(348)
+9715 14
++1 4
++1 12
++1 4
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(245)
+2997 1
+fi=(251)
+1720 1
+fi=(274)
+25 1
+fi=(237)
+-25 1
+fi=(274)
+25 1
+fi=(254)
+769 1
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+9780 3
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+9837 3
+fi=(231)
+961 4
+fe=(348)
+9837 3
+fi=(251)
+1720 1
+fi=(262)
+223 1
+fi=(237)
+0 1
+fi=(262)
+227 1
+fi=(392)
+82 2
+fe=(348)
+9847 1
+cfi=(225)
+cfn=(4282)
+calls=2 805 
+* 36
+fi=(245)
+2997 1
+fe=(348)
+9848 2
+0 1
+9854 4
++1 4
++1 4
++1 4
++1 4
++2 4
++1 4
++1 4
++1 4
+-10 3
++11 2
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
+* 1
+-11 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 77
+* 2
+-5 1
++19 1
+0 1
+9867 1
+cfi=(225)
+cfn=(4288)
+calls=2 805 
+* 25
+fi=(244)
+632 2
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fi=(257)
+745 1
+fi=(225)
++60 1
+fi=(244)
+632 2
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+-48 1
+fe=(348)
+9867 1
+cfi=(225)
+cfn=(4292)
+calls=2 805 
+* 18
+* 2
+cfi=(225)
+cfn=(4294)
+calls=2 805 
+* 18
+* 2
+cfi=(225)
+cfn=(4298)
+calls=2 805 
+* 18
+* 2
+0 1
+9867 1
+cfi=(225)
+cfn=(4302)
+calls=2 805 
+* 18
+* 2
+0 1
+fi=(225)
+805 3
+fi=(236)
+0 1
+fe=(348)
+9867 1
+cfi=(225)
+cfn=(4306)
+calls=2 805 
+* 10253
+* 2
+cfi=(225)
+cfn=(3670)
+calls=2 805 
+* 24663
+* 3
+cfi=(303)
+cfn=(4320)
+calls=2 2312 
+* 3
+fi=(244)
+632 2
+fe=(348)
+9867 1
+fi=(303)
+2312 2
+fi=(254)
+3051 3
+fi=(304)
+200 2
+fe=(348)
+9867 1
+fi=(231)
+1072 2
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+-48 2
+fe=(348)
+9867 1
+cfi=(225)
+cfn=(4324)
+calls=2 805 
+* 66
+fi=(244)
+632 2
+0 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 175
+-48 1
+fi=(225)
+805 2
+fi=(382)
+0 1
+fe=(348)
+9867 1
+cfi=(225)
+cfn=(4334)
+calls=2 805 
+* 12810
+* 2
+cfi=(225)
+cfn=(4346)
+calls=2 805 
+* 18
+* 2
+cfi=(225)
+cfn=(4298)
+calls=2 805 
+* 18
+* 2
+cfi=(225)
+cfn=(4350)
+calls=2 805 
+* 364
+* 1
+
+fn=(4952) litchi_opc::source_backed::finish_source_publication
+13003 11
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 6
+fe=(348)
+13009 8
+fi=(383)
+20 2
+fe=(348)
+13009 2
++4 1
++1 1
+0 1
+13015 3
++5 8
++2 7
+
+fn=(2896)
+12530 1386
+fi=(286)
+572 1782
+fi=(288)
+1993 198
+cfi=(286)
+cfn=(1122)
+calls=788 499 
+* 42945
+fi=(257)
+2766 396
++1 390
+fi=(293)
+211 195
+fi=(299)
+863 195
+fi=(286)
+572 1755
+fi=(288)
+1993 195
+cfi=(286)
+cfn=(1122)
+calls=780 499 
+* 29304
+fi=(257)
+2766 390
++1 195
+fi=(293)
+211 390
+fi=(257)
+662 195
+fi=(258)
++8 3
+817 12
+670 3
++25 3
+fi=(309)
+91 3
+fi=(258)
+670 3
+817 12
+670 3
++25 3
+fi=(309)
+91 3
+fi=(258)
+670 3
+817 12
+670 3
++25 3
+fi=(309)
+91 3
+fi=(258)
+670 3
+817 12
+670 3
++25 3
+fi=(309)
+91 3
+fi=(260)
+-71 6
+-20 3
+154 12
+fi=(291)
+0 195
+fe=(348)
+12538 1188
+-1 9
+
+fn=(4130)
+5639 4
+fi=(257)
+745 4
+fe=(348)
+5643 2
+0 4
+5654 6
+
+fn=(4526) litchi_opc::source_backed::replacement_member_name
+12520 4
++4 4
++1 10
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fi=(260)
+20 8
+fi=(258)
+1183 2
+fi=(293)
+508 2
+0 2
+211 2
+fe=(348)
+12528 6
+
+fn=(4148)
+12288 13
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+0 1
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(273)
+219 2
+0 1
+fe=(348)
+12337 3
+cfi=(351)
+cfn=(4154) soapberry_zip::office::IndexedArchive<R>::read_entry
+calls=2 4845 
+* 52688
++2 5
+fi=(257)
+745 2
+fi=(382)
+2422 2
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3890 1
+fi=(257)
+745 3
+fi=(394)
+129 2
+fi=(234)
+3890 1
+fi=(241)
+464 2
+0 1
+fi=(234)
+3908 1
+fi=(240)
+90 2
+-90 1
+fe=(348)
+12381 6
+fi=(257)
+745 1
+1654 2
+fe=(348)
+0 3
+fi=(257)
+745 3
+fi=(382)
+2422 2
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 1
+fi=(234)
+3890 1
+fi=(257)
+745 3
+fi=(394)
+129 2
+fi=(234)
+3890 1
+fi=(241)
+464 2
+0 1
+fi=(234)
+3908 1
+fi=(240)
+90 2
+-90 1
+fe=(348)
+12389 4
+fi=(257)
+745 1
+1654 1
+fe=(348)
+0 1
+fi=(257)
+745 2
+fe=(348)
+0 3
+fi=(257)
+745 4
+fi=(382)
+0 2
+fi=(257)
+1231 1
+fe=(348)
+12398 3
+fi=(257)
+745 1
+fe=(348)
+12398 3
++2 3
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(257)
+2262 4
+fe=(348)
+0 2
+5009 3
+fi=(257)
+745 2
+fi=(382)
+0 1
+fe=(348)
+12517 5
+fi=(225)
+805 2
+fe=(348)
+5790 3
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 4
+0 1
+fi=(234)
+3890 2
+fi=(296)
+1309 2
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+fi=(301)
+48 3
+fi=(303)
+2492 7
+0 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+2073 2
+fi=(231)
+1072 4
+fi=(351)
+1255 1
+fi=(300)
+434 1
+fi=(225)
+2444 2
+fe=(348)
+5796 1
+fi=(303)
+980 2
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(257)
+2262 4
+fe=(348)
+5009 3
+fi=(245)
+2997 3
+fe=(348)
+6097 2
+0 1
+5808 1
+6100 1
+fi=(254)
+2457 2
+fe=(348)
+6100 2
+0 1
+fi=(303)
+1365 1
+fe=(348)
+6102 2
+0 1
+fi=(254)
+2301 2
+fe=(348)
+6103 2
+fi=(240)
+0 5
+fe=(348)
+5820 1
+cfi=(225)
+cfn=(4192)
+calls=2 805 
+* 17
+12405 2
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(257)
+745 2
+fe=(348)
+12340 3
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(257)
+745 2
+fi=(237)
+0 1
+fe=(348)
+12453 7
++64 8
+-61 11
+cfn=(4196)
+calls=2 5942 
+* 1340
++17 2
+0 1
+12478 2
++3 7
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(348)
+12357 2
++11 1
+fi=(319)
+291 4
+fi=(303)
+980 2
+fe=(348)
+6115 5
+-1 1
+fi=(296)
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+* 1
+fi=(300)
+457 2
+fi=(303)
+1179 2
+fi=(301)
+48 11
+fi=(303)
+-48 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(287)
+433 1
+fi=(300)
++1 1
+fi=(302)
+1563 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+1793 2
+fi=(302)
+1563 2
+fi=(300)
+434 2
+fi=(238)
+286 2
+cfn=(2554)
+calls=2 -39 
+* 37
++3 6
+fe=(348)
+12376 2
++1 1
+fi=(303)
+2687 1
+fi=(300)
+457 2
+fi=(301)
+30 1
+fi=(254)
+2494 1
+fi=(303)
+2631 1
++3 1
++1 1
+2499 6
+fi=(231)
+1072 3
+fi=(225)
+1917 5
+0 1
+fi=(254)
+2301 3
+fe=(348)
+6123 1
+fi=(234)
+3923 2
+fi=(382)
+2405 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+0 1
+fi=(296)
+258 4
+cfi=(297)
+cfn=(1166)
+calls=2 694 
+* 147
+* 1
+fi=(303)
+956 1
+fi=(300)
+457 1
+fi=(303)
+1179 2
+fi=(301)
+48 10
+fi=(303)
+-48 1
+fi=(225)
+547 1
+fi=(302)
+1563 3
+fi=(307)
+50 2
+fi=(287)
+433 1
+fi=(300)
++1 1
+fi=(302)
+1563 1
+fi=(307)
+50 2
+fi=(306)
+641 1
+fi=(303)
+1793 2
+fi=(302)
+1563 2
+fi=(300)
+434 2
+fi=(303)
+2687 1
+fi=(300)
+457 2
+fi=(301)
+30 1
+fi=(254)
+2494 1
+fi=(303)
+2631 1
++3 1
++1 1
+2499 6
+fi=(231)
+1072 3
+fi=(225)
+1917 5
+fi=(394)
+129 2
+fi=(234)
+3890 1
+fi=(241)
+464 2
+0 1
+fi=(234)
+3908 2
+fi=(240)
+90 2
+fi=(296)
+1155 1
+fi=(303)
+983 3
+cfn=(1184)
+calls=2 +16 
+* 179
+fi=(237)
+-17 6
+fi=(303)
+-10 3
+fi=(237)
++10 1
+fe=(348)
+
+fn=(4864)
+4001 1883
+fi=(257)
+745 538
+fi=(237)
+0 269
+fe=(348)
+4013 2152
+
+fn=(4214)
+5165 10
+fi=(234)
+3975 2
+fi=(240)
+32 1
+fi=(234)
+3890 1
+fi=(241)
+464 3
+0 2
+fi=(234)
+3890 1
+fe=(348)
+5171 3
++16 10
+fi=(225)
+805 3
+fe=(348)
+5178 1
+fi=(225)
+805 3
+fe=(348)
+5179 1
+fi=(225)
+805 3
+fe=(348)
+5182 1
+fi=(279)
+2447 1
+fi=(225)
+805 2
+fe=(348)
+5183 4
++1 1
++1 1
+fi=(234)
+3923 2
+fi=(452) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/pal/unix/futex.rs
+116 5
+cob=(2)
+cfi=(422)
+cfn=(4222)
+calls=2 -87 
+* 12
+fi=(394)
++13 2
+fi=(234)
+3890 1
+fi=(241)
+464 2
+fi=(234)
+3908 1
+fi=(240)
+90 2
+fe=(348)
+
+fn=(3842)
+7060 18
++1 6
++3 6
++1 16
+
+fn=(4360)
+2816 14
++8 5
+0 1
+2825 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 197
+* 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(244)
+612 2
+fi=(245)
+1815 2
+fe=(348)
+11729 2
+cfn=(3842)
+calls=2 7060 
+* 23
+0 1
+fi=(237)
+2173 2
+fe=(348)
+11730 1
+fi=(234)
+3926 1
+-3 1
+fi=(382)
+2405 1
+fi=(251)
+444 2
+fi=(382)
+2422 6
+fe=(348)
+3841 1
+cfi=(383)
+cfn=(2796)
+calls=2 182 
+* 5
+fi=(237)
+2173 2
++1 2
+fi=(383)
+20 8
+fi=(236)
+-6 3
+cob=(2)
+cfi=(155)
+cfn=(792)
+calls=2 3739 
+* 66181
+fi=(244)
+562 2
+fe=(348)
+11742 2
+fi=(319)
+276 1
+fe=(348)
+11742 1
+fi=(319)
+276 1
+fe=(348)
+11742 1
+fi=(319)
+276 7
+fi=(423)
+578 1
+cfn=(4370)
+calls=2 +16 
+* 219682
+fe=(348)
+0 2
+11740 3
+fi=(237)
+0 3
+fe=(348)
+11744 2
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
+* 1
++17 2
+cfn=(2794)
+calls=2 3840 
+* 41
+fi=(237)
+2173 2
+fi=(423)
+899 1
+fe=(348)
+11762 2
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 109
+fi=(237)
+966 4
+0 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 3
+fi=(244)
+612 1
+fi=(231)
+961 1
+fi=(225)
+1917 4
+fe=(348)
+0 1
+fi=(245)
+1034 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(348)
+11779 2
+cfn=(4526)
+calls=2 12520 
+* 22
+0 2
+fi=(245)
+1025 2
++3 2
+fi=(236)
+0 2
+fe=(348)
+12078 1
+cfi=(225)
+cfn=(4974)
+calls=2 805 
+* 100786
+fi=(225)
+805 2
+fi=(244)
+632 2
+fi=(236)
+0 1
+fi=(225)
+805 17
+fi=(251)
+444 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+0 1
+fi=(244)
+632 2
+fi=(236)
+48 2
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 203
+fe=(348)
+2871 8
+11782 4
+cfi=(313)
+cfn=(4034)
+calls=2 34 
+* 3
+fi=(323)
+1339 4
+fi=(250)
+2875 1
+cfn=(1060)
+calls=2 2461 
+* 21
+0 1
+fe=(348)
+11783 3
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 105
+fi=(237)
+966 2
+0 1
+fe=(348)
+11798 2
+cfi=(245)
+cfn=(4490)
+calls=2 3465 
+* 27
+fi=(245)
+464 4
+fi=(244)
+-81 5
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(244)
+612 1
+fi=(245)
+1851 1
+fi=(313)
+34 2
+fi=(300)
+434 1
+fi=(323)
+1339 5
+fi=(250)
+2875 1
+cfn=(1060)
+calls=2 2461 
+* 21
+fe=(348)
+11810 2
+0 2
+fi=(231)
+961 5
+fi=(323)
+104 3
+fe=(348)
+11815 2
+cfi=(274)
+cfn=(1462)
+calls=2 326 
+* 33
+* 2
+fi=(245)
+464 4
+fi=(244)
+-81 6
+cfn=(1418)
+calls=2 717 
+* 10
+fi=(237)
+966 2
+0 2
+fe=(348)
+11831 1
+cfi=(245)
+cfn=(4490)
+calls=2 3465 
+* 16
+fi=(245)
+1815 1
+fi=(251)
+-95 1
+fi=(274)
+180 1
+0 16
+fi=(251)
+1720 66
+fi=(392)
+82 66
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(348)
+11833 132
++1 3
+cfn=(2794)
+calls=2 3840 
+* 41
+fi=(237)
+2173 3
+fi=(257)
+745 2
+fe=(348)
+11838 330
+cfi=(291)
+cfn=(4540)
+calls=132 2970 
+* 4883
+-1 132
+fi=(273)
+272 3
+fe=(348)
+11840 1
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(254)
+769 1
+fe=(348)
+11840 1
++8 5
+cfi=(291)
+cfn=(4540)
+calls=2 2970 
+* 22
+* 325
+cfi=(291)
+cfn=(4540)
+calls=130 2970 
+* 1430
+-1 132
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 9
+fi=(273)
+272 2
+fe=(348)
+11857 2
+0 1
+11863 1
+2567 5
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(251)
+1720 1
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 2
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fi=(274)
+331 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(348)
+0 1
+fi=(245)
+2997 2
+fi=(254)
++54 1
+fi=(300)
+457 1
+fe=(348)
+11874 1
+fi=(254)
+3051 1
+fi=(300)
+457 1
+fi=(254)
+0 1
+769 1
+fi=(300)
+457 1
+0 2
+fi=(254)
+769 5
+fi=(257)
+1545 2
+fi=(423)
+342 6
+fi=(245)
+1815 2
+fe=(348)
+11887 2
+cfi=(423)
+cfn=(4554)
+calls=2 372 
+* 400
+fi=(237)
+966 2
+0 2
+fe=(348)
+11892 1
+cfi=(423)
+cfn=(4560)
+calls=2 380 
+* 17
+fi=(237)
+966 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 7
+fe=(348)
+11916 18
+cfi=(423)
+cfn=(4562)
+calls=2 367 
+* 26
+fi=(251)
+1720 66
+fi=(392)
+82 66
+fi=(251)
+1720 66
+fi=(274)
+180 66
+fe=(348)
+11898 132
++1 3
+cfn=(2794)
+calls=2 3840 
+* 41
+fi=(237)
+2173 3
+fi=(257)
+745 2
+fe=(348)
+11903 330
+cfi=(291)
+cfn=(4540)
+calls=132 2970 
+* 4883
+-1 132
++19 325
+cfi=(291)
+cfn=(4540)
+calls=130 2970 
+* 1300
+-1 130
+fi=(423)
+97 65
+fe=(348)
+11926 390
+cfi=(423)
+cfn=(4562)
+calls=130 367 
+* 1690
+* 65
+fi=(273)
+272 4
+fe=(348)
+11905 1
+fi=(244)
+612 1
+fi=(245)
+1815 1
+fe=(348)
+11906 2
+cfn=(4526)
+calls=2 12520 
+* 22
+fi=(423)
+118 5
+fe=(348)
+11908 2
+fi=(251)
+444 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fe=(348)
+11910 3
+cfi=(423)
+cfn=(4566)
+calls=2 188 
+* 74
+* 1
+fi=(423)
+97 1
+217 2
+0 1
+218 3
+-1 1
+fe=(348)
+0 1
+11929 3
+fi=(231)
+961 3
+fe=(348)
+11929 3
+fi=(251)
+1720 1
+fi=(262)
+223 1
++4 2
+fe=(348)
+11935 1
+cfi=(225)
+cfn=(4576)
+calls=2 805 
+* 16
+* 2
++2 2
+cfn=(2794)
+calls=2 3840 
+* 41
+fi=(237)
+2173 3
+fi=(257)
+745 2
+fe=(348)
+11939 1
++2 2
+fi=(382)
+422 5
+fi=(238)
+286 2
+cfn=(2554)
+calls=2 -39 
+* 363
+* 1
++3 9
+fi=(257)
+745 2
+fe=(348)
+11944 1
+0 1
+12033 2
+cfn=(2556)
+calls=2 3676 
+* 42
+* 1
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fe=(348)
+12050 2
+-15 2
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
++15 13
+cfi=(423)
+cfn=(4582)
+calls=2 903 
+* 969148
+* 2
+fi=(428) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/bool.rs
+0 1
+fe=(348)
+12051 1
+cfn=(4908)
+calls=2 4265 
+* 79
+0 2
+fi=(237)
+966 4
+fi=(225)
+805 1
+cfn=(4930)
+calls=2 * 
+* 41
+* 1
+0 1
+fi=(382)
+2422 2
+fe=(348)
+12057 1
+cfi=(415)
+cfn=(4940)
+calls=2 490 
+* 23
+fi=(237)
+1620 2
+fi=(249)
+901 9
++1 1
+fe=(348)
+12060 8
+fi=(249)
+901 1
+fi=(257)
+1229 3
+fe=(348)
+12060 1
+fi=(257)
+1231 13
+fe=(348)
+12060 3
+cfi=(225)
+cfn=(4946)
+calls=2 805 
+* 13
+* 2
+fi=(257)
+745 2
+fi=(237)
+0 1
+fe=(348)
+12061 20
++6 3
+fi=(257)
+1231 2
+fe=(348)
+12073 23
+cfn=(4952)
+calls=2 13003 
+* 68
+0 1
+12074 4
++2 9
+fi=(257)
+1229 3
++2 9
++2 1
+fi=(225)
+0 1
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+0 1
+2854 1
+cfn=(2498)
+calls=2 2109 
+* 43
+fe=(348)
+12074 2
++4 1
+fi=(225)
+0 1
+fe=(348)
+12078 1
+cfi=(225)
+cfn=(4958)
+calls=2 805 
+* 570
+fi=(244)
+632 6
+fe=(348)
+12078 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+fi=(244)
+632 2
+fe=(348)
+12078 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+-48 1
+fe=(348)
+12078 1
+cfi=(225)
+cfn=(4968)
+calls=2 805 
+* 9836
+* 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 164
+* 1
+fi=(234)
+3943 1
+-1 1
+fi=(382)
+2811 1
+fe=(348)
+
+fl=(285)
+fn=(1038)
+43 28
+fi=(244)
+459 8
+0 8
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=13 3283 
+* 616
+fi=(244)
+468 8
+fi=(248)
+0 4
+fi=(225)
+547 16
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=13 255 
+* 64
+fi=(255)
+1014 12
+fi=(260)
+154 4
+fe=(285)
+45 4
+fi=(260)
+-25 8
+fi=(289)
+-20 20
+fe=(285)
+105 28
+
+fl=(407)
+fn=(3182)
+30 6
++4 1
++2 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(407)
+59 1
++1 5
+
+fl=(356)
+fn=(2120)
+2489 24
++1 8
++1 10
++1 18
+2803 28
+2499 8
++6 4
++1 4
++3 4
+fi=(366)
+34 4
+fi=(362)
+-11 4
+fi=(273)
+568 12
+fi=(362)
+23 8
+fi=(254)
+923 4
+fe=(356)
+2509 12
+0 4
+2526 8
+1653 1
+2536 2
+0 4
+1669 21
+2527 15
+1653 2
+2543 8
++1 1
++3 1
+1653 1
+2547 2
++27 6
+1653 3
+2629 6
++22 6
++14 6
++14 6
++22 6
++1 6
++3 12
+cfi=(363)
+cfn=(2124)
+calls=204 30 
+* 298721
++4 12
+0 1
+2710 2
++3 3
+0 2
+2768 1
++5 6
+-64 6
+0 1
+2715 2
+0 1
+2728 3
+-25 2
+1653 2
+2737 5
+cfn=(2282) zlib_rs::deflate::zng_tr_stored_block
+calls=68 1734 
+* 124
+* 1
++20 2
+cfn=(2262) zlib_rs::deflate::flush_pending
+calls=68 +48 
+* 119
+* 1
++2 2
+fi=(362)
+0 1
+fe=(356)
+2791 1
+cfn=(2262)
+calls=68 +14 
+* 90
++3 4
++4 2
+cfi=(362)
+cfn=(2308)
+calls=68 22 
+* 13
+* 3
++1 4
+
+fn=(2222) zlib_rs::deflate::Heap::pqdownheap
+3046 1944
++14 1944
+-4 1296
+0 1296
+3064 1296
+0 3326
+3076 232
++5 4802
+0 4802
+3064 4802
++2 8331
+-10 16662
++11 5554
++1 13305
+-12 15966
++13 7983
++7 5322
+0 382
+3088 382
++1 1528
+-1 266
++1 1064
+
+fn=(2128)
+1776 2048
++3 512
++4 512
+0 256
+1783 1280
++4 1024
++21 512
++14 2
++2 5
+cfn=(2130) zlib_rs::deflate::read_buf_window
+calls=68 1687 
+* 72
++2 1
++1 2
++3 4
++1 3
++1 2
++4 2
++4 1
+-1 1
++1 3
++3 2
++9 5
+fi=(365)
+0 256
+fe=(356)
+1858 768
++3 2048
+
+fn=(2228) zlib_rs::deflate::gen_codes
+2109 3
++4 9
++7 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
+-1 6
++1 3
++7 9
+0 3
+fi=(246)
+1169 9
+fi=(228)
+1916 294
+fi=(246)
+1169 294
+fe=(356)
+2135 1176
++1 294
+fi=(375) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/range.rs
+873 262
+fe=(356)
+2141 262
++1 262
+fi=(254)
+615 4716
+fe=(356)
+2142 1310
++1 524
+fi=(228)
+1916 262
+fi=(375)
+563 262
+fi=(228)
+1916 32
+fi=(375)
+563 32
+0 291
+563 582
+fe=(356)
+2160 6
+
+fn=(2050)
+745 1
++11 1
++1 2
++2 1
++4 1
+fi=(362)
+19 1
+fe=(356)
+766 1
+fi=(453) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/num/int_macros.rs
+3608 4
+fe=(356)
+766 1
++2 6
++5 2
++8 1
+1604 2
++2 2
++2 2
++2 1
++1 1
++10 2
+cfn=(2052) zlib_rs::deflate::State::init_block
+calls=68 +4 
+* 49950
+789 1
+fi=(366)
+89 1
+fe=(356)
+789 2
+fi=(404) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/specialize.rs
+60 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=68 198 
+* 131091
+fe=(356)
+795 2
++13 4
++1 1
+-1 2
++1 1
++1 2
++1 2
+fi=(365)
+15 1
+fe=(356)
+813 1
+-16 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
+-51 2
+
+fn=(2130)
+1687 6
++1 1
+fi=(228)
+1076 2
+fe=(356)
+1688 1
++2 1
+0 1
+1694 2
++2 6
++21 2
+fi=(254)
+923 4
+fe=(356)
+1717 1
+fi=(273)
+101 1
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=68 255 
+* 30
+fi=(231)
+-77 1
+fe=(356)
+1722 1
++1 1
++3 7
+
+fn=(2216)
+2436 20
++3 2
+2332 8
+0 4
+2336 2
+0 1
+2337 2
+0 1
+1531 2
+2338 1
+0 1
+2342 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=66 255 
+* 245
+* 1
+0 1
+fi=(225)
+1433 2
++1 2
++1 2
++1 2
+-3 2
++1 2
++1 2
++1 2
+fi=(254)
+844 1
+fi=(246)
+-72 2
+fi=(225)
+1433 70
++1 70
++1 70
++1 70
+-3 70
++1 70
++1 70
++1 70
+fi=(254)
+844 35
+fi=(246)
+-72 70
+fi=(225)
+1433 1
++1 1
++1 1
++1 1
+fe=(356)
+1947 3
++1 1
+3013 1
++4 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=68 198 
+* 2884
+* 1
+fi=(254)
+923 1
+fe=(356)
+3026 1
++1 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 4
+fe=(356)
+3036 33
+fi=(392)
+82 33
+fi=(251)
+1720 33
+fi=(274)
+180 33
+fe=(356)
+3030 572
++1 759
++1 759
++2 506
+fi=(392)
+82 253
+fi=(251)
+1720 253
+fi=(274)
+180 253
+0 1
+fe=(356)
+1957 2
+0 1
+1981 1
++4 2
+2335 2
+0 3
+1987 4
+cfn=(2222)
+calls=68 3046 
+* 50
+0 125
+1987 500
+cfn=(2222)
+calls=8301 3046 
+* 6255
+-1 252
+0 1
+1991 4
+cfn=(2224) zlib_rs::deflate::Heap::construct_huffman_tree
+calls=68 3104 
+* 108442
++17 1
+-1 1
++1 2
++1 4
++1 2
++1 1
++2 3
++4 7
+fi=(228)
+1916 1
+fi=(246)
+772 1
+0 4
+fe=(356)
+2024 4
+0 753
+fi=(228)
+1916 502
+fi=(246)
+772 251
+fe=(356)
+0 506
+fi=(228)
+1916 506
+fi=(246)
+772 253
+fe=(356)
+2023 1008
++1 3024
++2 2016
++6 504
++3 1008
++4 1012
++2 759
+0 504
+2042 2
+0 1
+2042 1
++3 1
++1 4
++3 2
+-4 252
++1 1008
++3 2528
++4 2
+0 1
+1998 4
+cfn=(2228)
+calls=68 2109 
+* 10247
+* 1
+0 1
+fi=(225)
+1433 2
++1 2
++1 2
++1 2
+-3 2
++1 2
++1 2
++1 2
+fi=(254)
+844 1
+fi=(246)
+-72 2
+fi=(225)
+1433 70
++1 70
++1 70
++1 70
+-3 70
++1 70
++1 70
++1 70
+fi=(254)
+844 35
+fi=(246)
+-72 70
+fi=(225)
+1433 1
++1 1
++1 1
++1 1
+fe=(356)
+2356 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=68 255 
+* 53
+fi=(225)
+1434 1
++2 2
+-1 1
+-1 1
++2 2
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+-3 1
++1 1
++1 1
++1 1
+fe=(356)
+1947 3
++1 1
+3013 1
++4 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=68 198 
+* 2884
+* 1
+fi=(254)
+923 1
+fe=(356)
+3026 1
++1 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 4
+fe=(356)
+3036 29
+fi=(392)
+82 29
+fi=(251)
+1720 29
+fi=(274)
+180 29
+fe=(356)
+3030 60
++1 3
++1 3
++2 2
+fi=(392)
+82 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fe=(356)
+1957 2
+0 2
+1959 5
++10 1
++1 2
++2 1
+-2 1
++1 1
++1 3
++2 5
+-17 2
+0 2
+1981 2
+0 3
+1987 4
+cfn=(2222)
+calls=67 3046 
+* 37
+-1 2
+0 1
+1991 4
+cfn=(2224)
+calls=68 3104 
+* 112
++17 1
+-1 1
++1 2
++1 4
++1 2
++1 1
++2 3
++4 7
+fi=(228)
+1916 1
+fi=(246)
+772 1
+0 4
+fe=(356)
+2024 4
+0 4
+fi=(228)
+1916 4
+fi=(246)
+772 2
+fe=(356)
+2023 4
++1 12
++2 8
++6 2
++3 4
++4 8
++2 6
++1 4
+0 2
+2042 2
++3 2
++1 8
++3 20
++4 2
+0 1
+1998 4
+cfn=(2228)
+calls=68 2109 
+* 303
+fi=(225)
+1434 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 2
+fe=(356)
+2370 1
+2268 1
++1 1
++1 1
+-3 3
+cfn=(2234) zlib_rs::deflate::scan_tree
+calls=68 -96 
+* 5584
++8 1
++1 1
+-3 3
+cfn=(2234)
+calls=68 2171 
+* 376
++8 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=68 255 
+* 30
+fi=(225)
+1434 1
++2 2
+-1 1
+-1 1
++2 2
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
+-1 1
++2 1
+-1 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+-2 1
+-1 1
++2 1
++1 1
+fe=(356)
+1947 3
++1 1
+3013 1
++4 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=68 198 
+* 2884
+* 1
+fi=(254)
+923 1
+fe=(356)
+3026 1
++1 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 4
+fe=(356)
+3036 12
+fi=(392)
+82 12
+fi=(251)
+1720 12
+fi=(274)
+180 12
+fe=(356)
+3030 38
++1 21
++1 21
++2 14
+fi=(392)
+82 7
+fi=(251)
+1720 7
+fi=(274)
+180 7
+0 1
+fe=(356)
+1957 2
+0 1
+1981 1
++4 2
+0 3
+1987 4
+cfn=(2222)
+calls=68 3046 
+* 55
+0 2
+1987 8
+cfn=(2222)
+calls=140 3046 
+* 100
+-1 6
+0 1
+1991 4
+cfn=(2224)
+calls=68 3104 
+* 974
++17 1
+-1 1
++1 2
++1 4
++1 2
++1 1
++2 3
++4 7
+fi=(228)
+1916 1
+fi=(246)
+772 1
+0 3
+fe=(356)
+2024 4
++21 7
++1 28
+0 14
+fi=(228)
+1916 14
+fi=(246)
+772 7
+fe=(356)
+0 10
+fi=(228)
+1916 10
+fi=(246)
+772 5
+fe=(356)
+2023 24
++1 72
++2 48
++6 12
++3 24
++4 28
++2 21
++1 28
++11 2
+0 1
+1998 4
+cfn=(2228)
+calls=68 2109 
+* 479
+fi=(225)
+1433 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 2
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+-3 1
++3 1
+fe=(356)
+2298 4
+0 2
+2298 2
++8 2
++68 1
+-68 3
++67 3
++1 2
++12 2
+0 1
+2407 4
++32 1
+-42 5
++9 1
++1 3
+cfn=(2282)
+calls=66 1734 
+* 168
++21 2
+cfn=(2052)
+calls=66 1625 
+* 49950
++1 3
+-20 1
+1093 2
+-40 2
++5 2
++1 2
++1 2
+fi=(366)
+34 1
+fi=(357)
+-20 2
+fi=(254)
+923 1
+0 1
+fi=(323)
+1852 3
+fi=(291)
+2154 2
+fe=(356)
+1053 2
++5 2
+0 4
+2428 2
+cfn=(2052)
+calls=70 1625 
+* 49950
++1 2
++1 3
+cfn=(2284) zlib_rs::deflate::BitWriter::emit_align
+calls=68 1000 
+* 64
++14 6
++1 4
+cfn=(2262)
+calls=136 2805 
+* 277
++1 16
+
+fn=(2262)
+2805 24
++3 12
+cfn=(2264) zlib_rs::deflate::BitWriter::flush_bits
+calls=272 988 
+* 248
+fi=(366)
+34 4
+fi=(362)
+-11 4
+fi=(273)
+568 12
+fi=(362)
+23 8
+fi=(254)
+923 4
+fe=(356)
+2811 4
+fi=(228)
+1076 8
+fe=(356)
+2813 8
+fi=(273)
+89 3
+fe=(356)
+2819 3
+fi=(225)
+547 9
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=204 255 
+* 84
+fi=(231)
+-77 3
+fe=(356)
+2821 3
++1 3
++1 6
+fi=(362)
+44 3
++1 3
++2 3
++1 3
+fe=(356)
+2826 24
+
+fn=(2224)
+3104 27
+-9 3
+0 3
+3095 518
+-1 259
++1 518
++1 518
++2 1295
+cfn=(2222)
+calls=17225 -52 
+* 45372
++9 259
++2 777
++1 777
++1 777
++1 777
++3 2072
+fi=(228)
+1037 1036
+fe=(356)
+3115 259
++1 518
++2 259
++1 259
++3 259
++1 259
++2 1295
+cfn=(2222)
+calls=17225 -79 
+* 50616
++2 777
++5 9
++1 12
++1 18
+
+fn=(2234)
+2171 14
++15 6
+-10 2
++5 14
++5 10
+0 2
+fi=(375)
+563 1104
+fe=(356)
+2192 825
+fi=(228)
+1916 550
+fe=(356)
+2192 275
+fi=(246)
+1169 275
+fe=(356)
+2194 1572
+0 52
+2196 104
++1 24
+-1 8
++2 88
++1 84
++3 38
+-4 38
++5 4
++1 2
+-4 12
++2 4
+-4 4
++8 1
+0 3
+2212 12
+fi=(375)
+563 1
+fe=(356)
+0 153
+2212 612
+fi=(375)
+563 51
+fe=(356)
+2223 16
+
+fn=(2282)
+1734 16
++6 2
+1093 2
+-40 4
++5 4
++1 4
++1 4
+1743 4
+cfn=(2284)
+calls=134 1000 
+* 124
+fi=(366)
+50 2
+fi=(254)
+923 6
+fi=(273)
+438 4
+fi=(366)
+50 2
+fi=(362)
+-20 10
++38 4
+fi=(273)
+580 4
+fe=(356)
+0 2
+fi=(366)
+38 2
+fi=(225)
+547 2
+fi=(362)
+77 4
+-47 8
++38 4
+fi=(273)
+580 4
+fe=(356)
+1754 4
+fi=(225)
+547 2
+fi=(362)
+77 4
+fe=(356)
+1758 4
+fi=(362)
+30 3
++38 2
+fi=(273)
+580 2
+fe=(356)
+0 1
+fi=(273)
+101 1
+fi=(225)
+547 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=66 255 
+* 30
+fi=(362)
+77 2
+fe=(356)
+1763 12
+
+fn=(2052)
+1625 9
+0 3
+1630 6
+fi=(251)
++90 6
+fi=(274)
+180 3
+fe=(356)
+1630 852
+fi=(251)
++90 852
+fi=(274)
+180 426
+fe=(356)
+1634 90
++4 57
++6 3
++2 6
+fi=(366)
+38 6
+fi=(404)
+-4 6
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=204 198 
+* 147513
+fi=(357)
++5 3
+fe=(356)
+1648 3
++1 6
+
+fn=(2264)
+988 28
++2 4
++1 8
++2 4
+fi=(254)
+3928 4
+fe=(356)
+990 4
+fi=(254)
+-67 4
+0 4
+fi=(366)
+50 4
+fi=(362)
+-20 20
++38 8
+fi=(273)
+580 8
+0 8
+101 8
+fi=(225)
+547 8
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=272 255 
+* 52
+fi=(362)
+77 8
+fe=(356)
+996 8
+fi=(254)
+2035 20
+fe=(356)
+997 4
++1 32
+
+fn=(2284)
+1000 15
++2 3
+fi=(254)
+3658 6
++1 6
++1 6
+fe=(356)
+1003 3
+fi=(254)
+3928 3
+fe=(356)
+1004 6
+fi=(254)
+-81 3
+0 3
+fi=(366)
+50 3
+fi=(362)
+-20 15
++38 6
+fi=(273)
+580 6
+101 6
+fi=(225)
+547 6
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=202 255 
+* 50
+fi=(362)
+77 6
+fe=(356)
+1006 12
++4 3
++1 3
++3 18
+
+fl=(242) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs
+fn=(842) std::sys::backtrace::__rust_begin_short_backtrace
+fi=(418)
+cfi=(243)
+cfn=(844)
+calls=0 165 
+250 2172678
+fe=(242)
+
+fl=(350)
+fn=(2110) soapberry_zip::writer::ReusableDeflateState::drain_pending
+2677 44
++1 12
+0 10
+fi=(273)
+89 6
+fi=(254)
+769 4
+fi=(300)
+457 2
+0 4
+fe=(350)
+2332 2
+426 2
+fi=(254)
+769 4
+fi=(300)
+457 2
+0 2
+fi=(244)
+617 2
+fi=(245)
+1446 2
+fi=(254)
+2494 2
+fi=(244)
+765 2
+-94 2
+0 2
+fi=(231)
+961 4
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=4 255 
+* 83
+fi=(245)
+2886 4
+fi=(254)
+769 4
+fi=(300)
+457 2
+fe=(350)
+-12 2
+fi=(254)
+769 2
+fi=(300)
+457 2
+fe=(350)
+2366 2
+0 2
+2704 6
++2 18
+0 2
+2704 6
++2 18
+
+fn=(4714)
+2107 9
++4 2
+cfn=(4632) soapberry_zip::writer::ZipArchiveWriter<W>::ensure_usable
+calls=2 1322 
+* 10
+fi=(237)
++62 2
+0 1
+fe=(350)
+2112 2
+cfn=(4634) soapberry_zip::writer::ZipArchiveWriter<W>::ensure_no_pending_borrowed_entry
+calls=2 1332 
+* 10
+fi=(237)
++61 2
+fe=(350)
++37 8
+0 2
+414 3
+fi=(249)
+901 1
++1 1
+fe=(350)
+2115 3
+0 1
+fi=(245)
+2997 1
+fe=(350)
+2129 7
+fi=(274)
+331 2
+0 2
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fe=(350)
+3656 6
+fi=(274)
+332 1
+fe=(350)
+3659 1
+fi=(251)
+659 1
+fi=(274)
+332 1
+fi=(251)
+1720 2
+0 2
+fe=(350)
+2137 6
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 3
+fi=(257)
+745 2
+fi=(228)
+1076 9
+0 3
+fe=(350)
+3635 3
+0 9
+3631 1
+cfi=(380)
+cfn=(2442)
+calls=2 3191 
+* 4
+* 2
+-21 8
+fi=(257)
+1164 5
+fe=(350)
+3645 1
+fi=(225)
+547 22
+fi=(228)
+1076 2
+fi=(225)
+547 1
+fi=(432)
+78 6
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 53
+fi=(237)
+2173 3
+fe=(350)
+-30 2
+fi=(245)
+1815 1
+fe=(350)
+2143 1
+fi=(254)
+923 3
+fi=(273)
+89 1
+fe=(350)
+2145 2
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 52
+fi=(237)
++28 2
+fe=(350)
+-23 4
+cfi=(361)
+cfn=(2106)
+calls=2 221 
+* 23
+0 1
+fi=(237)
+2173 4
+fe=(350)
+414 2
+2154 1
++7 3
++4 1
++16 4
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 56
+fi=(237)
+-8 2
+fe=(350)
++11 4
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 56
+fi=(237)
+-11 2
+0 1
+fe=(350)
+2189 6
+fi=(254)
+3928 2
+fe=(350)
+2194 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 59
+fi=(237)
+-21 2
+fi=(254)
+3928 2
+fe=(350)
+2195 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 59
+fi=(237)
+-22 2
+0 1
+fi=(228)
+1076 2
+fi=(254)
+3928 2
+fe=(350)
+2199 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 56
+fi=(237)
+-26 2
+0 1
+fi=(228)
+1076 2
+fi=(254)
+3928 2
+fe=(350)
+2203 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 56
+fi=(237)
+-30 2
+fi=(254)
+3928 2
+fe=(350)
+2206 3
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 59
+fi=(237)
+-33 2
+0 1
+fe=(350)
+2209 6
++1 2
+cfi=(225)
+cfn=(2456)
+calls=2 805 
+* 62
+fi=(244)
+632 2
+0 1
+fi=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 33
+-48 1
+fe=(350)
+2210 2
+cfi=(225)
+cfn=(2464)
+calls=2 805 
+* 9
+0 1
+fi=(244)
+632 2
+fi=(236)
+0 1
+fe=(350)
+2210 1
+fi=(225)
+805 2
+fe=(350)
+
+fn=(2314) soapberry_zip::writer::FileHeader::finalize_extra_fields
+3662 6
+-6 16
++35 6
+
+fn=(4632)
+1322 9
++1 6
+0 3
+1330 12
+
+fn=(2084) soapberry_zip::writer::ZipArchiveWriter<W>::write_local_header
+1648 10
++7 3
+fi=(238)
+0 5
+fi=(257)
+745 2
+fe=(350)
+0 2
+1699 1
+0 2
+1689 2
+0 2
+1705 1
+cfi=(380)
+cfn=(2442)
+calls=2 3191 
+* 4
++7 1
+-15 12
++18 4
+cfi=(380)
+cfn=(4654)
+calls=2 3912 
+* 79
+fi=(237)
+2173 2
+fe=(350)
+1716 4
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 52
+fi=(237)
+2173 2
+fe=(350)
+1719 4
+cfi=(361)
+cfn=(2106)
+calls=2 221 
+* 24
+fi=(237)
+2173 2
+0 1
+fe=(350)
+1721 8
+
+fn=(4630)
+1240 8
++1 2
++2 2
++1 1
++1 2
+-3 4
++4 1
+-4 9
++7 3
+1869 2
+cfn=(4632)
+calls=2 1322 
+* 10
+* 1
+fi=(237)
+2173 2
+fe=(350)
+1870 2
+cfn=(4634)
+calls=2 1332 
+* 10
+* 1
+fi=(237)
+2173 3
+0 1
+fi=(299)
+729 1
+fi=(286)
+489 1
+330 1
+fi=(251)
+1720 1
+fi=(274)
+25 1
+-25 2
+fi=(253)
+84 3
+fi=(286)
+-84 1
+fe=(350)
+1871 2
+cfi=(353) /home/zhuhe/code/litchi/crates/soapberry-zip/src/path.rs
+cfn=(1992) soapberry_zip::path::ZipFilePath<()>::from_str
+calls=2 174 
+* 264
+fi=(358) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/borrow.rs
+350 2
+fe=(350)
+1873 2
+414 1
+1881 1
+fi=(231)
+961 2
+0 1
+fi=(251)
+1720 1
+fi=(274)
+180 1
+fi=(251)
+1720 17
+fi=(274)
+180 17
+fi=(253)
+37 17
++1 34
+-38 51
+fi=(353)
+276 68
+0 1
+fi=(257)
+636 1
+fe=(350)
+1374 3
++5 8
++13 1
+fi=(254)
+769 2
+fi=(427)
+297 2
+fe=(350)
+1254 8
+0 1
+1891 1
+fi=(257)
+745 3
+fi=(237)
+0 2
+fe=(350)
+1892 1
+cfn=(4650) soapberry_zip::writer::ZipArchiveWriter<W>::owned_spool_name
+calls=2 1406 
+* 15
+0 1
+fi=(237)
+2173 1
+0 1
+2173 3
++1 2
+fe=(350)
+1893 4
+cfn=(2072) soapberry_zip::writer::ZipArchiveWriter<W>::reserve_member_metadata
+calls=2 1461 
+* 468
+fi=(237)
+2173 2
+fi=(225)
+0 1
+fe=(350)
+1896 8
+cfn=(2084)
+calls=2 1648 
+* 229
+* 1
+-1 1
++6 1
++7 1
++1 1
++3 1
+fi=(225)
+805 2
+fi=(237)
+2174 12
+fe=(350)
+1253 17
+
+fn=(4688)
+2945 7
+fi=(257)
+767 2
+fe=(350)
+2947 3
+cfn=(4690) soapberry_zip::writer::ReusableDeflateState::finish_to
+calls=2 2755 
+* 50805
+* 1
+fi=(237)
+2173 2
+fe=(350)
+0 2
+2954 8
+
+fn=(4678)
+3496 9
++72 2
+fi=(257)
+767 2
+fe=(350)
+2659 2
+fi=(273)
+580 3
+fe=(350)
+2658 1
+fi=(273)
+101 1
+fe=(350)
+2657 5
+cfn=(2116) soapberry_zip::writer::run_codec
+calls=2 -87 
+* 248632
+fi=(237)
+2173 2
++1 1
+fe=(350)
+2735 1
+-72 3
++72 2
+0 2
+2742 3
+cfn=(2110)
+calls=2 -65 
+* 130
+fi=(237)
+2173 2
+fe=(350)
+2659 2
+fi=(273)
+580 3
+fe=(350)
+0 1
+fi=(273)
+101 1
+fe=(350)
+2657 6
+cfn=(2116)
+calls=2 -87 
+* 169
+fi=(237)
+2173 2
++1 1
+fe=(350)
+2745 1
+-82 1
++82 2
++3 2
+0 1
+fi=(245)
+2997 1
+fe=(350)
+3413 2
++98 1
++4 1
+3413 1
+3513 1
+fi=(244)
+632 1
+fe=(350)
+3502 5
+fi=(244)
+632 1
+fe=(350)
+3503 8
+
+fn=(4650)
+1406 5
+fi=(257)
+636 1
+fe=(350)
+1407 1
+0 1
+1408 1
++11 6
+
+fn=(4694)
+2263 9
++4 3
+cfn=(4632)
+calls=2 1322 
+* 10
+* 1
+fi=(237)
+-94 2
+fe=(350)
++95 2
++4 1
++2 1
++1 1
++2 1
++1 2
++2 8
+-9 1
+-2 6
++1 1
+-1 2
++10 1
+-10 2
++13 1
+cfn=(2314)
+calls=2 3662 
+* 28
+* 3
+0 1
+3145 5
++2 5
+0 1
+3153 2
+fi=(225)
+547 2
+fe=(350)
+3156 2
+fi=(238)
+0 1
+fi=(225)
+547 3
+fe=(350)
+3163 2
+cfi=(359)
+cfn=(2452)
+calls=2 1876 
+* 52
+fi=(237)
+2173 2
+fe=(350)
+2305 10
+-5 3
+fi=(257)
+1097 5
+fe=(350)
+2301 16
+fi=(257)
+767 3
+fi=(245)
+1025 1
++3 2
+fi=(244)
+612 1
+fi=(231)
+961 1
+fi=(225)
+1917 16
+fi=(245)
+1034 2
+fe=(350)
+2302 1
+fi=(244)
+632 2
+fi=(236)
+0 2
+fe=(350)
+2305 1
+
+fn=(2072)
+1461 7
+fi=(257)
+636 1
+fe=(350)
+1462 1
+fi=(244)
+617 1
+fi=(245)
+1513 1
+fi=(254)
+2494 2
+fi=(244)
+765 1
+-77 1
+fi=(254)
++81 3
+fi=(300)
+457 1
+fi=(245)
+2881 2
+0 1
+fi=(231)
+961 2
+fi=(225)
+547 3
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 11
+* 2
+fi=(245)
+2886 2
+0 1
+fe=(350)
+1477 8
+0 2
+fi=(244)
+521 1
+fi=(228)
+1037 6
+fi=(244)
+527 7
+cfn=(1256)
+calls=2 +15 
+* 75
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 1
++1 3
+fi=(245)
+1513 1
+fi=(244)
+765 1
+-77 1
+0 2
+521 1
+fi=(228)
+1037 4
+fi=(244)
+527 7
+cfn=(1256)
+calls=2 +15 
+* 290
+fi=(237)
+2173 2
++1 2
+fi=(244)
+774 1
++1 3
+fi=(254)
+2494 1
+fi=(244)
+765 1
+-94 1
+fe=(350)
+
+fn=(2116)
+2570 36
+fi=(371)
+218 3
++5 3
+fe=(350)
+2579 24
+cfi=(354)
+cfn=(2118)
+calls=270 350 
+* 299301
+fi=(237)
+966 6
+fi=(371)
+218 3
+fi=(254)
+923 6
+fi=(371)
+223 3
+fi=(254)
+923 6
+fe=(350)
+2591 18
++4 24
+0 3
+2594 12
+
+fn=(2190) soapberry_zip::writer::CrcStage::update
+3384 2
+0 11
+3387 3
+fi=(245)
+2997 1
+fe=(350)
+3395 1
++18 2
+0 2
+fi=(372)
+97 2
+cfn=(2194)
+calls=68 +15 
+* 45
+fi=(257)
+1065 4
+0 2
+fi=(372)
+127 6
+fi=(373)
+-30 3
+cfn=(2206)
+calls=68 +57 
+* 151
+* 1
+fe=(350)
+3395 1
+0 7
+3396 1
+
+fn=(4622)
+2602 5
++2 1
+cfi=(354)
+cfn=(2030)
+calls=2 199 
+* 444044
+fi=(236)
+36 3
+cob=(2)
+cfi=(155)
+cfn=(792)
+calls=2 3739 
+* 32980
+fi=(244)
+468 2
+fe=(350)
+0 1
+2603 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=2 255 
+* 30
+* 10
++10 4
+
+fn=(4634)
+1332 6
++1 4
+0 2
+1340 8
+
+fn=(4690)
+2755 10
+0 1
+2757 3
+cfn=(2110)
+calls=2 -80 
+* 27
+fi=(237)
+2173 2
+fe=(350)
+2659 2
+fi=(273)
+580 3
+fe=(350)
+0 1
+fi=(273)
+101 1
+fe=(350)
+2657 6
+cfn=(2116)
+calls=2 -87 
+* 50647
+fi=(237)
+2173 3
++1 1
+fe=(350)
+2760 1
+-97 1
++97 2
++3 2
++1 9
+cfn=(2110)
+calls=2 -87 
+* 83
+
+fl=(164)
+fn=(596)
+cfi=(242)
+cfn=(842)
+calls=0 162 
+0 2172678
+
+fn=(564) (below main)
+cob=(2)
+cfi=(165)
+cfn=(566)
+calls=0 242 
+0 2172678
+
+fl=(297)
+fn=(1166)
+694 981
+fi=(298)
+203 654
++1 654
++1 654
++1 327
+fi=(277)
+84 3270
+fi=(298)
+306 1308
+cfn=(1168)
+calls=1779 -50 
+* 24073
+fe=(297)
++57 1635
+cfi=(298)
+cfn=(1168)
+calls=1779 256 
+* 13965
+fi=(298)
+-49 981
+-2 654
++4 654
+fi=(254)
+2457 654
+fi=(300)
+2029 327
+fi=(254)
+2457 327
+fi=(298)
+78 327
+fi=(300)
+2029 327
+fi=(298)
+79 327
+fi=(300)
+2029 327
+fi=(254)
+2457 654
+fi=(300)
+2029 327
+fi=(298)
+79 327
+fi=(300)
+2029 654
+fi=(298)
+78 327
+318 327
++2 327
+fi=(254)
+2457 654
+fi=(300)
+2029 327
+fi=(298)
+78 327
+fi=(300)
+2029 654
+fi=(298)
+79 327
+fi=(254)
+2457 327
+fi=(300)
+2029 327
+fi=(254)
+2457 327
+fi=(298)
+79 327
+fi=(300)
+2029 327
+fi=(298)
+78 327
+fi=(300)
+2029 327
+fi=(254)
+2457 654
+fi=(300)
+2029 327
+fi=(298)
+78 327
+fi=(300)
+2029 654
+fi=(298)
+79 327
+fi=(254)
+2457 327
+fi=(300)
+2029 327
+fi=(254)
+2457 327
+fi=(298)
+79 327
+fi=(300)
+2029 327
+fi=(298)
+78 327
+fi=(300)
+2029 327
+fi=(254)
+2457 654
+fi=(300)
+2029 327
+fi=(298)
+78 327
+fi=(300)
+2029 327
+fi=(298)
+79 327
+fi=(254)
+2457 327
+fi=(300)
+2029 1308
+fi=(298)
+323 981
+fe=(297)
+702 981
+-8 1350
+fi=(298)
+203 900
++1 900
++1 900
++1 450
+fi=(277)
+84 4500
+fi=(298)
+306 1800
+cfn=(1168)
+calls=2719 -50 
+* 34132
+fe=(297)
++57 2250
+cfi=(298)
+cfn=(1168)
+calls=2719 256 
+* 18310
+fi=(298)
+-49 1350
+-2 900
++4 900
+fi=(254)
+2457 900
+fi=(300)
+2029 450
+fi=(254)
+2457 450
+fi=(298)
+78 450
+fi=(300)
+2029 450
+fi=(298)
+79 450
+fi=(300)
+2029 450
+fi=(254)
+2457 900
+fi=(300)
+2029 450
+fi=(298)
+79 450
+fi=(300)
+2029 900
+fi=(298)
+78 450
+318 450
++2 450
+fi=(254)
+2457 900
+fi=(300)
+2029 450
+fi=(298)
+78 450
+fi=(300)
+2029 900
+fi=(298)
+79 450
+fi=(254)
+2457 450
+fi=(300)
+2029 450
+fi=(254)
+2457 450
+fi=(298)
+79 450
+fi=(300)
+2029 450
+fi=(298)
+78 450
+fi=(300)
+2029 450
+fi=(254)
+2457 900
+fi=(300)
+2029 450
+fi=(298)
+78 450
+fi=(300)
+2029 900
+fi=(298)
+79 450
+fi=(254)
+2457 450
+fi=(300)
+2029 450
+fi=(254)
+2457 450
+fi=(298)
+79 450
+fi=(300)
+2029 450
+fi=(298)
+78 450
+fi=(300)
+2029 450
+fi=(254)
+2457 900
+fi=(300)
+2029 450
+fi=(298)
+78 450
+fi=(300)
+2029 450
+fi=(298)
+79 450
+fi=(254)
+2457 450
+fi=(300)
+2029 1800
+fi=(298)
+323 1350
+fe=(297)
+702 1350
+-8 150
+fi=(298)
+203 150
++1 150
++1 150
++1 75
+fi=(277)
+84 675
+fi=(254)
+3928 225
+fi=(298)
+233 150
+cfn=(1168)
+calls=150 +23 
+* 4200
++81 225
+-2 150
++4 150
+fi=(254)
+2457 150
+fi=(300)
+2029 75
+fi=(254)
+2457 75
+fi=(298)
+78 75
+fi=(300)
+2029 75
+fi=(298)
+79 75
+fi=(300)
+2029 75
+fi=(254)
+2457 150
+fi=(300)
+2029 75
+fi=(298)
+79 75
+fi=(300)
+2029 150
+fi=(298)
+78 75
+318 75
++2 75
+fi=(254)
+2457 150
+fi=(300)
+2029 75
+fi=(298)
+78 75
+fi=(300)
+2029 150
+fi=(298)
+79 75
+fi=(254)
+2457 75
+fi=(300)
+2029 75
+fi=(254)
+2457 75
+fi=(298)
+79 75
+fi=(300)
+2029 75
+fi=(298)
+78 75
+fi=(300)
+2029 75
+fi=(254)
+2457 150
+fi=(300)
+2029 75
+fi=(298)
+78 75
+fi=(300)
+2029 150
+fi=(298)
+79 75
+fi=(254)
+2457 75
+fi=(300)
+2029 75
+fi=(254)
+2457 75
+fi=(298)
+79 75
+fi=(300)
+2029 75
+fi=(298)
+78 75
+fi=(300)
+2029 75
+fi=(254)
+2457 150
+fi=(300)
+2029 75
+fi=(298)
+78 75
+fi=(300)
+2029 75
+fi=(298)
+79 75
+fi=(254)
+2457 75
+fi=(300)
+2029 300
+fi=(298)
+323 225
+fe=(297)
+702 150
+-8 198
+fi=(298)
+203 132
++1 132
++1 132
++1 66
+fi=(277)
+84 660
+fi=(298)
+306 264
+cfn=(1168)
+calls=998 -50 
+* 5363
+fe=(297)
++57 330
+cfi=(298)
+cfn=(1168)
+calls=998 256 
+* 2310
+fi=(298)
+-49 198
+-2 132
++4 132
+fi=(254)
+2457 132
+fi=(300)
+2029 66
+fi=(254)
+2457 66
+fi=(298)
+78 66
+fi=(300)
+2029 66
+fi=(298)
+79 66
+fi=(300)
+2029 66
+fi=(254)
+2457 132
+fi=(300)
+2029 66
+fi=(298)
+79 66
+fi=(300)
+2029 132
+fi=(298)
+78 66
+318 66
++2 66
+fi=(254)
+2457 132
+fi=(300)
+2029 66
+fi=(298)
+78 66
+fi=(300)
+2029 132
+fi=(298)
+79 66
+fi=(254)
+2457 66
+fi=(300)
+2029 66
+fi=(254)
+2457 66
+fi=(298)
+79 66
+fi=(300)
+2029 66
+fi=(298)
+78 66
+fi=(300)
+2029 66
+fi=(254)
+2457 132
+fi=(300)
+2029 66
+fi=(298)
+78 66
+fi=(300)
+2029 132
+fi=(298)
+79 66
+fi=(254)
+2457 66
+fi=(300)
+2029 66
+fi=(254)
+2457 66
+fi=(298)
+79 66
+fi=(300)
+2029 66
+fi=(298)
+78 66
+fi=(300)
+2029 66
+fi=(254)
+2457 132
+fi=(300)
+2029 66
+fi=(298)
+78 66
+fi=(300)
+2029 66
+fi=(298)
+79 66
+fi=(254)
+2457 66
+fi=(300)
+2029 264
+fi=(298)
+323 198
+fe=(297)
+702 198
+
+fl=(289)
+fn=(1274)
+699 2
+0 4
+703 2
++12 3
++1 1
+cfi=(286)
+cfn=(1122)
+calls=68 499 
+* 219
+* 2
++2 2
++1 1
+fi=(293)
+211 1
+fe=(289)
+720 2
+fi=(293)
+0 1
+fi=(299)
+863 4
+fe=(289)
+729 1
+
+fl=(359)
+fn=(2452)
+1875 490
++1 140
+0 420
+1876 140
+fi=(228)
+1076 210
+fi=(348)
+4262 210
+cfn=(4862)
+calls=140 4017 
+* 9016
+fe=(359)
+1877 280
+fi=(273)
+568 210
+89 210
+fi=(236)
+-89 70
+fe=(359)
+1887 630
+-12 8
++1 2
+0 7
+1876 2
+fi=(350)
+3530 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+fi=(350)
+3536 2
+fi=(257)
+767 2
+0 4
+fi=(350)
+2718 3
+cfn=(2110)
+calls=2 -41 
+* 27
+fi=(237)
+2173 2
+fi=(350)
+2659 2
+fi=(273)
+580 3
+101 1
+fi=(371)
+218 1
++5 1
+fi=(350)
+2579 7
+cfi=(354)
+cfn=(2118)
+calls=2 350 
+* 357
+fi=(237)
+966 2
+0 1
+fi=(371)
+218 1
+fi=(254)
+923 3
+fi=(371)
+223 1
+fi=(254)
+923 3
+0 2
+fi=(350)
+2591 4
+0 1
+2663 2
++57 3
+fe=(359)
+0 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 1
+fi=(350)
+3549 1
++11 2
+0 1
+3561 5
+cfn=(2190)
+calls=2 3384 
+* 245
+* 1
+0 1
+fe=(359)
+1877 1
+fi=(273)
+89 3
+fe=(359)
+-89 1
+1887 8
+-11 24
+0 108
+fi=(350)
+426 24
+fi=(254)
+769 24
+fi=(300)
+457 12
+fi=(244)
+617 12
+fi=(245)
+1446 12
+fi=(254)
+2494 12
+fi=(244)
+765 12
+-94 12
+0 12
+fi=(231)
+961 24
+fi=(225)
+547 24
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=24 255 
+* 170
+fi=(245)
+2886 24
+fi=(254)
+769 24
+fi=(300)
+457 12
+fi=(350)
+-12 24
+0 84
+fe=(359)
+1887 12
+
+fl=(401)
+fn=(3070)
+72 20
+fi=(370)
++7 4
++5 6
+fi=(228)
+1076 4
+fi=(370)
+176 2
+fi=(228)
+1076 4
+fi=(370)
+177 2
++3 2
++1 2
+fi=(398)
+2385 8
++4 2
+fi=(299)
+468 4
+fi=(402) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/inflate/bitreader.rs
+34 4
+fi=(398)
+2397 10
++2 2
++1 4
+0 6
+926 12
+0 30
+926 90
++2 4
+1378 4
++2 4
+0 2
+fi=(406) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/inflate/writer.rs
+82 1
+fi=(402)
+-5 2
+-77 1
+fi=(366)
+50 2
+fi=(406)
++32 1
+fi=(228)
+1076 2
+fi=(402)
+77 1
+fi=(228)
+1076 2
+fi=(398)
+1387 2
+fi=(273)
+580 3
+0 1
+fi=(254)
+923 1
+fi=(273)
+101 1
+fi=(225)
+547 2
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=258 255 
+* 30
+fi=(406)
+102 3
+fi=(299)
+468 1
+fi=(402)
+45 1
+fi=(398)
+1394 1
+fi=(299)
+1663 1
+fi=(228)
+1076 1
+fi=(402)
+45 1
+fi=(398)
+1380 1
++14 2
+-14 1
+0 2
+1380 1
++20 4
+1288 12
+0 6
+fi=(402)
+87 3
+-87 3
+104 6
++3 3
+fi=(299)
+863 3
+fi=(402)
+108 3
++2 6
++1 3
+fi=(398)
+365 9
+0 3
+fi=(402)
+146 9
++1 6
+-6 6
+fi=(398)
+1299 9
+0 3
+1279 6
+fi=(402)
+97 10
++1 4
+-1 2
++1 2
+-1 2
+-10 2
+-87 8
+104 4
+0 2
+107 2
+fi=(299)
+863 2
+fi=(402)
+108 2
++2 8
++1 4
+-24 4
++17 4
++3 2
+fi=(299)
+863 2
+fi=(402)
+108 2
++2 6
++1 4
+-24 4
++17 4
++3 2
++3 2
+fi=(299)
+863 2
+fi=(402)
+108 2
++2 4
++1 6
+-24 4
++17 4
++3 2
+fi=(299)
+863 2
+fi=(402)
+110 2
+-2 2
++2 4
++1 2
+fi=(398)
+1360 10
++5 4
+fi=(402)
+170 2
++1 4
+fi=(398)
+1370 4
++66 1
+fi=(402)
+77 4
+fi=(398)
+571 2
+fi=(249)
+901 4
++1 4
+fi=(398)
+588 7
++14 5
+0 2
+602 1
+fi=(402)
+97 4
++1 3
+fi=(454) /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/lib.rs
+-98 1
+fi=(402)
+146 4
++1 6
+fi=(398)
+1305 2
+609 7
+0 3
+618 6
+fi=(402)
+77 2
+fi=(398)
+627 2
++9 5
+fi=(402)
+141 2
+fi=(398)
+642 2
+0 1
+642 1
++2 2
+-2 1
++2 2
+fi=(402)
+104 2
++3 1
+fi=(299)
+863 1
+fi=(402)
+110 3
++1 1
++30 2
+fi=(398)
+642 2
+0 2
+654 4
+0 1
+654 1
+fi=(402)
+146 2
++1 1
+fi=(398)
+674 3
++1 2
++2 2
++2 2
+1310 2
++5 2
+fi=(402)
+146 2
++1 3
+fi=(398)
+0 2
+684 1
+-90 1
++1 5
++1 11
+1786 1
++31 3
+0 2
+fi=(402)
+50 2
+fi=(406)
++18 2
+fi=(398)
+2404 2
++4 2
+-4 4
++1 4
++2 4
+fi=(254)
++50 2
+fi=(398)
+-49 2
++1 2
+fi=(402)
+77 6
+fi=(398)
+2411 2
++1 2
+fi=(366)
+50 2
+fi=(406)
++18 2
+fi=(398)
+2414 4
+fi=(366)
+46 2
+fi=(231)
+470 2
+fi=(398)
+2415 2
++2 6
+fi=(366)
+50 2
+fi=(405)
+-3 6
+fi=(398)
+2427 4
+0 2
+fi=(254)
+923 2
+fi=(398)
+2432 2
++5 4
+fi=(254)
+-92 6
+fi=(405)
+106 14
++20 6
+fi=(228)
+1076 6
+fi=(299)
+863 4
+fi=(291)
+2053 6
+fi=(398)
+2435 4
+fi=(273)
+580 2
+fi=(405)
+132 2
+fi=(273)
+580 4
+0 2
+fi=(254)
+923 2
+fi=(366)
+38 4
+fi=(273)
++63 2
+fi=(225)
+547 4
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=544 255 
+* 43
+fi=(291)
+137 2
+fi=(405)
++6 2
+0 2
+159 6
++1 4
+0 2
+163 14
++1 4
+-1 2
+fi=(398)
+2444 6
+fi=(402)
+67 4
+fi=(398)
+1861 6
++6 8
+2449 2
++2 10
+fi=(370)
+189 4
++1 4
+-1 2
++1 6
+fi=(398)
+2451 2
+0 4
+fi=(371)
+108 4
++1 4
++3 6
+fi=(370)
++80 10
+fi=(371)
+0 4
+fe=(401)
+79 16
+
+fl=(244)
+fn=(1690)
+659 21
+fi=(254)
+769 7
+fi=(300)
+457 7
+0 21
+fe=(244)
+521 14
+fi=(228)
+1037 14
+fe=(244)
+159 28
+fi=(228)
+1037 14
+fe=(244)
+527 35
+cfn=(1256)
+calls=14 +15 
+* 4704
+fi=(237)
+2173 14
++1 7
+fe=(244)
+774 7
++1 7
+669 28
+
+fn=(1256)
+542 1323
+fi=(254)
+3051 1176
+fi=(300)
+457 441
+0 147
+fe=(244)
+632 294
+fi=(304)
+135 6
+fi=(236)
+-82 6
+fi=(304)
+186 282
+-91 141
+fi=(236)
+-82 141
++41 18
+cob=(2)
+cfi=(155)
+cfn=(704)
+calls=12 3380 
+* 4365
+fe=(244)
+562 12
++1 588
+fi=(236)
+14 282
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=282 3283 
+* 15876
+fe=(244)
+562 282
+0 294
+566 1176
+-24 639
+fi=(254)
+3051 568
+fi=(300)
+457 213
+0 71
+fe=(244)
+632 142
+fi=(304)
+186 142
+-91 71
+fi=(236)
+-82 71
+fe=(244)
+563 284
+fi=(236)
+14 142
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=380 3283 
+* 4636
+fe=(244)
+562 142
+0 142
+566 568
+-24 36
+fi=(254)
+3051 32
+fi=(300)
+457 12
+0 4
+fe=(244)
+632 8
+fi=(304)
+186 8
+-91 4
+fi=(236)
+-82 4
+fe=(244)
+563 16
+fi=(236)
+14 8
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=678 3283 
+* 953
+fe=(244)
+562 8
+0 8
+566 32
+
+fn=(1418)
+717 288
+617 72
+fi=(254)
+2494 144
+fe=(244)
+765 72
+-42 72
+fi=(254)
++46 70
+fi=(300)
+457 70
+fe=(244)
+734 2
+0 420
+798 420
+cfn=(1256)
+calls=140 542 
+* 5521
+fi=(237)
+2173 140
++1 70
+fe=(244)
+774 70
++1 140
+0 280
+734 70
+-17 68
+617 17
+fi=(254)
+2494 34
+fe=(244)
+765 17
+-42 17
+fi=(254)
++46 4
+fi=(300)
+457 4
+fe=(244)
+734 13
+0 24
+798 24
+cfn=(1256)
+calls=12 542 
+* 714
+fi=(237)
+2173 8
++1 4
+fe=(244)
+774 4
++1 8
+0 16
+734 4
+
+fn=(1850)
+542 2072
+fi=(347) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/alloc/layout.rs
+75 259
++38 259
+0 259
+fe=(244)
+632 518
+fi=(304)
+186 518
+fi=(236)
+14 518
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=1957 3283 
+* 37801
+fe=(244)
+562 518
++1 777
+0 518
+566 1554
+
+fl=(419)
+fn=(4038)
+66 11
+fi=(294)
+-7 2
+fi=(279)
+555 2
+fi=(254)
+2457 1
+fi=(249)
+902 1
+fi=(321)
+363 6
+fi=(303)
+980 2
+fi=(245)
+464 3
+fe=(419)
+-32 16
++1 8
+
+fl=(353)
+fn=(1992)
+174 5
+fi=(251)
+1720 1
+fi=(274)
+180 1
+0 3
+fe=(353)
+177 34
+fi=(251)
+1720 34
+fi=(274)
+180 17
+0 17
+fe=(353)
+176 17
++1 115
+0 3
+192 2
+-1 7
+fi=(253)
+0 1
+fe=(353)
+196 3
++6 4
+
+fl=(351)
+fn=(4080)
+4398 10
+fi=(273)
+219 4
+fi=(244)
+612 2
+fi=(273)
+221 2
+fi=(380)
+3837 2
+fe=(351)
+4402 2
+-2 6
+0 4
+4405 8
+
+fn=(2812) soapberry_zip::office::lookup_member_name
+5658 1320
+fi=(251)
+1720 264
+fi=(274)
+180 264
+0 528
+fe=(351)
+0 4472
+fi=(251)
+1720 4472
+fi=(274)
+180 4472
+fi=(392)
+-98 4472
+fe=(351)
+5644 30264
+0 260
+fi=(254)
+923 1040
+fi=(273)
+89 520
+fe=(351)
+5629 1040
+0 260
+5629 520
+fi=(273)
+568 528
+fe=(351)
+5629 792
++26 264
+-26 1056
+0 264
+5663 1056
++16 1056
+
+fn=(2920)
+4384 2178
++1 594
+cfn=(2812)
+calls=656 5658 
+* 44388
+fi=(237)
+2173 198
+0 198
+2173 594
++1 198
+fe=(351)
+4386 396
+fi=(296)
+1309 396
+258 990
+cfi=(297)
+cfn=(1166)
+calls=656 694 
+* 42546
+fi=(301)
+48 594
+fi=(303)
+2492 1584
+0 198
+fi=(225)
+547 198
+fi=(302)
+1563 594
+fi=(307)
+50 396
+-50 1584
+fi=(306)
+641 198
+fi=(303)
+2073 396
+fi=(231)
+1072 594
+fi=(260)
+20 396
+fi=(303)
+1236 396
+fi=(260)
+154 396
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=528 -81 
+* 3816
+* 198
+fi=(300)
+434 198
+fi=(257)
+2126 396
+fi=(273)
+219 396
+fi=(244)
+612 198
+fi=(273)
+221 198
+fi=(380)
+3837 198
+fe=(351)
+4402 198
+-2 792
+0 396
+fi=(225)
+805 594
+fe=(351)
+4395 1584
+
+fn=(2810)
+4373 594
++1 66
+cfn=(2812)
+calls=264 5658 
+* 14796
+* 66
+0 132
+4374 132
++3 132
+fi=(296)
+1309 132
+0 66
+258 330
+cfi=(297)
+cfn=(1166)
+calls=264 694 
+* 14182
+* 66
+fi=(301)
+48 132
+fi=(303)
+2492 594
+0 66
+fi=(225)
+547 66
+fi=(302)
+1563 198
+fi=(307)
+50 132
+-50 396
+fi=(306)
+641 66
+fi=(303)
+2073 132
+fi=(231)
+1072 132
+fi=(260)
+20 132
+fi=(303)
+1236 66
+fi=(260)
+154 198
+cob=(2)
+cfi=(290)
+cfn=(1086)
+calls=264 -81 
+* 1272
+* 66
+fi=(300)
+434 66
+fi=(257)
+2126 132
+fi=(225)
+805 198
+fe=(351)
+4381 594
+
+fn=(4154)
+4845 2
+1620 2
+fi=(352)
+19 8
+fe=(351)
+1654 1
+cfn=(2964) soapberry_zip::office::IndexedReadSession<R>::read_entry_with_accounting
+calls=2 +4 
+* 52206
+fi=(225)
+805 5
+fi=(234)
+3942 1
+fi=(382)
+2811 1
++43 2
+cfn=(2498)
+calls=2 2109 
+* 79
+fi=(238)
+1920 2
+fi=(225)
+805 1
+fi=(236)
+48 1
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+* 151
+fi=(225)
+805 2
+cfi=(370)
+cfn=(3198)
+calls=2 218 
+* 221
+fe=(351)
+4848 3
+
+fn=(2964)
+1658 9
++5 2
+fi=(273)
+219 2
+0 1
+fi=(244)
+612 1
+fi=(273)
+221 2
+fi=(380)
+1724 2
+fi=(388)
+1274 1
+fi=(380)
+3843 1
+fe=(351)
+5400 3
+0 1
+5403 4
+fi=(244)
+612 1
+fi=(245)
+1815 2
+fi=(291)
+2975 2
+0 1
+2975 2
+0 4
+2985 2
++1 1
+fi=(273)
+253 1
+fe=(351)
+5371 1
+fi=(446)
+876 1
+fi=(291)
+3006 1
+-22 2
+0 6
+2985 12
++1 6
+fi=(273)
+253 6
+fe=(351)
+5371 6
+fi=(446)
+876 6
+fi=(291)
+3006 6
+-22 12
+fi=(273)
+253 1
+fe=(351)
+5371 1
+fi=(291)
+3016 3
+0 1
+fi=(273)
+219 4
+fi=(257)
+1276 1
+fi=(273)
+219 1
+fi=(257)
+1276 1
+0 1
+fi=(228)
+1076 2
+fi=(254)
+2301 11
+fi=(228)
+1076 4
+fi=(254)
+2345 3
+fi=(375)
+873 2
+fe=(351)
+5449 1
+fi=(244)
+765 3
+-42 1
+0 2
+fi=(385)
+99 6
+fi=(254)
+769 2
+fi=(300)
+457 1
+0 1
+fi=(273)
+101 2
+fi=(385)
++7 2
+cfi=(348)
+cfn=(2572)
+calls=6 3644 
+* 247
+fi=(237)
+2173 2
+0 2
+fi=(385)
+11 2
+111 2
+fi=(254)
+769 1
+fi=(300)
+457 1
+fe=(351)
+5459 2
+fi=(236)
+14 2
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=6 3283 
+* 30
+fi=(238)
+248 3
+fe=(351)
+0 1
+fi=(245)
+1773 2
+fi=(238)
+289 8
+fi=(244)
+632 1
+0 1
+798 6
+cfn=(1256)
+calls=6 542 
+* 75
+fi=(237)
+2173 2
+0 2
+fe=(351)
+1669 1
++3 6
+fi=(380)
+2098 3
++1 7
+cfi=(385)
+cfn=(3000)
+calls=6 47 
+* 73
+fi=(237)
++74 2
+fi=(387)
+8 1
+fi=(380)
+3898 2
+0 2
+fi=(387)
+8 1
++5 4
+fi=(380)
+3905 1
+fi=(237)
+2174 2
+fi=(380)
+-69 5
+fi=(254)
+2829 2
+fi=(380)
+3909 1
+fi=(254)
+2829 6
+fi=(380)
+2112 4
+fe=(351)
+1800 8
+0 1
+fi=(380)
+2116 8
++27 1
+0 1
+fi=(254)
+2829 4
+fi=(380)
+2149 2
+fi=(257)
+636 2
+fi=(380)
+2153 7
+fe=(351)
+1673 1
+fi=(254)
+769 2
+fi=(300)
+457 1
+fi=(245)
++7 4
+fi=(244)
+798 6
+cfn=(1256)
+calls=6 542 
+* 75
+fi=(237)
+2173 2
+fi=(236)
+0 1
+fi=(237)
+2174 1
+fi=(244)
+774 2
++1 1
+fi=(257)
+-30 2
+0 1
+fe=(351)
+1474 5
++3 4
+0 2
+1477 1
+0 1
+1723 7
+0 1
+fi=(257)
+767 3
+0 1
+2262 2
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(380)
+2202 7
+fi=(352)
+300 11
+fe=(351)
+1753 1
+cfi=(395)
+cfn=(3022)
+calls=6 170 
+* 48733
+0 1
+1753 2
+cfi=(257)
+cfn=(3044)
+calls=6 -31 
+* 79
+* 1
+fi=(237)
+2174 1
+fi=(246)
+772 1
+fi=(225)
+1917 3
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=6 198 
+* 36
+* 3
+fe=(351)
+1758 3
+fi=(257)
+2262 2
+fi=(234)
+3923 1
+fi=(382)
+2405 1
+fi=(380)
+2236 3
+fi=(359)
+1243 20
+fi=(244)
+617 1
+fi=(245)
+2997 2
+fi=(359)
+444 5
+fi=(245)
+0 5
+fi=(244)
+617 1
+fi=(359)
+455 6
+fi=(245)
+0 1
+fi=(244)
+617 1
+fi=(359)
+455 6
+fi=(244)
+612 4
+fi=(359)
+467 4
+0 2
+fi=(245)
+3202 2
+fi=(228)
+1076 6
+fi=(359)
+3093 6
+0 10
+fi=(400) /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/io/borrowed_buf.rs
+230 4
+fi=(359)
+3097 4
+fi=(273)
+429 6
+101 2
+fi=(225)
+709 6
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=12 198 
+* 52
+fi=(273)
+101 2
+fi=(359)
+1058 6
+cfi=(380)
+cfn=(3050)
+calls=12 2453 
+* 2183
+0 2
+fi=(237)
+2173 4
+fi=(400)
+277 4
++2 4
+fi=(359)
+3134 10
+0 6
+484 4
+0 2
+498 4
+fi=(245)
+2168 2
+fi=(359)
+505 6
+0 2
+509 6
++17 3
+-32 1
++32 2
+-17 4
++23 1
+fe=(351)
+0 7
+fi=(225)
+805 3
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+fe=(351)
+1764 1
++3 1
+-21 6
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(352)
+214 4
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(352)
+214 1
+fi=(237)
+1493 5
+fi=(254)
+769 1
+fi=(300)
+457 1
+fi=(352)
+214 1
+fe=(351)
+1779 2
+fi=(245)
+0 1
+fe=(351)
+1792 2
++7 5
+fi=(225)
+805 2
+fi=(234)
+3942 1
+fi=(382)
+2811 1
+0 1
+fi=(257)
+745 3
+fe=(351)
+1800 4
+
+ob=(3)
+fl=(152)
+fn=(710)
+0 10
+cob=(2)
+cfi=(203)
+cfn=(712)
+calls=187 255 
+0 1549
+
+fn=(782)
+0 6
+cob=(2)
+cfi=(219)
+cfn=(784)
+calls=279 198 
+0 131153
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 2172678
+
+totals: 2172678

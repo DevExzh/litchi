@@ -1,0 +1,27 @@
+[package]
+name = "opc-preservation-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "opc-preservation-probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../../../../crates/soapberry-zip" }
+
+# This is an independent diagnostic project. It names only the public OPC and
+# ZIP owners and introduces no production dependency or runtime feature.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+panic = "unwind"

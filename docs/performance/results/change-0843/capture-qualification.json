@@ -1,0 +1,50 @@
+{
+  "plan": {
+    "bytes": 9918,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/plan.json",
+    "sha256": "90a7ef227f9a13163c0208e67cdf621dfca3282bb56b974f91f2c4e57869cd41"
+  },
+  "receipts": [
+    {
+      "bytes": 1667,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-0004-publish/receipt.json",
+      "sha256": "e771de41edeb961931ba5f3e8aef8a4f76d1e11348fb6c7340d3d1354ca004ba"
+    },
+    {
+      "bytes": 1681,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-0004-lifecycle/receipt.json",
+      "sha256": "eb1b5454f569c802efb2947839da29b00128e96b6bd3630a878071617f783291"
+    },
+    {
+      "bytes": 1670,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-0064-publish/receipt.json",
+      "sha256": "ca13df3404e9727b1683195a43e70bca48319e2656361ef0f05f3762383f362d"
+    },
+    {
+      "bytes": 1684,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-0064-lifecycle/receipt.json",
+      "sha256": "df5d3503129e9377894cfcf7926cd5b8e9acc7e8a6db6713a6d63f749cb40212"
+    },
+    {
+      "bytes": 1674,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-1024-publish/receipt.json",
+      "sha256": "4d62a132aebf65912dfb83074d07ac74dccd0fa4fd33c90b5652bc022f7a22be"
+    },
+    {
+      "bytes": 1688,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-1024-lifecycle/receipt.json",
+      "sha256": "34dca570935d7365266e7fabfeeb133f14494f5a6ef8c148c45e8cd28a0fb4d2"
+    },
+    {
+      "bytes": 1676,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-4096-publish/receipt.json",
+      "sha256": "add5ff9c69adede7184845c03ec4d7945c56a6f5fb6bb82c2ee4b4a4db753c0b"
+    },
+    {
+      "bytes": 1690,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/qualification-00-4096-lifecycle/receipt.json",
+      "sha256": "0a94cce5c89b1de209b6d99bcceb0e7a94cb3f80fd07ea3ca6a19da104a17463"
+    }
+  ],
+  "status": "pass"
+}

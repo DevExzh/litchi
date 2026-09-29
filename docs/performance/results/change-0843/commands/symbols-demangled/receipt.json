@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "nm",
+    "-S",
+    "--defined-only",
+    "-C",
+    "/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790703033.2499492,
+  "log": {
+    "bytes": 281193,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/symbols-demangled/output.log",
+    "sha256": "4cee59bde24282ce058062c0af175e87a44692c795ee988d90b0702cf54a8512"
+  },
+  "started_unix": 1790703033.2365427
+}

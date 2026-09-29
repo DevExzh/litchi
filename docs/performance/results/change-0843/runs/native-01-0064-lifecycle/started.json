@@ -1,0 +1,42 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/native-01-0064-lifecycle/time.txt",
+    "/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe",
+    "--parts",
+    "64",
+    "--mode",
+    "lifecycle",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/native-01-0064-lifecycle/report.json"
+  ],
+  "binary": {
+    "bytes": 13358984,
+    "path": "/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe",
+    "sha256": "48622b783c980c3e5f5f2e66a112e8ff6f3629428b5c896f110d812d7e366a28"
+  },
+  "build": {
+    "bytes": 419,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/build.json",
+    "sha256": "cfe95a394db66cde91dd51a2ff5844f7e0875d3b8b49e34a4cda1ed1df14cdad"
+  },
+  "lane": "native",
+  "row": {
+    "block": 1,
+    "mode": "lifecycle",
+    "parts": 64,
+    "samples": 30,
+    "warmup": 3
+  },
+  "started_unix": 1790704530.3034458
+}

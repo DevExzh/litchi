@@ -1,0 +1,59 @@
+{
+  "schema": "litchi.opc-preservation-profile-0843.v1",
+  "tool": "opc-preservation-probe-0843",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "part_count": 1024,
+    "member_count": 1026,
+    "payload_bytes": 256,
+    "part_name_pattern": "/custom/p{index:05}.bin",
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 1023,
+    "target_part_name": "/custom/p01023.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 406944,
+    "sha256": "2f41054e75489efe131406707bc3c975d9388a6bb8e53f98b9d34813dd1244d8"
+  },
+  "source_logical": {
+    "bytes": 344512,
+    "sha256": "1ce85ce28d7368829d1ae0e7e27b30345f4acdac5c2d2002c72988ce3eac1ae6"
+  },
+  "expected_output": {
+    "bytes": 406944,
+    "sha256": "cf509e1f695342cbbaef769d973ae68db461bad0112d5d5a82db2074015de84d"
+  },
+  "expected_output_logical": {
+    "bytes": 344512,
+    "sha256": "43ed0bc055b7515d492eaf7e0e540e6c12521eb8875a179d2bfe87187073a1a1"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 77594379,
+      "output": {
+        "bytes": 406944,
+        "sha256": "cf509e1f695342cbbaef769d973ae68db461bad0112d5d5a82db2074015de84d"
+      },
+      "logical": {
+        "bytes": 344512,
+        "sha256": "43ed0bc055b7515d492eaf7e0e540e6c12521eb8875a179d2bfe87187073a1a1"
+      },
+      "member_count": 1026,
+      "hash_witness": {
+        "output_sha256": "cf509e1f695342cbbaef769d973ae68db461bad0112d5d5a82db2074015de84d",
+        "logical_sha256": "43ed0bc055b7515d492eaf7e0e540e6c12521eb8875a179d2bfe87187073a1a1",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ]
+}

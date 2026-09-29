@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0843 — many-Part OPC publication diagnosis
+
+[0843](0843-opc-many-part-publication-profile.md) validates 72 formal reports / 1,464 samples, plus two separate observer preflights. At 4,096 Parts, publish p50 is 3.682305 ms; topology preparation accounts for 59.18–59.34% of guest instructions and 24,603 of 32,826 owner allocations. Part-name insertion alone accounts for 20.39–20.45% Ir. Zero native block-spread flags; no production change or speedup claim. Bounded index construction is the next candidate, with all validation contracts retained. The broad goal remains active.
+
 ## 0842 — restore runtime compression dispatch
 
 [0842](0842-opc-runtime-compression-dispatch.md) adopts explicit flate2 runtime detection with exact archive bytes. In the named generic OPC warm protocol, large read p50 improves 14.46–21.32% and compressible changed-Part publication 33.81–38.36%. Original tiny p99 flags remain visible; a separate 24-process confirmation did not reproduce them. All 192 timing reports / 28,344 samples validate, with 6,931 affected-owner tests passing. Baseline-confirmed iWork gate failures and standalone lock repairs are explicit. No semantic Office, universal-tail or broad-goal completion claim follows.

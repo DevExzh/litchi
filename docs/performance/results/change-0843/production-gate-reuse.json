@@ -1,0 +1,46 @@
+{
+  "basis": "Production source is exactly0842 source-final at03fa423d73. No production edits planned; reuse its owner/workspace/probe-independent boundary evidence. Full workspace iWork exclusions remain.",
+  "closure": {
+    "bytes": 21466,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/closure.json",
+    "sha256": "628614af7d39e8517fccc3b3a2977a654ec544dd32feb3fe00b5d47c7d49442d"
+  },
+  "excluded_iwork": [
+    {
+      "bytes": 1104,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/workspace-gate-limitation.json",
+      "sha256": "ba065239c6c68d934193e81a2b4ea053f56b35ffb34281f158018a64ad471eb0"
+    },
+    {
+      "bytes": 1253,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/workspace-doc-limitation.json",
+      "sha256": "8bbcf3d341d7f2629a4c5b4ae9430405c8a56aaf77808cc984c9cc7dc91124bd"
+    }
+  ],
+  "previous_source": {
+    "bytes": 1202344,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-final.json",
+    "sha256": "21155baccb37beaf510d0a67215d140d3d9dc4020e3681d7bb29757bdf63fd3b"
+  },
+  "quality": {
+    "bytes": 1204369,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/quality-after.json",
+    "sha256": "4acea837ed7a60eb601554753dd91002aed55cb66779d73de08106194d454a64"
+  },
+  "replay": {
+    "bytes": 482,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/production-evidence-replay/receipt.json",
+    "sha256": "c6f277e27b2121f46aa1d2e9716ac7d533462bef9ee44e957d40de7b122d8ea6"
+  },
+  "source": {
+    "bytes": 1202131,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/source.json",
+    "sha256": "9c60f55a8b14e3d05fefaa3261c6156a5636dc837e8c2282a652898a26f893ec"
+  },
+  "status": "pass",
+  "tools": {
+    "bytes": 989,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tool-checks.json",
+    "sha256": "2f72133834377b9c6b75678562024aac2d706fa3489373d74f27cc1f2f12fa2f"
+  }
+}

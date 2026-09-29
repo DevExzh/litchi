@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0843/ancestor_allocation.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790704913.2644093,
+  "log": {
+    "bytes": 37,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/ancestor-allocation/output.log",
+    "sha256": "a66800014363f0a339683382befcb541511264ce80e435f6b98e4bc00a691e59"
+  },
+  "started_unix": 1790704912.9861493
+}

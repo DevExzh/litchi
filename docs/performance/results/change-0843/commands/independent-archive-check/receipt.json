@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0843/archive_check.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790703376.0820854,
+  "log": {
+    "bytes": 55,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/independent-archive-check/output.log",
+    "sha256": "fcae55710044965b0c3a7a805b9535028759cb76bb7e1007f14c8ab47012f98c"
+  },
+  "started_unix": 1790703375.7992258
+}

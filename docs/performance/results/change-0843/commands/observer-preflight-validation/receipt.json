@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0843/observer_check.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790704510.9563062,
+  "log": {
+    "bytes": 49,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/observer-preflight-validation/output.log",
+    "sha256": "ce5476eb9a51c3ec8b5ac310dd94d2fa66351a28e2aec26df53f0a15873a7d45"
+  },
+  "started_unix": 1790704510.8215494
+}

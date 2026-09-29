@@ -1,0 +1,39 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-1024-publish/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-1024-publish/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe",
+    "--parts",
+    "1024",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-1024-publish/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790704563.5987077,
+  "log": {
+    "bytes": 676,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/profiles-00-1024-publish/output.log",
+    "sha256": "49b2c701a0f7961070cbb35ffeba2e9fae321a6c3a11a950dcb2481f8e11687f"
+  },
+  "started_unix": 1790704556.4371614
+}

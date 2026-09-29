@@ -1,0 +1,30 @@
+{
+  "artifact_repair": "Qualification now retains changed artifact.zip and sibling source.zip; original source-only output could not prove changed archive preservation independently.",
+  "failures": [
+    {
+      "exit_code": 101,
+      "label": "probe-clippy",
+      "reason": "Four probe type/ownership errors: replacement argument, output reborrow, moved output, and moved logical identity.",
+      "source": "initial/probe"
+    },
+    {
+      "exit_code": 101,
+      "label": "probe-v2-clippy",
+      "reason": "Two probe Clippy findings: needless Result wrapper and indexed loop.",
+      "source": "preflight-v2/probe"
+    }
+  ],
+  "final_build": {
+    "bytes": 419,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/build.json",
+    "sha256": "cfe95a394db66cde91dd51a2ff5844f7e0875d3b8b49e34a4cda1ed1df14cdad"
+  },
+  "final_builder": {
+    "bytes": 1440,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/build_v3.py",
+    "sha256": "45e419a163b0b3d3082e8c323af0232678e375613c9de6a76f781df43ffde662"
+  },
+  "formal_native_processes": 0,
+  "qualification_processes": 8,
+  "status": "resolved-before-qualification"
+}

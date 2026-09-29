@@ -1,0 +1,22 @@
+
+/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000007d920 <opc_preservation_probe::profile_publish>:
+   7d920:	41 56                	push   %r14
+   7d922:	53                   	push   %rbx
+   7d923:	48 83 ec 18          	sub    $0x18,%rsp
+   7d927:	48 89 cb             	mov    %rcx,%rbx
+   7d92a:	48 89 d1             	mov    %rdx,%rcx
+   7d92d:	49 89 fe             	mov    %rdi,%r14
+   7d930:	48 89 da             	mov    %rbx,%rdx
+   7d933:	e8 88 4b fe ff       	call   624c0 <litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream>
+   7d938:	0f 10 43 08          	movups 0x8(%rbx),%xmm0
+   7d93c:	0f 11 44 24 08       	movups %xmm0,0x8(%rsp)
+   7d941:	48 8d 44 24 08       	lea    0x8(%rsp),%rax
+   7d946:	48 83 c4 18          	add    $0x18,%rsp
+   7d94a:	5b                   	pop    %rbx
+   7d94b:	41 5e                	pop    %r14
+   7d94d:	c3                   	ret

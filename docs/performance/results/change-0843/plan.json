@@ -1,0 +1,567 @@
+{
+  "base": "03fa423d739529ca5dee4b4f9ba8a056d6029062",
+  "cases": [
+    {
+      "mode": "publish",
+      "parts": 4
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 4
+    },
+    {
+      "mode": "publish",
+      "parts": 64
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 64
+    },
+    {
+      "mode": "publish",
+      "parts": 1024
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 1024
+    },
+    {
+      "mode": "publish",
+      "parts": 4096
+    },
+    {
+      "mode": "lifecycle",
+      "parts": 4096
+    }
+  ],
+  "cpu": 12,
+  "disposition": "diagnostic-only-no-production-change",
+  "heap": [
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    }
+  ],
+  "heap_scope": "Allocation events/requested bytes with profile_publish ancestry; no peak-live or latency claim fromHeaptrack.",
+  "limits": [
+    "Synthetic generic OPC many-small-part packages, not semantic Office workflows.",
+    "Warm owned source, serial publication; no filesystem/durability/scaling claim.",
+    "Callgrind guest instructions and native elapsed samples are separate populations; no causal phase time inferred fromIr.",
+    "Publish and lifecycle medians must not be subtracted as phase measurements.",
+    "No unbounded parsed metadata memo or source-validation bypass is authorized."
+  ],
+  "native": [
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 2,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 3,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 4,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    },
+    {
+      "block": 5,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 30,
+      "warmup": 3
+    }
+  ],
+  "profile_options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish"
+  ],
+  "profile_owner": "opc_preservation_probe::profile_publish",
+  "profiles": [
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    }
+  ],
+  "qualification": [
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 4,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 64,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 1024,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "publish",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "mode": "lifecycle",
+      "parts": 4096,
+      "samples": 1,
+      "warmup": 0
+    }
+  ]
+}

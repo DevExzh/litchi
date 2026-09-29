@@ -1,0 +1,21 @@
+{
+  "receipts": [
+    {
+      "bytes": 1640,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/observer-preflight/profiles/receipt.json",
+      "sha256": "ee0b66b4cbd32e3dec67ba9b02047fee591b4ee560361c2af77e93b324fbfdef"
+    },
+    {
+      "bytes": 1365,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/observer-preflight/heap/receipt.json",
+      "sha256": "9c4f4f0dd97592467a145e09117a5fc02c197d71c6cdf7d3c5cc2c6677f7cb1c"
+    }
+  ],
+  "scope": "Compatibility only; excluded from the72formal report/1464sample population.",
+  "script": {
+    "bytes": 1512,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/observer_preflight.py",
+    "sha256": "160ed996fa89db009cbfce711e338d83fd3e4fbe38914888e8cf88c079b380f3"
+  },
+  "status": "pass"
+}

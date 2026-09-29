@@ -1,0 +1,14 @@
+{
+  "probe": {
+    "bytes": 26124,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/probe/Cargo.lock",
+    "sha256": "5d80f451996b455f50d149f0ef8d3433fbf54cd12d351f270df9de6c75ec31f3"
+  },
+  "registry_packages": 108,
+  "root": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/root-Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "status": "pass"
+}

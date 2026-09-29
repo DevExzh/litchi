@@ -1,0 +1,50 @@
+{
+  "plan": {
+    "bytes": 9918,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/plan.json",
+    "sha256": "90a7ef227f9a13163c0208e67cdf621dfca3282bb56b974f91f2c4e57869cd41"
+  },
+  "receipts": [
+    {
+      "bytes": 1369,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-00-0004-publish/receipt.json",
+      "sha256": "23ac747fa67a7da363036247682bfa14bc9f14c315589d09aa45e7de31bb72a0"
+    },
+    {
+      "bytes": 1370,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-00-0064-publish/receipt.json",
+      "sha256": "23ab4383f54824346c6f77e4b9b26125a82c36008ab21fd45690a5c132daaaeb"
+    },
+    {
+      "bytes": 1373,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-00-1024-publish/receipt.json",
+      "sha256": "594ba08e40da9dcc271cb04e00c344c2486875f41a08bf7fb5c106ca7f3b6690"
+    },
+    {
+      "bytes": 1373,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-00-4096-publish/receipt.json",
+      "sha256": "0b4ddfec3c0820236522ff9c97d0a1d6be96c0e568246f3a0674c1ae22c5c8bc"
+    },
+    {
+      "bytes": 1370,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-0004-publish/receipt.json",
+      "sha256": "dcb1ca90ec2bd9a01976e7fd483f18d8455ad8d9d41ddce68eae373b4ab24a82"
+    },
+    {
+      "bytes": 1371,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-0064-publish/receipt.json",
+      "sha256": "b732075636b0e08f6d520da0614381d52d5114bce76595f853cf0db3f85dfe99"
+    },
+    {
+      "bytes": 1371,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-1024-publish/receipt.json",
+      "sha256": "3468ec51f4387efa5a59953f0297bb8d653f51415efaf8a37814e3e0ab8977a0"
+    },
+    {
+      "bytes": 1373,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/heap-01-4096-publish/receipt.json",
+      "sha256": "905b62ae36cb1069df04a7304b9aceb7f0e645058b5e578adcc710522b91dda0"
+    }
+  ],
+  "status": "pass"
+}

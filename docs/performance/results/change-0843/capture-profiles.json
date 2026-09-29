@@ -1,0 +1,50 @@
+{
+  "plan": {
+    "bytes": 9918,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/plan.json",
+    "sha256": "90a7ef227f9a13163c0208e67cdf621dfca3282bb56b974f91f2c4e57869cd41"
+  },
+  "receipts": [
+    {
+      "bytes": 1647,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-0004-publish/receipt.json",
+      "sha256": "3f9b78b9d26ac3111becf5240ead99f2ab877b0a10dc9167a953c7a16ca2aa30"
+    },
+    {
+      "bytes": 1648,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-0064-publish/receipt.json",
+      "sha256": "c8a3b438f51617dcc2a297e5b9b767af5bce37d4ff6c1563b9dcb90db6b1bc9e"
+    },
+    {
+      "bytes": 1650,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-1024-publish/receipt.json",
+      "sha256": "01674ef3dc7fc2f42562e3b81a1aebba5296167f7d3df23216387f51eb60204a"
+    },
+    {
+      "bytes": 1649,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-00-4096-publish/receipt.json",
+      "sha256": "e6a9927776c1ced949c2e002222b2bf56c2aefd975683c38e67a8de42e260a74"
+    },
+    {
+      "bytes": 1647,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-01-0004-publish/receipt.json",
+      "sha256": "b044f79ae710aac2852306b4330ffd73f2e3c43c5ae625d90204da9481262681"
+    },
+    {
+      "bytes": 1648,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-01-0064-publish/receipt.json",
+      "sha256": "3bc1e09fff45871bf9c4c833c717cbf1af64eaec44471ce41f37a38142c9513b"
+    },
+    {
+      "bytes": 1650,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-01-1024-publish/receipt.json",
+      "sha256": "680b5c75ce939c538caea7b3fc029bac5cf79ff6406db0bddeebc0158956fc9a"
+    },
+    {
+      "bytes": 1649,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/runs/profiles-01-4096-publish/receipt.json",
+      "sha256": "fb1013e614452fe2e7b11e6a40e00f8371241e56430890372a1b1a0e8858135e"
+    }
+  ],
+  "status": "pass"
+}

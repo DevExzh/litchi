@@ -1,0 +1,20 @@
+{
+  "removed": [
+    {
+      "files": 1861,
+      "logical_bytes": 728962777,
+      "path": "/home/zhuhe/code/litchi-target-0843"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 118,
+      "path": "/home/zhuhe/code/litchi-fs-0843"
+    }
+  ],
+  "status": "pass",
+  "verified_binary": {
+    "bytes": 13358984,
+    "path": "/home/zhuhe/code/litchi-target-0843/retained/opc-preservation-probe",
+    "sha256": "48622b783c980c3e5f5f2e66a112e8ff6f3629428b5c896f110d812d7e366a28"
+  }
+}

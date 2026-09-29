@@ -1,0 +1,29 @@
+{
+  "checker": {
+    "bytes": 1030,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/archive_check_v2.py",
+    "sha256": "af12742beceb58f0797ca4f86162608b6d2c5908256400efd61e7d9cb83f0b3b"
+  },
+  "original": {
+    "bytes": 5358,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/archive-check.json",
+    "sha256": "b7223f6a62c8d7de7aeb4283567ee50352a168317dc50742c71ae8e3def8c7ae"
+  },
+  "pairs": 8,
+  "status": "pass",
+  "target_stable_fields": [
+    "date_time",
+    "compress_type",
+    "flag_bits",
+    "file_size",
+    "extra",
+    "comment",
+    "create_system",
+    "create_version",
+    "extract_version",
+    "reserved",
+    "volume",
+    "internal_attr",
+    "external_attr"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0842/close_v2.py",
+    "verify"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790703076.8730354,
+  "log": {
+    "bytes": 12,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0843/commands/production-evidence-replay/output.log",
+    "sha256": "b9f05e59bc47f6f743726ade60f8d1e108291a046f2208b29766687ab89c4d4b"
+  },
+  "started_unix": 1790703071.6606078
+}
