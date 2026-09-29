@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/heap-00-shared-1024-publish-after/time.txt",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/heap-00-shared-1024-publish-after/trace",
+    "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe",
+    "--shape",
+    "shared",
+    "--parts",
+    "1024",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/heap-00-shared-1024-publish-after/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710812.1115978,
+  "log": {
+    "bytes": 696,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/heap-00-shared-1024-publish-after/output.log",
+    "sha256": "8446b31c5f8ddf0b2f740ff112e792fa41b5f45acb84077fb84ebc66980da58a"
+  },
+  "started_unix": 1790710811.9044292
+}

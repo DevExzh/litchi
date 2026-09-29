@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/07-deep-unique-4096-after/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/07-deep-unique-4096-after/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe",
+    "--shape",
+    "deep-unique",
+    "--parts",
+    "4096",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/07-deep-unique-4096-after/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790712212.2934082,
+  "log": {
+    "bytes": 907,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/profile-07-deep-unique-4096-after/output.log",
+    "sha256": "9d300e4d956b849e1ba33107c02bb4c7e99e838574d729764353a7a1818b3411"
+  },
+  "started_unix": 1790712184.6984475
+}

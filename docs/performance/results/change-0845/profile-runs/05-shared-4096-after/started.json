@@ -1,0 +1,68 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/05-shared-4096-after/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/05-shared-4096-after/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe",
+    "--shape",
+    "shared",
+    "--parts",
+    "4096",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/05-shared-4096-after/report.json"
+  ],
+  "binary": {
+    "bytes": 13379768,
+    "path": "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe",
+    "sha256": "d709404e830d567a1db3b9cc00cdb759a970197484f8c07b34a276a7876dca3e"
+  },
+  "build": {
+    "bytes": 431,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/build-after.json",
+    "sha256": "0dd9ca759550b57295b89d93f67469d716c6f15d64a162c293de78ba98d25ff3"
+  },
+  "plan": {
+    "bytes": 5782,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-plan.json",
+    "sha256": "6d36d676a834c5622be434a22b9d9843a81b80eeddd9c7a11f8a028c09b11c74"
+  },
+  "qualification": {
+    "bytes": 2350,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/qualification-00-shared-4096-publish-after/report.json",
+    "sha256": "7597815ea183f650a8cb18aca32131c7864a06fa25e9a47c9881b184d719c39b"
+  },
+  "row": {
+    "block": 5,
+    "leg": "after",
+    "mode": "publish",
+    "parts": 4096,
+    "repeat": 1,
+    "samples": 1,
+    "shape": "shared",
+    "warmup": 0
+  },
+  "source": {
+    "bytes": 1201915,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/source-after.json",
+    "sha256": "b92bbaf972afcc43c74d1e07cb53fb167384573d02be3214f86627f1325b07dd"
+  },
+  "started_unix": 1790712127.4268117
+}

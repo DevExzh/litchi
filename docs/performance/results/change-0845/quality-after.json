@@ -1,0 +1,51 @@
+{
+  "excluded": "iWork examples/full-workspace rustdoc retain baseline-confirmed exclusions; workspace lib/tests check and lib Clippy included.",
+  "receipts": [
+    {
+      "bytes": 421,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-fmt/receipt.json",
+      "sha256": "cd3cff7a6a09d583ff47f05e9fc2f742c86dfe9d7376263bcd18380bde8f9ff7"
+    },
+    {
+      "bytes": 514,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-workspace-check/receipt.json",
+      "sha256": "fd44c972b7f627cd39ee5ecbe7d98a8df21cddee079d84c16621193f39177125"
+    },
+    {
+      "bytes": 628,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-owner-check/receipt.json",
+      "sha256": "4b954be7ff03e8402a28b0b932cf86f86ca6b4e0c5c5c62ddc86691bdc6bc527"
+    },
+    {
+      "bytes": 552,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-workspace-clippy/receipt.json",
+      "sha256": "fce41f3502ca07a8e4fb477fea5848a2df8ff85679432fc58933ebb8ef74419b"
+    },
+    {
+      "bytes": 683,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-owner-clippy/receipt.json",
+      "sha256": "d8fa19fc8086f6eb4ab043a01ae1437c28aecd1d1d558ad7f8764cee9b09f696"
+    },
+    {
+      "bytes": 620,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-owner-doc/receipt.json",
+      "sha256": "f54235128ae4c90b054bb86709c8dabe8fa7b8934d0dd742aace026f3c2e3c0a"
+    },
+    {
+      "bytes": 607,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-owner-test/receipt.json",
+      "sha256": "4db9aa333a5ae492be540d4ee3eb462aa20473cc32dcc458d59a905f405862b6"
+    },
+    {
+      "bytes": 442,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-boundaries/receipt.json",
+      "sha256": "323d7d377f2ab59baa4e7c3955cbeb4c277f2e9373331495faf5cb1fd6848143"
+    }
+  ],
+  "source": {
+    "bytes": 1201915,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/source-after.json",
+    "sha256": "b92bbaf972afcc43c74d1e07cb53fb167384573d02be3214f86627f1325b07dd"
+  },
+  "status": "pass"
+}

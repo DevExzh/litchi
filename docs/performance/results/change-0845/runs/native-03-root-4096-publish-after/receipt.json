@@ -1,0 +1,36 @@
+{
+  "artifacts": [
+    {
+      "bytes": 67662,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/native-03-root-4096-publish-after/report.json",
+      "sha256": "ce4b10f51723ebda692365324f1a35e90dcc07d02a8344c3d7a383c750687735"
+    },
+    {
+      "bytes": 1209,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/native-03-root-4096-publish-after/started.json",
+      "sha256": "b29bbbc6b52f2eff7e212a4ccc0d9e8531e2366e6ceb0c5497c34b677e58ace5"
+    },
+    {
+      "bytes": 13,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/runs/native-03-root-4096-publish-after/time.txt",
+      "sha256": "4ff2903b96238a751c2c6ea4f25fe9f35660050423b05a822ab5e6f4957336f2"
+    }
+  ],
+  "command": {
+    "bytes": 953,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/native-03-root-4096-publish-after/receipt.json",
+    "sha256": "412f67c3a44a14cbfc2a4bcfe32ec5e79a2f527d59766e84a572f29443f5fef3"
+  },
+  "exit_code": 0,
+  "finished_unix": 1790710697.8939044,
+  "lane": "native",
+  "row": {
+    "block": 3,
+    "leg": "after",
+    "mode": "publish",
+    "parts": 4096,
+    "samples": 100,
+    "shape": "root",
+    "warmup": 3
+  }
+}

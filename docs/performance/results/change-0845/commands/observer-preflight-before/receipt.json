@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/observer-preflight/before/time.txt",
+    "heaptrack",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/observer-preflight/before/trace",
+    "/home/zhuhe/code/litchi-target-0845/retained/before/opc-preservation-probe",
+    "--shape",
+    "shared",
+    "--parts",
+    "4",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/observer-preflight/before/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790708958.751734,
+  "log": {
+    "bytes": 664,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/observer-preflight-before/output.log",
+    "sha256": "77887e36285cdc89f80397e90765b1a890e6f2693b99aa50583a3526a00dd698"
+  },
+  "started_unix": 1790708958.6164095
+}

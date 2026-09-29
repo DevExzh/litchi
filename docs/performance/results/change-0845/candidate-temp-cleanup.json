@@ -1,0 +1,11 @@
+{
+  "removed_roots": [
+    "/tmp/litchi-0845-candidate",
+    "/tmp/litchi-0845-patchrepo",
+    "/tmp/litchi-0845-patchrepo2",
+    "/tmp/litchi-0845-replay-1906",
+    "/tmp/litchi-0845-format-1907"
+  ],
+  "status": "pass",
+  "verification": "Root independently verified all five agent-reported temporary roots absent."
+}

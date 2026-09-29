@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "valgrind",
+    "--version"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790709566.804523,
+  "log": {
+    "bytes": 16,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/host-valgrind/output.log",
+    "sha256": "1addda0552a762aeb4f66ce400cabfbf1e6f144f8070c1e3abf0561c685b1767"
+  },
+  "started_unix": 1790709566.803282
+}

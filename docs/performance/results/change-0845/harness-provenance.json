@@ -1,0 +1,90 @@
+{
+  "files": [
+    {
+      "current": {
+        "bytes": 62994,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader.py",
+        "sha256": "bf8b4c65775ef49130815e90b20b29110c00535fff43d356a8344f6b1ac882cf"
+      },
+      "previous": {
+        "bytes": 62994,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/reader.py",
+        "sha256": "bf8b4c65775ef49130815e90b20b29110c00535fff43d356a8344f6b1ac882cf"
+      }
+    },
+    {
+      "current": {
+        "bytes": 18589,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader_tests.py",
+        "sha256": "8150886f0f5d516247951461e15cafdf60e2a524ddbb92176c9e18c03b6851ac"
+      },
+      "previous": {
+        "bytes": 18589,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/reader_tests.py",
+        "sha256": "8150886f0f5d516247951461e15cafdf60e2a524ddbb92176c9e18c03b6851ac"
+      }
+    },
+    {
+      "current": {
+        "bytes": 32471,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/heap_reader.py",
+        "sha256": "e8fd8029501d64920125f21930a5fd9657d6a9aa3e06a848dfc7e34ddea884c1"
+      },
+      "previous": {
+        "bytes": 32471,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/heap_reader.py",
+        "sha256": "e8fd8029501d64920125f21930a5fd9657d6a9aa3e06a848dfc7e34ddea884c1"
+      }
+    },
+    {
+      "current": {
+        "bytes": 9765,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/heap_reader_tests.py",
+        "sha256": "c048199dca4db7e1bb80b0e17ba7e61f08c08b7c5e639ad73d719e08723a6046"
+      },
+      "previous": {
+        "bytes": 9765,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/heap_reader_tests.py",
+        "sha256": "c048199dca4db7e1bb80b0e17ba7e61f08c08b7c5e639ad73d719e08723a6046"
+      }
+    },
+    {
+      "current": {
+        "bytes": 26124,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/probe/Cargo.lock",
+        "sha256": "5d80f451996b455f50d149f0ef8d3433fbf54cd12d351f270df9de6c75ec31f3"
+      },
+      "previous": {
+        "bytes": 26124,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/probe/Cargo.lock",
+        "sha256": "5d80f451996b455f50d149f0ef8d3433fbf54cd12d351f270df9de6c75ec31f3"
+      }
+    },
+    {
+      "current": {
+        "bytes": 630,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/probe/Cargo.toml",
+        "sha256": "1bdeb5c810af581735868924055f4cd12f574ad78662cc5de78a068cbc6d2f05"
+      },
+      "previous": {
+        "bytes": 630,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/probe/Cargo.toml",
+        "sha256": "1bdeb5c810af581735868924055f4cd12f574ad78662cc5de78a068cbc6d2f05"
+      }
+    },
+    {
+      "current": {
+        "bytes": 36110,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/probe/src/main.rs",
+        "sha256": "37832b88b78bd27d8d3be27ba72c8fab5d375c11a860d988447d69c5c71406e8"
+      },
+      "previous": {
+        "bytes": 36110,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0844/probe/src/main.rs",
+        "sha256": "37832b88b78bd27d8d3be27ba72c8fab5d375c11a860d988447d69c5c71406e8"
+      }
+    }
+  ],
+  "note": "Probe and independent readers remain byte-identical to0844; report schema deliberately remains0844. Drivers/reducers are new0845, retaining all validations and compacting only derived result storage.",
+  "status": "pass"
+}

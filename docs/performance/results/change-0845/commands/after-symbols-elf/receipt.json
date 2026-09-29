@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "readelf",
+    "-n",
+    "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710321.5205476,
+  "log": {
+    "bytes": 407,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-symbols-elf/output.log",
+    "sha256": "0ba1cf8b872165390f0786092becc36bae138053995a60ad7c265eec2d74ba7d"
+  },
+  "started_unix": 1790710321.519561
+}

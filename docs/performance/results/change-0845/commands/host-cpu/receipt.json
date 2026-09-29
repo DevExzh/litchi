@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "lscpu"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790709566.799711,
+  "log": {
+    "bytes": 3349,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/host-cpu/output.log",
+    "sha256": "4d826275478731a864dde306239b23da7bdd12bf7e86a1a98fc96cfe032cbed2"
+  },
+  "started_unix": 1790709566.7935832
+}

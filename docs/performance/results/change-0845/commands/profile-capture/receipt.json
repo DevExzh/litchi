@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile.py",
+    "capture"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790710888.4632118,
+  "log": {
+    "bytes": 1755,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/profile-capture/output.log",
+    "sha256": "c6945e2247cbd7eaf64d534469a02199353917fd38385c9fc478c3fe01edb31b"
+  },
+  "started_unix": 1790710826.5310154
+}

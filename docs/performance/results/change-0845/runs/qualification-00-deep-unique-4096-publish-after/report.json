@@ -1,0 +1,71 @@
+{
+  "schema": "litchi.opc-preservation-profile-0844.v1",
+  "tool": "opc-preservation-probe-0844",
+  "shape": "deep-unique",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "shape": "deep-unique",
+    "part_count": 4096,
+    "member_count": 4098,
+    "payload_bytes": 256,
+    "part_name_pattern": "/u{index:05}/b/c/d/e/f/g/h/p{index:05}.bin",
+    "depth": 9,
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 4095,
+    "target_part_name": "/u04095/b/c/d/e/f/g/h/p04095.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 1752152,
+    "sha256": "61a03c8934faee0d7e7991b93c45f64ef0143dd8d872a84e6ee09e9f1c9ab2c9"
+  },
+  "source_logical": {
+    "bytes": 1434048,
+    "sha256": "b331f7e5786289ee56db9da57f06d5f5ade6e1ce1e2f0b202954f48e5a3026cd"
+  },
+  "expected_output": {
+    "bytes": 1752152,
+    "sha256": "a8b5e15081a5a7492852881449cb42e4e6f49d4d93f00bb13025f5977552816f"
+  },
+  "expected_output_logical": {
+    "bytes": 1434048,
+    "sha256": "b637bbffe105872780eddbe38dcefb934d91e46114caf1d1c4cefb582e8e216b"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 6996339,
+      "output": {
+        "bytes": 1752152,
+        "sha256": "a8b5e15081a5a7492852881449cb42e4e6f49d4d93f00bb13025f5977552816f"
+      },
+      "logical": {
+        "bytes": 1434048,
+        "sha256": "b637bbffe105872780eddbe38dcefb934d91e46114caf1d1c4cefb582e8e216b"
+      },
+      "member_count": 4098,
+      "hash_witness": {
+        "output_sha256": "a8b5e15081a5a7492852881449cb42e4e6f49d4d93f00bb13025f5977552816f",
+        "logical_sha256": "b637bbffe105872780eddbe38dcefb934d91e46114caf1d1c4cefb582e8e216b",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ],
+  "artifact": {
+    "bytes": 1752152,
+    "sha256": "a8b5e15081a5a7492852881449cb42e4e6f49d4d93f00bb13025f5977552816f"
+  },
+  "artifact_role": "changed-output-archive",
+  "source_artifact": {
+    "bytes": 1752152,
+    "sha256": "61a03c8934faee0d7e7991b93c45f64ef0143dd8d872a84e6ee09e9f1c9ab2c9"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/04-shared-0064-after/time.txt",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/04-shared-0064-after/profile.callgrind",
+    "/home/zhuhe/code/litchi-target-0845/retained/after/opc-preservation-probe",
+    "--shape",
+    "shared",
+    "--parts",
+    "64",
+    "--mode",
+    "publish",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/04-shared-0064-after/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790712099.3178828,
+  "log": {
+    "bytes": 697,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/profile-04-shared-0064-after/output.log",
+    "sha256": "630e760ff75bd7d31dd67143e06a05c643b86a3907291e14c2416f5c017aa553"
+  },
+  "started_unix": 1790712098.4809196
+}

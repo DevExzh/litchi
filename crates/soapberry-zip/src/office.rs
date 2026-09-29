@@ -4443,6 +4443,16 @@ where
         }
     }
 
+    /// Iterate central-directory IDs and normalized non-directory names in
+    /// physical local-header order.
+    #[doc(hidden)]
+    pub fn file_entries(&self) -> impl ExactSizeIterator<Item = (EntryId, &str)> + '_ {
+        self.order.iter().map(|&entry_id| {
+            let name = self.entries[entry_id.0].name.as_str();
+            (entry_id, name)
+        })
+    }
+
     /// Whether an indexed file uses ZIP Store compression.
     pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
         let lookup = lookup_member_name(name)?;
@@ -12673,6 +12683,63 @@ mod tests {
                 b"folder/".to_vec(),
                 b"first.bin".to_vec(),
             ]
+        );
+    }
+
+    #[test]
+    fn indexed_archive_file_entries_pair_ids_names_and_metadata_in_physical_order() {
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"folder/", b""),
+            FixtureEntry::stored(b"dir/../second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let first_len = central_record_len(&bytes, central);
+        let second_len = central_record_len(&bytes, central + first_len);
+        let first = bytes[central..central + first_len].to_vec();
+        let second = bytes[central + first_len..central + first_len + second_len].to_vec();
+        let third = bytes[central + first_len + second_len..eocd].to_vec();
+        bytes[central..eocd].copy_from_slice(&[third, second, first].concat());
+
+        let indexed = indexed_archive(bytes);
+        let mut entries = indexed.file_entries();
+        assert_eq!(entries.len(), 2);
+
+        let first_entry = entries.next().unwrap();
+        assert_eq!(first_entry, (EntryId(1), "first.bin"));
+        assert_eq!(entries.len(), 1);
+        let second_entry = entries.next().unwrap();
+        assert_eq!(second_entry, (EntryId(0), "second.bin"));
+        assert_eq!(entries.next(), None);
+        assert_eq!(entries.len(), 0);
+
+        for (entry_id, name) in [first_entry, second_entry] {
+            assert_eq!(indexed.entry_id(name), Some(entry_id));
+            assert_eq!(
+                indexed.metadata(name).unwrap(),
+                indexed.metadata_for(entry_id).unwrap()
+            );
+        }
+        assert!(indexed.metadata("folder/").unwrap().is_directory());
+        assert_eq!(
+            indexed
+                .metadata_for(first_entry.0)
+                .unwrap()
+                .uncompressed_size(),
+            5
+        );
+        assert_eq!(
+            indexed
+                .metadata_for(second_entry.0)
+                .unwrap()
+                .uncompressed_size(),
+            6
+        );
+        assert_eq!(
+            indexed.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
         );
     }
 

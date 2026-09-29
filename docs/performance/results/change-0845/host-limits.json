@@ -1,0 +1,11 @@
+{
+  "affinity_cpu": 12,
+  "allocator": "Rust system/default; no production allocator instrumentation",
+  "files": {
+    "/sys/devices/system/cpu/cpu12/cpufreq/scaling_governor": null,
+    "/sys/fs/cgroup/cpu.max": null,
+    "/sys/fs/cgroup/cpuset.cpus.effective": "0-31",
+    "/sys/fs/cgroup/memory.max": null,
+    "/sys/fs/cgroup/memory.swap.max": null
+  }
+}

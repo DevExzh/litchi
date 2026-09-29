@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/capture.py",
+    "heap"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710826.5275164,
+  "log": {
+    "bytes": 5376,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/heap-capture/output.log",
+    "sha256": "0cce2c4a6873ab4ca6b533674fdd6845a15df991d456f398a1974c139af5a2d9"
+  },
+  "started_unix": 1790710810.9908667
+}

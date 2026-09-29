@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "df",
+    "-T",
+    "."
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790709566.79032,
+  "log": {
+    "bytes": 127,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/host-storage/output.log",
+    "sha256": "54782e7bc7ea1784ea059b7e57f540de5e9ef05fbce12329f76f3dc2a2d3e08d"
+  },
+  "started_unix": 1790709566.7891526
+}

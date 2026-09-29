@@ -1,0 +1,62 @@
+{
+  "schema": "litchi.opc-preservation-profile-0844.v1",
+  "tool": "opc-preservation-probe-0844",
+  "shape": "deep-unique",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "shape": "deep-unique",
+    "part_count": 1024,
+    "member_count": 1026,
+    "payload_bytes": 256,
+    "part_name_pattern": "/u{index:05}/b/c/d/e/f/g/h/p{index:05}.bin",
+    "depth": 9,
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 1023,
+    "target_part_name": "/u01023/b/c/d/e/f/g/h/p01023.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 438566,
+    "sha256": "d705bc0ca296ab4714e654aa8b97b4f71d262a2e43101082cdf53962f4a7ea84"
+  },
+  "source_logical": {
+    "bytes": 358848,
+    "sha256": "58a8834bf2b6aff7a7173768ae76d03b4960328d9526f59e048af1484ef5e907"
+  },
+  "expected_output": {
+    "bytes": 438566,
+    "sha256": "4e8db30f692b6e3c56a608597aa9d21788e00a8634fd3138c12d4341a2602ced"
+  },
+  "expected_output_logical": {
+    "bytes": 358848,
+    "sha256": "d0a03f3e10c0b97a42e7d2cc38c29d267ec3c7f87b39ab45ddae950e518bcf3d"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 7404091,
+      "output": {
+        "bytes": 438566,
+        "sha256": "4e8db30f692b6e3c56a608597aa9d21788e00a8634fd3138c12d4341a2602ced"
+      },
+      "logical": {
+        "bytes": 358848,
+        "sha256": "d0a03f3e10c0b97a42e7d2cc38c29d267ec3c7f87b39ab45ddae950e518bcf3d"
+      },
+      "member_count": 1026,
+      "hash_witness": {
+        "output_sha256": "4e8db30f692b6e3c56a608597aa9d21788e00a8634fd3138c12d4341a2602ced",
+        "logical_sha256": "d0a03f3e10c0b97a42e7d2cc38c29d267ec3c7f87b39ab45ddae950e518bcf3d",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ]
+}

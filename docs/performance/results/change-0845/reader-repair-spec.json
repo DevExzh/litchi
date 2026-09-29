@@ -1,0 +1,15 @@
+{
+  "installed_reference": {
+    "bytes": 30559,
+    "path": "/usr/share/doc/valgrind/html/cl-format.html",
+    "sha256": "055cd83505f8ff5fab097bc2d62a89d6b122fbabb333a2ec4d3ff5ef37ae5a0b"
+  },
+  "official_url": "https://valgrind.org/docs/manual/cl-format.html",
+  "regression_tests": {
+    "bytes": 7001,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader-v2-tests.json",
+    "sha256": "9bf90f17d6df70ed82654e47bc4284da9cf6d9d62e036059db80575306214f13"
+  },
+  "repair": "Recognize fe as a current source-file switch and cfl as the cfi callee-file alias; preserve function-identity and cost conservation assertions.",
+  "status": "reviewed"
+}

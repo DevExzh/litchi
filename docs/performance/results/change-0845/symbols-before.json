@@ -1,0 +1,37 @@
+{
+  "binary": {
+    "bytes": 13383544,
+    "path": "/home/zhuhe/code/litchi-target-0845/retained/before/opc-preservation-probe",
+    "sha256": "dd0357f475f98b1bce72912e6ef605edad253d6532400f1bf646d1cef80fe24e"
+  },
+  "inventory": {
+    "demangled": {
+      "bytes": 281596,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-symbols-demangled/output.log",
+      "sha256": "82b05e8b1edf0b92095470161c8eb7b750412305b15903e0a802673b7634e015"
+    },
+    "elf": {
+      "bytes": 407,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-symbols-elf/output.log",
+      "sha256": "b600352df440cbfc24505cead67461cec435303cd7c0dbbad34fea320d3ff176"
+    },
+    "raw": {
+      "bytes": 353787,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-symbols-raw/output.log",
+      "sha256": "6a9a75b86bf174d290c62a0d9189d87f8c418f46696f1f18ffce8f453d6b2e6b"
+    }
+  },
+  "owner": {
+    "address": 515440,
+    "assembly": {
+      "bytes": 991,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-symbols-owner-code/output.log",
+      "sha256": "5451373f094a128af496b8bea6d4d99dad6068854b072abd8aa8d57611e49cb6"
+    },
+    "kind": "t",
+    "raw_symbol": "_ZN22opc_preservation_probe15profile_publish17h346ff8f726b2c25bE",
+    "size": 46,
+    "symbol": "opc_preservation_probe::profile_publish"
+  },
+  "status": "pass"
+}

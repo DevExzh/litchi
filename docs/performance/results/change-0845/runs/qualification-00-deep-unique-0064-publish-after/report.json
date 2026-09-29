@@ -1,0 +1,71 @@
+{
+  "schema": "litchi.opc-preservation-profile-0844.v1",
+  "tool": "opc-preservation-probe-0844",
+  "shape": "deep-unique",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "shape": "deep-unique",
+    "part_count": 64,
+    "member_count": 66,
+    "payload_bytes": 256,
+    "part_name_pattern": "/u{index:05}/b/c/d/e/f/g/h/p{index:05}.bin",
+    "depth": 9,
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 63,
+    "target_part_name": "/u00063/b/c/d/e/f/g/h/p00063.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 27986,
+    "sha256": "6f19a047e63a7e37d9b504d0be4fc1c3909e465cb23108995d0bb8c5764aaea3"
+  },
+  "source_logical": {
+    "bytes": 22848,
+    "sha256": "91177ec829e381e4ecb18ebf8f6508c4ff887d627468a3d08f4d6c6c189a7af3"
+  },
+  "expected_output": {
+    "bytes": 27986,
+    "sha256": "aff024f7c2287d685f04f2daf2200f20fe471def361b8ce0fc18589116a65989"
+  },
+  "expected_output_logical": {
+    "bytes": 22848,
+    "sha256": "0a0d39b0226a783f8ef34efc32182a46aec0f5abc60b1bfbbd8c027ea6141a90"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 160831,
+      "output": {
+        "bytes": 27986,
+        "sha256": "aff024f7c2287d685f04f2daf2200f20fe471def361b8ce0fc18589116a65989"
+      },
+      "logical": {
+        "bytes": 22848,
+        "sha256": "0a0d39b0226a783f8ef34efc32182a46aec0f5abc60b1bfbbd8c027ea6141a90"
+      },
+      "member_count": 66,
+      "hash_witness": {
+        "output_sha256": "aff024f7c2287d685f04f2daf2200f20fe471def361b8ce0fc18589116a65989",
+        "logical_sha256": "0a0d39b0226a783f8ef34efc32182a46aec0f5abc60b1bfbbd8c027ea6141a90",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ],
+  "artifact": {
+    "bytes": 27986,
+    "sha256": "aff024f7c2287d685f04f2daf2200f20fe471def361b8ce0fc18589116a65989"
+  },
+  "artifact_role": "changed-output-archive",
+  "source_artifact": {
+    "bytes": 27986,
+    "sha256": "6f19a047e63a7e37d9b504d0be4fc1c3909e465cb23108995d0bb8c5764aaea3"
+  }
+}

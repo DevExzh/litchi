@@ -1,0 +1,12 @@
+{
+  "binary": {
+    "bytes": 13383544,
+    "path": "/home/zhuhe/code/litchi-target-0845/retained/before/opc-preservation-probe",
+    "sha256": "dd0357f475f98b1bce72912e6ef605edad253d6532400f1bf646d1cef80fe24e"
+  },
+  "freeze": {
+    "bytes": 1202823,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/freeze-before.json",
+    "sha256": "1f15dfa1d2676b66bf04aa0c2462db13220ca5c8da397963394cf37e0671ee32"
+  }
+}

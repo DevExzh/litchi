@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0845/heap_reader_tests.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790708802.8644927,
+  "log": {
+    "bytes": 1282,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/heap-reader-tests/output.log",
+    "sha256": "5e509704399f85330017c09e3c6f4e52c0bf56a26cdd3efc43da9cbcc6e79a42"
+  },
+  "started_unix": 1790708802.8236434
+}

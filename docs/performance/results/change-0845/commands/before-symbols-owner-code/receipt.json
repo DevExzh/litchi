@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "objdump",
+    "-d",
+    "-C",
+    "--start-address=0x7dd70",
+    "--stop-address=0x7dd9e",
+    "/home/zhuhe/code/litchi-target-0845/retained/before/opc-preservation-probe"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790708953.3884447,
+  "log": {
+    "bytes": 991,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-symbols-owner-code/output.log",
+    "sha256": "5451373f094a128af496b8bea6d4d99dad6068854b072abd8aa8d57611e49cb6"
+  },
+  "started_unix": 1790708953.3856816
+}

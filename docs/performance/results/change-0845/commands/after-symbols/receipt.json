@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/symbols.py",
+    "after"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710321.5391557,
+  "log": {
+    "bytes": 127,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-symbols/output.log",
+    "sha256": "d4de100df2d2aff41b4f99a534131f559d0e839398991000801cd870e6a0cf8c"
+  },
+  "started_unix": 1790710321.461003
+}

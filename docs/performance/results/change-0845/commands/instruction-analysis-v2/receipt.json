@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile_resume.py",
+    "analyze"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790712227.6495216,
+  "log": {
+    "bytes": 48,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/instruction-analysis-v2/output.log",
+    "sha256": "39847dc0b56df9d0682ca15c4a28146230c5daaafe4b2841ee69ccec5371a631"
+  },
+  "started_unix": 1790712225.130983
+}

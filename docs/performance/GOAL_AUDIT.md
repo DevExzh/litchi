@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0845 — retain indexed entry IDs through OPC publication
+
+[0845](0845-opc-indexed-entry-iteration.md) adopts direct entry iteration in two OPC scans. Across four synthetic 4,096-Part shapes, publication p50 improves 7.24–11.17% and lifecycle 2.31–4.18%, with unchanged owner allocation counts/bytes. All 512 main reports / 211,328 samples validate; no frozen latency, tail, RSS, allocation or spread flag fires. The separate instruction population and additive Callgrind reader repair preserve original captures and failure evidence. Candidate quality gates include 6,935 passing affected-owner tests. Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnosis is next; the broader goal remains open.
+
 ## 0844 — avoid repeated OPC ancestor allocations
 
 [0844](0844-opc-missing-ancestor-staging.md) adopts missing-suffix ancestor staging. At 4,096 Parts, shared/deep-shared publication p50 improves 3.13%/8.15%, with 24.95%/59.93% fewer owner allocation events. Deep-unique paths retain approximately 0.7–2.3% p50 costs below the frozen 5% trigger. The main 512 reports / 11,648 samples and separate 72-report / 72,000-sample tail confirmation remain distinct; original six p99 points are retained and confirmation has no review flags. Exact artifact checks and 6,934 affected-owner tests pass. These are synthetic OPC results; mixed-catalog and broader goal work remain open.

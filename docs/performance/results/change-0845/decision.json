@@ -1,0 +1,35 @@
+{
+  "all_flags_reviewed": true,
+  "allocation_flags": 0,
+  "analysis": {
+    "bytes": 63462552,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/analysis.json",
+    "sha256": "87da6566fa096ae9da6ed2a4e41ad704f85b17050e56e1786086bc506d750d16"
+  },
+  "decision": "adopt",
+  "formal_runs_replaced": 0,
+  "material_benefit": true,
+  "next_priority": "Current semantic DOCX/XLSX/PPTX mixed-catalog publication and durability diagnostic.",
+  "profile_analysis_v2": {
+    "bytes": 551641,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-analysis-v2.json",
+    "sha256": "13940ab29118dac194e7dc2d441c88f3dae83473724d401f61ae1c2e0ba80d05"
+  },
+  "profile_resume": {
+    "bytes": 14703,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-resume.json",
+    "sha256": "3e7c3542e4d98f44a3b00d5f75e7f6bbdf7ba5f29272444dd1710e843a149fb4"
+  },
+  "profile_resume_freeze": {
+    "bytes": 33217,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-resume-freeze.json",
+    "sha256": "e3a74211734955aa25b1fb5aaeaaf4c7126aaa5ec4302154c51854ab11fe550f"
+  },
+  "reason": "Direct immutable entry iteration removes repeated normalized-name lookup; all native p50 points improve and 4096-Part publication improves 7.24\u201311.17%, allocations unchanged; guest instruction work decreases in both repeats.",
+  "regression_flags": 0,
+  "scope": "Warm synthetic generic OPC publication/lifecycle; no semantic Office, mixed-catalog, cold-cache or durability claim.",
+  "spread_flags": 0,
+  "status": "complete-batch",
+  "tail_review": 0,
+  "unresolved_common_workload_damage": false
+}

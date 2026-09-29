@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0845/profile_preflight.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710340.3925343,
+  "log": {
+    "bytes": 55,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/profile-binding-preflight/output.log",
+    "sha256": "adc07e4f26a098f6136991c518f4eae663ee002f049d0726e374a5d45f425fd6"
+  },
+  "started_unix": 1790710338.4644794
+}

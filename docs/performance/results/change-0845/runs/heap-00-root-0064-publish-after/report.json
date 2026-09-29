@@ -1,0 +1,62 @@
+{
+  "schema": "litchi.opc-preservation-profile-0844.v1",
+  "tool": "opc-preservation-probe-0844",
+  "shape": "root",
+  "mode": "publish",
+  "timing_description": "SourceBackedPackage::prepare_topology validation and write_topology_to_stream via profile_publish on a prepared source package, replacement plan, and empty output Vec",
+  "generator": {
+    "shape": "root",
+    "part_count": 64,
+    "member_count": 66,
+    "payload_bytes": 256,
+    "part_name_pattern": "/p{index:05}.bin",
+    "depth": 1,
+    "payload_formula": "byte[i] = (part_index * 17 + i * 13) % 251",
+    "target_part_index": 63,
+    "target_part_name": "/p00063.bin",
+    "replacement": "target payload with byte[0] XOR 1",
+    "metadata_members": [
+      "[Content_Types].xml",
+      "_rels/.rels"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 25125,
+    "sha256": "1b9eb07459519708f91993aa19961f1cbf3f11d1d831ff7932acd7c2c3f33c2c"
+  },
+  "source_logical": {
+    "bytes": 21504,
+    "sha256": "5bdad8549a64e17e8f6163877f2e7d3bd8d953eb7932bb010a9c03646b681911"
+  },
+  "expected_output": {
+    "bytes": 25125,
+    "sha256": "b0e480da4e076fde14c6a4b4905982871cab21bfc270ccd9001ec0de030cda9e"
+  },
+  "expected_output_logical": {
+    "bytes": 21504,
+    "sha256": "71824ae5a575dc5fdaf9dd90bd80b69c25976913b42bbd002a09d02a57732d91"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 916983,
+      "output": {
+        "bytes": 25125,
+        "sha256": "b0e480da4e076fde14c6a4b4905982871cab21bfc270ccd9001ec0de030cda9e"
+      },
+      "logical": {
+        "bytes": 21504,
+        "sha256": "71824ae5a575dc5fdaf9dd90bd80b69c25976913b42bbd002a09d02a57732d91"
+      },
+      "member_count": 66,
+      "hash_witness": {
+        "output_sha256": "b0e480da4e076fde14c6a4b4905982871cab21bfc270ccd9001ec0de030cda9e",
+        "logical_sha256": "71824ae5a575dc5fdaf9dd90bd80b69c25976913b42bbd002a09d02a57732d91",
+        "output_exact_expected": true,
+        "logical_exact_expected": true
+      }
+    }
+  ]
+}

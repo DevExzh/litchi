@@ -10968,11 +10968,11 @@ impl SourceBackedPackage {
         let mut archive_total = 0_u64;
         let mut relationship_total = 0_u64;
         let mut relationship_event_total = 0_u64;
-        for (index, name) in self.archive.file_names().enumerate() {
+        for (index, (entry_id, name)) in self.archive.file_entries().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
-            let bytes = self.archive.metadata(name)?.uncompressed_size();
+            let bytes = self.archive.metadata_for(entry_id)?.uncompressed_size();
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
@@ -11586,14 +11586,11 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC physical member lookup",
                 source,
             })?;
-        for (index, name) in self.archive.file_names().enumerate() {
+        for (index, (entry_id, name)) in self.archive.file_entries().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
             let key = folded_ascii_name(name, "source-backed OPC folded physical member name")?;
-            let entry_id = self.archive.entry_id(name).ok_or_else(|| {
-                overlay_unavailable("indexed physical member disappeared during topology lookup")
-            })?;
             if let Some(info) = by_folded_name.get_mut(&key) {
                 info.count = info
                     .count

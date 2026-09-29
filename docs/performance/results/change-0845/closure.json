@@ -1,0 +1,2405 @@
+{
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "after-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-integration-quality"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-observer-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-observer-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-owner-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-owner-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-owner-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-owner-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-release"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-qualification-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-qualification-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-symbols"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-symbols-demangled"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-symbols-elf"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-symbols-owner-code"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-symbols-raw"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-workspace-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-workspace-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "baseline-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-observer-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-observer-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-owner-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-release"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-qualification-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-qualification-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-symbols"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-symbols-demangled"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-symbols-elf"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-symbols-owner-code"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-symbols-raw"
+    },
+    {
+      "exit_code": 0,
+      "label": "both-qualification-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-apply-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-00-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-01-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "heap-reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "host-cpu"
+    },
+    {
+      "exit_code": 0,
+      "label": "host-heaptrack"
+    },
+    {
+      "exit_code": 0,
+      "label": "host-storage"
+    },
+    {
+      "exit_code": 0,
+      "label": "host-valgrind"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-crosscheck"
+    },
+    {
+      "exit_code": 0,
+      "label": "instruction-analysis-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "main-analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-00-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-01-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-02-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-03-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-04-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-05-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "native-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "observer-preflight-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "observer-preflight-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-00-shared-0064-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-00-shared-0064-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-01-shared-4096-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-01-shared-4096-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-02-deep-unique-0064-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-02-deep-unique-0064-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-03-deep-unique-4096-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-03-deep-unique-4096-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-04-shared-0064-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-04-shared-0064-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-05-shared-4096-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-05-shared-4096-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-06-deep-unique-0064-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-06-deep-unique-0064-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-07-deep-unique-4096-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-07-deep-unique-4096-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-binding-preflight"
+    },
+    {
+      "exit_code": 1,
+      "label": "profile-capture"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-deep-unique-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-root-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0004-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0004-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0004-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0004-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0064-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0064-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0064-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-0064-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-1024-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-1024-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-1024-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-1024-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-4096-lifecycle-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-4096-lifecycle-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-4096-publish-after"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-00-shared-4096-publish-before"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-v2-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "render-tables"
+    },
+    {
+      "exit_code": 0,
+      "label": "resume-profiles"
+    }
+  ],
+  "controlled_failed_command": "profile-capture",
+  "decision": "adopt",
+  "formal_runs_replaced": 0,
+  "native_or_heap_pooling": false,
+  "profile_analysis_v2": {
+    "bytes": 551641,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-analysis-v2.json",
+    "sha256": "13940ab29118dac194e7dc2d441c88f3dae83473724d401f61ae1c2e0ba80d05"
+  },
+  "profile_resume_freeze": {
+    "bytes": 33217,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-resume-freeze.json",
+    "sha256": "e3a74211734955aa25b1fb5aaeaaf4c7126aaa5ec4302154c51854ab11fe550f"
+  },
+  "profile_resume_manifest": {
+    "bytes": 14703,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-resume.json",
+    "sha256": "3e7c3542e4d98f44a3b00d5f75e7f6bbdf7ba5f29272444dd1710e843a149fb4"
+  },
+  "reader_v2_tests": {
+    "bytes": 7001,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader-v2-tests.json",
+    "sha256": "9bf90f17d6df70ed82654e47bc4284da9cf6d9d62e036059db80575306214f13"
+  },
+  "reports": 512,
+  "samples": 211328,
+  "separate_heap_preflight_reports": 2,
+  "separate_heap_preflight_samples": 2,
+  "separate_instruction_reports": 16,
+  "separate_instruction_samples": 16,
+  "status": "pass",
+  "tests": {
+    "after-owner-test": {
+      "failed": 0,
+      "ignored": 38,
+      "passed": 6935
+    },
+    "after-probe-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 6
+    },
+    "before-owner-test": {
+      "failed": 0,
+      "ignored": 3,
+      "passed": 1653
+    },
+    "before-probe-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 6
+    }
+  }
+}

@@ -1,0 +1,26 @@
+Profile resume pre-resume freeze PASS 4 rows
+profile-02-deep-unique-0064-before 0
+profile-02-deep-unique-0064-before captured
+profile-02-deep-unique-0064-after 0
+profile-02-deep-unique-0064-after captured
+profile-03-deep-unique-4096-after 0
+profile-03-deep-unique-4096-after captured
+profile-03-deep-unique-4096-before 0
+profile-03-deep-unique-4096-before captured
+profile-04-shared-0064-after 0
+profile-04-shared-0064-after captured
+profile-04-shared-0064-before 0
+profile-04-shared-0064-before captured
+profile-05-shared-4096-before 0
+profile-05-shared-4096-before captured
+profile-05-shared-4096-after 0
+profile-05-shared-4096-after captured
+profile-06-deep-unique-0064-after 0
+profile-06-deep-unique-0064-after captured
+profile-06-deep-unique-0064-before 0
+profile-06-deep-unique-0064-before captured
+profile-07-deep-unique-4096-before 0
+profile-07-deep-unique-4096-before captured
+profile-07-deep-unique-4096-after 0
+profile-07-deep-unique-4096-after captured
+Profile resume PASS 16 reports; 16 samples

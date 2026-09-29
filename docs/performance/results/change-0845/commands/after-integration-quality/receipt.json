@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/quality.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790710321.4571455,
+  "log": {
+    "bytes": 158,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-integration-quality/output.log",
+    "sha256": "8a788d7a1ba4f3110e280060a8d8312d6445559aeee7aa6c002da69cb36bbefb"
+  },
+  "started_unix": 1790709280.1401181
+}

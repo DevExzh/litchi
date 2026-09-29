@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/capture.py",
+    "qualification",
+    "before"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790708955.0702603,
+  "log": {
+    "bytes": 3360,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/before-qualification-capture/output.log",
+    "sha256": "b77d18562eeba0e986f4c294d2faecb2f28509ab36c01c1cb52cfc4e1600a715"
+  },
+  "started_unix": 1790708953.3998466
+}

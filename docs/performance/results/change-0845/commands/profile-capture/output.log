@@ -1,0 +1,29 @@
+profile-00-shared-0064-before 0
+profile-00-shared-0064-before captured
+profile-00-shared-0064-after 0
+profile-00-shared-0064-after captured
+profile-01-shared-4096-after 0
+profile-01-shared-4096-after captured
+profile-01-shared-4096-before 0
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile.py", line 787, in <module>
+    capture()
+    ~~~~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/profile.py", line 723, in capture
+    r.validate_profile(out / "profile.callgrind.1", out / "profile.callgrind",
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       owner=PROFILE_OWNER, command=argv)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader.py", line 1273, in validate_profile
+    number = parse_raw(Path(numbered))
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader.py", line 1130, in parse_raw
+    require(not function["file"] or function["file"] == current_file,
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            f"{label}:{line_number}: function source file changed")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader.py", line 75, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0845/reader.py", line 70, in fail
+    raise ReaderError(message)
+reader.ReaderError: /home/zhuhe/code/litchi/docs/performance/results/change-0845/profile-runs/01-shared-4096-before/profile.callgrind.1:16400: function source file changed

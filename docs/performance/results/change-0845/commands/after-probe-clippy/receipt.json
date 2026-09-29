@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0845/probe/Cargo.toml",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790709233.8709645,
+  "log": {
+    "bytes": 328,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0845/commands/after-probe-clippy/output.log",
+    "sha256": "18b8ff139235c8d4fe4d3c2d20c33a35044c3afce9a67b981241f25b5d50ebb4"
+  },
+  "started_unix": 1790709231.4765246
+}

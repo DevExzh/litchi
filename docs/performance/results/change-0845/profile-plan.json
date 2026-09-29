@@ -1,0 +1,253 @@
+{
+  "schema": "litchi.opc-preservation-callgrind-plan-0845.v1",
+  "experiment": "direct-entry-id-iteration",
+  "scope": "Separate Callgrind guest-instruction evidence for the direct EntryId physical-member iteration candidate. These profiles are diagnostic and are never pooled with the native or Heaptrack populations.",
+  "base": "d6619c101f06115e8397d9369d41bed9d045a8ba",
+  "cpu": 12,
+  "mode": "publish",
+  "parts": [
+    64,
+    4096
+  ],
+  "shapes": [
+    "shared",
+    "deep-unique"
+  ],
+  "legs": [
+    "before",
+    "after"
+  ],
+  "repeats": 2,
+  "samples": 1,
+  "warmup": 0,
+  "reports": 16,
+  "formal_samples": 16,
+  "profile_owner": "opc_preservation_probe::profile_publish",
+  "profile_options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=opc_preservation_probe::profile_publish",
+    "--zero-before=opc_preservation_probe::profile_publish",
+    "--dump-after=opc_preservation_probe::profile_publish"
+  ],
+  "main_packet": {
+    "plan": "plan.json",
+    "driver": "driver.py",
+    "qualifier": "qualify.py",
+    "reader": "reader.py",
+    "admission": "admission.json"
+  },
+  "reader_provenance": {
+    "previous_packet": "../change-0844/reader.py",
+    "sha256": "bf8b4c65775ef49130815e90b20b29110c00535fff43d356a8344f6b1ac882cf"
+  },
+  "legs_bindings": {
+    "before": {
+      "source": "source-before.json",
+      "build": "build-before.json"
+    },
+    "after": {
+      "source": "source-after.json",
+      "build": "build-after.json"
+    }
+  },
+  "probe": [
+    "probe/Cargo.lock",
+    "probe/Cargo.toml",
+    "probe/src/main.rs"
+  ],
+  "run_root": "profile-runs",
+  "capture_manifest": "capture-profile.json",
+  "analysis_output": "profile-analysis.json",
+  "order_contract": "Each repeat contains one shared and one deep-unique pair at each part count. Every pair has one before-first and one after-first order across the two repeats.",
+  "rows": [
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 0,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "shared",
+      "warmup": 0
+    },
+    {
+      "block": 6,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 6,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 64,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 7,
+      "leg": "before",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    },
+    {
+      "block": 7,
+      "leg": "after",
+      "mode": "publish",
+      "parts": 4096,
+      "repeat": 1,
+      "samples": 1,
+      "shape": "deep-unique",
+      "warmup": 0
+    }
+  ],
+  "selected_symbols": {
+    "topology_limits": [
+      "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits"
+    ],
+    "physical_lookup": [
+      "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup"
+    ],
+    "metadata": [
+      "soapberry_zip::office::IndexedArchive<R>::metadata",
+      "soapberry_zip::office::IndexedArchive<R>::metadata_for"
+    ],
+    "entry_id": [
+      "soapberry_zip::office::IndexedArchive<R>::entry_id",
+      "soapberry_zip::office::IndexedArchive<R>::file_entries"
+    ],
+    "lookup_member_name": [
+      "soapberry_zip::office::lookup_member_name"
+    ]
+  },
+  "limits": {
+    "owner_exactly_once": true,
+    "owner_inclusive_matches_summary": true,
+    "owner_self_plus_direct_children_equals_summary": true,
+    "all_function_self_ir_equals_summary": true,
+    "termination_dump_summary_ir": 0,
+    "native_or_heap_overlap": false,
+    "cargo_overlap": false
+  }
+}
