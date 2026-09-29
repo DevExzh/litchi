@@ -1,0 +1,22 @@
+{
+  "admission": {
+    "bytes": 4371,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/admission.json",
+    "sha256": "e338ee3b41a78160304c73e1e3815f8ac30c718dcf6be8bf93cec25057f3afaf"
+  },
+  "driver": {
+    "bytes": 1340,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/capture.py",
+    "sha256": "a8d2c0d1ae7fef07ea0745875f60590237c966dcc40fe9a2f8619766cb99f08f"
+  },
+  "freeze": {
+    "bytes": 1206207,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/freeze-baseline.json",
+    "sha256": "55991157d4e70775f2491258c97b194dd2dd066d596845e6bb10d82edb85e6e9"
+  },
+  "plan": {
+    "bytes": 12635,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/measurement-plan.json",
+    "sha256": "34f1da4b65b6f7aac7c218763695d3fa03ab03477a6e390c6233ec8270820d1f"
+  }
+}

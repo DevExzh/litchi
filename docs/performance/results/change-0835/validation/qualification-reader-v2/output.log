@@ -1,0 +1,97 @@
+{
+  "claim_authorized": false,
+  "performance_claim": "none",
+  "qualification_valid": true,
+  "reports": [
+    {
+      "case": "opc_file_eager_open",
+      "index": 0,
+      "outputs": {
+        "opc_file_eager_open": {
+          "cold-verified": null,
+          "warm": null
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-00.json",
+      "report_sha256": "7abcafff69af19ae5eea1a3c0a40a0fb19c830474dbebd1e272f9e71a38779ae"
+    },
+    {
+      "case": "opc_file_source_open",
+      "index": 1,
+      "outputs": {
+        "opc_file_source_open": {
+          "cold-verified": null,
+          "warm": null
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-01.json",
+      "report_sha256": "a39886dd14e9c9687351ddef1743b69f39f44a56a26d26a18f8609960dce011f"
+    },
+    {
+      "case": "opc_file_eager_one_part_atomic_save",
+      "index": 2,
+      "outputs": {
+        "opc_file_eager_one_part_atomic_save": {
+          "cold-verified": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-02.json",
+      "report_sha256": "556e824a452ade75552b7981a984b2a1c996236c396e20fca42313b4e2fef9f1"
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 3,
+      "outputs": {
+        "opc_file_source_one_part_atomic_save": {
+          "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-03.json",
+      "report_sha256": "eca00b129e6baa18a4b42f52d35b8b121a0dfb35f02fc1b60476a603b539bdf2"
+    },
+    {
+      "case": "pptx_file_eager_open_selected_slide_lifecycle",
+      "index": 4,
+      "outputs": {
+        "pptx_file_eager_open_selected_slide_lifecycle": {
+          "cold-verified": null,
+          "warm": null
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-04.json",
+      "report_sha256": "a7a096aa03c6ff36a04091bbe39678987ccb69dea977aa3f20d05ea280659ec7"
+    },
+    {
+      "case": "pptx_file_source_open_selected_slide_lifecycle",
+      "index": 5,
+      "outputs": {
+        "pptx_file_source_open_selected_slide_lifecycle": {
+          "cold-verified": null,
+          "warm": null
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-05.json",
+      "report_sha256": "1bed7294718f679caff0af2ce99966de427fde3350e3524e5b1559cace53a041"
+    },
+    {
+      "case": "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+      "index": 6,
+      "outputs": {
+        "opc_file_eager_one_part_atomic_save": {
+          "cold-verified": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        },
+        "opc_file_source_one_part_atomic_save": {
+          "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+          "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+        }
+      },
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-opc-pair.json",
+      "report_sha256": "654d68f652ae06255148b8f5c58b8bbd4f57f79fd6d699965f450ecb6eb9048d"
+    }
+  ],
+  "status": "pass",
+  "validated_sample_count": 16
+}

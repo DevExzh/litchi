@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "13",
+    "python3",
+    "-B",
+    "docs/performance/results/change-0835/check-first-block.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790650642.2045453,
+  "log": {
+    "bytes": 59,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/validation/first-block-reader/output.log",
+    "sha256": "4289bb710cd44ad392ba7f14910fe7758925e7efb4c883c90cbecbeebb5a810e"
+  },
+  "started_unix": 1790650640.9372334
+}

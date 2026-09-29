@@ -1,0 +1,33 @@
+{
+  "after": {
+    "bytes": 36877,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/reader.py",
+    "sha256": "331422a310c4fbacc93b923b89b9370b60c669abc46a08b53fc93cad503ccf3d"
+  },
+  "before": {
+    "bytes": 36727,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/reader-versions/v1.py",
+    "sha256": "cc48fb345a09fd85e12c4c9b6485f0c15c02fa0824ca7829750d4d22a4f551b9"
+  },
+  "failed_receipt": {
+    "bytes": 638,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/validation/qualification-reader/receipt.json",
+    "sha256": "461a554fc214eb93b385d122773f702c579a6ed6ab8f94c64713270c24775093"
+  },
+  "failure": {
+    "bytes": 286,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-validation.json",
+    "sha256": "53c0885d34cdf87723df3d859f6df46ba34fbd1ed573605a60d05a0cc3acfc05"
+  },
+  "reason": "The combined qualification row contains two cases in both states: 6*2+2*2=16, not 14. No workload rerun or source change.",
+  "successful_receipt": {
+    "bytes": 644,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/validation/qualification-reader-v2/receipt.json",
+    "sha256": "23d9a06bbb7fbb8575d5d6fe200c71ca4c1c41e6690c8afbd24c2fc3309335ec"
+  },
+  "successful_validation": {
+    "bytes": 3736,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0835/qualification-validation-v2.json",
+    "sha256": "81926405690aa218aae3c6fb884dca415c2d2ed14ac3372f6088e41096b25502"
+  }
+}
