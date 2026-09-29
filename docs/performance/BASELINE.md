@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0838 — current-source DOCX inverse physical diagnosis
+
+[0838](0838-docx-durable-inverse-physical-diagnostic.md) reproduces the durable inverse physical limitation with current public writers: all 18 cases restore logical bytes, and retained-source undo is exact, while serialized undo is archive-exact only for the ordinary regenerated control. Three fresh processes retain 63 ZIPs and 18 wires with independent replay and deterministic bytes. Production and exact-artifact tests are unchanged; 0837 remains rejected. No performance claim or new baseline is admitted; physical restoration design remains open.
+
 ## 0837 — ZIP retry fix; fresh compression rejected
 
 [0837](0837-zip-interrupted-write-and-fresh-compression.md) retains six baseline preflight reports / twelve measured operations for prepared OPC publication. The fresh-compression candidate fails the durable DOCX inverse exact-byte gate before any candidate release build or comparative capture; no speedup or new formal baseline is admitted. A separate bounded ZIP Interrupted-write fix is retained.

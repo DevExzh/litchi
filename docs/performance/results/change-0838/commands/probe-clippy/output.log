@@ -1,0 +1,13 @@
+    Checking source-inverse-diagnostic v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0838/probe)
+error: unused import: `Part`
+  --> src/main.rs:24:54
+   |
+24 | use litchi_opc::{OpcPackage, PackURI, PackageWriter, Part};
+   |                                                      ^^^^
+   |
+   = note: `-D unused-imports` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: could not compile `source-inverse-diagnostic` (bin "source-inverse-diagnostic") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `source-inverse-diagnostic` (bin "source-inverse-diagnostic" test) due to 1 previous error

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0838 — current-source DOCX inverse physical diagnosis
+
+[0838](0838-docx-durable-inverse-physical-diagnostic.md) reproduces the durable inverse physical limitation with current public writers: all 18 cases restore logical bytes, and retained-source undo is exact, while serialized undo is archive-exact only for the ordinary regenerated control. Three fresh processes retain 63 ZIPs and 18 wires with independent replay and deterministic bytes. Production and exact-artifact tests are unchanged; 0837 remains rejected. No performance claim or new baseline is admitted; physical restoration design remains open.
+
 ## 0837 — ZIP retry fix; fresh compression rejected
 
 [0837](0837-zip-interrupted-write-and-fresh-compression.md) rejects fresh-only level-5 OPC publication: a source created by the candidate cannot be restored exactly by a serialized DOCX inverse using the opened-package encoder. Independent ZIP readback isolates the difference to the compressed main document. Compression work now needs physical inverse/provenance proof before timing. A retryable-write poisoning defect found during qualification is fixed.

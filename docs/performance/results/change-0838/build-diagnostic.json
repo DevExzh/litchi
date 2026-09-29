@@ -1,0 +1,17 @@
+{
+  "binary": {
+    "bytes": 15160744,
+    "path": "/home/zhuhe/code/litchi-target-0838/retained/diagnostic/source-inverse-diagnostic",
+    "sha256": "6e035e6f8f8b8527209475795bfcf53cff3bff225881a124787deb9c6bac3386"
+  },
+  "freeze": {
+    "bytes": 1202290,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/freeze-diagnostic.json",
+    "sha256": "eaf5d06e6daf036cd8461bc5ec5e14884f94ac07afc43b43afbbd65c6575b6f7"
+  },
+  "receipt": {
+    "bytes": 563,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/commands/build-diagnostic/receipt.json",
+    "sha256": "061fb9b8987e80c331ab98905cc8800c3aa4dfc70ed84c75c4a4b278120e4013"
+  }
+}

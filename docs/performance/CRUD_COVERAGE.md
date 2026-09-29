@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0838 — current-source DOCX inverse physical diagnosis
+
+[0838](0838-docx-durable-inverse-physical-diagnostic.md) reproduces the durable inverse physical limitation with current public writers: all 18 cases restore logical bytes, and retained-source undo is exact, while serialized undo is archive-exact only for the ordinary regenerated control. Three fresh processes retain 63 ZIPs and 18 wires with independent replay and deterministic bytes. Production and exact-artifact tests are unchanged; 0837 remains rejected. No performance claim or new baseline is admitted; physical restoration design remains open.
+
 ## 0837 — ZIP retry fix; fresh compression rejected
 
 [0837](0837-zip-interrupted-write-and-fresh-compression.md) adds direct Store/Deflate coverage for short interrupted sink writes, exact accepted-byte accounting, successful finalization and payload readback. The unchanged durable paragraph-copy inverse test rejects a fresh-compression candidate. No new producer, native Office, cold-cache, concurrency or format capability coverage is claimed.

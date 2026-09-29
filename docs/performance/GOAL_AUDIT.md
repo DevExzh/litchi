@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0838 — current-source DOCX inverse physical diagnosis
+
+[0838](0838-docx-durable-inverse-physical-diagnostic.md) reproduces the durable inverse physical limitation with current public writers: all 18 cases restore logical bytes, and retained-source undo is exact, while serialized undo is archive-exact only for the ordinary regenerated control. Three fresh processes retain 63 ZIPs and 18 wires with independent replay and deterministic bytes. Production and exact-artifact tests are unchanged; 0837 remains rejected. No performance claim or new baseline is admitted; physical restoration design remains open.
+
 ## 0837 — ZIP retry fix; fresh compression rejected
 
 [0837](0837-zip-interrupted-write-and-fresh-compression.md) makes a bounded correctness fix and rejects a compression optimization before comparative capture because exact durable inverse restoration fails. Candidate source, diagnostic ZIP artifacts and failure receipts remain retained. The affected-owner final gates, red/green regression and cleanup are recorded in the packet; broader non-iWork performance work remains open.

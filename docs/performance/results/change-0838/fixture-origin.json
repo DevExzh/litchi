@@ -1,0 +1,18 @@
+{
+  "claim": "Retained counterexample input; current-code source controls will be generated independently by the diagnostic.",
+  "diagnosis": {
+    "bytes": 3032,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/inverse-failure-analysis.json",
+    "sha256": "9af35fa69ad6c06d3d2884654a40d1ff8117d6dbc30ca93cd4b4deee3c157f25"
+  },
+  "fixture": {
+    "bytes": 1697,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/fixtures/fresh-source.zip",
+    "sha256": "828a042258b1563ee6fdfe4d8fee027c792f3ce6b4351f33f21a1cfe34fa7604"
+  },
+  "source": {
+    "bytes": 1697,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/diagnostics/fresh-source.zip",
+    "sha256": "828a042258b1563ee6fdfe4d8fee027c792f3ce6b4351f33f21a1cfe34fa7604"
+  }
+}

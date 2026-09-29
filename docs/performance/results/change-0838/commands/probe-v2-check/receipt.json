@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--all-targets",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0838/probe/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790689989.8689868,
+  "log": {
+    "bytes": 175,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/commands/probe-v2-check/output.log",
+    "sha256": "23b4787a26bbdf08c9af2074571120eab146e22b35bd7ece472e34381b5bfa7f"
+  },
+  "started_unix": 1790689989.7139816
+}

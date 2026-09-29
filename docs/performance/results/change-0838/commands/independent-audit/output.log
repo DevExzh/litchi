@@ -1,0 +1,202 @@
+{
+  "status": "pass",
+  "processes": 3,
+  "operations": 18,
+  "archives": 63,
+  "wires": 18,
+  "distinct_pids": [
+    3313990,
+    3313993,
+    3313996
+  ],
+  "cross_process_bytes_identical": true,
+  "rows": [
+    {
+      "run": "run-00",
+      "source": "original-retained",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-00",
+      "source": "original-retained",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-00",
+      "source": "borrowed-regenerated",
+      "operation": "copy",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-00",
+      "source": "borrowed-regenerated",
+      "operation": "removal",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-00",
+      "source": "current-owned-staged",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-00",
+      "source": "current-owned-staged",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "original-retained",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "original-retained",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "borrowed-regenerated",
+      "operation": "copy",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "borrowed-regenerated",
+      "operation": "removal",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "current-owned-staged",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-01",
+      "source": "current-owned-staged",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "original-retained",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "original-retained",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "borrowed-regenerated",
+      "operation": "copy",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "borrowed-regenerated",
+      "operation": "removal",
+      "durable_exact": true,
+      "changed_compressed_members": [],
+      "source_main_compressed_bytes": 141,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "current-owned-staged",
+      "operation": "copy",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    },
+    {
+      "run": "run-02",
+      "source": "current-owned-staged",
+      "operation": "removal",
+      "durable_exact": false,
+      "changed_compressed_members": [
+        "word/document.xml"
+      ],
+      "source_main_compressed_bytes": 135,
+      "restored_main_compressed_bytes": 141
+    }
+  ],
+  "scope": "ZIP/XML independently replayed; canonical wire re-encoding and stale refusal checked by Rust probe"
+}

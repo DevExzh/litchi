@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--offline",
+    "--format-version",
+    "1",
+    "--manifest-path",
+    "docs/performance/results/change-0838/probe/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0838",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790689536.7395756
+}

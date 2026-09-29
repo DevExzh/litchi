@@ -1,0 +1,69 @@
+{
+  "archives": 63,
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "build-diagnostic"
+    },
+    {
+      "exit_code": 0,
+      "label": "capture-00"
+    },
+    {
+      "exit_code": 0,
+      "label": "capture-01"
+    },
+    {
+      "exit_code": 0,
+      "label": "capture-02"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-audit"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-check"
+    },
+    {
+      "exit_code": 101,
+      "label": "probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock-resolved"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-v2-fmt"
+    }
+  ],
+  "operations": 18,
+  "performance_claim": "none",
+  "processes": 3,
+  "production_changes": 0,
+  "quality": "fresh standalone gates; source-identical inherited production gates",
+  "status": "pass",
+  "timed_operations": 0,
+  "wires": 18
+}
