@@ -1,0 +1,6 @@
+   Compiling zlib-rs v0.6.7
+   Compiling flate2 v1.1.10
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling compression-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 31.25s

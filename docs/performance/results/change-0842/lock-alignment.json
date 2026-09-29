@@ -1,0 +1,47 @@
+{
+  "nested_after": {
+    "bytes": 56289,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.lock",
+    "sha256": "db62bdd9174484613acae1f49f8187cf105d0b4976e2fea4de91df7372a893d5"
+  },
+  "nested_before": {
+    "bytes": 56919,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-before/tools/perf-baseline/Cargo.lock",
+    "sha256": "a373fcbf868c5e74da4adc8de1c39249f3e900b69bf7e735aaa419fe85a2801b"
+  },
+  "nested_changed_packages": [
+    "flate2"
+  ],
+  "nested_removed_unused_packages": [
+    "adler2",
+    "miniz_oxide",
+    "simd-adler32"
+  ],
+  "probe_active": {
+    "bytes": 26119,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe/Cargo.lock",
+    "sha256": "07ca98e41d09811f8e256894fbbc360dca30948df8e8d4950bb27fd16f50d72e"
+  },
+  "probe_after": {
+    "bytes": 26119,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/lock-snapshots/after.lock",
+    "sha256": "07ca98e41d09811f8e256894fbbc360dca30948df8e8d4950bb27fd16f50d72e"
+  },
+  "probe_before": {
+    "bytes": 26105,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/lock-snapshots/before.lock",
+    "sha256": "e6b99c089366e29dd01413fc34e03c0f00a1dccbd62fdfc681adf828747a6a45"
+  },
+  "root_after": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "root_before": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-before/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  },
+  "root_unchanged": true,
+  "status": "pass"
+}

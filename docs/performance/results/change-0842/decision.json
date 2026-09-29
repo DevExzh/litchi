@@ -1,0 +1,148 @@
+{
+  "all_flags_reviewed": true,
+  "analysis": {
+    "bytes": 2476362,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/analysis.json",
+    "sha256": "2fb1e2571d8b2c2e56eebd8d1255c52f49029999a2c75a1ad7711d7fad090054"
+  },
+  "decision": "adopt",
+  "material_benefit": true,
+  "reason": "Large generic OPC reads improve14.46\u201321.32% and compressible changed-Part publication33.81\u201338.36% in the fixed protocol, with exact output bytes and no original p50/RSS or spread flags. Original tiny write/read p99 flags are retained; separately preregistered1000-sample blocks do not reproduce them. Six block pairs remain the independent bootstrap units; no universal tail or semantic-Office claim.",
+  "regression_flags": 0,
+  "spread_flags": 0,
+  "status": "complete-batch",
+  "tail_analysis": {
+    "bytes": 11341285,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tail-analysis.json",
+    "sha256": "30e8dea644127ceac4dc4c752e22711e1fa1ba0f8abd6952c6f284ded40808c8"
+  },
+  "tail_confirmation_flags": 0,
+  "tail_review": [
+    {
+      "confirmation": {
+        "after": [
+          44940.0,
+          43100.0,
+          43380.0,
+          43460.0,
+          44100.0,
+          44860.0
+        ],
+        "before": [
+          43610.0,
+          44280.0,
+          44320.0,
+          43860.0,
+          44190.0,
+          43240.0
+        ],
+        "ci95_high": 1.0339814510967937,
+        "ci95_low": 0.97607100694954,
+        "estimate": 0.9944217065408079,
+        "ratios": [
+          1.0304975922953452,
+          0.9733514001806685,
+          0.9787906137184116,
+          0.9908800729594163,
+          0.9979633401221996,
+          1.0374653098982423
+        ]
+      },
+      "metric": "p99_ns",
+      "mode": "write",
+      "original": {
+        "after": [
+          60600.0,
+          37570.0,
+          47490.0,
+          53230.0,
+          76520.0,
+          74870.0
+        ],
+        "before": [
+          37320.0,
+          38460.0,
+          42050.0,
+          49660.0,
+          52480.0,
+          41380.0
+        ],
+        "ci95_high": 1.7165611950411759,
+        "ci95_low": 1.0243739592515637,
+        "estimate": 1.2937245330761868,
+        "ratios": [
+          1.6237942122186495,
+          0.9768590743629745,
+          1.1293697978596908,
+          1.071888844140153,
+          1.4580792682926829,
+          1.8093281778637023
+        ]
+      }
+    },
+    {
+      "confirmation": {
+        "after": [
+          8000.0,
+          10931.0,
+          8161.0,
+          7940.0,
+          9390.0,
+          7960.0
+        ],
+        "before": [
+          8110.0,
+          7930.0,
+          8090.0,
+          8340.0,
+          8140.0,
+          9610.0
+        ],
+        "ci95_high": 1.2659994856716168,
+        "ci95_low": 0.8901711097303219,
+        "estimate": 0.9976063825733616,
+        "ratios": [
+          0.9864364981504316,
+          1.37843631778058,
+          1.0087762669962916,
+          0.9520383693045563,
+          1.1535626535626535,
+          0.8283038501560874
+        ]
+      },
+      "metric": "p99_ns",
+      "mode": "read",
+      "original": {
+        "after": [
+          20940.0,
+          33710.0,
+          23310.0,
+          7540.0,
+          7520.0,
+          7800.0
+        ],
+        "before": [
+          7440.0,
+          8520.0,
+          13000.0,
+          8050.0,
+          7550.0,
+          8260.0
+        ],
+        "ci95_high": 3.385544449492655,
+        "ci95_low": 0.940477945046847,
+        "estimate": 1.394551706571574,
+        "ratios": [
+          2.814516129032258,
+          3.9565727699530515,
+          1.793076923076923,
+          0.9366459627329192,
+          0.9960264900662251,
+          0.9443099273607748
+        ]
+      }
+    }
+  ],
+  "tail_review_points": 2,
+  "unresolved_common_workload_damage": false
+}

@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/qualification-v2-00-tiny-changed-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "--mode",
+    "changed",
+    "--shape",
+    "tiny",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/qualification-v2-00-tiny-changed-leg-b/report.json",
+    "--artifact",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/qualification-v2-00-tiny-changed-leg-b/artifact.zip"
+  ],
+  "binary": {
+    "bytes": 13336376,
+    "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "sha256": "562b56251d75c000d93e6a08a27c12be6df3cf2d1329ab4f4c9f269a268ed47b"
+  },
+  "build": {
+    "bytes": 870,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/build-after.json",
+    "sha256": "e343157c3085c7c00138d383d0c54898abb05b9ac1a3d1f9d379b654febebbc8"
+  },
+  "lane": "qualification",
+  "row": {
+    "leg": "after",
+    "mode": "changed",
+    "samples": 1,
+    "shape": "tiny",
+    "warmup": 0
+  },
+  "started_unix": 1790699593.391793
+}

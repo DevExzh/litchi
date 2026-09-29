@@ -1,0 +1,29 @@
+[package]
+name = "soapberry-zip"
+version = "0.0.1"
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+edition = "2021"
+description = "High-performance ZIP reader for Office document formats (OOXML, ODF, iWork)"
+license = "MIT"
+keywords = ["zip", "archive", "office"]
+categories = ["filesystem", "compression", "parser-implementations"]
+rust-version = "1.70"
+
+[dependencies]
+# Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
+crc32fast = "1"
+# Keep runtime CPU dispatch enabled with the Rust-only Deflate backend.
+flate2 = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
+# Parallel processing for multi-threaded decompression
+rayon = "1"
+# SHA-256 replay fingerprints. Use the workspace's sha2 0.10 alias to avoid
+# introducing sha2 0.11's higher compiler requirement through this dependency.
+sha2_legacy = { workspace = true }
+
+[dev-dependencies]
+jiff = "0.2"
+paste = "1.0"
+quickcheck = "1.0.3"
+quickcheck_macros = "1.1.0"
+rstest = "0.26"
+tempfile = "3"

@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "cargo",
+    "tree",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "-e",
+    "features",
+    "-i",
+    "zlib-rs"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0842",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790699416.9881473
+}

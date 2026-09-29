@@ -1,0 +1,255 @@
+{
+  "added": [
+    {
+      "checksum": "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502",
+      "dependencies": [
+        "winapi-util"
+      ],
+      "name": "same-file",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.0.6"
+    },
+    {
+      "checksum": "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22",
+      "dependencies": [
+        "windows-sys"
+      ],
+      "name": "winapi-util",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.1.11"
+    }
+  ],
+  "baseline_manifests": {
+    "Cargo.toml": "3e7ec71577c193392836925963e893137f9086b1b7161ffea483e08aafb41d44",
+    "crates/soapberry-zip/Cargo.toml": "ae7d9795fa4c5724b602d074a5e6279c842811dbc4ce532a895d1dc7d04ce077"
+  },
+  "baseline_normalized": {
+    "bytes": 56826,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/lock-snapshots/native-resave-baseline-normalized.lock",
+    "sha256": "11d6e3ff37ff927c9b2f2309485f6575e5da74533db5f09cbf5983261db4c2dc"
+  },
+  "baseline_receipt": {
+    "bytes": 564,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-resave-baseline-lock-control/receipt.json",
+    "sha256": "fecf9c58e85be9708978ed710d703dcf52a78072e44aa8cccf5c953996503fa0"
+  },
+  "changed": [
+    {
+      "after": {
+        "dependencies": [
+          "bitflags",
+          "litchi-cfb",
+          "litchi-core",
+          "litchi-ole-common",
+          "md-5",
+          "quick-xml",
+          "rc4",
+          "sha1 0.11.0",
+          "subtle",
+          "zeroize"
+        ],
+        "name": "litchi-crypto",
+        "version": "0.0.1"
+      },
+      "before": {
+        "dependencies": [
+          "bitflags",
+          "litchi-cfb",
+          "litchi-core",
+          "litchi-ole-common",
+          "quick-xml",
+          "rc4",
+          "sha1 0.11.0",
+          "subtle",
+          "zeroize"
+        ],
+        "name": "litchi-crypto",
+        "version": "0.0.1"
+      }
+    },
+    {
+      "after": {
+        "dependencies": [
+          "bitflags",
+          "bumpalo",
+          "encoding_rs",
+          "litchi-cfb",
+          "litchi-codepage",
+          "litchi-core",
+          "litchi-crypto",
+          "litchi-odraw",
+          "litchi-ole-common",
+          "litchi-sign",
+          "litchi-vba",
+          "rand 0.10.2",
+          "serde_json",
+          "smallvec",
+          "subtle",
+          "thiserror",
+          "zerocopy",
+          "zerocopy-derive",
+          "zeroize"
+        ],
+        "name": "litchi-doc",
+        "version": "0.0.1"
+      },
+      "before": {
+        "dependencies": [
+          "bitflags",
+          "bumpalo",
+          "encoding_rs",
+          "litchi-cfb",
+          "litchi-codepage",
+          "litchi-core",
+          "litchi-crypto",
+          "litchi-odraw",
+          "litchi-ole-common",
+          "litchi-sign",
+          "litchi-vba",
+          "md-5",
+          "rand 0.10.2",
+          "rc4",
+          "serde_json",
+          "smallvec",
+          "subtle",
+          "thiserror",
+          "zerocopy",
+          "zerocopy-derive",
+          "zeroize"
+        ],
+        "name": "litchi-doc",
+        "version": "0.0.1"
+      }
+    },
+    {
+      "after": {
+        "dependencies": [
+          "aes",
+          "aes-gcm",
+          "argon2",
+          "atoi_simd",
+          "base64",
+          "bergshamra-c14n",
+          "blowfish",
+          "cbc",
+          "chrono",
+          "fast-float2",
+          "flate2",
+          "hmac 0.13.0",
+          "litchi-core",
+          "litchi-odf-common",
+          "memchr",
+          "p256",
+          "pbkdf2",
+          "phf",
+          "quick-xml",
+          "rand 0.10.2",
+          "rsa",
+          "same-file",
+          "serde_json",
+          "sha1 0.11.0",
+          "sha2 0.11.0",
+          "signature",
+          "smallvec",
+          "soapberry-zip",
+          "subtle",
+          "tempfile",
+          "x509-cert",
+          "xml-minifier",
+          "zeroize"
+        ],
+        "name": "litchi-odt",
+        "version": "0.0.1"
+      },
+      "before": {
+        "dependencies": [
+          "aes",
+          "aes-gcm",
+          "argon2",
+          "atoi_simd",
+          "base64",
+          "bergshamra-c14n",
+          "blowfish",
+          "cbc",
+          "chrono",
+          "fast-float2",
+          "flate2",
+          "hmac 0.13.0",
+          "litchi-core",
+          "litchi-odf-common",
+          "memchr",
+          "p256",
+          "pbkdf2",
+          "phf",
+          "quick-xml",
+          "rand 0.10.2",
+          "rsa",
+          "serde_json",
+          "sha1 0.11.0",
+          "sha2 0.11.0",
+          "signature",
+          "smallvec",
+          "soapberry-zip",
+          "subtle",
+          "x509-cert",
+          "xml-minifier",
+          "zeroize"
+        ],
+        "name": "litchi-odt",
+        "version": "0.0.1"
+      }
+    },
+    {
+      "after": {
+        "dependencies": [
+          "bitflags",
+          "chrono",
+          "litchi-biff",
+          "litchi-cfb",
+          "litchi-codepage",
+          "litchi-core",
+          "litchi-crypto",
+          "litchi-odraw",
+          "litchi-ograph",
+          "litchi-ole-common",
+          "litchi-sign",
+          "litchi-vba",
+          "rand 0.10.2",
+          "serde_json",
+          "zerocopy",
+          "zeroize"
+        ],
+        "name": "litchi-xls",
+        "version": "0.0.1"
+      },
+      "before": {
+        "dependencies": [
+          "bitflags",
+          "chrono",
+          "litchi-biff",
+          "litchi-cfb",
+          "litchi-codepage",
+          "litchi-core",
+          "litchi-crypto",
+          "litchi-odraw",
+          "litchi-ograph",
+          "litchi-ole-common",
+          "litchi-sign",
+          "litchi-vba",
+          "md-5",
+          "rand 0.10.2",
+          "rc4",
+          "serde_json",
+          "zerocopy",
+          "zeroize"
+        ],
+        "name": "litchi-xls",
+        "version": "0.0.1"
+      }
+    }
+  ],
+  "failed_guard": "integrate_locks.py rejected non-flate2 changes before native timing",
+  "interpretation": "Cargo refreshes stale local dependency edges and adds their two missing transitive packages even with original compression declarations. The candidate adds only crc32fast to flate2 relative to this normalized baseline. No existing registry version or checksum changes.",
+  "removed": [],
+  "status": "confirmed-preexisting-lock-drift"
+}

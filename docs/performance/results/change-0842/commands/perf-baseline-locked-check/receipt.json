@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/tools/perf-baseline/Cargo.toml",
+    "--lib"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790701356.2285483,
+  "log": {
+    "bytes": 5627,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/perf-baseline-locked-check/output.log",
+    "sha256": "2181f349bb186b8169ef59c60eca85ca232da498c09e1263eb4e65f178d5d471"
+  },
+  "started_unix": 1790701303.7776084
+}

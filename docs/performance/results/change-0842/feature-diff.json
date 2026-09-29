@@ -1,0 +1,51 @@
+{
+  "changes": {
+    "flate2": {
+      "after": {
+        "features": [
+          "any_impl",
+          "any_zlib",
+          "runtime_detection",
+          "zlib-rs"
+        ],
+        "version": "1.1.10"
+      },
+      "before": {
+        "features": [
+          "any_impl",
+          "any_zlib",
+          "zlib-rs"
+        ],
+        "version": "1.1.10"
+      }
+    },
+    "zlib-rs": {
+      "after": {
+        "features": [
+          "rust-allocator",
+          "std"
+        ],
+        "version": "0.6.7"
+      },
+      "before": {
+        "features": [
+          "rust-allocator"
+        ],
+        "version": "0.6.7"
+      }
+    }
+  },
+  "metadata": {
+    "after": {
+      "bytes": 473699,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/probe-after-lock/output.log",
+      "sha256": "787030c5367324d83f5c5cc010ecf299c36b088e0b2a4bc790eb021ecd4b1814"
+    },
+    "before": {
+      "bytes": 473223,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/probe-lock-alignment/output.log",
+      "sha256": "5993c5a2e777e48999c3abd966e3492422b313aff7c667d3df5761e4f09dd9bf"
+    }
+  },
+  "status": "pass"
+}

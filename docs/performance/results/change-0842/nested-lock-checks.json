@@ -1,0 +1,57 @@
+{
+  "baseline_lock_drift": {
+    "bytes": 6459,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/native-resave-lock-drift.json",
+    "sha256": "790f68117d61ce8e2e3f6e7c7c9e5d72c45180b3680e07b45835b301be4bb084"
+  },
+  "changes": [
+    {
+      "added_dependency": "crc32fast",
+      "after": {
+        "bytes": 26534,
+        "path": "/home/zhuhe/code/litchi/tools/perf-execution/Cargo.lock",
+        "sha256": "249f6086ed74614584aacf89afcf8cf89f76310ed66bec1641b43b371a1003f0"
+      },
+      "before": {
+        "bytes": 26520,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-before/tools/perf-execution/Cargo.lock",
+        "sha256": "93a1e7b103f7d4055945faaeda3f3b0d2e225778dffc7447a3ef640f2327e232"
+      },
+      "existing_registry_versions_unchanged": true,
+      "path": "tools/perf-execution/Cargo.lock"
+    },
+    {
+      "added_dependency": "crc32fast",
+      "after": {
+        "bytes": 56840,
+        "path": "/home/zhuhe/code/litchi/tools/native-resave/Cargo.lock",
+        "sha256": "caba1eef4588a2f90c2891a3650b6c6c5a783f871fba2e395e0fe41cc3c4343d"
+      },
+      "before": {
+        "bytes": 56365,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-before/tools/native-resave/Cargo.lock",
+        "sha256": "88085c7765744b7cde5336d955c18d48528e547d953e75415917521b6cd4f9fa"
+      },
+      "existing_registry_versions_unchanged": true,
+      "path": "tools/native-resave/Cargo.lock"
+    }
+  ],
+  "locked_metadata_receipts": [
+    {
+      "bytes": 574,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/perf-baseline-locked-metadata/receipt.json",
+      "sha256": "e880cb2de20e68630969a33ea745a72a0df5bdc260d53424fdef451273433222"
+    },
+    {
+      "bytes": 575,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/perf-execution-locked-metadata/receipt.json",
+      "sha256": "ece28f27bea747a8176a5c406beccc2db6ec53bd076cbf007e6064568438f3bf"
+    },
+    {
+      "bytes": 573,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-resave-locked-metadata/receipt.json",
+      "sha256": "5a518196cb29f5b9218e316929816d91670f151a412838918e5baf33a6dfba24"
+    }
+  ],
+  "status": "pass"
+}

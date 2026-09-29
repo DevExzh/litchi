@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--all-features",
+    "--lib",
+    "--no-deps",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790700238.9898655,
+  "log": {
+    "bytes": 5723,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/after-final-workspace-clippy/output.log",
+    "sha256": "79e44e4f4d0e3407d7b397e7dbbe879cf04b6a3ea5b1855d9ca5bb89acd41479"
+  },
+  "started_unix": 1790700132.76
+}

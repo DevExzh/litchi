@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys;sys.path.insert(0,'docs/performance/results/change-0842');import qualify as q;import driver as d;rows=q.validate_items('qualification','before');d.write(d.P/'qualification-before.json',dict(status='pass',rows=rows,reader=d.desc(d.P/'reader.py')));print(len(rows),'baseline reports pass')"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_LTO": "true",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-target-0842",
+    "RUSTFLAGS": null
+  },
+  "started_unix": 1790699340.9985893
+}

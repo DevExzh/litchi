@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "-p",
+    "soapberry-zip",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-pptx",
+    "--all-features",
+    "--all-targets"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790700132.7556374,
+  "log": {
+    "bytes": 2077,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/after-final-owner-check/output.log",
+    "sha256": "6bf76c98eba5a59513e7250aa555e6eff16c5e6d6632783a36e6c98991eb6ad9"
+  },
+  "started_unix": 1790700085.8077412
+}

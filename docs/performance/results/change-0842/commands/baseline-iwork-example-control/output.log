@@ -1,0 +1,59 @@
+   Compiling prost-derive v0.14.4
+   Compiling thiserror v2.0.18
+   Compiling buffa v0.9.1
+   Compiling prettyplease v0.2.37
+   Compiling regex-syntax v0.8.11
+   Compiling indexmap v2.11.4
+   Compiling prost v0.14.4
+   Compiling regex-automata v0.4.18
+   Compiling buffa-descriptor v0.9.1
+   Compiling petgraph v0.8.3
+   Compiling buffa-codegen v0.9.1
+   Compiling regex v1.13.1
+   Compiling prost-types v0.14.4
+   Compiling prost-build v0.14.4
+    Checking bytes v1.12.1
+    Checking hashbrown v0.15.5
+    Checking zeroize v1.9.0
+   Compiling buffa-build v0.9.1
+    Checking block-buffer v0.12.1
+    Checking litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-common)
+   Compiling litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-protos)
+    Checking digest v0.11.3
+    Checking sha2 v0.11.0
+    Checking getrandom v0.3.4
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking tempfile v3.27.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-iwa-package v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-package)
+    Checking litchi-iwa-text v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-text)
+    Checking plist v1.7.4
+   Compiling phf_macros v0.14.0
+    Checking phf v0.14.0
+    Checking sha1 v0.11.0
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-core)
+    Checking litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers-wire)
+    Checking litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-archive)
+    Checking litchi-iwa-text-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-text-wire)
+    Checking litchi-iwa-detect v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-detect)
+    Checking litchi-numbers v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers)
+    Checking litchi-pages v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pages)
+    Checking litchi-keynote v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-keynote)
+    Checking litchi-iwa v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa)
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_numbers_donut_chart.rs:68:5
+   |
+67 |   fn donut_data() -> litchi_iwa::Result<ChartData> {
+   |                      ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+68 | /     ChartData::new(
+69 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+70 | |         vec!["Revenue".to_owned()],
+71 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+72 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `litchi-iwa` (example "create_numbers_donut_chart") due to 1 previous error

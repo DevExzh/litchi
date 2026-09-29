@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0842 — restore runtime compression dispatch
+
+[0842](0842-opc-runtime-compression-dispatch.md) adopts explicit flate2 runtime detection with exact archive bytes. In the named generic OPC warm protocol, large read p50 improves 14.46–21.32% and compressible changed-Part publication 33.81–38.36%. Original tiny p99 flags remain visible; a separate 24-process confirmation did not reproduce them. All 192 timing reports / 28,344 samples validate, with 6,931 affected-owner tests passing. Baseline-confirmed iWork gate failures and standalone lock repairs are explicit. No semantic Office, universal-tail or broad-goal completion claim follows.
+
 ## 0841 — current PPT borrowed-text instruction diagnosis
 
 [0841](0841-ppt-borrowed-text-instruction-diagnostic.md) validates 156 current-source PPT diagnostic reports / 3,636 samples. All ten cases retain exact output goldens; many/Unicode historical regressions do not reproduce under the shared wrapper and current build. No new general baseline or adoption is claimed. Original and additive reader/reducer repairs preserve every workload; production is restored.

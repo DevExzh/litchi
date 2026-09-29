@@ -1,0 +1,2 @@
+Command exited with non-zero status 1
+4432 346 0

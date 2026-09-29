@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/native-04-tiny-read-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "--mode",
+    "read",
+    "--shape",
+    "tiny",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/native-04-tiny-read-leg-b/report.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790701503.317835,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-04-tiny-read-leg-b/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790701503.3156993
+}

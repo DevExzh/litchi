@@ -1,0 +1,130 @@
+{
+  "plan": {
+    "bytes": 4137,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tail-plan.json",
+    "sha256": "e6408b9f5f3c5bca8c9370f36f7a853669f564507278a145b15722f0da47ec75"
+  },
+  "receipts": [
+    {
+      "bytes": 1186,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-00-tiny-write-leg-a/receipt.json",
+      "sha256": "2c84564b010a725a71e1f794f4b95e33f1d00c83c1b3b55da85aa73c9f294c81"
+    },
+    {
+      "bytes": 1184,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-00-tiny-write-leg-b/receipt.json",
+      "sha256": "a48f8f5a57c460596465e894c5003641c85a558bf1615bef8f7e5d62271d3d63"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-00-tiny-read-leg-a/receipt.json",
+      "sha256": "fa67f2291cb6549566f7c5478540c0c80d2a04bf14fca17cfaa3a0bc060914da"
+    },
+    {
+      "bytes": 1180,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-00-tiny-read-leg-b/receipt.json",
+      "sha256": "92618af51eda192b96687c68be630419852c9966ecedd32a5e9780ad90fb568c"
+    },
+    {
+      "bytes": 1180,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-read-leg-b/receipt.json",
+      "sha256": "f8630dedad85d1b843d4f30a94d0efe01f5f1f0924d71813c172cb3a90ee068a"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-read-leg-a/receipt.json",
+      "sha256": "6071208b9740b705a563a0f21b935a0f3fd92066f82343162d0cc968c620eca5"
+    },
+    {
+      "bytes": 1184,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-write-leg-b/receipt.json",
+      "sha256": "22cc2e6e273f09c70e329c2ea91ae9707808896148e878f79a3c1e0aa8ea3e9a"
+    },
+    {
+      "bytes": 1186,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-write-leg-a/receipt.json",
+      "sha256": "6e14146e4206ac32a9f09aefcb128c33fe4cab6b50930cfa3bf9230da73ad96c"
+    },
+    {
+      "bytes": 1184,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-02-tiny-write-leg-a/receipt.json",
+      "sha256": "37c2889eb91171338f89c465b1c8903bad36a4b3240486f11412e81a1135e0ba"
+    },
+    {
+      "bytes": 1185,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-02-tiny-write-leg-b/receipt.json",
+      "sha256": "e9f1b0343d1de5c652eac7022c13489ed3fa5ac3517c8b3786f3cfdc289e8f4e"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-02-tiny-read-leg-a/receipt.json",
+      "sha256": "8bcd5a26ba1ae47172f569bd95350f7a0280fa3712680f3a5f0300670ddafbd2"
+    },
+    {
+      "bytes": 1179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-02-tiny-read-leg-b/receipt.json",
+      "sha256": "3feb43bb4ad8d17ddd521485fd7324d0bc2321fa9376e80b6db5cbef43b3138a"
+    },
+    {
+      "bytes": 1179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-03-tiny-read-leg-b/receipt.json",
+      "sha256": "1ea6726101a087192d71d5483691616ff69c7ebe18495fb46265bae6aaf21976"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-03-tiny-read-leg-a/receipt.json",
+      "sha256": "5e75131e8865f390d49021e81a4177c707bb3c532a84069d42ffd6524c494681"
+    },
+    {
+      "bytes": 1185,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-03-tiny-write-leg-b/receipt.json",
+      "sha256": "79113763b5679ffa6dfbfcee630cb3a6f386fb45a4e86a8653ef95c03a73245a"
+    },
+    {
+      "bytes": 1186,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-03-tiny-write-leg-a/receipt.json",
+      "sha256": "3bea144b0af2051af7ead68ab0966e09868888adaad52ba5b242194c6de90c63"
+    },
+    {
+      "bytes": 1186,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-04-tiny-write-leg-a/receipt.json",
+      "sha256": "9057e83b9501c6158b0ed524c95b8792146e910a406342ef2ed1295f5cd148c0"
+    },
+    {
+      "bytes": 1185,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-04-tiny-write-leg-b/receipt.json",
+      "sha256": "be077db4a56b551d37e247f2c75986f25b6efd9391150911f6d03fb35d80ea2d"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-04-tiny-read-leg-a/receipt.json",
+      "sha256": "3698155b722e58d266eeafbc3acc56e98dc171c338f069052cd8c6ba25fa6050"
+    },
+    {
+      "bytes": 1180,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-04-tiny-read-leg-b/receipt.json",
+      "sha256": "bb3f6475c49ebd65fe52ffa8619b7bf7cb31f7be32b32751fb75144ea819b446"
+    },
+    {
+      "bytes": 1179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-05-tiny-read-leg-b/receipt.json",
+      "sha256": "431049aa6975a30fbbd34934885742044c34bf30881a694de48d0401495032fc"
+    },
+    {
+      "bytes": 1181,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-05-tiny-read-leg-a/receipt.json",
+      "sha256": "bc56366bb8172ca63289687f45ade35cddb5bf3e85eb54aabce2026a0880a166"
+    },
+    {
+      "bytes": 1185,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-05-tiny-write-leg-b/receipt.json",
+      "sha256": "b4818f409294471e60cb2981831f3a1516d494d355ba78668c47481c50e059c1"
+    },
+    {
+      "bytes": 1185,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-05-tiny-write-leg-a/receipt.json",
+      "sha256": "f9ef354e1c805232c3c0d20831ddd5889a540bcc6f72954b850453dd68413961"
+    }
+  ],
+  "status": "pass"
+}

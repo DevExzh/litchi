@@ -1,0 +1,12 @@
+{
+  "agent_commit": "665b4c2c6be4637ed0f977b91c41b4f514fed426",
+  "agent_commit_description": "commit 665b4c2c6be4637ed0f977b91c41b4f514fed426\nAuthor:     Ryker Zhu <ryker.zhu@outlook.com>\nAuthorDate: Tue Sep 29 16:23:32 2026 +0000\nCommit:     Ryker Zhu <ryker.zhu@outlook.com>\nCommitDate: Tue Sep 29 16:23:32 2026 +0000\n\n    perf: add packet codec byte qualification\n\n .../results/change-0842/probe/src/codec.rs         | 447 +++++++++++++++++++++\n 1 file changed, 447 insertions(+)\n",
+  "base": "45ca1ca9fe9ff04f1ba14ded41cfe620629ffaa1",
+  "changed_paths": [
+    "docs/performance/results/change-0842/probe/src/codec.rs"
+  ],
+  "codec_sha256": "53e5678bfd1a4a7ad21415f3c1ca035f0c5daa2924d2b56645b956e7b64d4dd9",
+  "correction": "Root undid only the premature agent-owned packet commit with soft reset, unstaged its single file, and moved the preserved code to its assigned path before any probe build or workload.",
+  "source_unchanged": true,
+  "workloads_launched": 0
+}

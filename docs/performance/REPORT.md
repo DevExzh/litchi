@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0842 — restore runtime compression dispatch
+
+[0842](0842-opc-runtime-compression-dispatch.md) adopts explicit flate2 runtime detection with exact archive bytes. In the named generic OPC warm protocol, large read p50 improves 14.46–21.32% and compressible changed-Part publication 33.81–38.36%. Original tiny p99 flags remain visible; a separate 24-process confirmation did not reproduce them. All 192 timing reports / 28,344 samples validate, with 6,931 affected-owner tests passing. Baseline-confirmed iWork gate failures and standalone lock repairs are explicit. No semantic Office, universal-tail or broad-goal completion claim follows.
+
 ## 0841 — current PPT borrowed-text instruction diagnosis
 
 [0841](0841-ppt-borrowed-text-instruction-diagnostic.md) completes current-source native and owner-scoped instruction diagnosis without adopting the borrowed-text candidate. All 156 reports / 3,636 samples pass; production is restored exactly. Tiny write increases 2.46%, while many is approximately unchanged and payload/Unicode improve in these binaries. No native p50/RSS threshold is crossed; wrapper/build differences prevent a causal explanation of historical 0782. A separate compression feature discrepancy is retained for fresh investigation.

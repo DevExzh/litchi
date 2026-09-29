@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/native-02-random-changed-leg-a/time.txt",
+    "/home/zhuhe/code/litchi-target-0842/retained/leg-a/compression-probe",
+    "--mode",
+    "changed",
+    "--shape",
+    "random",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/runs/native-02-random-changed-leg-a/report.json"
+  ],
+  "binary": {
+    "bytes": 13266192,
+    "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-a/compression-probe",
+    "sha256": "e611d07769cd61fdbaa13fb63291b28fb298b03e05dd212e4fda08e6472714e1"
+  },
+  "build": {
+    "bytes": 872,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/build-before.json",
+    "sha256": "fd665737586546e7310d6e8c9cebc9de26e4cb9c22c1d7126b84ff5d804f35ee"
+  },
+  "lane": "native",
+  "row": {
+    "block": 2,
+    "leg": "before",
+    "mode": "changed",
+    "samples": 30,
+    "shape": "random",
+    "warmup": 3
+  },
+  "started_unix": 1790701490.548781
+}

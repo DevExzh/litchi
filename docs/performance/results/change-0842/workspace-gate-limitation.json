@@ -1,0 +1,20 @@
+{
+  "action": "Keep iWork unchanged per task scope. Check workspace libraries/tests and affected OPC/ZIP/OOXML all targets separately.",
+  "baseline_dependency_manifests": {
+    "Cargo.toml": "3e7ec71577c193392836925963e893137f9086b1b7161ffea483e08aafb41d44",
+    "crates/soapberry-zip/Cargo.toml": "ae7d9795fa4c5724b602d074a5e6279c842811dbc4ce532a895d1dc7d04ce077"
+  },
+  "baseline_receipt": {
+    "bytes": 554,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/baseline-iwork-example-control/receipt.json",
+    "sha256": "7410fc6d6a7d41311beffdb3560bcce380dce8ac217a82f6bb86d02b5d14b6ce"
+  },
+  "candidate_receipt": {
+    "bytes": 508,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/after-workspace-check/receipt.json",
+    "sha256": "7d991089d11813ab452fae817fa83c25d16a449031c70bd98f0e558097d9748d"
+  },
+  "candidate_restored": true,
+  "error": "create_numbers_donut_chart.rs:68 returns Result<ChartData,DataError> where Result<ChartData,litchi_iwa::Error> is required",
+  "status": "confirmed-preexisting-iwork-example-failure"
+}

@@ -1,0 +1,22 @@
+{
+  "binary": {
+    "bytes": 13336376,
+    "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "sha256": "562b56251d75c000d93e6a08a27c12be6df3cf2d1329ab4f4c9f269a268ed47b"
+  },
+  "codec": {
+    "bytes": 4878728,
+    "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/codec-qualify",
+    "sha256": "0dabb58a789cf398021077139e501b07bf07cfc1540a64a0493380c4b89e5ef3"
+  },
+  "freeze": {
+    "bytes": 1203036,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/freeze-after-v2.json",
+    "sha256": "5a1ad7e11ef1c06fa0a42134dea2db6c6e5dc796c53fb9e9f5d865c85e869407"
+  },
+  "receipt": {
+    "bytes": 567,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/after-v2-probe-release/receipt.json",
+    "sha256": "06387e6af758eddaa326a8105ca3ae6dcb259b0a108b482d947caaf16fcbe603"
+  }
+}

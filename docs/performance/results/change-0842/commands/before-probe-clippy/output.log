@@ -1,0 +1,50 @@
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling num-traits v0.2.19
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+   Compiling zerocopy v0.8.56
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking chrono v0.4.45
+   Compiling thiserror-impl v2.0.18
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking thiserror v2.0.18
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking compression-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe)
+error[E0618]: expected function, found `sha2::Sha256`
+   --> codec.rs:381:30
+    |
+364 |     let mut digest = Sha256::new();
+    |         ---------- `digest` has type `sha2::Sha256`
+...
+381 |         let payload_sha256 = digest(&case.payload);
+    |                              ^^^^^^---------------
+    |                              |
+    |                              call expression requires function
+...
+425 | fn digest(bytes: &[u8]) -> String {
+    | --------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+
+For more information about this error, try `rustc --explain E0618`.
+error: could not compile `compression-probe` (bin "codec-qualify" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: enclosing `Ok` and `?` operator are unneeded
+   --> src/main.rs:630:5
+    |
+630 |     Ok(logical_identity_from_members(names, payloads)?)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_question_mark
+    = note: `-D clippy::needless-question-mark` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_question_mark)]`
+help: remove the enclosing `Ok` and `?` operator
+    |
+630 -     Ok(logical_identity_from_members(names, payloads)?)
+630 +     logical_identity_from_members(names, payloads)
+    |
+
+error: could not compile `compression-probe` (bin "compression-probe") due to 1 previous error

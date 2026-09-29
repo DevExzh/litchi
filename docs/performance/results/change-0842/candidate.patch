@@ -1,0 +1,191 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index b28ec88b56..fda0b2e75f 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -87,7 +87,8 @@ crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
+ encoding_rs   = "0.8"
+ fast-float2   = "0.2"
+ fixedbitset   = "0.5"
+-flate2        = { version = "1", features = ["zlib-rs"], default-features = false }
++# flate2 1.1.10 makes zlib-rs CPU dispatch opt-in when defaults are disabled.
++flate2        = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
+ font-kit      = "0.14"
+ hmac          = "0.13"
+ image         = { version = "0.25", features = ["default-formats", "rayon"] }
+diff --git a/crates/soapberry-zip/Cargo.toml b/crates/soapberry-zip/Cargo.toml
+index 6de41fdde6..339170ca5c 100644
+--- a/crates/soapberry-zip/Cargo.toml
++++ b/crates/soapberry-zip/Cargo.toml
+@@ -12,8 +12,8 @@ rust-version = "1.70"
+ [dependencies]
+ # Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
+ crc32fast = "1"
+-# Deflate compression - used by all Office formats
+-flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
++# Keep runtime CPU dispatch enabled with the Rust-only Deflate backend.
++flate2 = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
+ # Parallel processing for multi-threaded decompression
+ rayon = "1"
+ # SHA-256 replay fingerprints. Use the workspace's sha2 0.10 alias to avoid
+diff --git a/tools/native-resave/Cargo.lock b/tools/native-resave/Cargo.lock
+index 801b0081ea..6a1fd919ed 100644
+--- a/tools/native-resave/Cargo.lock
++++ b/tools/native-resave/Cargo.lock
+@@ -598,6 +598,7 @@ version = "1.1.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+ dependencies = [
++ "crc32fast",
+  "zlib-rs",
+ ]
+ 
+@@ -960,6 +961,7 @@ dependencies = [
+  "litchi-cfb",
+  "litchi-core",
+  "litchi-ole-common",
++ "md-5",
+  "quick-xml",
+  "rc4",
+  "sha1 0.11.0",
+@@ -982,9 +984,7 @@ dependencies = [
+  "litchi-ole-common",
+  "litchi-sign",
+  "litchi-vba",
+- "md-5",
+  "rand 0.10.2",
+- "rc4",
+  "serde_json",
+  "smallvec",
+  "subtle",
+@@ -1169,6 +1169,7 @@ dependencies = [
+  "quick-xml",
+  "rand 0.10.2",
+  "rsa",
++ "same-file",
+  "serde_json",
+  "sha1 0.11.0",
+  "sha2 0.11.0",
+@@ -1176,6 +1177,7 @@ dependencies = [
+  "smallvec",
+  "soapberry-zip",
+  "subtle",
++ "tempfile",
+  "x509-cert",
+  "xml-minifier",
+  "zeroize",
+@@ -1367,9 +1369,7 @@ dependencies = [
+  "litchi-ole-common",
+  "litchi-sign",
+  "litchi-vba",
+- "md-5",
+  "rand 0.10.2",
+- "rc4",
+  "serde_json",
+  "zerocopy",
+  "zeroize",
+@@ -1828,6 +1828,15 @@ version = "1.0.23"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+ 
++[[package]]
++name = "same-file"
++version = "1.0.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
++dependencies = [
++ "winapi-util",
++]
++
+ [[package]]
+ name = "scopeguard"
+ version = "1.2.0"
+@@ -2234,6 +2243,15 @@ dependencies = [
+  "unicode-ident",
+ ]
+ 
++[[package]]
++name = "winapi-util"
++version = "0.1.11"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
++dependencies = [
++ "windows-sys",
++]
++
+ [[package]]
+ name = "windows-core"
+ version = "0.62.2"
+diff --git a/tools/perf-baseline/Cargo.lock b/tools/perf-baseline/Cargo.lock
+index ef101f3ad6..adf5253fc6 100644
+--- a/tools/perf-baseline/Cargo.lock
++++ b/tools/perf-baseline/Cargo.lock
+@@ -2,12 +2,6 @@
+ # It is not intended for manual editing.
+ version = 4
+ 
+-[[package]]
+-name = "adler2"
+-version = "2.0.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
+-
+ [[package]]
+ name = "aead"
+ version = "0.6.1"
+@@ -589,11 +583,11 @@ checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
+ 
+ [[package]]
+ name = "flate2"
+-version = "1.1.9"
++version = "1.1.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
++checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+ dependencies = [
+- "miniz_oxide",
++ "crc32fast",
+  "zlib-rs",
+ ]
+ 
+@@ -1461,16 +1455,6 @@ version = "2.8.3"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+ 
+-[[package]]
+-name = "miniz_oxide"
+-version = "0.8.9"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
+-dependencies = [
+- "adler2",
+- "simd-adler32",
+-]
+-
+ [[package]]
+ name = "num-bigint-dig"
+ version = "0.8.6"
+@@ -1969,12 +1953,6 @@ dependencies = [
+  "rand_core 0.6.4",
+ ]
+ 
+-[[package]]
+-name = "simd-adler32"
+-version = "0.3.10"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+-
+ [[package]]
+ name = "siphasher"
+ version = "1.0.3"
+diff --git a/tools/perf-execution/Cargo.lock b/tools/perf-execution/Cargo.lock
+index b2505c1a5c..d70f1cc6f4 100644
+--- a/tools/perf-execution/Cargo.lock
++++ b/tools/perf-execution/Cargo.lock
+@@ -260,6 +260,7 @@ version = "1.1.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+ dependencies = [
++ "crc32fast",
+  "zlib-rs",
+ ]
+ 

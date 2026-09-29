@@ -1,0 +1,423 @@
+{
+  "schema": "litchi.compression-codec-qualification-0842.v1",
+  "tool": "compression-probe-0842-codecs",
+  "generator": {
+    "version": "0842-packet-v1",
+    "large_bytes": 33025,
+    "pattern": "litchi-0842-codec-pattern-0123456789abcdef",
+    "pattern_rule": "PATTERN[i modulo pattern.len()]",
+    "random_algorithm": "xorshift32; emit state shifted right 24 after each step",
+    "random_seed": 2654435769,
+    "tiny_literal": "soapberry-0842-tiny"
+  },
+  "payloads": [
+    {
+      "name": "codec/empty.bin",
+      "kind": "empty",
+      "bytes": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "codec/tiny.bin",
+      "kind": "tiny",
+      "bytes": 19,
+      "payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+    },
+    {
+      "name": "codec/pattern.bin",
+      "kind": "pattern",
+      "bytes": 33025,
+      "payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+    },
+    {
+      "name": "codec/random.bin",
+      "kind": "random",
+      "bytes": 33025,
+      "payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+    }
+  ],
+  "expected_logical": {
+    "bytes": 66069,
+    "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+  },
+  "routes": [
+    {
+      "route": "borrowed",
+      "api": "StreamingArchiveWriter::write_deflated",
+      "archive": {
+        "bytes": 33839,
+        "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "owned-write-1",
+      "api": "StreamingArchiveWriter::start_entry + Write",
+      "archive": {
+        "bytes": 33829,
+        "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "owned-write-7",
+      "api": "StreamingArchiveWriter::start_entry + Write",
+      "archive": {
+        "bytes": 33829,
+        "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "owned-write-32768",
+      "api": "StreamingArchiveWriter::start_entry + Write",
+      "archive": {
+        "bytes": 33829,
+        "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "sized",
+      "api": "StreamingArchiveWriter::write_deflated_sized",
+      "archive": {
+        "bytes": 33757,
+        "sha256": "83f8f50dbe4cc58017e4edddb3f5e65c1c01311911259af2eeff89e492c61e77"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "reader-stream",
+      "api": "StreamingArchiveWriter::write_deflated_stream",
+      "archive": {
+        "bytes": 33910,
+        "sha256": "c7ac237d350ac94a2c16f098af7bd44972ec2f93dcff925a48bd3d51cf90c412"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "reader-alias",
+      "api": "StreamingArchiveWriter::write_deflated_reader",
+      "archive": {
+        "bytes": 33840,
+        "sha256": "9103594ffba7afbb5f93e53cb3c1d763d83639dd99217f6bd343c1aacb4e9c9a"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "reusable",
+      "api": "StreamingArchiveWriter::write_deflated repeated on one writer",
+      "archive": {
+        "bytes": 33839,
+        "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    },
+    {
+      "route": "preserved-copy",
+      "api": "IndexedArchive::preservation_index + PreservationPlan::copy_all",
+      "archive": {
+        "bytes": 33839,
+        "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+      },
+      "logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "expected_logical": {
+        "bytes": 66069,
+        "sha256": "9b2f0765272411056f4a7148c54eb9ff14c2d015f3c027ea005d42a8aa6ce8f0"
+      },
+      "members": [
+        {
+          "name": "codec/empty.bin",
+          "bytes": 0,
+          "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "decoded_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "codec/tiny.bin",
+          "bytes": 19,
+          "expected_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72",
+          "decoded_payload_sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+        },
+        {
+          "name": "codec/pattern.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d",
+          "decoded_payload_sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+        },
+        {
+          "name": "codec/random.bin",
+          "bytes": 33025,
+          "expected_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d",
+          "decoded_payload_sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys;sys.path.insert(0,'docs/performance/results/change-0842');import qualify as q;import driver as d;rows=q.validate_items('qualification','before');d.write(d.P/'qualification-before.json',dict(status='pass',rows=rows,reader=d.desc(d.P/'reader.py')));print(len(rows),'baseline reports pass')
+                                                                                                                     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0842/qualify.py", line 49, in validate_items
+    validated=r.validate_report(folder/'report.json',row['shape'],row['mode'],row['samples'],row['warmup'],artifact_path=artifact_path,expected=expected)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0842/reader.py", line 598, in validate_report
+    expected_payload_size = TINY_BYTES if shape == "tiny" else LARGE_BYTES
+                            ^^^^^^^^^^
+NameError: name 'TINY_BYTES' is not defined

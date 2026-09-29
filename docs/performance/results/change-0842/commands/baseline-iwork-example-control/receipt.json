@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-iwa",
+    "--all-features",
+    "--example",
+    "create_numbers_donut_chart"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 101,
+  "finished_unix": 1790699910.880554,
+  "log": {
+    "bytes": 3030,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/baseline-iwork-example-control/output.log",
+    "sha256": "e1e7b6aefeaa1f14a6ae464809cc7088a7342c2b72941e5a5ebdd9d4f6ab54c7"
+  },
+  "started_unix": 1790699860.2041724
+}

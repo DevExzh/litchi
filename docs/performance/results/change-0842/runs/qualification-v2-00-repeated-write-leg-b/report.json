@@ -1,0 +1,83 @@
+{
+  "schema": "litchi.compression-probe-0842.v1",
+  "tool": "compression-probe-0842",
+  "mode": "write",
+  "shape": "repeated",
+  "shape_description": "three 1 MiB valid XML members and one repeated deterministic byte pattern",
+  "timing_scope": "litchi_opc::PackageWriter::to_bytes on a prepared OpcPackage",
+  "part_count": 4,
+  "parts": [
+    {
+      "name": "/word/document.xml",
+      "archive_name": "word/document.xml",
+      "content_type": "application/xml",
+      "role": "DOCX-like XML part"
+    },
+    {
+      "name": "/xl/workbook.xml",
+      "archive_name": "xl/workbook.xml",
+      "content_type": "application/xml",
+      "role": "XLSX-like XML part"
+    },
+    {
+      "name": "/ppt/presentation.xml",
+      "archive_name": "ppt/presentation.xml",
+      "content_type": "application/xml",
+      "role": "PPTX-like XML part"
+    },
+    {
+      "name": "/custom/payload.bin",
+      "archive_name": "custom/payload.bin",
+      "content_type": "application/octet-stream",
+      "role": "opaque payload part"
+    }
+  ],
+  "target_part": "/custom/payload.bin",
+  "member_payload_bytes": 1048576,
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 313897,
+    "sha256": "c522750e9e6810bd5a0116b010b07358f5868a98682e86b9f5c15f61709b57e3"
+  },
+  "expected_archive": {
+    "bytes": 313897,
+    "sha256": "c522750e9e6810bd5a0116b010b07358f5868a98682e86b9f5c15f61709b57e3"
+  },
+  "expected_logical": {
+    "bytes": 4194833,
+    "sha256": "f14f5db37b8731043631e1336b1eeae4299fbf324c7756dff116a5bb099361d7"
+  },
+  "expected_changed_archive": {
+    "bytes": 313897,
+    "sha256": "c1756f0209b80589291db561e22fa636baf33d6e656e384565deba8df546c695"
+  },
+  "expected_changed_logical": {
+    "bytes": 4194833,
+    "sha256": "1b895b20169941d06bbbb2eabfa88348ab61cf3a752daa65d9d064a166e78d8f"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 12055399,
+      "archive": {
+        "bytes": 313897,
+        "sha256": "c522750e9e6810bd5a0116b010b07358f5868a98682e86b9f5c15f61709b57e3"
+      },
+      "logical": {
+        "bytes": 4194833,
+        "sha256": "f14f5db37b8731043631e1336b1eeae4299fbf324c7756dff116a5bb099361d7"
+      },
+      "archive_exact_match": true,
+      "logical_exact_match": true,
+      "archive_role": "operation-output-archive",
+      "input_archive_sha256": "c522750e9e6810bd5a0116b010b07358f5868a98682e86b9f5c15f61709b57e3",
+      "expected_logical_sha256": "f14f5db37b8731043631e1336b1eeae4299fbf324c7756dff116a5bb099361d7",
+      "uncompressed_bytes": 4194833
+    }
+  ],
+  "artifact": {
+    "bytes": 313897,
+    "sha256": "c522750e9e6810bd5a0116b010b07358f5868a98682e86b9f5c15f61709b57e3"
+  }
+}

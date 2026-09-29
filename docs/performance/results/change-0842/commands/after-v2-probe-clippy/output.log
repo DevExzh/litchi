@@ -1,0 +1,6 @@
+    Checking zlib-rs v0.6.7
+    Checking flate2 v1.1.10
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking compression-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe)
+    Finished `dev` profile [unoptimized] target(s) in 2.92s

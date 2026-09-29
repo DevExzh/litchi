@@ -1,0 +1,69 @@
+   Compiling litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-protos)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ods)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odp)
+    Checking litchi-eval v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-eval)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-core)
+    Checking litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-archive)
+    Checking litchi-iwa-detect v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-detect)
+    Checking litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers-wire)
+    Checking litchi-iwa-text-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-text-wire)
+    Checking litchi-pages v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pages)
+    Checking litchi-numbers v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers)
+    Checking litchi-keynote v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-keynote)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Checking litchi-iwa-structured v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-structured)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-odc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odc)
+    Checking litchi-odi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odi)
+    Checking litchi-oth v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-oth)
+    Checking litchi-odb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odb)
+    Checking litchi-odf-formula v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-formula)
+    Checking litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+    Checking litchi-odm v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odm)
+ Documenting litchi-py v0.0.1 (/home/zhuhe/code/litchi/crates/pyo3-litchi)
+ Documenting litchi-odf v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf)
+ Documenting litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+ Documenting litchi-iwa v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa)
+ Documenting xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+ Documenting litchi-iwa-index v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-index)
+ Documenting litchi-iwa-structured v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-structured)
+ Documenting litchi-keynote v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-keynote)
+ Documenting litchi-pages v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pages)
+ Documenting litchi-numbers v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers)
+ Documenting litchi-iwa-detect v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-detect)
+ Documenting litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-archive)
+ Documenting litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers-wire)
+error: unresolved link to `read_table_cells`
+  |
+  = note: the link appears in this line:
+          
+          only after [`read_table_cells`] returns successfully.
+                      ^^^^^^^^^^^^^^^^^^
+  = note: no item named `read_table_cells` in scope
+  = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+  = note: requested on the command line with `-D rustdoc::broken-intra-doc-links`
+
+error: unresolved link to `SidecarReference`
+  |
+  = note: the link appears in this line:
+          
+          identifiers are kept behind [`SidecarReference`] and never appear in the
+                                       ^^^^^^^^^^^^^^^^^^
+  = note: no item named `SidecarReference` in scope
+  = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+error: could not document `litchi-numbers-wire`
+warning: build failed, waiting for other jobs to finish...

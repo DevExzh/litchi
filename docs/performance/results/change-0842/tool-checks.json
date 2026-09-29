@@ -1,0 +1,25 @@
+{
+  "receipts": [
+    {
+      "bytes": 546,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/perf-baseline-locked-check/receipt.json",
+      "sha256": "0aee7fe1b95487d10793843e3a061b1bf36fb86a9a8015bdb73b266f8eddd6f7"
+    },
+    {
+      "bytes": 532,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/perf-execution-locked-check/receipt.json",
+      "sha256": "ebd0ab948a8b132dd4099bf402634ace3cd2bd4005af61d42edd290b1d31d3f6"
+    },
+    {
+      "bytes": 572,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-resave-locked-check/receipt.json",
+      "sha256": "f40948a8c706e1b32eb319e5b83574d6bd3e2ad931a4d6d61ca588880ab712b2"
+    }
+  ],
+  "source": {
+    "bytes": 1202344,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/source-final.json",
+    "sha256": "21155baccb37beaf510d0a67215d140d3d9dc4020e3681d7bb29757bdf63fd3b"
+  },
+  "status": "pass"
+}

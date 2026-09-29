@@ -1,0 +1,25 @@
+{
+  "action": "Keep excluded iWork unchanged; require warning-denied docs for the five affected crates.",
+  "baseline_dependency_manifests": {
+    "Cargo.toml": "3e7ec71577c193392836925963e893137f9086b1b7161ffea483e08aafb41d44",
+    "crates/soapberry-zip/Cargo.toml": "ae7d9795fa4c5724b602d074a5e6279c842811dbc4ce532a895d1dc7d04ce077"
+  },
+  "baseline_receipt": {
+    "bytes": 524,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/baseline-iwork-doc-control/receipt.json",
+    "sha256": "1b86eac07a0de55a000f48be81db6451b8184aa1dea487c7a89f8424876e2b40"
+  },
+  "candidate_receipt": {
+    "bytes": 505,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/after-final-workspace-doc/receipt.json",
+    "sha256": "9ecef39fcee328cfe7b76baf6896ffb1408f2c9b5de0b7299aa309ce1346dc2d"
+  },
+  "candidate_restored": true,
+  "control_driver": {
+    "bytes": 2318,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/quality_finish.py",
+    "sha256": "6ced6440f147619ac8831841b5ad6cbb4af7bdfefc7bcd304b42a9c1809516bf"
+  },
+  "error": "Unresolved read_table_cells and SidecarReference rustdoc links in litchi-numbers-wire",
+  "status": "confirmed-preexisting-iwork-doc-failure"
+}

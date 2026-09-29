@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/tools/native-resave/Cargo.toml",
+    "--format-version",
+    "1"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790701303.1684432,
+  "log": {
+    "bytes": 290129,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-resave-locked-metadata/output.log",
+    "sha256": "332031d5898fd54e9cdcbf5fb373551ca178e2eeccb3b0b91d8058fd3be31ff2"
+  },
+  "started_unix": 1790701303.114843
+}

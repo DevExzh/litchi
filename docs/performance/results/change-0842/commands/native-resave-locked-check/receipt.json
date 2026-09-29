@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/tools/native-resave/Cargo.toml",
+    "--features",
+    "docx,xlsx,pptx"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790701385.5313182,
+  "log": {
+    "bytes": 3207,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/native-resave-locked-check/output.log",
+    "sha256": "7078a7ca492ba6278f30eafef1939e06a0a690e2e556fa4926d8c7213568ef19"
+  },
+  "started_unix": 1790701359.822455
+}

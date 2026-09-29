@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0842 — restore runtime compression dispatch
+
+[0842](0842-opc-runtime-compression-dispatch.md) adopts explicit flate2 runtime detection with exact archive bytes. In the named generic OPC warm protocol, large read p50 improves 14.46–21.32% and compressible changed-Part publication 33.81–38.36%. Original tiny p99 flags remain visible; a separate 24-process confirmation did not reproduce them. All 192 timing reports / 28,344 samples validate, with 6,931 affected-owner tests passing. Baseline-confirmed iWork gate failures and standalone lock repairs are explicit. No semantic Office, universal-tail or broad-goal completion claim follows.
+
 ## 0841 — current PPT borrowed-text instruction diagnosis
 
 [0841](0841-ppt-borrowed-text-instruction-diagnostic.md) localizes the rejected borrowed-text candidate to lower operation-scoped guest Ir: many about −1.36%, Unicode −5.48%, ASCII payload −37.51%, with identical Unicode textbox-encoder self Ir. Historical native regressions do not reproduce; their cause remains unproven. A separate dependency audit confirms that the current OPC-only flate2 1.1.10 graph lacks the runtime-dispatch feature present in 0836’s 1.1.9 harness graph. Fresh current-graph qualification is the next compression target.

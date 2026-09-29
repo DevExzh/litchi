@@ -87,7 +87,8 @@ crc-fast      = { version = "1.8", features = ["optimize_crc32_auto"] }
 encoding_rs   = "0.8"
 fast-float2   = "0.2"
 fixedbitset   = "0.5"
-flate2        = { version = "1", features = ["zlib-rs"], default-features = false }
+# flate2 1.1.10 makes zlib-rs CPU dispatch opt-in when defaults are disabled.
+flate2        = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
 font-kit      = "0.14"
 hmac          = "0.13"
 image         = { version = "0.25", features = ["default-formats", "rayon"] }

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys;sys.path.insert(0,'docs/performance/results/change-0842');import qualify as q;import driver as d;rows=q.validate_items('qualification','before');d.write(d.P/'qualification-before.json',dict(status='pass',rows=rows,reader=d.desc(d.P/'reader.py')));print(len(rows),'baseline reports pass')"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790699352.639507,
+  "log": {
+    "bytes": 25,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/baseline-qualification-reader-v2/output.log",
+    "sha256": "3a355c0b57d43de5352ca80801e7ca1f882ec280a2da91e7e708d0df1518a11c"
+  },
+  "started_unix": 1790699351.2176878
+}

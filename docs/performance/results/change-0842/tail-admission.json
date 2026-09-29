@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "bytes": 4137,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tail-plan.json",
+      "sha256": "e6408b9f5f3c5bca8c9370f36f7a853669f564507278a145b15722f0da47ec75"
+    },
+    {
+      "bytes": 1519,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tail_capture.py",
+      "sha256": "380d311335af3c9bb0f95a61a7ad3072747779e10e71aadf9b9d2236d8cc0a22"
+    },
+    {
+      "bytes": 2481,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tail_analyze.py",
+      "sha256": "802bcc23bf0cc535c77cf868c21a6e10e71829a0a7872383d969bfcbaa3dea78"
+    },
+    {
+      "bytes": 121255,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/admission.json",
+      "sha256": "a255f437eecf989bd8ee26991cd9ca8b2a1a2c69fe05093eee8092b3a7cce5a3"
+    },
+    {
+      "bytes": 2476362,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/analysis.json",
+      "sha256": "2fb1e2571d8b2c2e56eebd8d1255c52f49029999a2c75a1ad7711d7fad090054"
+    },
+    {
+      "bytes": 872,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/build-before.json",
+      "sha256": "fd665737586546e7310d6e8c9cebc9de26e4cb9c22c1d7126b84ff5d804f35ee"
+    },
+    {
+      "bytes": 870,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/build-after.json",
+      "sha256": "e343157c3085c7c00138d383d0c54898abb05b9ac1a3d1f9d379b654febebbc8"
+    }
+  ],
+  "status": "pass"
+}

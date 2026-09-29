@@ -1,0 +1,20 @@
+zlib-rs v0.6.7
+├── zlib-rs feature "rust-allocator"
+│   └── flate2 v1.1.10
+│       ├── flate2 feature "any_impl"
+│       │   └── flate2 feature "any_zlib"
+│       │       └── flate2 feature "zlib-rs"
+│       │           └── soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+│       │               └── soapberry-zip feature "default"
+│       │                   ├── compression-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe)
+│       │                   │   └── compression-probe feature "default" (command-line)
+│       │                   └── litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+│       │                       └── litchi-opc feature "default"
+│       │                           └── compression-probe v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0842/probe) (*)
+│       ├── flate2 feature "any_zlib" (*)
+│       ├── flate2 feature "runtime_detection"
+│       │   └── soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip) (*)
+│       └── flate2 feature "zlib-rs" (*)
+│   └── zlib-rs feature "std"
+│       └── flate2 feature "runtime_detection" (*)
+└── zlib-rs feature "std" (*)

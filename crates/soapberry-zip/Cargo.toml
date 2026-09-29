@@ -12,8 +12,8 @@ rust-version = "1.70"
 [dependencies]
 # Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
 crc32fast = "1"
-# Deflate compression - used by all Office formats
-flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+# Keep runtime CPU dispatch enabled with the Rust-only Deflate backend.
+flate2 = { version = "1.1.10", features = ["zlib-rs", "runtime_detection"], default-features = false }
 # Parallel processing for multi-threaded decompression
 rayon = "1"
 # SHA-256 replay fingerprints. Use the workspace's sha2 0.10 alias to avoid

@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0842/codec_check.py",
+    "before"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790699580.2594192,
+  "log": {
+    "bytes": 41,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/codecs-independent-before/output.log",
+    "sha256": "df0f4323850dac86b90e7728c1b9147d2de05c8a4be49a6bcb60035f4f6991de"
+  },
+  "started_unix": 1790699580.2143257
+}

@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "doc",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-numbers-wire",
+    "--all-features",
+    "--no-deps"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 101,
+  "finished_unix": 1790700639.0332572,
+  "log": {
+    "bytes": 1265,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/baseline-iwork-doc-control/output.log",
+    "sha256": "d27755e9735c97860e1002ce20bf29902eb29221f494adb2beec52cd20d39443"
+  },
+  "started_unix": 1790700617.7270489
+}

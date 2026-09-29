@@ -1,0 +1,1785 @@
+{
+  "archives": 9,
+  "checker": {
+    "bytes": 3764,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/codec_check.py",
+    "sha256": "42b113095e008688c30386d62b679540d48576e2af4bc05d9b43018fc408f8f6"
+  },
+  "limitation": "Nine named artifacts include a duplicate borrowed/reusable control; this is not nine distinct algorithms.",
+  "members": 36,
+  "processes": 1,
+  "reader": {
+    "bytes": 34685,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/reader.py",
+    "sha256": "925dbb9f3ed1e2b1d981667b32d3932b136ce0c9a2d177b8aae8dadff0d57830"
+  },
+  "results": {
+    "before": [
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33839,
+            "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 7,
+                "sha256": "5f56d3024ccaf9b4f40afb7e7f2b54937d4fa6f6897b0b1251745f135553c739"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 68,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 27,
+                "sha256": "99b622bee6a86d8daf2a8cb7cbdc1782a1d6f010bf62e082dc6799f0d3528e1a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 155,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 251,
+                "sha256": "37f30860a8088ab409b78dd96b66108aa6d5541adea926b3fecee6720169f560"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 469,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "borrowed"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33829,
+            "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 2,
+                "sha256": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 63,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 21,
+                "sha256": "34b7c5110b5a4d609c745f99f3f461cdfa2c7181fd96e75cbdaa1139c315c6a6"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 144,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 252,
+                "sha256": "eeba190fcf5e42ec77c0400fa0e50cde2b0386a19d303f4bf1b23bc3ae4d03f1"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 459,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "owned-write-1"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33829,
+            "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 2,
+                "sha256": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 63,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 21,
+                "sha256": "34b7c5110b5a4d609c745f99f3f461cdfa2c7181fd96e75cbdaa1139c315c6a6"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 144,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 252,
+                "sha256": "eeba190fcf5e42ec77c0400fa0e50cde2b0386a19d303f4bf1b23bc3ae4d03f1"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 459,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "owned-write-7"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33829,
+            "sha256": "7222a6be1a0ca95087f8d7db5cdb679907ab61bd3be742bdccaaccec19d04c1c"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 2,
+                "sha256": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 63,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 21,
+                "sha256": "34b7c5110b5a4d609c745f99f3f461cdfa2c7181fd96e75cbdaa1139c315c6a6"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 144,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 252,
+                "sha256": "eeba190fcf5e42ec77c0400fa0e50cde2b0386a19d303f4bf1b23bc3ae4d03f1"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 459,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "owned-write-32768"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33757,
+            "sha256": "83f8f50dbe4cc58017e4edddb3f5e65c1c01311911259af2eeff89e492c61e77"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 0,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 0,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 2,
+                "sha256": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 0,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 0,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 47,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 21,
+                "sha256": "34b7c5110b5a4d609c745f99f3f461cdfa2c7181fd96e75cbdaa1139c315c6a6"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 0,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 0,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 112,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 244,
+                "sha256": "09b00d15e12f70e6e30702dc47e1991fdfde83f6d9a74b449a5b4466a28c04f3"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 0,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 0,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 403,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "sized"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33910,
+            "sha256": "c7ac237d350ac94a2c16f098af7bd44972ec2f93dcff925a48bd3d51cf90c412"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 7,
+                "sha256": "5f56d3024ccaf9b4f40afb7e7f2b54937d4fa6f6897b0b1251745f135553c739"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 68,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 27,
+                "sha256": "99b622bee6a86d8daf2a8cb7cbdc1782a1d6f010bf62e082dc6799f0d3528e1a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 155,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 315,
+                "sha256": "0b98cff31e341aac95b6f84b03991fd4996892024fa380f301487f12ea7a692d"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 533,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33047,
+                "sha256": "f0f8f6c91c55a5f195c1474a3ab93a79d61af9b5934ed5129324f2aaeeb9e1ce"
+              }
+            }
+          ]
+        },
+        "route": "reader-stream"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33840,
+            "sha256": "9103594ffba7afbb5f93e53cb3c1d763d83639dd99217f6bd343c1aacb4e9c9a"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 7,
+                "sha256": "5f56d3024ccaf9b4f40afb7e7f2b54937d4fa6f6897b0b1251745f135553c739"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 68,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 27,
+                "sha256": "99b622bee6a86d8daf2a8cb7cbdc1782a1d6f010bf62e082dc6799f0d3528e1a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 155,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 245,
+                "sha256": "0ca38ebca21df1f85b89c9c97bf0c6aacc49053e7d11fd0aefecd18537fa924a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 463,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33047,
+                "sha256": "f0f8f6c91c55a5f195c1474a3ab93a79d61af9b5934ed5129324f2aaeeb9e1ce"
+              }
+            }
+          ]
+        },
+        "route": "reader-alias"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33839,
+            "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 7,
+                "sha256": "5f56d3024ccaf9b4f40afb7e7f2b54937d4fa6f6897b0b1251745f135553c739"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 68,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 27,
+                "sha256": "99b622bee6a86d8daf2a8cb7cbdc1782a1d6f010bf62e082dc6799f0d3528e1a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 155,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 251,
+                "sha256": "37f30860a8088ab409b78dd96b66108aa6d5541adea926b3fecee6720169f560"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 469,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "reusable"
+      },
+      {
+        "manifest": {
+          "archive": {
+            "bytes": 33839,
+            "sha256": "c7cbed8f164bf46967450aedf0dd96275da7f6760b48be6baf02ecda6310d8b8"
+          },
+          "member_count": 4,
+          "members": [
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 0,
+              "crc32_hex": "00000000",
+              "index": 0,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 15,
+                "offset": 0,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "name": "codec/empty.bin",
+              "raw": {
+                "bytes": 7,
+                "sha256": "5f56d3024ccaf9b4f40afb7e7f2b54937d4fa6f6897b0b1251745f135553c739"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 3522725509,
+              "crc32_hex": "d1f88685",
+              "index": 1,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 14,
+                "offset": 68,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 19,
+                "sha256": "40ded1984a59cd21889542d487e70dbaaabf9e471ce3abd63e9ccdc740006f72"
+              },
+              "name": "codec/tiny.bin",
+              "raw": {
+                "bytes": 27,
+                "sha256": "99b622bee6a86d8daf2a8cb7cbdc1782a1d6f010bf62e082dc6799f0d3528e1a"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 729953373,
+              "crc32_hex": "2b82345d",
+              "index": 2,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 17,
+                "offset": 155,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "04f7e15b48ff3b214ff3695a5d858e20d50740f42c7b37e98e5a0b815369823d"
+              },
+              "name": "codec/pattern.bin",
+              "raw": {
+                "bytes": 251,
+                "sha256": "37f30860a8088ab409b78dd96b66108aa6d5541adea926b3fecee6720169f560"
+              }
+            },
+            {
+              "central": {
+                "comment": "",
+                "compress_type": 8,
+                "create_system": 0,
+                "create_version": 20,
+                "date_time": [
+                  1980,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "external_attr": 0,
+                "extra": "",
+                "extract_version": 20,
+                "flag_bits": 8,
+                "internal_attr": 0,
+                "reserved": 0,
+                "volume": 0
+              },
+              "compression": "deflated",
+              "crc32": 2533753481,
+              "crc32_hex": "97060289",
+              "index": 3,
+              "local": {
+                "extra_bytes": 0,
+                "flags": 8,
+                "mdate": 0,
+                "method": 8,
+                "mtime": 0,
+                "name_bytes": 16,
+                "offset": 469,
+                "version": 20
+              },
+              "logical": {
+                "bytes": 33025,
+                "sha256": "678dc48cd3c323c26336c38c0b3f6b534aa9b8ea3ab053e6fe005f7eb778d06d"
+              },
+              "name": "codec/random.bin",
+              "raw": {
+                "bytes": 33040,
+                "sha256": "049ebef4f4e09c52b661e2713a919f1007c7bf41e850d9e8311933b2bcb65ab9"
+              }
+            }
+          ]
+        },
+        "route": "preserved-copy"
+      }
+    ]
+  },
+  "status": "pass"
+}

@@ -1,0 +1,39 @@
+{
+  "checks": [
+    "zip-logical-crc-raw-metadata",
+    "zip-duplicate-member",
+    "zip-unsafe-member",
+    "zip-compressed-byte-metadata-mismatch",
+    "qualification-valid",
+    "missing-schema",
+    "wrong-schema",
+    "wrong-shape",
+    "wrong-part-count",
+    "wrong-member-dimension",
+    "wrong-warmup",
+    "wrong-sample-count",
+    "zero-elapsed",
+    "nonfinite-elapsed",
+    "wrong-source-hash",
+    "false-archive-witness",
+    "false-logical-witness",
+    "wrong-report-artifact",
+    "artifact-byte-corruption"
+  ],
+  "reader": {
+    "bytes": 34685,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/reader.py",
+    "sha256": "925dbb9f3ed1e2b1d981667b32d3932b136ce0c9a2d177b8aae8dadff0d57830"
+  },
+  "receipt": {
+    "bytes": 459,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/reader-tests/receipt.json",
+    "sha256": "e78c3d55f265666afa036dde80022f84b5fefcbb033590c6578ca2387b053e6b"
+  },
+  "status": "pass",
+  "tests": {
+    "bytes": 6644,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/reader_tests.py",
+    "sha256": "14ba5fd5212bee9d8d4002f0383a74225bf768d665e6d1dd4885b62ae77d8eab"
+  }
+}

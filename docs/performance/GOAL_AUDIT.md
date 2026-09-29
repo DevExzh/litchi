@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0842 — restore runtime compression dispatch
+
+[0842](0842-opc-runtime-compression-dispatch.md) adopts explicit flate2 runtime detection with exact archive bytes. In the named generic OPC warm protocol, large read p50 improves 14.46–21.32% and compressible changed-Part publication 33.81–38.36%. Original tiny p99 flags remain visible; a separate 24-process confirmation did not reproduce them. All 192 timing reports / 28,344 samples validate, with 6,931 affected-owner tests passing. Baseline-confirmed iWork gate failures and standalone lock repairs are explicit. No semantic Office, universal-tail or broad-goal completion claim follows.
+
 ## 0841 — current PPT borrowed-text instruction diagnosis
 
 [0841](0841-ppt-borrowed-text-instruction-diagnostic.md) makes verified diagnostic progress: 156 reports / 3,636 samples, exact artifact parity, lower scoped guest Ir, thirty native quantile cross-checks and sixty independently recomputed intervals. Current many/Unicode regressions do not reproduce, but no candidate is adopted and no historical cause is assigned. Reader freeze/command-format defects are retained and repaired additively without rerunning workloads. Production and unrelated work are preserved; the broad goal is not complete.

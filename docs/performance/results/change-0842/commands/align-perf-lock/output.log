@@ -1,0 +1,5 @@
+    Removing adler2 v2.0.1
+    Updating flate2 v1.1.9 -> v1.1.10
+    Removing miniz_oxide v0.8.9
+    Removing simd-adler32 v0.3.10
+note: pass `--verbose` to see 57 unchanged dependencies behind latest

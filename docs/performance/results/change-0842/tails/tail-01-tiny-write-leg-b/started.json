@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-write-leg-b/time.txt",
+    "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "--mode",
+    "write",
+    "--shape",
+    "tiny",
+    "--samples",
+    "1000",
+    "--warmup",
+    "10",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0842/tails/tail-01-tiny-write-leg-b/report.json"
+  ],
+  "binary": {
+    "bytes": 13336376,
+    "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+    "sha256": "562b56251d75c000d93e6a08a27c12be6df3cf2d1329ab4f4c9f269a268ed47b"
+  },
+  "build": {
+    "bytes": 870,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/build-after.json",
+    "sha256": "e343157c3085c7c00138d383d0c54898abb05b9ac1a3d1f9d379b654febebbc8"
+  },
+  "lane": "tail",
+  "row": {
+    "block": 1,
+    "leg": "after",
+    "mode": "write",
+    "samples": 1000,
+    "shape": "tiny",
+    "warmup": 10
+  },
+  "started_unix": 1790701648.6767342
+}

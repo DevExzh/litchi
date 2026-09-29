@@ -1,0 +1,49 @@
+{
+  "removed": [
+    {
+      "files": 69673,
+      "logical_bytes": 10753630869,
+      "path": "/home/zhuhe/code/litchi-target-0842"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0842"
+    }
+  ],
+  "status": "pass",
+  "verified_binaries": [
+    {
+      "bytes": 13266192,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-a/compression-probe",
+      "sha256": "e611d07769cd61fdbaa13fb63291b28fb298b03e05dd212e4fda08e6472714e1"
+    },
+    {
+      "bytes": 4807040,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-a/codec-qualify",
+      "sha256": "285c970248db2891bb91d84f13ec8521f67988d1601586224681679232b0d48f"
+    },
+    {
+      "bytes": 13336376,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/compression-probe",
+      "sha256": "562b56251d75c000d93e6a08a27c12be6df3cf2d1329ab4f4c9f269a268ed47b"
+    },
+    {
+      "bytes": 4878728,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/leg-b/codec-qualify",
+      "sha256": "0dabb58a789cf398021077139e501b07bf07cfc1540a64a0493380c4b89e5ef3"
+    }
+  ],
+  "verified_initial_binaries": [
+    {
+      "bytes": 13259232,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/initial-leg-a/compression-probe",
+      "sha256": "b5da922e3d1ba68fd560d9ff69b3d47bba652d11737e55b5a856cd290f5caff1"
+    },
+    {
+      "bytes": 4807040,
+      "path": "/home/zhuhe/code/litchi-target-0842/retained/initial-leg-a/codec-qualify",
+      "sha256": "285c970248db2891bb91d84f13ec8521f67988d1601586224681679232b0d48f"
+    }
+  ]
+}

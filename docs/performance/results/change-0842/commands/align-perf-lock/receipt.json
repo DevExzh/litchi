@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "update",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "-p",
+    "flate2",
+    "--precise",
+    "1.1.10"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790699399.069407,
+  "log": {
+    "bytes": 201,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/align-perf-lock/output.log",
+    "sha256": "a1f02234f5cd652b185983e2c38495b75fc88b62056d16690fb6901a1e28b86d"
+  },
+  "started_unix": 1790699398.9323874
+}

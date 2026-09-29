@@ -1,0 +1,34 @@
+{
+  "baseline_control": {
+    "bytes": 6459,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/native-resave-lock-drift.json",
+    "sha256": "790f68117d61ce8e2e3f6e7c7c9e5d72c45180b3680e07b45835b301be4bb084"
+  },
+  "failures": [
+    {
+      "exit_code": 1,
+      "reason": "Guard detected additional native-resave lock drift; metadata commands succeeded, formal timing not started.",
+      "script": {
+        "bytes": 2816,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/integrate_locks.py",
+        "sha256": "cbfb16bb20555cdeaca9a838313654055a0e3c68d5ed8de10b0d2b52574ae690"
+      }
+    },
+    {
+      "exit_code": 1,
+      "reason": "Baseline normalization and exact feature-only comparison succeeded, but the hand-written expected local-package name list was incorrect. Actual changed packages are litchi-crypto/doc/odt/xls.",
+      "script": {
+        "bytes": 4712,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/integrate_locks_v2.py",
+        "sha256": "b48c51eafeab547160cebb2de6c97b2531b65438c3fb1042ee5d32156935ccb8"
+      }
+    }
+  ],
+  "formal_native_runs": 0,
+  "resolution": {
+    "bytes": 4455,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/integrate_locks_v3.py",
+    "sha256": "b22473eb8d60d41402eac19a59a27a28fb98dc04d8c9f361049915863557d5d7"
+  },
+  "status": "resolved-before-native-admission"
+}

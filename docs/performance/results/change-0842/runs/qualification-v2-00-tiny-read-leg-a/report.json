@@ -1,0 +1,83 @@
+{
+  "schema": "litchi.compression-probe-0842.v1",
+  "tool": "compression-probe-0842",
+  "mode": "read",
+  "shape": "tiny",
+  "shape_description": "four 64-byte members",
+  "timing_scope": "ArchiveReader::new plus indexed reads and Deflate decompression of every member",
+  "part_count": 4,
+  "parts": [
+    {
+      "name": "/word/document.xml",
+      "archive_name": "word/document.xml",
+      "content_type": "application/xml",
+      "role": "DOCX-like XML part"
+    },
+    {
+      "name": "/xl/workbook.xml",
+      "archive_name": "xl/workbook.xml",
+      "content_type": "application/xml",
+      "role": "XLSX-like XML part"
+    },
+    {
+      "name": "/ppt/presentation.xml",
+      "archive_name": "ppt/presentation.xml",
+      "content_type": "application/xml",
+      "role": "PPTX-like XML part"
+    },
+    {
+      "name": "/custom/payload.bin",
+      "archive_name": "custom/payload.bin",
+      "content_type": "application/octet-stream",
+      "role": "opaque payload part"
+    }
+  ],
+  "target_part": "/custom/payload.bin",
+  "member_payload_bytes": 64,
+  "warmup": 0,
+  "samples_requested": 1,
+  "source": {
+    "bytes": 1396,
+    "sha256": "ab8bece0f1688df2273def42c6d853c269eb77a5a2887883f2851826242fe04f"
+  },
+  "expected_archive": {
+    "bytes": 1396,
+    "sha256": "ab8bece0f1688df2273def42c6d853c269eb77a5a2887883f2851826242fe04f"
+  },
+  "expected_logical": {
+    "bytes": 785,
+    "sha256": "d09e5a42c69603ee89386e02992b9123ac4c173c8c4b9111f6d98afb8628ff19"
+  },
+  "expected_changed_archive": {
+    "bytes": 1392,
+    "sha256": "d17ec4601910ebe1e444c4818ee7d3530c6fce4f6663361229f43bf296967113"
+  },
+  "expected_changed_logical": {
+    "bytes": 785,
+    "sha256": "8594e6f44b65260b69b6f08060c9c4d9ddc21ee36642617c68e0e7b337d6a9d2"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 8120,
+      "archive": {
+        "bytes": 1396,
+        "sha256": "ab8bece0f1688df2273def42c6d853c269eb77a5a2887883f2851826242fe04f"
+      },
+      "logical": {
+        "bytes": 785,
+        "sha256": "d09e5a42c69603ee89386e02992b9123ac4c173c8c4b9111f6d98afb8628ff19"
+      },
+      "archive_exact_match": true,
+      "logical_exact_match": true,
+      "archive_role": "input-source-archive",
+      "input_archive_sha256": "ab8bece0f1688df2273def42c6d853c269eb77a5a2887883f2851826242fe04f",
+      "expected_logical_sha256": "d09e5a42c69603ee89386e02992b9123ac4c173c8c4b9111f6d98afb8628ff19",
+      "uncompressed_bytes": 785
+    }
+  ],
+  "artifact": {
+    "bytes": 1396,
+    "sha256": "ab8bece0f1688df2273def42c6d853c269eb77a5a2887883f2851826242fe04f"
+  }
+}

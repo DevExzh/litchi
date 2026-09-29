@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0842/codec_check_v2.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790699839.7977736,
+  "log": {
+    "bytes": 66,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/commands/codecs-explicit-deflate/output.log",
+    "sha256": "fd6295fdb28169119fcb0a979f425ea20b48a7ef67be0abfe2c5a57a79d12bd9"
+  },
+  "started_unix": 1790699839.738722
+}

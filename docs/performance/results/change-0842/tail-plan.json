@@ -1,0 +1,205 @@
+{
+  "cpu": 12,
+  "decision_rule": "Review each p50/p95/p99/RSS paired median ratio >1.05 with95% lower endpoint >1. Any such unresolved common-workload damage prevents adoption; original flags remain disclosed. No retries or selective replacement.",
+  "original_analysis": {
+    "bytes": 2476362,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0842/analysis.json",
+    "sha256": "2fb1e2571d8b2c2e56eebd8d1255c52f49029999a2c75a1ad7711d7fad090054"
+  },
+  "reason": "Original tiny write/read p99 point flags; original p99 was max of30 observations. Longer separate confirmation estimates p99 from1000 samples per child, using identical binaries/protocol.",
+  "rows": [
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 0,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 0,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 1,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 1,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 2,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 2,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 3,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 3,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 4,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 4,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "read",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 5,
+      "leg": "after",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    },
+    {
+      "block": 5,
+      "leg": "before",
+      "mode": "write",
+      "samples": 1000,
+      "shape": "tiny",
+      "warmup": 10
+    }
+  ],
+  "schema": "litchi.compression-tail-confirmation-0842.v1"
+}

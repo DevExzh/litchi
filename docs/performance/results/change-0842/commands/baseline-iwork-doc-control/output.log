@@ -1,0 +1,28 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+    Checking once_cell v1.21.4
+    Checking buffa v0.9.1
+    Checking litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-protos)
+    Checking chrono v0.4.45
+    Checking litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-iwa-common)
+ Documenting litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-numbers-wire)
+error: unresolved link to `read_table_cells`
+  |
+  = note: the link appears in this line:
+          
+          only after [`read_table_cells`] returns successfully.
+                      ^^^^^^^^^^^^^^^^^^
+  = note: no item named `read_table_cells` in scope
+  = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+  = note: requested on the command line with `-D rustdoc::broken-intra-doc-links`
+
+error: unresolved link to `SidecarReference`
+  |
+  = note: the link appears in this line:
+          
+          identifiers are kept behind [`SidecarReference`] and never appear in the
+                                       ^^^^^^^^^^^^^^^^^^
+  = note: no item named `SidecarReference` in scope
+  = help: to escape `[` and `]` characters, add '\' before them like `\[` or `\]`
+
+error: could not document `litchi-numbers-wire`
