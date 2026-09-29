@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver_sha256": "bd2a0ce6bea3a13e905e0cdaaf6fb949f5c15618029bd1d141728c2e5256b766",
+  "prepare_sha256": "993e2edfe77e1c46216c79fbd4a4a56b1ed0ac02c23cabd4de27e41cad46eaed",
+  "started_unix": 1790642326.8456302
+}

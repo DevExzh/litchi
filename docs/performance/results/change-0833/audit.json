@@ -1,0 +1,58 @@
+{
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "qualification-00",
+      "report_retained": true
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-01",
+      "report_retained": true
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-02",
+      "report_retained": true
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-03",
+      "report_retained": true
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-04",
+      "report_retained": true
+    },
+    {
+      "exit_code": 1,
+      "label": "qualification-05",
+      "report_retained": false
+    },
+    {
+      "exit_code": 0,
+      "label": "diagnostic-pptx-warm",
+      "report_retained": true
+    },
+    {
+      "exit_code": 1,
+      "label": "diagnostic-pptx-cold",
+      "report_retained": false
+    },
+    {
+      "exit_code": 1,
+      "label": "diagnostic-opc-save-pair-cold",
+      "report_retained": false
+    }
+  ],
+  "disposition": "qualification_failed",
+  "formal_reports": 0,
+  "inputs_checked": 9388,
+  "opcode_cold_output_byte_difference": 1776,
+  "performance_claim": "none",
+  "quality_gates_reused": 8,
+  "retained_qualification_diagnostic_samples": 11,
+  "retained_reports": 6,
+  "status": "pass"
+}

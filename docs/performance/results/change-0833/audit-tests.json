@@ -1,0 +1,20 @@
+{
+  "audit_sha256": "84aa5437e34687bb5a14ec8a23b218389da1769b673022cdedfdba6f25457731",
+  "rejected_mutations": [
+    "cold-status",
+    "cold-resident",
+    "cold-read-bytes",
+    "cold-post-tool",
+    "archive-identity",
+    "output-identity",
+    "output-padding",
+    "read-count",
+    "sample-clock",
+    "binary-identity",
+    "missing-state",
+    "configuration"
+  ],
+  "script_sha256": "a5639e0330188b29ad127a3a04592fcf9a87a9a5a2da5a6d6cf016e14adc663b",
+  "status": "pass",
+  "valid_control": 1
+}

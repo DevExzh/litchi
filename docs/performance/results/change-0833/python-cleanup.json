@@ -1,0 +1,10 @@
+{
+  "removed": [
+    {
+      "bytes": 70408,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/__pycache__/reader.cpython-314.pyc",
+      "sha256": "dd405f7add80595c624a79502d22accac84ef069f955e792d95c0043c9e08e03"
+    }
+  ],
+  "status": "complete"
+}

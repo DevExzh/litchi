@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0833 — cold filesystem qualification blocked
+
+[0833](0833-filesystem-cold-qualification.md) Fresh six-case qualification stops before the planned 72-report matrix. Warm-only PPTX source access passes; cold-only replay rejects payload-range classification. Cold OPC save routes pass separately but differ by a 1,776-byte alignment comment and fail the combined output-parity gate. Six retained reports contain eleven diagnostic samples; no performance baseline advances. Production is unchanged, and the next task is a bounded harness-evidence correction.
+
 ## 0832 — first XLSX column record stored inline
 
 [0832](0832-xlsx-inline-column-map.md) The matched parent experiment retains 180 reports / 20,304 samples. Real-edit requested bytes fall 2,373,966→276,494 (88.35%); paired native p50 ratio is 0.895998 [0.887658–0.898114]. Lifecycle ratio is 0.990366 [0.981989–0.996211]. A separate 48-report / 12,040-sample promotion guard passes without regression flags; no RSS reduction is claimed.

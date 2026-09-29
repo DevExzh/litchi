@@ -1,0 +1,30 @@
+{
+  "qualification": {
+    "bytes": 3290,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/qualification.json",
+    "sha256": "b6ede83da516177c83c1b597180733fe94f82ba8c24ae5941002ab9ca9a653cb"
+  },
+  "rows": [
+    [
+      "pptx-warm",
+      "pptx_file_source_open_selected_slide_lifecycle",
+      "warm"
+    ],
+    [
+      "pptx-cold",
+      "pptx_file_source_open_selected_slide_lifecycle",
+      "cold-verified"
+    ],
+    [
+      "opc-save-pair-cold",
+      "opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save",
+      "cold-verified"
+    ]
+  ],
+  "scope": "Failure isolation only; no performance claims",
+  "script": {
+    "bytes": 1416,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0833/diagnose.py",
+    "sha256": "715ecb2ca7d6c93add73a6ee6e376a96f7d0f51240b97a795b8199bd32a81022"
+  }
+}

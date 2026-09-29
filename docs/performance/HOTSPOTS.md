@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0833 — cold filesystem qualification blocked
+
+[0833](0833-filesystem-cold-qualification.md) Fresh six-case qualification stops before the planned 72-report matrix. Warm-only PPTX source access passes; cold-only replay rejects payload-range classification. Cold OPC save routes pass separately but differ by a 1,776-byte alignment comment and fail the combined output-parity gate. Six retained reports contain eleven diagnostic samples; no performance baseline advances. Production is unchanged, and the next task is a bounded harness-evidence correction.
+
 ## 0832 — first XLSX column record stored inline
 
 [0832](0832-xlsx-inline-column-map.md) Keeping the first complete column record inline removes two dense parser maps and intermediate range buffers on the pinned worksheet: 2,097,472 fewer requested bytes and four fewer calls per edit. The corpus census finds 43 single-record and 159 multi-record worksheets. Both multi-record guards retain allocation totals and entry-adjusted peaks; required parser passes and bounded overlap handling remain intact.

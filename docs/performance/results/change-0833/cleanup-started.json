@@ -1,0 +1,30 @@
+{
+  "binary": {
+    "bytes": 68855752,
+    "path": "/home/zhuhe/code/litchi-target-0833/release/litchi-perf-baseline",
+    "sha256": "eb0039f40ef8e5eb30cf2653bb6f29d76fe3b103bff6e338dec75956025bd8f7"
+  },
+  "roots": [
+    {
+      "files": 1782,
+      "logical_bytes": 1247257391,
+      "owner": {
+        "bytes": 182,
+        "path": "/home/zhuhe/code/litchi-target-0833/.owner-0833.json",
+        "sha256": "0af59562c0e79e8e5a371e4841a300eec87dd1d809b411d3cb98220b8806f89a"
+      },
+      "path": "/home/zhuhe/code/litchi-target-0833"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 178,
+      "owner": {
+        "bytes": 178,
+        "path": "/home/zhuhe/code/litchi-fs-0833/.owner-0833.json",
+        "sha256": "bc8b806458f818bf14fe9b16cc9e2ac2735fb4fece2a33cca9c55707057a7571"
+      },
+      "path": "/home/zhuhe/code/litchi-fs-0833"
+    }
+  ],
+  "started_unix": 1790643365.2625556
+}

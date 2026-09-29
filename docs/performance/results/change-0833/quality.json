@@ -1,0 +1,50 @@
+{
+  "evidence": {
+    "docs/performance/results/change-0832/commands/quality-after-boundaries.json": "56e095f893f5368e657649468d776d5e7b0147d65e180ef2d2adecaf5e014bf9",
+    "docs/performance/results/change-0832/commands/quality-after-boundaries.log": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1",
+    "docs/performance/results/change-0832/commands/quality-after-boundaries.started.json": "fb49292434f983c74d29e7fbeabe375609be51df76cdf0fac4eee65ef08b9123",
+    "docs/performance/results/change-0832/commands/quality-after-check.json": "4004bc0b6d732a60b51e4773f951c70a5bbbfa9a8232604e31e95bc97f311586",
+    "docs/performance/results/change-0832/commands/quality-after-check.log": "e7d8bd037df440425a5be4936e95c72278a596c9f429d17ab46572671f50df0e",
+    "docs/performance/results/change-0832/commands/quality-after-check.started.json": "3c56c34a4210ae641be633bbbd367f0a34b7c0f384215b69c652af2e14c4e4f9",
+    "docs/performance/results/change-0832/commands/quality-after-clippy.json": "980588f750be50025756062aab1115d531f69f756013d0c248e3bf8f705f1909",
+    "docs/performance/results/change-0832/commands/quality-after-clippy.log": "78526ed0db0ee7cdbe5e698092374d391e222302b6fec5058f736dbeeb3e029f",
+    "docs/performance/results/change-0832/commands/quality-after-clippy.started.json": "6c66d19c0f5a8a40292d784522afeb71e81da58c7f4274c61fd11674e6b99636",
+    "docs/performance/results/change-0832/commands/quality-after-doc.json": "976af8879a229a89b0e720977746b5d6b6b040fac3acdf155053a0785286770a",
+    "docs/performance/results/change-0832/commands/quality-after-doc.log": "357a71ba93e5f18db16451b50fbd3b0e0bc8c1ff57947762e215bda1a76f8b23",
+    "docs/performance/results/change-0832/commands/quality-after-doc.started.json": "4784bc8c9572bbe5f1d130134c1c3fefffd49b107a7ee8ef026abab63b7ba42e",
+    "docs/performance/results/change-0832/commands/quality-after-fmt.json": "3ad40c4c575861dda9c87aee6be2382b67a138388d52f1540f64ad4a2e0c1f8f",
+    "docs/performance/results/change-0832/commands/quality-after-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/performance/results/change-0832/commands/quality-after-fmt.started.json": "d4c5c5eae626f42f5eebf45755c9dd076aa07d71b7a30a7cb9dd419b5dfcaf0d",
+    "docs/performance/results/change-0832/commands/quality-after-harness-test.json": "e4d7cfc1e8926c51f1650b12f2e74e3300d08dc1de31aaeec3fe254c9026d376",
+    "docs/performance/results/change-0832/commands/quality-after-harness-test.log": "dbb8c2570b6aca53da5226b6418ddde39b4c45e3a313e520a068e71aea74d907",
+    "docs/performance/results/change-0832/commands/quality-after-harness-test.started.json": "c091a7910fb880124ac1b37b69593c1822552b0d5142c51da64ad2ad1a2acd48",
+    "docs/performance/results/change-0832/commands/quality-after-oracle.json": "58d63b10707dae6ce9538803f883dc4a14ca9e29aa9a9b94bfce9dad4d1b5ef6",
+    "docs/performance/results/change-0832/commands/quality-after-oracle.log": "2066912199c0ecfe8587516edf428718bb264ba2c88b33e5f4cd4e3f667d658b",
+    "docs/performance/results/change-0832/commands/quality-after-oracle.started.json": "268c6d78ca194cf50876652c268fda47c9536e91c3603a3d57b074120f656799",
+    "docs/performance/results/change-0832/commands/quality-after-test.json": "a19aaa0808a9be293234ef5bbd1119d7abfd39446b7e3d845d7901d93225aa50",
+    "docs/performance/results/change-0832/commands/quality-after-test.log": "00a355468d0126501be50050bca158fac06246b508f53b025487e532dfc72c35",
+    "docs/performance/results/change-0832/commands/quality-after-test.started.json": "0bfd584b067b7dd54475671fca9fedcdda5a65689227791b1e82b60150e03db2",
+    "docs/performance/results/change-0832/inputs.json": "aa993a6d7d8e82ad97641db621189a2a75a64abd8e7a1d579f4ab16b62356cda",
+    "docs/performance/results/change-0832/quality-after.json": "18cd117b8dadb4cd1169a8f22766c8b663a7e2827a16ec587aeee3aaee0c3705"
+  },
+  "gates": 8,
+  "normalization": {
+    "crates/litchi-xlsx/src/column.rs": "00e1b8f63498ca1b3c1db7d60a82036ba33559903326d044f4b02010685cce36",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "5e4eb73c054230b27117cd285614225e497b9e447ec51f19d8cf93f77766e6e6",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/columns.rs": "71d02d3f211b80c256307a283bf8df9dd797880a9596061d685d3a77fa954972",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/validation.rs": "ce7630e984247253c6d73e8f4b1487621af905f002bb070049003dd2c9ce7a91"
+  },
+  "normalized_current_inputs": 9388,
+  "prepare_sha256": "993e2edfe77e1c46216c79fbd4a4a56b1ed0ac02c23cabd4de27e41cad46eaed",
+  "previous_seal": {
+    "bytes": 236737,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0832/seal.json",
+    "sha256": "4f093c8714af53bbbf3de182b8ee61d4bec2f4e5335defddd5318ed9955712e0"
+  },
+  "reader_sha256": "e7760089117b8c940c5f2940fd26332e5d4efd883152aa626a3b9e627690166a",
+  "reused": true,
+  "reused_from": "docs/performance/results/change-0832",
+  "scope": "Reused historical quality gates; no fresh test execution in 0833",
+  "source_identity": "All 9388 current build/normative inputs equal sealed 0832 after source",
+  "status": "pass"
+}
