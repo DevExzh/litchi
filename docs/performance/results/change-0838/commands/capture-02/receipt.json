@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0838/retained/diagnostic/source-inverse-diagnostic",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0838/fixtures/fresh-source.zip",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0838/runs/run-02"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790690095.1779,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/commands/capture-02/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790690095.1734722
+}

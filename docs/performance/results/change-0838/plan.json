@@ -1,0 +1,34 @@
+{
+  "base": "4435bae2c9727f52d8bf1af75a4b788d2fccd5c9",
+  "cases_per_process": 6,
+  "gates": [
+    "all input variants have identical logical members",
+    "every forward result has requested paragraph text sequence",
+    "every durable inverse has byte-identical logical members",
+    "every immediate retained-source inverse is byte-exact",
+    "durable wire canonical roundtrip",
+    "foreign complete source refuses with empty sink",
+    "independent Python ZIP readback",
+    "cross-process determinism of all source/output/wire bytes"
+  ],
+  "input": "../change-0837/diagnostics/fresh-source.zip",
+  "input_sha256": "828a042258b1563ee6fdfe4d8fee027c792f3ce6b4351f33f21a1cfe34fa7604",
+  "operations": [
+    "copy paragraph0 before2",
+    "remove paragraph0"
+  ],
+  "policy": "No production compression or patch contract change authorized by this diagnostic; retain exact existing tests.",
+  "processes": 3,
+  "quality": [
+    "source-identical inherited affected-owner gates",
+    "probe fmt/check/clippy/rustdoc",
+    "three fresh diagnostic processes"
+  ],
+  "scope": "Current production DOCX copy/removal inverse semantics and physical restoration diagnostic, not benchmark",
+  "sources": [
+    "retained staged source",
+    "current borrowed-regenerated control",
+    "current owned-staged source"
+  ],
+  "timed_operations": 0
+}

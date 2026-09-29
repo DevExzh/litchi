@@ -1,0 +1,22 @@
+[workspace]
+
+[package]
+name = "source-inverse-diagnostic"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "source-inverse-diagnostic"
+path = "src/main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "../../../../../crates/soapberry-zip" }
+
+[profile.release]
+debug = 1

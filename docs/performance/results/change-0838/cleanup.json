@@ -1,0 +1,15 @@
+{
+  "removed": [
+    {
+      "files": 2149,
+      "logical_bytes": 902489431,
+      "path": "/home/zhuhe/code/litchi-target-0838"
+    },
+    {
+      "files": 1,
+      "logical_bytes": 124,
+      "path": "/home/zhuhe/code/litchi-fs-0838"
+    }
+  ],
+  "status": "pass"
+}

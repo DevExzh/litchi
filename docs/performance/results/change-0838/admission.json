@@ -1,0 +1,54 @@
+{
+  "files": [
+    {
+      "bytes": 1338,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/plan.json",
+      "sha256": "643c94768a0cbea33aa5f4c099f6404eece7dfd24b7af3f1a0b8e4492f3fb263"
+    },
+    {
+      "bytes": 1203046,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/quality.json",
+      "sha256": "aae62ff28035de68ab3b0f285655ff92b709532e575c15147f8871bebb795cab"
+    },
+    {
+      "bytes": 1202427,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/quality-reuse.json",
+      "sha256": "dfbb6ab713b56f67b52525ed1916bd88ddd45f5802bc10e96ec3b14518ddc15f"
+    },
+    {
+      "bytes": 678,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/build-diagnostic.json",
+      "sha256": "a20345fa6869c033ddfd03fdb54bd48be44ed161fe39eb88bfc020be8421a367"
+    },
+    {
+      "bytes": 19134,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/probe/src/main.rs",
+      "sha256": "e352f74e23ad065944d7e4e65a00848931db7a774bdaaa5e669ec44391719eef"
+    },
+    {
+      "bytes": 496,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/probe/Cargo.toml",
+      "sha256": "28cb6f44a28d62abf5df8c7791dc183cd0e6c55ba5317e6f59c641884829f211"
+    },
+    {
+      "bytes": 35471,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/probe/Cargo.lock",
+      "sha256": "649c6f0e6a20e26d6270aaf323ac96ac5ef3a97df76628324572a3e5f492014b"
+    },
+    {
+      "bytes": 917,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/capture.py",
+      "sha256": "691a0443a7bf2e285ddf512f7b699f4e82d905813ab77e10a6b9c5a68d357f18"
+    },
+    {
+      "bytes": 4660,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/audit.py",
+      "sha256": "83a51f1f684890e0869c10a2ebdc28d124384f6f380a08d130fd5965662d59a6"
+    },
+    {
+      "bytes": 1697,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0838/fixtures/fresh-source.zip",
+      "sha256": "828a042258b1563ee6fdfe4d8fee027c792f3ce6b4351f33f21a1cfe34fa7604"
+    }
+  ]
+}
