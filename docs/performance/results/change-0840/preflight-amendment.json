@@ -1,0 +1,23 @@
+{
+  "cases": [
+    "doc-tiny",
+    "doc-large",
+    "doc-payload",
+    "cfb-tiny",
+    "cfb-large",
+    "cfb-large-only",
+    "cfb-mini-only",
+    "cfb-v4",
+    "cfb-difat"
+  ],
+  "lane": "allocation-preflight",
+  "legs": [
+    "before",
+    "after"
+  ],
+  "pooled": false,
+  "purpose": "Qualify each separate allocator executable and its reader before formal capture; no threshold, case or sample reducer changes.",
+  "samples": 1,
+  "stage": "Before all workload capture",
+  "warmup": 0
+}

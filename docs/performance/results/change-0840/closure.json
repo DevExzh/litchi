@@ -1,0 +1,262 @@
+{
+  "commands": [
+    {
+      "exit_code": 0,
+      "label": "add-focused-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "admission"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-allocation-preflight"
+    },
+    {
+      "exit_code": 1,
+      "label": "after-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-observer"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-probe-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-qualification"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "after-v2-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "apply-candidate"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-allocation-preflight"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-observer"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-check"
+    },
+    {
+      "exit_code": 101,
+      "label": "before-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-qualification"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "before-v2-probe-test"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after-allocation"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-after-native"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before-allocation"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-before-native"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "capture-allocation"
+    },
+    {
+      "exit_code": 0,
+      "label": "capture-native"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-analysis-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-crosscheck"
+    },
+    {
+      "exit_code": 101,
+      "label": "focused-red"
+    },
+    {
+      "exit_code": 1,
+      "label": "paired-analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "paired-analysis-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 1,
+      "label": "qualify-before"
+    },
+    {
+      "exit_code": 1,
+      "label": "qualify-before-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualify-before-v3"
+    },
+    {
+      "exit_code": 0,
+      "label": "qualify-both"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests-v2"
+    }
+  ],
+  "decision": "adopt",
+  "production_changes": 2,
+  "regression_flags": 0,
+  "reports": 270,
+  "samples": 6534,
+  "status": "pass",
+  "target_benefit": true,
+  "tests": {
+    "after-probe-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 41
+    },
+    "after-v2-test": {
+      "failed": 0,
+      "ignored": 15,
+      "passed": 1868
+    },
+    "before-test": {
+      "failed": 0,
+      "ignored": 15,
+      "passed": 1863
+    },
+    "before-v2-probe-test": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 41
+    },
+    "focused-red": {
+      "failed": 1,
+      "ignored": 0,
+      "passed": 4
+    }
+  }
+}

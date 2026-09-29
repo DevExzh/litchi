@@ -1,0 +1,119 @@
+{
+  "allocation": {
+    "blocks": 6,
+    "cpu": 12,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "base": "f43040e1da61f6fc31019b37786fd7e13d2bd643",
+  "benefit": {
+    "ci_high_below": 1,
+    "p50_ratio_at_most": 0.97,
+    "target": "doc-payload"
+  },
+  "cases": [
+    "doc-tiny",
+    "doc-large",
+    "doc-payload",
+    "cfb-tiny",
+    "cfb-large",
+    "cfb-large-only",
+    "cfb-mini-only",
+    "cfb-v4",
+    "cfb-difat"
+  ],
+  "decision": "Adopt only if byte equality and semantic/sink gates pass, target benefit passes, and no unresolved regression flag. Report all p95/p99 and cases individually. No prior timings pooled.",
+  "guard": {
+    "ci_low_above": 1,
+    "metrics": [
+      "native p50",
+      "native peak RSS",
+      "allocation calls",
+      "allocation bytes",
+      "allocation peak above entry",
+      "allocation retained delta"
+    ],
+    "ratio": 1.05,
+    "zero_baseline": "any absolute increase triggers review"
+  },
+  "hypothesis": "Writing fresh CFB large streams before the later-allocated ministream avoids Cursor gap initialization without changing layout or output bytes.",
+  "native": {
+    "blocks": 6,
+    "cpu": 12,
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "quantile": "nearest rank",
+    "rss": "GNU time whole-child maximum RSS KiB",
+    "samples": 30,
+    "warmup": 3
+  },
+  "observer": {
+    "samples": 1,
+    "timed": false,
+    "warmup": 0
+  },
+  "qualification": {
+    "samples": 1,
+    "warmup": 0
+  },
+  "scope": "Fresh seekable CFB writer and DOC fresh public writer on deterministic inputs; no opened-layout, filesystem durability, concurrency, or whole-Office claim.",
+  "statistics": {
+    "draws": 10000,
+    "endpoints": [
+      249,
+      9749
+    ],
+    "paired": "median of six paired per-process ratios; bootstrap block pairs",
+    "seed": 840084
+  }
+}

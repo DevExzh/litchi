@@ -1,0 +1,30 @@
+{
+  "receipts": [
+    {
+      "bytes": 536,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-v2-probe-fmt/receipt.json",
+      "sha256": "72e3f15b390a2d542f2cc9d8a51cc20b3877074736f139f687f7ae46a49687d4"
+    },
+    {
+      "bytes": 593,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-v2-probe-check/receipt.json",
+      "sha256": "b76eef25266eaadcb01b00dd89471a205cedd24091c6bf85b55aff5fefa0a327"
+    },
+    {
+      "bytes": 631,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-v2-probe-clippy/receipt.json",
+      "sha256": "c1f0ed2465ae6f4e6e57893c5355ccaa374aec18a995101d06525f790f3a548d"
+    },
+    {
+      "bytes": 585,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-v2-probe-doc/receipt.json",
+      "sha256": "296e3009005f83964a5ebd5e766dbb5ff8b3b031f521795ffc531fb793ca232f"
+    },
+    {
+      "bytes": 605,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/before-v2-probe-test/receipt.json",
+      "sha256": "3658bed71231bf1d91dfbd3f5afc90a68ca9c70823e69ec2d0c0d41bcc0a0a70"
+    }
+  ],
+  "status": "pass"
+}

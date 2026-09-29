@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/analyze.py", line 41, in <module>
+    summarize(lane,case,metric,values('before'),values('after'),lane=='allocation' or metric in ['p50_ns','rss_kib'])
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/analyze.py", line 26, in summarize
+    row=dict(lane=lane,case=case,metric=metric,before=before,after=after,before_median=st.median(before),after_median=st.median(after),**stats,guarded=guard,regression_flag=bool(guard and flag))
+TypeError: dict() got multiple values for keyword argument 'before'

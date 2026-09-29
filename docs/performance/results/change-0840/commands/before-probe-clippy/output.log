@@ -1,0 +1,57 @@
+    Checking litchi-perf-cfb-emission v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe)
+error: function `identity_for_case` is never used
+   --> main.rs:554:15
+    |
+554 | pub(crate) fn identity_for_case(case: Case, input: &Prepared) -> InputIdentity {
+    |               ^^^^^^^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `prepare_case` is never used
+   --> main.rs:583:15
+    |
+583 | pub(crate) fn prepare_case(case: Case) -> AnyResult<Prepared> {
+    |               ^^^^^^^^^^^^
+
+error: function `write_case` is never used
+   --> main.rs:588:15
+    |
+588 | pub(crate) fn write_case(input: &Prepared) -> AnyResult<Vec<u8>> {
+    |               ^^^^^^^^^^
+
+error: function `verify_case` is never used
+   --> main.rs:595:15
+    |
+595 | pub(crate) fn verify_case(input: &Prepared, bytes: &[u8]) -> AnyResult<()> {
+    |               ^^^^^^^^^^^
+
+error: could not compile `litchi-perf-cfb-emission` (bin "cfb-emission-probe") due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: type `probe::DocInput` is more private than the item `probe::Prepared::Doc::0`
+   --> main.rs:125:9
+    |
+125 |     Doc(DocInput),
+    |         ^^^^^^^^ field `probe::Prepared::Doc::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `probe::DocInput` is only usable at visibility `pub(self)`
+   --> main.rs:107:1
+    |
+107 | struct DocInput {
+    | ^^^^^^^^^^^^^^^
+    = note: `-D private-interfaces` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(private_interfaces)]`
+
+error: type `probe::CfbInput` is more private than the item `probe::Prepared::Cfb::0`
+   --> main.rs:126:9
+    |
+126 |     Cfb(CfbInput),
+    |         ^^^^^^^^ field `probe::Prepared::Cfb::0` is reachable at visibility `pub(crate)`
+    |
+note: but type `probe::CfbInput` is only usable at visibility `pub(self)`
+   --> main.rs:118:1
+    |
+118 | struct CfbInput {
+    | ^^^^^^^^^^^^^^^
+
+error: could not compile `litchi-perf-cfb-emission` (bin "cfb-emission-probe-alloc" test) due to 2 previous errors

@@ -1,0 +1,61 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+   Compiling litchi-perf-cfb-emission v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0840/probe)
+    Finished `test` profile [unoptimized] target(s) in 10.37s
+     Running unittests main.rs (/home/zhuhe/code/litchi-target-0840/debug/deps/cfb_emission_probe-cd641c31467e40bb)
+
+running 5 tests
+test tests::generation_is_deterministic_and_has_expected_shape_counts ... ok
+test tests::observer_propagates_sink_failure_without_timing ... ok
+test tests::observer_records_gap_and_backward_seek ... ok
+test tests::parser_accepts_all_cases_and_bounds_samples ... ok
+test tests::tiny_observer_reopens_and_preserves_all_streams ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests allocation_main.rs (/home/zhuhe/code/litchi-target-0840/debug/deps/cfb_emission_probe_alloc-f8ed3927b60ccd4c)
+
+running 36 tests
+test allocation_metrics::tests::checked_difference_turns_counter_wrap_into_overflow_status ... ok
+test allocation_metrics::tests::concurrent_allocations_retain_the_exact_overlapping_peak ... ok
+test allocation_metrics::tests::concurrent_begin_race_grants_one_region_and_marks_others_unavailable ... ok
+test allocation_metrics::tests::counter_arithmetic_overflow_and_live_underflow_are_sticky ... ok
+test allocation_metrics::tests::disabled_region_publishes_no_sample ... ok
+test allocation_metrics::tests::dropping_a_split_region_after_an_error_releases_the_token ... ok
+test allocation_metrics::tests::failed_allocation_does_not_change_live_or_peak_bytes ... ok
+test allocation_metrics::tests::missing_split_peak_is_sticky_overflow_for_both_finish_paths ... ok
+test allocation_metrics::tests::multi_step_counter_state_matches_an_independent_live_reference ... ok
+test allocation_metrics::tests::nested_callback_entry_is_suppressed_and_invalidates_future_regions ... ok
+test allocation_metrics::tests::one_allocation_then_deallocation_retains_peak_live_bytes ... ok
+test allocation_metrics::tests::poisoned_observer_is_recovered_as_unavailable ... ok
+test allocation_metrics::tests::reallocation_growth_and_shrink_update_live_bytes_without_losing_peak ... ok
+test allocation_metrics::tests::reentrant_callback_makes_active_and_future_regions_unavailable ... ok
+test allocation_metrics::tests::region_counts_cross_thread_totals_without_resetting_absolute_counters ... ok
+test allocation_metrics::tests::region_guard_rejects_overlap_without_heap_scope_state ... ok
+test allocation_metrics::tests::region_peak_includes_concurrent_callbacks_before_finish ... ok
+test allocation_metrics::tests::region_peak_is_separate_from_historical_process_peak ... ok
+test allocation_metrics::tests::region_peak_retains_an_entry_allocation_after_it_is_freed ... ok
+test allocation_metrics::tests::region_reallocation_growth_shrink_and_failed_allocations_are_ordered ... ok
+test allocation_metrics::tests::repeated_boundaries_and_dropped_regions_release_only_the_owner ... ok
+test allocation_metrics::tests::sample_status_serialization_is_explicit ... ok
+test allocation_metrics::tests::split_boundary_observer_poison_and_reentry_remain_unavailable ... ok
+test allocation_metrics::tests::split_phase_counter_faults_remain_overflow_without_partial_values ... ok
+test allocation_metrics::tests::split_regions_are_sequential_and_preserve_the_combined_interval ... ok
+test allocation_metrics::tests::split_regions_publish_measured_zero_and_repeated_boundaries ... ok
+test counting_allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test counting_allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test counting_allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test counting_allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_process_live_accounting ... ok
+test counting_allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+test probe::tests::generation_is_deterministic_and_has_expected_shape_counts ... ok
+test probe::tests::observer_propagates_sink_failure_without_timing ... ok
+test probe::tests::observer_records_gap_and_backward_seek ... ok
+test probe::tests::parser_accepts_all_cases_and_bounds_samples ... ok
+test probe::tests::tiny_observer_reopens_and_preserves_all_streams ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+

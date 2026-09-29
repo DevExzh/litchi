@@ -1,0 +1,69 @@
+{
+  "schema": "litchi.execution-allocation-observer.v1",
+  "scope": "global system allocator callbacks around the same fresh public writer operation; no wall or CPU timing",
+  "config": {
+    "case": "cfb-mini-only",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "verification": "outside allocation region: reopen, semantic projection, hashes, and inventory"
+  },
+  "corpus": {
+    "case": "cfb-mini-only",
+    "format": "CFB/OLE2",
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "input_sha256": "a9c9c8ef3ebecfc15c4ff0710512e4498cac2f4ec52fed54574feb85d6e86f33",
+    "logical_input_bytes": 4864,
+    "members": [
+      {
+        "bytes": 256,
+        "name": "MiniPayloadA",
+        "sha256": "340676fe766c69699d0a09dd949da23ae877f1abf002a4bbacc18c3738e668c6"
+      },
+      {
+        "bytes": 1536,
+        "name": "MiniPayloadB",
+        "sha256": "454014b177288b24ab4926909c6ec1660fd3622c65ee699f893622204fa94cef"
+      },
+      {
+        "bytes": 3072,
+        "name": "MiniPayloadC",
+        "sha256": "694ef32e9bc2373f75cfc4b066f87ad8f27dad7b76bd4a56cde429da753185df"
+      }
+    ],
+    "paragraph_count": null,
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation",
+    "sector_size": 512,
+    "stream_count": 3
+  },
+  "metrics": {
+    "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+    "counter_revision": "serialized_region_peak_v3",
+    "instrumentation_identity": "system_allocator_operation_scoped",
+    "timing": "not measured by this binary"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "output_bytes": 7168,
+      "output_sha256": "a4d7ca2c5dd9d7e4baa59e8d552841021c3f4243fbbe4078b45dbc27bcd8c7e9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 50,
+        "deallocation_calls": 39,
+        "reallocation_calls": 10,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 33628,
+        "deallocated_bytes": 22876,
+        "live_bytes_before": 9171,
+        "live_bytes_after": 19923,
+        "peak_live_bytes_before": 9407,
+        "peak_live_bytes_after": 34175,
+        "region_peak_live_bytes": 34175
+      }
+    }
+  ],
+  "final_output_sha256": "a4d7ca2c5dd9d7e4baa59e8d552841021c3f4243fbbe4078b45dbc27bcd8c7e9",
+  "final_output_bytes": 7168
+}

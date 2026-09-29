@@ -1,0 +1,11 @@
+{
+  "allocation_reducer": "Median of each process\u2019s thirty operation regions, then six paired process ratios. Retained delta and peak-above-entry are observer metrics, not physical RSS.",
+  "leg_path_labels": {
+    "after": "leg-b",
+    "before": "leg-a"
+  },
+  "native_reducer": "Nearest-rank process quantiles; GNU time maximum RSS per process; matched block bootstrap per frozen plan.",
+  "reason": "Equal-length executable and output argument paths avoid the known argv-length/heap-layout confound; semantic leg identity stays in started receipts.",
+  "scope": "All captures serialized, CPU12, no build overlaps; qualification and seek observers are separate, never pooled.",
+  "status": "before any native capture"
+}

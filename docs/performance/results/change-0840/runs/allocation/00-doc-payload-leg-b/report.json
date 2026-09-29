@@ -1,0 +1,1274 @@
+{
+  "schema": "litchi.execution-allocation-observer.v1",
+  "scope": "global system allocator callbacks around the same fresh public writer operation; no wall or CPU timing",
+  "config": {
+    "case": "doc-payload",
+    "samples": 30,
+    "warmup": 3,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "verification": "outside allocation region: reopen, semantic projection, hashes, and inventory"
+  },
+  "corpus": {
+    "case": "doc-payload",
+    "format": "DOC/CFB",
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "input_sha256": "c448ff58dd0700c6e6bf6260e6e0933b6a3a181d92d1cd80a950124e318e9a9c",
+    "logical_input_bytes": 2560000,
+    "members": [
+      {
+        "bytes": 20000,
+        "name": "paragraph:00000",
+        "sha256": "4f9c9226c3e1bd9b1dd1d0f9e24068fb723948337db3a25b9da5e9afa91c50ec"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00001",
+        "sha256": "21317d1abbc56eccc8db6ebf47f9f6ed61016db1826ffdbe3d7efa53e828a104"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00002",
+        "sha256": "87bfac2d6be1d560fe8454d50de7217b7058159c82e256facd505c24d3ed1053"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00003",
+        "sha256": "88b9063cc21aa703b5310e813359cd9db11ed1fa5b6de9ecd220aa6c765899a8"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00004",
+        "sha256": "a84313df46d7fcca26c3d90c10c6f691e32ee48943ce606dfd73f8fd289af8e5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00005",
+        "sha256": "5ae66dd62ea314919dcd8ae8f60ac4a40274ca6737459310f95c98458866bf14"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00006",
+        "sha256": "8c3d6e92a9893cb55849b0280b465ab7948fd7bc4ae5a8b2452a5fd4bd5d54c0"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00007",
+        "sha256": "39e5dfcd5fa4f45cf85151babab5dc0299a1627a432b395d4fc0efbe80ee0821"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00008",
+        "sha256": "d003a41cc6e4090f9c70acad2ee727d40c29825672e9e2f8df778ef0d6d8c1ab"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00009",
+        "sha256": "b6e94f1260b4a04f8ac9105fd739ffa5be0f3b4f2f0782d177e78927ce1aa46a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00010",
+        "sha256": "e2f728f710e60507d7654187e184d1dedf8087e2fd47df061ac94aff77d7148f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00011",
+        "sha256": "5e7e823bf1dd7edfd4285b995084e3a86863dfe0e8f371445ed31146c0d04fd9"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00012",
+        "sha256": "4896c1c07b0ccf2547a5104ae2be985bbcc4c1d0d474e18319e1c12c67a886ab"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00013",
+        "sha256": "6ca2f070e0d744c06fede450608fbca91f7de2243320d6782a8f6527b84dc522"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00014",
+        "sha256": "4c0f8e0605cb7d07200c5aba4c1688a709f1ae753392c344fc24bc31cdf3bd11"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00015",
+        "sha256": "fbd0d12bf0bc9d6aa73b78cda9405cdd25bae4ed927b7e8e6c8cf3cf10fe62d5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00016",
+        "sha256": "df53d6d7ba0863b931aa0746644618b86d4183f28e6e787a3db0ec67e6820fa5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00017",
+        "sha256": "91625044dfec70eaac19b61c4957fdfaa3395608e3bc3995004946f39ee55271"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00018",
+        "sha256": "0b1cc274eb16ac0243424f54e17b603c5bed1a0299081763e0c36065af9d72a5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00019",
+        "sha256": "edbc1161e767c1cca1e8568cd6de4af87a2d329417cc09d3dfbeb11eecaab473"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00020",
+        "sha256": "5c574e55c11e14bdef978e2a2a1643a712f5732bbc92ee3c7c1155fa8eb979eb"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00021",
+        "sha256": "fed92442732f6efd0881a1d7949f22067d599b47bef2b48599f1f149dd9b5228"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00022",
+        "sha256": "84624c31c96133ec400eb6d09c058a18682d5e43df47c19dabf2c82d890d9b70"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00023",
+        "sha256": "99362d38461b2517221e00fd50b600fbf12a92fcc271cd771378fca6f35ba9a9"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00024",
+        "sha256": "101ae414fb3e69dbae062e121544e9dedf5ae7e333c0259c4666deb660cf2bbf"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00025",
+        "sha256": "4d0502a089aa55b5846cc0a49e9edfdf5be3641a8a16a770508cd176d937230a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00026",
+        "sha256": "27cc4ed01b956dd05abc38811b6fc36c0ccacf41ff7e2b0009733d1d45265dee"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00027",
+        "sha256": "fc206518d9cf35d3e6512d6118fe79183d31298ddf06e3f3f267f5baf70deeb6"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00028",
+        "sha256": "4a626a92141b18253fa70d19560c32ec5e4d2016aecda02feeba661a9c31e4d1"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00029",
+        "sha256": "f301718fad2bb8fece357a6aabf5e827881cd6aa9fc153bdb894a08784326884"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00030",
+        "sha256": "b18ae574f189d3aaa034a493704775a05daec0acaae74ffb750c75392451ccfc"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00031",
+        "sha256": "4176e73c6a5f26ce0b894fa19116e764379fc53d68cfdef713402c939a546622"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00032",
+        "sha256": "416b7fef0ad15c7154e700ef6827051022fcff379f4b2722ff6942a8c3b04a1e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00033",
+        "sha256": "4cb9561aa9ab288063b364e13dbec0281347aed211199a4e0e44a03b819d09a3"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00034",
+        "sha256": "38533ebec54ea522090b368767514ec2678389432bc5932b3f152573315b6034"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00035",
+        "sha256": "82eb718545882b8b3bd011cc4c2aa9698cfd33d52ef3fc9dce2aef8962072860"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00036",
+        "sha256": "14d0242602b6e8c79ebaea55ef6a3ee788fc7fb9665db898b3313801337ed86c"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00037",
+        "sha256": "045a5e99795b771f2e7af742a69f9915132f5d281f3332b0e069025f4b11cdcf"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00038",
+        "sha256": "ffa2fa895f035b9cddfb1db8ef3a8e93be4061161820730fe8e4324d33d9fd9e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00039",
+        "sha256": "797b2012e46d6aff54dcbc6da474edc78ea3a22fc4f22a64890e33442791a5e7"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00040",
+        "sha256": "8bdd57e759fbfb4c1f627a11f642fb17ed1972bf5129842c033d61a04011af14"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00041",
+        "sha256": "b46d14820bc9dcdef7f7f336b058361102443bb17aa6f1c2fad2282a1bf250e8"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00042",
+        "sha256": "01d4774f2550ef350e2d2300ecd1f76f790e90fd62fd6c78f5709bb3bc7801a8"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00043",
+        "sha256": "9a2b521e1d2a41dbc2bcfc9674dfe8f7a39e92ac7441b92252358786e29a7c9d"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00044",
+        "sha256": "70bee0a68cc6992468f92a8801c6e9402f17206274977f8f47ac43652d35d5ae"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00045",
+        "sha256": "68c38b18a9b86ea706be3423b22cef26f996a8e8f8ae0a759fe1d2264dcd5745"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00046",
+        "sha256": "6b34b9ffca81d94dc5faa343fb5bded93dcbb1289ef4eece6ea2a01d35193d52"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00047",
+        "sha256": "6f96041754ff3ddae1135fcc335b3d2351f985e5544bafb2298c276989d8c639"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00048",
+        "sha256": "8d0f7ed68526ab887b56d93db82c0d23daf0ab86ed9b7f5c320708b47a207c62"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00049",
+        "sha256": "a9f0389efc6ca06c397da4d5dbbbe7831550b6acd9fb8e121e6729d47cdf3d35"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00050",
+        "sha256": "b513f157cc2bf7cf398e4f71fa3cdb3398fb4cf2a6109f737a06703cc040daff"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00051",
+        "sha256": "800f441a2543608c40e64b5bca4cc4b4fb27866b02e2957e3fb68559ed68d43f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00052",
+        "sha256": "0d6204ffcdb0353a0ffe52d9fd616d9d7d376055d0c38f02419028ae05756a06"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00053",
+        "sha256": "db7ff3226fc669b6d8ca4eae5b9ded0985e47877e3d9af2780ed73c3c845e2b0"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00054",
+        "sha256": "f0ca2457b6767c61eb4cf9caa782267b3dc749e05f3c668bae7d0b728d53c530"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00055",
+        "sha256": "b4291c7a67e0933d79c748fb2fa29d87691fd977f6460fa3202269432e1e5365"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00056",
+        "sha256": "dc64e7170237d36807630562190bbb88957e1ef03b0b7713abcf42248624646c"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00057",
+        "sha256": "19dd485ce2d47f99b8b0e9f7cbd64789908ffcab9fcd93f57eadecf99228ab21"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00058",
+        "sha256": "f1efdd6d5fa995248e16dae8a0830d9bf3e0e7e3d66dd2f28ae275ba00d4ea4b"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00059",
+        "sha256": "dde198fdc55e959afa1801f3f51d1374ac1bbefcaad7a45a71ba5e9c89d0cf86"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00060",
+        "sha256": "340ea9e10f4e503957fe69a20ef8d25faa8dcf295c65a3894113993b6a4e1916"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00061",
+        "sha256": "5bbe0953ec6d1e813c4d9d0887eea4c9a73039552485326c36652bf83d748a9a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00062",
+        "sha256": "49335b036052a2662dadb759495bdad5306f9717bd729945f233b85f2895af40"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00063",
+        "sha256": "0b47080c837aa45ca43e9227c8fb0f44c15b656d3a2613ba8224bb9dac5bef7b"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00064",
+        "sha256": "97fb05c98e8fce8e38812fbb4cfe31e758968f2dc46e761df685d73065dbd62e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00065",
+        "sha256": "3a5c2b567cdfb093e886e92ed8dc826103b1db2dea1e3106d3a83f5c7cd0fd6f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00066",
+        "sha256": "f32b5c0a7796d37d5e3a973a6eb4f04139e01f2690cb2f31e4d4199af9289073"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00067",
+        "sha256": "300bd51da63e690a6bfd1184dd42547f55cbb8fd02558df9ca160f750d64137f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00068",
+        "sha256": "43b5204cb4efd0307302b6fa2cd7d69494a73c36477a2a26a489772706dabe19"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00069",
+        "sha256": "b0450c0eb5cf95d26dab57b8f1ba941fd286f9236e6b1786606e181004b99f6f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00070",
+        "sha256": "6674ad05a6ac3b710792518780b4730df20f27b609f5bee971b2ac8951d2dc0d"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00071",
+        "sha256": "ba008348314ba9252b2e33f1de679e533e515a41852ee6a139d5a7be00006134"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00072",
+        "sha256": "240ad4565080616883957452f34b054ffe1b13121fc2a9ef0f80b78bcf71e12a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00073",
+        "sha256": "33632876e907ec8b708f93d5ebaadf2033495919e97955b1c6968f1ed8b7bf9a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00074",
+        "sha256": "742522d05a6c72f8325714e667eaef4bd46fcc289883b48dc3982e1651b52cd0"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00075",
+        "sha256": "e00c276b3084752bff3f58cc476e257069645de0d46e2f53b9e7fab5e7795661"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00076",
+        "sha256": "58e731ae8f607a36e2bc5070ffcdcc4948b09d5dfe64f129e127d152a4a9d84f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00077",
+        "sha256": "9f02aefed6ed5af9f74b849e0927f15eff8812e133aaa7c1ef90fd872ca15c13"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00078",
+        "sha256": "306a339c2df6c4c42919c9431e02640db62032c160ccc88dec654a58f1a46763"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00079",
+        "sha256": "e3ebcd34815e35b95b2975bf3086ba025483d5af965890a02a8d433022f13a31"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00080",
+        "sha256": "802011efbee678ee10e40ac53717a8acce888dbf745d46d2e7b889e5ec82ef60"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00081",
+        "sha256": "2c0a2f34b1b184f98de15134673c698a52cdbcc37c4e2f26bc5116bcb3c6d7b9"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00082",
+        "sha256": "639624cd9274e53524aa0072474356c669296cb24f69653c76bd318e40d9f4d8"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00083",
+        "sha256": "66bddcb0d8261507f02ea2bd1f54254e789a54d723dd9313e33d4e4d186645f2"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00084",
+        "sha256": "9b9e46ce5001e784890a006cb23373fcb14999148bf16fb2ffb224b1ecaa8d24"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00085",
+        "sha256": "ef943e8e8865f4c8647807b3b0f7e4f0aba4530c35d045b8c9ee7a29d0d06e68"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00086",
+        "sha256": "724fc2b88fe760882cf8bc67308f3b7a05961982e74cfc305058c01fe161131b"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00087",
+        "sha256": "1347e3f69c4b2f1d1da379d96897cb6b33efb74c9f4d589cca9590ed0e47c262"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00088",
+        "sha256": "478e104ab21aea1369de2c91b7ed065a6d1170f1a9bab70857e736b7e0479d1a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00089",
+        "sha256": "0c3aafe56f06ca34211c6c71ed8bf483776fbeba6cfec39a0d874232c43eeb20"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00090",
+        "sha256": "b81db08e85934416e362411acff76ee6d876ab87bba89039afe646274519d28e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00091",
+        "sha256": "c937f54778864425efe8a65c355598cee38a2dda940c464e616a7c38be9aff4f"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00092",
+        "sha256": "855717f513e2e0e1bf393a85ac06207c9f6a4e52c4e7101b8d2f4ee3b73b1ec0"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00093",
+        "sha256": "5bf18cae8f5967ab1d1652a401c6217ab01a00631497312412e79a59ecb84bd0"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00094",
+        "sha256": "63a2ed6c9090dde06a9f71305704b99eaf85d631eaef40fdf7bc0f82d2a0504d"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00095",
+        "sha256": "7f8f52ead57127c3bb8df4322dec23c5ea16d100d38cfe16f26d9aebd2148333"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00096",
+        "sha256": "c4b563b3374b169cf4f27c8bdf521b17f987c2f2e5fcea11aa533ba1d317c42c"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00097",
+        "sha256": "8a9fd5943b2c918868434131f7a53bc04e53b089bd6c5480f03efba4a10a023e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00098",
+        "sha256": "de5ce8e7187f1b99d197695d4771c88e517659c672a7fa347d2efc538af35a2e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00099",
+        "sha256": "d04b19c3ee4db2ba53fc47041dd03eb37d28dfbbb22e0600ab1398006b3ca1ed"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00100",
+        "sha256": "2e73e8911f7fadb066c02f846f26709dea3002a8fdc6c0c01736dfc26262593e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00101",
+        "sha256": "cc4f6943a1221ae5cd07aa08fbf9a073b3b56839215256200e4294452b24c87e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00102",
+        "sha256": "10c0a11a2e7396f5025e4e76a2b1a57b8405aaa5495ccfbfd6787ac3b36b6a85"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00103",
+        "sha256": "5aff143c7d4b3f2be387937ddb2bbac537657120863c65d9b974e9785578e9be"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00104",
+        "sha256": "4c8b568213be4668af990faa59c3b10035dabed5e3c3dda927c2fb65321ddd0a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00105",
+        "sha256": "5b6691beadb7ea6bd99e72b3fc33571da24793d152818a2b6fa667d2dbd213ce"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00106",
+        "sha256": "0e922eeaf2b23be30641aec27d1910ff6eabba267a5d0f66da84ebdc097fb673"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00107",
+        "sha256": "b1b6d14fbc38de36264932f732aa324b984d1675162f9cbc671cb184980e33c4"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00108",
+        "sha256": "4ae7be8052de050d0606ff5af23993d632bb2625b930ba8a2ef896a6bb38e34b"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00109",
+        "sha256": "0954b8794c80f696a0a3378dfbeb9a30e92a73686b7812fcbaf91b8e3b57fa92"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00110",
+        "sha256": "01027631076cfa4d09c586ed29eb9e43102528c927f4d18f809151c7d7a13f9b"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00111",
+        "sha256": "df68a341bd668a971d7ad14507afcf2f0b0d53a3d47e760fa7e8cb2740670f17"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00112",
+        "sha256": "8512d97735fca70c205d667e1a01900e7f7169b1ebfbc12175573bdcec19a342"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00113",
+        "sha256": "76024f7f3101d30654a40a496c84899fe96ebfabc25f6fa2b8aad7cfa98f622c"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00114",
+        "sha256": "f069c51895f7de52d40deaa1c4ddd2ef0b8f7a981a5a491d9878a1ed52868943"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00115",
+        "sha256": "0af8884d378a960e91b83ee777431cc43b6152f94896c6b438a1ca508ecb159a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00116",
+        "sha256": "1d4f6299e5744d18d939ba739e7dc078e1b524ce81a6bcf09bf580d62f7586f3"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00117",
+        "sha256": "3c6be1312db9ff3a0905cb2e0444feecf77a9f3e231cd77a7e8dcb9a4f5f2ee5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00118",
+        "sha256": "510414bcd70598662323da94fa165a8bf6d478542f9203c7858bd7679a1b4e34"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00119",
+        "sha256": "2416a3c71506b4a2818085deafdec3233edcc358d41565d4fdf9905d25584422"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00120",
+        "sha256": "53becb6352811c5968418f7344f6888fd85a71dae2c3ff895cfa2f77b104354a"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00121",
+        "sha256": "2e0285fe0636fb08df3f8521c574fdda7ca8235a92ebec14e623565bb0568eb4"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00122",
+        "sha256": "58e9efe520fec5d7a688df7fdae1d189a043a39233734f56b35564502e614cac"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00123",
+        "sha256": "08f68b92d544d8b9b5da40da65bc4ad8b88069c87e6200965e35fbb4400df43e"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00124",
+        "sha256": "53aec5cbd3a95d40fcb87627b6856187ef05209bb6ec2891373603a53dbfcee8"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00125",
+        "sha256": "4987019fcb6ddb1f6aba1dc6dc1cd693c65f1faa93a5e324cdb241a2c1bc5ac1"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00126",
+        "sha256": "67be6fea64989a1559eb2d8d6326c6a386f142d73b964dee58f57454822d1da5"
+      },
+      {
+        "bytes": 20000,
+        "name": "paragraph:00127",
+        "sha256": "85fb1547d26f05cdbd86ec9deab006ce89cca84e59f68df3587f02b0ccede20c"
+      }
+    ],
+    "paragraph_count": 128,
+    "preparation_boundary": "paragraph text generation and hashing occur before each measured operation",
+    "sector_size": null,
+    "stream_count": null
+  },
+  "metrics": {
+    "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+    "counter_revision": "serialized_region_peak_v3",
+    "instrumentation_identity": "system_allocator_operation_scoped",
+    "timing": "not measured by this binary"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3319703,
+        "live_bytes_after": 13577111,
+        "peak_live_bytes_before": 88243549,
+        "peak_live_bytes_after": 88243549,
+        "region_peak_live_bytes": 21485871
+      }
+    },
+    {
+      "sample": 1,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3319767,
+        "live_bytes_after": 13577175,
+        "peak_live_bytes_before": 88243549,
+        "peak_live_bytes_after": 88243549,
+        "region_peak_live_bytes": 21485935
+      }
+    },
+    {
+      "sample": 2,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3319831,
+        "live_bytes_after": 13577239,
+        "peak_live_bytes_before": 88243613,
+        "peak_live_bytes_after": 88243613,
+        "region_peak_live_bytes": 21485999
+      }
+    },
+    {
+      "sample": 3,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3319895,
+        "live_bytes_after": 13577303,
+        "peak_live_bytes_before": 88243677,
+        "peak_live_bytes_after": 88243677,
+        "region_peak_live_bytes": 21486063
+      }
+    },
+    {
+      "sample": 4,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3319959,
+        "live_bytes_after": 13577367,
+        "peak_live_bytes_before": 88243741,
+        "peak_live_bytes_after": 88243741,
+        "region_peak_live_bytes": 21486127
+      }
+    },
+    {
+      "sample": 5,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320023,
+        "live_bytes_after": 13577431,
+        "peak_live_bytes_before": 88243805,
+        "peak_live_bytes_after": 88243805,
+        "region_peak_live_bytes": 21486191
+      }
+    },
+    {
+      "sample": 6,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320087,
+        "live_bytes_after": 13577495,
+        "peak_live_bytes_before": 88243869,
+        "peak_live_bytes_after": 88243869,
+        "region_peak_live_bytes": 21486255
+      }
+    },
+    {
+      "sample": 7,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320151,
+        "live_bytes_after": 13577559,
+        "peak_live_bytes_before": 88243933,
+        "peak_live_bytes_after": 88243933,
+        "region_peak_live_bytes": 21486319
+      }
+    },
+    {
+      "sample": 8,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320215,
+        "live_bytes_after": 13577623,
+        "peak_live_bytes_before": 88243997,
+        "peak_live_bytes_after": 88243997,
+        "region_peak_live_bytes": 21486383
+      }
+    },
+    {
+      "sample": 9,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320279,
+        "live_bytes_after": 13577687,
+        "peak_live_bytes_before": 88244061,
+        "peak_live_bytes_after": 88244061,
+        "region_peak_live_bytes": 21486447
+      }
+    },
+    {
+      "sample": 10,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320343,
+        "live_bytes_after": 13577751,
+        "peak_live_bytes_before": 88244125,
+        "peak_live_bytes_after": 88244125,
+        "region_peak_live_bytes": 21486511
+      }
+    },
+    {
+      "sample": 11,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320407,
+        "live_bytes_after": 13577815,
+        "peak_live_bytes_before": 88244189,
+        "peak_live_bytes_after": 88244189,
+        "region_peak_live_bytes": 21486575
+      }
+    },
+    {
+      "sample": 12,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320471,
+        "live_bytes_after": 13577879,
+        "peak_live_bytes_before": 88244253,
+        "peak_live_bytes_after": 88244253,
+        "region_peak_live_bytes": 21486639
+      }
+    },
+    {
+      "sample": 13,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320535,
+        "live_bytes_after": 13577943,
+        "peak_live_bytes_before": 88244317,
+        "peak_live_bytes_after": 88244317,
+        "region_peak_live_bytes": 21486703
+      }
+    },
+    {
+      "sample": 14,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320599,
+        "live_bytes_after": 13578007,
+        "peak_live_bytes_before": 88244381,
+        "peak_live_bytes_after": 88244381,
+        "region_peak_live_bytes": 21486767
+      }
+    },
+    {
+      "sample": 15,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320663,
+        "live_bytes_after": 13578071,
+        "peak_live_bytes_before": 88244445,
+        "peak_live_bytes_after": 88244445,
+        "region_peak_live_bytes": 21486831
+      }
+    },
+    {
+      "sample": 16,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320727,
+        "live_bytes_after": 13578135,
+        "peak_live_bytes_before": 88244509,
+        "peak_live_bytes_after": 88244509,
+        "region_peak_live_bytes": 21486895
+      }
+    },
+    {
+      "sample": 17,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320791,
+        "live_bytes_after": 13578199,
+        "peak_live_bytes_before": 88244573,
+        "peak_live_bytes_after": 88244573,
+        "region_peak_live_bytes": 21486959
+      }
+    },
+    {
+      "sample": 18,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320855,
+        "live_bytes_after": 13578263,
+        "peak_live_bytes_before": 88244637,
+        "peak_live_bytes_after": 88244637,
+        "region_peak_live_bytes": 21487023
+      }
+    },
+    {
+      "sample": 19,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320919,
+        "live_bytes_after": 13578327,
+        "peak_live_bytes_before": 88244701,
+        "peak_live_bytes_after": 88244701,
+        "region_peak_live_bytes": 21487087
+      }
+    },
+    {
+      "sample": 20,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3320983,
+        "live_bytes_after": 13578391,
+        "peak_live_bytes_before": 88244765,
+        "peak_live_bytes_after": 88244765,
+        "region_peak_live_bytes": 21487151
+      }
+    },
+    {
+      "sample": 21,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321047,
+        "live_bytes_after": 13578455,
+        "peak_live_bytes_before": 88244829,
+        "peak_live_bytes_after": 88244829,
+        "region_peak_live_bytes": 21487215
+      }
+    },
+    {
+      "sample": 22,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321111,
+        "live_bytes_after": 13578519,
+        "peak_live_bytes_before": 88244893,
+        "peak_live_bytes_after": 88244893,
+        "region_peak_live_bytes": 21487279
+      }
+    },
+    {
+      "sample": 23,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321175,
+        "live_bytes_after": 13578583,
+        "peak_live_bytes_before": 88244957,
+        "peak_live_bytes_after": 88244957,
+        "region_peak_live_bytes": 21487343
+      }
+    },
+    {
+      "sample": 24,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321239,
+        "live_bytes_after": 13578647,
+        "peak_live_bytes_before": 88245021,
+        "peak_live_bytes_after": 88245021,
+        "region_peak_live_bytes": 21487407
+      }
+    },
+    {
+      "sample": 25,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321303,
+        "live_bytes_after": 13578711,
+        "peak_live_bytes_before": 88245085,
+        "peak_live_bytes_after": 88245085,
+        "region_peak_live_bytes": 21487471
+      }
+    },
+    {
+      "sample": 26,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321367,
+        "live_bytes_after": 13578775,
+        "peak_live_bytes_before": 88245149,
+        "peak_live_bytes_after": 88245149,
+        "region_peak_live_bytes": 21487535
+      }
+    },
+    {
+      "sample": 27,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321431,
+        "live_bytes_after": 13578839,
+        "peak_live_bytes_before": 88245213,
+        "peak_live_bytes_after": 88245213,
+        "region_peak_live_bytes": 21487599
+      }
+    },
+    {
+      "sample": 28,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321495,
+        "live_bytes_after": 13578903,
+        "peak_live_bytes_before": 88245277,
+        "peak_live_bytes_after": 88245277,
+        "region_peak_live_bytes": 21487663
+      }
+    },
+    {
+      "sample": 29,
+      "output_bytes": 5179904,
+      "output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 915,
+        "deallocation_calls": 834,
+        "reallocation_calls": 80,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 23672438,
+        "deallocated_bytes": 13415030,
+        "live_bytes_before": 3321559,
+        "live_bytes_after": 13578967,
+        "peak_live_bytes_before": 88245341,
+        "peak_live_bytes_after": 88245341,
+        "region_peak_live_bytes": 21487727
+      }
+    }
+  ],
+  "final_output_sha256": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+  "final_output_bytes": 5179904
+}

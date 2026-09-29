@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-cfb",
+    "--all-features",
+    "--test",
+    "writer_emission_order"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 101,
+  "finished_unix": 1790694355.0811086,
+  "log": {
+    "bytes": 1847,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/focused-red/output.log",
+    "sha256": "e180bf65fb3447c2afbfd0431cf0811b8ff2581fda102f57104cc3c4df0fdba2"
+  },
+  "started_unix": 1790694349.675108
+}

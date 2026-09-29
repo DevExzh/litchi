@@ -1,0 +1,64 @@
+{
+  "schema": "litchi.execution-allocation-observer.v1",
+  "scope": "global system allocator callbacks around the same fresh public writer operation; no wall or CPU timing",
+  "config": {
+    "case": "cfb-v4",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "verification": "outside allocation region: reopen, semantic projection, hashes, and inventory"
+  },
+  "corpus": {
+    "case": "cfb-v4",
+    "format": "CFB/OLE2",
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "input_sha256": "3c1d44845a2a2e48924f6803f1c30e6693aee7a47dc8d1422a5834732373c09a",
+    "logical_input_bytes": 4196352,
+    "members": [
+      {
+        "bytes": 2048,
+        "name": "MiniPayload",
+        "sha256": "7eb899b0d52b8e28c3f025f78a9fed8e1e95ee07b155b4949039811dc5bff16e"
+      },
+      {
+        "bytes": 4194304,
+        "name": "LargePayload",
+        "sha256": "e2c5217ee991477f8e6a83c7910d0adf72220b8021023c45f79ab40182b5a4aa"
+      }
+    ],
+    "paragraph_count": null,
+    "preparation_boundary": "stream payload generation and hashing occur before each measured operation",
+    "sector_size": 4096,
+    "stream_count": 2
+  },
+  "metrics": {
+    "allocator_identity": "CountingSystemAllocator(std::alloc::System)",
+    "counter_revision": "serialized_region_peak_v3",
+    "instrumentation_identity": "system_allocator_operation_scoped",
+    "timing": "not measured by this binary"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "output_bytes": 4218880,
+      "output_sha256": "2814510a4e307ff844758f4ee2d463be57232ee6ab579835399a47d0be30691e",
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 45,
+        "deallocation_calls": 37,
+        "reallocation_calls": 7,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 16843738,
+        "deallocated_bytes": 8442842,
+        "live_bytes_before": 4199828,
+        "live_bytes_after": 12600724,
+        "peak_live_bytes_before": 4199931,
+        "peak_live_bytes_after": 16822226,
+        "region_peak_live_bytes": 16822226
+      }
+    }
+  ],
+  "final_output_sha256": "2814510a4e307ff844758f4ee2d463be57232ee6ab579835399a47d0be30691e",
+  "final_output_bytes": 4218880
+}

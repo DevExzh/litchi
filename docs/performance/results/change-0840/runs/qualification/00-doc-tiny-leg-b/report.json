@@ -1,0 +1,65 @@
+{
+  "schema": "litchi.execution-cfb-emission.v1",
+  "mode": "timed",
+  "config": {
+    "case": "doc-tiny",
+    "samples": 1,
+    "warmup": 0,
+    "measured_operation": "fresh public writer construction, prepared-input registration, and write_to",
+    "output_verification": "outside wall timer: reopen, semantic projection, hashes, and inventory"
+  },
+  "input": {
+    "generator": "tools/perf-baseline/src/lib.rs::write_fresh_doc+cfb-emission-v1",
+    "case": "doc-tiny",
+    "format": "DOC/CFB",
+    "sector_size": null,
+    "paragraph_count": 3,
+    "stream_count": null,
+    "logical_input_bytes": 189,
+    "input_sha256": "e696632c4f95607f2a47c73ce8d8a445023f86e69bce3df9a5592c8641d0a830",
+    "members": [
+      {
+        "name": "paragraph:00000",
+        "bytes": 63,
+        "sha256": "ee6989b8d88cf238f44c15f0f232eb5a2a2dde0b550e4eb65b1ea196cbcdf77d"
+      },
+      {
+        "name": "paragraph:00001",
+        "bytes": 63,
+        "sha256": "21835219b293a306cec9e67d47c307503ac6ef133c3e23e4ea75dc8d5ac08a77"
+      },
+      {
+        "name": "paragraph:00002",
+        "bytes": 63,
+        "sha256": "7c9d405e217c853248c87251a2768f8fb98d50a47b17f24524c680e28fb5cf59"
+      }
+    ],
+    "preparation_boundary": "paragraph text generation and hashing occur before each measured operation"
+  },
+  "samples": [
+    {
+      "sample": 0,
+      "wall_ns": 118061,
+      "output_bytes": 15360,
+      "output_sha256": "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
+      "verification": {
+        "valid_output": true,
+        "output_bytes": 15360,
+        "output_sha256": "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
+        "semantic_sha256": "d346c27ebf02025e195df6575ad0031a8ad711d988c5f58b5b690211678a5ed6",
+        "logical_output_bytes": 189,
+        "member_or_paragraph_count": 3,
+        "exact_input_match": true
+      }
+    }
+  ],
+  "final_verification": {
+    "valid_output": true,
+    "output_bytes": 15360,
+    "output_sha256": "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
+    "semantic_sha256": "d346c27ebf02025e195df6575ad0031a8ad711d988c5f58b5b690211678a5ed6",
+    "logical_output_bytes": 189,
+    "member_or_paragraph_count": 3,
+    "exact_input_match": true
+  }
+}

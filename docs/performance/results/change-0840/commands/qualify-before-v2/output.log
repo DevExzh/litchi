@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/qualify.py", line 48, in <module>
+    rows=all_rows();print('qualification PASS',len(rows),'reports')
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/qualify.py", line 33, in all_rows
+    rows=[validate(p.parent) for p in sorted((d.P/'runs').rglob('receipt.json'))]
+          ~~~~~~~~^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/qualify.py", line 27, in validate
+    data=(folder/'output.cfb').read_bytes();value['cfb']=r.validate_cfb_artifact(case,data)
+                                                         ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/readers.py", line 833, in validate_cfb_artifact
+    "minifat": {"sector_ids": minifat_chain, "entry_count": len(minifat_values),
+                 "sha256": _sha256(b"".join(struct.pack("<I", value)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/readers.py", line 50, in require
+    fail(message)
+    ~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0840/readers.py", line 45, in fail
+    raise ReaderError(message)
+readers.ReaderError: cfb-large CFB stream sequence differs from prepared input

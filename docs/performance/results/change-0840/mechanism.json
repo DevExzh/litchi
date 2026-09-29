@@ -1,0 +1,213 @@
+{
+  "rows": [
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 8,
+        "write_bytes": 15360,
+        "write_calls": 10,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 12800,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 12288,
+        "seek_calls": 8,
+        "write_bytes": 15360,
+        "write_calls": 10,
+        "zero_filled_gap_bytes": 12288
+      },
+      "case": "doc-tiny"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 9,
+        "write_bytes": 97792,
+        "write_calls": 11,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 94720,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 94208,
+        "seek_calls": 9,
+        "write_bytes": 97792,
+        "write_calls": 11,
+        "zero_filled_gap_bytes": 94208
+      },
+      "case": "doc-large"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 87,
+        "write_bytes": 5179904,
+        "write_calls": 89,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 5136896,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 5136384,
+        "seek_calls": 87,
+        "write_bytes": 5179904,
+        "write_calls": 89,
+        "zero_filled_gap_bytes": 5136384
+      },
+      "case": "doc-payload"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 6,
+        "write_bytes": 10752,
+        "write_calls": 7,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 8704,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 8192,
+        "seek_calls": 6,
+        "write_bytes": 10752,
+        "write_calls": 7,
+        "zero_filled_gap_bytes": 8192
+      },
+      "case": "cfb-tiny"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 70,
+        "write_bytes": 4231168,
+        "write_calls": 71,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 4196352,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 4194304,
+        "seek_calls": 70,
+        "write_bytes": 4231168,
+        "write_calls": 71,
+        "zero_filled_gap_bytes": 4194304
+      },
+      "case": "cfb-large"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 68,
+        "write_bytes": 4228608,
+        "write_calls": 69,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 68,
+        "write_bytes": 4228608,
+        "write_calls": 69,
+        "zero_filled_gap_bytes": 0
+      },
+      "case": "cfb-large-only"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 5,
+        "write_bytes": 7168,
+        "write_calls": 6,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 5,
+        "write_bytes": 7168,
+        "write_calls": 6,
+        "zero_filled_gap_bytes": 0
+      },
+      "case": "cfb-mini-only"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 0,
+        "backward_seek_calls": 0,
+        "gap_events": 0,
+        "largest_gap_bytes": 0,
+        "seek_calls": 7,
+        "write_bytes": 4218880,
+        "write_calls": 9,
+        "zero_filled_gap_bytes": 0
+      },
+      "before": {
+        "backward_seek_bytes": 4198400,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 4194304,
+        "seek_calls": 7,
+        "write_bytes": 4218880,
+        "write_calls": 9,
+        "zero_filled_gap_bytes": 4194304
+      },
+      "case": "cfb-v4"
+    },
+    {
+      "after": {
+        "backward_seek_bytes": 67072,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 512,
+        "seek_calls": 134,
+        "write_bytes": 8456704,
+        "write_calls": 135,
+        "zero_filled_gap_bytes": 512
+      },
+      "before": {
+        "backward_seek_bytes": 67072,
+        "backward_seek_calls": 1,
+        "gap_events": 1,
+        "largest_gap_bytes": 512,
+        "seek_calls": 134,
+        "write_bytes": 8456704,
+        "write_calls": 135,
+        "zero_filled_gap_bytes": 512
+      },
+      "case": "cfb-difat"
+    }
+  ],
+  "scope": "Untimed cursor high-water replay; gap bytes are overwritten zero initialization, not total memory copies or physical page faults.",
+  "status": "pass"
+}

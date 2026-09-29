@@ -1,0 +1,9 @@
+allocation-preflight after doc-tiny 0 PASS
+allocation-preflight after doc-large 0 PASS
+allocation-preflight after doc-payload 0 PASS
+allocation-preflight after cfb-tiny 0 PASS
+allocation-preflight after cfb-large 0 PASS
+allocation-preflight after cfb-large-only 0 PASS
+allocation-preflight after cfb-mini-only 0 PASS
+allocation-preflight after cfb-v4 0 PASS
+allocation-preflight after cfb-difat 0 PASS

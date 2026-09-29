@@ -1,0 +1,43 @@
+   Compiling hybrid-array v0.4.14
+   Compiling num-traits v0.2.19
+   Compiling syn v2.0.114
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling zerocopy v0.8.56
+   Compiling digest v0.11.3
+   Compiling memchr v2.8.3
+   Compiling chrono v0.4.45
+   Compiling thiserror-impl v2.0.18
+   Compiling serde_json v1.0.149
+   Compiling thiserror v2.0.18
+   Compiling sha2 v0.11.0
+   Compiling zerocopy-derive v0.8.56
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized] target(s) in 5.37s
+     Running tests/writer_emission_order.rs (/home/zhuhe/code/litchi-target-0840/debug/deps/writer_emission_order-0aa5f03275db64d7)
+
+running 5 tests
+test mixed_sink_failure_is_reported_as_the_typed_io_error ... ok
+test mixed_v3_and_v4_overwrite_a_nonzero_reused_sink_to_the_golden_bytes ... ok
+test mixed_v3_and_v4_retry_short_and_interrupted_seekable_writes ... ok
+test mixed_v3_and_v4_emission_has_no_fresh_cursor_gap_before_a_write ... FAILED
+test mixed_zero_and_cutoff_streams_round_trip_for_v3_and_v4 ... ok
+
+failures:
+
+---- mixed_v3_and_v4_emission_has_no_fresh_cursor_gap_before_a_write stdout ----
+
+thread 'mixed_v3_and_v4_emission_has_no_fresh_cursor_gap_before_a_write' (3689949) panicked at crates/litchi-cfb/tests/writer_emission_order.rs:261:9:
+assertion `left == right` failed: v512 emission sought past the current Cursor end
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mixed_v3_and_v4_emission_has_no_fresh_cursor_gap_before_a_write
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-cfb --test writer_emission_order`

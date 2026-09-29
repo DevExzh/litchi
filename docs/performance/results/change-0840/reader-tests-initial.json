@@ -1,0 +1,26 @@
+{
+  "artifact_parser_checks": 4,
+  "mutations": [
+    "timed-schema",
+    "timed-input-member-hash",
+    "timed-nonpositive-wall",
+    "timed-final-output-hash",
+    "timed-member-order",
+    "observer-gap-counter",
+    "observer-event-count",
+    "observer-truncated-events",
+    "allocation-counter-revision",
+    "allocation-unmeasured",
+    "allocation-live-conservation",
+    "allocation-region-peak-bound",
+    "cfb-header-signature",
+    "bootstrap-seed-endpoints"
+  ],
+  "reader": {
+    "bytes": 44614,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/readers.py",
+    "sha256": "822a65019a1660b602f9c1bc21bedb0a0bae895a2d1aef4f3569423e5688d273"
+  },
+  "statistical_checks": 2,
+  "status": "pass"
+}

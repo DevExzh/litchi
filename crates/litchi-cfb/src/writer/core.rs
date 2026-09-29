@@ -1929,6 +1929,18 @@ impl OleWriter {
             writer.write_all(&[0; SECTOR_SIZE_V4])?;
         }
 
+        // Large streams were allocated before the ministream. Emit them first
+        // so a fresh seekable sink does not initialize a large-payload gap.
+        // Write large stream data sectors
+        for plan in &large_streams {
+            if plan.start_sector == ENDOFCHAIN {
+                continue;
+            }
+            let data = &self.streams[plan.index].1;
+
+            write_chain_aligned(writer, data, plan.start_sector, fat.fat(), self.sector_size)?;
+        }
+
         // Write ministream data (if any)
         if !minifat.is_empty() && ministream_start != ENDOFCHAIN {
             let ministream_data = minifat.ministream_data();
@@ -1939,16 +1951,6 @@ impl OleWriter {
                 fat.fat(),
                 self.sector_size,
             )?;
-        }
-
-        // Write large stream data sectors
-        for plan in &large_streams {
-            if plan.start_sector == ENDOFCHAIN {
-                continue;
-            }
-            let data = &self.streams[plan.index].1;
-
-            write_chain_aligned(writer, data, plan.start_sector, fat.fat(), self.sector_size)?;
         }
 
         // Write directory stream

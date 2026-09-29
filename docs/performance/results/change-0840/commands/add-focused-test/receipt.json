@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "git",
+    "apply",
+    "--include=crates/litchi-cfb/tests/writer_emission_order.rs",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0840/candidate.patch"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790694349.6351783,
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0840/commands/add-focused-test/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "started_unix": 1790694349.6336384
+}
