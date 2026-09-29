@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/audit.py",
+    "--preflight"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790684744.996561,
+  "log": {
+    "bytes": 113,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight/output.log",
+    "sha256": "07b74e6cee1ba51a1498fb41b52d4ef2dc5638d5b3a00c8c2c3c72e9bfe7fd53"
+  },
+  "started_unix": 1790684744.0766113
+}

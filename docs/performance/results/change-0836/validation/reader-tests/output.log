@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-tests.py", line 262, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-tests.py", line 238, in main
+    report_sha256 = _report_mutations(checks)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-tests.py", line 153, in _report_mutations
+    raise AssertionError("no retained multi-sample report is available")
+AssertionError: no retained multi-sample report is available

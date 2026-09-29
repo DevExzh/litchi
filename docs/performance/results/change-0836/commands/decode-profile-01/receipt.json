@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "perf",
+    "script",
+    "--no-inline",
+    "--ns",
+    "--show-lost-events",
+    "-i",
+    "/home/zhuhe/code/litchi-target-0836/profile-01.data"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790685353.8109984,
+  "freeze": {
+    "bytes": 1206200,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+    "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+  },
+  "log": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/decode-profile-01/output.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "runner": {
+    "bytes": 1073,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/runner.py",
+    "sha256": "cb22fa6d143db47b8839fa5180cdd8210a92757e137291c1ff24f196b49ae792"
+  },
+  "started_unix": 1790685353.2023988,
+  "stdout": {
+    "bytes": 72635878,
+    "path": "/home/zhuhe/code/litchi-target-0836/profile-01.script",
+    "sha256": "57e6d38d2cebda99f862b2a2c92ddbb38a3f018f80395f46bb947c5a25a61727"
+  }
+}

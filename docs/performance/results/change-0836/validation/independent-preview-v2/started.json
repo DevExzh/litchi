@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/audit.py",
+    "--preview"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790685943.817787
+}

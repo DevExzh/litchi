@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys; sys.path.insert(0,\"docs/performance/results/change-0836\"); import profile_analysis as a; p=a.read_json(a.HERE/\"plan.json\"); m=a.read_json(a.HERE/\"traces.json\"); print([(r[\"label\"],a.trace_row(r,e,i)[\"order_provenance_verified\"]) for i,(r,e) in enumerate(zip(m[\"rows\"],p[\"trace\"]))])"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 1,
+  "finished_unix": 1790685325.9784946,
+  "log": {
+    "bytes": 1507,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-analysis-precheck/output.log",
+    "sha256": "4a313e4251842a29ac748c14e8e2fc92c8e041d5988d199921b34c4d2f9df00d"
+  },
+  "started_unix": 1790685325.9105866
+}

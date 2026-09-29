@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys; sys.path.insert(0,\"docs/performance/results/change-0836\"); import audit as a; c=a.preflight_components(); print(a.validate_mappings(c[\"binaries\"])[\"status\"])"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790685627.7156365
+}

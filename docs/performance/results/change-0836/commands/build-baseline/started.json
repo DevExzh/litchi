@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "freeze": {
+    "bytes": 1206206,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-baseline.json",
+    "sha256": "89fba9596a91c92b7d2d874361abf8600cf05339ca694adcc77bdf9c7e6b021f"
+  },
+  "started_unix": 1790653034.0775545
+}

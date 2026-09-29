@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "perf",
+    "stat",
+    "-e",
+    "cycles:u",
+    "--",
+    "taskset",
+    "-c",
+    "12",
+    "true"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790683904.2194686,
+  "freeze": {
+    "bytes": 1206206,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-baseline.json",
+    "sha256": "89fba9596a91c92b7d2d874361abf8600cf05339ca694adcc77bdf9c7e6b021f"
+  },
+  "log": {
+    "bytes": 257,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/perf-availability/output.log",
+    "sha256": "f34e4509e77cdc23a76352f3c4bd9c032bbfb936c76535f77480c0ac56e0e98c"
+  },
+  "started_unix": 1790683904.1679192
+}

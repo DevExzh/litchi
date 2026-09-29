@@ -1,0 +1,344 @@
+{
+  "offline_checks": 36,
+  "retained_failed_checks": 11,
+  "rows": [
+    {
+      "exit_code": 0,
+      "label": "audit-replay",
+      "receipt": {
+        "bytes": 467,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/audit-replay/receipt.json",
+        "sha256": "55ef6f2fae82206a51260136819313f9ebffe79739dc9d22e12e3103bcce7f65"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "cleanup",
+      "receipt": {
+        "bytes": 450,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/cleanup/receipt.json",
+        "sha256": "f27d667fc3f947d46a6c7b863bac1850dc616e10750a4bba4bb13afe30b4ad0c"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-final",
+      "receipt": {
+        "bytes": 458,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-final/receipt.json",
+        "sha256": "36c88c6fb49067d60cec438913ffd90fab15865b94c2b2c281240cddd0dda455"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-final-preview",
+      "receipt": {
+        "bytes": 483,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-final-preview/receipt.json",
+        "sha256": "ce550e0e73cb843a17496fe99ce75a10c7b01f0743d30de356ab1849d5c7abbd"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-mapping-custody",
+      "receipt": {
+        "bytes": 607,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-mapping-custody/receipt.json",
+        "sha256": "6e00f7f873921d9d879ad415375b511a4080de31ad9a4a84b1bf319da9036080"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "independent-owner-crosscheck",
+      "receipt": {
+        "bytes": 475,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-owner-crosscheck/receipt.json",
+        "sha256": "477a7fe5c00149ec9a71149f941c9869f0d9130d5b4697bf2a46575c89d628b1"
+      },
+      "resolved_by": "independent-owner-crosscheck-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-owner-crosscheck-v2",
+      "receipt": {
+        "bytes": 478,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-owner-crosscheck-v2/receipt.json",
+        "sha256": "92120d788c133a27a7d96132034ab8edc4cf9ea97ed21400c910754986f31397"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "independent-preflight",
+      "receipt": {
+        "bytes": 481,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight/receipt.json",
+        "sha256": "aad85184110fb8b5370db879ba27cccdb8f50db3d62a27fe73af434ec9e918ea"
+      },
+      "resolved_by": "independent-preflight-v4"
+    },
+    {
+      "exit_code": 1,
+      "label": "independent-preflight-v2",
+      "receipt": {
+        "bytes": 484,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight-v2/receipt.json",
+        "sha256": "bf3d54f98007b71c636ac4596c5f24f19e409b577459ee58f086c267f077e620"
+      },
+      "resolved_by": "independent-preflight-v4"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-preflight-v3",
+      "receipt": {
+        "bytes": 484,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight-v3/receipt.json",
+        "sha256": "8f58641b1ee861f2e0f89bb28cc4985c55cd42ecca508df216fd6b4ce5ac11d4"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-preflight-v4",
+      "receipt": {
+        "bytes": 484,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preflight-v4/receipt.json",
+        "sha256": "c8e588c047d621342a75970abad7790e100a8bef05179e3021f6224d8374ecd1"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "independent-preview-v1",
+      "receipt": {
+        "bytes": 480,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preview-v1/receipt.json",
+        "sha256": "3377a864824c4cf747d1b9bde79d0653caae69ceb1e57da7cca98451f9f08c43"
+      },
+      "resolved_by": "independent-final"
+    },
+    {
+      "exit_code": 1,
+      "label": "independent-preview-v2",
+      "receipt": {
+        "bytes": 479,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preview-v2/receipt.json",
+        "sha256": "96761f9eadda701f60b07da23cd7977c2819088640e5d66c995e09b85236a8cf"
+      },
+      "resolved_by": "independent-final"
+    },
+    {
+      "exit_code": 0,
+      "label": "independent-preview-v3",
+      "receipt": {
+        "bytes": 480,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/independent-preview-v3/receipt.json",
+        "sha256": "0dec215f93bd0d49ad4d24044c117f71b1d8e1f3474dae57d04f292bac12c2f2"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "mutations-post-cleanup",
+      "receipt": {
+        "bytes": 657,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/mutations-post-cleanup/receipt.json",
+        "sha256": "78fed74edf2c4c7a0e07d3600d6053e885e43d99077915aa92dab38ace8e9fcb"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "native-reader",
+      "receipt": {
+        "bytes": 596,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/native-reader/receipt.json",
+        "sha256": "231ae44f04184a7e1beaa82189205260c17cf10b86d9225c4d70f74ff16e9d49"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "owner-agreement",
+      "receipt": {
+        "bytes": 979,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/owner-agreement/receipt.json",
+        "sha256": "31c1fdff7a0a9a50239753c9d1fe44dd69995d8b08884168e7697bb0e993a8ec"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "owner-post-cleanup",
+      "receipt": {
+        "bytes": 480,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/owner-post-cleanup/receipt.json",
+        "sha256": "af0c1bed1c46511cc381d639b8fd422a620991cb56a321ff247eca47395e0ed5"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-analysis",
+      "receipt": {
+        "bytes": 466,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-analysis/receipt.json",
+        "sha256": "921d597a5aebb1bfe5b53da6ee4b7837879719455159ef2c98e9dd199c5b86a3"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-analysis-replay",
+      "receipt": {
+        "bytes": 490,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-analysis-replay/receipt.json",
+        "sha256": "dee273229d8dac613226541b38763b065ae492f35d8e3a471cd8ada1ff96f95a"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "profile-parser-preflight",
+      "receipt": {
+        "bytes": 492,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-parser-preflight/receipt.json",
+        "sha256": "33022c42bff827f5ef579c93c26a83eb9465e64046b23b176ebfc0f963adc076"
+      },
+      "resolved_by": "profile-tests-full"
+    },
+    {
+      "exit_code": 1,
+      "label": "profile-parser-preflight-v2",
+      "receipt": {
+        "bytes": 494,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-parser-preflight-v2/receipt.json",
+        "sha256": "cf06a2fcc0c18a3fd72e80d8dd65532b81c64df342eed6bf817c0054264ce25e"
+      },
+      "resolved_by": "profile-tests-full"
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-parser-preflight-v3",
+      "receipt": {
+        "bytes": 495,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-parser-preflight-v3/receipt.json",
+        "sha256": "941d5a085eb90136cb0db64a998da0aea5e26a68aeecac77ab3248ae80c2c978"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-post-cleanup",
+      "receipt": {
+        "bytes": 487,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-post-cleanup/receipt.json",
+        "sha256": "82ab478a9e82c8d11fc2b01d8835875e09d4c2fb3c83fd1776b9e8f6f19f00b4"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-reader",
+      "receipt": {
+        "bytes": 598,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-reader/receipt.json",
+        "sha256": "bf7c1c3540ed6d3fc0c174701579077a5702042f1db31cfe34d7810e559b1e14"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "profile-tests-full",
+      "receipt": {
+        "bytes": 466,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-tests-full/receipt.json",
+        "sha256": "86cef8083aa0b720c1d7ada8f662bcb9c7d27e17467ac29640defc10ae93c9c2"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "qualification-reader",
+      "receipt": {
+        "bytes": 616,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/qualification-reader/receipt.json",
+        "sha256": "1dfdfb9b6e2025dc37d05ff073835197c50a7a31a8b2bc904697ec87c24b2812"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-preflight-tests",
+      "receipt": {
+        "bytes": 489,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/reader-preflight-tests/receipt.json",
+        "sha256": "f5eb66a37b0d57907d1d9b5629ef03d2042e88963ab97276750c8ddeb05233e4"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "reader-tests",
+      "receipt": {
+        "bytes": 461,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/reader-tests/receipt.json",
+        "sha256": "e019abab832aeacf7ad0bfe66114e480f273180d6b0cc9b6aed3c4ef92ff4d9e"
+      },
+      "resolved_by": "reader-tests-full"
+    },
+    {
+      "exit_code": 0,
+      "label": "reader-tests-full",
+      "receipt": {
+        "bytes": 465,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/reader-tests-full/receipt.json",
+        "sha256": "c410f9722542911d553c6382a151de4e7182db92015f5facaeb843099f959fbb"
+      }
+    },
+    {
+      "exit_code": 0,
+      "label": "reports-post-cleanup",
+      "receipt": {
+        "bytes": 470,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/reports-post-cleanup/receipt.json",
+        "sha256": "9ead12a51c1578e148138b0cf3a573a80500ee096e7f0ce7f0b6abbaf2ac6097"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "trace-analysis-precheck",
+      "receipt": {
+        "bytes": 739,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-analysis-precheck/receipt.json",
+        "sha256": "3d4e7e6393e49ce7daee129bc0d07b605c04d0a0dc8a0d43bc7e14d707267ffb"
+      },
+      "resolved_by": "profile-analysis"
+    },
+    {
+      "exit_code": 1,
+      "label": "trace-analysis-precheck-v2",
+      "receipt": {
+        "bytes": 742,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-analysis-precheck-v2/receipt.json",
+        "sha256": "9d5daf458167fd6bd8357d42342e045a0939e2536d3bd93a6b5acaec6e71be50"
+      },
+      "resolved_by": "profile-analysis"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-parser-preflight",
+      "receipt": {
+        "bytes": 763,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-parser-preflight/receipt.json",
+        "sha256": "81bcca7d89aea819f8c67a4549a1b94826e735bdf7d33e7c1bfaccbd51e2abd3"
+      }
+    },
+    {
+      "exit_code": 1,
+      "label": "trace-reader",
+      "receipt": {
+        "bytes": 518,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-reader/receipt.json",
+        "sha256": "109444de2eb9b4fafd38ef61a787d976f138a5af986073726f735710ec4419e5"
+      },
+      "resolved_by": "trace-reader-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "trace-reader-v2",
+      "receipt": {
+        "bytes": 597,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-reader-v2/receipt.json",
+        "sha256": "002c44b225f575975e4b3e0377fe45b5e7d6c8a46ca6830f5248025d2a57e28f"
+      }
+    }
+  ],
+  "scope": "Every failed offline invocation is retained and linked to successful corrected replay; all 76 build/workload/auxiliary commands succeeded.",
+  "status": "pass",
+  "successful_checks": 25
+}

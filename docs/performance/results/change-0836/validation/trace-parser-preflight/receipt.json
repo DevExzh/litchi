@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import sys; sys.path.insert(0,\"docs/performance/results/change-0836\"); import importlib.util; s=importlib.util.spec_from_file_location(\"profile_tests\",\"docs/performance/results/change-0836/profile-tests.py\"); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); checks=[]; m.trace_synthetic_checks(checks); print(checks)"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790685197.863799,
+  "log": {
+    "bytes": 260,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-parser-preflight/output.log",
+    "sha256": "f29ea4c9af85545b65bf1989af9c702821be76751aecf218d0b61b3a48b1b91d"
+  },
+  "started_unix": 1790685197.833749
+}

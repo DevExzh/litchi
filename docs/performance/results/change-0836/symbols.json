@@ -1,0 +1,422 @@
+{
+  "owner": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream",
+  "plan": {
+    "bytes": 7179,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/plan.json",
+    "sha256": "ef26ac9ba91871b8747caa512b7a6b2039d93929b73d93ee924b0777f4232b26"
+  },
+  "scope": "source-backed single-Part overlay publication only; excludes package open and final atomic synchronization",
+  "stages": {
+    "baseline": {
+      "binary": {
+        "bytes": 69112496,
+        "path": "/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline",
+        "sha256": "79cd220bdb5d569f0a7676ffa724d215b8e09763e6ed86df6e77e5c4c14af0d2"
+      },
+      "build_id": "80f12b56c3f70dc8b31debaa1071fe669654564e",
+      "inventory": {
+        "bytes": 1881,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/symbols-baseline.json",
+        "sha256": "8856f3fa0b24f906162e037ae99fccdcf8735217b68b352203bd062712fadf0a"
+      },
+      "ranges": [
+        {
+          "address": 19098592,
+          "assembly": {
+            "bytes": 30238,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-00/output.log",
+            "sha256": "b1cc7fcf8d91a227f33372f20616433503235ed8b8cf38c75feafa78d61ba36b"
+          },
+          "end": 19100694,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h12e6f49550b98faaE",
+          "receipt": {
+            "bytes": 771,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-00/receipt.json",
+            "sha256": "4c4dc3c7b3fbd40e8a59a8d69b67ec7e3e625fabe92fc3e93980c40dc4b5e05e"
+          },
+          "size": 2102,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19100704,
+          "assembly": {
+            "bytes": 29294,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-01/output.log",
+            "sha256": "eed610cd1e7808e6fb4ac61427a3f2597a8f8bb65e56e59beeeaea1377faeabc"
+          },
+          "end": 19102728,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h256f758197bf11a1E",
+          "receipt": {
+            "bytes": 769,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-01/receipt.json",
+            "sha256": "d90e72d9fa81b47066ecdf178f5ec4301a781f354104c191e8473f1e7565d7e2"
+          },
+          "size": 2024,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19102736,
+          "assembly": {
+            "bytes": 31394,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-02/output.log",
+            "sha256": "1109f5a9159092ebd613959514a6c65a21207a7695ce9b60e3ed76f98b969831"
+          },
+          "end": 19104917,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h2dca1d239594cb8fE",
+          "receipt": {
+            "bytes": 770,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-02/receipt.json",
+            "sha256": "c0bcf1bf0b9af5e0ffbc08c561bc996b796e4e9b6e6da385854090ea6696e711"
+          },
+          "size": 2181,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19104928,
+          "assembly": {
+            "bytes": 30238,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-03/output.log",
+            "sha256": "977b82f508cb7a3fac78dc58d67fcd35f19832b2c22861387aec60a5721ab6d3"
+          },
+          "end": 19107030,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h37041fc083d744a6E",
+          "receipt": {
+            "bytes": 770,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-03/receipt.json",
+            "sha256": "e6c97e415baf42cf96767792914a803bba03cfd4a1c0450588e556c72a11d7c8"
+          },
+          "size": 2102,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19107040,
+          "assembly": {
+            "bytes": 32338,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-04/output.log",
+            "sha256": "bed28dcb3d4dcb99c7e8bcb9a851654520ffa6ac3b17b889ff2ee2ac00e8aa9a"
+          },
+          "end": 19109300,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h7110e74775ae325bE",
+          "receipt": {
+            "bytes": 771,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-04/receipt.json",
+            "sha256": "01a22c11d12c210269c979f1a9296d1f5e5de30a9e20717c9faf7fcf9278018f"
+          },
+          "size": 2260,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19109312,
+          "assembly": {
+            "bytes": 29294,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-05/output.log",
+            "sha256": "3ccb8905007a13608a3a794825f7ecb82cc740108610c6e404573f1036f4db22"
+          },
+          "end": 19111336,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h8ad86e67df0ea0aeE",
+          "receipt": {
+            "bytes": 771,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-05/receipt.json",
+            "sha256": "e27624c82e83f166f055d314a3f45207fc520110c17789e8f9a0b8f431108274"
+          },
+          "size": 2024,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19111344,
+          "assembly": {
+            "bytes": 29294,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-06/output.log",
+            "sha256": "df81c9a55cf0d274d0c3af6984cc5dc76d7256ef08ae92d39bbb30a1c2373211"
+          },
+          "end": 19113368,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hb3a58a118f3ac25fE",
+          "receipt": {
+            "bytes": 770,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-06/receipt.json",
+            "sha256": "637fa3b16a0bf8fb8d693fc13ff77d5c64b9fc9b85fc8b7053e53999337498f0"
+          },
+          "size": 2024,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19113376,
+          "assembly": {
+            "bytes": 30238,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-07/output.log",
+            "sha256": "cdb12d72afd89ec6cd71609617c6d6d3631d806db57d6b3cddfb2716a3fc37f6"
+          },
+          "end": 19115478,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hb663b801573e8d7dE",
+          "receipt": {
+            "bytes": 771,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-07/receipt.json",
+            "sha256": "416067964a914d210cc519d20d4b12f92835447e9177c9ec3e8af3d9a0ad8dd5"
+          },
+          "size": 2102,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19115488,
+          "assembly": {
+            "bytes": 30238,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-08/output.log",
+            "sha256": "89ba59eea8f67137bef5b9e6bb181508b5f08ccd948e875d3b9ccb297d1b80f5"
+          },
+          "end": 19117590,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hc57932695aa4551fE",
+          "receipt": {
+            "bytes": 770,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-08/receipt.json",
+            "sha256": "28b8b539cec7ac763aeded95ea5e77170f28e440d643762c6cd6e4048abf6176"
+          },
+          "size": 2102,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 19117600,
+          "assembly": {
+            "bytes": 32338,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-09/output.log",
+            "sha256": "2ded8937f9c288ca3ab83805c46ae5bacc188050e45b4c23f6130f9e2d1ddb2d"
+          },
+          "end": 19119860,
+          "frame_pointer_prologue": false,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hfd9dc7c7878f3316E",
+          "receipt": {
+            "bytes": 769,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-09/receipt.json",
+            "sha256": "d6ecc29e53bc12d30e77e4d6b4e04ae66d592266323c4f760339eea66bf909dd"
+          },
+          "size": 2260,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        }
+      ]
+    },
+    "fp": {
+      "binary": {
+        "bytes": 67622240,
+        "path": "/home/zhuhe/code/litchi-target-0836/retained/fp/litchi-perf-baseline",
+        "sha256": "e1d0c28ef203cb193b92d29de15a4de7c62c3cc3240f44aad6d805f81e296141"
+      },
+      "build_id": "3bab3df54d0be859a6d6fb926b3bb10d48fbd964",
+      "inventory": {
+        "bytes": 1833,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/symbols-fp.json",
+        "sha256": "7484cbc908435d760d2bd999030ac611d5288ac48363d5c5d9e3a0956a3c0b0d"
+      },
+      "ranges": [
+        {
+          "address": 18010608,
+          "assembly": {
+            "bytes": 29576,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-00/output.log",
+            "sha256": "0ed2a53eb3617b9af688e4714cb9f59ba0129d0e5469a21910895054f8584873"
+          },
+          "end": 18012630,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h12e6f49550b98faaE",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-00/receipt.json",
+            "sha256": "89da40897be6f930b5376e527b8a5b75c5abc1040c40eebb90c4e76f75806049"
+          },
+          "size": 2022,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18012640,
+          "assembly": {
+            "bytes": 28656,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-01/output.log",
+            "sha256": "afaee049f90d137e51e9623eeafed08e9d254d8c1a840aaaafa005aec23d9498"
+          },
+          "end": 18014586,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h256f758197bf11a1E",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-01/receipt.json",
+            "sha256": "d89e4e483dd8c9bd879c5f8b8a263eaacf83e929056b78c22a35b17c836b3e1d"
+          },
+          "size": 1946,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18014592,
+          "assembly": {
+            "bytes": 31727,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-02/output.log",
+            "sha256": "ac0a17e51c8056b198910e3b7f9cf6eb9ecb117627626ace67307d5db4c84589"
+          },
+          "end": 18016761,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h2dca1d239594cb8fE",
+          "receipt": {
+            "bytes": 752,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-02/receipt.json",
+            "sha256": "abe3d7e8a520a81b319c6e7d11729215e1ad9483b87ec2a3bee741c7eac6e3ff"
+          },
+          "size": 2169,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18016768,
+          "assembly": {
+            "bytes": 29576,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-03/output.log",
+            "sha256": "d695101ae45cdf22f36595d46be0adbc1b6068aace55478273cfc65f659e663a"
+          },
+          "end": 18018790,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h37041fc083d744a6E",
+          "receipt": {
+            "bytes": 752,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-03/receipt.json",
+            "sha256": "20b115b069107c2dc3d96bd99d0d48802a26a4110c1374e3d881c7cf4ce16406"
+          },
+          "size": 2022,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18018800,
+          "assembly": {
+            "bytes": 32441,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-04/output.log",
+            "sha256": "0e30142f75ddf552790f72c397fba00dbee4b3be70c7b1fbf2de30fcedad1c04"
+          },
+          "end": 18021028,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h7110e74775ae325bE",
+          "receipt": {
+            "bytes": 752,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-04/receipt.json",
+            "sha256": "563da1a392d5594ee5b0c0fa6f73e187cbc3d9de217252c334fe2f0836aecfba"
+          },
+          "size": 2228,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18021040,
+          "assembly": {
+            "bytes": 28656,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-05/output.log",
+            "sha256": "3b01e1d86842c9fe6d44282a499c8e58268cffb2814637a48d2aca183743f89e"
+          },
+          "end": 18022986,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17h8ad86e67df0ea0aeE",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-05/receipt.json",
+            "sha256": "19bc5c1ea0aee5452ad39620b02ba8f9ae8c7c09f307229a932b5647aeb9c7af"
+          },
+          "size": 1946,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18022992,
+          "assembly": {
+            "bytes": 28656,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-06/output.log",
+            "sha256": "45d34aa9889587934007964b587806280e3f016845872f475647c5c5a92a5ecc"
+          },
+          "end": 18024938,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hb3a58a118f3ac25fE",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-06/receipt.json",
+            "sha256": "db537430f1f116f08e190b58dca26602ec76c033296a7f79cc3d232b4c378ba0"
+          },
+          "size": 1946,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18024944,
+          "assembly": {
+            "bytes": 29576,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-07/output.log",
+            "sha256": "d0db0b39ecce0d288889733fa56d428f8d686351cee3e59280150d15502f439b"
+          },
+          "end": 18026966,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hb663b801573e8d7dE",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-07/receipt.json",
+            "sha256": "1a1ed0932c9ff389afd04513435b8f3e5e8c4f20e2ab1197a151340cd4ee97aa"
+          },
+          "size": 2022,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18026976,
+          "assembly": {
+            "bytes": 29576,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-08/output.log",
+            "sha256": "55ff029bc948da3675dda172ca19b33b88c3d7c3af93dd83a3d6859fbea39fb7"
+          },
+          "end": 18028998,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hc57932695aa4551fE",
+          "receipt": {
+            "bytes": 753,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-08/receipt.json",
+            "sha256": "c12f28ec8515b648d42cbe0cf84a9a1855255c331aa8036fd4288f5a9b70b9a5"
+          },
+          "size": 2022,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        },
+        {
+          "address": 18029008,
+          "assembly": {
+            "bytes": 32441,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-09/output.log",
+            "sha256": "ce50627298ab2379a26c659a60d9991d7eac0e5b301411ba10b2790cc32545e0"
+          },
+          "end": 18031236,
+          "frame_pointer_prologue": true,
+          "kind": "t",
+          "raw_symbol": "_ZN10litchi_opc13source_backed19SourceBackedPackage35write_single_part_overlay_to_stream17hfd9dc7c7878f3316E",
+          "receipt": {
+            "bytes": 752,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-fp-owner-09/receipt.json",
+            "sha256": "e1e76db1727d43cffd42eb1ec48fd0ae9ffe86528e5e3e63d42ce83f4220da9f"
+          },
+          "size": 2228,
+          "symbol": "litchi_opc::source_backed::SourceBackedPackage::write_single_part_overlay_to_stream"
+        }
+      ]
+    }
+  },
+  "status": "pass"
+}

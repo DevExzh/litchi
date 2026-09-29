@@ -1,0 +1,88 @@
+{
+  "scope": "Retained actual Cargo fingerprint rustflags, bound to frozen driver and unique isolated build roots; captured after qualification, before cleanup.",
+  "stages": {
+    "baseline": {
+      "binary": {
+        "bytes": 69112496,
+        "path": "/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline",
+        "sha256": "79cd220bdb5d569f0a7676ffa724d215b8e09763e6ed86df6e77e5c4c14af0d2"
+      },
+      "environment": {
+        "RUSTFLAGS": null
+      },
+      "fingerprints": [
+        {
+          "original": {
+            "bytes": 2290,
+            "path": "/home/zhuhe/code/litchi-target-0836/release/.fingerprint/litchi-perf-baseline-bdd5dc80510845aa/bin-litchi-perf-baseline.json",
+            "sha256": "c83f5f348fd4e780883a776a4db065c1d80d544ba3c856256e3c3afe1ab1d4fc"
+          },
+          "retained": {
+            "bytes": 2290,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/fingerprints/baseline/litchi-perf-baseline-bdd5dc80510845aa/bin-litchi-perf-baseline.json",
+            "sha256": "c83f5f348fd4e780883a776a4db065c1d80d544ba3c856256e3c3afe1ab1d4fc"
+          },
+          "rustflags": []
+        },
+        {
+          "original": {
+            "bytes": 2220,
+            "path": "/home/zhuhe/code/litchi-target-0836/release/.fingerprint/litchi-perf-baseline-1f63daeef5ec999f/lib-litchi_perf_baseline.json",
+            "sha256": "baca77374c61b52c06b37ce95f2fc0f6c435b990dd449e84fb0cab64a03a241b"
+          },
+          "retained": {
+            "bytes": 2220,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/fingerprints/baseline/litchi-perf-baseline-1f63daeef5ec999f/lib-litchi_perf_baseline.json",
+            "sha256": "baca77374c61b52c06b37ce95f2fc0f6c435b990dd449e84fb0cab64a03a241b"
+          },
+          "rustflags": []
+        }
+      ]
+    },
+    "fp": {
+      "binary": {
+        "bytes": 67622240,
+        "path": "/home/zhuhe/code/litchi-target-0836/retained/fp/litchi-perf-baseline",
+        "sha256": "e1d0c28ef203cb193b92d29de15a4de7c62c3cc3240f44aad6d805f81e296141"
+      },
+      "environment": {
+        "RUSTFLAGS": "-C force-frame-pointers=yes"
+      },
+      "fingerprints": [
+        {
+          "original": {
+            "bytes": 2326,
+            "path": "/home/zhuhe/code/litchi-target-0836/fp/release/.fingerprint/litchi-perf-baseline-3b3a26555d53481d/bin-litchi-perf-baseline.json",
+            "sha256": "c993cf1ca10abcc32f493393a27a63d2855701da07a3eacc7c4cea1441f6bf75"
+          },
+          "retained": {
+            "bytes": 2326,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/fingerprints/fp/litchi-perf-baseline-3b3a26555d53481d/bin-litchi-perf-baseline.json",
+            "sha256": "c993cf1ca10abcc32f493393a27a63d2855701da07a3eacc7c4cea1441f6bf75"
+          },
+          "rustflags": [
+            "-C",
+            "force-frame-pointers=yes"
+          ]
+        },
+        {
+          "original": {
+            "bytes": 2255,
+            "path": "/home/zhuhe/code/litchi-target-0836/fp/release/.fingerprint/litchi-perf-baseline-38ea08372ffba49d/lib-litchi_perf_baseline.json",
+            "sha256": "397d515bd5fcab706ef0cfb96dc49f420cb2643913eec130d06f96f708dc7c51"
+          },
+          "retained": {
+            "bytes": 2255,
+            "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/fingerprints/fp/litchi-perf-baseline-38ea08372ffba49d/lib-litchi_perf_baseline.json",
+            "sha256": "397d515bd5fcab706ef0cfb96dc49f420cb2643913eec130d06f96f708dc7c51"
+          },
+          "rustflags": [
+            "-C",
+            "force-frame-pointers=yes"
+          ]
+        }
+      ]
+    }
+  },
+  "status": "pass"
+}

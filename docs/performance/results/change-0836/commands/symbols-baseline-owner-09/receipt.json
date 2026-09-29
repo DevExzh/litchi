@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "objdump",
+    "-d",
+    "-C",
+    "--start-address=0x123b620",
+    "--stop-address=0x123bef4",
+    "/home/zhuhe/code/litchi-target-0836/retained/baseline/litchi-perf-baseline"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790684238.0870411,
+  "freeze": {
+    "bytes": 1206206,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-baseline.json",
+    "sha256": "89fba9596a91c92b7d2d874361abf8600cf05339ca694adcc77bdf9c7e6b021f"
+  },
+  "log": {
+    "bytes": 32338,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/symbols-baseline-owner-09/output.log",
+    "sha256": "2ded8937f9c288ca3ab83805c46ae5bacc188050e45b4c23f6130f9e2d1ddb2d"
+  },
+  "started_unix": 1790684238.05176
+}

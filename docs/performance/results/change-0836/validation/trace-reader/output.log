@@ -1,0 +1,7 @@
+{
+  "claim_authorized": false,
+  "error": "missing regular JSON: /home/zhuhe/code/litchi/traces.json",
+  "manifest_valid": false,
+  "performance_claim": "none",
+  "status": "invalid"
+}

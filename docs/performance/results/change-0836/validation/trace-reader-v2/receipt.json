@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/reader.py",
+    "docs/performance/results/change-0836/traces.json",
+    "--write",
+    "docs/performance/results/change-0836/traces-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790685298.5358512,
+  "log": {
+    "bytes": 3329,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/trace-reader-v2/output.log",
+    "sha256": "b4b28c90f2a2dc71dec58dc1acba2e8988ebd8909fbd6d57ca82f6cdb34c917e"
+  },
+  "started_unix": 1790685296.7752166
+}

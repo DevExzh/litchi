@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/reader.py",
+    "docs/performance/results/change-0836/traces.json",
+    "--write",
+    "docs/performance/results/change-0836/traces-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790685296.7752166
+}

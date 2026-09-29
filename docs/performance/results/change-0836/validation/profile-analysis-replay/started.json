@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/profile_analysis.py",
+    "--check"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790686043.2678075
+}

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/profile-tests.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686020.374207,
+  "log": {
+    "bytes": 44,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-tests-full/output.log",
+    "sha256": "884d2d9cdf2518350fec65ea32ec10ce0325459acb567e77e1e0d8299387c6a5"
+  },
+  "started_unix": 1790686020.1422927
+}

@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "12",
+    "/home/zhuhe/code/litchi-target-0836/retained/fp/litchi-perf-baseline",
+    "--case",
+    "opc_file_source_one_part_atomic_save",
+    "--samples",
+    "12",
+    "--warmup",
+    "2",
+    "--filesystem-cache",
+    "warm",
+    "--filesystem-root",
+    "/home/zhuhe/code/litchi-fs-0836",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0836/native-22.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "freeze": {
+    "bytes": 1206200,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+    "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+  },
+  "started_unix": 1790684636.6294227
+}

@@ -1,0 +1,102 @@
+{
+  "created_unix": 1790684322.064393,
+  "inputs": {
+    "build-baseline.json": {
+      "bytes": 448,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/build-baseline.json",
+      "sha256": "40b905797b71f534b74b934cb3ee53f86d099e0d06ec27aa94d403505fe955bb"
+    },
+    "build-fp.json": {
+      "bytes": 436,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/build-fp.json",
+      "sha256": "6d8082b443316d37f04e1d050b98b38ee43148e247a9a706d0c5120a9d7a53f6"
+    },
+    "capture.py": {
+      "bytes": 2936,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/capture.py",
+      "sha256": "ff9be30be7fab918a2a43249e4e91dc9de54de3d6f4e723b179a53ebe57d8831"
+    },
+    "driver.py": {
+      "bytes": 6266,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/driver.py",
+      "sha256": "1740ad25f3f358e325453d3c96d6bb6f10c26cf62825d4ed2576add18fe2f348"
+    },
+    "freeze-baseline.json": {
+      "bytes": 1206206,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-baseline.json",
+      "sha256": "89fba9596a91c92b7d2d874361abf8600cf05339ca694adcc77bdf9c7e6b021f"
+    },
+    "freeze-fp.json": {
+      "bytes": 1206200,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+      "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+    },
+    "host.json": {
+      "bytes": 52704,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/host.json",
+      "sha256": "bfe574c27e4fdfeff7e54b73359f4f49dbfcd253270f5d4a82a7bb664ba19b74"
+    },
+    "origin.json": {
+      "bytes": 4600,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/origin.json",
+      "sha256": "20bfe692715d3a52ae81c5dbf05c94d0dc85d2e17cb0e0407e10a1bc0a785e38"
+    },
+    "plan.json": {
+      "bytes": 7179,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/plan.json",
+      "sha256": "ef26ac9ba91871b8747caa512b7a6b2039d93929b73d93ee924b0777f4232b26"
+    },
+    "qualification-validation.json": {
+      "bytes": 3025,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification-validation.json",
+      "sha256": "cbee9d2fa8da94158c9ca3f6ed4a43676571f51ab0d930a3cd7b09f67ceca7ca"
+    },
+    "qualification.json": {
+      "bytes": 1522,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification.json",
+      "sha256": "79b3ae1ff4d7b9fcec7434244d5f604316aed5f0cdcefeb0b32b98caf817c859"
+    },
+    "quality-reuse.json": {
+      "bytes": 3905,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/quality-reuse.json",
+      "sha256": "96cd34307eecd033c92f38d9304e576251979782c459ce241e27d5fad4baec00"
+    },
+    "reader-preflight-tests.json": {
+      "bytes": 1440,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-preflight-tests.json",
+      "sha256": "43269b8c9119fb7ea8982a6d48b00437d67abbd33ca5c28f7c415ed36e60ce58"
+    },
+    "reader-tests.py": {
+      "bytes": 11953,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader-tests.py",
+      "sha256": "90737502966a0ee5579306ca10fddc43a9e0bb3677825067ebb0847b3e73a29f"
+    },
+    "reader.py": {
+      "bytes": 28818,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/reader.py",
+      "sha256": "fa2b8e473126c366d924bedb979ccd256666087615e3623428b89dceebe8e668"
+    },
+    "runner.py": {
+      "bytes": 1073,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/runner.py",
+      "sha256": "cb22fa6d143db47b8839fa5180cdd8210a92757e137291c1ff24f196b49ae792"
+    },
+    "symbols.json": {
+      "bytes": 21045,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/symbols.json",
+      "sha256": "1870b9520b2acd63026c5cad7c1ff4fee0f8036b5fe39a009a1f16aa1c909cb2"
+    },
+    "symbols.py": {
+      "bytes": 3965,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/symbols.py",
+      "sha256": "83a3bf8f45ad2c9dfe8b94531468132bdf5100641d2c78dc6943e278133f4f2a"
+    },
+    "tools.json": {
+      "bytes": 2261,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/tools.json",
+      "sha256": "11711e35d75dfc9768898b7231320b2723c1798217691309ea310a9057e3c3fe"
+    }
+  },
+  "scope": "Native controls admitted; CPU/trace artifact readers and independent final audit remain required before attribution.",
+  "status": "pass"
+}

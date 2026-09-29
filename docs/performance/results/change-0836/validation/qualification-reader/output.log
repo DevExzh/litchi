@@ -1,0 +1,81 @@
+{
+  "claim_authorized": false,
+  "manifest_valid": true,
+  "performance_claim": "none",
+  "rows": [
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 0,
+      "label": "qualification-00",
+      "outputs": {
+        "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+        "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/qualification-00/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification-00.json",
+      "report_sha256": "d9a4833500840c923db15e0f0d52230e157ba0b94adff1341c5c77026e78c5eb",
+      "samples": 1,
+      "stage": "baseline",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    },
+    {
+      "case": "opc_file_source_one_part_atomic_save",
+      "index": 1,
+      "label": "qualification-01",
+      "outputs": {
+        "cold-verified": "3f66abdd5fbdc94eaf4961089cd7193deb9eaffff9004871e8f4e47544a55a66",
+        "warm": "f4bbe4de18853444cc6cd093cf561249decaa81f776afcf5de122667f5dd7009"
+      },
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/qualification-01/receipt.json",
+      "report": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/qualification-01.json",
+      "report_sha256": "024c8f2ecbbb59946cca2acee1ed82e6ffd8fb6e54e039f1901f2b28e79ec65a",
+      "samples": 1,
+      "stage": "fp",
+      "state": "warm,cold-verified",
+      "warmup": 0
+    }
+  ],
+  "stage_environments": {
+    "baseline": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "12",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": "ext2/ext3",
+      "git_revision": "5bb91a4de42a403cd1dfcb6e10058e3fe62d2228",
+      "git_worktree_dirty": true,
+      "kernel": "Linux 7.0.0-1012-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustflags": null,
+      "source_destination_same_device": true,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    },
+    "fp": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "12",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": "ext2/ext3",
+      "git_revision": "5bb91a4de42a403cd1dfcb6e10058e3fe62d2228",
+      "git_worktree_dirty": true,
+      "kernel": "Linux 7.0.0-1012-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustflags": "-C force-frame-pointers=yes",
+      "source_destination_same_device": true,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "status": "pass",
+  "validated_sample_count": 4
+}

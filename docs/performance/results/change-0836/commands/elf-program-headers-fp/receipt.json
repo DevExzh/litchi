@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "readelf",
+    "-lW",
+    "/home/zhuhe/code/litchi-target-0836/retained/fp/litchi-perf-baseline"
+  ],
+  "error": null,
+  "exit_code": 0,
+  "finished_unix": 1790685426.4474168,
+  "freeze": {
+    "bytes": 1206200,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/freeze-fp.json",
+    "sha256": "3cea8f1c54a961d710b4b65f550dbf4bea6fcdc1fb97e90e62e285d9793b5912"
+  },
+  "log": {
+    "bytes": 2049,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/commands/elf-program-headers-fp/output.log",
+    "sha256": "7b8cba8bb734b9859fab8fb600390b6c3ee7abd38dfe465b160b881ced4982f0"
+  },
+  "started_unix": 1790685426.445477
+}

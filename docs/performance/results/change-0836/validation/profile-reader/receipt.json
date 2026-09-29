@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/reader.py",
+    "docs/performance/results/change-0836/profiles.json",
+    "--write",
+    "docs/performance/results/change-0836/profiles-validation.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790685429.118059,
+  "log": {
+    "bytes": 3353,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/profile-reader/output.log",
+    "sha256": "aef3cb263a86ca5bc54648c899eed542683f4647ff09082a64eb3cae3651c519"
+  },
+  "started_unix": 1790685427.341532
+}

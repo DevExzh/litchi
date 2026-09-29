@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "label": "profile-00",
+      "measured_pids": 30,
+      "owner_named_outside_ranges": 0,
+      "owner_period": 8008286318,
+      "owner_samples": 1886
+    },
+    {
+      "label": "profile-01",
+      "measured_pids": 30,
+      "owner_named_outside_ranges": 0,
+      "owner_period": 7969006876,
+      "owner_samples": 1863
+    },
+    {
+      "label": "profile-02",
+      "measured_pids": 30,
+      "owner_named_outside_ranges": 0,
+      "owner_period": 7979009916,
+      "owner_samples": 1881
+    },
+    {
+      "label": "profile-03",
+      "measured_pids": 30,
+      "owner_named_outside_ranges": 0,
+      "owner_period": 7967417744,
+      "owner_samples": 1870
+    }
+  ],
+  "scope": "Independent mmap/ELF/static-range owner census; no CPU or wall fraction.",
+  "status": "pass"
+}

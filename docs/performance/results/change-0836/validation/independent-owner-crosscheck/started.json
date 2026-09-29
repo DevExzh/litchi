@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/crosscheck.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_unix": 1790685575.6062906
+}

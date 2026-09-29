@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0836/replay_reports.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686132.9158573,
+  "log": {
+    "bytes": 67,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0836/validation/reports-post-cleanup/output.log",
+    "sha256": "4b46cc9f9d919a39a66e8a4495149fa9032419b0b98a764424b49f794d8f1b85"
+  },
+  "started_unix": 1790686122.4330788
+}
