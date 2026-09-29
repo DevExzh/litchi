@@ -1,0 +1,4611 @@
+//! Package writer for OPC packages.
+//!
+//! This module provides functionality to serialize and write OPC packages to disk,
+//! including writing `[Content_Types].xml`, relationships, and all parts.
+use crate::constants::content_type as ct;
+#[cfg(test)]
+use crate::content_type::ContentType;
+use crate::error::Result;
+use crate::package::{OpcPackage, SourceMember, SourceMemberKind};
+use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
+use crate::part::Part;
+use crate::phys_pkg::PhysPkgWriter;
+use crate::rel::Relationships;
+use litchi_core::Durability;
+#[cfg(test)]
+use litchi_core::xml::escape_xml;
+use std::collections::{HashMap, HashSet};
+#[cfg(test)]
+use std::fmt::Write as _;
+use std::io::Write;
+use std::path::Path;
+use std::sync::Arc;
+
+const EXACT_SOURCE_CHUNK_BYTES: usize = 64 * 1024;
+
+struct Counted<'a, W> {
+    inner: W,
+    written: &'a mut u64,
+}
+
+struct Chunked<W> {
+    inner: W,
+}
+
+impl<W: Write> Write for Chunked<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.inner
+            .write(&bytes[..bytes.len().min(EXACT_SOURCE_CHUNK_BYTES)])
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<W: Write> Write for Counted<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        *self.written = self.written.saturating_add(written as u64);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Fully validated package metadata and the stable order used for publication.
+///
+/// Building this plan is deliberately separate from emission: every fallible
+/// serialization and XML audit completes before a sequential sink sees bytes.
+struct PublicationPlan<'package> {
+    content_types_uri: PackURI,
+    /// `None` while the opened source's own `[Content_Types].xml` still
+    /// describes the package exactly, so the member is copied and a rebuilt
+    /// manifest would never be published.
+    content_types_xml: Option<PlannedXml<'package>>,
+    package_rels_uri: PackURI,
+    /// `None` while the package relationships are unchanged since open.
+    package_rels_xml: Option<PlannedXml<'package>>,
+    parts: Vec<PlannedPart<'package>>,
+}
+
+/// The bytes a plan publishes for one package metadata member.
+enum PlannedXml<'package> {
+    /// Retained source bytes whose parsed declarations still describe the
+    /// package, published exactly instead of a canonical rebuild.
+    Source(&'package [u8]),
+    /// Deterministic authored bytes, audited while the plan is built.
+    Authored(Vec<u8>),
+}
+
+impl PlannedXml<'_> {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Source(bytes) => bytes,
+            Self::Authored(bytes) => bytes.as_slice(),
+        }
+    }
+}
+
+struct PlannedPart<'package> {
+    part: &'package dyn Part,
+    partname: &'package PackURI,
+    /// The payload when it is already decoded, and `None` while the part
+    /// still holds the payload its source member carries.
+    ///
+    /// `None` is a proof, not an absence: a deferred payload that nothing has
+    /// decoded cannot have been replaced, because no caller has ever held its
+    /// bytes. Publication uses that to copy the source member without
+    /// decoding it (ADR 0030).
+    ///
+    /// This allocation is the one handle to the part's bytes: the audit, the
+    /// proof check, the copy-or-regenerate decision, the sizes and every
+    /// writer read it, and nothing asks the part for its bytes again. The
+    /// bytes audited are therefore the bytes published even for a custom part
+    /// whose `blob` and `blob_arc` disagree. Before change 0754's review the
+    /// owned-source route regenerated a changed member from `blob_arc` after
+    /// the plan had audited `blob`.
+    blob: Option<Arc<Vec<u8>>>,
+    /// Audit every authored/replaced XML allocation, including replacements
+    /// equal to source bytes. Unchanged source allocations and deferred source
+    /// members retain their publication provenance (0665 and ADR 0030).
+    audit_payload: bool,
+    rels: &'package Relationships,
+    relationships_member_present: bool,
+    /// The source `.rels` member still holds these relationships, proven by
+    /// the open-time capture, so the member is copied verbatim and no
+    /// serialization or audit is planned for it.
+    relationships_pristine: bool,
+    relationships: Option<PlannedRelationships<'package>>,
+}
+
+impl<'package> PlannedPart<'package> {
+    /// Whether publication emits a relationships member for this part.
+    fn has_relationships(&self) -> bool {
+        self.relationships_pristine || self.relationships.is_some()
+    }
+
+    /// The payload, decoding it if the part still defers it.
+    ///
+    /// Every route that must emit or measure a part's bytes goes through
+    /// this, so a deferred payload's refusal reaches the caller instead of
+    /// being read as an empty member. A payload the plan already holds is
+    /// that same allocation.
+    fn materialized_blob(&self) -> Result<Arc<Vec<u8>>> {
+        if let Some(blob) = &self.blob {
+            return Ok(Arc::clone(blob));
+        }
+        self.part.ensure_payload()?;
+        Ok(self.part.blob_arc())
+    }
+}
+
+struct PlannedRelationships<'package> {
+    uri: PackURI,
+    /// Canonical bytes remain the semantic preservation fingerprint.
+    xml: Vec<u8>,
+    source_xml: Option<&'package [u8]>,
+}
+
+impl PlannedRelationships<'_> {
+    fn bytes(&self) -> &[u8] {
+        self.source_xml.unwrap_or(self.xml.as_slice())
+    }
+}
+
+/// The retained source manifest while its declarations still describe the
+/// current parts, and deterministic authored XML otherwise.
+fn planned_content_types(package: &OpcPackage) -> Result<PlannedXml<'_>> {
+    if let Some((bytes, _declarations)) = package.source_content_types_source()? {
+        return Ok(PlannedXml::Source(bytes));
+    }
+    let bytes = authored_content_types_xml(package)?;
+    PackageWriter::audit_authored_xml("[Content_Types].xml", &bytes)?;
+    Ok(PlannedXml::Authored(bytes))
+}
+
+/// The package relationships' retained source member while it still holds
+/// these relationships, and their audited canonical serialization otherwise.
+fn planned_package_relationships<'package>(
+    package: &'package OpcPackage,
+    package_uri: &PackURI,
+) -> Result<PlannedXml<'package>> {
+    let xml = package.rels().try_to_xml_bytes()?;
+    PackageWriter::audit_authored_xml("_rels/.rels", xml.as_slice())?;
+    Ok(
+        match package.source_relationships_xml(package_uri, package.rels())? {
+            Some(source) => PlannedXml::Source(source),
+            None => PlannedXml::Authored(xml),
+        },
+    )
+}
+
+/// One part's relationships member: the canonical serialization is always
+/// audited, and the retained source member is published while it still holds
+/// the same relationships.
+fn planned_relationships<'package>(
+    package: &'package OpcPackage,
+    partname: &PackURI,
+    relationships: &Relationships,
+) -> Result<PlannedRelationships<'package>> {
+    let uri = partname
+        .rels_uri()
+        .map_err(crate::OpcError::InvalidPackUri)?;
+    let xml = relationships.try_to_xml_bytes()?;
+    PackageWriter::audit_authored_xml(uri.as_str(), xml.as_slice())?;
+    let source_xml = package.source_relationships_xml(partname, relationships)?;
+    Ok(PlannedRelationships {
+        uri,
+        xml,
+        source_xml,
+    })
+}
+
+enum PlannedAppend<'package> {
+    Part(&'package PlannedPart<'package>),
+    Relationships(&'package PlannedPart<'package>),
+}
+
+impl PlannedAppend<'_> {
+    fn owner_name(&self) -> &str {
+        match self {
+            Self::Part(part) | Self::Relationships(part) => part.partname.as_str(),
+        }
+    }
+
+    fn member_name(&self) -> Option<&str> {
+        match self {
+            Self::Part(part) => Some(part.partname.membername()),
+            Self::Relationships(part) => part
+                .relationships
+                .as_ref()
+                .map(|relationships| relationships.uri.membername()),
+        }
+    }
+
+    fn kind_order(&self) -> u8 {
+        match self {
+            Self::Part(_) => 0,
+            Self::Relationships(_) => 1,
+        }
+    }
+}
+
+impl<'package> PublicationPlan<'package> {
+    fn from_package(package: &'package OpcPackage) -> Result<Self> {
+        let provenance = package
+            .preservation_source()
+            .map(|(_source, provenance)| provenance);
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(package.part_count())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC XML publication part plan",
+                source,
+            })?;
+        // Every part whose content type still matches the opened source leaves
+        // the source manifest describing the package exactly. Removed and
+        // added parts are caught by the part-count comparison below.
+        let mut content_types_match_source = provenance.is_some();
+        for part in package.iter_parts_undecoded() {
+            let source_part =
+                provenance.and_then(|provenance| provenance.parts.get(part.partname()));
+            content_types_match_source &= source_part
+                .is_some_and(|source_part| source_part.content_type == part.content_type());
+            // The package still holds the source relationships token for this
+            // part; replacing or adding a part drops it, so a replacement
+            // publishes its own relationships even when it cloned the
+            // original's collection (and with it the open-time capture).
+            let relationships_member_present =
+                package.source_relationships_member_present(part.partname());
+            let relationships_pristine = relationships_member_present
+                && source_part.is_some_and(|source_part| {
+                    source_part.relationships_member_present
+                        && part.rels().source_capture().is_some_and(|capture| {
+                            Arc::ptr_eq(capture, &source_part.relationships_xml)
+                        })
+                });
+            parts.push(PlannedPart {
+                part,
+                partname: part.partname(),
+                blob: part.decoded_blob().map(|_decoded| part.blob_arc()),
+                audit_payload: xml_minifier::audit::package::is_xml_part(
+                    part.partname().as_str(),
+                    part.content_type(),
+                ) && !package.holds_original_source_xml(part),
+                rels: part.rels(),
+                relationships_member_present,
+                relationships_pristine,
+                relationships: None,
+            });
+        }
+        parts.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+
+        // Matching part names and types is not enough to copy the source
+        // member: a manifest token installed since open can describe the same
+        // parts with different bytes, and the full writer publishes it. The
+        // package must still hold the very allocation the open captured.
+        let content_types_pristine = content_types_match_source
+            && provenance.is_some_and(|provenance| {
+                provenance.parts.len() == parts.len()
+                    && package.retains_source_content_types(&provenance.content_types_xml)
+            });
+        let package_rels_pristine = provenance.is_some_and(|provenance| {
+            package
+                .rels()
+                .source_capture()
+                .is_some_and(|capture| Arc::ptr_eq(capture, &provenance.package_relationships_xml))
+        });
+
+        let content_types_uri =
+            PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
+        let content_types_xml = if content_types_pristine {
+            None
+        } else {
+            Some(planned_content_types(package)?)
+        };
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(crate::OpcError::InvalidPackUri)?;
+        let package_rels_uri = package_uri
+            .rels_uri()
+            .map_err(crate::OpcError::InvalidPackUri)?;
+        let package_rels_xml = if package_rels_pristine {
+            None
+        } else {
+            Some(planned_package_relationships(package, &package_uri)?)
+        };
+
+        for part in &mut parts {
+            if part.audit_payload {
+                let blob = part.materialized_blob()?;
+                // A payload whose exact allocation already passed this audit
+                // under these limits carries the proof (change 0754); any
+                // other bytes, including a copy or a substitute of proven
+                // ones, are audited here. Either way it is the allocation the
+                // plan keeps and every writer publishes.
+                if !part
+                    .part
+                    .payload_handle()
+                    .payload()
+                    .publication_audit_covers(&blob)
+                {
+                    PackageWriter::audit_published_xml(part.partname.as_str(), &blob)?;
+                }
+                part.blob = Some(blob);
+            }
+            if part.relationships_pristine {
+                continue;
+            }
+            if !part.rels.is_empty() || part.relationships_member_present {
+                part.relationships =
+                    Some(planned_relationships(package, part.partname, part.rels)?);
+            }
+        }
+
+        Ok(Self {
+            content_types_uri,
+            content_types_xml,
+            package_rels_uri,
+            package_rels_xml,
+            parts,
+        })
+    }
+
+    /// Serialize and audit every member this plan left to the source archive.
+    ///
+    /// Preservation copies pristine members straight out of the source, so
+    /// their bytes are never built. The full writer republishes every member
+    /// instead, so it needs them materialized: the retained source bytes where
+    /// the package kept them, the audited canonical serialization otherwise.
+    /// Materializing here keeps every fallible serialization and audit ahead of
+    /// emission, exactly as building the plan does.
+    fn materialize_pristine(&mut self, package: &'package OpcPackage) -> Result<()> {
+        if self.content_types_xml.is_none() {
+            self.content_types_xml = Some(planned_content_types(package)?);
+        }
+        if self.package_rels_xml.is_none() {
+            let package_uri = PackURI::new(PACKAGE_URI).map_err(crate::OpcError::InvalidPackUri)?;
+            self.package_rels_xml = Some(planned_package_relationships(package, &package_uri)?);
+        }
+        for part in &mut self.parts {
+            // The full writer republishes every member, so every payload has
+            // to be materialized — and every decode refusal raised — before a
+            // sequential sink sees a byte.
+            part.blob = Some(part.materialized_blob()?);
+            if !part.relationships_pristine {
+                continue;
+            }
+            part.relationships = Some(planned_relationships(package, part.partname, part.rels)?);
+            part.relationships_pristine = false;
+        }
+        Ok(())
+    }
+
+    fn write<W: Write>(&self, physical: &mut PhysPkgWriter<W>) -> Result<()> {
+        let (Some(content_types_xml), Some(package_rels_xml)) = (
+            self.content_types_xml.as_ref(),
+            self.package_rels_xml.as_ref(),
+        ) else {
+            return Err(unmaterialized_publication_error());
+        };
+        physical.write(&self.content_types_uri, content_types_xml.bytes())?;
+        physical.write(&self.package_rels_uri, package_rels_xml.bytes())?;
+        for part in &self.parts {
+            if part.relationships_pristine {
+                return Err(unmaterialized_publication_error());
+            }
+            let Some(blob) = part.blob.as_deref() else {
+                return Err(unmaterialized_publication_error());
+            };
+            physical.write(part.partname, blob)?;
+            if let Some(relationships) = &part.relationships {
+                physical.write(&relationships.uri, relationships.bytes())?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Publish every materialized member through the owned staged entry path.
+    ///
+    /// This route is reserved for packages authored without source ingress.
+    /// Opened packages continue through [`Self::write`], whose borrowed entry
+    /// protocol preserves their existing regenerated bytes.
+    fn write_authored<W: Write>(&self, mut physical: PhysPkgWriter<W>) -> Result<PhysPkgWriter<W>> {
+        let (Some(content_types_xml), Some(package_rels_xml)) = (
+            self.content_types_xml.as_ref(),
+            self.package_rels_xml.as_ref(),
+        ) else {
+            return Err(unmaterialized_publication_error());
+        };
+        physical =
+            write_authored_part(physical, &self.content_types_uri, content_types_xml.bytes())?;
+        physical = write_authored_part(physical, &self.package_rels_uri, package_rels_xml.bytes())?;
+        for part in &self.parts {
+            if part.relationships_pristine {
+                return Err(unmaterialized_publication_error());
+            }
+            let Some(blob) = part.blob.as_deref() else {
+                return Err(unmaterialized_publication_error());
+            };
+            physical = write_authored_part(physical, part.partname, blob)?;
+            if let Some(relationships) = &part.relationships {
+                physical =
+                    write_authored_part(physical, &relationships.uri, relationships.bytes())?;
+            }
+        }
+        Ok(physical)
+    }
+}
+
+fn write_authored_part<W: Write>(
+    physical: PhysPkgWriter<W>,
+    partname: &PackURI,
+    blob: &[u8],
+) -> Result<PhysPkgWriter<W>> {
+    let mut part = physical.start_part(partname)?;
+    part.write_all(blob)?;
+    part.finish()
+}
+
+enum PreservationWrite<W> {
+    Written(W),
+    Fallback(W),
+}
+
+fn try_write_preserved<W: Write>(
+    writer: W,
+    package: &OpcPackage,
+    publication: &PublicationPlan<'_>,
+) -> Result<PreservationWrite<W>> {
+    let Some((source, provenance)) = package.preservation_source() else {
+        return Ok(PreservationWrite::Fallback(writer));
+    };
+    let Ok(archive) = soapberry_zip::ZipArchive::from_slice(source) else {
+        return Ok(PreservationWrite::Fallback(writer));
+    };
+    let archive = archive.into_zip_archive();
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC ZIP preservation index",
+            source,
+        })?;
+    buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0_u8);
+    let Ok(index) = soapberry_zip::PreservationIndex::new(&archive, &mut buffer) else {
+        return Ok(PreservationWrite::Fallback(writer));
+    };
+    if index.archive_end_offset() != source.len() as u64 {
+        // Preserve only a complete source archive.  Otherwise a successful
+        // preservation write would silently discard bytes after the EOCD.
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if index.entries().len() != provenance.members.len() {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+
+    let mut planned_parts = HashMap::new();
+    planned_parts
+        .try_reserve(publication.parts.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC targeted publication part lookup",
+            source,
+        })?;
+    let mut additions = Vec::new();
+    let mut relationship_additions = Vec::new();
+    additions
+        .try_reserve(publication.parts.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC topology-add publication parts",
+            source,
+        })?;
+    relationship_additions
+        .try_reserve(publication.parts.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC topology-add relationship members",
+            source,
+        })?;
+    for part in &publication.parts {
+        if let Some(source_part) = provenance.parts.get(part.partname) {
+            if !source_part.member_present {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            if !source_part.relationships_member_present && part.has_relationships() {
+                relationship_additions.push(part);
+            }
+            planned_parts.insert(part.partname, part);
+        } else {
+            additions.push(part);
+        }
+    }
+    additions.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+    relationship_additions
+        .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+    let mut omitted_ids = HashSet::new();
+    omitted_ids
+        .try_reserve(index.entries().len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC omitted preservation members",
+            source,
+        })?;
+    for (source_member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+        let omitted = match &source_member.kind {
+            SourceMemberKind::Part(partname) => !planned_parts.contains_key(partname),
+            SourceMemberKind::PartRelationships(partname) => planned_parts
+                .get(partname)
+                .is_none_or(|part| !part.has_relationships()),
+            SourceMemberKind::ContentTypes
+            | SourceMemberKind::PackageRelationships
+            | SourceMemberKind::Unknown => false,
+        };
+        if omitted {
+            omitted_ids.insert(indexed_entry.id());
+        }
+    }
+    let topology_add = !additions.is_empty() || !relationship_additions.is_empty();
+    let append_capacity = additions
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(relationship_additions.len()))
+        .ok_or_else(|| crate::OpcError::ZipError("OPC append member count overflow".into()))?;
+    let mut appended = Vec::new();
+    appended
+        .try_reserve_exact(append_capacity)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC appended preservation members",
+            source,
+        })?;
+    for part in &additions {
+        appended.push(PlannedAppend::Part(part));
+        if part.relationships.is_some() {
+            appended.push(PlannedAppend::Relationships(part));
+        }
+    }
+    for part in &relationship_additions {
+        appended.push(PlannedAppend::Relationships(part));
+    }
+    appended.sort_unstable_by(|left, right| {
+        left.owner_name()
+            .cmp(right.owner_name())
+            .then_with(|| left.kind_order().cmp(&right.kind_order()))
+    });
+    if provenance
+        .members
+        .iter()
+        .zip(index.entries())
+        .any(|(member, indexed_entry)| {
+            !matches!(&member.kind, SourceMemberKind::Unknown)
+                && preservation_member_name(member, indexed_entry).is_none()
+        })
+    {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if topology_add
+        && provenance
+            .members
+            .iter()
+            .zip(index.entries())
+            .any(|(member, indexed_entry)| {
+                preservation_member_name(member, indexed_entry).is_none()
+                    || matches!(&member.kind, SourceMemberKind::Unknown)
+            })
+    {
+        // Appending generated entries after a source member whose identity is
+        // not modeled would silently change an opaque archive topology. The
+        // caller turns this fallback into a typed capability error for owned
+        // sources; only new or borrowed packages may use the full writer.
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if topology_add {
+        let mut member_names = HashSet::new();
+        member_names
+            .try_reserve(provenance.members.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC source preservation member names",
+                source,
+            })?;
+        for (member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+            let Some(name) = preservation_member_name(member, indexed_entry) else {
+                return Ok(PreservationWrite::Fallback(writer));
+            };
+            member_names.insert(normalized_member_name(
+                name,
+                "OPC source preservation member name",
+            )?);
+        }
+
+        let mut planned_parts_by_name: HashMap<String, &PackURI> = HashMap::new();
+        planned_parts_by_name
+            .try_reserve(publication.parts.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC planned part member names",
+                source,
+            })?;
+        for part in &publication.parts {
+            let name =
+                normalized_member_name(part.partname.membername(), "OPC planned part member name")?;
+            if let Some(existing) = planned_parts_by_name.get(&name)
+                && (*existing).conflict_with(part.partname).is_some()
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            planned_parts_by_name.insert(name, part.partname);
+        }
+        for (name, current) in &planned_parts_by_name {
+            for (index, byte) in name.as_bytes().iter().enumerate().skip(1) {
+                if *byte != b'/' {
+                    continue;
+                }
+                let Some(existing) = planned_parts_by_name.get(&name[..index]) else {
+                    continue;
+                };
+                if (*existing).conflict_with(current).is_some() {
+                    return Ok(PreservationWrite::Fallback(writer));
+                }
+            }
+        }
+
+        let final_member_count = publication
+            .parts
+            .len()
+            .checked_mul(2)
+            .and_then(|count| count.checked_add(2))
+            .ok_or_else(|| crate::OpcError::ZipError("OPC final member count overflow".into()))?;
+        let mut final_member_names = HashSet::new();
+        final_member_names
+            .try_reserve(final_member_count)
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC final member names",
+                source,
+            })?;
+        if !insert_final_member_name(
+            &mut final_member_names,
+            &publication.content_types_uri,
+            "OPC final member name",
+        )? || !insert_final_member_name(
+            &mut final_member_names,
+            &publication.package_rels_uri,
+            "OPC final member name",
+        )? {
+            return Ok(PreservationWrite::Fallback(writer));
+        }
+        for part in &publication.parts {
+            if !insert_final_member_name(
+                &mut final_member_names,
+                part.partname,
+                "OPC final member name",
+            )? {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            if part.has_relationships() {
+                // A pristine part has no planned relationships URI, because
+                // the plan never serialized one; the member name is the same
+                // one the plan would have derived from the part name.
+                let relationships_uri = part
+                    .partname
+                    .rels_uri()
+                    .map_err(crate::OpcError::InvalidPackUri)?;
+                if !insert_final_member_name(
+                    &mut final_member_names,
+                    &relationships_uri,
+                    "OPC final member name",
+                )? {
+                    return Ok(PreservationWrite::Fallback(writer));
+                }
+            }
+        }
+        if has_final_member_prefix_conflict(&final_member_names) {
+            return Ok(PreservationWrite::Fallback(writer));
+        }
+
+        let mut planned_relationship_names = HashSet::new();
+        planned_relationship_names
+            .try_reserve(publication.parts.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC planned relationship member names",
+                source,
+            })?;
+        for part in &publication.parts {
+            let relationships_uri = match part.partname.rels_uri() {
+                Ok(uri) => uri,
+                Err(_) => return Ok(PreservationWrite::Fallback(writer)),
+            };
+            let name = normalized_member_name(
+                relationships_uri.membername(),
+                "OPC planned relationship member name",
+            )?;
+            if !planned_relationship_names.insert(name) {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+
+        for part in &additions {
+            let part_name =
+                normalized_member_name(part.partname.membername(), "OPC added part member name")?;
+            if member_names.contains(&part_name) || planned_relationship_names.contains(&part_name)
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            let relationships_uri = match part.partname.rels_uri() {
+                Ok(uri) => uri,
+                Err(_) => return Ok(PreservationWrite::Fallback(writer)),
+            };
+            let relationships_name = normalized_member_name(
+                relationships_uri.membername(),
+                "OPC added relationship member name",
+            )?;
+            if member_names.contains(&relationships_name)
+                || planned_parts_by_name.contains_key(&relationships_name)
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+
+        let mut appended_names = HashSet::new();
+        appended_names
+            .try_reserve(appended.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC appended preservation member names",
+                source,
+            })?;
+        for append in &appended {
+            let Some(name) = append.member_name() else {
+                return Ok(PreservationWrite::Fallback(writer));
+            };
+            if name.is_empty() {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            let normalized = normalized_member_name(name, "OPC appended preservation member name")?;
+            if member_names.contains(&normalized) || !appended_names.insert(normalized) {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+    }
+
+    let package_relationship_members = provenance
+        .members
+        .iter()
+        .filter(|member| matches!(member.kind, SourceMemberKind::PackageRelationships))
+        .count();
+    if package_relationship_members != 1 {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+
+    // The plan already decided most of this. A pristine manifest or package
+    // relationships member is `None` and is copied. Otherwise the member is
+    // republished only when the planned bytes differ from the retained source
+    // member, so a source-compatible manifest, which publishes the source's own
+    // bytes, is copied as well.
+    let content_types_changed = publication
+        .content_types_xml
+        .as_ref()
+        .is_some_and(|xml| provenance.content_types_xml.as_slice() != xml.bytes());
+    let package_rels_changed = publication
+        .package_rels_xml
+        .as_ref()
+        .is_some_and(|xml| provenance.package_relationships_xml.as_bytes() != xml.bytes());
+    let mut regenerated_bytes = 0_u64;
+    let mut regenerated_members = 0_u64;
+    let omitted_members = u64::try_from(omitted_ids.len())
+        .map_err(|_| crate::OpcError::ZipError("OPC omitted member count overflow".into()))?;
+    let mut appended_members = 0_u64;
+    let mut appended_bytes = 0_u64;
+    for (member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+        if omitted_ids.contains(&indexed_entry.id()) {
+            continue;
+        }
+        let bytes = match &member.kind {
+            SourceMemberKind::ContentTypes if content_types_changed => publication
+                .content_types_xml
+                .as_ref()
+                .map(|xml| xml.bytes().len()),
+            SourceMemberKind::PackageRelationships if package_rels_changed => publication
+                .package_rels_xml
+                .as_ref()
+                .map(|xml| xml.bytes().len()),
+            SourceMemberKind::Part(partname) => {
+                let Some(part) = planned_parts.get(partname) else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                let Some(source_part) = provenance.parts.get(partname) else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                if source_blob_retained(source_part, part) {
+                    None
+                } else {
+                    Some(part.materialized_blob()?.len())
+                }
+            },
+            SourceMemberKind::PartRelationships(partname) => {
+                let Some(part) = planned_parts.get(partname) else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                if part.relationships_pristine {
+                    None
+                } else {
+                    let Some(relationships) = part.relationships.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(source_part) = provenance.parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    (source_part.relationships_xml.as_bytes() != relationships.bytes())
+                        .then_some(relationships.bytes().len())
+                }
+            },
+            SourceMemberKind::ContentTypes
+            | SourceMemberKind::PackageRelationships
+            | SourceMemberKind::Unknown => None,
+        };
+        if let Some(bytes) = bytes {
+            if preservation_member_name(member, indexed_entry).is_none() {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            regenerated_bytes = match regenerated_bytes.checked_add(bytes as u64) {
+                Some(total) => total,
+                None => return Ok(PreservationWrite::Fallback(writer)),
+            };
+            regenerated_members += 1;
+        }
+    }
+    for append in &appended {
+        appended_members = appended_members.checked_add(1).ok_or_else(|| {
+            crate::OpcError::ZipError("OPC appended member count overflow".into())
+        })?;
+        let bytes = match append {
+            PlannedAppend::Part(part) => part.materialized_blob()?.len(),
+            PlannedAppend::Relationships(part) => {
+                let Some(relationships) = part.relationships.as_ref() else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                relationships.bytes().len()
+            },
+        };
+        appended_bytes = appended_bytes.checked_add(bytes as u64).ok_or_else(|| {
+            crate::OpcError::ZipError("OPC appended member bytes overflow".into())
+        })?;
+    }
+    let conservative_output_bound = (source.len() as u64)
+        .checked_add(regenerated_bytes.saturating_mul(2))
+        .and_then(|size| size.checked_add(regenerated_members.saturating_mul(64 * 1024)))
+        .and_then(|size| size.checked_add(appended_bytes.saturating_mul(2)))
+        .and_then(|size| size.checked_add(appended_members.saturating_mul(64 * 1024)));
+    if conservative_output_bound.is_none()
+        || checked_output_entry_count(provenance.members.len(), omitted_members, appended_members)
+            .is_none()
+    {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    let mut plan = soapberry_zip::PreservationPlan::new();
+    plan.try_reserve_exact(index.entries().len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC preservation actions",
+            source,
+        })?;
+    plan.try_reserve_appended(usize::try_from(appended_members).map_err(|_| {
+        crate::OpcError::ZipError("OPC appended member count exceeds platform limits".into())
+    })?)
+    .map_err(|source| crate::OpcError::Allocation {
+        resource: "OPC appended preservation members",
+        source,
+    })?;
+    for (source_member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+        let action = if omitted_ids.contains(&indexed_entry.id()) {
+            soapberry_zip::PreservationAction::Omit(indexed_entry.id())
+        } else {
+            match &source_member.kind {
+                SourceMemberKind::ContentTypes if content_types_changed => {
+                    let Some(content_types_xml) = publication.content_types_xml.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    regenerated_action(
+                        indexed_entry.id(),
+                        preservation_member_name(source_member, indexed_entry),
+                        content_types_xml.bytes(),
+                    )?
+                },
+                SourceMemberKind::PackageRelationships if package_rels_changed => {
+                    let Some(package_rels_xml) = publication.package_rels_xml.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    regenerated_action(
+                        indexed_entry.id(),
+                        preservation_member_name(source_member, indexed_entry),
+                        package_rels_xml.bytes(),
+                    )?
+                },
+                SourceMemberKind::Part(partname) => {
+                    let Some(part) = planned_parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(source_part) = provenance.parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    if source_blob_retained(source_part, part) {
+                        soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                    } else {
+                        regenerated_part_action(
+                            indexed_entry.id(),
+                            preservation_member_name(source_member, indexed_entry),
+                            part.part,
+                            part.materialized_blob()?,
+                        )?
+                    }
+                },
+                SourceMemberKind::PartRelationships(partname) => {
+                    let Some(part) = planned_parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    if part.relationships_pristine {
+                        soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                    } else {
+                        let Some(relationships) = &part.relationships else {
+                            return Ok(PreservationWrite::Fallback(writer));
+                        };
+                        let Some(source_part) = provenance.parts.get(partname) else {
+                            return Ok(PreservationWrite::Fallback(writer));
+                        };
+                        if source_part.relationships_xml.as_bytes() == relationships.bytes() {
+                            soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                        } else {
+                            regenerated_action(
+                                indexed_entry.id(),
+                                preservation_member_name(source_member, indexed_entry),
+                                relationships.bytes(),
+                            )?
+                        }
+                    }
+                },
+                SourceMemberKind::ContentTypes
+                | SourceMemberKind::PackageRelationships
+                | SourceMemberKind::Unknown => {
+                    soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                },
+            }
+        };
+        plan.push(action);
+    }
+    for append in &appended {
+        let entry = match append {
+            PlannedAppend::Part(part) => regenerated_part_entry(
+                part.partname.membername(),
+                part.part,
+                part.materialized_blob()?,
+            )?,
+            PlannedAppend::Relationships(part) => {
+                let Some(relationships) = part.relationships.as_ref() else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                regenerated_entry(
+                    relationships.uri.membername(),
+                    relationships.bytes(),
+                    "OPC appended relationship payload",
+                )?
+            },
+        };
+        plan.try_append(entry)
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC appended preservation members",
+                source,
+            })?;
+    }
+
+    index
+        .write_to(&plan, Chunked { inner: writer })
+        .map(|writer| PreservationWrite::Written(writer.inner))
+        .map_err(|error| crate::OpcError::ZipError(error.to_string()))
+}
+
+/// Whether the part still holds the exact payload the source member carries.
+///
+/// The provenance normally retains the very allocation the part was loaded
+/// with, so the pointer settles the untouched case before a whole-part
+/// comparison is charged. The byte comparison remains the decision for every
+/// part whose payload was replaced.
+fn source_blob_retained(source_part: &crate::package::SourcePart, part: &PlannedPart<'_>) -> bool {
+    let Some(blob) = part.blob.as_deref().map(Vec::as_slice) else {
+        // The part still holds the payload its source member carries, so no
+        // caller has ever held its bytes and it cannot have been replaced.
+        // The member is copied without decoding it (ADR 0030).
+        return true;
+    };
+    if let Some(source) = source_part.blob.decoded() {
+        return std::ptr::eq(source.as_slice(), blob) || source.as_slice() == blob;
+    }
+    // The part was decoded, so the source payload has to be decoded too to
+    // decide. A source payload that cannot be decoded proves nothing, and the
+    // planned payload is republished instead of copied.
+    source_part
+        .blob
+        .force()
+        .is_ok_and(|source| source.as_slice() == blob)
+}
+
+/// A plan reached the full writer with members only preservation can publish.
+///
+/// Pristine members exist only while an owned source archive backs the
+/// package, and such a package never reaches the full writer: it is refused
+/// with [`owned_source_preservation_error`] first. This keeps that reasoning
+/// enforced instead of assumed, so a future route cannot silently drop a
+/// member the plan left to the source.
+fn unmaterialized_publication_error() -> crate::OpcError {
+    crate::OpcError::PreservationUnavailable {
+        reason: "publication plan retained source members the full writer cannot republish"
+            .to_owned(),
+    }
+}
+
+fn insert_final_member_name(
+    names: &mut HashSet<String>,
+    uri: &PackURI,
+    resource: &'static str,
+) -> Result<bool> {
+    let name = normalized_member_name(uri.membername(), resource)?;
+    Ok(names.insert(name))
+}
+
+fn has_final_member_prefix_conflict(names: &HashSet<String>) -> bool {
+    for name in names {
+        for (index, byte) in name.as_bytes().iter().enumerate().skip(1) {
+            if *byte != b'/' {
+                continue;
+            }
+            if names.contains(&name[..index]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn preservation_member_name<'a>(
+    member: &SourceMember,
+    indexed_entry: &'a soapberry_zip::PreservedEntry,
+) -> Option<&'a str> {
+    let name = std::str::from_utf8(indexed_entry.raw_name_bytes()).ok()?;
+    match &member.kind {
+        SourceMemberKind::ContentTypes => name
+            .eq_ignore_ascii_case("[Content_Types].xml")
+            .then_some(name),
+        SourceMemberKind::PackageRelationships => {
+            let package_uri = PackURI::new(PACKAGE_URI).ok()?;
+            let relationships_uri = package_uri.rels_uri().ok()?;
+            let relationships_name = relationships_uri.membername();
+            (name == relationships_name).then_some(name)
+        },
+        SourceMemberKind::Part(partname) => (name == partname.membername()).then_some(name),
+        SourceMemberKind::PartRelationships(partname) => {
+            let relationships_uri = partname.rels_uri().ok()?;
+            let relationships_name = relationships_uri.membername();
+            (name == relationships_name).then_some(name)
+        },
+        SourceMemberKind::Unknown => Some(name),
+    }
+}
+
+fn regenerated_action(
+    id: soapberry_zip::PreservationEntryId,
+    name: Option<&str>,
+    bytes: &[u8],
+) -> Result<soapberry_zip::PreservationAction> {
+    let owned_name = regenerated_name(name)?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(bytes.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC targeted member payload",
+            source,
+        })?;
+    data.extend_from_slice(bytes);
+    Ok(soapberry_zip::PreservationAction::Regenerate {
+        id,
+        entry: soapberry_zip::RegeneratedEntry::new(owned_name, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    })
+}
+
+/// Regenerate one existing member from the payload the plan holds.
+fn regenerated_part_action(
+    id: soapberry_zip::PreservationEntryId,
+    name: Option<&str>,
+    part: &dyn Part,
+    blob: Arc<Vec<u8>>,
+) -> Result<soapberry_zip::PreservationAction> {
+    Ok(soapberry_zip::PreservationAction::Regenerate {
+        id,
+        entry: part_entry(regenerated_name(name)?, part, blob),
+    })
+}
+
+fn regenerated_entry(
+    name: &str,
+    bytes: &[u8],
+    resource: &'static str,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    let mut data = Vec::new();
+    data.try_reserve_exact(bytes.len())
+        .map_err(|source| crate::OpcError::Allocation { resource, source })?;
+    data.extend_from_slice(bytes);
+    Ok(
+        soapberry_zip::RegeneratedEntry::new(regenerated_name(Some(name))?, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    )
+}
+
+/// Generate one appended member from the payload the plan holds.
+fn regenerated_part_entry(
+    name: &str,
+    part: &dyn Part,
+    blob: Arc<Vec<u8>>,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    Ok(part_entry(regenerated_name(Some(name))?, part, blob))
+}
+
+/// The generated entry for the payload the plan holds for `part`.
+///
+/// A part built from a verified compressed transfer (change 0742) carries the
+/// exact compressed bytes its payload decodes from, with their method, actual
+/// CRC and sizes; the writer frames them with fresh known-size headers. Every
+/// other payload is deflated from its decoded bytes, as before. The payload
+/// and its compressed representation are one value, so a part whose payload
+/// was replaced no longer carries one; the capture is still used only when
+/// the planned allocation is the one it was verified against, so a custom
+/// part that forwards its payload handle cannot publish stale bytes.
+fn part_entry(
+    name: String,
+    part: &dyn Part,
+    blob: Arc<Vec<u8>>,
+) -> soapberry_zip::RegeneratedEntry {
+    let handle = part.payload_handle();
+    match handle.payload().compressed_transfer() {
+        Some((decoded, compressed)) if Arc::ptr_eq(decoded, &blob) => {
+            soapberry_zip::RegeneratedEntry::new_precompressed_shared(name, compressed.clone())
+        },
+        _ => soapberry_zip::RegeneratedEntry::new_shared(name, blob)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    }
+}
+
+fn normalized_member_name(name: &str, resource: &'static str) -> Result<String> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(name.len())
+        .map_err(|source| crate::OpcError::Allocation { resource, source })?;
+    bytes.extend(name.as_bytes().iter().map(u8::to_ascii_lowercase));
+    String::from_utf8(bytes).map_err(|_| {
+        crate::OpcError::ZipError("OPC preservation member name normalization failed".into())
+    })
+}
+
+fn checked_output_entry_count(
+    source_members: usize,
+    omitted_members: u64,
+    appended_members: u64,
+) -> Option<u64> {
+    u64::try_from(source_members)
+        .ok()
+        .and_then(|count| count.checked_sub(omitted_members))
+        .and_then(|count| count.checked_add(appended_members))
+}
+
+fn regenerated_name(name: Option<&str>) -> Result<String> {
+    let Some(name) = name else {
+        return Err(crate::OpcError::ZipError(
+            "targeted OPC member has no preservable UTF-8 name".to_owned(),
+        ));
+    };
+    let mut owned_name = String::new();
+    owned_name
+        .try_reserve_exact(name.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC targeted member name",
+            source,
+        })?;
+    owned_name.push_str(name);
+    Ok(owned_name)
+}
+
+/// Package writer that serializes an OPC package to a ZIP file.
+///
+/// This is the main entry point for saving packages. It handles writing:
+/// - `[Content_Types].xml`
+/// - _rels/.rels (package relationships)
+/// - All parts and their relationships
+///
+/// # Example
+///
+/// ```no_run
+/// use litchi_opc::package::OpcPackage;
+/// use litchi_opc::pkgwriter::PackageWriter;
+///
+/// let mut pkg = OpcPackage::new();
+/// // ... add parts to package ...
+/// PackageWriter::write("output.docx", &pkg)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub struct PackageWriter;
+
+impl PackageWriter {
+    /// Atomically write an OPC package to a file.
+    ///
+    /// # Arguments
+    /// * `path` - Path where the package should be written
+    /// * `package` - The OPC package to write
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if writing to the filesystem fails.
+    pub fn write<P: AsRef<Path>>(path: P, package: &OpcPackage) -> Result<()> {
+        Self::write_with_durability(path, package, Durability::Full)
+    }
+
+    /// Atomically write an OPC package to a file at a caller-chosen
+    /// [`Durability`].
+    ///
+    /// [`Self::write`] is this method at [`Durability::Full`]. Every level
+    /// serializes the same bytes through the same sibling temporary file and
+    /// rename; see [`crate::atomic::replace_with_durability`] for what each
+    /// level synchronizes. The level is a property of this one call: it is
+    /// not stored on the package and does not revoke its exact-source
+    /// authorization.
+    ///
+    /// # Errors
+    /// As [`Self::write`], except that only [`Durability::Full`] can return
+    /// [`crate::OpcError::Committed`].
+    pub fn write_with_durability<P: AsRef<Path>>(
+        path: P,
+        package: &OpcPackage,
+        durability: Durability,
+    ) -> Result<()> {
+        crate::atomic::replace_with_durability(path.as_ref(), durability, |writer| {
+            Self::write_to_stream(writer, package)
+        })
+    }
+
+    /// Write an OPC package directly to a sequential stream.
+    ///
+    /// On failure after output begins, [`crate::OpcError::IncompleteOutput`]
+    /// reports how many bytes the sink accepted. Seeking is not required.
+    ///
+    /// # Arguments
+    /// * `writer` - A writer that implements Write
+    /// * `package` - The OPC package to write
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if the sink rejects a write. When
+    /// the sink has already accepted bytes, the error is wrapped in
+    /// [`crate::OpcError::IncompleteOutput`] with the accepted byte count.
+    pub fn write_to_stream<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+        let mut written = 0_u64;
+        let result = Self::write_counted(
+            Counted {
+                inner: writer,
+                written: &mut written,
+            },
+            package,
+        );
+        match result {
+            Err(source) if written != 0 => Err(crate::OpcError::IncompleteOutput {
+                written,
+                source: Box::new(source),
+            }),
+            other => other,
+        }
+    }
+
+    fn write_counted<W: Write>(writer: W, package: &OpcPackage) -> Result<()> {
+        if let Some(source) = package.exact_source() {
+            let mut writer = writer;
+            for chunk in source.chunks(EXACT_SOURCE_CHUNK_BYTES) {
+                writer.write_all(chunk)?;
+            }
+            writer.flush()?;
+            return Ok(());
+        }
+        Self::validate_source_publication(package)?;
+        let mut plan = PublicationPlan::from_package(package)?;
+        let writer = match try_write_preserved(writer, package, &plan)? {
+            PreservationWrite::Written(_writer) => return Ok(()),
+            PreservationWrite::Fallback(writer) => {
+                if package.requires_owned_source_preservation() {
+                    return Err(owned_source_preservation_error());
+                }
+                plan.materialize_pristine(package)?;
+                writer
+            },
+        };
+        let physical = PhysPkgWriter::with_writer(writer);
+        let physical = if package.is_fresh_authored() {
+            plan.write_authored(physical)?
+        } else {
+            let mut physical = physical;
+            plan.write(&mut physical)?;
+            physical
+        };
+        let mut finished = physical.finish_into_inner()?;
+        finished.flush()?;
+        Ok(())
+    }
+
+    /// Serialize an OPC package to bytes.
+    ///
+    /// # Arguments
+    /// * `package` - The OPC package to serialize
+    ///
+    /// # Returns
+    /// The serialized package as a byte vector
+    ///
+    /// # Errors
+    /// Returns an error if the package cannot be serialized (for example an
+    /// invalid content type or partname) or if the in-memory zip writer fails.
+    pub fn to_bytes(package: &OpcPackage) -> Result<Vec<u8>> {
+        if let Some(source) = package.exact_source() {
+            let mut bytes = Vec::new();
+            bytes.try_reserve_exact(source.len()).map_err(|source| {
+                crate::OpcError::Allocation {
+                    resource: "OPC exact source copy",
+                    source,
+                }
+            })?;
+            bytes.extend_from_slice(source);
+            return Ok(bytes);
+        }
+        Self::validate_source_publication(package)?;
+        let mut plan = PublicationPlan::from_package(package)?;
+        match try_write_preserved(Vec::new(), package, &plan)? {
+            PreservationWrite::Written(bytes) => return Ok(bytes),
+            PreservationWrite::Fallback(bytes) => {
+                if package.requires_owned_source_preservation() {
+                    return Err(owned_source_preservation_error());
+                }
+                debug_assert!(bytes.is_empty());
+                plan.materialize_pristine(package)?;
+            },
+        }
+        let physical = PhysPkgWriter::new();
+        let physical = if package.is_fresh_authored() {
+            plan.write_authored(physical)?
+        } else {
+            let mut physical = physical;
+            plan.write(&mut physical)?;
+            physical
+        };
+        physical.finish()
+    }
+
+    /// Audit one XML member the eager writer is about to publish.
+    ///
+    /// The audit keeps every check that protects the published archive — UTF-8
+    /// decoding, well-formed XML, exactly one document element, no character
+    /// data or CDATA outside it, no DTD or DOCTYPE, the attribute grammar, a
+    /// valid `xml:space`, and each finite budget — and asserts no compactness
+    /// contract on any member, whatever its provenance. Change 0652's decision
+    /// 2 names original bytes; change 0665 records this eager-route extension
+    /// as an implementation interpretation informed by the source profile
+    /// established in 0654 and 0657, not as a new owner decision. Compactness
+    /// of this repository's own serializers remains a quality property,
+    /// verified by test and by the debug assertions at the three sites that
+    /// author XML here, not a publication refusal.
+    ///
+    /// Refusals keep their identity: the same
+    /// [`OpcError::XmlPublication`](crate::OpcError::XmlPublication) is
+    /// constructed from the same [`xml_minifier::audit::Error`], and it still
+    /// precedes every emitted byte because the whole plan is built before a
+    /// sink sees anything.
+    fn audit_published_xml(name: &str, bytes: &[u8]) -> Result<()> {
+        xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
+            .map(|_report| ())
+            .map_err(|source| crate::OpcError::XmlPublication {
+                part: name.to_string(),
+                source,
+            })
+    }
+
+    /// Audit XML this writer authored, and hold it to the compact output
+    /// contract in debug builds only.
+    ///
+    /// The manifest and the relationship members are serialized here, so their
+    /// spelling is this repository's own and `docs/CRUD_Scenario_Checklist.md`'s
+    /// "every generated XML part is byte-minimal" applies to them. Publication
+    /// no longer refuses a member for breaking it (change 0665); the debug
+    /// assertion keeps every test run and every debug build checking it, so a
+    /// serializer that regresses is caught where it is written rather than
+    /// where a caller's package is refused.
+    fn audit_authored_xml(name: &str, bytes: &[u8]) -> Result<()> {
+        debug_assert!(
+            xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+                .is_ok(),
+            "this writer authored XML for '{name}' that is not compact: {:?}",
+            xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+                .err()
+        );
+        Self::audit_published_xml(name, bytes)
+    }
+
+    fn validate_source_publication(package: &OpcPackage) -> Result<()> {
+        if package.requires_signature_edit_policy() {
+            return Err(crate::OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        Ok(())
+    }
+}
+
+fn owned_source_preservation_error() -> crate::OpcError {
+    crate::OpcError::PreservationUnavailable {
+        reason: "source ZIP framing or opaque members cannot be preserved after this mutation"
+            .to_owned(),
+    }
+}
+
+/// Helper for building `[Content_Types].xml` content.
+///
+/// Manages Default and Override elements for content type mapping.
+#[cfg(test)]
+struct ContentTypesItem {
+    /// Default content types by extension
+    defaults: HashMap<String, ContentType>,
+
+    /// Override content types by partname
+    overrides: HashMap<String, ContentType>,
+}
+
+/// Build deterministic authored content-types XML from package metadata only.
+/// This is used by source-bound snapshots for newly authored packages, where
+/// no admitted source manifest exists to retain.
+pub(crate) fn authored_content_types_xml(package: &OpcPackage) -> Result<Vec<u8>> {
+    authored_content_types_xml_with_limits(package, crate::ReadLimits::default())
+}
+
+const AUTHORED_CONTENT_TYPE_DEFAULTS: [(&str, &str); 10] = [
+    ("bin", ct::XLSB_BIN),
+    ("emf", "image/x-emf"),
+    ("gif", "image/gif"),
+    ("jpeg", "image/jpeg"),
+    ("jpg", "image/jpeg"),
+    (
+        "odttf",
+        "application/vnd.openxmlformats-officedocument.obfuscatedFont",
+    ),
+    ("png", "image/png"),
+    ("rels", ct::OPC_RELATIONSHIPS),
+    ("wmf", "image/x-wmf"),
+    ("xml", ct::XML),
+];
+
+struct AuthoredContentTypesBudget {
+    limits: crate::ReadLimits,
+    bytes: usize,
+    mappings: usize,
+}
+
+impl AuthoredContentTypesBudget {
+    fn check_attribute(&self, key: &str, value: &str) -> Result<()> {
+        let encoded = value.bytes().try_fold(0usize, |length, byte| {
+            length.checked_add(match byte {
+                b'&' => 5,
+                b'<' | b'>' => 4,
+                b'"' | b'\'' => 6,
+                _ => 1,
+            })
+        });
+        let actual = key
+            .len()
+            .checked_add(encoded.ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types attribute size overflows".into(),
+                )
+            })?)
+            .ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types attribute size overflows".into(),
+                )
+            })?;
+        self.limits.check(
+            crate::ReadResource::XmlAttributeBytes,
+            actual as u64,
+            self.limits.max_xml_attribute_bytes() as u64,
+        )
+    }
+
+    fn charge(
+        &mut self,
+        prefix: &[u8],
+        name_attribute: &str,
+        name: &str,
+        content_type: &str,
+    ) -> Result<()> {
+        use crate::ReadResource;
+        let maximum = self.limits.max_content_types_bytes();
+        self.mappings = self
+            .mappings
+            .checked_add(1)
+            .ok_or_else(|| crate::OpcError::ReadLimit {
+                resource: ReadResource::ContentTypeMappings,
+                actual: u64::MAX,
+                maximum: self.limits.max_content_type_mappings() as u64,
+            })?;
+        self.limits.check(
+            ReadResource::ContentTypeMappings,
+            self.mappings as u64,
+            self.limits.max_content_type_mappings() as u64,
+        )?;
+        self.check_attribute(name_attribute, name)?;
+        self.check_attribute("ContentType", content_type)?;
+        self.bytes = self
+            .bytes
+            .checked_add(prefix.len() + b"\" ContentType=\"".len() + b"\"/>".len())
+            .ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types size overflows".into(),
+                )
+            })?;
+        self.limits.check(
+            ReadResource::ContentTypesBytes,
+            self.bytes as u64,
+            maximum as u64,
+        )?;
+        for value in [name, content_type] {
+            // Reject oversized caller strings before scanning their contents.
+            let lower_bound = self.bytes.checked_add(value.len()).ok_or_else(|| {
+                crate::OpcError::InvalidContentTypesManifest(
+                    "authored content-types size overflows".into(),
+                )
+            })?;
+            self.limits.check(
+                ReadResource::ContentTypesBytes,
+                lower_bound as u64,
+                maximum as u64,
+            )?;
+            let escaped = value.bytes().try_fold(0usize, |length, byte| {
+                length.checked_add(match byte {
+                    b'&' => 5,
+                    b'<' | b'>' => 4,
+                    b'"' | b'\'' => 6,
+                    _ => 1,
+                })
+            });
+            self.bytes = escaped
+                .and_then(|length| self.bytes.checked_add(length))
+                .ok_or_else(|| {
+                    crate::OpcError::InvalidContentTypesManifest(
+                        "authored content-types size overflows".into(),
+                    )
+                })?;
+            self.limits.check(
+                ReadResource::ContentTypesBytes,
+                self.bytes as u64,
+                maximum as u64,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn authored_content_types_xml_with_limits(
+    package: &OpcPackage,
+    limits: crate::ReadLimits,
+) -> Result<Vec<u8>> {
+    use crate::ReadResource;
+
+    const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#;
+    const FOOTER: &[u8] = b"</Types>";
+    const DEFAULT_PREFIX: &[u8] = b"<Default Extension=\"";
+    const OVERRIDE_PREFIX: &[u8] = b"<Override PartName=\"";
+
+    let name = PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
+    crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
+
+    limits.check(
+        ReadResource::Parts,
+        package.part_count() as u64,
+        limits.max_parts() as u64,
+    )?;
+    let mut budget = AuthoredContentTypesBudget {
+        limits,
+        bytes: HEADER.len() + FOOTER.len(),
+        mappings: 0,
+    };
+    budget.check_attribute("xmlns", crate::constants::namespace::OPC_CONTENT_TYPES)?;
+    let mut defaults = [false; AUTHORED_CONTENT_TYPE_DEFAULTS.len()];
+    // Only borrowed metadata is retained before the complete escaped output
+    // size is admitted. Repeated default mappings do not consume output quota.
+    let mut override_count = 0usize;
+    for index in [7, 9] {
+        defaults[index] = true;
+        budget.charge(
+            DEFAULT_PREFIX,
+            "Extension",
+            AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
+            AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
+        )?;
+    }
+    for part in package.iter_parts() {
+        if let Some(index) =
+            AUTHORED_CONTENT_TYPE_DEFAULTS
+                .iter()
+                .position(|(extension, content_type)| {
+                    part.partname().ext().eq_ignore_ascii_case(extension)
+                        && part.content_type() == *content_type
+                })
+        {
+            if !defaults[index] {
+                budget.charge(
+                    DEFAULT_PREFIX,
+                    "Extension",
+                    AUTHORED_CONTENT_TYPE_DEFAULTS[index].0,
+                    AUTHORED_CONTENT_TYPE_DEFAULTS[index].1,
+                )?;
+                defaults[index] = true;
+            }
+        } else {
+            budget.charge(
+                OVERRIDE_PREFIX,
+                "PartName",
+                part.partname().as_str(),
+                part.content_type(),
+            )?;
+            override_count += 1;
+        }
+    }
+
+    // The canonical stream has one declaration, one root start/end pair and
+    // one event per mapping plus EOF.  Admit its structure and fixed owned
+    // XML ceiling before retaining borrowed mapping metadata or allocating the
+    // final output buffer.
+    let events = budget.mappings.checked_add(4).ok_or_else(|| {
+        crate::OpcError::InvalidContentTypesManifest(
+            "authored content-types event count overflows".into(),
+        )
+    })?;
+    limits.check(
+        ReadResource::XmlEvents,
+        events as u64,
+        limits.max_xml_events() as u64,
+    )?;
+    let depth = if budget.mappings == 0 { 1 } else { 2 };
+    limits.check(ReadResource::XmlDepth, depth, limits.max_xml_depth() as u64)?;
+    crate::OwnedXmlPart::check_capture_size(&name, budget.bytes, limits)?;
+
+    let mut overrides = Vec::new();
+    overrides
+        .try_reserve_exact(override_count)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC authored content-types mapping index",
+            source,
+        })?;
+    for part in package.iter_parts() {
+        if let Err(reason) = crate::content_type::validate_content_type(part.content_type()) {
+            let mut value = String::new();
+            value
+                .try_reserve_exact(part.content_type().len())
+                .map_err(|source| crate::OpcError::Allocation {
+                    resource: "OPC invalid authored content type",
+                    source,
+                })?;
+            value.push_str(part.content_type());
+            return Err(crate::OpcError::InvalidContentType { value, reason });
+        }
+        if !AUTHORED_CONTENT_TYPE_DEFAULTS
+            .iter()
+            .any(|(extension, content_type)| {
+                part.partname().ext().eq_ignore_ascii_case(extension)
+                    && part.content_type() == *content_type
+            })
+        {
+            overrides.push((part.partname().as_str(), part.content_type()));
+        }
+    }
+    overrides.sort_unstable_by_key(|(name, _)| *name);
+    let mut output = Vec::new();
+    limits.check(
+        ReadResource::PartBytes,
+        budget.bytes as u64,
+        limits.max_part_bytes(),
+    )?;
+    output
+        .try_reserve_exact(budget.bytes)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC authored content-types XML",
+            source,
+        })?;
+    output.extend_from_slice(HEADER);
+    for (index, (name, content_type)) in AUTHORED_CONTENT_TYPE_DEFAULTS.iter().enumerate() {
+        if defaults[index] {
+            append_authored_content_type(&mut output, DEFAULT_PREFIX, name, content_type);
+        }
+    }
+    for (name, content_type) in overrides {
+        append_authored_content_type(&mut output, OVERRIDE_PREFIX, name, content_type);
+    }
+    output.extend_from_slice(FOOTER);
+    debug_assert_eq!(output.len(), budget.bytes);
+    Ok(output)
+}
+
+fn append_authored_content_type(
+    output: &mut Vec<u8>,
+    prefix: &[u8],
+    name: &str,
+    content_type: &str,
+) {
+    output.extend_from_slice(prefix);
+    for (index, value) in [name, content_type].iter().enumerate() {
+        if index == 1 {
+            output.extend_from_slice(b"\" ContentType=\"");
+        }
+        for byte in value.bytes() {
+            match byte {
+                b'&' => output.extend_from_slice(b"&amp;"),
+                b'<' => output.extend_from_slice(b"&lt;"),
+                b'>' => output.extend_from_slice(b"&gt;"),
+                b'"' => output.extend_from_slice(b"&quot;"),
+                b'\'' => output.extend_from_slice(b"&apos;"),
+                _ => output.push(byte),
+            }
+        }
+    }
+    output.extend_from_slice(b"\"/>");
+}
+
+#[cfg(test)]
+impl ContentTypesItem {
+    /// Create a new `ContentTypesItem`.
+    fn new() -> Result<Self> {
+        let mut defaults = HashMap::new();
+
+        // Add standard defaults
+        defaults.insert("rels".to_string(), ContentType::new(ct::OPC_RELATIONSHIPS)?);
+        defaults.insert("xml".to_string(), ContentType::new(ct::XML)?);
+
+        Ok(Self {
+            defaults,
+            overrides: HashMap::new(),
+        })
+    }
+
+    /// Add a content type for a part.
+    ///
+    /// Uses a default mapping if the extension matches a well-known type,
+    /// otherwise uses an override for the specific partname.
+    fn add_content_type(&mut self, partname: &PackURI, content_type: &str) -> Result<()> {
+        let ext = partname.ext().to_ascii_lowercase();
+        let parsed_content_type = ContentType::new(content_type)?;
+
+        // Check if this is a standard default mapping
+        if Self::is_default_content_type(&ext, parsed_content_type.as_str()) {
+            self.defaults.insert(ext, parsed_content_type);
+        } else {
+            self.overrides
+                .insert(partname.to_string(), parsed_content_type);
+        }
+        Ok(())
+    }
+
+    /// Check if an extension/content-type pair is a standard default.
+    fn is_default_content_type(ext: &str, content_type: &str) -> bool {
+        matches!(
+            (ext, content_type),
+            ("rels", ct::OPC_RELATIONSHIPS)
+                | ("xml", ct::XML)
+                | ("bin", ct::XLSB_BIN)
+                | ("png", "image/png")
+                | ("jpg" | "jpeg", "image/jpeg")
+                | ("gif", "image/gif")
+                | ("emf", "image/x-emf")
+                | ("wmf", "image/x-wmf")
+                | (
+                    "odttf",
+                    "application/vnd.openxmlformats-officedocument.obfuscatedFont"
+                )
+        )
+    }
+
+    /// Generate the XML for `[Content_Types].xml`.
+    fn to_xml(&self) -> String {
+        let mut xml = String::with_capacity(4096);
+
+        xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        xml.push_str(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">"#,
+        );
+
+        // Write Default elements (sorted by extension)
+        let mut exts: Vec<_> = self.defaults.keys().collect();
+        exts.sort();
+        for ext in exts {
+            let content_type = &self.defaults[ext];
+            let _ignored = write!(
+                xml,
+                r#"<Default Extension="{}" ContentType="{}"/>"#,
+                escape_xml(ext),
+                escape_xml(content_type.as_str())
+            );
+        }
+
+        // Write Override elements (sorted by partname)
+        let mut partnames: Vec<_> = self.overrides.keys().collect();
+        partnames.sort();
+        for partname in partnames {
+            let content_type = &self.overrides[partname];
+            let _ignored = write!(
+                xml,
+                r#"<Override PartName="{}" ContentType="{}"/>"#,
+                escape_xml(partname),
+                escape_xml(content_type.as_str())
+            );
+        }
+
+        xml.push_str("</Types>");
+
+        xml
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+    use std::io;
+
+    use super::*;
+
+    #[test]
+    fn bounded_authored_content_types_match_legacy_bytes_and_exact_limits() {
+        let mut package = OpcPackage::new();
+        for (name, content_type) in [
+            ("/custom/a&b.xml", "application/x-test;id=\"a&b\""),
+            ("/media/a.PNG", "image/png"),
+            ("/media/b.png", "image/png"),
+            ("/custom/plain.xml", ct::XML),
+            ("/custom/data.bin", ct::XLSB_BIN),
+        ] {
+            package
+                .try_add_part(Box::new(crate::BlobPart::new(
+                    PackURI::new(name).unwrap(),
+                    content_type.into(),
+                    Vec::new(),
+                )))
+                .unwrap();
+        }
+        let mut legacy = ContentTypesItem::new().unwrap();
+        for part in package.iter_parts() {
+            legacy
+                .add_content_type(part.partname(), part.content_type())
+                .unwrap();
+        }
+        let expected = legacy.to_xml().into_bytes();
+        let exact = crate::ReadLimits::builder()
+            .max_content_types_bytes(expected.len())
+            .unwrap()
+            .max_content_type_mappings(5)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            authored_content_types_xml_with_limits(&package, exact).unwrap(),
+            expected
+        );
+        let too_small = crate::ReadLimits::builder()
+            .max_content_types_bytes(expected.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, too_small),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+        let too_few = crate::ReadLimits::builder()
+            .max_content_type_mappings(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, too_few),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypeMappings,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn authored_content_type_quota_precedes_oversized_value_retention() {
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(crate::BlobPart::new(
+                PackURI::new("/custom/item.bin").unwrap(),
+                "invalid ".repeat(2048),
+                Vec::new(),
+            )))
+            .unwrap();
+        let limits = crate::ReadLimits::builder()
+            .max_content_types_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored_content_types_xml_with_limits(&package, limits),
+            Err(crate::OpcError::ReadLimit {
+                resource: crate::ReadResource::ContentTypesBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn override_selector_quota_precedes_invalid_content_type_parsing() {
+        let source = OpcPackage::new().source_content_types().unwrap();
+        let name = PackURI::new("/custom/item.bin").unwrap();
+        let oversized = "invalid ".repeat(2048);
+        let error = source
+            .with_part_overrides(&[(&name, &oversized)], 1024)
+            .unwrap_err();
+        assert!(
+            matches!(error, crate::OpcError::InvalidContentTypesManifest(message)
+            if message.contains("selectors exceed"))
+        );
+        assert!(
+            source
+                .with_part_overrides(&[(&name, "invalid")], 1024)
+                .is_err()
+        );
+    }
+
+    struct ChunkSink {
+        total: usize,
+        writes: usize,
+        largest: usize,
+        limit: usize,
+    }
+
+    struct FailAfter {
+        written: usize,
+        limit: usize,
+    }
+
+    impl Write for FailAfter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let available = self.limit.saturating_sub(self.written);
+            if available == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "injected sink failure",
+                ));
+            }
+            let accepted = available.min(bytes.len());
+            self.written += accepted;
+            Ok(accepted)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl Write for ChunkSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if bytes.len() > self.limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "writer received an archive-sized chunk",
+                ));
+            }
+            self.total = self.total.saturating_add(bytes.len());
+            self.writes = self.writes.saturating_add(1);
+            self.largest = self.largest.max(bytes.len());
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct ShortInterruptedSink {
+        bytes: Vec<u8>,
+        maximum: usize,
+        interrupt_next: bool,
+        interruptions: usize,
+    }
+
+    impl ShortInterruptedSink {
+        fn new(maximum: usize) -> Self {
+            assert!(maximum > 0);
+            Self {
+                bytes: Vec::new(),
+                maximum,
+                interrupt_next: false,
+                interruptions: 0,
+            }
+        }
+    }
+
+    impl Write for ShortInterruptedSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.interrupt_next {
+                self.interrupt_next = false;
+                self.interruptions += 1;
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            self.interrupt_next = true;
+            let accepted = bytes.len().min(self.maximum);
+            self.bytes.extend_from_slice(&bytes[..accepted]);
+            Ok(accepted)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn owned_protocol_payload() -> Vec<u8> {
+        let length = 96 * 1024 + 19;
+        let mut output = Vec::with_capacity(length);
+        for index in 0..length {
+            let position = index as u64;
+            let block = (position / 257) ^ 1;
+            let byte = if position % 19 < 13 {
+                (block as u8).wrapping_add(0x31)
+            } else {
+                let mut value = position.wrapping_add(0x9e37_79b9);
+                value ^= value >> 30;
+                value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                value ^= value >> 27;
+                value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
+                value ^= value >> 31;
+                value as u8
+            };
+            output.push(byte);
+        }
+        output
+    }
+
+    fn authored_payload_package(payload: Vec<u8>) -> (OpcPackage, PackURI) {
+        let partname = PackURI::new("/custom/payload.bin").expect("payload URI");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            partname.clone(),
+            "application/octet-stream".to_owned(),
+            payload,
+        )));
+        (package, partname)
+    }
+
+    fn legacy_publication_bytes(package: &OpcPackage) -> Vec<u8> {
+        let mut plan = PublicationPlan::from_package(package).expect("build legacy plan");
+        plan.materialize_pristine(package)
+            .expect("materialize legacy plan");
+        let mut physical = PhysPkgWriter::new();
+        plan.write(&mut physical).expect("write legacy plan");
+        physical.finish().expect("finish legacy plan")
+    }
+
+    #[test]
+    fn fresh_publication_uses_owned_staging_and_keeps_logical_payload() {
+        let payload = owned_protocol_payload();
+        let (package, partname) = authored_payload_package(payload.clone());
+        assert!(package.is_fresh_authored());
+
+        let authored = PackageWriter::to_bytes(&package).expect("write authored package");
+        let legacy = legacy_publication_bytes(&package);
+        assert_ne!(
+            authored, legacy,
+            "owned staging must change the legacy stream"
+        );
+
+        for bytes in [&authored, &legacy] {
+            let archive =
+                soapberry_zip::office::ArchiveReader::new(bytes).expect("open authored archive");
+            assert_eq!(archive.read(partname.membername()).unwrap(), payload);
+        }
+    }
+
+    #[test]
+    fn fresh_to_bytes_matches_stream_with_short_interrupted_sink() {
+        let (package, _partname) = authored_payload_package(owned_protocol_payload());
+        let expected = PackageWriter::to_bytes(&package).expect("write authored bytes");
+        let mut sink = ShortInterruptedSink::new(7);
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("stream authored package");
+
+        assert!(sink.interruptions > 0);
+        assert_eq!(sink.bytes, expected);
+    }
+
+    #[test]
+    fn source_ingress_survives_clone_and_part_removal() {
+        let (mut authored, partname) = authored_payload_package(b"fresh".to_vec());
+        assert!(authored.is_fresh_authored());
+        assert!(authored.clone().is_fresh_authored());
+        assert!(authored.remove_part(&partname));
+        assert!(authored.is_fresh_authored());
+
+        let (source_package, source_part) = authored_payload_package(b"opened".to_vec());
+        let source = legacy_publication_bytes(&source_package);
+        let mut borrowed = OpcPackage::from_bytes(&source).expect("open borrowed package");
+        assert!(!borrowed.is_fresh_authored());
+        assert!(!borrowed.clone().is_fresh_authored());
+        assert!(borrowed.remove_part(&source_part));
+        assert!(!borrowed.is_fresh_authored());
+    }
+
+    #[test]
+    fn opened_packages_keep_legacy_publication_protocols() {
+        let payload = owned_protocol_payload();
+        let (source_package, partname) = authored_payload_package(payload);
+        let source = legacy_publication_bytes(&source_package);
+
+        let mut borrowed = OpcPackage::from_bytes(&source).expect("open borrowed package");
+        assert!(!borrowed.is_fresh_authored());
+        borrowed
+            .get_part_mut(&partname)
+            .expect("borrowed editable payload")
+            .set_blob(b"changed borrowed payload".to_vec());
+        assert_eq!(
+            PackageWriter::to_bytes(&borrowed).expect("republish borrowed package"),
+            legacy_publication_bytes(&borrowed)
+        );
+
+        let owned = OpcPackage::from_vec(source.clone()).expect("open owned package");
+        assert!(!owned.is_fresh_authored());
+        assert_eq!(
+            PackageWriter::to_bytes(&owned).expect("copy owned package"),
+            source
+        );
+
+        let mut edited = OpcPackage::from_vec(source).expect("open editable package");
+        edited
+            .get_part_mut(&partname)
+            .expect("editable payload")
+            .set_blob(b"changed opened payload".to_vec());
+        let output = PackageWriter::to_bytes(&edited).expect("publish edited package");
+        let output_archive =
+            soapberry_zip::office::ArchiveReader::new(&output).expect("open edited archive");
+        assert_eq!(
+            output_archive.read(partname.membername()).unwrap(),
+            b"changed opened payload"
+        );
+    }
+
+    fn with_eocd_comment(mut archive: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let comment_len = u16::try_from(comment.len()).expect("ZIP comment fits in EOCD");
+        let eocd = archive.len().checked_sub(22).expect("archive has an EOCD");
+        assert_eq!(&archive[eocd..eocd + 4], b"PK\x05\x06");
+        archive[eocd + 20..eocd + 22].copy_from_slice(&comment_len.to_le_bytes());
+        archive.extend_from_slice(comment);
+        archive
+    }
+
+    fn exact_empty_archive(comment: &[u8]) -> Vec<u8> {
+        with_eocd_comment(
+            PackageWriter::to_bytes(&OpcPackage::new()).expect("serialize source package"),
+            comment,
+        )
+    }
+
+    struct RawArchive {
+        central_order: Vec<String>,
+        local_order: Vec<String>,
+        local_members: HashMap<String, Vec<u8>>,
+        central_records: HashMap<String, Vec<u8>>,
+        comment: Vec<u8>,
+    }
+
+    fn raw_archive(data: &[u8]) -> RawArchive {
+        let archive = soapberry_zip::ZipArchive::from_slice(data).expect("parse ZIP");
+        let comment = archive.comment().as_bytes().to_vec();
+        let central_order: Vec<String> = archive
+            .entries()
+            .map(|entry| {
+                let entry = entry.expect("central entry");
+                std::str::from_utf8(entry.file_path().as_ref())
+                    .expect("UTF-8 member name")
+                    .to_owned()
+            })
+            .collect();
+        let indexed = archive.into_zip_archive();
+        let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let index =
+            soapberry_zip::PreservationIndex::new(&indexed, &mut buffer).expect("preservable ZIP");
+        let mut local_members = HashMap::new();
+        let mut central_records = HashMap::new();
+        let mut records = Vec::new();
+        for (name, entry) in central_order.iter().zip(index.entries()) {
+            let local = entry.local_span();
+            let central = entry.central_record();
+            records.push((local.start, name.clone()));
+            local_members.insert(
+                name.clone(),
+                data[local.start as usize..local.end as usize].to_vec(),
+            );
+            central_records.insert(
+                name.clone(),
+                data[central.start as usize..central.end as usize].to_vec(),
+            );
+        }
+        records.sort_unstable_by_key(|(offset, _)| *offset);
+        RawArchive {
+            central_order,
+            local_order: records.into_iter().map(|(_, name)| name).collect(),
+            local_members,
+            central_records,
+            comment,
+        }
+    }
+
+    fn central_without_local_offset(record: &[u8]) -> Vec<u8> {
+        let mut record = record.to_vec();
+        record[42..46].fill(0);
+        record
+    }
+
+    #[test]
+    fn targeted_output_entry_count_checks_checked_arithmetic() {
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX - 1), 0, 0),
+            Some(u64::from(u16::MAX - 1))
+        );
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX - 1), 0, 1),
+            Some(u64::from(u16::MAX))
+        );
+        assert_eq!(
+            checked_output_entry_count(usize::from(u16::MAX), 1, 0),
+            Some(u64::from(u16::MAX - 1))
+        );
+        assert_eq!(checked_output_entry_count(0, 1, 0), None);
+    }
+
+    fn pseudo_random_bytes(len: usize, mut state: u32) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(len);
+        while bytes.len() < len {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            bytes.push((state >> 24) as u8);
+        }
+        bytes
+    }
+
+    fn two_part_source(comment: &[u8]) -> (Vec<u8>, PackURI, PackURI) {
+        let first = PackURI::new("/custom/first.bin").expect("first URI");
+        let second = PackURI::new("/custom/second.bin").expect("second URI");
+        let mut first_part = crate::BlobPart::new(
+            first.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(256 * 1024, 0x1234_5678),
+        );
+        Part::relate_to_ext(&mut first_part, "https://example.com/old", "urn:test");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(first_part));
+        package.add_part(Box::new(crate::BlobPart::new(
+            second.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(128 * 1024, 0x8765_4321),
+        )));
+        (
+            with_eocd_comment(
+                PackageWriter::to_bytes(&package).expect("serialize two-part source"),
+                comment,
+            ),
+            first,
+            second,
+        )
+    }
+
+    fn zip32_entry_count_boundary_source() -> Vec<u8> {
+        const PART_COUNT: usize = (u16::MAX as usize - 1) - 2;
+        const CONTENT_TYPES: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        let package_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .expect("write boundary content types");
+        writer
+            .write_stored("_rels/.rels", package_relationships.as_bytes())
+            .expect("write boundary package relationships");
+        for index in 0..PART_COUNT {
+            let name = format!("custom/opaque-{index:05}.bin");
+            let payload = [u8::try_from(index % 251).expect("boundary payload byte")];
+            writer
+                .write_stored(&name, &payload)
+                .expect("write boundary opaque Part");
+        }
+        writer
+            .finish_to_bytes()
+            .expect("finish boundary source archive")
+    }
+
+    #[test]
+    fn borrowed_ingress_preserves_relationship_xml_and_invalidates_changed_edges() {
+        const ROOT: &[u8] = br#"<?xml version='1.0'?>
+<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- root context --> <r:Relationship Target='custom/first.bin' Type='urn:test:part' Id='rId9'/>
+</r:Relationships>"#;
+        const PART: &[u8] = br#"<?xml version='1.0'?>
+<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- edge context --> <Relationship TargetMode='External' Target='https://example.test/?a=1&amp;b=2' Type='urn:test:external' Id='rId7'/>
+</Relationships>"#;
+        const EMPTY: &[u8] = br#"<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- empty owner context -->
+</Relationships>"#;
+        let first = PackURI::new("/custom/first.bin").unwrap();
+        for stored in [false, true] {
+            let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+            for (name, bytes) in [
+                ("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#.as_slice()),
+                ("_rels/.rels", ROOT),
+                ("custom/first.bin", b"first".as_slice()),
+                ("custom/second.bin", b"second".as_slice()),
+                ("custom/_rels/first.bin.rels", PART),
+                ("custom/_rels/second.bin.rels", EMPTY),
+            ] {
+                if stored { writer.write_stored(name, bytes).unwrap(); }
+                else { writer.write_deflated(name, bytes).unwrap(); }
+            }
+            let source = writer.finish_to_bytes().unwrap();
+            let mut package = OpcPackage::from_bytes(&source).unwrap().clone();
+            assert!(package.preservation_source().is_none());
+            let check_original_relationships = |package: &OpcPackage| {
+                let output = PackageWriter::to_bytes(package).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+                for (name, bytes) in [
+                    ("_rels/.rels", ROOT),
+                    ("custom/_rels/first.bin.rels", PART),
+                    ("custom/_rels/second.bin.rels", EMPTY),
+                ] {
+                    assert_eq!(
+                        archive.read(name).unwrap(),
+                        bytes,
+                        "{name}, stored={stored}"
+                    );
+                }
+            };
+            check_original_relationships(&package);
+            package
+                .rels_mut()
+                .retarget("rId9", "custom/second.bin".into())
+                .unwrap();
+            package
+                .get_part_mut(&first)
+                .unwrap()
+                .rels_mut()
+                .retarget("rId7", "https://example.test/changed".into())
+                .unwrap();
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            let reopened = OpcPackage::from_bytes(&output).unwrap();
+            assert_eq!(
+                reopened.rels().get("rId9").unwrap().target_ref(),
+                "custom/second.bin"
+            );
+            assert_eq!(
+                reopened
+                    .get_part(&first)
+                    .unwrap()
+                    .rels()
+                    .get("rId7")
+                    .unwrap()
+                    .target_ref(),
+                "https://example.test/changed"
+            );
+            package
+                .rels_mut()
+                .retarget("rId9", "custom/first.bin".into())
+                .unwrap();
+            package
+                .get_part_mut(&first)
+                .unwrap()
+                .rels_mut()
+                .retarget("rId7", "https://example.test/?a=1&b=2".into())
+                .unwrap();
+            check_original_relationships(&package);
+        }
+    }
+
+    fn source_with_explicit_empty_part_relationships() -> (Vec<u8>, PackURI) {
+        let partname = PackURI::new("/custom/empty.bin").expect("empty part URI");
+        let empty_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<?xml version="1.0"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="bin" ContentType="application/octet-stream"/>
+</Types>"#,
+            )
+            .expect("write content types");
+        writer
+            .write_deflated("_rels/.rels", empty_relationships.as_bytes())
+            .expect("write package relationships");
+        writer
+            .write_deflated(partname.membername(), b"original")
+            .expect("write part");
+        writer
+            .write_deflated(
+                partname
+                    .rels_uri()
+                    .expect("part relationships URI")
+                    .membername(),
+                empty_relationships.as_bytes(),
+            )
+            .expect("write explicit empty part relationships");
+        (writer.finish_to_bytes().expect("finish source"), partname)
+    }
+
+    #[test]
+    fn replacing_relationship_owner_does_not_inherit_old_member_provenance() {
+        let (source, name) = source_with_explicit_empty_part_relationships();
+        for owned in [false, true] {
+            for insertion in 0..3 {
+                let mut package = if owned {
+                    OpcPackage::from_vec(source.clone()).unwrap()
+                } else {
+                    OpcPackage::from_bytes(&source).unwrap()
+                };
+                let replacement = Box::new(crate::BlobPart::new(
+                    name.clone(),
+                    "application/octet-stream".into(),
+                    b"replacement".to_vec(),
+                ));
+                if insertion == 0 {
+                    package.add_part(replacement);
+                } else {
+                    assert!(package.remove_part(&name));
+                    if insertion == 1 {
+                        package.try_add_part(replacement).unwrap();
+                    } else {
+                        package.try_add_source_part(replacement).unwrap();
+                    }
+                }
+                let output = PackageWriter::to_bytes(&package).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+                assert!(
+                    !archive
+                        .file_names()
+                        .any(|candidate| candidate == "custom/_rels/empty.bin.rels"),
+                    "owned={owned}, insertion={insertion}"
+                );
+                assert_eq!(archive.read(name.membername()).unwrap(), b"replacement");
+            }
+        }
+    }
+
+    #[test]
+    fn replacement_with_identical_edges_uses_its_own_relationship_xml() {
+        let (source, name) = source_with_explicit_empty_part_relationships();
+        let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+        let rels_uri = name.rels_uri().unwrap();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        for member in original.file_names() {
+            let bytes = if member == rels_uri.membername() {
+                br#"<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>
+<!-- original owner --> <Relationship TargetMode='External' Target='https://example.test/' Type='urn:test:external' Id='rId1'/>
+</Relationships>"#.to_vec()
+            } else {
+                original.read(member).unwrap()
+            };
+            writer.write_deflated(member, &bytes).unwrap();
+        }
+        let source = writer.finish_to_bytes().unwrap();
+        for owned in [false, true] {
+            let mut package = if owned {
+                OpcPackage::from_vec(source.clone()).unwrap()
+            } else {
+                OpcPackage::from_bytes(&source).unwrap()
+            };
+            let mut replacement = crate::BlobPart::new(
+                name.clone(),
+                "application/octet-stream".into(),
+                b"replacement".to_vec(),
+            );
+            *Part::rels_mut(&mut replacement) = package.get_part(&name).unwrap().rels().clone();
+            let expected = Part::rels(&replacement).to_xml();
+            package.add_part(Box::new(replacement));
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            assert_eq!(
+                soapberry_zip::office::ArchiveReader::new(&output)
+                    .unwrap()
+                    .read(rels_uri.membername())
+                    .unwrap(),
+                expected.as_bytes(),
+                "owned={owned}"
+            );
+        }
+    }
+
+    fn signed_source() -> (Vec<u8>, PackURI) {
+        let first = PackURI::new("/custom/first.bin").expect("first URI");
+        let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            first.clone(),
+            "application/octet-stream".to_owned(),
+            b"signed payload".to_vec(),
+        )));
+        package.add_part(Box::new(crate::BlobPart::new(
+            origin,
+            crate::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            b"<origin/>".to_vec(),
+        )));
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            crate::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        (
+            PackageWriter::to_bytes(&package).expect("serialize signed source"),
+            first,
+        )
+    }
+
+    fn read_u16(bytes: &[u8], offset: usize) -> u16 {
+        u16::from_le_bytes(bytes[offset..offset + 2].try_into().expect("u16 field"))
+    }
+
+    fn read_u32(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("u32 field"))
+    }
+
+    fn central_record_len(bytes: &[u8], offset: usize) -> usize {
+        46 + usize::from(read_u16(bytes, offset + 28))
+            + usize::from(read_u16(bytes, offset + 30))
+            + usize::from(read_u16(bytes, offset + 32))
+    }
+
+    fn add_extras_to_last_member(mut bytes: Vec<u8>) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let mut record = central;
+        let mut last_local = 0_usize;
+        while record < eocd {
+            last_local = last_local.max(read_u32(&bytes, record + 42) as usize);
+            record += central_record_len(&bytes, record);
+        }
+
+        let local_extra = [0xfe, 0xca, 3, 0, b'l', b'o', b'c'];
+        let local_name_len = usize::from(read_u16(&bytes, last_local + 26));
+        let old_local_extra_len = usize::from(read_u16(&bytes, last_local + 28));
+        let local_insert = last_local + 30 + local_name_len + old_local_extra_len;
+        bytes[last_local + 28..last_local + 30].copy_from_slice(
+            &u16::try_from(old_local_extra_len + local_extra.len())
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes.splice(local_insert..local_insert, local_extra);
+
+        let shifted_central = central + local_extra.len();
+        let shifted_eocd = eocd + local_extra.len();
+        bytes[shifted_eocd + 16..shifted_eocd + 20]
+            .copy_from_slice(&(shifted_central as u32).to_le_bytes());
+
+        let mut target_record = shifted_central;
+        while read_u32(&bytes, target_record + 42) as usize != last_local {
+            target_record += central_record_len(&bytes, target_record);
+        }
+        let central_extra = [0xef, 0xbe, 3, 0, b'c', b'e', b'n'];
+        let central_name_len = usize::from(read_u16(&bytes, target_record + 28));
+        let old_central_extra_len = usize::from(read_u16(&bytes, target_record + 30));
+        let central_insert = target_record + 46 + central_name_len + old_central_extra_len;
+        bytes[target_record + 30..target_record + 32].copy_from_slice(
+            &u16::try_from(old_central_extra_len + central_extra.len())
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes.splice(central_insert..central_insert, central_extra);
+
+        let final_eocd = shifted_eocd + central_extra.len();
+        let central_size = read_u32(&bytes, final_eocd + 12);
+        bytes[final_eocd + 12..final_eocd + 16]
+            .copy_from_slice(&(central_size + central_extra.len() as u32).to_le_bytes());
+        bytes
+    }
+
+    fn reverse_central_order(mut bytes: Vec<u8>) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let mut records = Vec::new();
+        let mut offset = central;
+        while offset < eocd {
+            let len = central_record_len(&bytes, offset);
+            records.push(bytes[offset..offset + len].to_vec());
+            offset += len;
+        }
+        records.reverse();
+        let replacement: Vec<u8> = records.into_iter().flatten().collect();
+        bytes[central..eocd].copy_from_slice(&replacement);
+        bytes
+    }
+
+    fn promote_to_zip64(mut bytes: Vec<u8>) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let eocd = archive.eocd_offset() as usize;
+        let entries = u64::from(read_u16(&bytes, eocd + 10));
+        let central_size = u64::from(read_u32(&bytes, eocd + 12));
+        let central_offset = u64::from(read_u32(&bytes, eocd + 16));
+        let mut records = Vec::new();
+        records.extend_from_slice(&0x0606_4b50_u32.to_le_bytes());
+        records.extend_from_slice(&44_u64.to_le_bytes());
+        records.extend_from_slice(&45_u16.to_le_bytes());
+        records.extend_from_slice(&45_u16.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&entries.to_le_bytes());
+        records.extend_from_slice(&entries.to_le_bytes());
+        records.extend_from_slice(&central_size.to_le_bytes());
+        records.extend_from_slice(&central_offset.to_le_bytes());
+        records.extend_from_slice(&0x0706_4b50_u32.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&(eocd as u64).to_le_bytes());
+        records.extend_from_slice(&1_u32.to_le_bytes());
+        bytes.splice(eocd..eocd, records);
+        let ordinary_eocd = eocd + 76;
+        bytes[ordinary_eocd + 8..ordinary_eocd + 12].fill(0xff);
+        bytes[ordinary_eocd + 12..ordinary_eocd + 20].fill(0xff);
+        bytes
+    }
+
+    fn add_zip64_tail_extension(mut bytes: Vec<u8>, extension: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP64");
+        assert!(archive.is_zip64());
+        let head = archive.head_eocd_offset() as usize;
+        let old_size = u64::from_le_bytes(bytes[head + 4..head + 12].try_into().unwrap());
+        bytes.splice(head + 56..head + 56, extension.iter().copied());
+        bytes[head + 4..head + 12].copy_from_slice(
+            &old_size
+                .checked_add(extension.len() as u64)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes
+    }
+
+    fn zip64_tail_extensible_data(data: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(data).expect("parse ZIP64");
+        let head = archive.head_eocd_offset() as usize;
+        let locator = archive.eocd_offset() as usize - 20;
+        data[head + 56..locator].to_vec()
+    }
+
+    fn promote_member_to_zip64_descriptor(mut bytes: Vec<u8>, membername: &str) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let (target_local, target_central, payload_end) = archive
+            .entries()
+            .find_map(|entry| {
+                let entry = entry.expect("central entry");
+                (entry.file_path().as_ref() == membername.as_bytes()).then(|| {
+                    let payload_end = archive
+                        .get_entry(entry.wayfinder())
+                        .expect("target entry")
+                        .compressed_data_range()
+                        .1 as usize;
+                    (
+                        entry.local_header_offset() as usize,
+                        entry.central_directory_offset() as usize,
+                        payload_end,
+                    )
+                })
+            })
+            .expect("target member");
+        let next_local = archive
+            .entries()
+            .map(|entry| entry.expect("central entry").local_header_offset() as usize)
+            .filter(|&offset| offset > target_local)
+            .min()
+            .unwrap_or(central);
+        let descriptor_len = next_local - payload_end;
+        assert!(matches!(descriptor_len, 12 | 16));
+        let signed = descriptor_len == 16;
+        let crc_offset = payload_end + usize::from(signed) * 4;
+        let crc = read_u32(&bytes, crc_offset);
+        let compressed = read_u32(&bytes, target_central + 20);
+        let uncompressed = read_u32(&bytes, target_central + 24);
+
+        let mut descriptor = Vec::with_capacity(descriptor_len + 8);
+        if signed {
+            descriptor.extend_from_slice(&0x0807_4b50_u32.to_le_bytes());
+        }
+        descriptor.extend_from_slice(&crc.to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        bytes.splice(payload_end..next_local, descriptor.iter().copied());
+
+        let shifted_central = central + 8;
+        let shifted_eocd = eocd + 8;
+        let mut central_cursor = shifted_central;
+        while central_cursor < shifted_eocd {
+            let length = central_record_len(&bytes, central_cursor);
+            let local_offset = read_u32(&bytes, central_cursor + 42);
+            if usize::try_from(local_offset).unwrap() > target_local {
+                let shifted = local_offset.checked_add(8).expect("local offset shift");
+                bytes[central_cursor + 42..central_cursor + 46]
+                    .copy_from_slice(&shifted.to_le_bytes());
+            }
+            central_cursor += length;
+        }
+
+        let target_central = target_central + 8;
+        let target_record_len = central_record_len(&bytes, target_central);
+        let target_record = bytes[target_central..target_central + target_record_len].to_vec();
+        let name_len = usize::from(read_u16(&bytes, target_central + 28));
+        let old_extra_len = usize::from(read_u16(&bytes, target_central + 30));
+        let variable_start = 46 + name_len;
+        let old_extra_end = variable_start + old_extra_len;
+        let mut promoted = target_record[..variable_start].to_vec();
+        promoted[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+        promoted[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+        let mut zip64_extra = Vec::with_capacity(20);
+        zip64_extra.extend_from_slice(&1u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&16u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        promoted[30..32].copy_from_slice(
+            &u16::try_from(old_extra_len + zip64_extra.len())
+                .expect("ZIP64 extra length")
+                .to_le_bytes(),
+        );
+        promoted.extend_from_slice(&target_record[variable_start..old_extra_end]);
+        promoted.extend_from_slice(&zip64_extra);
+        promoted.extend_from_slice(&target_record[old_extra_end..]);
+        assert_eq!(promoted.len(), target_record_len + 20);
+        bytes.splice(
+            target_central..target_central + target_record_len,
+            promoted.iter().copied(),
+        );
+
+        let final_eocd = shifted_eocd + 20;
+        let central_size = read_u32(&bytes, final_eocd + 12);
+        bytes[final_eocd + 12..final_eocd + 16].copy_from_slice(
+            &central_size
+                .checked_add(20)
+                .expect("central size")
+                .to_le_bytes(),
+        );
+        bytes[final_eocd + 16..final_eocd + 20].copy_from_slice(
+            &u32::try_from(shifted_central)
+                .expect("central offset")
+                .to_le_bytes(),
+        );
+        bytes
+    }
+
+    fn source_with_non_part_framing() -> (Vec<u8>, PackURI) {
+        let content_types = br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/first.bin" ContentType="application/octet-stream"/><Override PartName="/custom/second.bin" ContentType="application/octet-stream"/></Types>"#;
+        let relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+        let first = PackURI::new("/custom/first.bin").unwrap();
+        let mut physical = PhysPkgWriter::new();
+        physical
+            .write(
+                &PackURI::new("/[Content_Types].xml").unwrap(),
+                content_types,
+            )
+            .unwrap();
+        physical
+            .write(&PackURI::new("/_rels/.rels").unwrap(), relationships)
+            .unwrap();
+        physical
+            .write(&first, &pseudo_random_bytes(32 * 1024, 0x1111_2222))
+            .unwrap();
+        physical
+            .write(
+                &PackURI::new("/custom/second.bin").unwrap(),
+                &pseudo_random_bytes(16 * 1024, 0x3333_4444),
+            )
+            .unwrap();
+        physical
+            .write(
+                &PackURI::new("/junk.dat").unwrap(),
+                b"untyped non-part payload",
+            )
+            .unwrap();
+        let bytes = physical.finish().unwrap();
+        let bytes = add_extras_to_last_member(bytes);
+        let bytes = reverse_central_order(bytes);
+        (
+            with_eocd_comment(bytes, b"archive comment and framing"),
+            first,
+        )
+    }
+
+    #[test]
+    fn test_content_types_xml() {
+        let mut cti = ContentTypesItem::new().unwrap();
+        cti.defaults
+            .insert("png".to_string(), ContentType::new("image/png").unwrap());
+        cti.overrides.insert(
+            "/word/document.xml".to_string(),
+            ContentType::new(ct::WML_DOCUMENT_MAIN).unwrap(),
+        );
+
+        let xml = cti.to_xml();
+
+        assert!(xml.contains(r#"<Default Extension="png" ContentType="image/png"/>"#));
+        assert!(xml.contains(r#"<Override PartName="/word/document.xml""#));
+    }
+
+    #[test]
+    fn owned_source_round_trips_exactly_to_bytes_and_stream() {
+        let source = exact_empty_archive(b"nonzero EOCD comment");
+        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+
+        assert_eq!(
+            PackageWriter::to_bytes(&package).expect("copy exact source"),
+            source
+        );
+
+        let mut streamed = Vec::new();
+        package
+            .to_stream(&mut streamed)
+            .expect("stream exact source");
+        assert_eq!(streamed, source);
+    }
+
+    #[test]
+    fn changed_owned_signed_source_refuses_before_output() {
+        let (source, first) = signed_source();
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open signed source");
+        assert!(package.is_signed());
+        assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
+
+        package
+            .get_part_mut(&first)
+            .expect("signed payload")
+            .set_blob(b"changed signed payload".to_vec());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("changed signed source must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn generic_signature_infrastructure_removal_stays_policy_gated() {
+        let (source, _first) = signed_source();
+        let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
+        let mut package = OpcPackage::from_vec(source).expect("open signed source");
+
+        package
+            .rels_mut()
+            .remove("rId1")
+            .expect("signature-origin relationship");
+        assert!(
+            package.is_signed(),
+            "origin part remains signature infrastructure"
+        );
+        assert!(package.remove_part(&origin));
+        assert!(!package.is_signed(), "generic removal emptied the graph");
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("generic removal must not authorize signature stripping");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn untouched_borrowed_signed_source_refuses_without_exact_bytes() {
+        let (source, _first) = signed_source();
+        let package = OpcPackage::from_bytes(&source).expect("open borrowed signed source");
+        assert!(package.is_signed());
+        assert!(package.exact_source().is_none());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("borrowed signed source must not normalize signatures");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn open_and_reader_retain_owned_source_but_borrowed_bytes_do_not() {
+        let source = exact_empty_archive(b"owned source");
+
+        let from_reader =
+            OpcPackage::from_reader(io::Cursor::new(source.clone())).expect("open reader source");
+        assert_eq!(
+            PackageWriter::to_bytes(&from_reader).expect("copy reader source"),
+            source
+        );
+
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("source.opc");
+        std::fs::write(&path, &source).expect("write source package");
+        let opened = OpcPackage::open(path).expect("open file source");
+        assert_eq!(
+            PackageWriter::to_bytes(&opened).expect("copy file source"),
+            source
+        );
+
+        let borrowed = OpcPackage::from_bytes(&source).expect("open borrowed source");
+        assert!(borrowed.exact_source().is_none());
+        assert_ne!(
+            PackageWriter::to_bytes(&borrowed).expect("republish borrowed source"),
+            source
+        );
+    }
+
+    #[test]
+    fn part_edit_revokes_exact_source_and_republishes_edited_package() {
+        let partname = PackURI::new("/custom/metadata.xml").expect("valid part URI");
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            partname.clone(),
+            ct::XML.to_owned(),
+            b"<original/>".to_vec(),
+        )));
+        let source = with_eocd_comment(
+            PackageWriter::to_bytes(&source_package).expect("serialize source package"),
+            b"exact source",
+        );
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+
+        package
+            .get_part_mut(&partname)
+            .expect("editable part")
+            .set_blob(b"<edited/>".to_vec());
+        let rewritten = PackageWriter::to_bytes(&package).expect("republish edited package");
+
+        assert_ne!(rewritten, source);
+        let reopened = OpcPackage::from_bytes(&rewritten).expect("reopen edited package");
+        assert_eq!(
+            reopened.get_part(&partname).expect("edited part").blob(),
+            b"<edited/>"
+        );
+    }
+
+    #[test]
+    fn exact_source_streaming_respects_the_64_kib_chunk_bound() {
+        let comment = vec![b'x'; u16::MAX as usize];
+        let source = exact_empty_archive(&comment);
+        assert!(source.len() > EXACT_SOURCE_CHUNK_BYTES);
+        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: EXACT_SOURCE_CHUNK_BYTES,
+        };
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("stream exact source");
+
+        assert_eq!(sink.total, source.len());
+        assert!(sink.writes > 1);
+        assert!(sink.largest <= EXACT_SOURCE_CHUNK_BYTES);
+    }
+
+    #[test]
+    fn incomplete_exact_source_stream_reports_accepted_bytes() {
+        let source = exact_empty_archive(b"exact source");
+        let package = OpcPackage::from_vec(source).expect("open owned source");
+        let sink = FailAfter {
+            written: 0,
+            limit: 128,
+        };
+
+        let error = PackageWriter::write_to_stream(sink, &package)
+            .expect_err("bounded sink must reject exact source");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput {
+                written: 128,
+                source,
+            } if matches!(*source, crate::OpcError::IoError(_))
+        ));
+    }
+
+    #[test]
+    fn targeted_part_mutation_raw_copies_every_other_member() {
+        let (source, first, _second) = two_part_source(b"preserve targeted comment");
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(pseudo_random_bytes(256 * 1024, 0x0bad_f00d));
+
+        let output = PackageWriter::to_bytes(&package).expect("targeted publication");
+        let output_raw = raw_archive(&output);
+
+        assert_eq!(output_raw.comment, source_raw.comment);
+        assert_eq!(output_raw.central_order, source_raw.central_order);
+        assert_eq!(output_raw.local_order, source_raw.local_order);
+        for (name, source_member) in &source_raw.local_members {
+            if name == first.membername() {
+                assert_ne!(output_raw.local_members[name], *source_member);
+            } else {
+                assert_eq!(output_raw.local_members[name], *source_member, "{name}");
+                assert_eq!(
+                    central_without_local_offset(&output_raw.central_records[name]),
+                    central_without_local_offset(&source_raw.central_records[name]),
+                    "{name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn targeted_relationship_and_content_type_changes_regenerate_only_their_closure() {
+        let (source, first, second) = two_part_source(b"closure comment");
+        let source_raw = raw_archive(&source);
+
+        let mut relationship_edit =
+            OpcPackage::from_vec(source.clone()).expect("open relationship source");
+        relationship_edit
+            .get_part_mut(&first)
+            .expect("first part")
+            .rels_mut()
+            .retarget("rId1", "https://example.com/new".to_owned())
+            .expect("retarget relationship");
+        let relationship_output =
+            PackageWriter::to_bytes(&relationship_edit).expect("publish relationship edit");
+        let relationship_raw = raw_archive(&relationship_output);
+        let relationships_name = first.rels_uri().unwrap().membername().to_owned();
+        for (name, source_member) in &source_raw.local_members {
+            if name == &relationships_name {
+                assert_ne!(relationship_raw.local_members[name], *source_member);
+            } else {
+                assert_eq!(
+                    relationship_raw.local_members[name], *source_member,
+                    "{name}"
+                );
+            }
+        }
+
+        let mut content_type_edit = OpcPackage::from_vec(source).expect("open content-type source");
+        content_type_edit
+            .get_part_mut(&second)
+            .expect("second part")
+            .set_content_type("application/vnd.example.changed".to_owned())
+            .expect("change content type");
+        let content_type_output =
+            PackageWriter::to_bytes(&content_type_edit).expect("publish content-type edit");
+        let content_type_raw = raw_archive(&content_type_output);
+        for (name, source_member) in &source_raw.local_members {
+            if name == "[Content_Types].xml" {
+                assert_ne!(content_type_raw.local_members[name], *source_member);
+            } else {
+                assert_eq!(
+                    content_type_raw.local_members[name], *source_member,
+                    "{name}"
+                );
+            }
+        }
+    }
+
+    fn two_related_parts_source() -> (Vec<u8>, PackURI, PackURI) {
+        let first = PackURI::new("/custom/first.bin").expect("first URI");
+        let second = PackURI::new("/custom/second.bin").expect("second URI");
+        let mut first_part = crate::BlobPart::new(
+            first.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(4 * 1024, 0x1234_5678),
+        );
+        Part::relate_to_ext(&mut first_part, "https://example.com/first", "urn:test");
+        let mut second_part = crate::BlobPart::new(
+            second.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(4 * 1024, 0x8765_4321),
+        );
+        Part::relate_to_ext(&mut second_part, "https://example.com/second", "urn:test");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(first_part));
+        package.add_part(Box::new(second_part));
+        (
+            PackageWriter::to_bytes(&package).expect("serialize related source"),
+            first,
+            second,
+        )
+    }
+
+    fn partnames(package: &OpcPackage) -> Vec<PackURI> {
+        package
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .collect()
+    }
+
+    #[test]
+    fn a_pristine_relationships_proof_publishes_what_the_byte_compare_publishes() {
+        let (source, _first, _second) = two_related_parts_source();
+
+        // Taking the package relationship seam revokes exact-source
+        // authorization without changing a value, so publication takes the
+        // preservation route with every member still pristine.
+        let mut pristine = OpcPackage::from_vec(source.clone()).expect("open pristine source");
+        let _seam = pristine.rels_mut();
+        let pristine_output = PackageWriter::to_bytes(&pristine).expect("publish pristine package");
+
+        // Removing an absent identifier keeps every value identical but drops
+        // every open-time proof, so the same publication has to serialize and
+        // byte-compare each member exactly as it did before this change.
+        let mut compared = OpcPackage::from_vec(source.clone()).expect("open compared source");
+        compared.rels_mut().remove("rIdAbsent0593");
+        for partname in partnames(&compared) {
+            compared
+                .get_part_mut(&partname)
+                .expect("compared part")
+                .rels_mut()
+                .remove("rIdAbsent0593");
+        }
+        let compared_output =
+            PackageWriter::to_bytes(&compared).expect("publish byte-compared package");
+
+        assert_eq!(pristine_output, compared_output);
+        let reopened = OpcPackage::from_bytes(&pristine_output).expect("reopen pristine output");
+        assert_eq!(reopened.part_count(), 2);
+    }
+
+    #[test]
+    fn a_relationship_collection_moved_between_parts_cannot_reuse_its_proof() {
+        let (source, first, second) = two_related_parts_source();
+
+        let donor = OpcPackage::from_vec(source.clone()).expect("open donor source");
+        let donated = donor.get_part(&first).expect("donor part").rels().clone();
+
+        let mut package = OpcPackage::from_vec(source).expect("open target source");
+        let _seam = package.rels_mut();
+        *package
+            .get_part_mut(&second)
+            .expect("second part")
+            .rels_mut() = donated;
+
+        let output = PackageWriter::to_bytes(&package).expect("publish moved collection");
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen moved collection");
+        // The donated proof describes the first part, so the second part's
+        // member is serialized and compared rather than copied, and the
+        // publication carries the donated relationship instead of the source's.
+        let relationship = reopened
+            .get_part(&second)
+            .expect("republished second part")
+            .rels()
+            .get("rId1")
+            .expect("moved relationship");
+        assert_eq!(relationship.target_ref(), "https://example.com/first");
+    }
+
+    #[test]
+    fn adding_a_part_still_rebuilds_the_content_types_manifest() {
+        let (source, _first, _second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open topology source");
+        let third = PackURI::new("/custom/third.dat").expect("third URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            third,
+            "application/vnd.example.added".to_owned(),
+            pseudo_random_bytes(512, 0x0fed_cba9),
+        )));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish topology add");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["[Content_Types].xml"],
+            source_raw.local_members["[Content_Types].xml"]
+        );
+    }
+
+    #[test]
+    fn removing_a_part_still_rebuilds_the_content_types_manifest() {
+        let (source, first, _second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open removal source");
+        assert!(package.remove_part(&first));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish removal");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["[Content_Types].xml"],
+            source_raw.local_members["[Content_Types].xml"]
+        );
+    }
+
+    #[test]
+    fn package_relationship_changes_still_regenerate_the_package_member() {
+        let (source, _first, second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        package.relate_to(second.membername(), "urn:package:test");
+
+        let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["_rels/.rels"],
+            source_raw.local_members["_rels/.rels"]
+        );
+    }
+
+    #[test]
+    fn package_relationship_edit_regenerates_using_raw_source_name() {
+        let (source, _first, second) = two_part_source(b"package relationship edit");
+        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        package.relate_to(second.membername(), "urn:package:test");
+
+        let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
+        let raw = raw_archive(&output);
+        assert!(raw.central_order.iter().any(|name| name == "_rels/.rels"));
+
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen package relationship edit");
+        let relationship = reopened.rels().get("rId1").expect("package relationship");
+        assert_eq!(relationship.target_ref(), second.membername());
+    }
+
+    #[test]
+    fn revoked_part_mutation_preserves_explicit_empty_relationship_member() {
+        let (source, partname) = source_with_explicit_empty_part_relationships();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open explicit empty source");
+        package
+            .get_part_mut(&partname)
+            .expect("empty relationship part")
+            .set_blob(b"changed".to_vec());
+
+        let output = PackageWriter::to_bytes(&package).expect("publish changed part");
+        let raw = raw_archive(&output);
+        let relationships_name = partname
+            .rels_uri()
+            .expect("part relationships URI")
+            .membername()
+            .to_owned();
+        assert!(
+            raw.central_order
+                .iter()
+                .any(|name| name == &relationships_name)
+        );
+        assert_eq!(
+            raw.local_members[&relationships_name],
+            source_raw.local_members[&relationships_name]
+        );
+        assert_eq!(
+            central_without_local_offset(&raw.central_records[&relationships_name]),
+            central_without_local_offset(&source_raw.central_records[&relationships_name])
+        );
+
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen changed part");
+        let part = reopened.get_part(&partname).expect("changed part");
+        assert_eq!(part.blob(), b"changed");
+        assert!(part.rels().is_empty());
+    }
+
+    #[test]
+    fn revoked_noop_uses_preservation_copy_all() {
+        let (source, _first, _second) = two_part_source(b"copy-all comment");
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let options = package.save_options().clone();
+        package.set_save_options(options);
+        assert!(package.exact_source().is_none());
+
+        assert_eq!(
+            PackageWriter::to_bytes(&package).expect("copy preserved source"),
+            source
+        );
+
+        let mut failed = OpcPackage::from_vec(source.clone()).expect("open failure source");
+        assert!(
+            failed
+                .get_part_mut(&PackURI::new("/missing.bin").unwrap())
+                .is_err()
+        );
+        assert!(failed.exact_source().is_none());
+        assert_eq!(PackageWriter::to_bytes(&failed).unwrap(), source);
+    }
+
+    #[test]
+    fn targeted_partial_sink_failure_reports_accepted_bytes() {
+        let (source, first, _second) = two_part_source(b"partial targeted output");
+        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(pseudo_random_bytes(256 * 1024, 0xfeed_beef));
+        let sink = FailAfter {
+            written: 0,
+            limit: 70_000,
+        };
+
+        let error = PackageWriter::write_to_stream(sink, &package)
+            .expect_err("sink must reject targeted output");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput {
+                written: 70_000,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn targeted_streaming_keeps_generated_writes_bounded() {
+        let (source, first, _second) = two_part_source(b"bounded targeted output");
+        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        package
+            .get_part_mut(&first)
+            .unwrap()
+            .set_blob(pseudo_random_bytes(256 * 1024, 0xdead_beef));
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: EXACT_SOURCE_CHUNK_BYTES,
+        };
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("bounded targeted stream");
+
+        assert!(sink.total > 256 * 1024);
+        assert!(sink.writes > 1);
+        assert!(sink.largest <= EXACT_SOURCE_CHUNK_BYTES);
+    }
+
+    #[test]
+    fn targeted_save_preserves_comments_extras_descriptors_order_and_non_parts() {
+        let (source, first) = source_with_non_part_framing();
+        let source_raw = raw_archive(&source);
+        assert!(
+            source_raw.local_members["junk.dat"]
+                .windows(7)
+                .any(|window| window == [0xfe, 0xca, 3, 0, b'l', b'o', b'c'])
+        );
+        assert!(
+            source_raw.central_records["junk.dat"]
+                .windows(7)
+                .any(|window| window == [0xef, 0xbe, 3, 0, b'c', b'e', b'n'])
+        );
+        assert!(
+            source_raw
+                .local_members
+                .values()
+                .any(|member| member.windows(4).any(|window| window == b"PK\x07\x08"))
+        );
+
+        let mut package = OpcPackage::from_vec(source).expect("open framed source");
+        assert_eq!(package.non_part_members()[0].name(), "junk.dat");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(pseudo_random_bytes(32 * 1024, 0x5555_6666));
+        let output = PackageWriter::to_bytes(&package).expect("targeted framed save");
+        let output_raw = raw_archive(&output);
+
+        assert_eq!(output_raw.comment, source_raw.comment);
+        assert_eq!(output_raw.central_order, source_raw.central_order);
+        assert_eq!(output_raw.local_order, source_raw.local_order);
+        for name in [
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "custom/second.bin",
+            "junk.dat",
+        ] {
+            assert_eq!(
+                output_raw.local_members[name],
+                source_raw.local_members[name]
+            );
+            assert_eq!(
+                central_without_local_offset(&output_raw.central_records[name]),
+                central_without_local_offset(&source_raw.central_records[name])
+            );
+        }
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen framed output");
+        assert_eq!(reopened.non_part_members()[0].name(), "junk.dat");
+    }
+
+    #[test]
+    fn topology_part_add_preserves_source_and_appends_deterministic_members() {
+        let (source, _first, _second) = two_part_source(b"topology addition");
+        let source_raw = raw_archive(&source);
+        let mut added = OpcPackage::from_vec(source.clone()).expect("open add source");
+        let first_added = PackURI::new("/custom/zzz.bin").unwrap();
+        let second_added = PackURI::new("/custom/aaa.bin").unwrap();
+        let mut first_part = crate::BlobPart::new(
+            first_added.clone(),
+            "application/octet-stream".to_owned(),
+            b"third with relationships".to_vec(),
+        );
+        Part::relate_to_ext(&mut first_part, "https://example.com/new", "urn:new");
+        added.add_part(Box::new(first_part));
+        added.add_part(Box::new(crate::BlobPart::new(
+            second_added.clone(),
+            "application/octet-stream".to_owned(),
+            b"third without relationships".to_vec(),
+        )));
+
+        let added_output = PackageWriter::to_bytes(&added).expect("publish added parts");
+        let added_raw = raw_archive(&added_output);
+        assert_eq!(added_raw.comment, source_raw.comment);
+        assert_eq!(
+            &added_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &added_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            &added_raw.local_order[source_raw.local_order.len()..],
+            [
+                "custom/aaa.bin",
+                "custom/zzz.bin",
+                "custom/_rels/zzz.bin.rels"
+            ]
+        );
+        assert_eq!(
+            &added_raw.central_order[source_raw.central_order.len()..],
+            [
+                "custom/aaa.bin",
+                "custom/zzz.bin",
+                "custom/_rels/zzz.bin.rels"
+            ]
+        );
+        for name in &source_raw.local_order {
+            if name == "[Content_Types].xml" {
+                assert_ne!(
+                    added_raw.local_members[name],
+                    source_raw.local_members[name]
+                );
+            } else {
+                assert_eq!(
+                    added_raw.local_members[name], source_raw.local_members[name],
+                    "{name}"
+                );
+                assert_eq!(
+                    central_without_local_offset(&added_raw.central_records[name]),
+                    central_without_local_offset(&source_raw.central_records[name]),
+                    "{name}"
+                );
+            }
+        }
+        let reopened = OpcPackage::from_bytes(&added_output).expect("reopen added package");
+        assert_eq!(
+            reopened.get_part(&second_added).unwrap().blob(),
+            b"third without relationships"
+        );
+        let reopened_first = reopened.get_part(&first_added).unwrap();
+        assert_eq!(reopened_first.blob(), b"third with relationships");
+        assert_eq!(reopened_first.rels().len(), 1);
+        assert_eq!(
+            reopened_first.rels().get("rId1").unwrap().target_ref(),
+            "https://example.com/new"
+        );
+        assert_eq!(
+            reopened.get_part(&second_added).unwrap().content_type(),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn topology_add_at_zip32_entry_count_boundary_promotes_owned_source() {
+        const SOURCE_MEMBER_COUNT: usize = u16::MAX as usize - 1;
+        const SOURCE_PART_COUNT: usize = SOURCE_MEMBER_COUNT - 2;
+        const BINARY_CONTENT_TYPE: &str = "application/vnd.ms-excel.sheet.binary.macroEnabled.main";
+        const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+        const BINARY_DEFAULT: &[u8] = br#"<Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/>"#;
+
+        let source = zip32_entry_count_boundary_source();
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        assert!(!source_archive.is_zip64());
+        assert_eq!(source_archive.entries_hint(), u64::from(u16::MAX - 1));
+        assert_eq!(source_archive.entries().count(), SOURCE_MEMBER_COUNT);
+        let source_content_types = soapberry_zip::office::ArchiveReader::new(&source)
+            .unwrap()
+            .read(CONTENT_TYPES_MEMBER)
+            .unwrap();
+        assert!(
+            source_content_types
+                .windows(BINARY_DEFAULT.len())
+                .any(|window| window == BINARY_DEFAULT)
+        );
+        let source_raw = raw_archive(&source);
+
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open boundary source");
+        assert_eq!(package.part_count(), SOURCE_PART_COUNT);
+        let added = PackURI::new("/custom/new.bin").unwrap();
+        package.add_part(Box::new(crate::BlobPart::new(
+            added.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"new payload".to_vec(),
+        )));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish boundary addition");
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(output_archive.entries_hint(), u64::from(u16::MAX));
+        assert_eq!(output_archive.entries().count(), usize::from(u16::MAX));
+
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            &output_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(output_raw.local_order.last().unwrap(), added.membername());
+        assert_eq!(output_raw.central_order.last().unwrap(), added.membername());
+        for name in &source_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_raw.local_members[name], source_raw.local_members[name],
+                "source local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_raw.central_records[name]),
+                central_without_local_offset(&source_raw.central_records[name]),
+                "source central record changed for {name}"
+            );
+        }
+
+        let archive_reader = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            archive_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            archive_reader.read(added.membername()).unwrap(),
+            b"new payload"
+        );
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen boundary output");
+        assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 1);
+        assert_eq!(reopened.get_part(&added).unwrap().blob(), b"new payload");
+
+        let second = PackURI::new("/custom/new-2.bin").unwrap();
+        let mut package = OpcPackage::from_vec(output).expect("reopen owned ZIP64 output");
+        package.add_part(Box::new(crate::BlobPart::new(
+            second.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"second payload".to_vec(),
+        )));
+        let output_2 = PackageWriter::to_bytes(&package).expect("publish 65536-member output");
+        let output_2_archive = soapberry_zip::ZipArchive::from_slice(&output_2).unwrap();
+        assert!(output_2_archive.is_zip64());
+        assert_eq!(output_2_archive.entries_hint(), u64::from(u16::MAX) + 1);
+        assert_eq!(
+            output_2_archive.entries().count(),
+            usize::from(u16::MAX) + 1
+        );
+        let output_2_raw = raw_archive(&output_2);
+        assert_eq!(
+            &output_2_raw.local_order[..output_raw.local_order.len()],
+            output_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_2_raw.central_order[..output_raw.central_order.len()],
+            output_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            output_2_raw.local_order.last().unwrap(),
+            second.membername()
+        );
+        assert_eq!(
+            output_2_raw.central_order.last().unwrap(),
+            second.membername()
+        );
+        for name in &output_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_2_raw.local_members[name], output_raw.local_members[name],
+                "retained local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_2_raw.central_records[name]),
+                central_without_local_offset(&output_raw.central_records[name]),
+                "retained central record changed for {name}"
+            );
+        }
+        let output_2_reader = soapberry_zip::office::ArchiveReader::new(&output_2).unwrap();
+        assert_eq!(
+            output_2_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            output_2_reader.read(second.membername()).unwrap(),
+            b"second payload"
+        );
+
+        let third = PackURI::new("/custom/new-3.bin").unwrap();
+        let mut package = OpcPackage::from_vec(output_2).expect("reopen 65536-member output");
+        package.add_part(Box::new(crate::BlobPart::new(
+            third.clone(),
+            BINARY_CONTENT_TYPE.to_owned(),
+            b"third payload".to_vec(),
+        )));
+        let output_3 = PackageWriter::to_bytes(&package).expect("publish 65537-member output");
+        let output_3_archive = soapberry_zip::ZipArchive::from_slice(&output_3).unwrap();
+        assert!(output_3_archive.is_zip64());
+        assert_eq!(output_3_archive.entries_hint(), u64::from(u16::MAX) + 2);
+        assert_eq!(
+            output_3_archive.entries().count(),
+            usize::from(u16::MAX) + 2
+        );
+        let output_3_raw = raw_archive(&output_3);
+        assert_eq!(
+            &output_3_raw.local_order[..output_2_raw.local_order.len()],
+            output_2_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_3_raw.central_order[..output_2_raw.central_order.len()],
+            output_2_raw.central_order.as_slice()
+        );
+        assert_eq!(output_3_raw.local_order.last().unwrap(), third.membername());
+        assert_eq!(
+            output_3_raw.central_order.last().unwrap(),
+            third.membername()
+        );
+        for name in &output_2_raw.local_order {
+            if name == CONTENT_TYPES_MEMBER {
+                continue;
+            }
+            assert_eq!(
+                output_3_raw.local_members[name], output_2_raw.local_members[name],
+                "last-phase retained local record changed for {name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_3_raw.central_records[name]),
+                central_without_local_offset(&output_2_raw.central_records[name]),
+                "last-phase retained central record changed for {name}"
+            );
+        }
+        let output_3_reader = soapberry_zip::office::ArchiveReader::new(&output_3).unwrap();
+        assert_eq!(
+            output_3_reader.read(CONTENT_TYPES_MEMBER).unwrap(),
+            source_content_types
+        );
+        assert_eq!(
+            output_3_reader.read(third.membername()).unwrap(),
+            b"third payload"
+        );
+        let reopened = OpcPackage::from_bytes(&output_3).expect("reopen final boundary output");
+        assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 3);
+        assert_eq!(
+            reopened.get_part(&second).unwrap().blob(),
+            b"second payload"
+        );
+        assert_eq!(reopened.get_part(&third).unwrap().blob(), b"third payload");
+    }
+
+    #[test]
+    fn topology_add_rejects_packuri_derived_relationship_name_conflict() {
+        let existing_name = PackURI::new("/custom/new.bin").unwrap();
+        let candidate_name = PackURI::new("/custom/_rels/new.bin.rels").unwrap();
+        let mut existing = crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        );
+        Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(existing));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize conflict source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open conflict source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/vnd.openxmlformats-package.relationships+xml".to_owned(),
+            Relationships::new(PACKAGE_URI.to_owned())
+                .to_xml()
+                .into_bytes(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_relationship_member_prefix_conflict() {
+        let existing_name = PackURI::new("/custom/_rels").unwrap();
+        let candidate_name = PackURI::new("/custom/foo").unwrap();
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        )));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        let mut candidate = crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        );
+        Part::relate_to_ext(&mut candidate, "https://example.com", "urn:test");
+        package.add_part(Box::new(candidate));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_part_descending_from_existing_relationship_member() {
+        let existing_name = PackURI::new("/custom/base.bin").unwrap();
+        let candidate_name = PackURI::new("/custom/_rels/base.bin.rels/child.bin").unwrap();
+        let mut source_package = OpcPackage::new();
+        let mut existing = crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        );
+        Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        source_package.add_part(Box::new(existing));
+        let source =
+            PackageWriter::to_bytes(&source_package).expect("serialize relationship source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open relationship source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_packuri_prefix_conflict() {
+        let existing_name = PackURI::new("/custom/foo").unwrap();
+        let candidate_name = PackURI::new("/custom/foo/bar.bin").unwrap();
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        )));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn appended_suffix_removal_restores_exact_source_bytes() {
+        let (source, _first, _second) = two_part_source(b"suffix removal");
+        let appended_name = PackURI::new("/custom/appended.bin").unwrap();
+        let mut appended_part = crate::BlobPart::new(
+            appended_name.clone(),
+            "application/octet-stream".to_owned(),
+            b"temporary appended payload".to_vec(),
+        );
+        Part::relate_to_ext(
+            &mut appended_part,
+            "https://example.com/temporary",
+            "urn:temporary",
+        );
+
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open append source");
+        package.add_part(Box::new(appended_part));
+        let appended = PackageWriter::to_bytes(&package).expect("publish appended suffix");
+        assert_ne!(appended, source);
+
+        let mut reopened = OpcPackage::from_vec(appended).expect("reopen appended suffix");
+        assert!(reopened.remove_part(&appended_name));
+        let restored = PackageWriter::to_bytes(&reopened).expect("remove appended suffix");
+
+        assert_eq!(restored, source);
+    }
+
+    #[test]
+    fn non_suffix_part_and_relationship_removals_preserve_retained_members() {
+        let (source, first, second) = two_part_source(b"topology removal");
+        let source_raw = raw_archive(&source);
+
+        let mut removed = OpcPackage::from_vec(source.clone()).expect("open remove source");
+        assert!(removed.remove_part(&first));
+        let removed_output = PackageWriter::to_bytes(&removed).expect("publish removed part");
+        let removed_raw = raw_archive(&removed_output);
+        assert_eq!(removed_raw.comment, source_raw.comment);
+        assert_eq!(
+            removed_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&removed_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let reopened_removed =
+            OpcPackage::from_bytes(&removed_output).expect("reopen removed part output");
+        assert!(!reopened_removed.contains_part(&first));
+        assert!(reopened_removed.contains_part(&second));
+
+        let mut removed_relationship =
+            OpcPackage::from_vec(source).expect("open relationship removal source");
+        assert!(
+            removed_relationship
+                .get_part_mut(&first)
+                .unwrap()
+                .rels_mut()
+                .remove("rId1")
+                .is_some()
+        );
+        let relationship_output =
+            PackageWriter::to_bytes(&removed_relationship).expect("publish relationship removal");
+        let relationship_raw = raw_archive(&relationship_output);
+        assert_eq!(relationship_raw.comment, source_raw.comment);
+        assert_eq!(
+            relationship_raw.local_members[first.membername()],
+            source_raw.local_members[first.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&relationship_raw.central_records[first.membername()]),
+            central_without_local_offset(&source_raw.central_records[first.membername()])
+        );
+        let reopened_relationship =
+            OpcPackage::from_bytes(&relationship_output).expect("reopen relationship output");
+        assert!(
+            reopened_relationship
+                .get_part(&first)
+                .expect("retained first part")
+                .rels()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn adding_relationship_member_to_existing_part_preserves_and_appends() {
+        let (source, _first, second) = two_part_source(b"relationship presence addition");
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open relationship source");
+        package
+            .get_part_mut(&second)
+            .unwrap()
+            .relate_to_ext("https://example.com", "urn:new");
+        let output = PackageWriter::to_bytes(&package).expect("publish relationship addition");
+        let output_raw = raw_archive(&output);
+        assert_eq!(output_raw.comment, source_raw.comment);
+        assert_eq!(
+            &output_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.local_order[source_raw.local_order.len()..],
+            ["custom/_rels/second.bin.rels"]
+        );
+        assert_eq!(
+            &output_raw.central_order[source_raw.central_order.len()..],
+            ["custom/_rels/second.bin.rels"]
+        );
+        for name in &source_raw.local_order {
+            assert_eq!(
+                output_raw.local_members[name], source_raw.local_members[name],
+                "{name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_raw.central_records[name]),
+                central_without_local_offset(&source_raw.central_records[name]),
+                "{name}"
+            );
+        }
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen relationship output");
+        let relationships = reopened.get_part(&second).unwrap().rels();
+        assert_eq!(relationships.len(), 1);
+        assert_eq!(
+            relationships.get("rId1").unwrap().target_ref(),
+            "https://example.com"
+        );
+    }
+
+    #[test]
+    fn replaced_content_types_token_is_published_on_every_route() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:item" Target="custom/item1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated("custom/item1.xml", b"<item/>")
+            .unwrap();
+        let source = writer.finish_to_bytes().unwrap();
+        let item = PackURI::new("/custom/item1.xml").unwrap();
+        for preserve in [true, false] {
+            let mut package = if preserve {
+                OpcPackage::from_vec(source.clone()).unwrap()
+            } else {
+                OpcPackage::from_bytes(&source).unwrap().clone()
+            };
+            assert_eq!(package.preservation_source().is_some(), preserve);
+            // The override repeats the type the Default already gives, so the
+            // token describes every part exactly as the source manifest did;
+            // only its bytes differ.
+            let current = package.source_content_types().unwrap();
+            let replacement = current
+                .with_part_overrides(&[(&item, "application/xml")], 1 << 20)
+                .unwrap();
+            assert_ne!(replacement.bytes(), current.bytes());
+            assert!(
+                package
+                    .try_replace_content_types(current.bytes(), &replacement)
+                    .unwrap()
+            );
+
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            let published = soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read("[Content_Types].xml")
+                .unwrap();
+            assert_eq!(published, replacement.bytes(), "preserve={preserve}");
+            let mut streamed = Vec::new();
+            PackageWriter::write_to_stream(&mut streamed, &package).unwrap();
+            assert_eq!(streamed, output, "preserve={preserve}");
+        }
+    }
+
+    #[test]
+    fn topology_add_with_unknown_non_part_refuses_normalization() {
+        let (source, _first) = source_with_non_part_framing();
+        let mut package = OpcPackage::from_vec(source).expect("open unknown-member source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/third.bin").unwrap(),
+            "application/octet-stream".to_owned(),
+            b"third".to_vec(),
+        )));
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn unsupported_prefixed_source_refuses_normalization_before_output() {
+        let (source, first, _second) = two_part_source(b"prefixed fallback");
+        let mut prefixed = b"unsupported ZIP prelude".to_vec();
+        prefixed.extend_from_slice(&source);
+        let mut package = OpcPackage::from_vec(prefixed.clone()).expect("open prefixed OPC");
+        assert!(package.preservation_source().is_some());
+        assert_eq!(
+            PackageWriter::to_bytes(&package).expect("exact prefixed copy"),
+            prefixed
+        );
+        package
+            .get_part_mut(&first)
+            .unwrap()
+            .set_blob(b"changed".to_vec());
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("unsupported source framing must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn unsupported_owned_source_revoked_noop_refuses_before_output() {
+        let (source, _first, _second) = two_part_source(b"prefixed no-op");
+        let mut prefixed = b"unsupported ZIP prelude".to_vec();
+        prefixed.extend_from_slice(&source);
+        let mut package = OpcPackage::from_vec(prefixed).expect("open prefixed OPC");
+        let options = package.save_options().clone();
+        package.set_save_options(options);
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("unsupported source framing must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn trailing_source_bytes_refuse_normalization_before_targeted_preservation() {
+        let (source, first, _second) = two_part_source(b"trailing fallback");
+        let mut suffixed = source;
+        suffixed.extend_from_slice(b"trailing bytes outside EOCD");
+        let mut package = OpcPackage::from_vec(suffixed).expect("open suffixed OPC");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(b"changed payload".to_vec());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn zip64_source_targeted_save_preserves_untouched_records_and_tail() {
+        let (source, first, second) = two_part_source(b"ZIP64 targeted save");
+        let source = add_zip64_tail_extension(promote_to_zip64(source), &[0xa1, 0xb2, 0xc3, 0xd4]);
+        let source_raw = raw_archive(&source);
+        assert!(
+            soapberry_zip::ZipArchive::from_slice(&source)
+                .unwrap()
+                .is_zip64()
+        );
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open ZIP64 OPC");
+        let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
+        assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
+        package
+            .get_part_mut(&first)
+            .unwrap()
+            .set_blob(b"ZIP64 changed".to_vec());
+
+        let output = PackageWriter::to_bytes(&package).expect("targeted ZIP64 save");
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(
+            zip64_tail_extensible_data(&output),
+            [0xa1, 0xb2, 0xc3, 0xd4]
+        );
+        assert_eq!(output_archive.comment().as_bytes(), b"ZIP64 targeted save");
+
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            output_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&output_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen targeted ZIP64 save");
+        assert_eq!(reopened.get_part(&first).unwrap().blob(), b"ZIP64 changed");
+        assert_eq!(reopened.get_part(&second).unwrap().blob(), untouched_second);
+
+        let mut output = Vec::new();
+        PackageWriter::write_to_stream(&mut output, &package).expect("targeted ZIP64 stream save");
+        assert_eq!(output, PackageWriter::to_bytes(&package).unwrap());
+    }
+
+    #[test]
+    fn zip64_targeted_stream_failure_reports_partial_output() {
+        let (source, first, _second) = two_part_source(b"ZIP64 sink failure");
+        let source = promote_to_zip64(source);
+        let mut package = OpcPackage::from_vec(source).expect("open ZIP64 sink source");
+        package
+            .get_part_mut(&first)
+            .unwrap()
+            .set_blob(b"ZIP64 changed before sink failure".to_vec());
+
+        let error = PackageWriter::write_to_stream(
+            FailAfter {
+                written: 0,
+                limit: 70_000,
+            },
+            &package,
+        )
+        .expect_err("ZIP64 sink must reject targeted output");
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput { written, .. } if written == 70_000
+        ));
+    }
+
+    #[test]
+    fn projected_zip64_descriptor_targeted_save_preserves_untouched_member() {
+        let (source, first, second) = two_part_source(b"projected ZIP64 targeted save");
+        let source = promote_member_to_zip64_descriptor(source, second.membername());
+        let source_raw = raw_archive(&source);
+        let archive = soapberry_zip::ZipArchive::from_slice(&source).expect("open projected ZIP64");
+        assert!(!archive.is_zip64());
+        assert!(archive.entries().any(|entry| {
+            let entry = entry.expect("central entry");
+            entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
+        }));
+
+        let mut package = OpcPackage::from_vec(source).expect("open projected ZIP64 OPC");
+        let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(b"projected ZIP64 changed".to_vec());
+
+        let output = PackageWriter::to_bytes(&package).expect("targeted projected ZIP64 save");
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            output_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&output_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.entries().any(|entry| {
+            let entry = entry.expect("central entry");
+            entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
+        }));
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen projected ZIP64 save");
+        assert_eq!(
+            reopened.get_part(&first).expect("changed part").blob(),
+            b"projected ZIP64 changed"
+        );
+        assert_eq!(
+            reopened.get_part(&second).expect("untouched part").blob(),
+            untouched_second
+        );
+
+        let mut streamed = Vec::new();
+        PackageWriter::write_to_stream(&mut streamed, &package)
+            .expect("targeted projected ZIP64 stream save");
+        assert_eq!(streamed, output);
+    }
+
+    #[test]
+    fn rejects_invalid_part_content_type_before_writing() {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/data.bin").unwrap(),
+            "application/octet-stream (comment)".to_string(),
+            Vec::new(),
+        )));
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::InvalidContentType { .. })
+        ));
+    }
+
+    /// Every XML part name the publication audit recognizes is still audited
+    /// for the structural defects that would corrupt the published archive,
+    /// whoever authored its bytes.
+    #[test]
+    fn refuses_malformed_authored_xml_bytes_before_publication() {
+        for (part_name, content_type) in [
+            ("/custom/manifest.rdf", "application/octet-stream"),
+            ("/custom/metadata", "application/rdf+xml"),
+            (
+                "/_xmlsignatures/sig1.bin",
+                "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+            ),
+        ] {
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                content_type.to_string(),
+                b"<root><child/>".to_vec(),
+            )));
+
+            assert!(matches!(
+                PackageWriter::to_bytes(&package),
+                Err(crate::OpcError::XmlPublication { part, .. }) if part == part_name
+            ));
+        }
+    }
+
+    /// Change 0665: no member is refused for its spelling on this route any
+    /// more. Each of these four payloads is one of the compactness verdicts
+    /// change 0654 enumerated, and each one publishes here byte for byte.
+    #[test]
+    fn publishes_every_noncompact_spelling_the_authored_contract_refuses() {
+        for payload in [
+            b"<?xml version=\"1.0\"?>\r\n<root>\n  <child/>\n</root>".as_slice(),
+            b"<root> <child/></root>".as_slice(),
+            b"<root a=\"1\"\n      b=\"2\"/>".as_slice(),
+            b"<root a=\"1\" />".as_slice(),
+        ] {
+            let part_name = "/custom/metadata.xml";
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                ct::XML.to_owned(),
+                payload.to_vec(),
+            )));
+
+            let published = PackageWriter::to_bytes(&package).expect("non-compact XML publishes");
+            let reopened = OpcPackage::from_vec(published).expect("published package reopens");
+            let uri = PackURI::new(part_name).expect("valid part URI");
+            assert_eq!(
+                reopened.get_part(&uri).expect("part survives").blob(),
+                payload,
+                "the published member must carry the payload byte for byte",
+            );
+        }
+    }
+
+    /// The members this writer serializes itself stay byte-minimal. The
+    /// contract is no longer a publication refusal (change 0665), so it is
+    /// asserted here and by the debug assertion in
+    /// [`PackageWriter::audit_authored_xml`].
+    #[test]
+    fn every_member_this_writer_authors_is_compact() {
+        let mut package = OpcPackage::new();
+        let part_name = PackURI::new("/custom/metadata.xml").expect("valid part URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            part_name.clone(),
+            ct::XML.to_owned(),
+            b"<root>\n  <child/>\n</root>".to_vec(),
+        )));
+        package
+            .rels_mut()
+            .get_or_add("urn:test:reltype", "/custom/metadata.xml");
+        package
+            .get_part_mut(&part_name)
+            .expect("part exists")
+            .relate_to("/custom/metadata.xml", "urn:test:selfref");
+
+        let plan = PublicationPlan::from_package(&package).expect("plan builds");
+        let limits = xml_minifier::audit::Limits::default();
+        let mut audited = 0_usize;
+        for (name, bytes) in [
+            (
+                "[Content_Types].xml",
+                plan.content_types_xml
+                    .as_ref()
+                    .expect("manifest is serialized")
+                    .bytes(),
+            ),
+            (
+                "_rels/.rels",
+                plan.package_rels_xml
+                    .as_ref()
+                    .expect("package relationships are serialized")
+                    .bytes(),
+            ),
+        ] {
+            let _report =
+                xml_minifier::audit::verify_authored(bytes, limits).unwrap_or_else(|error| {
+                    panic!("member '{name}' this writer authored is not compact: {error}")
+                });
+            audited += 1;
+        }
+        for part in &plan.parts {
+            let relationships = part
+                .relationships
+                .as_ref()
+                .expect("the part carries a serialized relationships member");
+            let _report =
+                xml_minifier::audit::verify_authored(relationships.xml.as_slice(), limits)
+                    .unwrap_or_else(|error| {
+                        panic!(
+                            "member '{}' this writer authored is not compact: {error}",
+                            relationships.uri.as_str()
+                        )
+                    });
+            audited += 1;
+        }
+        assert!(
+            PackageWriter::to_bytes(&package).is_ok(),
+            "the non-compact part payload still publishes",
+        );
+        assert_eq!(audited, 3, "manifest, package .rels and the part .rels");
+    }
+
+    /// Every refusal family change 0654 kept for original bytes is kept here
+    /// too, and each one still precedes every emitted byte.
+    #[test]
+    fn every_structural_encoding_doctype_and_budget_refusal_survives_with_no_output() {
+        let oversized_token = format!("<root a=\"{}\"/>", "a".repeat(4 * 1024 * 1024 + 1));
+        let cases: [(&str, Vec<u8>); 10] = [
+            ("unclosed root", b"<root>".to_vec()),
+            ("two document elements", b"<a/><b/>".to_vec()),
+            ("mismatched end tag", b"<a></b>".to_vec()),
+            ("character data outside the root", b"text<a/>".to_vec()),
+            ("CDATA outside the root", b"<![CDATA[x]]><a/>".to_vec()),
+            ("a document type declaration", b"<!DOCTYPE a><a/>".to_vec()),
+            ("an attribute with no value", b"<a b/>".to_vec()),
+            ("an invalid xml:space", b"<a xml:space=\"maybe\"/>".to_vec()),
+            ("an empty document", Vec::new()),
+            ("a token over the budget", oversized_token.into_bytes()),
+        ];
+        let invalid_utf8 = {
+            let mut bytes = b"<root>".to_vec();
+            bytes.push(0xff);
+            bytes.extend_from_slice(b"</root>");
+            bytes
+        };
+        for (label, payload) in cases.into_iter().chain([("invalid UTF-8", invalid_utf8)]) {
+            let mut package = OpcPackage::new();
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new("/custom/metadata.xml").expect("valid part URI"),
+                ct::XML.to_owned(),
+                payload,
+            )));
+            let mut sink = ChunkSink {
+                total: 0,
+                writes: 0,
+                largest: 0,
+                limit: usize::MAX,
+            };
+            let Err(error) = PackageWriter::write_to_stream(&mut sink, &package) else {
+                panic!("{label} must be refused before publication");
+            };
+            assert!(
+                matches!(
+                    &error,
+                    crate::OpcError::XmlPublication { part, .. }
+                        if part == "/custom/metadata.xml"
+                ),
+                "{label} must keep the publication refusal, got {error:?}"
+            );
+            assert!(
+                !matches!(
+                    &error,
+                    crate::OpcError::XmlPublication {
+                        source: xml_minifier::audit::Error::NotCompact(_),
+                        ..
+                    }
+                ),
+                "{label} must not be a compactness verdict"
+            );
+            assert_eq!(sink.total, 0, "{label} emitted bytes");
+            assert_eq!(sink.writes, 0, "{label} reached the sink");
+        }
+    }
+
+    #[test]
+    fn publication_plan_failure_leaves_sequential_sink_untouched() {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/metadata.xml").expect("valid part URI"),
+            ct::XML.to_owned(),
+            b"<root><child/>".to_vec(),
+        )));
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: usize::MAX,
+        };
+
+        let error = PackageWriter::write_to_stream(&mut sink, &package)
+            .expect_err("authored XML must fail publication planning");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::XmlPublication { part, .. }
+                if part == "/custom/metadata.xml"
+        ));
+        assert_eq!(sink.total, 0);
+        assert_eq!(sink.writes, 0);
+    }
+
+    #[test]
+    fn exact_source_xml_bytes_may_remain_opaque() {
+        let content_types = br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/manifest.rdf" ContentType="application/rdf+xml"/></Types>"#;
+        let relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+        let source_rdf = b"<rdf:RDF xmlns:rdf=\"urn:test\">\n <rdf:Description/>\n</rdf:RDF>";
+        let mut physical = PhysPkgWriter::new();
+        physical
+            .write(
+                &PackURI::new("/[Content_Types].xml").expect("content-types URI"),
+                content_types,
+            )
+            .expect("write content types");
+        physical
+            .write(
+                &PackURI::new("/_rels/.rels").expect("relationship URI"),
+                relationships,
+            )
+            .expect("write relationships");
+        physical
+            .write(
+                &PackURI::new("/custom/manifest.rdf").expect("RDF URI"),
+                source_rdf,
+            )
+            .expect("write source RDF");
+        let source = physical.finish().expect("finish source package");
+
+        let package = OpcPackage::from_vec(source).expect("open source package");
+        let rewritten = PackageWriter::to_bytes(&package).expect("preserve source RDF");
+        let rewritten_physical = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(rewritten)
+            .expect("open rewritten package");
+        assert_eq!(
+            rewritten_physical
+                .read_member("custom/manifest.rdf")
+                .expect("read rewritten RDF"),
+            source_rdf
+        );
+    }
+
+    #[test]
+    fn real_package_enumeration_covers_all_xml_bearing_members() {
+        let mut package = OpcPackage::new();
+        for (part_name, content_type, payload) in [
+            (
+                "/custom/manifest.rdf",
+                "application/rdf+xml",
+                b"<rdf:RDF xmlns:rdf=\"urn:test\"/>".as_slice(),
+            ),
+            (
+                "/custom/metadata",
+                "application/vnd.example.metadata+xml",
+                b"<metadata/>".as_slice(),
+            ),
+            (
+                "/_xmlsignatures/sig1.xml",
+                "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+                b"<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"/>".as_slice(),
+            ),
+        ] {
+            package.add_part(Box::new(crate::BlobPart::new(
+                PackURI::new(part_name).expect("valid part URI"),
+                content_type.to_string(),
+                payload.to_vec(),
+            )));
+        }
+        let bytes = PackageWriter::to_bytes(&package).expect("publish package");
+        let physical =
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(bytes).expect("open published package");
+        let mut audited = Vec::new();
+        for name in physical.member_names().expect("enumerate members") {
+            let media_type = match name.as_str() {
+                "custom/metadata" => "application/vnd.example.metadata+xml",
+                "custom/manifest.rdf" => "application/rdf+xml",
+                "_xmlsignatures/sig1.xml" => {
+                    "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"
+                },
+                _ => "application/octet-stream",
+            };
+            if xml_minifier::audit::package::is_xml_part(&name, media_type) {
+                let payload = physical.read_member(&name).expect("read XML member");
+                let _report = xml_minifier::audit::verify_authored(
+                    &payload,
+                    xml_minifier::audit::Limits::default(),
+                )
+                .expect("emitted XML is compact");
+                audited.push(name);
+            }
+        }
+        audited.sort();
+        assert_eq!(
+            audited,
+            [
+                "[Content_Types].xml",
+                "_rels/.rels",
+                "_xmlsignatures/sig1.xml",
+                "custom/manifest.rdf",
+                "custom/metadata",
+            ]
+        );
+    }
+
+    #[test]
+    fn streams_large_packages_to_a_non_seekable_bounded_chunk_sink() {
+        let mut state = 0x9e37_79b9_u32;
+        let mut payload = Vec::with_capacity(2 * 1024 * 1024);
+        while payload.len() < payload.capacity() {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            payload.push((state >> 24) as u8);
+        }
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/random.bin").expect("valid part URI"),
+            "application/octet-stream".to_owned(),
+            payload,
+        )));
+        let mut sink = ChunkSink {
+            total: 0,
+            writes: 0,
+            largest: 0,
+            limit: 64 * 1024,
+        };
+
+        PackageWriter::write_to_stream(&mut sink, &package).expect("stream package");
+
+        assert!(sink.total > 1024 * 1024);
+        assert!(sink.writes > 1);
+        assert!(sink.largest <= sink.limit);
+    }
+
+    #[test]
+    fn incomplete_stream_errors_report_accepted_bytes() {
+        let package = OpcPackage::new();
+        let sink = FailAfter {
+            written: 0,
+            limit: 128,
+        };
+
+        let error = PackageWriter::write_to_stream(sink, &package)
+            .expect_err("bounded sink must reject the package");
+
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput {
+                written: 128,
+                source,
+            } if matches!(*source, crate::OpcError::ZipError(_))
+        ));
+    }
+
+    #[test]
+    fn filesystem_write_replaces_only_with_a_finalized_package() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("package.xlsx");
+        std::fs::write(&destination, b"previous artifact").expect("seed destination");
+        let mut package = OpcPackage::new();
+        let partname = PackURI::new("/custom/data.bin").expect("valid part URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            partname.clone(),
+            "application/octet-stream".to_owned(),
+            b"payload".to_vec(),
+        )));
+
+        PackageWriter::write(&destination, &package).expect("atomic package write");
+
+        let reopened = OpcPackage::open(destination).expect("reopen package");
+        assert_eq!(
+            reopened.get_part(&partname).expect("saved part").blob(),
+            b"payload"
+        );
+    }
+
+    #[test]
+    fn invalid_packages_never_replace_an_existing_artifact() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("package.xlsx");
+        std::fs::write(&destination, b"previous artifact").expect("seed destination");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/data.bin").expect("valid part URI"),
+            "invalid content type".to_owned(),
+            Vec::new(),
+        )));
+
+        let result = PackageWriter::write(&destination, &package);
+
+        assert!(matches!(
+            result,
+            Err(crate::OpcError::InvalidContentType { .. })
+        ));
+        assert_eq!(
+            std::fs::read(destination).expect("read destination"),
+            b"previous artifact"
+        );
+    }
+}

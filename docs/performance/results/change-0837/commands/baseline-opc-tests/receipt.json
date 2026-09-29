@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790686717.817413,
+  "log": {
+    "bytes": 97785,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/baseline-opc-tests/output.log",
+    "sha256": "8bd18d5b48308485f4d3d8ced14d9dbb561fd045a0cea2112526cdc14c6407b4"
+  },
+  "started_unix": 1790686675.0521386
+}

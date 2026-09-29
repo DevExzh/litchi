@@ -1,0 +1,9 @@
+{
+  "mechanism": "Applied production hunks with git apply --recount; inserted additive test lines before unique with_eocd_comment anchor; cargo fmt. Original draft and unsuccessful context correction retained.",
+  "patch": {
+    "bytes": 10804,
+    "path": "docs/performance/results/change-0837/candidate-applied.patch",
+    "sha256": "ebc630eb5babbdeffd38bba6d510f5065f9d8ca7fee2ea2dd12ce7518dc86791"
+  },
+  "status": "applied"
+}

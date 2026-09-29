@@ -1,0 +1,220 @@
+{
+  "baseline_preflight_reports": 6,
+  "baseline_preflight_samples": 12,
+  "commands": [
+    {
+      "exit_code": 101,
+      "label": "baseline-interruption-regression"
+    },
+    {
+      "exit_code": 0,
+      "label": "baseline-opc-tests"
+    },
+    {
+      "exit_code": 101,
+      "label": "build-baseline"
+    },
+    {
+      "exit_code": 0,
+      "label": "build-baseline-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-focused"
+    },
+    {
+      "exit_code": 101,
+      "label": "candidate-focused-applied"
+    },
+    {
+      "exit_code": 0,
+      "label": "candidate-focused-interruption-fix"
+    },
+    {
+      "exit_code": 101,
+      "label": "candidate-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-interruption-regression"
+    },
+    {
+      "exit_code": 101,
+      "label": "final-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-boundaries"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-check"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-clippy"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-doc"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "final-v2-tests"
+    },
+    {
+      "exit_code": 0,
+      "label": "inverse-diagnostic-replay"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-borrowed-edit"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-fresh-many"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-fresh-random"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-fresh-small"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-fresh-xml"
+    },
+    {
+      "exit_code": 0,
+      "label": "preflight-baseline-owned-edit"
+    },
+    {
+      "exit_code": 0,
+      "label": "prepare-fixtures"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-fmt"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-format-v2"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock"
+    },
+    {
+      "exit_code": 0,
+      "label": "probe-lock-v2"
+    }
+  ],
+  "comparative_reports": 0,
+  "comparative_samples": 0,
+  "final_source_delta": [
+    "crates/soapberry-zip/src/office.rs",
+    "crates/soapberry-zip/tests/streaming_interrupted_write.rs"
+  ],
+  "fixture": {
+    "bytes": 498483,
+    "members": 3,
+    "raw_sha256": "3d013d8d3a2d80e13238cca1d5852bb32af8de67c59070d8489b1885dc9ea19f"
+  },
+  "performance_claim": "none; candidate rejected before capture",
+  "rejected_source_delta": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-opc/src/pkgwriter.rs",
+    "crates/soapberry-zip/src/office.rs",
+    "crates/soapberry-zip/tests/streaming_interrupted_write.rs"
+  ],
+  "status": "pass",
+  "tests": {
+    "baseline-interruption-regression": {
+      "failed": 1,
+      "ignored": 0,
+      "passed": 0
+    },
+    "baseline-opc-tests": {
+      "failed": 0,
+      "ignored": 1,
+      "passed": 966
+    },
+    "candidate-focused": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 2
+    },
+    "candidate-focused-applied": {
+      "failed": 1,
+      "ignored": 0,
+      "passed": 3
+    },
+    "candidate-focused-interruption-fix": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "candidate-tests": {
+      "failed": 1,
+      "ignored": 1,
+      "passed": 1559
+    },
+    "final-interruption-regression": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 1
+    },
+    "final-tests": {
+      "failed": 11,
+      "ignored": 38,
+      "passed": 6840
+    },
+    "final-v2-tests": {
+      "failed": 0,
+      "ignored": 38,
+      "passed": 6847
+    }
+  }
+}

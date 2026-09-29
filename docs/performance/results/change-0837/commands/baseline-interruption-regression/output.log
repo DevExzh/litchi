@@ -1,0 +1,45 @@
+   Compiling memchr v2.8.3
+   Compiling typenum v1.20.1
+   Compiling aho-corasick v1.1.5
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling regex-automata v0.4.18
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling digest v0.10.7
+   Compiling futures-macro v0.3.31
+   Compiling regex v1.13.1
+   Compiling futures-util v0.3.31
+   Compiling env_logger v0.8.4
+   Compiling rstest_macros v0.26.1
+   Compiling sha2 v0.10.9
+   Compiling rand v0.8.8
+   Compiling once_cell v1.21.4
+   Compiling tempfile v3.27.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling rstest v0.26.1
+   Compiling quickcheck v1.0.3
+   Compiling quickcheck_macros v1.1.0
+    Finished `test` profile [unoptimized] target(s) in 5.54s
+     Running tests/streaming_interrupted_write.rs (/home/zhuhe/code/litchi-target-0837/debug/deps/streaming_interrupted_write-e4c7e0b12590c07c)
+
+running 1 test
+test interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting ... FAILED
+
+failures:
+
+---- interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting stdout ----
+
+thread 'interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting' (3296531) panicked at crates/soapberry-zip/tests/streaming_interrupted_write.rs:54:21:
+assertion failed: !entry.is_poisoned()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    interrupted_owned_payload_writes_resume_without_poisoning_or_double_counting
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p soapberry-zip --test streaming_interrupted_write`

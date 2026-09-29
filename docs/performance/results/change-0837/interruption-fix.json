@@ -1,0 +1,14 @@
+{
+  "failure": {
+    "bytes": 502,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/candidate-focused-applied/receipt.json",
+    "sha256": "0608012c5bf8317fc9476577650293cf0d68da83d33b092035a18365f372ed45"
+  },
+  "passing": {
+    "bytes": 509,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/candidate-focused-interruption-fix/receipt.json",
+    "sha256": "8c60d86e0cb8ed45f847d14b25e05679beada8957f536071cceed013bf26805d"
+  },
+  "scope": "StreamingArchiveEntry::write retains lower owned-entry retry-safe Interrupted behavior, refreshes progress, and keeps hard-error poisoning. Added direct Store/Deflate interruption accounting regression. Explicit flush handling unchanged.",
+  "status": "focused OPC test passed"
+}

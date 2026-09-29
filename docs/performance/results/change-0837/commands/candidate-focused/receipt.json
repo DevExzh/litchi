@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "--lib",
+    "fresh_"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "exit_code": 0,
+  "finished_unix": 1790687401.9869585,
+  "log": {
+    "bytes": 519,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/candidate-focused/output.log",
+    "sha256": "556f16522b71cc6c4b43f7b4f12743772b09d1f6557f8bb793e440dff7e1786a"
+  },
+  "started_unix": 1790687401.8643968
+}

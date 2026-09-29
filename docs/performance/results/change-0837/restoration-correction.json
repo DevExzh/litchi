@@ -1,0 +1,17 @@
+{
+  "files": [
+    {
+      "mtime_ns": 1790471859483367996,
+      "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/package.rs",
+      "sha256": "98b86459e5d8ca5bf0ef72d0d5a9c04408ee754d78ded789b7ac9e62cfdca98e"
+    },
+    {
+      "mtime_ns": 1790471859484368000,
+      "path": "/home/zhuhe/code/litchi/crates/litchi-opc/src/pkgwriter.rs",
+      "sha256": "eea4f1bef388d19a68d2dd8fd66fffec1879dfa83f2e6104c88429e118cbdf7d"
+    }
+  ],
+  "invalid_final_prefix": "final-",
+  "reason": "shutil.copy2 restoration kept baseline timestamps older than candidate compilation. Cargo reused candidate artifacts; final-* gates cannot establish final source behavior.",
+  "required_action": "After terminal process, refresh mtimes of restored OPC files and rerun all gates with final-v2-* labels. Content remains restored baseline."
+}

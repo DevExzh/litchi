@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0837 — ZIP retry fix; fresh compression rejected
+
+[0837](0837-zip-interrupted-write-and-fresh-compression.md) makes a bounded correctness fix and rejects a compression optimization before comparative capture because exact durable inverse restoration fails. Candidate source, diagnostic ZIP artifacts and failure receipts remain retained. The affected-owner final gates, red/green regression and cleanup are recorded in the packet; broader non-iWork performance work remains open.
+
 ## 0836 — OPC source save CPU and durability diagnosis
 
 [0836](0836-opc-filesystem-save-profile.md) completes 34 reports / 444 measured outputs on unchanged source. Ordinary save p50 is 77.123311 ms warm and 144.921409 ms verified cold. Independent mmap/ELF replay confirms 1,863–1,886 overlay samples per capture, with Deflate the largest observed stack group. Unknown frames keep CPU fractions withheld. All 32 traced children have the three-call atomic publication sequence; sixteen cold-preparation fsyncs remain separate. No production optimization is claimed; changed-Part compression is the next measured target.

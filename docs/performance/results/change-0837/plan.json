@@ -1,0 +1,53 @@
+{
+  "adoption": {
+    "fresh_size_growth_review_threshold": 1.01,
+    "latency_ratio_review_threshold": 1.05,
+    "minimum_material_improvement_ratio": 0.95,
+    "opened_output": "byte identical to baseline on same pinned source fixture",
+    "rss_ratio_review_threshold": 1.05,
+    "semantic": "all logical member names and payload bytes identical across legs"
+  },
+  "authority": "0758 owner decision4; 0762 existing authored codec protocol; source_ingress distinguishes borrowed and owned opens from new packages.",
+  "base": "1df3e5d38c20587dc8d025ab669982ef5a54b2d2",
+  "blocks": 6,
+  "cases": [
+    "fresh-small",
+    "fresh-xml",
+    "fresh-many",
+    "fresh-random",
+    "borrowed-edit",
+    "owned-edit"
+  ],
+  "cpu": 12,
+  "hypothesis": "Route fresh-only OPC publication through the existing staged level-5 owned-part writer, reducing Deflate work while preserving all opened-package output bytes.",
+  "limits": [
+    "No before/after claim for0836source filesystem save.",
+    "Compression policy changes only newly constructed source_ingress=false packages.",
+    "No physical filesystem, cold-cache, concurrency or live-allocation claim.",
+    "Rejected candidates must be removed while retaining evidence."
+  ],
+  "measured_operations": 1440,
+  "order": "forward cases/baseline-candidate on even blocks; reverse cases/candidate-baseline on odd blocks",
+  "process_scope": "One fresh process per report; twenty repeated operations after three warmups; peak RSS includes graph preparation and verification",
+  "quality": [
+    "baseline OPC suite",
+    "candidate OPC suite and focused fresh/source/error tests",
+    "candidate soapberry-zip and OOXML dependent tests",
+    "format/check/warning-denied clippy/rustdoc/boundaries"
+  ],
+  "reports": 72,
+  "samples": 20,
+  "statistics": {
+    "bootstrap": 10000,
+    "endpoints": [
+      249,
+      9749
+    ],
+    "p50": "integer midpoint for each20sample row; median of six matched candidate/baseline ratios",
+    "p95": "nearest rank",
+    "p99": "maximum at20samples",
+    "seed": 837083
+  },
+  "timer": "PackageWriter::to_bytes on an already prepared package; fixture construction, decompression validation, output hashing and output drop outside elapsed interval",
+  "warmup": 3
+}

@@ -1,0 +1,15 @@
+{
+  "probe_lock": {
+    "bytes": 26095,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/probe/Cargo.lock",
+    "sha256": "cda262d81d458e5a052cdb4f5327d64bc34175d4886abdb1b0de8e2d094e2123"
+  },
+  "scope": "All probe registry versions/checksums are drawn from the workspace lock; standalone root dependency graph only.",
+  "shared_registry_packages": 108,
+  "status": "pass",
+  "workspace_lock": {
+    "bytes": 138443,
+    "path": "/home/zhuhe/code/litchi/Cargo.lock",
+    "sha256": "d80aa535dcf880a85fa31e92fe2e5ce78b91d93a55953ae734e513aed83e0061"
+  }
+}

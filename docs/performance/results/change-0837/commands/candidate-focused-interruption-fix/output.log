@@ -1,0 +1,13 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 6.95s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0837/debug/deps/litchi_opc-5e5ec62e7ad589c6)
+
+running 4 tests
+test package::compressed_transfer::tests::a_zip64_framed_member_transfers_with_fresh_zip32_framing ... ok
+test package::compressed_transfer::tests::a_deflated_member_transfers_its_exact_compressed_span_in_fresh_sized_framing ... ok
+test pkgwriter::tests::fresh_to_bytes_matches_stream_with_short_interrupted_sink ... ok
+test pkgwriter::tests::fresh_publication_uses_owned_staging_and_keeps_logical_payload ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 602 filtered out; finished in 0.03s
+

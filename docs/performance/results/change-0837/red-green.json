@@ -1,0 +1,17 @@
+{
+  "baseline": "expected runtime assertion failure: retryable Interrupted poisoned bounded entry",
+  "final": "Store and Deflate payload retries, byte accounting and readback pass",
+  "receipts": [
+    {
+      "bytes": 535,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/baseline-interruption-regression/receipt.json",
+      "sha256": "7faac66ee761ee32a98e5eeba6e3fc5c4f13a77b9e589d83306271166abf3b5a"
+    },
+    {
+      "bytes": 528,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0837/commands/final-interruption-regression/receipt.json",
+      "sha256": "ca9ad94b77f541fd84dc2b07c22c0cb91a78b88974e581a3179121570e0ba53a"
+    }
+  ],
+  "status": "pass"
+}

@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0837 — ZIP retry fix; fresh compression rejected
+
+[0837](0837-zip-interrupted-write-and-fresh-compression.md) keeps an eight-line bounded ZIP adapter fix and a Store/Deflate interruption regression. The fresh OPC compression candidate is reverted after a durable-inverse failure; logical member equality is insufficient for physical restoration. Six baseline preflight reports / twelve operations remain diagnostic only. No comparative performance claim is made.
+
 ## 0836 — OPC source save CPU and durability diagnosis
 
 [0836](0836-opc-filesystem-save-profile.md) completes 34 reports / 444 measured outputs on unchanged source. Ordinary save p50 is 77.123311 ms warm and 144.921409 ms verified cold. Independent mmap/ELF replay confirms 1,863–1,886 overlay samples per capture, with Deflate the largest observed stack group. Unknown frames keep CPU fractions withheld. All 32 traced children have the three-call atomic publication sequence; sixteen cold-preparation fsyncs remain separate. No production optimization is claimed; changed-Part compression is the next measured target.

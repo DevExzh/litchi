@@ -1,0 +1,51 @@
+{
+  "all_elapsed_ns": [
+    65580,
+    27541,
+    22660
+  ],
+  "all_outputs_validated": true,
+  "case": "fresh-small",
+  "command": "run",
+  "elapsed_ns": [
+    27541,
+    22660
+  ],
+  "expected_output_sha256": "f74248cce83a99186bf49f2def87a7ee04bcbd67c7e2429873d7aeceea49d078",
+  "fixture_raw_sha256": null,
+  "input_semantic_sha256": "566fe41ad361e3d03c0e402fc13f1191dd31663739a313384b87b0194fb0d805",
+  "member_canonical_sha256": "38247c5d60c55292ef80ec649e814366720f785ab9806ef354bbf5fa19b0b963",
+  "members": [
+    {
+      "bytes": 293,
+      "name": "[Content_Types].xml",
+      "sha256": "4e1d88ebbdbb27ba5d3f7b5230ca3ad5f5c745d0a4864e34f66853d6939765fb"
+    },
+    {
+      "bytes": 268,
+      "name": "_rels/.rels",
+      "sha256": "f364b87cf853b541392db6648155f0efd0916a54181cab22adc0aae21eb25df7"
+    },
+    {
+      "bytes": 70,
+      "name": "custom/data.xml",
+      "sha256": "915a19d667e7741f174a723acbb4c0e8dccca41a71a54d13ac68f2902cb3c337"
+    }
+  ],
+  "output_bytes": 816,
+  "output_sha256": "f74248cce83a99186bf49f2def87a7ee04bcbd67c7e2429873d7aeceea49d078",
+  "output_stable_within_process": true,
+  "pid": 3229772,
+  "sample_elapsed_ns": [
+    27541,
+    22660
+  ],
+  "samples": 2,
+  "schema": "fresh-publication-v1",
+  "selected_xml_part": null,
+  "vm_hwm_bytes": 4149248,
+  "warmup": 1,
+  "warmup_elapsed_ns": [
+    65580
+  ]
+}
