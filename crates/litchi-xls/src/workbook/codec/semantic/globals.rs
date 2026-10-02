@@ -3,6 +3,7 @@
 use super::super::WorkbookGlobalsSink;
 use crate::defined_names::{DefinedNameSlot, LBL_RECORD_TYPE, NAME_CMT_RECORD_TYPE};
 use crate::error::{Error, Result};
+use crate::leniency::EncodingDefect;
 use crate::number_format::{DateSystem, Formatting};
 use crate::protection;
 use crate::records::{BofRecord, BoundSheetRecord, Encoding, SharedStringTable};
@@ -200,7 +201,15 @@ impl<R: Read + Seek> Workbook<R> {
                     // CodePage
                     if record.payload().len() >= 2 => {
                         let codepage = litchi_core::binary::read_u16_le_at(record.payload(), 0)?;
-                        *encoding = Encoding::from_codepage(codepage)?;
+                        let (selected, fell_back) = Encoding::from_codepage_or_fallback(codepage);
+                        if fell_back {
+                            tolerance.report_mut().record(
+                                EncodingDefect::UnsupportedCodePage,
+                                record_offset(record),
+                                u32::from(codepage),
+                            );
+                        }
+                        *encoding = selected;
                     },
                 0x0022
                     // Date1904
@@ -333,4 +342,10 @@ impl<R: Read + Seek> Workbook<R> {
 
         Ok(())
     }
+}
+
+/// A globals record's byte offset within the Workbook stream, saturated to
+/// the `u32` the tolerance report stores.
+fn record_offset(record: &litchi_biff::RecordRef<'_>) -> u32 {
+    u32::try_from(record.offset()).unwrap_or(u32::MAX)
 }

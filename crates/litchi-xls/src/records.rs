@@ -313,6 +313,27 @@ impl Encoding {
         }
     }
 
+    /// The encoding a `CODEPAGE` record selects, falling back the way Excel,
+    /// LibreOffice, and POI do when it names a page without an exact codec.
+    ///
+    /// Returns the encoding together with whether the fallback was taken. The
+    /// fallback is Windows-1252, the page MS-XLS assumes when no `CODEPAGE`
+    /// record is present; it decodes every byte, so text that the named page
+    /// would have decoded differently is read lossily rather than refused.
+    /// The caller records the substitution as
+    /// [`crate::EncodingDefect::UnsupportedCodePage`].
+    pub(crate) fn from_codepage_or_fallback(codepage: u16) -> (Self, bool) {
+        match Self::from_codepage(codepage) {
+            Ok(encoding) => (encoding, false),
+            Err(_) => (Self::fallback(), true),
+        }
+    }
+
+    /// Windows-1252, the default workbook code page.
+    pub(crate) fn fallback() -> Self {
+        Encoding::Codepage(Mbcs::WINDOWS_1252)
+    }
+
     /// Decode byte data using this encoding
     ///
     /// Record terminators are handled here while the shared codec performs
@@ -2217,6 +2238,19 @@ mod shared_string_tests {
         assert!(Encoding::from_codepage(437).is_err());
         assert!(Encoding::from_codepage(1201).is_err());
         assert!(Encoding::Utf16Le.decode(b"A").is_err());
+    }
+
+    #[test]
+    fn an_unsupported_codepage_falls_back_to_windows_1252() {
+        for page in [437_u16, 850, 1201, 0xFFFF] {
+            let (encoding, fell_back) = Encoding::from_codepage_or_fallback(page);
+            assert!(fell_back, "{page}");
+            // Windows-1252 is total: every byte decodes.
+            assert_eq!(encoding.decode(&[0x41, 0xE9, 0x80]).unwrap(), "Aé€");
+        }
+        for page in [1200_u16, 1252, 1251] {
+            assert!(!Encoding::from_codepage_or_fallback(page).1, "{page}");
+        }
     }
 
     #[test]

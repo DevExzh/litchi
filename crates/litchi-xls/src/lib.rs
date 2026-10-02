@@ -671,7 +671,8 @@ pub use header_footer_picture::HeaderFooterPicture;
 pub use interface_records::{InterfaceEnd, InterfaceHdr};
 pub use layout::{Column, Row};
 pub use leniency::{
-    CellFormatDefect, Defect, FormattingDefect, Leniency, ToleranceReport, ToleratedDefect,
+    CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, ToleranceReport,
+    ToleratedDefect,
 };
 pub use list_object::{
     CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,

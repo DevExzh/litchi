@@ -17,9 +17,8 @@
 //! bytes Excel and LibreOffice read past without complaint, so rejecting
 //! them would cost the caller a whole worksheet over metadata that cannot
 //! change what a conforming workbook means. Each substitutes the value
-//! documented on the corresponding [`CellFormatDefect`] variant. This class
-//! currently holds a single repair: substituting the default cell XF for a
-//! cell, row, or column `ixfe` that cannot format a cell.
+//! documented on the corresponding [`CellFormatDefect`] or [`EncodingDefect`]
+//! variant.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -162,6 +161,15 @@ pub enum CellFormatDefect {
 }
 
 impl CellFormatDefect {
+    /// The BIFF record type whose payload carried the defect, or `None` when
+    /// the carrying record varies per occurrence.
+    #[must_use]
+    pub fn record_type(self) -> Option<u16> {
+        match self {
+            CellFormatDefect::XfReference => None,
+        }
+    }
+
     /// A stable, allocation-free description of the defect class.
     #[must_use]
     pub fn description(self) -> &'static str {
@@ -173,11 +181,55 @@ impl CellFormatDefect {
     }
 }
 
+/// The class of text-encoding defect the reader repairs the way Excel and
+/// LibreOffice repair it.
+///
+/// Like [`CellFormatDefect`], every class here is repaired and recorded under
+/// every [`Leniency`] variant, including [`Leniency::Strict`]: the repair
+/// decodes text lossily instead of discarding the workbook, and BIFF8 stores
+/// almost all text as UTF-16 regardless.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum EncodingDefect {
+    /// The `CODEPAGE` record (MS-XLS 2.4.52) named a code page this reader
+    /// has no exact codec for.
+    ///
+    /// The raw value is kept in the report, and byte-stream text decodes
+    /// through Windows-1252 — the default `CODEPAGE` MS-XLS assumes when the
+    /// record is absent, and the page LibreOffice and POI fall back to. The
+    /// page is total, so every byte still decodes to some character.
+    UnsupportedCodePage,
+}
+
+impl EncodingDefect {
+    /// The BIFF record type whose payload carried the defect.
+    #[must_use]
+    pub fn record_type(self) -> Option<u16> {
+        match self {
+            EncodingDefect::UnsupportedCodePage => Some(CODEPAGE_RECORD),
+        }
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            EncodingDefect::UnsupportedCodePage => {
+                "CODEPAGE names a code page without a supported codec"
+            },
+        }
+    }
+}
+
+/// `CODEPAGE` (MS-XLS 2.4.52).
+const CODEPAGE_RECORD: u16 = 0x0042;
+
 /// One class of defect repaired while a workbook was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// a read may change about a workbook. [`Defect::CellFormat`] classes are
-/// repaired under every [`Leniency`] variant; [`Defect::Formatting`] classes
+/// a read may change about a workbook. [`Defect::CellFormat`] and
+/// [`Defect::Encoding`] classes are repaired under every [`Leniency`]
+/// variant; [`Defect::Formatting`] classes
 /// require [`Leniency::TolerateFormattingDefects`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -187,6 +239,8 @@ pub enum Defect {
     Formatting(FormattingDefect),
     /// A cell-format defect repaired the way Excel repairs it.
     CellFormat(CellFormatDefect),
+    /// A text-encoding defect repaired the way Excel repairs it.
+    Encoding(EncodingDefect),
 }
 
 impl Defect {
@@ -199,7 +253,8 @@ impl Defect {
     pub fn record_type(self) -> Option<u16> {
         match self {
             Defect::Formatting(defect) => Some(defect.record_type()),
-            Defect::CellFormat(_) => None,
+            Defect::CellFormat(defect) => defect.record_type(),
+            Defect::Encoding(defect) => defect.record_type(),
         }
     }
 
@@ -209,6 +264,7 @@ impl Defect {
         match self {
             Defect::Formatting(defect) => defect.description(),
             Defect::CellFormat(defect) => defect.description(),
+            Defect::Encoding(defect) => defect.description(),
         }
     }
 }
@@ -222,6 +278,12 @@ impl From<FormattingDefect> for Defect {
 impl From<CellFormatDefect> for Defect {
     fn from(defect: CellFormatDefect) -> Self {
         Self::CellFormat(defect)
+    }
+}
+
+impl From<EncodingDefect> for Defect {
+    fn from(defect: EncodingDefect) -> Self {
+        Self::Encoding(defect)
     }
 }
 
@@ -251,6 +313,8 @@ impl ToleratedDefect {
     /// it is the number of `XF` records that were actually parsed. For
     /// [`CellFormatDefect::XfReference`] it is the zero-based row of the
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
+    /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
+    /// the `CODEPAGE` record within the Workbook stream.
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -266,6 +330,8 @@ impl ToleratedDefect {
     /// declared `cch`. For [`FormattingDefect::FontNameEmpty`] it is always
     /// zero, since the defect *is* the value. For
     /// [`CellFormatDefect::XfReference`] it is the `ixfe` the record carried.
+    /// For [`EncodingDefect::UnsupportedCodePage`] it is the raw `cv` code
+    /// page identifier.
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
@@ -285,7 +351,8 @@ impl ToleratedDefect {
 ///
 /// An empty report means the workbook conformed and no substitution was made.
 /// After a [`Leniency::Strict`] read the report can still list
-/// [`Defect::CellFormat`] repairs, which Excel itself applies; it never lists
+/// [`Defect::CellFormat`] and [`Defect::Encoding`] repairs, which Excel
+/// itself applies; it never lists
 /// [`Defect::Formatting`] repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
@@ -543,5 +610,8 @@ mod tests {
         let cell = Defect::from(CellFormatDefect::XfReference);
         assert_eq!(cell.record_type(), None);
         assert!(!cell.description().is_empty());
+        let encoding = Defect::from(EncodingDefect::UnsupportedCodePage);
+        assert_eq!(encoding.record_type(), Some(0x0042));
+        assert!(!encoding.description().is_empty());
     }
 }

@@ -5760,7 +5760,13 @@ fn parse_workbook_stream(
         let record = record_result?;
         match record.kind().get() {
             CODE_PAGE if record.payload().len() == 2 => {
-                encoding = Encoding::from_codepage(binary::read_u16_le_at(record.payload(), 0)?)?;
+                // The same Windows-1252 fallback the reader applies (and records
+                // in its tolerance report) for a page without an exact codec.
+                encoding = Encoding::from_codepage_or_fallback(binary::read_u16_le_at(
+                    record.payload(),
+                    0,
+                )?)
+                .0;
             },
             BOUND_SHEET => {
                 let mut payload = Vec::new();

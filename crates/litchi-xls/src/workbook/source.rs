@@ -11,7 +11,7 @@
 use super::query_cache::{CellSlot, IndexCandidate, QueryIndexCache, WorksheetCellIndex};
 use crate::cell::Cell;
 use crate::error::Error;
-use crate::leniency::{Leniency, ToleranceLog, ToleranceReport};
+use crate::leniency::{EncodingDefect, Leniency, ToleranceLog, ToleranceReport};
 use crate::number_format::{DateSystem, Formatting};
 use crate::records::{
     BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue,
@@ -2106,6 +2106,7 @@ fn parse_globals(
         ));
     }
 
+    let mut tolerance = ToleranceLog::new(leniency);
     let mut encoding =
         Encoding::from_codepage(DEFAULT_CODEPAGE).map_err(SourceBackedError::Parse)?;
     // BoundSheet8 names use the workbook CODEPAGE.  Keep the raw payloads
@@ -2127,7 +2128,15 @@ fn parse_globals(
                     }));
                 }
                 let codepage = u16::from_le_bytes([record.payload()[0], record.payload()[1]]);
-                encoding = Encoding::from_codepage(codepage).map_err(SourceBackedError::Parse)?;
+                let (selected, fell_back) = Encoding::from_codepage_or_fallback(codepage);
+                if fell_back {
+                    tolerance.report_mut().record(
+                        EncodingDefect::UnsupportedCodePage,
+                        u32::try_from(record.offset()).unwrap_or(u32::MAX),
+                        u32::from(codepage),
+                    );
+                }
+                encoding = selected;
             },
             BOUND_SHEET => {
                 if bound_payloads.len() >= limits.max_sheet_count {
@@ -2236,7 +2245,6 @@ fn parse_globals(
             }));
         }
     }
-    let mut tolerance = ToleranceLog::new(leniency);
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
     let sst = scan_shared_string_records(&sst_refs).map_err(map_shared_string_error)?;
