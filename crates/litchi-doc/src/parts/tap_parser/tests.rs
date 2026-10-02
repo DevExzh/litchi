@@ -9,7 +9,9 @@ use super::super::tap::{
     WidthType,
 };
 use super::TapParser;
-use crate::leniency::{Defect, SprmDefect, ToleranceReport, ToleratedDefect};
+use crate::leniency::{
+    Defect, SprmDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
+};
 use bumpalo::Bump;
 
 fn table_definition_grpprl(operand: &[u8]) -> Vec<u8> {
@@ -93,10 +95,22 @@ fn rejects_malformed_table_definitions() {
             .parse_tap(&table_definition_grpprl(&[2, 0, 0, 200, 0, 100, 0]))
             .is_err()
     );
-    assert!(
-        parser
-            .parse_tap(&table_definition_grpprl(&[1, 0x3F, 0x84, 0, 0]))
-            .is_err()
+
+    // A boundary outside the XAS range is clamped and recorded, not fatal.
+    let mut tolerance = ToleranceReport::default();
+    let clamped = parser
+        .parse_tap_with_report(
+            &table_definition_grpprl(&[1, 0x3F, 0x84, 0, 0]),
+            &mut tolerance,
+        )
+        .unwrap();
+    assert_eq!(clamped.cell_boundaries, [-31_680, 0]);
+    assert_eq!(
+        tolerance.defects(),
+        &[ToleratedDefect {
+            defect: Defect::TableDefinition(TableDefinitionDefect::BoundaryRange),
+            context: 0,
+        }]
     );
 
     let empty = parser
@@ -148,23 +162,60 @@ fn decodes_tc80_layout_bits_and_width_type() {
     assert_eq!(width.width_type, WidthType::Twips);
 }
 
+/// MS-DOC 2.9.313 places no reader-side rejection on the unused TC80
+/// encodings: each reads as the field's neutral member, recorded against the
+/// cell index, and the rest of the row is decoded unchanged.
 #[test]
-fn rejects_invalid_tc80_layout_values() {
+fn repairs_unused_tc80_layout_values() {
     let arena = Bump::new();
     let parser = TapParser::new(&arena);
-    for flags in [2 << 2, 2 << 5, 3 << 7, 4 << 9] {
-        assert!(
-            parser
-                .parse_tap(&single_cell_definition_grpprl(flags, 1440))
-                .is_err(),
-            "flags {flags:#06x} should be rejected"
-        );
-    }
-    assert!(
-        parser
-            .parse_tap(&single_cell_definition_grpprl(3 << 9, -1))
-            .is_err()
+    let parse = |flags: u16, width: i16| {
+        // One cell spanning 0..1440 whose TC80 carries `flags` and `width`.
+        let mut grpprl = single_cell_definition_grpprl(flags, 1440);
+        let w_width = grpprl.len() - 18;
+        grpprl[w_width..w_width + 2].copy_from_slice(&width.to_le_bytes());
+        let mut tolerance = ToleranceReport::default();
+        let tap = parser
+            .parse_tap_with_report(&grpprl, &mut tolerance)
+            .expect("unused TC80 encodings are repaired, not fatal");
+        (tap.cell_properties[0].clone(), tolerance.defects().to_vec())
+    };
+    let recorded = |defect| ToleratedDefect {
+        defect: Defect::TableDefinition(defect),
+        context: 0,
+    };
+
+    let (cell, defects) = parse(2 << 2, 1440);
+    assert_eq!(cell.text_direction, TextDirection::LrTb);
+    assert_eq!(defects, [recorded(TableDefinitionDefect::TextFlow)]);
+
+    let (cell, defects) = parse(2 << 5, 1440);
+    assert_eq!(cell.vertical_merge_status, VerticalMergeStatus::None);
+    assert_eq!(defects, [recorded(TableDefinitionDefect::VerticalMerge)]);
+
+    let (cell, defects) = parse(3 << 7, 1440);
+    assert_eq!(cell.vertical_alignment, VerticalAlignment::Top);
+    assert_eq!(
+        defects,
+        [recorded(TableDefinitionDefect::VerticalAlignment)]
     );
+
+    let (cell, defects) = parse(4 << 9, 1440);
+    assert_eq!(cell.preferred_width, None);
+    assert_eq!(defects, [recorded(TableDefinitionDefect::WidthUnit)]);
+
+    let (cell, defects) = parse(3 << 9, -1);
+    assert_eq!(cell.preferred_width, None);
+    assert_eq!(defects, [recorded(TableDefinitionDefect::NegativeWidth)]);
+
+    // The other fields of a repaired descriptor still decode.
+    let (cell, _) = parse((2 << 2) | 0x2000 | 1, 1440);
+    assert_eq!(cell.merge_status, CellMergeStatus::Merged);
+    assert!(cell.no_wrap);
+
+    // Defined encodings record nothing.
+    let (_, defects) = parse((5 << 2) | (1 << 5) | (2 << 7) | (2 << 9), 50);
+    assert!(defects.is_empty());
 }
 
 #[test]

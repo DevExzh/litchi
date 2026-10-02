@@ -536,6 +536,59 @@ impl BookmarkDefect {
     }
 }
 
+/// The class of table-definition (`sprmTDefTable`) defect the reader
+/// repairs the way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// repairs a read applies to the cell boundaries (`rgdxaCenter`) and cell
+/// descriptors (`TC80`, MS-DOC 2.9.313) of a table row under every
+/// [`Leniency`] variant, including [`Leniency::Strict`]. MS-DOC defines the
+/// used encodings of each field but places no reader-side rejection on the
+/// unused ones; Word clamps or ignores them and LibreOffice reads the flags
+/// bit by bit, so each repair substitutes the field's neutral member and
+/// leaves the rest of the row intact. Operand framing — the 63-column limit,
+/// truncated boundaries or descriptors, and decreasing boundaries — stays a
+/// hard error. The recorded [`ToleratedDefect::context`] is the zero-based
+/// cell index (`itc`) within the row, or the boundary index for
+/// [`Self::BoundaryRange`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TableDefinitionDefect {
+    /// A cell boundary lay outside the XAS range (-31680 to 31680 twips).
+    /// It is clamped to the nearest end of the range.
+    BoundaryRange,
+    /// `TC80.textFlow` used an undefined value (2, 6, or 7). The cell reads
+    /// as left-to-right, top-to-bottom text (`grpfTFlrtb`).
+    TextFlow,
+    /// `TC80.vertMerge` used the undefined value 2. The cell reads as not
+    /// vertically merged.
+    VerticalMerge,
+    /// `TC80.vertAlign` used the undefined value 3. The cell reads as
+    /// top-aligned.
+    VerticalAlignment,
+    /// `TC80.ftsWidth` used an undefined unit (4 through 7). The cell reads
+    /// as having no preferred width.
+    WidthUnit,
+    /// `TC80.wWidth` was negative. The cell reads as having no preferred
+    /// width.
+    NegativeWidth,
+}
+
+impl TableDefinitionDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::BoundaryRange => "clamped the cell boundary to the XAS range",
+            Self::TextFlow => "read the undefined text flow as left-to-right, top-to-bottom",
+            Self::VerticalMerge => "read the undefined vertical merge state as not merged",
+            Self::VerticalAlignment => "read the undefined vertical alignment as top",
+            Self::WidthUnit => "read the undefined width unit as no preferred width",
+            Self::NegativeWidth => "read the negative preferred width as no preferred width",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -561,6 +614,9 @@ pub enum Defect {
     Comment(CommentDefect),
     /// A standard-bookmark defect repaired the way Word repairs it.
     Bookmark(BookmarkDefect),
+    /// A table-definition (`sprmTDefTable`) defect repaired the way Word
+    /// repairs it.
+    TableDefinition(TableDefinitionDefect),
 }
 
 impl Defect {
@@ -575,6 +631,7 @@ impl Defect {
             Self::Style(defect) => defect.repair(),
             Self::Comment(defect) => defect.repair(),
             Self::Bookmark(defect) => defect.repair(),
+            Self::TableDefinition(defect) => defect.repair(),
         }
     }
 }
@@ -621,6 +678,12 @@ impl From<BookmarkDefect> for Defect {
     }
 }
 
+impl From<TableDefinitionDefect> for Defect {
+    fn from(defect: TableDefinitionDefect) -> Self {
+        Self::TableDefinition(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -633,7 +696,8 @@ pub struct ToleratedDefect {
     /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]), and
     /// the style index (`istd`) for a [`Defect::Style`], and the comment
     /// index in `PlcfandRef` for a [`Defect::Comment`], and the bookmark
-    /// index in `PlcfBkf` for a [`Defect::Bookmark`].
+    /// index in `PlcfBkf` for a [`Defect::Bookmark`], and the cell (or
+    /// boundary) index within the row for a [`Defect::TableDefinition`].
     pub context: u16,
 }
 
@@ -830,6 +894,12 @@ mod tests {
             Defect::from(BookmarkDefect::EndIndex),
             Defect::from(BookmarkDefect::ReversedRange),
             Defect::from(BookmarkDefect::ColumnRange),
+            Defect::from(TableDefinitionDefect::BoundaryRange),
+            Defect::from(TableDefinitionDefect::TextFlow),
+            Defect::from(TableDefinitionDefect::VerticalMerge),
+            Defect::from(TableDefinitionDefect::VerticalAlignment),
+            Defect::from(TableDefinitionDefect::WidthUnit),
+            Defect::from(TableDefinitionDefect::NegativeWidth),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

@@ -40,13 +40,17 @@ impl TapParser<'_> {
                 boundaries.push(binary_to_doc_result(read_i16_le(data, boundary_offset))?);
             }
         }
-        if boundaries
-            .iter()
-            .any(|boundary| !(-31_680..=31_680).contains(boundary))
-        {
-            return Err(PackageError::Corrupted(
-                "sprmTDefTable cell boundary is outside the XAS range".to_string(),
-            ));
+        // A boundary outside the XAS range cannot be laid out; Word clamps
+        // it to the page coordinate range. Clamping preserves the ordering
+        // checked below, so the repair never invents an inverted cell.
+        for (index, boundary) in boundaries.iter_mut().enumerate() {
+            if !(-31_680..=31_680).contains(boundary) {
+                tolerance.record(
+                    TableDefinitionDefect::BoundaryRange,
+                    u16::try_from(index).unwrap_or(u16::MAX),
+                );
+                *boundary = (*boundary).clamp(-31_680, 31_680);
+            }
         }
         if boundaries.windows(2).any(|pair| pair[0] > pair[1]) {
             return Err(PackageError::Corrupted(
@@ -67,6 +71,7 @@ impl TapParser<'_> {
                     cell_props.push(self.parse_table_cell_descriptor(
                         data,
                         tc_offset,
+                        u16::try_from(i).unwrap_or(u16::MAX),
                         sprm.opcode,
                         tolerance,
                     )?);
@@ -92,11 +97,17 @@ impl TapParser<'_> {
     /// - bytes 8-11: brcLeft (left border, 4 bytes)
     /// - bytes 12-15: brcBottom (bottom border, 4 bytes)
     /// - bytes 16-19: brcRight (right border, 4 bytes)
+    ///
+    /// MS-DOC 2.9.313 defines the used values of each flag field but places
+    /// no reader-side rejection on the unused encodings. Like Word and
+    /// LibreOffice, an unused encoding reads as the field's neutral member
+    /// and is recorded as a [`TableDefinitionDefect`] against `cell_index`.
 
     pub(in crate::parts::tap_parser) fn parse_table_cell_descriptor(
         &self,
         data: &[u8],
         offset: usize,
+        cell_index: u16,
         opcode: u16,
         tolerance: &mut ToleranceReport,
     ) -> Result<CellProperties> {
@@ -124,10 +135,9 @@ impl TapParser<'_> {
             3 => TextDirection::BtLr,
             4 => TextDirection::LrBt,
             5 => TextDirection::TbLr,
-            value => {
-                return Err(PackageError::Corrupted(format!(
-                    "TC80 contains invalid textFlow value {value}"
-                )));
+            _ => {
+                tolerance.record(TableDefinitionDefect::TextFlow, cell_index);
+                TextDirection::LrTb
             },
         };
 
@@ -136,10 +146,9 @@ impl TapParser<'_> {
             0 => VerticalMergeStatus::None,
             1 => VerticalMergeStatus::Merged,
             3 => VerticalMergeStatus::First,
-            value => {
-                return Err(PackageError::Corrupted(format!(
-                    "TC80 contains invalid vertMerge value {value}"
-                )));
+            _ => {
+                tolerance.record(TableDefinitionDefect::VerticalMerge, cell_index);
+                VerticalMergeStatus::None
             },
         };
 
@@ -149,10 +158,9 @@ impl TapParser<'_> {
             0 => VerticalAlignment::Top,
             1 => VerticalAlignment::Center,
             2 => VerticalAlignment::Bottom,
-            value => {
-                return Err(PackageError::Corrupted(format!(
-                    "TC80 contains invalid vertAlign value {value}"
-                )));
+            _ => {
+                tolerance.record(TableDefinitionDefect::VerticalAlignment, cell_index);
+                VerticalAlignment::Top
             },
         };
         props.direct_style.vertical_alignment = true;
@@ -164,14 +172,15 @@ impl TapParser<'_> {
 
         // Read preferred width (bytes 2-3)
         let w_width = binary_to_doc_result(read_i16_le(data, offset + 2))?;
+        // A negative width cannot be laid out; the cell falls back to no
+        // preferred width, as if ftsWidth were ftsNil.
         if w_width < 0 {
-            return Err(PackageError::Corrupted(
-                "TC80 preferred width is negative".to_string(),
-            ));
+            tolerance.record(TableDefinitionDefect::NegativeWidth, cell_index);
         }
         let fts_width = (flags >> 9) & 0x07;
         props.preferred_width = match fts_width {
             0 => None,
+            1..=3 if w_width < 0 => None,
             1 => Some(TableWidth {
                 value: w_width,
                 width_type: WidthType::Auto,
@@ -184,10 +193,9 @@ impl TapParser<'_> {
                 value: w_width,
                 width_type: WidthType::Twips,
             }),
-            value => {
-                return Err(PackageError::Corrupted(format!(
-                    "TC80 contains invalid ftsWidth value {value}"
-                )));
+            _ => {
+                tolerance.record(TableDefinitionDefect::WidthUnit, cell_index);
+                None
             },
         };
 

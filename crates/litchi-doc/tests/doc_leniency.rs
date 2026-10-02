@@ -38,7 +38,7 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, Writer,
+    SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, TableDefinitionDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -648,5 +648,49 @@ fn undefined_table_border_bytes_are_repaired_and_recorded() {
             .iter()
             .all(|(defect, _)| matches!(defect, Defect::Sprm(_))),
         "only the border repairs are recorded: {defects:?}"
+    );
+}
+
+/// MS-DOC 2.9.313 places no reader-side rejection on unused TC80 encodings:
+/// a cell carrying one reads as the neutral member, recorded with its cell
+/// index, instead of failing the paragraph properties and the document.
+#[test]
+fn unused_tc80_encodings_are_repaired_per_cell() {
+    let clean = writer_document(|writer| {
+        writer.add_table(1, 2).expect("fixture table");
+    });
+    let bytes = edit_word_stream(&clean, |word| {
+        let tc = first_tc80_offset(word);
+        let flags = u16::from_le_bytes([word[tc], word[tc + 1]]) | (3 << 7); // vertAlign 3
+        word[tc..tc + 2].copy_from_slice(&flags.to_le_bytes());
+        let tc = tc + 20;
+        let flags = (u16::from_le_bytes([word[tc], word[tc + 1]]) & !(7 << 2)) | (6 << 2); // textFlow 6
+        word[tc..tc + 2].copy_from_slice(&flags.to_le_bytes());
+    });
+    let document = open_degraded(bytes);
+    assert_eq!(document.tables().expect("tables").len(), 1);
+    let defects = document
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| (tolerated.defect, tolerated.context))
+        .collect::<Vec<_>>();
+    for expected in [
+        (
+            Defect::TableDefinition(TableDefinitionDefect::VerticalAlignment),
+            0,
+        ),
+        (Defect::TableDefinition(TableDefinitionDefect::TextFlow), 1),
+    ] {
+        assert!(
+            defects.contains(&expected),
+            "missing {expected:?}: {defects:?}"
+        );
+    }
+    assert!(
+        defects
+            .iter()
+            .all(|(defect, _)| matches!(defect, Defect::TableDefinition(_))),
+        "only the TC80 repairs are recorded: {defects:?}"
     );
 }
