@@ -146,6 +146,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   case.
 - **Suggested posture**: default-repair — test bit 0 only, accept any count, record.
 ### 1.3 GRFSTD / StdfPost2000 reserved bits and iPriority range validated instead of ignored — P1
+> **Status: FIXED (2026-10-02)** — reserved GRFSTD/StdfPost2000 bits masked, iPriority > 99 clamped; recorded as `StyleDefect::{ReservedStyleFlags,
+> ReservedPost2000Flags, Priority}` (context = istd); raw STD bytes kept for round-trip, writer still rejects priority > 99.
 - **Location**: `crates/litchi-doc/src/parts/styles/codec/parser.rs:166` ("GRFSTD
   contains reserved flags"), :183-189 (StdfPost2000), :191-193 (`priority > 99`).
 - **Check**: any set reserved/unused bit or a style priority outside 0-99 aborts the
@@ -158,6 +160,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
 - **Suggested posture**: default-repair — mask defined bits, clamp/ignore priority,
   record. Same shape as `SprmDefect::CellBorderSideFlags`.
 ### 1.4 Comment descriptor (ATRDPre10) reserved fields, author bounds, bookmark-tag domain — P1
+> **Status: FIXED (2026-10-02)** — non-zero ATRDPre10 reserved fields ignored, out-of-range author → empty author, lTagBkmk < -1 → point comment;
+> recorded as `CommentDefect::{ReservedFields, AuthorIndex, BookmarkTag}` (context = comment index).
 - **Location**: `crates/litchi-doc/src/parts/comments.rs:48-54` ("ATRDPre10 reserved
   fields must be zero"), :43-47 (author index), :62-66 (`lTagBkmk < -1`); fatal via
   package.rs:178.
@@ -172,6 +176,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
 - **Suggested posture**: default-repair — ignore reserved fields, degrade author to a
   placeholder, clamp negative tags to `None`; record.
 ### 1.5 Bookmark BKC fPub reserved bit, ibkl uniqueness, CP-consistency checks — P1
+> **Status: FIXED (2026-10-02)** — BKC.fPub masked; bad/duplicate ibkl or reversed range drops only that bookmark; empty column range demotes to a text bookmark;
+> recorded as `BookmarkDefect::{ReservedPublicFlag, EndIndex, ReversedRange, ColumnRange}` (context = bookmark index); table framing stays fatal.
 - **Location**: `crates/litchi-doc/src/parts/bookmarks.rs:91` ("bookmark BKC fPub must be
   zero"), :83-87 (non-unique `ibkl`), :98-101 (start > end), :106-110 (empty column
   range); fatal via package.rs:187.
@@ -186,6 +192,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   individual bookmarks rather than failing the table; F1.1 makes wholesale table failure
   non-fatal anyway.
 ### 1.6 Table border operands: unknown brcType / Ico index are fatal — P1
+> **Status: FIXED (2026-10-02)** — undefined brcType → `BorderType::None` (LibreOffice default), Brc80 Ico > 16 → automatic; recorded as
+> `SprmDefect::{BorderType, BorderColor}` (context = SPRM opcode).
 - **Location**: `crates/litchi-doc/src/parts/tap_parser/codec/borders.rs:42` ("Brc80
   contains invalid color index {ico}"), :89 ("DOC border contains invalid border type").
 - **Check**: any border-type byte outside the enumerated set or a color index above 16
@@ -200,6 +208,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   out-of-range Ico → `Automatic`; record. Closest analog of
   `SprmDefect::CellBorderSideFlags`.
 ### 1.7 TC80 cell-descriptor unused enum values and boundary checks are fatal — P1
+> **Status: FIXED (2026-10-02)** — unused TC80 textFlow/vertMerge/vertAlign/ftsWidth values and negative wWidth read as neutral values, out-of-range rgdxaCenter clamped;
+> recorded as `TableDefinitionDefect` (context = cell/boundary index); 63-column limit, truncation, decreasing boundaries stay fatal.
 - **Location**: `crates/litchi-doc/src/parts/tap_parser/codec/definitions.rs:121` ("TC80
   contains invalid textFlow value"; vertMerge = 2 :131-135, vertAlign = 3 :144-148,
   ftsWidth > 3 :179-183, negative wWidth :159-163, XAS range :42-54).
@@ -214,6 +224,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   vertMerge→None, vertAlign→Top, ftsWidth→None), record. Keep >63-column and truncation
   checks (framing).
 ### 1.8 One malformed PAPX run aborts all paragraph properties and the document — P1
+> **Status: FIXED (2026-10-02)** — malformed/unreachable PapxFkp page skipped, unreadable run gets default paragraph properties, producer pad trim on by default;
+> recorded as `PapxDefect::{Page, Run, AlignmentPadding}` (context = PlcfBtePapx page index).
 - **Location**: `crates/litchi-doc/src/parts/pap_bin_table.rs:172-174` (one malformed FKP
   entry → Err), :193 (`parse_properties_with_direct_cached` in the per-run loop), :312;
   propagates at package.rs:227/290.
@@ -230,6 +242,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   chp_bin_table.rs:186), record; make the proven one-byte pad trim unconditional like the
   cell-border mask.
 ### 1.9 Section SEPX: Brc80/SPgbProp reserved bytes and enum ranges are fatal — P1
+> **Status: FIXED (2026-10-02)** — Brc80/SPgbProp reserved bits ignored, undefined page-border type/Ico → none/automatic, undefined section enums keep defaults, Boolean8 ∉ {0,1} → true;
+> recorded as `SectionDefect` (context = SPRM opcode); SEPX framing and numeric range checks stay fatal.
 - **Location**: `crates/litchi-doc/src/section/borders/codec.rs:74` ("{name} contains
   reserved Brc80 effect bits"), :98 ("sprmSPgbProp reserved byte must be zero"), :64-68
   (Ico range); enum/Boolean8 guards in `parts/sections/model.rs` (e.g. :491); fatal via
@@ -276,6 +290,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   (chp/codec.rs:916-924) instead of erroring; map unknown enum codes to "unset" + record,
   consistently across bin-table, style, and extractor paths.
 ### 1.12 One unresolvable Pcd.Prm discards the entire piece table (silent total formatting loss) — P2
+> **Status: FIXED (2026-10-02)** — an unresolvable Pcd.prm gives only that piece an empty modifier (text and FKP formatting kept) instead of silently dropping both bin tables;
+> recorded as `PieceDefect::PropertyModifier` (context = piece index).
 - **Location**: `crates/litchi-doc/src/parts/piece_table.rs:231`
   (`Self::resolve_property_modifier(prm, &property_groups)?` in the per-piece loop), :295
   (returns `None` on an out-of-range `Prm1` index or unlisted `Prm0.isprm`).
@@ -656,6 +672,8 @@ errors.
   ambiguous, but default-repair to per-cell degradation is defensible given Excel opens
   the file.
 ### 3.11 litchi-xlsb: systemic reserved-bit / strict-layout / trailing-byte refusals — P1
+> **Status: FIXED (2026-10-02)** — litchi-xlsb gained its `ToleranceReport` carrier (`Workbook`/`Package`/`Worksheet`/`SourceBackedWorkbook::tolerance_report()`); reserved bits on Cell,
+> BrtRowHdr, BrtColInfo, GrbitFmla, BrtBorder, Blxf, BrtCalcProp, BrtName are masked and trailing bytes ignored, recorded as `ReservedFieldDefect`/`LayoutDefect`; truncation and limits stay fatal.
 - **Location**: `crates/litchi-xlsb/src/cell_values/worksheet.rs:1671-1677` ("nonzero
   reserved Cell flag bits" on *every* cell record); `styles/codec.rs:213-218`
   (`BrtBorder` flags), :305-312 (`Blxf` style/reserved), :188-193 (`BrtColor`
@@ -1335,6 +1353,8 @@ opaque tail bytes on string/empty properties. litchi-crypto was largely out of s
 ("UNICODE-LP-P4 padding is nonzero", crates/litchi-crypto/src/spaces.rs:974) — worth
 revisiting only if IRM/encrypted files from non-Microsoft producers become a target.
 ### 7.1 FAT chain longer than the declared stream size is fatal — P1
+> **Status: FIXED (2026-10-02)** — litchi-cfb/ole-common gained `ToleranceReport` carriers (`OleFile`/`SharedOleFile::tolerance_report()`); a chain longer than the declared size is cut at
+> the size (POI/LO) and unclaimed sectors recorded; cycles, out-of-range sectors, short chains and shared sectors stay fatal.
 - **Location**: `crates/litchi-cfb/src/file.rs:4019` ("{table_name} chain exceeds its
   declared length"; scratch variant :4153; unclaimed-sector reconciliation "unclaimed
   physical sector {sector} has FAT marker" at :1667).
@@ -1353,6 +1373,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   sectors, stop validating there, and drop the unclaimed-sector-vs-FREESECT
   reconciliation to a recorded warning.
 ### 7.2 Zero-size stream whose start sector is not ENDOFCHAIN is fatal — P1
+> **Status: FIXED (2026-10-02)** — a zero-size stream with a stale start sector reads as empty (entry reset to ENDOFCHAIN in memory) and is recorded per SID.
 - **Location**: `crates/litchi-cfb/src/file.rs:3978` ("Empty {table_name} chain must
   start with ENDOFCHAIN"; scratch path :4098), applied to every stream at open via
   `validate_stream_allocations` (file.rs:1545, 1590, 1634).
@@ -1367,6 +1388,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
 - **Suggested posture**: default-repair — when size is 0, ignore the start marker
   entirely (chain = empty) and record. Cannot produce wrong content.
 ### 7.3 Red-black sibling-tree name-ordering violation fails the whole file — P1 (confidence: high on references; medium on prevalence)
+> **Status: FIXED (2026-10-02)** — sibling-tree name-ordering violations are recorded per SID and name lookups fall back to a tree scan; ordered files keep the binary-search path.
 - **Location**: `crates/litchi-cfb/src/file.rs:1769` ("CFB sibling tree violates name
   ordering at SID {sid}"; repeated-SID/ownership check at :1748).
 - **Check**: full binary-search-tree ordering per MS-CFB 2.6.4 is validated across every
@@ -1383,6 +1405,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   (safety-relevant), but on ordering violation fall back to a linear name index for
   lookups instead of failing; record.
 ### 7.4 Directory entries unreachable from the root are fatal — P1
+> **Status: FIXED (2026-10-02)** — well-formed directory entries unreachable from the root are treated as unused and recorded per SID (with their unclaimed sectors); malformed ones stay fatal.
 - **Location**: `crates/litchi-cfb/src/file.rs:1801` ("CFB directory SID {} is not owned
   by a storage").
 - **Check**: after tree traversal, every non-empty entry must be owned by a storage; a
