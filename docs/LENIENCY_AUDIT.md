@@ -1850,6 +1850,8 @@ duplicate-check-free `ManifestImport` tolerates them.
   adopt the mimetype stream value and record `manifest-root-missing`; keep the hard error
   only for genuinely conflicting non-empty values (matches LibreOffice exactly).
 ### 9.3 RTF: no EOF recovery — unclosed groups and trailing content are fatal — P1 (confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — litchi-rtf gained its `ToleranceReport` carrier (`Document::tolerance_report()`, `read::Options`); content after the root group's close is ignored and
+> recorded by default (Word/LO stop there); unclosed groups at EOF close under opt-in `Leniency::TolerateUnclosedGroups`, one record each.
 - **Location**: `crates/litchi-rtf/src/codec/parser/codec/content.rs:445` (any group left
   open at EOF → `RtfError::UnexpectedEof`, aborting the whole document);
   `codec/parser/codec/api.rs:555` ("RTF document contains trailing non-whitespace
@@ -1870,6 +1872,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   `unclosed-groups-at-eof`); default-repair for trailing content (ignore tokens after
   root close, record `trailing-content-after-root`), which LO models as safe.
 ### 9.4 RTF: unknown control symbols are fatal — P1
+> **Status: FIXED (2026-10-02)** — undefined control symbols are kept as inert unknown controls and recorded as `SyntaxDefect` at the backslash; spec-defined `\|`/`\:` are not recorded.
 - **Location**: `crates/litchi-rtf/src/codec/lexer/codec/scanner/control.rs:82`
   (`RtfError::InvalidControlWord`).
 - **Check**: a backslash followed by a non-alphabetic character that is not one of the 11
@@ -1886,6 +1889,8 @@ duplicate-check-free `ManifestImport` tolerates them.
   `ControlWord::Unknown` (or a dedicated token) and feed it into the existing
   `preserve_unknown_control` path (content.rs:25-33), recording `unknown-control-symbol`.
 ### 9.5 RTF: strict 0/1 toggle, parameterless-flag, and required-parameter validation — P1
+> **Status: FIXED (2026-10-02)** — malformed parameter shapes get Word's interpretation (nonzero toggle = on, stray flag/destination parameter ignored, missing value → LibreOffice default),
+> recorded as `ParameterDefect` at the control word; `\rtf`, `\u`, `\htmltag`, `\xmlns`, `\xmlattrns`, `\shpinst` and range checks stay strict.
 - **Location**: representative sites — `crates/litchi-rtf/src/codec/parser/codec/mod.rs:136`
   ("RTF {name} accepts only 0 or 1", also :163), :1265-1273 (`associated_toggle`), :985
   ("RTF {name} does not accept a parameter"), :155-166 (`required_paragraph_bool`), and
@@ -1909,6 +1914,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   record `value-missing-parameter`; range overflows: clamp and record — the mask-and-record
   pattern from litchi-doc's leniency.rs.
 ### 9.6 RTF: lone-surrogate `\uN` sequences are fatal — P1 (confidence: high on references; medium on frequency)
+> **Status: FIXED (2026-10-02)** — every `\uN` path substitutes U+FFFD for an unpaired surrogate and records `UnicodeDefect`; Word's split non-BMP pairs now decode cleanly.
 - **Location**: `crates/litchi-rtf/src/codec/parser/codec/unicode.rs:75`
   (`String::from_utf16` → `RtfError::InvalidUnicode` for the whole document); same
   strictness in styles.rs:995-999, markup.rs:104, markup.rs:700, info.rs:81,
@@ -1925,6 +1931,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   `char::decode_utf16(...).map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))`, record
   `unpaired-surrogate-substituted`. Output matches what Word shows.
 ### 9.7 RTF: invalid or incomplete `\'hh` hex escapes are fatal — P1
+> **Status: FIXED (2026-10-02)** — under opt-in `Leniency::TolerateMalformedHexEscapes`, a bad `\'hh` keeps its valid hex digits (LibreOffice) and is recorded; the default still rejects.
 - **Location**: `crates/litchi-rtf/src/codec/lexer/codec/scanner/text.rs:16-23`
   ("Incomplete hex escape" / "Invalid hex escape" → `RtfError::InvalidUnicode`).
 - **Check**: one malformed hex escape anywhere (`\'g1`, `\'f` at EOF) discards the whole
