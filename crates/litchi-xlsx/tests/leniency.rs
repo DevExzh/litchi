@@ -605,3 +605,41 @@ fn theme_color_scheme_deviations_are_repaired_and_recorded() {
         ]
     );
 }
+
+/// Finding 4.12: a structurally imperfect shared-string item keeps its text
+/// and an unpaired surrogate escape decodes to U+FFFD; each is recorded at
+/// the item instead of failing every string cell.
+#[test]
+fn shared_string_item_defects_are_repaired_per_item() {
+    use litchi_xlsx::{Cell, SharedStringsDefect as S, SourceCellView, Value};
+
+    let bytes = patched(&[("xl/sharedStrings.xml", &|text: &str| {
+        replace("<si><t>Date</t>", "<si><t>Da</t><t>te</t>")(text).replacen(
+            "<si><t>Time</t>",
+            "<si><t>Ti_xD800_me</t>",
+            1,
+        )
+    })]);
+
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    assert!(matches!(
+        source.sheet(0usize).unwrap().unwrap().cell("A1").unwrap(),
+        SourceCellView::Stored(Cell::Value(Value::Text(_)))
+    ));
+
+    assert_eq!(
+        worksheet_entries(&both_reports(&bytes)),
+        [
+            (
+                Defect::SharedStrings(S::RunStructure),
+                None,
+                ToleranceLocation::SharedStringItem(0)
+            ),
+            (
+                Defect::SharedStrings(S::UnpairedEscape),
+                None,
+                ToleranceLocation::SharedStringItem(1)
+            ),
+        ]
+    );
+}

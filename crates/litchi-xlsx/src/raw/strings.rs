@@ -241,10 +241,10 @@ impl<'a> SelectedParser<'a> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string text outside an item"))?;
+            // Mixed or repeated text is repaired and recorded by the
+            // materializing parse (audit finding 4.12).
             if item.saw_simple || item.saw_run {
-                return Err(invalid(
-                    "shared-string item mixes or duplicates simple and rich text",
-                ));
+                self.irregular = true;
             }
             item.saw_simple = true;
             return Ok(Context::Text);
@@ -255,7 +255,7 @@ impl<'a> SelectedParser<'a> {
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run outside an item"))?;
             if item.saw_simple {
-                return Err(invalid("shared-string item mixes simple and rich text"));
+                self.irregular = true;
             }
             item.runs = item
                 .runs
@@ -272,7 +272,7 @@ impl<'a> SelectedParser<'a> {
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run text outside an item"))?;
             if item.seen_text_in_run {
-                return Err(invalid("shared-string run has duplicate text"));
+                self.irregular = true;
             }
             item.seen_text_in_run = true;
             return Ok(Context::Text);
@@ -340,6 +340,12 @@ impl<'a> SelectedParser<'a> {
             .take()
             .ok_or_else(|| invalid("missing shared-string item"))?;
         item.text_state.finish()?;
+        if item.text_state.irregular {
+            // An unpaired surrogate escape is repaired and recorded by the
+            // materializing parse (audit finding 4.12).
+            self.irregular = true;
+            return Ok(());
+        }
         if item.text.is_none() || item.unsupported {
             return Ok(());
         }
@@ -452,6 +458,9 @@ struct SpreadsheetTextState {
     candidate_len: usize,
     high_surrogate: Option<u16>,
     decoded_chars: usize,
+    /// An escape encoded an unpaired surrogate; the materializing parse
+    /// decodes it to U+FFFD and records it (audit finding 4.12).
+    irregular: bool,
 }
 
 impl SpreadsheetTextState {
@@ -475,13 +484,10 @@ impl SpreadsheetTextState {
             self.flush_candidate_literal()?;
         }
 
-        if self.high_surrogate.is_some() {
-            if character != '_' {
-                return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
-            }
-            self.candidate[0] = b'_';
-            self.candidate_len = 1;
-        } else if character == '_' {
+        if self.high_surrogate.is_some() && character != '_' {
+            self.unpaired()?;
+        }
+        if character == '_' {
             self.candidate[0] = b'_';
             self.candidate_len = 1;
         } else {
@@ -490,9 +496,16 @@ impl SpreadsheetTextState {
         Ok(())
     }
 
+    /// Count an unpaired surrogate as the one U+FFFD it decodes to.
+    fn unpaired(&mut self) -> Result<()> {
+        self.high_surrogate = None;
+        self.irregular = true;
+        self.add_decoded_chars(1)
+    }
+
     fn finish(&mut self) -> Result<()> {
         if self.high_surrogate.is_some() {
-            return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
+            self.unpaired()?;
         }
         if self.candidate_len != 0 {
             self.flush_candidate_literal()?;
@@ -506,7 +519,7 @@ impl SpreadsheetTextState {
         self.candidate_len = 0;
         let Some(unit) = unit else {
             if self.high_surrogate.is_some() {
-                return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
+                self.unpaired()?;
             }
             self.add_decoded_chars(1)?;
             for byte in &candidate[1..] {
@@ -515,17 +528,19 @@ impl SpreadsheetTextState {
             return Ok(());
         };
 
-        if let Some(high) = self.high_surrogate.take() {
-            if !(0xDC00..=0xDFFF).contains(&unit) {
-                return Err(invalid(format!(
-                    "unpaired high surrogate in SpreadsheetML escape (high {high:04X})"
-                )));
+        if self.high_surrogate.is_some() {
+            if (0xDC00..=0xDFFF).contains(&unit) {
+                self.high_surrogate = None;
+                self.add_decoded_chars(1)?;
+                return Ok(());
             }
-            self.add_decoded_chars(1)?;
-        } else if (0xD800..=0xDBFF).contains(&unit) {
+            self.unpaired()?;
+        }
+        if (0xD800..=0xDBFF).contains(&unit) {
             self.high_surrogate = Some(unit);
         } else if (0xDC00..=0xDFFF).contains(&unit) {
-            return Err(invalid("unpaired low surrogate in SpreadsheetML escape"));
+            self.irregular = true;
+            self.add_decoded_chars(1)?;
         } else {
             self.add_decoded_chars(1)?;
         }
@@ -685,6 +700,22 @@ impl<'r> Parser<'r> {
             .map_err(|source| allocation("shared-string table", source))
     }
 
+    /// The location of the item being parsed: the index it will take.
+    fn item_location(&self) -> Location {
+        Location::SharedStringItem(u32::try_from(self.strings.len()).unwrap_or(u32::MAX))
+    }
+
+    /// Accept an item whose text elements break the content model — simple
+    /// and rich text mixed, or a repeated `t` (audit finding 4.12) — keeping
+    /// every text element's characters in document order, as LibreOffice
+    /// appends each portion; or refuse it with `error`.
+    fn tolerate_run_structure(&mut self, error: crate::Error) -> Result<()> {
+        let location = self.item_location();
+        let tolerance = self.tolerance.as_deref_mut().ok_or(error)?;
+        tolerance.record(SharedStringsDefect::RunStructure, location);
+        Ok(())
+    }
+
     /// Read one advisory `sst` count hint.
     ///
     /// ECMA-376 §18.4.9 makes `count`/`uniqueCount` optional informational
@@ -729,12 +760,13 @@ impl<'r> Parser<'r> {
                 .item
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string text outside an item"))?;
-            if item.saw_simple || item.saw_run {
-                return Err(invalid(
-                    "shared-string item mixes or duplicates simple and rich text",
-                ));
-            }
+            let irregular = item.saw_simple || item.saw_run;
             item.saw_simple = true;
+            if irregular {
+                self.tolerate_run_structure(invalid(
+                    "shared-string item mixes or duplicates simple and rich text",
+                ))?;
+            }
             return Ok(Context::Text);
         }
         if parent == Context::Item && is_spreadsheetml_name(namespace, element.name(), b"r") {
@@ -743,8 +775,14 @@ impl<'r> Parser<'r> {
                 .as_mut()
                 .ok_or_else(|| invalid("shared-string run outside an item"))?;
             if item.saw_simple {
-                return Err(invalid("shared-string item mixes simple and rich text"));
+                self.tolerate_run_structure(invalid(
+                    "shared-string item mixes simple and rich text",
+                ))?;
             }
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("shared-string run outside an item"))?;
             item.runs = item
                 .runs
                 .checked_add(1)
@@ -756,7 +794,7 @@ impl<'r> Parser<'r> {
         }
         if parent == Context::Run && is_spreadsheetml_name(namespace, element.name(), b"t") {
             if self.seen_text_in_run {
-                return Err(invalid("shared-string run has duplicate text"));
+                self.tolerate_run_structure(invalid("shared-string run has duplicate text"))?;
             }
             self.seen_text_in_run = true;
             return Ok(Context::Text);
@@ -801,7 +839,11 @@ impl<'r> Parser<'r> {
             .item
             .take()
             .ok_or_else(|| invalid("missing shared-string item"))?;
-        let text = decode_spreadsheet_text(&item.text)?;
+        let (text, replaced) = decode_spreadsheet_text_with(&item.text, self.tolerance.is_some())?;
+        let location = self.item_location();
+        if replaced && let Some(tolerance) = self.tolerance.as_deref_mut() {
+            tolerance.record(SharedStringsDefect::UnpairedEscape, location);
+        }
         if text.chars().count() > MAX_CELL_CHARACTERS {
             return Err(invalid(format!(
                 "shared string exceeds {MAX_CELL_CHARACTERS} characters"
@@ -840,6 +882,14 @@ fn parse_count_hint_value(value: &str, name: &[u8]) -> Result<usize> {
 }
 
 pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
+    decode_spreadsheet_text_with(value, false).map(|(decoded, _)| decoded)
+}
+
+/// Decode `_xHHHH_` escapes. With `lossy`, an escape encoding an unpaired
+/// surrogate decodes to U+FFFD instead of failing (audit finding 4.12), and
+/// the returned flag reports whether any such replacement was made.
+fn decode_spreadsheet_text_with(value: &str, lossy: bool) -> Result<(String, bool)> {
+    let mut replaced = false;
     let bytes = value.as_bytes();
     let mut decoded = String::new();
     decoded
@@ -859,16 +909,20 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
         };
         decoded.push_str(&value[copied_until..index]);
         if (0xD800..=0xDBFF).contains(&unit) {
-            let Some((low, pair_end)) = spreadsheet_escape_at(bytes, end) else {
-                return Err(invalid(format!(
-                    "unpaired high surrogate in SpreadsheetML escape at byte {index}"
-                )));
+            let low = spreadsheet_escape_at(bytes, end)
+                .filter(|(low, _)| (0xDC00..=0xDFFF).contains(low));
+            let Some((low, pair_end)) = low else {
+                if !lossy {
+                    return Err(invalid(format!(
+                        "unpaired high surrogate in SpreadsheetML escape at byte {index}"
+                    )));
+                }
+                decoded.push(char::REPLACEMENT_CHARACTER);
+                replaced = true;
+                index = end;
+                copied_until = end;
+                continue;
             };
-            if !(0xDC00..=0xDFFF).contains(&low) {
-                return Err(invalid(format!(
-                    "unpaired high surrogate in SpreadsheetML escape at byte {index}"
-                )));
-            }
             let scalar = 0x1_0000 + ((u32::from(unit) - 0xD800) << 10) + (u32::from(low) - 0xDC00);
             let character = char::from_u32(scalar).ok_or_else(|| {
                 invalid(format!(
@@ -879,9 +933,15 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
             index = pair_end;
             copied_until = pair_end;
         } else if (0xDC00..=0xDFFF).contains(&unit) {
-            return Err(invalid(format!(
-                "unpaired low surrogate in SpreadsheetML escape at byte {index}"
-            )));
+            if !lossy {
+                return Err(invalid(format!(
+                    "unpaired low surrogate in SpreadsheetML escape at byte {index}"
+                )));
+            }
+            decoded.push(char::REPLACEMENT_CHARACTER);
+            replaced = true;
+            index = end;
+            copied_until = end;
         } else {
             let character = char::from_u32(u32::from(unit)).ok_or_else(|| {
                 invalid(format!(
@@ -894,7 +954,7 @@ pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
         }
     }
     decoded.push_str(&value[copied_until..]);
-    Ok(decoded)
+    Ok((decoded, replaced))
 }
 
 /// Encode XML-illegal control characters and protect literal `_xHHHH_`
@@ -1275,6 +1335,85 @@ mod tests {
         assert!(decode_spreadsheet_text("_xD83D_").is_err());
         let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="2147483648"/>"#;
         assert!(parse(excessive).is_err());
+    }
+
+    /// Audit finding 4.12: mixed or repeated text elements keep every
+    /// portion in document order and an unpaired surrogate escape decodes to
+    /// U+FFFD, each recorded at the item; the strict parse keeps the errors,
+    /// and the dependency scan reports the table as irregular.
+    #[test]
+    fn repairs_and_records_item_micro_structure_and_unpaired_escapes() {
+        use crate::leniency::{Defect, SharedStringsDefect as D};
+
+        let sst = |items: &str| {
+            format!(
+                r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>ok</t></si>{items}</sst>"#
+            )
+        };
+        for (items, expected_text, expected) in [
+            (
+                r#"<si><t>a</t><r><t>b</t></r></si>"#,
+                "ab",
+                vec![D::RunStructure],
+            ),
+            (
+                r#"<si><r><t>a</t></r><t>b</t></si>"#,
+                "ab",
+                vec![D::RunStructure],
+            ),
+            (r#"<si><t>a</t><t>b</t></si>"#, "ab", vec![D::RunStructure]),
+            (
+                r#"<si><r><t>a</t><t>b</t></r></si>"#,
+                "ab",
+                vec![D::RunStructure],
+            ),
+            (
+                r#"<si><t>x_xD83D_y</t></si>"#,
+                "x\u{FFFD}y",
+                vec![D::UnpairedEscape],
+            ),
+            (
+                r#"<si><t>_xDC00__xD800_</t></si>"#,
+                "\u{FFFD}\u{FFFD}",
+                vec![D::UnpairedEscape],
+            ),
+        ] {
+            let xml = sst(items);
+            let mut report = ToleranceReport::default();
+            let strings = parse_repairing(xml.as_bytes(), &mut report)
+                .unwrap_or_else(|error| panic!("{items}: {error}"));
+            assert_eq!(strings[1].as_str(), expected_text, "{items}");
+            let recorded = report
+                .iter()
+                .map(|entry| {
+                    assert_eq!(entry.location, Location::SharedStringItem(1), "{items}");
+                    entry.defect
+                })
+                .collect::<Vec<_>>();
+            let expected = expected
+                .into_iter()
+                .map(Defect::SharedStrings)
+                .collect::<Vec<_>>();
+            assert_eq!(recorded, expected, "{items}");
+            assert!(
+                parse(xml.as_bytes()).is_err(),
+                "strict parse accepted {items}"
+            );
+            let selected = streaming_0364_default(xml.as_bytes(), &[0, 1]).expect("scanned");
+            assert!(selected.irregular, "{items}");
+        }
+
+        // A conformant table repairs nothing and stays regular.
+        let xml = sst(r#"<si><r><t>a</t></r><r><t>_xD83D__xDE00_</t></r></si>"#);
+        let mut report = ToleranceReport::default();
+        let strings = parse_repairing(xml.as_bytes(), &mut report).expect("conformant");
+        assert_eq!(strings[1].as_str(), "a😀");
+        assert!(report.is_clean());
+        assert!(
+            !streaming_0364_default(xml.as_bytes(), &[1])
+                .expect("scanned")
+                .irregular
+        );
     }
 
     #[test]

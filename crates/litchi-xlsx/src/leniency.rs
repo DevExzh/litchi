@@ -76,8 +76,8 @@
 //! selected-range scanner that never builds a store. That scanner does not
 //! repair anything: whenever a dependency it needs is irregular — a
 //! shared-string index the table does not hold, a style index past the
-//! catalog — it falls back to the authoritative store parse, which repairs
-//! and records. Selected reads therefore never observe a defect the report
+//! catalog, or a lexical the store parse would repair — it falls back to
+//! the authoritative store parse, which repairs and records. Selected reads therefore never observe a defect the report
 //! does not list.
 //!
 //! # Carrier status
@@ -85,13 +85,6 @@
 //! The plumbing is in place: both workbook handles carry an open-time
 //! report, every worksheet store carries the report of the parse that built
 //! it, and the aggregates above expose them. Live recording sites:
-//!
-//! * finding 4.2 — `Store::repair_style_indexes`, run by both read facades
-//!   before a worksheet store is published, records
-//!   [`CellDefect::StyleIndexOutOfRange`] at the cell, row, or column;
-//! * finding 4.4 — cell materialization (`raw/worksheet/semantic.rs`)
-//!   records [`CellDefect::SharedStringIndexOutOfRange`] and
-//!   [`CellDefect::MissingSharedStringTable`] at the cell.
 //!
 //! * OPC packaging findings 8.5–8.9 — folded from the package's own report
 //!   at open as [`Defect::Package`]. Shared metadata repairs (core and
@@ -101,35 +94,6 @@
 //!   in with [`ToleranceReport::append_properties`] as
 //!   [`Defect::Properties`]. Custom properties read through
 //!   `Package::custom_props` carry their own report on the returned value.
-//! * finding 4.5 — the shared-string table parse (`raw/strings.rs`) records
-//!   [`SharedStringsDefect::CountHint`]; each workbook handle keeps the
-//!   table's report beside its write-once cache and the aggregate lists it
-//!   after the open-time entries, with no sheet. The bounded selected
-//!   dependency scan reports such a table as irregular and the read falls
-//!   back to the repairing parse.
-//! * finding 4.7 — the open-time catalog parse (`raw/catalog.rs`) records
-//!   [`CatalogDefect::ActiveTabOutOfRange`] and
-//!   [`CatalogDefect::LocalSheetIdOutOfRange`]; under
-//!   [`Leniency::TolerateSheetNameRules`] it also records
-//!   [`CatalogDefect::SheetNameRules`] (finding 4.8, opt-in). The standalone
-//!   `raw::parse_catalog` and the feature snapshots that re-read the
-//!   catalog for editing keep the historical errors.
-//! * finding 4.11 — `style::theme::Theme::parse` records [`ThemeDefect`]s
-//!   in the parsed theme's own report; no workbook handle parses the theme.
-//! * finding 4.10 — the worksheet event parser records
-//!   [`WorksheetDefect::MisplacedElement`],
-//!   [`WorksheetDefect::CountMismatch`], and
-//!   [`WorksheetDefect::RowOutOfOrder`]; the selected-range scanner defers
-//!   such a worksheet to it.
-//! * finding 4.9 — the worksheet event parser records
-//!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
-//!   at the cell; the selected-range scanner defers such a cell to it.
-//! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
-//!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
-//! * finding 4.3 — cell materialization records
-//!   [`CellDefect::MalformedNumber`], [`CellDefect::MalformedBoolean`], and
-//!   [`CellDefect::MalformedDate`] at the cell; the selected-range scanner
-//!   defers such a cell to the materializing parse.
 //! * finding 4.1 — the worksheet event parser (`raw/worksheet/codec.rs`,
 //!   with `sheetFormatPr` in `raw/worksheet/validation.rs`) records
 //!   [`WorksheetDefect::RowHeightOutOfRange`],
@@ -137,11 +101,49 @@
 //!   [`WorksheetDefect::SheetFormatDefaultOutOfRange`] at the row, column
 //!   range, or worksheet. The standalone `raw::parse_worksheet_defaults`
 //!   reader has no report and keeps its errors.
+//! * finding 4.2 — `Store::repair_style_indexes`, run by both read facades
+//!   before a worksheet store is published, records
+//!   [`CellDefect::StyleIndexOutOfRange`] at the cell, row, or column.
+//! * findings 4.3 and 4.4 — cell materialization
+//!   (`raw/worksheet/semantic.rs`) records [`CellDefect::MalformedNumber`],
+//!   [`CellDefect::MalformedBoolean`], [`CellDefect::MalformedDate`],
+//!   [`CellDefect::SharedStringIndexOutOfRange`], and
+//!   [`CellDefect::MissingSharedStringTable`] at the cell.
+//! * findings 4.5 and 4.12 — the shared-string table parse
+//!   (`raw/strings.rs`) records [`SharedStringsDefect::CountHint`],
+//!   [`SharedStringsDefect::RunStructure`], and
+//!   [`SharedStringsDefect::UnpairedEscape`]; each workbook handle keeps the
+//!   table's report beside its write-once cache and the aggregate lists it
+//!   after the open-time entries, with no sheet. The bounded selected
+//!   dependency scan reports such a table as irregular and the read falls
+//!   back to the repairing parse.
+//! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
+//!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
+//! * findings 4.7 and 4.8 — the open-time catalog parse (`raw/catalog.rs`)
+//!   records [`CatalogDefect::ActiveTabOutOfRange`] and
+//!   [`CatalogDefect::LocalSheetIdOutOfRange`]; under the opt-in
+//!   [`Leniency::TolerateSheetNameRules`] it also records
+//!   [`CatalogDefect::SheetNameRules`]. The standalone `raw::parse_catalog`
+//!   and the feature snapshots that re-read the catalog for editing keep the
+//!   historical errors.
+//! * findings 4.9 and 4.10 — the worksheet event parser records
+//!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
+//!   at the cell, and [`WorksheetDefect::MisplacedElement`],
+//!   [`WorksheetDefect::CountMismatch`], and
+//!   [`WorksheetDefect::RowOutOfOrder`].
+//! * finding 4.11 — `style::theme::Theme::parse` records [`ThemeDefect`]s
+//!   in the parsed theme's own report; no workbook handle parses the theme.
 //!
-//! Write paths stay strict: the value-only cell editor parses with repairs
-//! refused and keeps its historical errors, and commit-time readback
-//! verification still refuses stale style indexes, so an edit never makes a
-//! repair durable. Every other variant below is a roadmap contract.
+//! Whenever the selected-range scanner meets a cell or worksheet one of the
+//! worksheet sites would repair, it defers to the materializing parse.
+//!
+//! Write paths stay strict where they re-read source parts: the value-only
+//! cell editor parses worksheets with repairs refused and keeps its
+//! historical errors, commit-time readback verification still refuses stale
+//! style indexes, and the catalog re-reads of the edit planners and the
+//! source-backed shared-string re-reads refuse repairs.
+//! [`SharedStringsDefect::RunProperty`] is the one remaining roadmap
+//! contract.
 //!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents and `crates/litchi-xls/src/leniency.rs` for
@@ -403,9 +405,14 @@ impl CatalogDefect {
 
 /// A shared-string table (`xl/sharedStrings.xml`) defect.
 ///
-/// [`SharedStringsDefect::CountHint`] (audit finding 4.5) is live; the
-/// rich-text variants (finding 4.12) are *roadmap contracts* no read
-/// produces yet.
+/// Recorded by the workbook handles' shared-string parse (`raw/strings.rs`):
+/// [`SharedStringsDefect::CountHint`] (audit finding 4.5) at
+/// [`Location::SharedStringTable`], and [`SharedStringsDefect::RunStructure`]
+/// and [`SharedStringsDefect::UnpairedEscape`] (finding 4.12) at
+/// [`Location::SharedStringItem`]. That parser reads item text only, so a
+/// malformed run property cannot fail it; [`SharedStringsDefect::RunProperty`]
+/// is a *roadmap contract* for the standalone `raw::shared_strings::Table`
+/// reader, which keeps its errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SharedStringsDefect {
@@ -416,15 +423,17 @@ pub enum SharedStringsDefect {
     /// twin parser already does. One entry per malformed hint, at
     /// [`Location::SharedStringTable`].
     CountHint,
-    /// A rich-text run lacks its `<t>`, or an item mixes simple and rich
-    /// text (finding 4.12). The offending run is dropped; the item's
-    /// remaining text is kept.
+    /// An item mixes simple and rich text, or repeats a `<t>` in the item
+    /// or in one run (finding 4.12). LibreOffice appends every text portion;
+    /// the reader keeps every text element's characters in document order,
+    /// so no text is lost.
     RunStructure,
     /// A run property is duplicated, unknown, or malformed (finding 4.12).
     /// The property is dropped; an unknown underline reads as single.
     RunProperty,
-    /// An `_xHHHH_` escape encodes an unpaired surrogate (finding 4.12). The
-    /// escape decodes to U+FFFD.
+    /// An `_xHHHH_` escape encodes an unpaired surrogate (finding 4.12).
+    /// The escape decodes to U+FFFD, as reference decoders do; one entry
+    /// per affected item.
     UnpairedEscape,
 }
 
@@ -434,7 +443,7 @@ impl SharedStringsDefect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::CountHint => "ignored the malformed shared-string count hint",
-            Self::RunStructure => "dropped the malformed rich-text run; the item text was kept",
+            Self::RunStructure => "kept every text portion of the malformed item in document order",
             Self::RunProperty => "dropped the malformed run property",
             Self::UnpairedEscape => "decoded the unpaired surrogate escape as U+FFFD",
         }
