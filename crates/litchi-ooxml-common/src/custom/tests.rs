@@ -496,3 +496,87 @@ fn powerpoint_locations_require_escaped_names_and_host_boundaries() {
     Props::read_for(&package, Host::PowerPoint).expect("host-aware read");
     assert!(Props::read_for(&package, Host::Word).is_err());
 }
+
+/// Build a package whose custom-properties part holds `xml`.
+fn package_with_custom(xml: &str) -> OpcPackage {
+    let mut package = OpcPackage::new();
+    package.add_part(Box::new(BlobPart::new(
+        custom_part_name().expect("URI"),
+        ct::OFC_CUSTOM_PROPERTIES.to_owned(),
+        xml.as_bytes().to_vec(),
+    )));
+    package.relate_to(PART_TARGET, rt::CUSTOM_PROPERTIES);
+    package
+}
+
+/// `(defect, item)` pairs of a read collection's report.
+fn recorded(props: &Props) -> Vec<(crate::leniency::CustomPropertiesDefect, Option<String>)> {
+    props
+        .tolerance_report()
+        .iter()
+        .map(|tolerated| {
+            let crate::leniency::Defect::CustomProperties(defect) = tolerated.defect() else {
+                panic!("unexpected defect family");
+            };
+            assert_eq!(tolerated.part(), "/docProps/custom.xml");
+            (defect, tolerated.item().map(str::to_owned))
+        })
+        .collect()
+}
+
+/// LENIENCY_AUDIT 8.3: one bad property costs only that property. Unknown
+/// variant types, unparseable values, missing/invalid identity, duplicate
+/// PIDs and names, unknown root children, PIs and unknown entities are each
+/// skipped and recorded; the good properties survive.
+#[test]
+fn package_reads_skip_bad_custom_properties_and_record_them() {
+    use crate::leniency::CustomPropertiesDefect as D;
+    let body = [
+        property(2, "Good", "<vt:lpwstr>kept</vt:lpwstr>"),
+        property(3, "Due", "<vt:date>2026-01-01</vt:date>"),
+        property(4, "Flag", "<vt:bool>maybe</vt:bool>"),
+        r#"<property pid="5" name="NoFmtid"><vt:i4>1</vt:i4></property>"#.to_owned(),
+        format!(r#"<property fmtid="{FORMAT_ID}" pid="1" name="LowPid"><vt:i4>1</vt:i4></property>"#),
+        property(2, "SamePid", "<vt:i4>1</vt:i4>"),
+        property(6, "good", "<vt:i4>1</vt:i4>"),
+        r#"<x:ext xmlns:x="urn:x"><x:y/></x:ext>"#.to_owned(),
+        "<?xml-stylesheet href=\"a\"?>".to_owned(),
+        property(7, "Entity", "<vt:lpwstr>&nbsp;</vt:lpwstr>"),
+        property(8, "Two", "<vt:i4>1</vt:i4><vt:i4>2</vt:i4>"),
+        property(9, "Other", "<vt:i8>42</vt:i8>"),
+    ]
+    .concat();
+    let props = Props::read(&package_with_custom(&document(&body))).expect("degrades");
+    assert_eq!(props.len(), 2);
+    assert_eq!(props.get("Good"), Some(&Value::Text("kept".to_owned())));
+    assert_eq!(props.get("Other"), Some(&Value::I64(42)));
+    let item = |name: &str| Some(name.to_owned());
+    assert_eq!(
+        recorded(&props),
+        vec![
+            (D::UnsupportedValueType, item("Due")),
+            (D::InvalidValue, item("Flag")),
+            (D::InvalidIdentity, item("NoFmtid")),
+            (D::InvalidIdentity, item("LowPid")),
+            (D::DuplicateProperty, item("SamePid")),
+            (D::DuplicateProperty, item("good")),
+            (D::UnknownElement, item("x:ext")),
+            (D::ProcessingInstruction, None),
+            (D::InvalidValue, item("Entity")),
+            (D::MalformedProperty, item("Two")),
+        ]
+    );
+
+    // The strict codec (used for authored round trips) still refuses.
+    assert!(decode(document(&body).as_bytes()).is_err());
+
+    // A conformant part reads clean, and well-formedness stays fatal.
+    let clean = Props::read(&package_with_custom(&document(&property(
+        2,
+        "Good",
+        "<vt:lpwstr>kept</vt:lpwstr>",
+    ))))
+    .expect("clean");
+    assert!(clean.tolerance_report().is_clean());
+    assert!(Props::read(&package_with_custom(&format!("{PREFIX}<property"))).is_err());
+}

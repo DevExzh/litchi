@@ -274,6 +274,24 @@ fn validate_shape_fragments(properties: &Props, base: &str) -> Result<()> {
     Ok(())
 }
 
+/// Each shape-ID fragment base whose fragment set is inconsistent, with the
+/// error [`validate`] would report for it.
+pub(super) fn invalid_shape_fragment_sets(properties: &Props) -> Vec<(&'static str, crate::Error)> {
+    SHAPE_PROPERTIES
+        .into_iter()
+        .filter_map(|base| {
+            validate_shape_fragments(properties, base)
+                .err()
+                .map(|error| (base, error))
+        })
+        .collect()
+}
+
+/// Whether `name` is a shape-ID fragment of `base`.
+pub(super) fn is_shape_fragment_of(name: &str, base: &str) -> bool {
+    shape_fragment_for(name, base).is_some()
+}
+
 fn shape_fragment(name: &str) -> Option<(&'static str, &str)> {
     SHAPE_PROPERTIES
         .into_iter()

@@ -16,6 +16,8 @@ impl Props {
     /// A genuinely absent relationship and part produce empty properties.
     /// Orphans, duplicate relationships, external targets, missing targets,
     /// wrong content types, and malformed XML are returned as typed errors.
+    /// A malformed or unsupported individual property is skipped and recorded
+    /// in [`Props::tolerance_report`] instead (see [`crate::leniency`]).
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -26,7 +28,7 @@ impl Props {
             return Ok(Self::new());
         };
         let part = package.get_part(&part_name)?;
-        codec::decode(part.blob())
+        codec::decode_tolerant(part.blob(), part_name.as_str())
     }
 
     /// Reads custom properties and validates reserved names for `host`.

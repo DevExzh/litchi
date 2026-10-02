@@ -20,6 +20,7 @@ use super::schema::{
     SUMMARY_FORMAT_ID, VT_NS, checked_depth, checked_increment, checked_total, count_node, invalid,
     limit,
 };
+use crate::leniency::{CustomPropertiesDefect, ToleranceReport};
 use crate::xml::attributes::BytesStartExt as _;
 use crate::{Error, Result};
 
@@ -30,7 +31,66 @@ struct PendingProperty {
     value: Option<(WireKind, Value)>,
 }
 
+/// Decode custom-properties XML strictly: every deviation a package read
+/// repairs is an error here.
+#[cfg(test)]
 pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
+    decode_with(xml, &mut Sink::strict())
+}
+
+/// Decode custom-properties XML, repairing per property and recording each
+/// repair into the returned collection's report (LENIENCY_AUDIT 8.3).
+pub(crate) fn decode_tolerant(xml: &[u8], part: &str) -> Result<Props> {
+    let mut report = ToleranceReport::default();
+    let mut props = decode_with(xml, &mut Sink::tolerant(&mut report, part))?;
+    props.tolerance_report = report;
+    Ok(props)
+}
+
+/// Where per-property repairs go. A strict sink turns every repair back into
+/// the error it replaces.
+pub(super) struct Sink<'a> {
+    report: Option<&'a mut ToleranceReport>,
+    part: &'a str,
+}
+
+impl<'a> Sink<'a> {
+    #[cfg(test)]
+    pub(super) fn strict() -> Self {
+        Self {
+            report: None,
+            part: "",
+        }
+    }
+
+    pub(super) fn tolerant(report: &'a mut ToleranceReport, part: &'a str) -> Self {
+        Self {
+            report: Some(report),
+            part,
+        }
+    }
+
+    /// Repair `error` by recording `defect`, or return it when strict. Only
+    /// [`Error::Invalid`] content errors are repairable: XML, limit and
+    /// allocation errors always propagate.
+    pub(super) fn tolerate(
+        &mut self,
+        error: Error,
+        defect: CustomPropertiesDefect,
+        item: Option<&str>,
+        value: Option<&str>,
+    ) -> Result<()> {
+        match (&mut self.report, &error) {
+            (Some(report), Error::Invalid(_)) => {
+                report.record(defect, self.part, item, value);
+                Ok(())
+            },
+            _ => Err(error),
+        }
+    }
+}
+
+fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
             "custom-properties XML bytes",
@@ -50,10 +110,42 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut declaration_seen = false;
+    // The property (or unknown root child) at depth 2 is being skipped until
+    // its end tag, after a recorded per-property repair.
+    let mut abandoned = false;
 
     loop {
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event()?;
+        if abandoned {
+            match event {
+                Event::Start(_) => {
+                    count_node(&mut nodes)?;
+                    depth = checked_depth(depth)?;
+                },
+                Event::End(_) => {
+                    count_node(&mut nodes)?;
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("custom-properties XML depth underflow"))?;
+                    if depth <= 1 {
+                        abandoned = false;
+                        pending = None;
+                        value_kind = None;
+                        value_text.clear();
+                    }
+                },
+                Event::DocType(_) => {
+                    return Err(invalid(
+                        "DTD declarations are forbidden in custom-properties XML",
+                    ));
+                },
+                Event::Eof => break,
+                Event::PI(_) => {},
+                _ => count_node(&mut nodes)?,
+            }
+            continue;
+        }
         match event {
             Event::Decl(_) => {
                 count_node(&mut nodes)?;
@@ -67,11 +159,12 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
                     "DTD declarations are forbidden in custom-properties XML",
                 ));
             },
-            Event::PI(_) => {
-                return Err(invalid(
-                    "processing instructions are forbidden in custom-properties XML",
-                ));
-            },
+            Event::PI(_) => sink.tolerate(
+                invalid("processing instructions are forbidden in custom-properties XML"),
+                CustomPropertiesDefect::ProcessingInstruction,
+                None,
+                None,
+            )?,
             Event::Start(element) => {
                 count_node(&mut nodes)?;
                 let child_depth = checked_depth(depth)?;
@@ -87,36 +180,40 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
                     },
                     2 => {
                         if !is_name(&namespace, &element, CUSTOM_NS, b"property") {
-                            return Err(invalid(format!(
-                                "unexpected element '{}' below custom-properties root",
-                                display_name(element.name().as_ref())
-                            )));
-                        }
-                        if pending.is_some() {
+                            let name = display_name(element.name().as_ref());
+                            sink.tolerate(
+                                invalid(format!(
+                                    "unexpected element '{name}' below custom-properties root"
+                                )),
+                                CustomPropertiesDefect::UnknownElement,
+                                Some(&name),
+                                None,
+                            )?;
+                            abandoned = true;
+                        } else if pending.is_some() {
                             return Err(invalid("custom properties cannot be nested"));
+                        } else {
+                            match admit_property(&element, decoder, &mut pids, sink)? {
+                                Some(parsed) => pending = Some(parsed),
+                                None => abandoned = true,
+                            }
                         }
-                        let parsed = parse_property_attributes(&element, decoder)?;
-                        if !pids.insert(parsed.pid) {
-                            return Err(invalid(format!(
-                                "duplicate custom property PID {}",
-                                parsed.pid
-                            )));
-                        }
-                        pending = Some(parsed);
                     },
                     3 => {
                         let property = pending.as_ref().ok_or_else(|| {
                             invalid("custom-property value has no owning property")
                         })?;
-                        if property.value.is_some() || value_kind.is_some() {
-                            return Err(invalid(format!(
-                                "custom property '{}' must contain exactly one value",
-                                property.name
-                            )));
+                        match start_value(property, value_kind.is_some(), &namespace, &element) {
+                            Ok(kind) => {
+                                value_kind = Some(kind);
+                                value_text.clear();
+                            },
+                            Err((error, defect, value)) => {
+                                let name = property.name.clone();
+                                sink.tolerate(error, defect, Some(&name), value.as_deref())?;
+                                abandoned = true;
+                            },
                         }
-                        value_kind = Some(parse_value_element(&namespace, &element)?);
-                        value_text.clear();
-                        validate_value_attributes(&element)?;
                     },
                     _ => {
                         return Err(limit(
@@ -143,23 +240,45 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
                         root_closed = true;
                     },
                     2 => {
-                        return Err(invalid(
-                            "custom property must contain exactly one typed value",
-                        ));
+                        let is_property = is_name(&namespace, &element, CUSTOM_NS, b"property");
+                        let name = if is_property {
+                            property_name_attribute(&element, decoder)
+                        } else {
+                            Some(display_name(element.name().as_ref()))
+                        };
+                        sink.tolerate(
+                            invalid("custom property must contain exactly one typed value"),
+                            if is_property {
+                                CustomPropertiesDefect::MalformedProperty
+                            } else {
+                                CustomPropertiesDefect::UnknownElement
+                            },
+                            name.as_deref(),
+                            None,
+                        )?;
                     },
                     3 => {
                         let property = pending.as_mut().ok_or_else(|| {
                             invalid("custom-property value has no owning property")
                         })?;
-                        if property.value.is_some() || value_kind.is_some() {
-                            return Err(invalid(format!(
-                                "custom property '{}' must contain exactly one value",
-                                property.name
-                            )));
+                        let parsed = start_value(property, value_kind.is_some(), &namespace, &element)
+                            .and_then(|kind| {
+                                parse_value(kind, "")
+                                    .map(|value| (kind, value))
+                                    .map_err(|error| {
+                                        (error, CustomPropertiesDefect::InvalidValue, None)
+                                    })
+                            });
+                        match parsed {
+                            Ok(value) => property.value = Some(value),
+                            Err((error, defect, value)) => {
+                                let name = property.name.clone();
+                                sink.tolerate(error, defect, Some(&name), value.as_deref())?;
+                                // The property's own end tag closes the skip.
+                                abandoned = true;
+                                depth = 2;
+                            },
                         }
-                        let kind = parse_value_element(&namespace, &element)?;
-                        validate_value_attributes(&element)?;
-                        property.value = Some((kind, parse_value(kind, "")?));
                     },
                     _ => {
                         return Err(limit(
@@ -177,30 +296,29 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
                         let kind = value_kind
                             .take()
                             .ok_or_else(|| invalid("custom-property value state is incomplete"))?;
-                        let value = parse_value(kind, &value_text)?;
                         let property = pending.as_mut().ok_or_else(|| {
                             invalid("custom-property value has no owning property")
                         })?;
-                        property.value = Some((kind, value));
+                        match parse_value(kind, &value_text) {
+                            Ok(value) => property.value = Some((kind, value)),
+                            Err(error) => {
+                                let name = property.name.clone();
+                                sink.tolerate(
+                                    error,
+                                    CustomPropertiesDefect::InvalidValue,
+                                    Some(&name),
+                                    Some(&value_text),
+                                )?;
+                                abandoned = true;
+                            },
+                        }
                         value_text.clear();
                     },
                     2 => {
                         let property = pending
                             .take()
                             .ok_or_else(|| invalid("custom-property record is incomplete"))?;
-                        let (wire, value) = property.value.ok_or_else(|| {
-                            invalid(format!(
-                                "custom property '{}' must contain exactly one value",
-                                property.name
-                            ))
-                        })?;
-                        props.insert_parsed(
-                            property.name,
-                            property.pid,
-                            property.format_id,
-                            wire,
-                            value,
-                        )?;
+                        insert_property(&mut props, property, sink)?;
                     },
                     1 => {
                         root_closed = true;
@@ -219,15 +337,17 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
                 if depth == 3 {
                     append_value_text(&mut value_text, &text)?;
                 } else if !text.trim().is_empty() {
-                    return Err(invalid(
-                        "non-whitespace text is not allowed outside a property value",
-                    ));
+                    let error =
+                        invalid("non-whitespace text is not allowed outside a property value");
+                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
                 }
             },
             Event::CData(text) => {
                 count_node(&mut nodes)?;
                 if depth != 3 {
-                    return Err(invalid("CDATA is only allowed inside a property value"));
+                    let error = invalid("CDATA is only allowed inside a property value");
+                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
+                    continue;
                 }
                 let text = text
                     .decode()
@@ -237,12 +357,24 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
             Event::GeneralRef(reference) => {
                 count_node(&mut nodes)?;
                 if depth != 3 {
-                    return Err(invalid(
-                        "entity references are only allowed inside a property value",
-                    ));
+                    let error =
+                        invalid("entity references are only allowed inside a property value");
+                    abandon_pending(&mut pending, &mut abandoned, depth, error, sink)?;
+                    continue;
                 }
-                let decoded = decode_reference(&reference)?;
-                append_value_text(&mut value_text, &decoded)?;
+                match decode_reference(&reference) {
+                    Ok(decoded) => append_value_text(&mut value_text, &decoded)?,
+                    Err(error) => {
+                        let name = pending.as_ref().map(|property| property.name.clone());
+                        sink.tolerate(
+                            error,
+                            CustomPropertiesDefect::InvalidValue,
+                            name.as_deref(),
+                            None,
+                        )?;
+                        abandoned = true;
+                    },
+                }
             },
             Event::Comment(_) => count_node(&mut nodes)?,
             Event::Eof => break,
@@ -254,8 +386,189 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
             "custom-properties XML must contain one complete Properties root",
         ));
     }
+    repair_shape_fragments(&mut props, sink)?;
     validate_collection(&props)?;
     Ok(props)
+}
+
+/// Content outside a value inside a property costs that property; at the
+/// root level it stays an error.
+fn abandon_pending(
+    pending: &mut Option<PendingProperty>,
+    abandoned: &mut bool,
+    depth: usize,
+    error: Error,
+    sink: &mut Sink<'_>,
+) -> Result<()> {
+    if depth != 2 {
+        return Err(error);
+    }
+    let name = pending.as_ref().map(|property| property.name.clone());
+    sink.tolerate(
+        error,
+        CustomPropertiesDefect::MalformedProperty,
+        name.as_deref(),
+        None,
+    )?;
+    *abandoned = true;
+    Ok(())
+}
+
+/// Admit a property start tag, or `None` after a recorded repair.
+fn admit_property(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    pids: &mut HashSet<i32>,
+    sink: &mut Sink<'_>,
+) -> Result<Option<PendingProperty>> {
+    let parsed = match parse_property_attributes(element, decoder) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            let name = property_name_attribute(element, decoder);
+            sink.tolerate(
+                error,
+                CustomPropertiesDefect::InvalidIdentity,
+                name.as_deref(),
+                None,
+            )?;
+            return Ok(None);
+        },
+    };
+    if !pids.insert(parsed.pid) {
+        let pid = parsed.pid.to_string();
+        sink.tolerate(
+            invalid(format!("duplicate custom property PID {pid}")),
+            CustomPropertiesDefect::DuplicateProperty,
+            Some(&parsed.name),
+            Some(&pid),
+        )?;
+        return Ok(None);
+    }
+    Ok(Some(parsed))
+}
+
+/// Best-effort `name` attribute of a property element, for repair context.
+fn property_name_attribute(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Option<String> {
+    element
+        .checked_attributes()
+        .take(MAX_ATTRIBUTES)
+        .filter_map(std::result::Result::ok)
+        .find(|attribute| attribute.key.as_ref() == b"name")
+        .filter(|attribute| attribute.value.len() <= MAX_ATTRIBUTE_BYTES)
+        .and_then(|attribute| {
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .ok()
+                .map(Cow::into_owned)
+        })
+}
+
+type ValueFailure = (Error, CustomPropertiesDefect, Option<String>);
+
+/// Validate a value element's position, type, and attributes.
+fn start_value(
+    property: &PendingProperty,
+    value_open: bool,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> std::result::Result<WireKind, ValueFailure> {
+    if property.value.is_some() || value_open {
+        return Err((
+            invalid(format!(
+                "custom property '{}' must contain exactly one value",
+                property.name
+            )),
+            CustomPropertiesDefect::MalformedProperty,
+            None,
+        ));
+    }
+    let kind = parse_value_element(namespace, element).map_err(|error| {
+        (
+            error,
+            CustomPropertiesDefect::UnsupportedValueType,
+            Some(display_name(element.name().as_ref())),
+        )
+    })?;
+    validate_value_attributes(element)
+        .map_err(|error| (error, CustomPropertiesDefect::MalformedProperty, None))?;
+    Ok(kind)
+}
+
+/// Insert a completed property, recording the per-property failures a read
+/// repairs; collection-level limits stay errors.
+fn insert_property(props: &mut Props, property: PendingProperty, sink: &mut Sink<'_>) -> Result<()> {
+    let Some((wire, value)) = property.value else {
+        return sink.tolerate(
+            invalid(format!(
+                "custom property '{}' must contain exactly one value",
+                property.name
+            )),
+            CustomPropertiesDefect::MalformedProperty,
+            Some(&property.name),
+            None,
+        );
+    };
+    if let Err(error) = validate_name(&property.name) {
+        return sink.tolerate(
+            error,
+            CustomPropertiesDefect::InvalidIdentity,
+            Some(&property.name),
+            None,
+        );
+    }
+    if let Err(error) = validate_value(&value) {
+        return sink.tolerate(
+            error,
+            CustomPropertiesDefect::InvalidValue,
+            Some(&property.name),
+            None,
+        );
+    }
+    if let Err(error) = reserved::validate_property(&property.name, &value, None) {
+        return sink.tolerate(
+            error,
+            CustomPropertiesDefect::ReservedProperty,
+            Some(&property.name),
+            None,
+        );
+    }
+    if props.folded_names.contains_key(&fold_name(&property.name)) {
+        return sink.tolerate(
+            invalid(format!(
+                "duplicate custom property name '{}' (names are case-insensitive)",
+                property.name
+            )),
+            CustomPropertiesDefect::DuplicateProperty,
+            Some(&property.name),
+            None,
+        );
+    }
+    props.insert_parsed(property.name, property.pid, property.format_id, wire, value)
+}
+
+/// Reserved shape-ID fragment sets (MS-OI29500 3.11) are validated as a
+/// group; a read drops an inconsistent group's fragments, recording each.
+fn repair_shape_fragments(props: &mut Props, sink: &mut Sink<'_>) -> Result<()> {
+    for (base, error) in reserved::invalid_shape_fragment_sets(props) {
+        let fragments: Vec<String> = props
+            .names()
+            .filter(|name| reserved::is_shape_fragment_of(name, base))
+            .map(str::to_owned)
+            .collect();
+        for name in fragments {
+            sink.tolerate(
+                invalid(error.to_string()),
+                CustomPropertiesDefect::ReservedProperty,
+                Some(&name),
+                None,
+            )?;
+            props.remove(&name);
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
