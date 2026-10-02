@@ -215,11 +215,20 @@ fn parser_errors_and_invalid_uris_keep_exact_manifest_phase() {
         "opc.package.loaded_relationship_manifests",
         relationship_phases,
     );
+    // LENIENCY_AUDIT 8.6: an unresolvable internal target is a recorded
+    // ingress repair (the relationship stays dangling), not a structural
+    // rejection, so validation admits the package.
     let invalid_relationship_uri = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="../escape.xml"/></Relationships>"#;
-    assert_structural_phase(
-        package_bytes(EMPTY_CONTENT_TYPES, invalid_relationship_uri, b"document"),
-        "opc.package.loaded_relationship_manifests",
-        relationship_phases,
+    let report = validate_read_at(Arc::new(OwnedSource::new(package_bytes(
+        EMPTY_CONTENT_TYPES,
+        invalid_relationship_uri,
+        b"document",
+    ))))
+    .unwrap();
+    assert!(!report.has_errors());
+    assert_eq!(
+        &phase_vector(&report)[..3],
+        ["complete", "complete", "complete"]
     );
 }
 

@@ -1898,13 +1898,19 @@ impl PackageReader {
             .try_reserve(pkg_srels.len())
             .map_err(|source| allocation("OPC relationship work queue", source))?;
         for srel in pkg_srels {
-            Self::enqueue_target(srel, &mut visited, &mut work_queue, limits)?;
+            Self::enqueue_target(srel, &mut visited, &mut work_queue, limits, &mut ledger.report)?;
         }
 
         while let Some(partname) = work_queue.pop() {
             let part_srels = Self::load_rels_lazy(archive, &partname, limits, ledger)?;
             for child_srel in &part_srels {
-                Self::enqueue_target(child_srel, &mut visited, &mut work_queue, limits)?;
+                Self::enqueue_target(
+                    child_srel,
+                    &mut visited,
+                    &mut work_queue,
+                    limits,
+                    &mut ledger.report,
+                )?;
             }
             // `enqueue_target` is the only producer of this queue and it inserts
             // the node before pushing it, so the slot already exists and the
@@ -1924,16 +1930,36 @@ impl PackageReader {
     }
 
     /// Queue an internal relationship target for traversal, once.
+    ///
+    /// A target that cannot be resolved to a part name — a literal space or
+    /// backslash, an absolute URI, a `..` escaping the package root — is a
+    /// producer-rule violation (ECMA-376 Part 2 §9.1.1.1) with no consumer
+    /// directive. Like a dangling target, the relationship stays visible on
+    /// its source but is not followed, and the repair is recorded; Apache POI
+    /// substitutes a dummy URI and Word opens the file with the link dead.
     fn enqueue_target(
         srel: &SerializedRelationship,
         visited: &mut HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
         work_queue: &mut Vec<PackURI>,
         limits: ReadLimits,
+        report: &mut ToleranceReport,
     ) -> Result<()> {
         if srel.is_external() {
             return Ok(());
         }
-        let partname = srel.target_partname()?;
+        let partname = match srel.target_partname() {
+            Ok(partname) => partname,
+            Err(OpcError::InvalidPackUri(_) | OpcError::InvalidRelationship(_)) => {
+                report.record(
+                    RelationshipDefect::UnresolvableTarget,
+                    srel.source_uri.as_deref().unwrap_or(&srel.base_uri),
+                    Some(&srel.r_id),
+                    Some(&srel.target_ref),
+                );
+                return Ok(());
+            },
+            Err(error) => return Err(error),
+        };
         limits.check(
             ReadResource::RelationshipTargetBytes,
             partname.as_str().len() as u64,
@@ -2622,14 +2648,22 @@ mod tests {
     }
 
     #[test]
-    fn invalid_internal_relationship_targets_are_rejected() {
+    fn invalid_internal_relationship_targets_stay_dangling_and_are_recorded() {
+        // LENIENCY_AUDIT 8.6: an unresolvable internal target is not followed.
         let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="officeDocument" Target="../escape.xml"/></Relationships>"#;
         let bytes = package_bytes(relationships, b"document");
         let physical = PhysPkgReader::new(&bytes).unwrap();
-        let Err(error) = PackageReader::from_phys_reader(&physical) else {
-            panic!("invalid relationship target unexpectedly loaded")
-        };
-        assert!(matches!(error, OpcError::InvalidPackUri(_)));
+        let reader = PackageReader::from_phys_reader(&physical).unwrap();
+        assert_eq!(reader.pkg_srels().len(), 1);
+        let recorded = reader.tolerance_report().defects();
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(
+            recorded[0].defect(),
+            crate::leniency::Defect::Relationship(RelationshipDefect::UnresolvableTarget)
+        );
+        assert_eq!(recorded[0].part(), "/");
+        assert_eq!(recorded[0].item(), Some("rId1"));
+        assert_eq!(recorded[0].value(), Some("../escape.xml"));
     }
 
     fn package_with_physical_parts(first: &str, second: &str) -> Vec<u8> {

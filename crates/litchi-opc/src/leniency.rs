@@ -47,7 +47,8 @@
 //!
 //! The carrier is wired through every ingress path. The defect classes are
 //! the contract for findings 8.5–8.9 of `docs/LENIENCY_AUDIT.md`; recording
-//! sites land finding by finding: 8.5 (duplicate relationship `Id`).
+//! sites land finding by finding: 8.5 (duplicate relationship `Id`), 8.6
+//! (unresolvable internal target).
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays

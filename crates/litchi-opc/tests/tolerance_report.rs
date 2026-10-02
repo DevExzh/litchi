@@ -137,3 +137,39 @@ fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
     );
     assert_round_trips(&bytes);
 }
+
+/// LENIENCY_AUDIT 8.6: an internal target that cannot be resolved to a part
+/// name (literal space, backslash, absolute URI, root escape) stays visible
+/// as a dangling relationship, is not followed, and is recorded.
+#[test]
+fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image 1.png"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media\image2.png"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../../../escape.png"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="http://example.com/a.png"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    let unresolvable = Defect::Relationship(RelationshipDefect::UnresolvableTarget);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (unresolvable, Some("rId2"), Some("media/image 1.png")),
+            (unresolvable, Some("rId3"), Some("media\\image2.png")),
+            (unresolvable, Some("rId4"), Some("../../../escape.png")),
+            (unresolvable, Some("rId5"), Some("http://example.com/a.png")),
+        ]
+    );
+    assert!(report.iter().all(|t| t.part() == "/word/document.xml"));
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    assert_eq!(document.rels().len(), 5, "dangling relationships stay visible");
+    assert!(document.rels().get("rId2").unwrap().target_partname().is_err());
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+}
