@@ -931,7 +931,9 @@ fn core_properties_repairs_are_folded_into_the_open_report() {
 #[test]
 fn ill_formed_package_manifests_stay_fatal() {
     let deck = shapes_with_member("ppt/_rels/presentation.xml.rels", |xml| {
-        xml.replacen("<Relationship ", "<Relationship<", 1)
+        // An unclosed root element is ill-formed XML under every reader;
+        // unknown-but-well-formed elements are skipped since F8.11.
+        xml.replacen("</Relationships>", "", 1)
     });
     assert!(Package::from_vec(deck).is_err());
 }
