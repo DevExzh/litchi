@@ -57,6 +57,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     let mut description = String::new();
     let mut name = String::new();
     let mut preset = None;
+    let mut unknown_preset = None;
     let mut has_text_box = false;
     let mut is_inline = true;
     let mut anchor_id = None;
@@ -76,6 +77,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         description.clear();
                         name.clear();
                         preset = None;
+                        unknown_preset = None;
                         has_text_box = false;
                         has_shape = false;
                         is_inline = true;
@@ -114,8 +116,15 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         in_shape = true;
                         has_shape = true;
                     },
-                    b"prstGeom" if in_shape => {
-                        preset = Some(parse_preset(&element)?);
+                    b"prstGeom" if in_shape => match parse_preset(&element)? {
+                        Ok(value) => {
+                            preset = Some(value);
+                            unknown_preset = None;
+                        },
+                        Err(token) => {
+                            preset = None;
+                            unknown_preset = Some(token);
+                        },
                     },
                     b"txbx" if in_shape => {
                         in_text_box = true;
@@ -149,23 +158,26 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         } else {
                             Kind::Other
                         };
-                        objects.push(Object::from_inventory(
-                            name.clone(),
-                            description.clone(),
-                            width_emu,
-                            height_emu,
-                            x_emu,
-                            y_emu,
-                            preset,
-                            kind,
-                            if is_inline {
-                                Anchor::Inline
-                            } else {
-                                Anchor::Floating
-                            },
-                            anchor_id,
-                            text_content.clone(),
-                        ));
+                        objects.push(
+                            Object::from_inventory(
+                                name.clone(),
+                                description.clone(),
+                                width_emu,
+                                height_emu,
+                                x_emu,
+                                y_emu,
+                                preset,
+                                kind,
+                                if is_inline {
+                                    Anchor::Inline
+                                } else {
+                                    Anchor::Floating
+                                },
+                                anchor_id,
+                                text_content.clone(),
+                            )
+                            .with_unknown_preset(unknown_preset.take()),
+                        );
                     },
                     b"wsp" => {
                         in_shape = false;
@@ -348,14 +360,19 @@ fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
     Ok(value)
 }
 
+/// Read `prstGeom@prst`: the closed preset, or the raw token when it names
+/// no `ST_ShapeType` value (the empty string when `prst` is missing).
+///
+/// LibreOffice imports such a shape with an unknown preset type
+/// (`PresetShapeGeometryContext`) and Word renders it best-effort, so the
+/// object is kept rather than failing the paragraph's inventory
+/// (LENIENCY_AUDIT 2.10). Malformed attributes stay errors.
 #[inline]
-fn parse_preset(element: &BytesStart<'_>) -> Result<Preset> {
-    let value = strict_attribute(element, b"prst")?.ok_or_else(|| {
-        Error::InvalidFormat("DrawingML prstGeom is missing required prst".to_string())
-    })?;
-    value.parse().map_err(|error| {
-        Error::InvalidFormat(format!("invalid DrawingML shape preset '{value}': {error}"))
-    })
+fn parse_preset(element: &BytesStart<'_>) -> Result<std::result::Result<Preset, String>> {
+    let Some(value) = strict_attribute(element, b"prst")? else {
+        return Ok(Err(String::new()));
+    };
+    Ok(value.parse().map_err(|_unknown| value))
 }
 
 fn number_attribute(element: &BytesStart<'_>, name: &[u8], default: i64) -> Result<i64> {

@@ -661,6 +661,25 @@ impl<'a> Document<'a> {
 
         Ok(matches)
     }
+    /// Return the drawing objects of the main-story paragraphs in document
+    /// order (see [`Paragraph::drawing_objects`](crate::Paragraph::drawing_objects)).
+    ///
+    /// A shape whose preset geometry is unrecognized or missing is kept with
+    /// its raw token ([`Object::unknown_preset`](crate::drawing::Object::unknown_preset))
+    /// and recorded as [`crate::leniency::DrawingDefect`] in
+    /// [`Document::tolerance_report`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a paragraph's drawing markup is malformed.
+    pub fn drawing_objects(&self) -> Result<Vec<crate::drawing::Object>> {
+        let paragraphs = self.paragraphs()?;
+        let mut repaired = crate::leniency::ToleranceReport::default();
+        let objects = crate::drawing::collect_document_objects(&paragraphs, &mut repaired);
+        self.merge_tolerance(&repaired);
+        objects
+    }
+
     /// Get document statistics.
     ///
     /// Calculates comprehensive statistics about the document including

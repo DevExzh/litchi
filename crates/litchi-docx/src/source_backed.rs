@@ -3331,6 +3331,24 @@ impl Document {
         Ok(Some(text))
     }
 
+    /// Return the drawing objects of the main-story paragraphs in document
+    /// order.
+    ///
+    /// A shape whose preset geometry is unrecognized or missing is kept with
+    /// its raw token and recorded as [`crate::leniency::DrawingDefect`] in
+    /// [`Self::tolerance_report`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a paragraph's drawing markup is malformed.
+    pub fn drawing_objects(&self) -> Result<Vec<crate::drawing::Object>> {
+        let paragraphs = self.paragraphs()?;
+        let mut repaired = crate::leniency::ToleranceReport::default();
+        let objects = crate::drawing::collect_document_objects(&paragraphs, &mut repaired);
+        self.merge_tolerance(&repaired);
+        objects
+    }
+
     /// Return visible paragraphs sharing the pinned main-document allocation.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
         self.check_selective_operation("document paragraphs")?;

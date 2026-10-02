@@ -8,7 +8,8 @@
 use std::io;
 use std::path::Path;
 
-use litchi_docx::{Defect, NumberingDefect, Package, StyleDefect, source_backed};
+use litchi_docx::{Defect, DrawingDefect, NumberingDefect, Package, StyleDefect, source_backed};
+use litchi_drawingml::geom::Preset;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 fn fixture(name: &str) -> Vec<u8> {
@@ -25,20 +26,26 @@ fn member(bytes: &[u8], name: &str) -> String {
 
 /// Rewrite `name` in the archive by replacing the first `from` with `to`.
 fn patch(bytes: &[u8], name: &str, from: &str, to: &str) -> Vec<u8> {
+    patch_with(bytes, name, |text| {
+        assert!(text.contains(from), "{name} contains {from}");
+        text.replacen(from, to, 1)
+    })
+}
+
+/// Rewrite the text of archive member `name` with `rewrite`.
+fn patch_with(bytes: &[u8], name: &str, rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
     let archive = ArchiveReader::new(bytes).expect("fixture archive");
     let mut writer = StreamingArchiveWriter::new();
-    let mut patched = false;
+    let mut rewrite = Some(rewrite);
     for member in archive.file_names() {
         let mut content = archive.read(member).expect("archive member");
         if member == name {
             let text = String::from_utf8(content).expect("UTF-8 member");
-            assert!(text.contains(from), "{name} contains {from}");
-            content = text.replacen(from, to, 1).into_bytes();
-            patched = true;
+            content = rewrite.take().expect("member once")(text).into_bytes();
         }
         writer.write_stored(member, &content).expect("write member");
     }
-    assert!(patched, "fixture has {name}");
+    assert!(rewrite.is_none(), "fixture has {name}");
     writer.finish_to_bytes().expect("finish archive")
 }
 
@@ -255,4 +262,132 @@ fn non_numeric_levels_stay_fatal() {
         .styles()
         .expect("styles");
     assert!(styles.len().is_err());
+}
+
+// ---------------------------------------------------------------------------
+// F2.10 — unknown `a:prstGeom@prst`
+// ---------------------------------------------------------------------------
+
+const SHAPES: &str = "../../libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx";
+
+/// The shape fixture with its `wps` choice unwrapped from
+/// `mc:AlternateContent` (dropping the VML fallback), the way third-party
+/// producers write a Word shape; the markup-compatibility reader would
+/// otherwise select the fallback.
+fn shape_fixture() -> Vec<u8> {
+    patch_with(&fixture(SHAPES), "word/document.xml", |xml| {
+        let open = xml
+            .find("<mc:AlternateContent>")
+            .expect("alternate content");
+        let choice = "<mc:Choice Requires=\"wps\">";
+        let body = xml[open..].find(choice).expect("wps choice") + open + choice.len();
+        let close = xml.find("</mc:Choice>").expect("choice end");
+        let end_tag = "</mc:AlternateContent>";
+        let end = xml.find(end_tag).expect("alternate content end") + end_tag.len();
+        format!("{}{}{}", &xml[..open], &xml[body..close], &xml[end..])
+    })
+}
+
+fn shape_presets(
+    objects: &[litchi_docx::drawing::Object],
+) -> Vec<(Option<Preset>, Option<String>)> {
+    objects
+        .iter()
+        .filter(|object| object.kind() != litchi_docx::drawing::Kind::Other)
+        .map(|object| (object.preset(), object.unknown_preset().map(str::to_owned)))
+        .collect()
+}
+
+#[test]
+fn unknown_shape_preset_is_kept_as_raw_geometry_and_recorded() {
+    let original = shape_fixture();
+    let control = open(&original);
+    let control_document = control.document().expect("document");
+    let control_objects = control_document.drawing_objects().expect("drawings");
+    assert_eq!(
+        shape_presets(&control_objects),
+        [(Some(Preset::Rect), None)]
+    );
+    let index = control_document
+        .paragraphs()
+        .expect("paragraphs")
+        .iter()
+        .position(|paragraph| !paragraph.drawing_objects().expect("drawings").is_empty())
+        .expect("shape paragraph") as u64;
+    assert!(control_document.tolerance_report().is_clean());
+
+    let bytes = patch(
+        &original,
+        "word/document.xml",
+        r#"<a:prstGeom prst="rect""#,
+        r#"<a:prstGeom prst="customShape""#,
+    );
+    let expected = [(Defect::Drawing(DrawingDefect::UnknownPreset), index)];
+
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let objects = document
+        .drawing_objects()
+        .expect("drawing inventory survives");
+    assert_eq!(objects.len(), control_objects.len());
+    assert_eq!(
+        shape_presets(&objects),
+        [(None, Some("customShape".to_owned()))]
+    );
+    assert_eq!(objects[0].name(), control_objects[0].name());
+    assert_eq!(defects(&document.tolerance_report()), expected);
+
+    let source = open_source_backed(&bytes);
+    let pinned = source.document().expect("pinned document");
+    let objects = pinned
+        .drawing_objects()
+        .expect("drawing inventory survives");
+    assert_eq!(
+        shape_presets(&objects),
+        [(None, Some("customShape".to_owned()))]
+    );
+    assert_eq!(defects(&pinned.tolerance_report()), expected);
+
+    let source_control = open_source_backed(&original);
+    let pinned = source_control.document().expect("pinned document");
+    pinned.drawing_objects().expect("drawings");
+    assert!(pinned.tolerance_report().is_clean());
+}
+
+#[test]
+fn missing_shape_preset_is_kept_and_recorded() {
+    let bytes = patch(
+        &shape_fixture(),
+        "word/document.xml",
+        r#"<a:prstGeom prst="rect""#,
+        "<a:prstGeom",
+    );
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let objects = document
+        .drawing_objects()
+        .expect("drawing inventory survives");
+    assert_eq!(shape_presets(&objects), [(None, Some(String::new()))]);
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        [Defect::Drawing(DrawingDefect::MissingPreset)]
+    );
+}
+
+#[test]
+fn malformed_shape_preset_attribute_stays_fatal() {
+    let bytes = patch(
+        &shape_fixture(),
+        "word/document.xml",
+        r#"<a:prstGeom prst="rect""#,
+        r#"<a:prstGeom prst="rect" prst="rect""#,
+    );
+    // A duplicated attribute is ill-formed XML: the document does not open.
+    assert!(open(&bytes).document().is_err());
+    assert!(open_source_backed(&bytes).document().is_err());
 }

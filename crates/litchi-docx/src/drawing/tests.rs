@@ -4,15 +4,27 @@ use super::{Anchor, AnchorId, Kind, LegacyAnchorKind, Object, parse, parse_legac
 use litchi_drawingml::geom::Preset;
 
 #[test]
-fn rejects_unknown_or_non_schema_shape_presets() {
+fn keeps_unknown_or_missing_shape_presets_as_raw_geometry() {
     assert!("customShape".parse::<Preset>().is_err());
     assert!("textBox".parse::<Preset>().is_err());
 
-    let xml = br#"<w:drawing><wp:inline><wps:wsp><wps:spPr>
+    let xml = br#"<w:drawing><wp:inline><wp:docPr name="Odd"/><wps:wsp><wps:spPr>
         <a:prstGeom prst="customShape"/>
+        </wps:spPr></wps:wsp></wp:inline></w:drawing><w:drawing><wp:inline><wps:wsp><wps:spPr>
+        <a:prstGeom/>
+        </wps:spPr></wps:wsp></wp:inline></w:drawing><w:drawing><wp:inline><wps:wsp><wps:spPr>
+        <a:prstGeom prst="ellipse"/>
         </wps:spPr></wps:wsp></wp:inline></w:drawing>"#;
-    let error = parse(xml).unwrap_err();
-    assert!(error.to_string().contains("customShape"));
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 3);
+    assert_eq!(objects[0].name(), "Odd");
+    assert_eq!(objects[0].kind(), Kind::Shape);
+    assert_eq!(objects[0].preset(), None);
+    assert_eq!(objects[0].unknown_preset(), Some("customShape"));
+    assert_eq!(objects[1].preset(), None);
+    assert_eq!(objects[1].unknown_preset(), Some(""));
+    assert_eq!(objects[2].preset(), Some(Preset::Ellipse));
+    assert_eq!(objects[2].unknown_preset(), None);
 }
 
 #[test]

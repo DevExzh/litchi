@@ -116,6 +116,10 @@ pub struct Object {
     y_emu: i64,
     /// Closed `DrawingML` preset geometry, when a `prstGeom` was present.
     preset: Option<Preset>,
+    /// The raw `prstGeom@prst` token when it names no `ST_ShapeType` preset
+    /// (empty when the attribute is missing); see
+    /// [`crate::leniency::DrawingDefect`].
+    unknown_preset: Option<String>,
     /// Discovered semantic family.
     kind: Kind,
     /// Discovered `WordprocessingML` placement.
@@ -173,10 +177,17 @@ impl Object {
             x_emu,
             y_emu,
             preset,
+            unknown_preset: None,
             kind,
             anchor,
             anchor_id,
         }
+    }
+
+    /// Keep an unrecognized `prstGeom@prst` token as raw geometry.
+    pub(crate) fn with_unknown_preset(mut self, token: Option<String>) -> Self {
+        self.unknown_preset = token;
+        self
     }
 
     /// Return the shape title.
@@ -274,6 +285,21 @@ impl Object {
     #[must_use]
     pub fn preset(&self) -> Option<Preset> {
         self.preset
+    }
+
+    /// Return the raw `prstGeom@prst` token of a preset geometry that names no
+    /// `ST_ShapeType` value (for example a producer's `customShape`), or the
+    /// empty string when `prst` is missing.
+    ///
+    /// Such a shape is kept with [`preset`](Self::preset) `None`, the way
+    /// LibreOffice imports it with an unknown shape type, instead of failing
+    /// the paragraph's drawing inventory; the document-level
+    /// [`Document::drawing_objects`](crate::Document::drawing_objects) records
+    /// [`crate::leniency::DrawingDefect`] for it.
+    #[inline]
+    #[must_use]
+    pub fn unknown_preset(&self) -> Option<&str> {
+        self.unknown_preset.as_deref()
     }
 
     /// Return the discovered semantic family.

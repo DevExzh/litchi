@@ -14,7 +14,8 @@
 //! Each substitutes the behavior documented on the corresponding defect
 //! variant: [`TextDefect`] (semantic text extraction), [`SettingsDefect`]
 //! (`settings.xml`), [`NumberingDefect`] (`numbering.xml` and list
-//! resolution), [`StyleDefect`] (`styles.xml`), [`RevisionDefect`]
+//! resolution), [`StyleDefect`] (`styles.xml`), [`DrawingDefect`] (drawing
+//! inventory), [`RevisionDefect`]
 //! (tracked-change metadata),
 //! [`SectionDefect`] (section column models), and [`ContentControlDefect`]
 //! (`w:sdtPr` properties).
@@ -55,6 +56,9 @@
 //! - 2.9 — the list resolvers record [`NumberingDefect::LevelOutOfRange`]
 //!   for a paragraph `w:ilvl` above 8 and merge the [`StyleDefect`]s of the
 //!   [`Styles`](crate::styles::Styles) they load, which carries its own.
+//! - 2.10 — [`Document::drawing_objects`](crate::Document::drawing_objects)
+//!   (and the pinned source-backed one) record [`DrawingDefect`]; each
+//!   [`Object`](crate::drawing::Object) keeps its raw preset token.
 //! - 2.5 — [`Document::revisions`](crate::Document::revisions) and the pinned
 //!   source-backed `Document::revisions` record [`RevisionDefect`].
 //! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
@@ -376,6 +380,42 @@ impl StyleDefect {
     }
 }
 
+/// The class of `DrawingML` drawing-inventory defect the reader repairs per
+/// object, the way LibreOffice imports the shape.
+///
+/// This enumeration is closed by design. Each repair keeps the drawing
+/// object — name, description, extent, placement, text-box story — and
+/// degrades only its preset geometry, so one odd shape never hides the other
+/// drawings of its paragraph. The raw token stays on the object
+/// ([`Object::unknown_preset`](crate::drawing::Object::unknown_preset));
+/// [`Document::drawing_objects`](crate::Document::drawing_objects) and the
+/// pinned source-backed `Document::drawing_objects` record it, with the
+/// zero-based index of the paragraph in the main story as the context.
+/// Malformed attributes and ill-formed XML stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DrawingDefect {
+    /// `a:prstGeom@prst` names no `ST_ShapeType` preset (for example a
+    /// producer's `customShape`). LibreOffice imports the shape with an
+    /// unknown preset type (`PresetShapeGeometryContext`) and Word renders
+    /// it best-effort; the object is kept with no preset and the raw token.
+    UnknownPreset,
+    /// `a:prstGeom` has no `prst`, which `CT_PresetGeometry2D` requires. The
+    /// object is kept with no preset and an empty raw token.
+    MissingPreset,
+}
+
+impl DrawingDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnknownPreset => "kept the shape with its unknown preset token as raw geometry",
+            Self::MissingPreset => "kept the shape without a preset geometry",
+        }
+    }
+}
+
 /// The class of tracked-revision defect the reader repairs the way Word
 /// repairs it.
 ///
@@ -527,6 +567,8 @@ pub enum Defect {
     Revision(RevisionDefect),
     /// A `styles.xml` property defect repaired per style.
     Style(StyleDefect),
+    /// A drawing-inventory preset-geometry defect repaired per object.
+    Drawing(DrawingDefect),
     /// A section column-model defect repaired the way Word lays it out.
     Section(SectionDefect),
     /// A content-control property defect repaired per control.
@@ -553,6 +595,7 @@ impl Defect {
             Self::Numbering(defect) => defect.repair(),
             Self::Revision(defect) => defect.repair(),
             Self::Style(defect) => defect.repair(),
+            Self::Drawing(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
             Self::ContentControl(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
@@ -588,6 +631,12 @@ impl From<RevisionDefect> for Defect {
 impl From<StyleDefect> for Defect {
     fn from(defect: StyleDefect) -> Self {
         Self::Style(defect)
+    }
+}
+
+impl From<DrawingDefect> for Defect {
+    fn from(defect: DrawingDefect) -> Self {
+        Self::Drawing(defect)
     }
 }
 
@@ -905,6 +954,8 @@ mod tests {
             Defect::from(RevisionDefect::NonIntegerId),
             Defect::from(StyleDefect::LevelOutOfRange),
             Defect::from(StyleDefect::OutlineLevelOutOfRange),
+            Defect::from(DrawingDefect::UnknownPreset),
+            Defect::from(DrawingDefect::MissingPreset),
             Defect::from(SectionDefect::ColumnWidthMissing),
             Defect::from(SectionDefect::ColumnCountOutOfRange),
             Defect::from(SectionDefect::ColumnCountMismatch),
