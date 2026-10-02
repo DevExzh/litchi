@@ -322,7 +322,19 @@ impl<'a> Styles<'a> {
         let mut pending_level = None;
 
         loop {
-            match reader.read_event() {
+            let event = match reader.read_event() {
+                // Markup-compatibility processing re-serializes a part whose
+                // root declares `mc:Ignorable`, expanding every empty element
+                // into a start/end pair. Read a property leaf in either form.
+                Ok(Event::Start(e))
+                    if current_style.is_some()
+                        && is_style_property_leaf(e.local_name().as_ref()) =>
+                {
+                    Ok(Event::Empty(e))
+                },
+                other => other,
+            };
+            match event {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"style" => {
                     // Start a new style
                     let mut builder = StyleBuilder::default();
@@ -414,18 +426,25 @@ impl<'a> Styles<'a> {
                             );
                         },
                         b"outlineLvl" if in_ppr => {
-                            if builder.outline.is_some() {
+                            if builder.saw_outline {
                                 return Err(Error::InvalidFormat(
                                     "style has duplicate outlineLvl".to_owned(),
                                 ));
                             }
+                            builder.saw_outline = true;
                             let raw = required_style_value(&e, reader.decoder())?;
                             let level = raw.parse::<u8>().map_err(|_source_error| {
                                 Error::InvalidFormat(format!("invalid style outlineLvl '{raw}'"))
                             })?;
-                            builder.outline = Some(Outline::new(level).ok_or_else(|| {
-                                Error::InvalidFormat(format!("invalid style outlineLvl '{raw}'"))
-                            })?);
+                            // 0-8 are heading levels; 9 is Word's body-text
+                            // level, which has no outline rank.
+                            if level != BODY_TEXT_OUTLINE_LEVEL {
+                                builder.outline = Some(Outline::new(level).ok_or_else(|| {
+                                    Error::InvalidFormat(format!(
+                                        "invalid style outlineLvl '{raw}'"
+                                    ))
+                                })?);
+                            }
                         },
                         b"name" => {
                             // Parse name attribute
@@ -527,6 +546,23 @@ impl<'a> Styles<'a> {
     }
 }
 
+/// Whether `name` is a style property the loader reads from an empty
+/// element (and so must also read from a start/end pair).
+fn is_style_property_leaf(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"numId"
+            | b"ilvl"
+            | b"outlineLvl"
+            | b"name"
+            | b"basedOn"
+            | b"uiPriority"
+            | b"qFormat"
+            | b"semiHidden"
+            | b"locked"
+    )
+}
+
 /// Builder for constructing Style objects during XML parsing.
 #[derive(Debug, Default)]
 struct StyleBuilder {
@@ -538,11 +574,17 @@ struct StyleBuilder {
     based_on: Option<String>,
     numbering: Option<Paragraph>,
     outline: Option<Outline>,
+    /// Whether a `w:outlineLvl` was seen (the body-text level leaves
+    /// `outline` unset).
+    saw_outline: bool,
     priority: Option<i32>,
     is_quick_style: bool,
     is_hidden: bool,
     is_locked: bool,
 }
+
+/// The `w:outlineLvl` value Word writes for body text: no outline level.
+const BODY_TEXT_OUTLINE_LEVEL: u8 = 9;
 
 /// A single style definition in a Word document.
 ///
@@ -746,6 +788,21 @@ mod tests {
         });
     }
 
+    /// Markup-compatibility processing expands empty elements into
+    /// start/end pairs; the properties must read the same either way.
+    #[test]
+    fn expanded_property_elements_read_like_empty_ones() {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:style w:type="paragraph" w:styleId="List"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:uiPriority w:val="34"/><w:qFormat/><w:pPr><w:numPr><w:ilvl w:val="3"/><w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="1"/></w:pPr></w:style></w:styles>"#, |styles| {
+            let style = styles.get_by_id("List").unwrap().unwrap();
+            assert_eq!(style.name(), Some("List Paragraph"));
+            assert_eq!(style.based_on(), Some("Normal"));
+            assert_eq!(style.priority(), Some(34));
+            assert!(style.is_quick_style());
+            assert_eq!(style.numbering(), Some(Paragraph { num_id: 1, level: 3 }));
+            assert_eq!(style.outline(), Some(Outline::H2));
+        });
+    }
+
     #[test]
     fn rejects_based_on_cycles_and_malformed_num_pr() {
         with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#, |cycle| {
@@ -768,8 +825,11 @@ mod tests {
                 Some(Outline::H1)
             );
         });
-        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style></w:styles>"#, |styles| {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="10"/></w:pPr></w:style></w:styles>"#, |styles| {
             assert!(styles.len().is_err());
+        });
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Body"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert_eq!(styles.get_by_id("Body").unwrap().unwrap().outline(), None);
         });
     }
 
