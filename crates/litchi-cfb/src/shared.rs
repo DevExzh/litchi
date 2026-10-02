@@ -775,6 +775,15 @@ impl SharedOleFile {
         self.index.file_size
     }
 
+    /// Every reference-compatible repair applied while opening this file.
+    ///
+    /// The report is empty for a conformant file. See [`crate::leniency`]
+    /// for the repairs it can list and how format crates merge it.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::ToleranceReport {
+        &self.index.tolerance
+    }
+
     /// Returns the captured positional source identity after checking that it
     /// is still current.
     pub fn source_version(&self) -> Result<SourceVersion, OleError> {

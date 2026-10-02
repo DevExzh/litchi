@@ -18,6 +18,7 @@
 pub mod consts;
 mod directory_name;
 mod file;
+pub mod leniency;
 mod overlay;
 mod shared;
 mod shared_bulk;
@@ -28,6 +29,10 @@ pub mod writer;
 
 pub use directory_name::{DirectoryNameKey, directory_names_equal, validate_directory_name};
 pub use file::{DirectoryEntry, OleError, OleFile, OleFileLimits, is_ole_file};
+pub use leniency::{
+    AllocationDefect, Defect, DirectoryDefect, HeaderDefect, Leniency, ToleranceReport,
+    ToleratedDefect,
+};
 pub use overlay::{
     ArtifactFingerprint, ComposedOverlaySource, OutputProgress, OverlayError, OverlayLimits,
     OverlayOperationShape, OverlaySourceMode, PublishReport, SameLengthStreamOverlay,
@@ -61,5 +66,7 @@ mod splice_tests;
 mod stream_compare_tests;
 #[cfg(test)]
 mod stream_move_tests;
+#[cfg(test)]
+mod tolerance_tests;
 #[cfg(test)]
 mod validation_tests;

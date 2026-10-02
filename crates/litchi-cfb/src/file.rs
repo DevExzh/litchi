@@ -5,6 +5,7 @@ use super::consts::{
     TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
+use crate::leniency::ToleranceReport;
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -473,6 +474,8 @@ pub struct OleFile<R: Read + Seek> {
     /// memory, which can exceed [`RETAINED_CHAIN_SCRATCH_BYTES`] for very large
     /// files (e.g. a v4 file over 32 GiB has more than 8.4M FAT entries).
     stream_chain: EndChainScratch,
+    /// Every reference-compatible repair the open applied.
+    tolerance: ToleranceReport,
 }
 
 /// The validated, cursor-independent portion of an OLE file.
@@ -492,6 +495,8 @@ pub(crate) struct ParsedOleIndex {
     pub(crate) root: Option<DirectoryEntry>,
     pub(crate) dir_entries: Vec<Option<DirectoryEntry>>,
     pub(crate) dir_name_data: Vec<Option<DirectoryNameData>>,
+    /// Every reference-compatible repair the open applied.
+    pub(crate) tolerance: ToleranceReport,
 }
 
 /// Represents an OLE directory entry (stream or storage)
@@ -904,6 +909,7 @@ impl<R: Read + Seek> OleFile<R> {
             root: self.root,
             dir_entries: self.dir_entries,
             dir_name_data: self.dir_name_data,
+            tolerance: self.tolerance,
         }
     }
 
@@ -1107,6 +1113,7 @@ impl<R: Read + Seek> OleFile<R> {
             ministream: None,
             sector_roles,
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
 
         // Load FAT (File Allocation Table)
@@ -1136,6 +1143,15 @@ impl<R: Read + Seek> OleFile<R> {
 
     pub fn file_size(&self) -> u64 {
         self.file_size
+    }
+
+    /// Every reference-compatible repair applied while opening this file.
+    ///
+    /// The report is empty for a conformant file. See [`crate::leniency`]
+    /// for the repairs it can list and how format crates merge it.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Sector size used by this compound file.
@@ -4963,6 +4979,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -5017,6 +5034,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
 
         assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
@@ -5039,6 +5057,7 @@ mod tests {
             ministream: None,
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -5251,6 +5270,7 @@ mod tests {
             ministream: Some(ministream),
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -5316,6 +5336,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; bytes.len() / SECTOR_SIZE_V3],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -5795,6 +5816,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_sectors],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -6139,6 +6161,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 3],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
         let mut data = vec![0xFF; 2 * SECTOR_SIZE_V3];
 
@@ -6198,6 +6221,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 113],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
         assert!(matches!(
             file.load_fat(&header, 111, 109, 2),
@@ -6236,6 +6260,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
 
         assert!(matches!(
@@ -6263,6 +6288,7 @@ mod tests {
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed],
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
 
         assert!(matches!(
@@ -6305,6 +6331,7 @@ mod tests {
             ministream: None,
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
         assert!(matches!(
             file.read_sector(0),
@@ -6332,6 +6359,7 @@ mod tests {
             ministream: None,
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
         let mut destination = [0xFF; SECTOR_SIZE_V3];
 
@@ -6424,6 +6452,7 @@ mod tests {
             ministream: None,
             sector_roles: Vec::new(),
             stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
         };
 
         let streams = file.list_streams();
