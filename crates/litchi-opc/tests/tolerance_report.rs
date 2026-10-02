@@ -469,6 +469,75 @@ fn manifest_shape_deviations_are_ignored_and_recorded() {
     assert_round_trips(&bytes);
 }
 
+/// LENIENCY_AUDIT 8.12: a `ContentType` or `Extension` outside the RFC 2616
+/// grammar is kept verbatim (LibreOffice's opaque strings) and recorded.
+#[test]
+fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
+    const MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    let raw = format!("{MAIN}; charset=utf-8");
+    let content_types = CONTENT_TYPES
+        .replace(
+            &format!(r#"ContentType="{MAIN}""#),
+            &format!(r#"ContentType="{raw}""#),
+        )
+        .replace(
+            "</Types>",
+            r#"<Default Extension="my ext" ContentType="text/plain"/></Types>"#,
+        );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                Defect::ContentType(ContentTypeDefect::InvalidMediaType),
+                CONTENT_TYPES_PART,
+                Some("/word/document.xml"),
+                Some(raw.as_str()),
+            ),
+            (
+                Defect::ContentType(ContentTypeDefect::InvalidExtension),
+                CONTENT_TYPES_PART,
+                Some("my ext"),
+                Some("text/plain"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        package
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        raw
+    );
+    assert_round_trips(&bytes);
+
+    // Empty content types and control characters stay fatal.
+    for fatal in [
+        CONTENT_TYPES.replace(&format!(r#"ContentType="{MAIN}""#), r#"ContentType="""#),
+        CONTENT_TYPES.replace(
+            &format!(r#"ContentType="{MAIN}""#),
+            r#"ContentType="a/&#1;b""#,
+        ),
+    ] {
+        assert!(
+            OpcPackage::from_bytes(&package_bytes(&fatal)).is_err(),
+            "{fatal}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(package_bytes(&fatal)).is_err(),
+            "{fatal}"
+        );
+    }
+}
+
+fn package_bytes(content_types: &str) -> Vec<u8> {
+    package(content_types, ROOT_RELS, DOCUMENT_RELS)
+}
+
 /// Structural corruption stays fatal: a malformed relationships manifest,
 /// a relationship without an Id, and an ill-formed content-types manifest
 /// are still rejected.
@@ -499,4 +568,51 @@ fn structural_manifest_corruption_stays_fatal() {
         assert!(OpcPackage::from_bytes(&bytes).is_err(), "{types}");
         assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{types}");
     }
+}
+
+/// An edited package whose manifest is regenerated carries a source content
+/// type admitted verbatim forward unchanged, while a content type the caller
+/// authors keeps the MIME grammar check.
+#[test]
+fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() {
+    const MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    let content_types = CONTENT_TYPES.replace(
+        &format!(r#"ContentType="{MAIN}""#),
+        &format!(r#"ContentType="{MAIN}; charset=utf-8""#),
+    );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let add = |package: &mut OpcPackage, content_type: &str| {
+        package
+            .try_add_part(Box::new(litchi_opc::BlobPart::new(
+                PackURI::new("/custom/item.bin").unwrap(),
+                content_type.to_owned(),
+                vec![1, 2, 3],
+            )))
+            .unwrap();
+    };
+
+    let mut edited = OpcPackage::from_bytes(&bytes).unwrap();
+    add(&mut edited, "application/octet-stream");
+    let mut saved = Vec::new();
+    edited
+        .to_stream(std::io::Cursor::new(&mut saved))
+        .expect("a source content type admitted verbatim is carried forward");
+    let reopened = OpcPackage::from_bytes(&saved).unwrap();
+    assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
+    assert_eq!(
+        reopened
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        format!("{MAIN}; charset=utf-8")
+    );
+
+    let mut authored = OpcPackage::from_bytes(&bytes).unwrap();
+    add(&mut authored, "application/octet-stream; x=1");
+    assert!(
+        authored
+            .to_stream(std::io::Cursor::new(&mut Vec::new()))
+            .is_err()
+    );
 }

@@ -532,6 +532,14 @@ pub(crate) fn with_part_overrides(
             "content-type override selectors contain duplicate part names".into(),
         ));
     }
+    // Authored content types keep the MIME grammar check; only values read
+    // from a source manifest are admitted verbatim (LENIENCY_AUDIT 8.12).
+    for (_, content_type) in overrides {
+        validate_content_type(content_type).map_err(|reason| OpcError::InvalidContentType {
+            value: (*content_type).to_owned(),
+            reason,
+        })?;
+    }
     if overrides.is_empty() {
         return Ok(source.clone());
     }

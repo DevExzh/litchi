@@ -614,6 +614,25 @@ impl OpcPackage {
             .map(|matches| matches.then_some((bytes, map)))
     }
 
+    /// Whether `content_type` is exactly what the retained source manifest
+    /// declared for `partname`.
+    ///
+    /// Source content types are admitted verbatim at ingress even when they
+    /// break the MIME grammar (LENIENCY_AUDIT 8.12, recorded in the tolerance
+    /// report), so a regenerated manifest may carry such a value forward
+    /// unchanged; content types the caller authors keep the grammar check.
+    pub(crate) fn content_type_is_from_source(
+        &self,
+        partname: &PackURI,
+        content_type: &str,
+    ) -> bool {
+        self.source_content_types.as_ref().is_some_and(|source| {
+            source
+                .lookup(partname)
+                .is_some_and(|declared| declared.as_str() == content_type)
+        })
+    }
+
     /// Whether the retained source manifest is still `allocation`, the one
     /// the open captured. A token installed since then
     /// ([`Self::try_replace_content_types`] or a batch add) replaces the

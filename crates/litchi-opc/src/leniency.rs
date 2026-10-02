@@ -45,23 +45,27 @@
 //!
 //! # Status
 //!
-//! Live for findings 8.5–8.11 of `docs/LENIENCY_AUDIT.md`: duplicate
+//! Live for findings 8.5–8.12 of `docs/LENIENCY_AUDIT.md`: duplicate
 //! relationship `Id` (8.5), unresolvable internal target (8.6), `TargetMode`
 //! casing and value (8.7), missing `Target`/`Type` (8.8), duplicate
 //! content-type mappings (8.9), a relationships part declared with another
-//! content type (8.10), and manifest shape — unknown elements and
-//! attributes, character data and CDATA in `[Content_Types].xml` and `.rels`
-//! (8.11). The P2 grammar finding 8.12 remains strict.
+//! content type (8.10), manifest shape — unknown elements and attributes,
+//! character data and CDATA in `[Content_Types].xml` and `.rels` (8.11) —
+//! and `ContentType`/`Extension` grammar (8.12).
 //!
 //! Where the references differ the more tolerant one is followed, and only
 //! when the repair cannot change which part is which: relationships-part
-//! typing by name (LibreOffice and Apache POI alike), and Apache POI for
+//! typing by name (LibreOffice and Apache POI alike), Apache POI for
 //! unknown manifest elements (skipped, where LibreOffice's SAX handler
-//! throws) — skipping an element never invents a mapping or relationship,
-//! and the skip is recorded. A `DOCTYPE` (Apache POI disallows DTDs
-//! outright; entity declarations are a parser-security surface), an unbound
-//! namespace prefix, a missing `ContentType`, `Extension`, `PartName`, or
-//! `Id`, and a wrong document element stay hard errors.
+//! throws), and LibreOffice for content-type grammar (opaque strings, where
+//! Apache POI validates the RFC 2616 grammar) — no repair invents a mapping
+//! or relationship, and each is recorded. A `DOCTYPE` (Apache POI disallows
+//! DTDs outright; entity declarations are a parser-security surface), an
+//! unbound namespace prefix, a missing `ContentType`, `Extension`,
+//! `PartName`, or `Id`, an empty `ContentType` or `Extension` (both
+//! references reject it), control characters in either (they cannot be
+//! written back as XML 1.0), and a wrong document element stay hard errors.
+//! Content types the caller authors keep the grammar check.
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays
@@ -276,6 +280,25 @@ pub enum ContentTypeDefect {
     /// The value is `#text` or `#cdata-section`; the content itself is not
     /// stored.
     UnexpectedContent,
+    /// A `ContentType` value that does not follow the RFC 2616 media-type
+    /// grammar §9.1.2.2 asks producers for — for example
+    /// `application/xml; charset=utf-8` (a space after `;`) or a value
+    /// without `/`.
+    ///
+    /// The raw value is kept verbatim and compared verbatim, as LibreOffice
+    /// treats content types as opaque strings; the grammar never decides
+    /// which part is which. Empty values and values carrying control
+    /// characters stay hard errors. The raw value is recorded.
+    InvalidMediaType,
+    /// A `Default` `Extension` value that cannot occur as a part-name
+    /// extension: it contains whitespace, non-ASCII characters, or one of
+    /// `.`, `/`, `\`, `?`, `#`.
+    ///
+    /// The mapping is kept verbatim (LibreOffice stores it opaquely); it can
+    /// only ever match a part whose extension is spelled the same way. Empty
+    /// values and values carrying control characters stay hard errors. The
+    /// raw extension is the item, the mapping's content type the value.
+    InvalidExtension,
 }
 
 impl ContentTypeDefect {
@@ -297,6 +320,8 @@ impl ContentTypeDefect {
             },
             Self::UnknownAttribute => "ignored an unknown content-type mapping attribute",
             Self::UnexpectedContent => "ignored character data in the content types manifest",
+            Self::InvalidMediaType => "kept the content type verbatim despite its MIME grammar",
+            Self::InvalidExtension => "kept the Default extension verbatim despite its grammar",
         }
     }
 }
@@ -625,6 +650,8 @@ mod tests {
             Defect::from(ContentTypeDefect::UnknownElement),
             Defect::from(ContentTypeDefect::UnknownAttribute),
             Defect::from(ContentTypeDefect::UnexpectedContent),
+            Defect::from(ContentTypeDefect::InvalidMediaType),
+            Defect::from(ContentTypeDefect::InvalidExtension),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

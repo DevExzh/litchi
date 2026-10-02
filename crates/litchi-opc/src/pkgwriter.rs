@@ -1623,7 +1623,9 @@ pub(crate) fn authored_content_types_xml_with_limits(
             source,
         })?;
     for part in package.iter_parts() {
-        if let Err(reason) = crate::content_type::validate_content_type(part.content_type()) {
+        if let Err(reason) = crate::content_type::validate_content_type(part.content_type())
+            && !package.content_type_is_from_source(part.partname(), part.content_type())
+        {
             let mut value = String::new();
             value
                 .try_reserve_exact(part.content_type().len())

@@ -32,6 +32,17 @@ impl ContentType {
         Ok(Self(text))
     }
 
+    /// Adopt a content type read from a source manifest without the MIME
+    /// grammar check.
+    ///
+    /// Source content types are admitted verbatim (a grammar deviation is
+    /// recorded at ingress, `ContentTypeDefect::InvalidMediaType`), so values
+    /// carried over from an opened package must not be re-validated.
+    /// Authored values keep going through [`Self::new`].
+    pub(crate) fn from_admitted_source(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
     /// Return the serialized content type.
     #[inline]
     #[must_use]
@@ -270,7 +281,6 @@ impl ContentTypeMap {
         content_type: ContentType,
         report: &mut ToleranceReport,
     ) -> Result<()> {
-        validate_extension(&extension)?;
         let key = extension.to_ascii_lowercase();
         if self.defaults.contains_key(&key) {
             report.record(
@@ -452,14 +462,17 @@ fn inspect_element(
         let (extension, content_type, unknown) =
             required_attributes(element, decoder, "Extension", "Default", limits)?;
         record_unknown_attributes(report, &extension, &unknown);
-        map.add_default(extension.clone(), ContentType::new(content_type)?, report)?;
+        let content_type = admit_content_type(content_type, &extension, report)?;
+        admit_extension(&extension, &content_type, report)?;
+        map.add_default(extension.clone(), content_type, report)?;
         Ok(Inspected::Mapping(extension))
     } else {
         let (partname, content_type, unknown) =
             required_attributes(element, decoder, "PartName", "Override", limits)?;
         record_unknown_attributes(report, &partname, &unknown);
+        let content_type = admit_content_type(content_type, &partname, report)?;
         let part_uri = PackURI::new(partname.clone()).map_err(OpcError::InvalidPackUri)?;
-        map.add_override(part_uri, ContentType::new(content_type)?, report)?;
+        map.add_override(part_uri, content_type, report)?;
         Ok(Inspected::Mapping(partname))
     }
 }
@@ -472,6 +485,58 @@ fn record_unknown_attributes(report: &mut ToleranceReport, key: &str, unknown: &
             Some(key),
             Some(bounded_name(name)),
         );
+    }
+}
+
+/// Admit a source `ContentType` value (LENIENCY_AUDIT 8.12).
+///
+/// A value that breaks the RFC 2616 grammar is kept verbatim and recorded:
+/// LibreOffice stores and compares content types as opaque strings, and the
+/// grammar never changes which part is which. An empty value (rejected by
+/// both LibreOffice and Apache POI) and a value carrying control characters
+/// (which cannot be written back as XML 1.0) stay hard errors.
+fn admit_content_type(
+    value: String,
+    key: &str,
+    report: &mut ToleranceReport,
+) -> Result<ContentType> {
+    match validate_content_type(&value) {
+        Ok(()) => Ok(ContentType(value)),
+        Err(reason) if value.is_empty() || value.chars().any(char::is_control) => {
+            Err(OpcError::InvalidContentType { value, reason })
+        },
+        Err(_) => {
+            report.record(
+                ContentTypeDefect::InvalidMediaType,
+                CONTENT_TYPES_URI,
+                Some(key),
+                Some(&value),
+            );
+            Ok(ContentType(value))
+        },
+    }
+}
+
+/// Admit a source `Default` `Extension` value (LENIENCY_AUDIT 8.12): kept
+/// verbatim and recorded when it breaks the extension grammar, except an
+/// empty value or one carrying control characters.
+fn admit_extension(
+    extension: &str,
+    content_type: &ContentType,
+    report: &mut ToleranceReport,
+) -> Result<()> {
+    match validate_extension(extension) {
+        Ok(()) => Ok(()),
+        Err(error) if extension.is_empty() || extension.chars().any(char::is_control) => Err(error),
+        Err(_) => {
+            report.record(
+                ContentTypeDefect::InvalidExtension,
+                CONTENT_TYPES_URI,
+                Some(extension),
+                Some(content_type.as_str()),
+            );
+            Ok(())
+        },
     }
 }
 
@@ -726,6 +791,59 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    /// LENIENCY_AUDIT 8.12: grammar deviations in `ContentType` and
+    /// `Extension` are kept verbatim and recorded; empty values and control
+    /// characters stay fatal.
+    #[test]
+    fn content_type_and_extension_grammar_is_recorded_not_enforced() {
+        let xml = manifest(
+            r#"<Default Extension="xml" ContentType="application/xml; charset=utf-8"/><Default Extension="my file" ContentType="text/plain"/><Override PartName="/a.bin" ContentType="opaque"/>"#,
+        );
+        let mut report = ToleranceReport::default();
+        let map =
+            ContentTypeMap::from_xml_reporting(xml.as_bytes(), ReadLimits::default(), &mut report)
+                .unwrap();
+        assert_eq!(
+            map.get(&PackURI::new("/doc.xml").unwrap()).unwrap(),
+            "application/xml; charset=utf-8"
+        );
+        assert_eq!(map.get(&PackURI::new("/a.bin").unwrap()).unwrap(), "opaque");
+        assert_eq!(
+            recorded(&report),
+            vec![
+                (
+                    ContentTypeDefect::InvalidMediaType.into(),
+                    Some("xml"),
+                    Some("application/xml; charset=utf-8"),
+                ),
+                (
+                    ContentTypeDefect::InvalidExtension.into(),
+                    Some("my file"),
+                    Some("text/plain")
+                ),
+                (
+                    ContentTypeDefect::InvalidMediaType.into(),
+                    Some("/a.bin"),
+                    Some("opaque")
+                ),
+            ]
+        );
+
+        for fatal in [
+            manifest(r#"<Default Extension="xml" ContentType=""/>"#),
+            manifest(r#"<Default Extension="xml" ContentType="text/&#1;x"/>"#),
+            manifest(r#"<Default Extension="" ContentType="text/xml"/>"#),
+            manifest(r#"<Default Extension="a&#1;" ContentType="text/xml"/>"#),
+        ] {
+            assert!(
+                ContentTypeMap::from_xml(fatal.as_bytes(), ReadLimits::default()).is_err(),
+                "{fatal}"
+            );
+        }
+        // Authored values keep the grammar check.
+        assert!(ContentType::new("application/xml; charset=utf-8").is_err());
     }
 
     #[test]

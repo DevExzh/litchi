@@ -106,7 +106,9 @@ impl SourceXmlPart {
             .and_then(|bytes| bytes.checked_add(size_of::<[usize; 8]>()))
             .ok_or_else(|| invalid_source("source XML metadata size overflows"))?;
         let metadata_reservation = reserve_output_memory(&source, metadata_bytes)?;
-        let source_content_type = ContentType::new(source_content_type)?;
+        // Source content types were admitted verbatim at ingress (a grammar
+        // deviation is recorded there, LENIENCY_AUDIT 8.12).
+        let source_content_type = ContentType::from_admitted_source(source_content_type);
         let bytes = original.as_bytes();
         limits.check(
             ReadResource::PartBytes,

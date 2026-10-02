@@ -6595,8 +6595,8 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                content_type: ContentType::new(part.content_type)
-                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+                // Admitted verbatim by the catalog reader (LENIENCY_AUDIT 8.12).
+                content_type: ContentType::from_admitted_source(part.content_type),
                 relationships,
                 entry_id,
             });
@@ -6998,7 +6998,8 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                content_type: ContentType::new(part.content_type)?,
+                // Admitted verbatim by the catalog reader (LENIENCY_AUDIT 8.12).
+                content_type: ContentType::from_admitted_source(part.content_type),
                 relationships,
                 entry_id,
             });
