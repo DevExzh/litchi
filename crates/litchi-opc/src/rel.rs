@@ -29,13 +29,18 @@ impl TargetMode {
         match value {
             "Internal" => (Self::Internal, None),
             "External" => (Self::External, None),
-            _ if value.eq_ignore_ascii_case("Internal") => {
-                (Self::Internal, Some(RelationshipDefect::NonCanonicalTargetMode))
-            },
-            _ if value.eq_ignore_ascii_case("External") => {
-                (Self::External, Some(RelationshipDefect::NonCanonicalTargetMode))
-            },
-            _ => (Self::External, Some(RelationshipDefect::UnrecognizedTargetMode)),
+            _ if value.eq_ignore_ascii_case("Internal") => (
+                Self::Internal,
+                Some(RelationshipDefect::NonCanonicalTargetMode),
+            ),
+            _ if value.eq_ignore_ascii_case("External") => (
+                Self::External,
+                Some(RelationshipDefect::NonCanonicalTargetMode),
+            ),
+            _ => (
+                Self::External,
+                Some(RelationshipDefect::UnrecognizedTargetMode),
+            ),
         }
     }
 
@@ -72,6 +77,12 @@ pub struct Relationship {
 
     /// Typed target mode.
     target_mode: TargetMode,
+
+    /// Whether `r_id` was read from a source manifest, where an `Id` that is
+    /// not an XML ID is admitted verbatim (LENIENCY_AUDIT 2.12). Canonical
+    /// serialization carries such an `Id` forward; authored relationships
+    /// keep the XML ID check.
+    source_admitted_id: bool,
 }
 
 impl Relationship {
@@ -132,7 +143,15 @@ impl Relationship {
             base_uri,
             source_uri,
             target_mode,
+            source_admitted_id: false,
         }
+    }
+
+    /// Whether this relationship's `Id` was admitted from a source manifest
+    /// rather than authored (LENIENCY_AUDIT 2.12).
+    #[inline]
+    pub(crate) fn has_source_admitted_id(&self) -> bool {
+        self.source_admitted_id
     }
 
     /// Get the relationship ID.
@@ -422,6 +441,30 @@ impl Relationships {
         r_id: String,
         target_mode: TargetMode,
     ) -> Result<&Relationship> {
+        self.try_insert_relationship(reltype, target_ref, r_id, target_mode, false)
+    }
+
+    /// Add a relationship read from a source manifest (or carried over from
+    /// one), whose `Id` was admitted at ingress even when it is not an XML ID
+    /// (LENIENCY_AUDIT 2.12).
+    pub(crate) fn try_add_source_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+    ) -> Result<&Relationship> {
+        self.try_insert_relationship(reltype, target_ref, r_id, target_mode, true)
+    }
+
+    fn try_insert_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+        source_admitted_id: bool,
+    ) -> Result<&Relationship> {
         if self.rels.contains_key(&r_id) {
             return Err(OpcError::DuplicateRelationshipId(r_id));
         }
@@ -433,14 +476,16 @@ impl Relationships {
             Entry::Occupied(entry) => Err(OpcError::DuplicateRelationshipId(entry.key().clone())),
             Entry::Vacant(entry) => {
                 let id = entry.key().clone();
-                Ok(entry.insert(Relationship::new_with_source(
+                let mut relationship = Relationship::new_with_source(
                     id,
                     reltype,
                     target_ref,
                     base_uri,
                     source_uri,
                     target_mode,
-                )))
+                );
+                relationship.source_admitted_id = source_admitted_id;
+                Ok(entry.insert(relationship))
             },
         }
     }

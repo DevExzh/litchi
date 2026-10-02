@@ -616,3 +616,200 @@ fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() 
             .is_err()
     );
 }
+
+/// LENIENCY_AUDIT 2.12 (packaging half): a non-empty relationship `Id` that
+/// is not an XML ID is kept verbatim — LibreOffice and Apache POI treat it as
+/// an opaque string — and recorded on every ingress path.
+#[test]
+fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="a:b" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::NonConformingId),
+                "/word/document.xml",
+                Some("1"),
+                None,
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::NonConformingId),
+                "/word/document.xml",
+                Some("a:b"),
+                None,
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert!(
+        package
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .rels()
+            .get("a:b")
+            .is_some_and(|relationship| relationship.target_mode() == TargetMode::External)
+    );
+    let materialized = SourceBackedPackage::from_vec(bytes.clone())
+        .unwrap()
+        .to_opc_package()
+        .unwrap();
+    assert_eq!(
+        relationship_type(&materialized, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+
+    // An empty Id and one carrying control characters stay fatal.
+    for fatal in [
+        rels.replace(r#"Id="1""#, r#"Id="""#),
+        rels.replace(r#"Id="1""#, r#"Id="1&#1;""#),
+    ] {
+        let bytes = package_with_rels(&fatal);
+        assert!(OpcPackage::from_bytes(&bytes).is_err(), "{fatal}");
+        assert!(SourceBackedPackage::from_vec(bytes).is_err(), "{fatal}");
+    }
+}
+
+fn package_with_rels(document_rels: &str) -> Vec<u8> {
+    package(CONTENT_TYPES, ROOT_RELS, document_rels)
+}
+
+/// A source relationship `Id` admitted verbatim is carried forward when its
+/// collection is edited and re-serialized, while an `Id` the caller authors
+/// keeps the XML ID check.
+#[test]
+fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
+    let rels = DOCUMENT_RELS.replace(r#"Id="rId1""#, r#"Id="1""#);
+    let bytes = package_with_rels(&rels);
+    let document = PackURI::new("/word/document.xml").unwrap();
+
+    let mut edited = OpcPackage::from_bytes(&bytes).unwrap();
+    edited
+        .get_part_mut(&document)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            "urn:test".to_owned(),
+            "https://example.test/".to_owned(),
+            "rId9".to_owned(),
+            TargetMode::External,
+        )
+        .unwrap();
+    let relationships = edited.get_part(&document).unwrap().rels();
+    relationships
+        .plan_canonical(litchi_opc::ReadLimits::default())
+        .expect("a source Id admitted verbatim is carried forward");
+    let mut saved = Vec::new();
+    edited
+        .to_stream(std::io::Cursor::new(&mut saved))
+        .expect("save");
+    let reopened = OpcPackage::from_bytes(&saved).unwrap();
+    assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
+    assert_eq!(
+        relationship_type(&reopened, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+
+    // An authored Id that is not an XML ID is still refused by the canonical
+    // serializer.
+    let mut authored = litchi_opc::Relationships::new("/word/".to_owned());
+    authored
+        .try_add_relationship(
+            "urn:test".to_owned(),
+            "https://example.test/".to_owned(),
+            "2".to_owned(),
+            TargetMode::External,
+        )
+        .unwrap();
+    assert!(
+        authored
+            .plan_canonical(litchi_opc::ReadLimits::default())
+            .is_err()
+    );
+}
+
+/// A source-backed topology edit re-reads the opened manifest under the same
+/// rules: a relationship can be added beside, replaced at, or removed from a
+/// source `Id` admitted verbatim, while an added `Id` must be an XML ID.
+#[test]
+fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
+    use litchi_opc::{Relationships, SourceRelationshipTarget, SourceTopologyPlan};
+
+    let document = PackURI::new("/word/document.xml").unwrap();
+    let publish = |bytes: &[u8], plan: SourceTopologyPlan| {
+        let source = SourceBackedPackage::from_vec(bytes.to_vec()).unwrap();
+        let mut output = Vec::new();
+        source
+            .write_topology_to_stream(&mut output, plan)
+            .expect("publish");
+        OpcPackage::from_bytes(&output).unwrap()
+    };
+
+    // Appending to and removing from a producer-formatted manifest.
+    let rels = DOCUMENT_RELS
+        .replace(r#"Id="rId1""#, r#"Id="1""#)
+        .replace(r#"Id="rId2""#, r#"Id="2""#);
+    let bytes = package_with_rels(&rels);
+    let mut append = SourceTopologyPlan::new();
+    append
+        .try_add_external_relationship(
+            document.clone(),
+            "rId9",
+            "urn:test",
+            "https://example.test/",
+        )
+        .unwrap();
+    let appended = publish(&bytes, append);
+    assert_eq!(
+        relationship_type(&appended, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert!(relationship_type(&appended, "/word/document.xml", "rId9").is_some());
+    let mut remove = SourceTopologyPlan::new();
+    remove
+        .try_remove_relationship(document.clone(), "2")
+        .unwrap();
+    let removed = publish(&bytes, remove);
+    assert!(relationship_type(&removed, "/word/document.xml", "2").is_none());
+    assert!(relationship_type(&removed, "/word/document.xml", "1").is_some());
+
+    // Replacing at an admitted Id in a canonical manifest keeps the Id.
+    let mut canonical = Relationships::new("/word/".to_owned());
+    canonical
+        .try_add_relationship(
+            STYLES_TYPE.to_owned(),
+            "styles.xml".to_owned(),
+            "1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let bytes = package_with_rels(&canonical.to_xml());
+    let mut replace = SourceTopologyPlan::new();
+    replace
+        .try_replace_relationship(
+            document.clone(),
+            "1",
+            "urn:test",
+            SourceRelationshipTarget::External("https://example.test/".to_owned()),
+        )
+        .unwrap();
+    let replaced = publish(&bytes, replace);
+    assert_eq!(
+        relationship_type(&replaced, "/word/document.xml", "1").as_deref(),
+        Some("urn:test")
+    );
+
+    let mut authored = SourceTopologyPlan::new();
+    assert!(
+        authored
+            .try_add_external_relationship(document, "9", "urn:test", "https://example.test/")
+            .is_err()
+    );
+}

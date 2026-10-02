@@ -945,10 +945,12 @@ fn inspect_relationship_append_child(
                 "Relationship requires a non-empty Target",
             )
         })?;
-    if !is_xml_id(&id) {
+    // Read exactly as package ingress read it (LENIENCY_AUDIT 2.12): a
+    // non-XML-ID source Id was admitted verbatim and recorded at open.
+    if !crate::pkgreader::admissible_source_relationship_id(&id) {
         return Err(relationship_manifest_append_error(
             member_name,
-            "Relationship Id is not an XML ID",
+            "Relationship Id contains control characters",
         ));
     }
     limits.check(
@@ -2382,7 +2384,17 @@ impl SourceTopologyPlan {
         field_bytes = field_bytes
             .checked_add(r_id.len())
             .ok_or_else(|| overlay_unavailable("topology relationship field bytes overflow"))?;
-        if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !is_xml_id(r_id) {
+        // An added relationship's Id is authored and must be an XML ID. A
+        // replacement or removal names an existing relationship, whose
+        // source Id may have been admitted verbatim (LENIENCY_AUDIT 2.12).
+        let id_valid = match operation {
+            TopologyRelationshipOperation::Add { .. } => is_xml_id(r_id),
+            TopologyRelationshipOperation::Replace { .. }
+            | TopologyRelationshipOperation::Remove { .. } => {
+                crate::pkgreader::admissible_source_relationship_id(r_id)
+            },
+        };
+        if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !id_valid {
             return Err(OpcError::InvalidRelationship(format!(
                 "relationship Id '{r_id}' is not a bounded XML ID"
             )));
@@ -12717,7 +12729,7 @@ fn relationships_for_package_with_context(
         if let Some(context) = context {
             context.check().map_err(map_execution_error)?;
         }
-        relationships.try_add_relationship(
+        relationships.try_add_source_relationship(
             relationship.reltype,
             relationship.target_ref,
             relationship.r_id,
@@ -12744,7 +12756,7 @@ fn relationships_for_part_with_context(
         if let Some(context) = context {
             context.check().map_err(map_execution_error)?;
         }
-        relationships.try_add_relationship(
+        relationships.try_add_source_relationship(
             relationship.reltype,
             relationship.target_ref,
             relationship.r_id,
@@ -12756,12 +12768,14 @@ fn relationships_for_part_with_context(
 
 fn copy_relationships(from: &Relationships, to: &mut Relationships) -> Result<()> {
     for relationship in from.iter() {
-        to.try_add_relationship(
-            relationship.reltype().to_string(),
-            relationship.target_ref().to_string(),
-            relationship.r_id().to_string(),
-            relationship.target_mode(),
-        )?;
+        let reltype = relationship.reltype().to_string();
+        let target_ref = relationship.target_ref().to_string();
+        let r_id = relationship.r_id().to_string();
+        if relationship.has_source_admitted_id() {
+            to.try_add_source_relationship(reltype, target_ref, r_id, relationship.target_mode())?;
+        } else {
+            to.try_add_relationship(reltype, target_ref, r_id, relationship.target_mode())?;
+        }
     }
     Ok(())
 }

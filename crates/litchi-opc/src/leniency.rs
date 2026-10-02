@@ -51,21 +51,24 @@
 //! content-type mappings (8.9), a relationships part declared with another
 //! content type (8.10), manifest shape — unknown elements and attributes,
 //! character data and CDATA in `[Content_Types].xml` and `.rels` (8.11) —
-//! and `ContentType`/`Extension` grammar (8.12).
+//! and `ContentType`/`Extension` grammar (8.12) — plus a non-XML-ID
+//! relationship `Id` (2.12, the packaging half of a docx finding).
 //!
 //! Where the references differ the more tolerant one is followed, and only
 //! when the repair cannot change which part is which: relationships-part
 //! typing by name (LibreOffice and Apache POI alike), Apache POI for
 //! unknown manifest elements (skipped, where LibreOffice's SAX handler
 //! throws), and LibreOffice for content-type grammar (opaque strings, where
-//! Apache POI validates the RFC 2616 grammar) — no repair invents a mapping
+//! Apache POI validates the RFC 2616 grammar); both references treat a
+//! relationship `Id` as an opaque string — no repair invents a mapping
 //! or relationship, and each is recorded. A `DOCTYPE` (Apache POI disallows
 //! DTDs outright; entity declarations are a parser-security surface), an
 //! unbound namespace prefix, a missing `ContentType`, `Extension`,
-//! `PartName`, or `Id`, an empty `ContentType` or `Extension` (both
-//! references reject it), control characters in either (they cannot be
+//! `PartName`, or `Id`, an empty `ContentType`, `Extension`, or `Id` (both
+//! references reject it), control characters in any of them (they cannot be
 //! written back as XML 1.0), and a wrong document element stay hard errors.
-//! Content types the caller authors keep the grammar check.
+//! Content types and relationship `Id`s the caller authors keep the grammar
+//! and XML ID checks.
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays
@@ -201,6 +204,16 @@ pub enum RelationshipDefect {
     /// The value is `#text` or `#cdata-section`; the content itself is not
     /// stored.
     UnexpectedContent,
+    /// A non-empty `Id` that is not an XML ID (`xsd:ID`, an NCName) — for
+    /// example a numeric `1`, or one containing `:` or a leading digit.
+    ///
+    /// The `Id` is kept verbatim: references (`r:id`) resolve it by string
+    /// equality, as LibreOffice and Apache POI both treat it as an opaque
+    /// string, so the ID-ness constraint never decides which relationship a
+    /// reference names. An empty or missing `Id` and one carrying control
+    /// characters stay hard errors, and relationships the caller authors keep
+    /// the XML ID check. The raw `Id` is the item.
+    NonConformingId,
 }
 
 impl RelationshipDefect {
@@ -221,6 +234,9 @@ impl RelationshipDefect {
             },
             Self::UnknownAttribute => "ignored an unknown Relationship attribute",
             Self::UnexpectedContent => "ignored character data in the relationships manifest",
+            Self::NonConformingId => {
+                "kept the relationship Id verbatim although it is not an XML ID"
+            },
         }
     }
 }
@@ -646,6 +662,7 @@ mod tests {
             Defect::from(RelationshipDefect::UnknownElement),
             Defect::from(RelationshipDefect::UnknownAttribute),
             Defect::from(RelationshipDefect::UnexpectedContent),
+            Defect::from(RelationshipDefect::NonConformingId),
             Defect::from(ContentTypeDefect::RelationshipPartType),
             Defect::from(ContentTypeDefect::UnknownElement),
             Defect::from(ContentTypeDefect::UnknownAttribute),

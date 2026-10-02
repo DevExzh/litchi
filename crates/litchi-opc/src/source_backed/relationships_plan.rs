@@ -167,13 +167,25 @@ pub(crate) fn plan_relationship_publications(
                     if package.has_signature_infrastructure() {
                         return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                     }
+                    // A replacement keeps the Id, and with it the Id's
+                    // provenance (LENIENCY_AUDIT 2.12).
+                    let source_admitted_id = existing.has_source_admitted_id();
                     effective.remove(&change.r_id);
-                    effective.try_add_relationship(
-                        reltype.clone(),
-                        target_ref,
-                        change.r_id.clone(),
-                        target_mode,
-                    )?;
+                    if source_admitted_id {
+                        effective.try_add_source_relationship(
+                            reltype.clone(),
+                            target_ref,
+                            change.r_id.clone(),
+                            target_mode,
+                        )?;
+                    } else {
+                        effective.try_add_relationship(
+                            reltype.clone(),
+                            target_ref,
+                            change.r_id.clone(),
+                            target_mode,
+                        )?;
+                    }
                     changed = true;
                 },
                 TopologyRelationshipOperation::Remove { required_mode } => {

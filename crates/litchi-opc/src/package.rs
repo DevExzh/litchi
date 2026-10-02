@@ -1272,7 +1272,7 @@ impl OpcPackage {
 
             // Load part relationships
             for srel in spart.srels {
-                part.rels_mut().try_add_relationship(
+                part.rels_mut().try_add_source_relationship(
                     srel.reltype,    // Move
                     srel.target_ref, // Move
                     srel.r_id,       // Move
@@ -1300,7 +1300,7 @@ impl OpcPackage {
         // Load package relationships - move instead of clone
         package.rels.try_reserve(pkg_srels.len())?;
         for srel in pkg_srels {
-            package.rels.try_add_relationship(
+            package.rels.try_add_source_relationship(
                 srel.reltype,    // Move
                 srel.target_ref, // Move
                 srel.r_id,       // Move

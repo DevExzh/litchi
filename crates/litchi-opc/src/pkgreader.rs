@@ -830,7 +830,7 @@ impl PackageReader {
         };
         relationships.try_reserve(serialized.len())?;
         for rel in serialized {
-            relationships.try_add_relationship(
+            relationships.try_add_source_relationship(
                 rel.reltype,
                 rel.target_ref,
                 rel.r_id,
@@ -2385,11 +2385,7 @@ fn inspect_relationship_element(
             limits.max_relationship_target_bytes() as u64,
         )?;
     }
-    if !is_xml_id(&id) {
-        return Err(OpcError::InvalidRelationshipsManifest(format!(
-            "relationship Id '{id}' is not an XML ID"
-        )));
-    }
+    admit_relationship_id(&id, owner, report)?;
     for name in &unknown_attributes {
         report.record(
             RelationshipDefect::UnknownAttribute,
@@ -2489,6 +2485,38 @@ fn required_relationship_attribute(value: Option<String>, name: &str) -> Result<
             "Relationship requires a non-empty {name} attribute"
         ))
     })
+}
+
+/// Admit a source relationship `Id` (LENIENCY_AUDIT 2.12).
+///
+/// ST_RelationshipId is `xsd:ID`, but `r:id` references resolve it by string
+/// equality: LibreOffice and Apache POI both keep it as an opaque string. A
+/// non-empty `Id` that is not an XML ID is therefore kept verbatim and
+/// recorded. An `Id` carrying control characters (which cannot be written
+/// back as XML 1.0) stays a hard error; the caller has already rejected an
+/// empty one.
+pub(crate) fn admit_relationship_id(
+    id: &str,
+    owner: &str,
+    report: &mut ToleranceReport,
+) -> Result<()> {
+    if is_xml_id(id) {
+        return Ok(());
+    }
+    if !admissible_source_relationship_id(id) {
+        return Err(OpcError::InvalidRelationshipsManifest(format!(
+            "relationship Id {id:?} is empty or contains control characters"
+        )));
+    }
+    report.record(RelationshipDefect::NonConformingId, owner, Some(id), None);
+    Ok(())
+}
+
+/// Whether a relationship `Id` read from a source manifest is admissible:
+/// non-empty and free of control characters. An admissible `Id` need not be
+/// an XML ID (LENIENCY_AUDIT 2.12); authored ones must be.
+pub(crate) fn admissible_source_relationship_id(id: &str) -> bool {
+    !id.is_empty() && !id.chars().any(char::is_control)
 }
 
 pub(crate) fn is_xml_id(value: &str) -> bool {
@@ -3258,11 +3286,39 @@ mod tests {
     fn relationships_require_ids_and_repair_cataloged_defects() {
         for child in [
             r#"<Relationship Type="urn:test" Target="part.xml"/>"#,
-            r#"<Relationship Id="1bad" Type="urn:test" Target="part.xml"/>"#,
-            r#"<Relationship Id="r:id" Type="urn:test" Target="part.xml"/>"#,
+            r#"<Relationship Id="" Type="urn:test" Target="part.xml"/>"#,
+            r#"<Relationship Id="a&#1;" Type="urn:test" Target="part.xml"/>"#,
         ] {
             let xml = relationships_xml(child);
             assert!(PackageReader::parse_rels_xml(xml.as_bytes(), "/word").is_err());
+        }
+
+        // LENIENCY_AUDIT 2.12: a non-empty Id that is not an XML ID is kept
+        // verbatim and recorded.
+        for id in ["1bad", "r:id", "1"] {
+            let xml = relationships_xml(&format!(
+                r#"<Relationship Id="{id}" Type="urn:test" Target="part.xml"/>"#
+            ));
+            let mut report = ToleranceReport::default();
+            let mut ledger = RelationshipLedger::default();
+            let parsed = PackageReader::parse_rels_xml_with_source(
+                xml.as_bytes(),
+                "/word",
+                Some("/word/document.xml"),
+                ReadLimits::default(),
+                &mut ledger,
+                &mut report,
+            )
+            .unwrap();
+            assert_eq!(parsed[0].r_id, id);
+            let recorded = &report.defects()[0];
+            assert_eq!(
+                recorded.defect(),
+                RelationshipDefect::NonConformingId.into(),
+                "{id}"
+            );
+            assert_eq!(recorded.part(), "/word/document.xml");
+            assert_eq!(recorded.item(), Some(id));
         }
 
         // LENIENCY_AUDIT 8.8: a relationship without Type or Target is skipped.
