@@ -402,3 +402,64 @@ fn stale_active_tab_and_local_sheet_id_are_repaired_at_open() {
     let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
     assert_eq!(source.active_sheet().unwrap().name(), "Flags");
 }
+
+/// Finding 4.8 (opt-in): a sheet name breaking Excel's authoring rules fails
+/// the default open, and opens verbatim with a recorded repair under
+/// `Leniency::TolerateSheetNameRules`.
+#[test]
+fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
+    use litchi_xlsx::{CatalogDefect, Leniency};
+
+    const NAME: &str = "Q3: revenue [draft] by region and product line";
+    let bytes = patched(&[(
+        "xl/workbook.xml",
+        &replace(
+            r#"<sheet name="Flags""#,
+            r#"<sheet name="Q3: revenue [draft] by region and product line""#,
+        ),
+    )]);
+
+    assert!(Workbook::from_slice(&bytes).is_err());
+    assert!(SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).is_err());
+
+    let lenient = Leniency::TolerateSheetNameRules;
+    let workbook = Workbook::from_slice_with_leniency(&bytes, lenient).unwrap();
+    let source =
+        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(bytes.clone()), lenient)
+            .unwrap();
+    assert_eq!(workbook.leniency(), lenient);
+    assert_eq!(workbook.sheet(0usize).unwrap().unwrap().name(), NAME);
+    assert_eq!(source.sheet(0usize).unwrap().unwrap().name(), NAME);
+    assert!(workbook.sheet(NAME).unwrap().is_some());
+    for sheet in workbook.sheets() {
+        sheet.tolerance_report().unwrap();
+    }
+    for sheet in source.sheets() {
+        sheet.tolerance_report().unwrap();
+    }
+    let report = workbook.tolerance_report();
+    assert_eq!(report, source.tolerance_report());
+    assert_eq!(
+        worksheet_entries(&report),
+        [(
+            Defect::Catalog(CatalogDefect::SheetNameRules),
+            None,
+            ToleranceLocation::Sheet(0)
+        )]
+    );
+
+    // The opt-in admits only authoring-rule violations: a conformant
+    // workbook reports clean, and an empty name stays fatal.
+    assert!(
+        Workbook::from_slice_with_leniency(BASE, lenient)
+            .unwrap()
+            .tolerance_report()
+            .is_clean()
+    );
+    let empty = patched(&[(
+        "xl/workbook.xml",
+        &replace(r#"<sheet name="Flags""#, r#"<sheet name="""#),
+    )]);
+    assert!(Workbook::from_slice_with_leniency(&empty, lenient).is_err());
+    assert!(SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(empty), lenient).is_err());
+}

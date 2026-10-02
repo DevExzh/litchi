@@ -10,10 +10,11 @@ use quick_xml::reader::NsReader;
 
 use super::{Catalog, DefinedName, PivotCache, Sheet, Visibility};
 use crate::error::{Result, invalid};
-use crate::leniency::{CatalogDefect, Location, ToleranceReport};
+use crate::leniency::{CatalogDefect, Leniency, Location, ToleranceReport};
 use crate::raw::namespace::{
     SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
+use crate::sheet::NameError;
 
 const INITIAL_SHEETS_CAPACITY: usize = 16;
 const MAX_SHEETS: usize = 32_767;
@@ -64,6 +65,8 @@ struct WorkbookInfo {
     /// Repairs made so far; `None` refuses every cataloged defect with its
     /// historical error (see `crate::leniency`).
     tolerance: Option<ToleranceReport>,
+    /// The opt-in repairs this parse may apply.
+    leniency: Leniency,
 }
 
 impl WorkbookInfo {
@@ -91,17 +94,40 @@ impl WorkbookInfo {
             external_reference_ids: Vec::new(),
             external_reference_id_set: HashSet::new(),
             tolerance: None,
+            leniency: Leniency::Strict,
+        }
+    }
+
+    /// Admit a sheet name that breaks Excel's authoring rules (audit finding
+    /// 4.8) when [`Leniency::TolerateSheetNameRules`] is in effect, recording
+    /// it at the sheet's catalog position; otherwise keep the error. An
+    /// empty name is never admitted: nothing could address the sheet.
+    fn tolerate_sheet_name(&mut self, error: NameError, position: usize) -> Result<()> {
+        let tolerated = !matches!(error, NameError::Empty | NameError::XmlCharacter { .. });
+        match self.tolerance.as_mut() {
+            Some(tolerance) if tolerated && self.leniency == Leniency::TolerateSheetNameRules => {
+                tolerance.record(
+                    CatalogDefect::SheetNameRules,
+                    Location::Sheet(u32::try_from(position).unwrap_or(u32::MAX)),
+                );
+                Ok(())
+            },
+            _ => Err(error.into()),
         }
     }
 
     fn parse(content: &[u8]) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
-        Self::parse_processed(processed.as_ref(), None)
+        Self::parse_processed(processed.as_ref(), None, Leniency::Strict)
     }
 
-    fn parse_repairing(content: &[u8]) -> Result<Self> {
+    fn parse_repairing(content: &[u8], leniency: Leniency) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
-        Self::parse_processed(processed.as_ref(), Some(ToleranceReport::default()))
+        Self::parse_processed(
+            processed.as_ref(),
+            Some(ToleranceReport::default()),
+            leniency,
+        )
     }
 
     fn parse_with_mce(
@@ -111,15 +137,20 @@ impl WorkbookInfo {
     ) -> Result<Self> {
         let processed =
             litchi_ooxml_common::mce::process_markup_compatibility(content, capabilities, limits)?;
-        Self::parse_processed(processed.xml.as_ref(), None)
+        Self::parse_processed(processed.xml.as_ref(), None, Leniency::Strict)
     }
 
-    fn parse_processed(content: &[u8], tolerance: Option<ToleranceReport>) -> Result<Self> {
+    fn parse_processed(
+        content: &[u8],
+        tolerance: Option<ToleranceReport>,
+        leniency: Leniency,
+    ) -> Result<Self> {
         let content = std::str::from_utf8(content)
             .map_err(|error| invalid(format!("workbook XML is not UTF-8: {error}")))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
         info.tolerance = tolerance;
+        info.leniency = leniency;
         let mut stack = Vec::new();
         let mut closed_root = false;
 
@@ -279,8 +310,10 @@ impl WorkbookInfo {
                     "workbook sheet count exceeds Office's {MAX_SHEETS}-sheet limit"
                 )));
             }
-            let sheet = parse_sheet_element(element, decoder, resolver)?;
             let position = self.sheets.len();
+            let sheet = parse_sheet_element(element, decoder, resolver, |error| {
+                self.tolerate_sheet_name(error, position)
+            })?;
             let name_key = crate::sheet::key(&sheet.name);
             if let Some(first) = self.sheet_names.insert(name_key, position) {
                 return Err(crate::Error::SheetNameConflict {
@@ -578,9 +611,10 @@ pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
 /// and appending each repair to `tolerance` (see `crate::leniency`).
 pub(crate) fn parse_catalog_repairing(
     content: &[u8],
+    leniency: Leniency,
     tolerance: &mut ToleranceReport,
 ) -> Result<Catalog> {
-    let mut info = WorkbookInfo::parse_repairing(content)?;
+    let mut info = WorkbookInfo::parse_repairing(content, leniency)?;
     if let Some(report) = info.tolerance.take() {
         tolerance.append(&report);
     }
@@ -640,9 +674,12 @@ fn parse_sheet_element(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    tolerate_name: impl FnOnce(NameError) -> Result<()>,
 ) -> Result<Sheet> {
     let name = required_string(element, b"name", decoder, "workbook sheet name")?;
-    crate::sheet::validate_str(&name)?;
+    if let Err(error) = crate::sheet::validate_str(&name) {
+        tolerate_name(error)?;
+    }
     let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
         .ok_or_else(|| invalid("workbook sheet is missing relationship ID"))?;
     if relationship_id.is_empty() {

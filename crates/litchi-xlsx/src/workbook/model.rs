@@ -18,7 +18,7 @@ use once_cell::sync::OnceCell;
 
 use crate::cell::{Extents, SharedStringLineage, Store, Text};
 use crate::error::{Error, Result, invalid};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Leniency, ToleranceReport};
 use crate::raw;
 use crate::style::StyleLineage;
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
@@ -413,6 +413,9 @@ pub(crate) struct Inner {
     pub(super) page_break_cache: Arc<PageBreakProjectionCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
+    /// The opt-in repairs this workbook was opened with; snapshots derived
+    /// from it by edits re-open under the same policy.
+    pub(super) leniency: Leniency,
 }
 
 /// Immutable, cheap-to-share XLSX workbook snapshot.
@@ -591,6 +594,34 @@ impl Workbook {
         Self::from_package(package)
     }
 
+    /// [`Self::from_package`] with the opt-in repairs `leniency` allows; see
+    /// [`crate::leniency`]. The Excel-compatible repairs apply under every
+    /// policy.
+    pub fn from_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
+        Self::open_package(package, None, leniency)
+    }
+
+    /// [`Self::open`] with the opt-in repairs `leniency` allows.
+    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
+        Self::from_package_with_leniency(OpcPackage::open(path)?, leniency)
+    }
+
+    /// [`Self::from_slice`] with the opt-in repairs `leniency` allows.
+    pub fn from_slice_with_leniency(bytes: &[u8], leniency: Leniency) -> Result<Self> {
+        Self::from_package_with_leniency(OpcPackage::from_bytes(bytes)?, leniency)
+    }
+
+    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
+    pub fn from_reader_with_leniency(reader: impl Read, leniency: Leniency) -> Result<Self> {
+        Self::from_package_with_leniency(OpcPackage::from_reader(reader)?, leniency)
+    }
+
+    /// The opt-in repair policy this workbook was opened with.
+    #[must_use]
+    pub fn leniency(&self) -> Leniency {
+        self.inner.leniency
+    }
+
     #[cfg(feature = "encryption")]
     pub(crate) fn from_package_with_encryption(
         package: OpcPackage,
@@ -604,6 +635,15 @@ impl Workbook {
     pub(super) fn from_package_with_styles(
         package: OpcPackage,
         source: Option<&Workbook>,
+    ) -> Result<Self> {
+        let leniency = source.map_or(Leniency::Strict, |source| source.inner.leniency);
+        Self::open_package(package, source, leniency)
+    }
+
+    fn open_package(
+        package: OpcPackage,
+        source: Option<&Workbook>,
+        leniency: Leniency,
     ) -> Result<Self> {
         // The packaging repairs come first (they were made before the
         // workbook part could be read), then the open-time catalog sites
@@ -619,7 +659,7 @@ impl Workbook {
                     workbook.content_type()
                 ))
             })?;
-            let catalog = raw::parse_catalog_repairing(workbook.blob(), &mut tolerance)?;
+            let catalog = raw::parse_catalog_repairing(workbook.blob(), leniency, &mut tolerance)?;
             let sheet_parts = package::validate_sheet_graph(&package, workbook, &catalog.sheets)?;
             let shared_strings_uri = package::validate_shared_strings(&package, workbook)?;
             let styles_uri = package::validate_styles(&package, workbook)?;
@@ -728,6 +768,7 @@ impl Workbook {
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
                 page_break_cache: lineage_page_break_cache,
                 tolerance,
+                leniency,
             }),
             #[cfg(feature = "encryption")]
             encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),

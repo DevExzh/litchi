@@ -16,10 +16,11 @@
 //! the value documented on the corresponding defect variant.
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
-//! [`Leniency`] variants. None exist yet, so [`Leniency::Strict`] is the only
-//! variant; the judgment-call class on the roadmap (audit finding 4.8,
-//! sheet-name authoring rules enforced at load time) joins here as an
-//! explicit variant when it lands.
+//! [`Leniency`] variants, passed to the `*_with_leniency` open functions of
+//! [`crate::Workbook`] and [`crate::SourceBackedWorkbook`]. The one
+//! judgment-call class on the roadmap — sheet-name authoring rules enforced
+//! at load time (audit finding 4.8) — is gated by
+//! [`Leniency::TolerateSheetNameRules`].
 //!
 //! The defect enumerations are sized to the litchi-xlsx section of
 //! `docs/LENIENCY_AUDIT.md` (findings 4.1–4.12). A variant whose recording
@@ -108,7 +109,9 @@
 //!   back to the repairing parse.
 //! * finding 4.7 — the open-time catalog parse (`raw/catalog.rs`) records
 //!   [`CatalogDefect::ActiveTabOutOfRange`] and
-//!   [`CatalogDefect::LocalSheetIdOutOfRange`]. The standalone
+//!   [`CatalogDefect::LocalSheetIdOutOfRange`]; under
+//!   [`Leniency::TolerateSheetNameRules`] it also records
+//!   [`CatalogDefect::SheetNameRules`] (finding 4.8, opt-in). The standalone
 //!   `raw::parse_catalog` and the feature snapshots that re-read the
 //!   catalog for editing keep the historical errors.
 //! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
@@ -155,11 +158,23 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 pub enum Leniency {
     /// Reject every defect whose repair requires opting in.
     ///
-    /// This is the default and currently the only variant: the
-    /// Excel-compatible repairs are applied and recorded here too, and no
-    /// opt-in gate exists yet.
+    /// This is the default: the Excel-compatible repairs are applied and
+    /// recorded here too.
     #[default]
     Strict,
+    /// [`Leniency::Strict`], plus admit sheet names that break Excel's
+    /// authoring rules (audit finding 4.8) — over 31 characters, a reserved
+    /// character (`* ? / \ : [ ]`), or a leading/trailing apostrophe.
+    ///
+    /// ECMA-376 §18.2.18 types `sheet/@name` as `ST_Xstring` with no such
+    /// constraint; the rules are Excel *application* limits, Apache POI
+    /// accepts any name, and Excel and LibreOffice repair by renaming on
+    /// import. Renaming is a judgment call, so this reader instead keeps the
+    /// name verbatim (sheets are keyed by position) and records
+    /// [`CatalogDefect::SheetNameRules`] at [`Location::Sheet`]. An empty
+    /// name, and a name colliding with another, stay hard errors; renaming
+    /// or creating a sheet still enforces the rules.
+    TolerateSheetNameRules,
 }
 
 /// A per-cell defect repaired the way Excel repairs it.
@@ -325,9 +340,8 @@ impl WorksheetDefect {
 
 /// A workbook-catalog (`xl/workbook.xml`) defect.
 ///
-/// The finding 4.7 variants are live and recorded when a workbook handle is
-/// opened; [`CatalogDefect::SheetNameRules`] (finding 4.8) is a *roadmap
-/// contract*.
+/// Every variant is live and recorded when a workbook handle is opened;
+/// [`CatalogDefect::SheetNameRules`] only under its opt-in [`Leniency`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CatalogDefect {
@@ -346,8 +360,9 @@ pub enum CatalogDefect {
     /// A sheet name violates Excel's authoring rules — over 31 characters,
     /// a reserved character, or a leading/trailing apostrophe (finding 4.8).
     /// The name is retained verbatim. This is the one judgment-call repair on
-    /// the xlsx roadmap and will be gated behind an opt-in [`Leniency`]
-    /// variant.
+    /// the xlsx roadmap: it applies only under the opt-in
+    /// [`Leniency::TolerateSheetNameRules`]; under [`Leniency::Strict`] the
+    /// name fails the open. Located at [`Location::Sheet`].
     SheetNameRules,
 }
 
@@ -532,6 +547,8 @@ pub enum Location {
     Workbook,
     /// The zero-based position of a `definedName` in the catalog.
     DefinedName(u32),
+    /// The zero-based position of a `sheet` entry in the catalog.
+    Sheet(u32),
     /// The shared-string table as a whole (for example its count hints).
     SharedStringTable,
     /// The zero-based index of one shared-string item (`si`).
@@ -742,6 +759,7 @@ mod tests {
     #[test]
     fn strict_is_the_default() {
         assert_eq!(Leniency::default(), Leniency::Strict);
+        assert_ne!(Leniency::default(), Leniency::TolerateSheetNameRules);
     }
 
     #[test]

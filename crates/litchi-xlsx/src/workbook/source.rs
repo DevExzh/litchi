@@ -33,7 +33,7 @@ use litchi_sheet::{Area, At, Cell as Address, Rect};
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
 use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Leniency, ToleranceReport};
 use crate::raw;
 use crate::raw::selected_worksheet::SelectedPayload;
 
@@ -439,9 +439,47 @@ impl SourceBackedWorkbook {
         Self::from_source_backed_package_with_execution_context(package, None)
     }
 
+    /// [`Self::from_source_backed_package`] with the opt-in repairs
+    /// `leniency` allows; see [`crate::leniency`]. The Excel-compatible
+    /// repairs apply under every policy.
+    pub fn from_source_backed_package_with_leniency(
+        package: SourceBackedPackage,
+        leniency: Leniency,
+    ) -> Result<Self> {
+        Self::open_source_backed_package(package, None, leniency)
+    }
+
+    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
+    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
+        Self::from_source_backed_package_with_leniency(
+            SourceBackedPackage::from_reader_with_limits(reader, ReadLimits::default())?,
+            leniency,
+        )
+    }
+
+    /// [`Self::from_path`] with the opt-in repairs `leniency` allows.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
+        Self::from_source_backed_package_with_leniency(
+            SourceBackedPackage::from_read_at_with_limits(
+                file_source(path)?,
+                ReadLimits::default(),
+            )?,
+            leniency,
+        )
+    }
+
     fn from_source_backed_package_with_execution_context(
         package: SourceBackedPackage,
         execution: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        Self::open_source_backed_package(package, execution, Leniency::Strict)
+    }
+
+    fn open_source_backed_package(
+        package: SourceBackedPackage,
+        execution: Option<ExecutionContext>,
+        leniency: Leniency,
     ) -> Result<Self> {
         check_execution(execution.as_ref())?;
         let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
@@ -459,7 +497,8 @@ impl SourceBackedWorkbook {
         let mut tolerance = ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         let catalog_bytes = workbook.data()?;
-        let catalog = raw::parse_catalog_repairing(catalog_bytes.as_bytes(), &mut tolerance)?;
+        let catalog =
+            raw::parse_catalog_repairing(catalog_bytes.as_bytes(), leniency, &mut tolerance)?;
         check_execution(execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
         check_execution(execution.as_ref())?;
