@@ -1,22 +1,70 @@
 //! Presentation package graph lifecycle and CRUD for legacy comments.
 
 use super::codec::{
-    parse_comment_authors, parse_slide_comments, validate_authors, validate_comment_list,
-    write_comment_authors, write_slide_comments,
+    parse_comment_authors, parse_slide_comments_strict, parse_slide_comments_with_tolerance,
+    validate_authors, validate_comment_list, write_comment_authors, write_slide_comments,
 };
 use super::{
     AUTHORS_CONTENT_TYPE, AUTHORS_REL, Author, COMMENTS_CONTENT_TYPE, COMMENTS_REL, Comment,
     Comments, Conformance, List, MAX_SLIDES, MAX_TOTAL_COMMENTS, SLIDE_CONTENT_TYPE, SLIDE_REL,
     STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid,
 };
+use crate::leniency::{CommentDefect, ToleranceReport};
 use crate::{Error, Result};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};
 
+/// Load the presentation's legacy comment graph.
+///
+/// The read applies the `PowerPoint`-compatible comment repairs of audit
+/// finding 6.12 ([`CommentDefect`]): a comment with `idx="0"` or one
+/// repeating an earlier `(authorId, idx)` key is kept instead of failing the
+/// whole graph. [`load_presentation_comments_with_tolerance`] reports what
+/// was repaired; the edit functions of this module load through
+/// [`load_presentation_comments_strict`] and refuse a graph that needed a
+/// repair, so an edit never silently rewrites (or drops) such comments.
+///
+/// [`Comments`] stays a plain value with public fields (callers construct
+/// it to store a new graph), so the report travels beside it rather than
+/// inside it.
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comments>> {
+    load_presentation_comments_with_tolerance(package, &mut ToleranceReport::default())
+}
+
+/// [`load_presentation_comments`], appending each [`CommentDefect`] repair
+/// to `tolerance`, stamped with the comment part it was found in.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_presentation_comments_with_tolerance(
+    package: &OpcPackage,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<Comments>> {
+    load_comments(package, Some(tolerance))
+}
+
+/// Load the legacy comment graph without any repair: a comment index of `0`
+/// or a repeated `(authorId, idx)` key — within a slide or across the
+/// presentation — is an error, as before audit finding 6.12. Every comment
+/// edit function of this module loads through this contract.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read, is malformed, or would
+/// need a [`CommentDefect`] repair.
+pub fn load_presentation_comments_strict(package: &OpcPackage) -> Result<Option<Comments>> {
+    load_comments(package, None)
+}
+
+fn load_comments(
+    package: &OpcPackage,
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<Option<Comments>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
     let presentation_name = presentation.partname().to_string();
@@ -67,11 +115,21 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comment
         let part = package.get_part(&target)?;
         require_content_type(part, COMMENTS_CONTENT_TYPE)?;
         reject_outbound_relationships(part, "comments")?;
+        let comments = match tolerance.as_deref_mut() {
+            Some(tolerance) => {
+                let mut repairs = ToleranceReport::default();
+                let comments = parse_slide_comments_with_tolerance(part.blob(), &mut repairs)?;
+                repairs.locate_in_part(target.as_str());
+                tolerance.append(&repairs);
+                comments
+            },
+            None => parse_slide_comments_strict(part.blob())?,
+        };
         slide_lists.push(List {
             slide_part_name: slide_name.clone(),
             relationship_id: relationship.r_id().to_owned(),
             part_name: target.to_string(),
-            comments: parse_slide_comments(part.blob())?,
+            comments,
         });
     }
 
@@ -98,7 +156,7 @@ pub fn load_presentation_comments(package: &OpcPackage) -> Result<Option<Comment
         authors: parse_comment_authors(author_part.blob())?,
         slides: slide_lists,
     };
-    validate_package_value(&value)?;
+    validate_package_value_with(&value, tolerance)?;
     Ok(Some(value))
 }
 
@@ -232,7 +290,7 @@ pub fn add_presentation_comment_author(
     author: Author,
     conformance: Conformance,
 ) -> Result<()> {
-    let Some(mut graph) = load_presentation_comments(package)? else {
+    let Some(mut graph) = load_presentation_comments_strict(package)? else {
         let presentation = package.main_document_part()?;
         let relationship_id = next_relationship_id(presentation, "rIdCommentAuthors")?;
         let part_name = next_legacy_author_part_name(package)?.to_string();
@@ -268,7 +326,7 @@ pub fn update_presentation_comment_author(
     if author.id != author_id {
         return Err(invalid("replacement author ID must remain stable"));
     }
-    let mut graph = load_presentation_comments(package)?
+    let mut graph = load_presentation_comments_strict(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let target = graph
         .authors
@@ -299,7 +357,7 @@ pub fn remove_presentation_comment_author(
     author_id: u32,
     conformance: Conformance,
 ) -> Result<bool> {
-    let Some(mut graph) = load_presentation_comments(package)? else {
+    let Some(mut graph) = load_presentation_comments_strict(package)? else {
         return Ok(false);
     };
     if graph.slides.iter().any(|slide| {
@@ -330,7 +388,7 @@ pub fn reorder_presentation_comment_authors(
     ordered_ids: &[u32],
     conformance: Conformance,
 ) -> Result<()> {
-    let mut graph = load_presentation_comments(package)?
+    let mut graph = load_presentation_comments_strict(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let expected = graph
         .authors
@@ -391,7 +449,7 @@ pub fn add_presentation_comment(
     comment: Comment,
     conformance: Conformance,
 ) -> Result<()> {
-    let mut graph = load_presentation_comments(package)?
+    let mut graph = load_presentation_comments_strict(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let author = graph
         .authors
@@ -421,7 +479,7 @@ pub fn add_presentation_comment(
     {
         slide.comments.push(comment);
         let xml = write_slide_comments(&slide.comments, conformance)?;
-        parse_slide_comments(&xml)?;
+        parse_slide_comments_strict(&xml)?;
         let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
         package.get_part_mut(&uri)?.set_blob(xml);
     } else {
@@ -465,7 +523,7 @@ pub fn update_presentation_comment(
     if replacement.author_id != author_id || replacement.index != index {
         return Err(invalid("replacement comment identity must remain stable"));
     }
-    let graph = load_presentation_comments(package)?
+    let graph = load_presentation_comments_strict(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let slide = graph
         .slides
@@ -512,7 +570,7 @@ pub fn remove_presentation_comment(
     index: u32,
     conformance: Conformance,
 ) -> Result<bool> {
-    let Some(graph) = load_presentation_comments(package)? else {
+    let Some(graph) = load_presentation_comments_strict(package)? else {
         return Ok(false);
     };
     let Some(slide) = graph
@@ -556,7 +614,7 @@ pub fn reorder_presentation_comments(
     ordered_keys: &[(u32, u32)],
     conformance: Conformance,
 ) -> Result<()> {
-    let graph = load_presentation_comments(package)?
+    let graph = load_presentation_comments_strict(package)?
         .ok_or_else(|| invalid("legacy comment graph does not exist"))?;
     let slide = graph
         .slides
@@ -612,7 +670,7 @@ fn commit_legacy_slide_comments(
     conformance: Conformance,
 ) -> Result<()> {
     let xml = write_slide_comments(&comments, conformance)?;
-    parse_slide_comments(&xml)?;
+    parse_slide_comments_strict(&xml)?;
     let uri = PackURI::new(&slide.part_name).map_err(invalid)?;
     package.get_part_mut(&uri)?.set_blob(xml);
     package.unsign();
@@ -677,6 +735,17 @@ fn part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
 }
 
 fn validate_package_value(value: &Comments) -> Result<()> {
+    validate_package_value_with(value, None)
+}
+
+/// Validate a comment graph. With `tolerance`, the graph was read through the
+/// tolerant slide parser: comment-key repairs already recorded per slide are
+/// not re-checked, and a key repeated across slides is recorded as
+/// [`CommentDefect::DuplicateKey`] instead of failing.
+fn validate_package_value_with(
+    value: &Comments,
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<()> {
     validate_authors(&value.authors)?;
     if value.slides.len() > MAX_SLIDES {
         return Err(invalid("commented-slide count exceeds limit"));
@@ -703,7 +772,10 @@ fn validate_package_value(value: &Comments) -> Result<()> {
                 slide.part_name
             )));
         }
-        validate_comment_list(&slide.comments)?;
+        if tolerance.is_none() {
+            validate_comment_list(&slide.comments)?;
+        }
+        let mut slide_keys = HashSet::new();
         total = total
             .checked_add(slide.comments.len())
             .ok_or_else(|| invalid("comment count overflow"))?;
@@ -723,24 +795,52 @@ fn validate_package_value(value: &Comments) -> Result<()> {
                     comment.index, comment.author_id
                 )));
             }
-            if !keys.insert((comment.author_id, comment.index)) {
-                return Err(invalid(
-                    "duplicate author/index comment key across presentation",
-                ));
+            let key = (comment.author_id, comment.index);
+            let repeated_on_slide = !slide_keys.insert(key);
+            if !keys.insert(key) && !repeated_on_slide {
+                let Some(tolerance) = tolerance.as_deref_mut() else {
+                    return Err(invalid(
+                        "duplicate author/index comment key across presentation",
+                    ));
+                };
+                let mut repair = ToleranceReport::default();
+                repair.record_comment(CommentDefect::DuplicateKey, key.0, key.1);
+                repair.locate_in_part(&slide.part_name);
+                tolerance.append(&repair);
             }
         }
     }
     Ok(())
 }
 
+/// The presentation's slide parts in slide-list order (slides the list does
+/// not reference follow, by relationship ID), so a "first" comment is
+/// well defined for the duplicate-key repair.
 fn collect_slides(package: &OpcPackage, presentation: &dyn Part) -> Result<Vec<String>> {
-    let mut names = Vec::new();
-    let mut seen = HashSet::new();
-    for relationship in presentation
+    let order: HashMap<String, usize> = crate::parts::PresentationPart::from_part(presentation)
+        .and_then(|part| part.slide_references())
+        .map(|references| {
+            references
+                .iter()
+                .enumerate()
+                .map(|(position, reference)| (reference.relationship_id().to_owned(), position))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut relationships: Vec<_> = presentation
         .rels()
         .iter()
         .filter(|relationship| matches!(relationship.reltype(), SLIDE_REL | STRICT_SLIDE_REL))
-    {
+        .collect();
+    relationships.sort_by(|left, right| {
+        let position = |id: &str| order.get(id).copied().unwrap_or(usize::MAX);
+        position(left.r_id())
+            .cmp(&position(right.r_id()))
+            .then_with(|| left.r_id().cmp(right.r_id()))
+    });
+    let mut names = Vec::new();
+    let mut seen = HashSet::new();
+    for relationship in relationships {
         if relationship.is_external() {
             return Err(invalid(
                 "presentation slide relationship cannot be external",
@@ -874,6 +974,7 @@ fn is_authors_relationship(value: &str) -> bool {
     reason = "test assertions panic on failure by design"
 )]
 mod tests {
+    use super::super::codec::parse_slide_comments;
     use super::super::{MAX_AUTHORS, MAX_DEPTH, MAX_PART_BYTES, PML, STRICT_PML};
     use super::*;
 
@@ -1029,7 +1130,7 @@ mod tests {
             assert!(if xml.contains("cmAuthorLst") {
                 parse_comment_authors(xml.as_bytes()).is_err()
             } else {
-                parse_slide_comments(xml.as_bytes()).is_err()
+                parse_slide_comments_strict(xml.as_bytes()).is_err()
             });
         }
         assert!(parse_slide_comments(&vec![b' '; MAX_PART_BYTES + 1]).is_err());

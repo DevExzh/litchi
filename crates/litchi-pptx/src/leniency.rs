@@ -214,6 +214,27 @@
 //! ([`ShapeDefect::InvalidPlaceholderIndex`]); the scene, the shape, and its
 //! siblings are kept.
 //!
+//! # Legacy comments (audit finding 6.12)
+//!
+//! [`crate::comments::load_presentation_comments`] and
+//! [`crate::comments::parse_slide_comments`] no longer fail the comment
+//! graph over a comment with `idx="0"` ([`CommentDefect::ZeroIndex`]) or a
+//! comment repeating an earlier `(authorId, idx)` key on the same slide or
+//! across the presentation ([`CommentDefect::DuplicateKey`]). Both keep the
+//! comment, in document order — LibreOffice imports every `p:cm` as written
+//! — so no comment is lost on read. [`crate::comments::Comments`] stays a
+//! plain public-field value (callers build it to store a graph), so the
+//! report travels beside it:
+//! [`crate::comments::load_presentation_comments_with_tolerance`] and
+//! [`crate::comments::parse_slide_comments_with_tolerance`] append the
+//! repairs (context = author ID, [`ToleratedDefect::item`] = index, part =
+//! comment part). Every comment *edit* function loads through
+//! [`crate::comments::load_presentation_comments_strict`] and refuses a
+//! graph that needed a repair, so an edit never rewrites — or silently
+//! drops — such comments; writers validate strictly as before. Unknown
+//! attributes or children, non-numeric indexes, invalid dates, and the
+//! author-reference and `lastIdx` checks stay hard errors.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -318,6 +339,8 @@ pub enum Defect {
     /// repaired by `litchi_opc` while the package was opened, folded into
     /// the presentation's open-time report.
     Package(litchi_opc::leniency::Defect),
+    /// A legacy slide-comment defect repaired on the comment carrying it.
+    Comment(CommentDefect),
     /// A core- or custom-properties defect repaired by
     /// `litchi_ooxml_common` while the document metadata was read, folded
     /// into the presentation's report.
@@ -335,6 +358,7 @@ impl Defect {
             Self::Presentation(defect) => defect.repair(),
             Self::Markup(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
+            Self::Comment(defect) => defect.repair(),
             Self::Properties(defect) => defect.repair(),
         }
     }
@@ -574,6 +598,54 @@ impl MarkupDefect {
     }
 }
 
+/// The class of legacy slide-comment defect (`p:cmLst`, audit finding 6.12)
+/// the comment reader repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant. Each
+/// repair keeps the comment: nothing a producer wrote is dropped. The
+/// context is the comment's `authorId` and [`ToleratedDefect::item`] its
+/// `idx` in decimal; the part is the comment part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CommentDefect {
+    /// A comment carried `idx="0"`.
+    ///
+    /// `CT_Comment@idx` is `ST_Index`, a plain `xsd:unsignedInt`, so zero is
+    /// schema-valid; only `PowerPoint`'s authoring numbers from 1.
+    /// LibreOffice imports the index as an opaque string. The reader keeps
+    /// the comment with index `0`.
+    ZeroIndex,
+    /// A comment repeated the `(authorId, idx)` key of an earlier comment on
+    /// the same slide or, when the whole presentation graph is loaded, on
+    /// another slide.
+    ///
+    /// The schema states no uniqueness constraint; duplicates appear after
+    /// co-authoring merges and producer round-trips. LibreOffice imports
+    /// every `p:cm` in order and `PowerPoint` renumbers rather than discard
+    /// them, so the reader keeps both comments in document order; a lookup by
+    /// key resolves to the first.
+    DuplicateKey,
+}
+
+impl CommentDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ZeroIndex => "kept the comment with index 0 as written",
+            Self::DuplicateKey => {
+                "kept the comment repeating an earlier author/index key after the first"
+            },
+        }
+    }
+}
+
+impl From<CommentDefect> for Defect {
+    fn from(defect: CommentDefect) -> Self {
+        Self::Comment(defect)
+    }
+}
+
 impl From<litchi_opc::leniency::Defect> for Defect {
     fn from(defect: litchi_opc::leniency::Defect) -> Self {
         Self::Package(defect)
@@ -640,6 +712,8 @@ pub struct ToleratedDefect {
     ///   skipped slide-list entry, or `0` for
     ///   [`PresentationDefect::SlideListContent`];
     /// * [`Defect::Markup`] — `0`; the part locates it;
+    /// * [`Defect::Comment`] — the comment's `authorId`; its `idx` is
+    ///   [`Self::item()`];
     /// * [`Defect::Package`] and [`Defect::Properties`] — `0`; the folded
     ///   defect is located by [`Self::part()`], [`Self::item()`], and
     ///   [`Self::value()`], carried over from the lower-level report.
@@ -655,8 +729,9 @@ pub struct ToleratedDefect {
     /// The keyed item within the part, for defects folded from a lower-level
     /// report: a relationship `Id`, a content-type extension or part name,
     /// or a property name (see `litchi_opc::leniency::ToleratedDefect::item`
-    /// and `litchi_ooxml_common::leniency::ToleratedDefect::item`). `None`
-    /// for this crate's own defect classes, which locate themselves through
+    /// and `litchi_ooxml_common::leniency::ToleratedDefect::item`); for a
+    /// [`Defect::Comment`], the comment index (`idx`) in decimal. `None` for
+    /// this crate's other defect classes, which locate themselves through
     /// [`Self::context`].
     pub item: Option<Box<str>>,
     /// The raw value a folded lower-level repair replaced or discarded, as
@@ -742,6 +817,18 @@ impl ToleranceReport {
             context,
             part: None,
             item: None,
+            value: None,
+        });
+    }
+
+    /// Record one comment repair: the context is the author ID and the item
+    /// the comment index.
+    pub(crate) fn record_comment(&mut self, defect: CommentDefect, author_id: u32, index: u32) {
+        self.push(ToleratedDefect {
+            defect: defect.into(),
+            context: author_id,
+            part: None,
+            item: Some(index.to_string().into_boxed_str()),
             value: None,
         });
     }
@@ -923,6 +1010,8 @@ mod tests {
             Defect::from(PresentationDefect::DuplicateSlideTarget),
             Defect::from(PresentationDefect::SlideListContent),
             Defect::from(MarkupDefect::ProcessingInstruction),
+            Defect::from(CommentDefect::ZeroIndex),
+            Defect::from(CommentDefect::DuplicateKey),
             Defect::from(litchi_opc::leniency::Defect::Relationship(
                 litchi_opc::leniency::RelationshipDefect::DuplicateId,
             )),

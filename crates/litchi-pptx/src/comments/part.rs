@@ -20,6 +20,9 @@ impl<'a> ListPart<'a> {
         Ok(Self { part })
     }
 
+    /// The part's comments, read with the comment repairs of
+    /// [`super::parse_slide_comments`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -27,11 +30,17 @@ impl<'a> ListPart<'a> {
         super::parse_slide_comments(self.part.blob())
     }
 
+    /// Re-serialize the part. A list whose read would need a repair is
+    /// refused ([`super::parse_slide_comments_strict`]).
+    ///
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        super::write_slide_comments(&self.comments()?, conformance)
+        super::write_slide_comments(
+            &super::parse_slide_comments_strict(self.part.blob())?,
+            conformance,
+        )
     }
 
     #[inline]

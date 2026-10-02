@@ -4,6 +4,7 @@ use super::{
     Author, Comment, Conformance, MAX_AUTHORS, MAX_COMMENTS_PER_SLIDE, MAX_DEPTH, MAX_NODES,
     MAX_PART_BYTES, MAX_STRING_BYTES, PML, STRICT_PML, invalid,
 };
+use crate::leniency::{CommentDefect, ToleranceReport};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_core::xml::ReaderOrigin;
@@ -75,10 +76,50 @@ pub fn parse_comment_authors(xml: &[u8]) -> Result<Vec<Author>> {
     Ok(authors)
 }
 
+/// Parse a legacy slide comment list (`p:cmLst`), applying the
+/// `PowerPoint`-compatible repairs of audit finding 6.12: a comment with
+/// `idx="0"` is kept as written, and a comment repeating an earlier
+/// `(authorId, idx)` key is kept after it (see [`CommentDefect`]). Use
+/// [`parse_slide_comments_with_tolerance`] to collect what was repaired, or
+/// [`parse_slide_comments_strict`] to refuse such a list.
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn parse_slide_comments(xml: &[u8]) -> Result<Vec<Comment>> {
+    parse_slide_comments_with_tolerance(xml, &mut ToleranceReport::default())
+}
+
+/// [`parse_slide_comments`], appending each [`CommentDefect`] repair to
+/// `tolerance` (no part is stamped; the caller knows the part name).
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn parse_slide_comments_with_tolerance(
+    xml: &[u8],
+    tolerance: &mut ToleranceReport,
+) -> Result<Vec<Comment>> {
+    parse_slide_comments_inner(xml, Some(tolerance))
+}
+
+/// Parse a legacy slide comment list without any repair: a comment index of
+/// `0` or a repeated `(authorId, idx)` key is an error. The comment edit
+/// functions load through this contract, so they never rewrite a list whose
+/// read needed a repair.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read, is malformed, or would
+/// need a [`CommentDefect`] repair.
+pub fn parse_slide_comments_strict(xml: &[u8]) -> Result<Vec<Comment>> {
+    parse_slide_comments_inner(xml, None)
+}
+
+fn parse_slide_comments_inner(
+    xml: &[u8],
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<Vec<Comment>> {
     let root = parse_document(xml)?;
     let namespace = root_namespace(&root, "cmLst")?;
     no_attributes(&root, &[])?;
@@ -122,12 +163,22 @@ pub fn parse_slide_comments(xml: &[u8]) -> Result<Vec<Comment>> {
             y: required_i64(position, "y")?,
             text: text.text.clone(),
         };
-        if comment.index == 0 {
-            return Err(invalid("comment index must be at least 1"));
-        }
         validate_string("comment text", &comment.text)?;
+        if comment.index == 0 {
+            let Some(tolerance) = tolerance.as_deref_mut() else {
+                return Err(invalid("comment index must be at least 1"));
+            };
+            tolerance.record_comment(CommentDefect::ZeroIndex, comment.author_id, 0);
+        }
         if !keys.insert((comment.author_id, comment.index)) {
-            return Err(invalid("duplicate author/index comment key in slide"));
+            let Some(tolerance) = tolerance.as_deref_mut() else {
+                return Err(invalid("duplicate author/index comment key in slide"));
+            };
+            tolerance.record_comment(
+                CommentDefect::DuplicateKey,
+                comment.author_id,
+                comment.index,
+            );
         }
         comments.push(comment);
     }

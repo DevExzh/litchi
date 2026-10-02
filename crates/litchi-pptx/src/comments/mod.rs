@@ -10,7 +10,8 @@ mod package;
 pub mod part;
 
 pub use codec::{
-    parse_comment_authors, parse_slide_comments, write_comment_authors, write_slide_comments,
+    parse_comment_authors, parse_slide_comments, parse_slide_comments_strict,
+    parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
 pub use collaboration::{
     AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
@@ -23,11 +24,12 @@ pub use collaboration::{
 pub use model::{Author, Comment, Comments, Conformance, List};
 pub use package::{
     add_presentation_comment, add_presentation_comment_author, find_presentation_comment,
-    find_presentation_comment_author, load_presentation_comments, remove_presentation_comment,
-    remove_presentation_comment_author, reorder_presentation_comment_authors,
-    reorder_presentation_comments, replace_presentation_comment,
-    replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
-    update_presentation_comment_author,
+    find_presentation_comment_author, load_presentation_comments,
+    load_presentation_comments_strict, load_presentation_comments_with_tolerance,
+    remove_presentation_comment, remove_presentation_comment_author,
+    reorder_presentation_comment_authors, reorder_presentation_comments,
+    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
+    update_presentation_comment, update_presentation_comment_author,
 };
 pub use part::{AuthorListPart, ListPart};
 

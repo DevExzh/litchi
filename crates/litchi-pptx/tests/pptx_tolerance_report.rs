@@ -825,8 +825,14 @@ fn unparseable_shape_id_and_placeholder_index_degrade_and_are_recorded() {
 /// `shapes.pptx` with archive member `name` rewritten by `edit`, every other
 /// member copied byte for byte in its original order.
 fn shapes_with_member(name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> {
+    archive_with_member(SHAPES, name, edit)
+}
+
+/// `archive` with member `name` rewritten by `edit`, every other member
+/// copied byte for byte in its original order.
+fn archive_with_member(archive: &[u8], name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
-    let reader = ArchiveReader::new(SHAPES).unwrap();
+    let reader = ArchiveReader::new(archive).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     let mut edit = Some(edit);
     let mut writer = StreamingArchiveWriter::new();
@@ -928,4 +934,170 @@ fn ill_formed_package_manifests_stay_fatal() {
         xml.replacen("<Relationship ", "<Relationship<", 1)
     });
     assert!(Package::from_vec(deck).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.12: legacy comment index 0 and duplicate (authorId, idx).
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::CommentDefect;
+
+const COMMENTED: &[u8] =
+    include_bytes!("../../../test-data/poi/test-data/slideshow/45545_Comment.pptx");
+const COMMENT1: &str = "/ppt/comments/comment1.xml";
+const COMMENT2: &str = "/ppt/comments/comment2.xml";
+
+/// `45545_Comment.pptx` with a second comment of index 0 in `comment1.xml`
+/// (slide 1) and the `comment2.xml` comment (a later slide) renumbered to
+/// repeat `comment1.xml`'s `(0, 1)` key.
+fn deck_with_comment_defects() -> Vec<u8> {
+    let deck = archive_with_member(COMMENTED, "ppt/comments/comment1.xml", |xml| {
+        xml.replace(
+            "</p:cmLst>",
+            r#"<p:cm authorId="0" idx="0"><p:pos x="1" y="2"/><p:text>zero</p:text></p:cm></p:cmLst>"#,
+        )
+    });
+    archive_with_member(&deck, "ppt/comments/comment2.xml", |xml| {
+        xml.replace(r#"idx="2""#, r#"idx="1""#)
+    })
+}
+
+fn located_items(
+    report: &litchi_pptx::ToleranceReport,
+) -> Vec<(Defect, u32, Option<&str>, Option<&str>)> {
+    report
+        .defects()
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect,
+                tolerated.context,
+                tolerated.item(),
+                tolerated.part(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
+    use litchi_pptx::comments::{
+        load_presentation_comments, load_presentation_comments_strict,
+        load_presentation_comments_with_tolerance,
+    };
+    let package = Package::from_vec(deck_with_comment_defects()).unwrap();
+    let opc = package.opc().unwrap();
+
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let comments = load_presentation_comments_with_tolerance(opc, &mut report)
+        .unwrap()
+        .unwrap();
+    let keys: Vec<Vec<(u32, u32, &str)>> = comments
+        .slides
+        .iter()
+        .map(|slide| {
+            slide
+                .comments
+                .iter()
+                .map(|comment| (comment.author_id, comment.index, comment.text.as_str()))
+                .collect()
+        })
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            vec![(0, 1, "testdoc"), (0, 0, "zero")],
+            vec![(0, 1, "test phrase")],
+        ]
+    );
+    assert_eq!(
+        located_items(&report),
+        [
+            (
+                Defect::Comment(CommentDefect::ZeroIndex),
+                0,
+                Some("0"),
+                Some(COMMENT1)
+            ),
+            (
+                Defect::Comment(CommentDefect::DuplicateKey),
+                0,
+                Some("1"),
+                Some(COMMENT2)
+            ),
+        ]
+    );
+    assert_eq!(load_presentation_comments(opc).unwrap(), Some(comments));
+
+    // The edit functions load strictly and refuse to rewrite the graph.
+    assert!(load_presentation_comments_strict(opc).is_err());
+    let mut editable = opc.clone();
+    let before = editable
+        .get_part(&PackURI::new(COMMENT1).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    assert!(
+        litchi_pptx::comments::remove_presentation_comment(
+            &mut editable,
+            "/ppt/slides/slide1.xml",
+            0,
+            1,
+            litchi_pptx::Conformance::Transitional,
+        )
+        .is_err()
+    );
+    assert_eq!(
+        editable
+            .get_part(&PackURI::new(COMMENT1).unwrap())
+            .unwrap()
+            .blob(),
+        before.as_slice()
+    );
+
+    // A key repeated within one list is kept after the first, too.
+    let xml = concat!(
+        r#"<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+        r#"<p:cm authorId="3" idx="4"><p:pos x="0" y="0"/><p:text>a</p:text></p:cm>"#,
+        r#"<p:cm authorId="3" idx="4"><p:pos x="0" y="0"/><p:text>b</p:text></p:cm></p:cmLst>"#,
+    );
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let list =
+        litchi_pptx::comments::parse_slide_comments_with_tolerance(xml.as_bytes(), &mut report)
+            .unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(
+        located_items(&report),
+        [(
+            Defect::Comment(CommentDefect::DuplicateKey),
+            3,
+            Some("4"),
+            None
+        )]
+    );
+    assert!(litchi_pptx::comments::parse_slide_comments_strict(xml.as_bytes()).is_err());
+}
+
+#[test]
+fn conformant_comments_record_nothing_and_malformed_comments_stay_fatal() {
+    use litchi_pptx::comments::load_presentation_comments_with_tolerance;
+    let package = Package::from_bytes(COMMENTED).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let comments = load_presentation_comments_with_tolerance(package.opc().unwrap(), &mut report)
+        .unwrap()
+        .unwrap();
+    assert_eq!(comments.slides.len(), 2);
+    assert_clean(&report);
+    assert!(
+        litchi_pptx::comments::load_presentation_comments_strict(package.opc().unwrap())
+            .unwrap()
+            .is_some()
+    );
+
+    // A non-numeric index is not an index-0/duplicate repair.
+    let deck = archive_with_member(COMMENTED, "ppt/comments/comment1.xml", |xml| {
+        xml.replace(r#"idx="1""#, r#"idx="one""#)
+    });
+    let package = Package::from_vec(deck).unwrap();
+    assert!(litchi_pptx::comments::load_presentation_comments(package.opc().unwrap()).is_err());
 }

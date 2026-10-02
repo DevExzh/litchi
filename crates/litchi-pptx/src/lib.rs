@@ -134,12 +134,13 @@ pub use comments::collaboration::{
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
-    load_presentation_comments, parse_comment_authors, parse_slide_comments,
-    remove_presentation_comment, remove_presentation_comment_author,
-    reorder_presentation_comment_authors, reorder_presentation_comments,
-    replace_presentation_comment, replace_presentation_comment_author, store_presentation_comments,
-    update_presentation_comment, update_presentation_comment_author, write_comment_authors,
-    write_slide_comments,
+    load_presentation_comments, load_presentation_comments_strict,
+    load_presentation_comments_with_tolerance, parse_comment_authors, parse_slide_comments,
+    parse_slide_comments_strict, parse_slide_comments_with_tolerance, remove_presentation_comment,
+    remove_presentation_comment_author, reorder_presentation_comment_authors,
+    reorder_presentation_comments, replace_presentation_comment,
+    replace_presentation_comment_author, store_presentation_comments, update_presentation_comment,
+    update_presentation_comment_author, write_comment_authors, write_slide_comments,
 };
 pub use error::{
     DurablePatchFormat, Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal,
@@ -148,8 +149,8 @@ pub use error::{
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 pub use leniency::{
-    Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect, TimingDefect, ToleranceReport,
-    ToleratedDefect, TransitionDefect,
+    CommentDefect, Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect, TimingDefect,
+    ToleranceReport, ToleratedDefect, TransitionDefect,
 };
 #[cfg(feature = "encryption")]
 pub use litchi_crypto::ooxml as encryption;
