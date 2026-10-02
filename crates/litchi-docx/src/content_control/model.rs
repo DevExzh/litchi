@@ -543,6 +543,9 @@ impl Occurrence {
 #[derive(Debug, Clone, Default)]
 pub struct Inventory {
     pub(crate) occurrences: Vec<Occurrence>,
+    /// Per-control repairs applied while the inventory was read; see
+    /// [`crate::leniency::ContentControlDefect`].
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
 }
 
 impl Inventory {
@@ -562,6 +565,17 @@ impl Inventory {
     /// Returns an error if the operation cannot be completed.
     pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Self> {
         super::parse_inventory(xml, limits)
+    }
+
+    /// Everything repaired while the inventory was read, in discovery order.
+    ///
+    /// Each entry is a [`crate::leniency::ContentControlDefect`] with the byte
+    /// offset of the offending `w:sdtPr` child within the visible
+    /// (markup-compatibility processed) document XML. The report is empty
+    /// when every control conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
     }
 
     /// Source-order occurrences, including missing and duplicate IDs.

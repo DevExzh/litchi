@@ -1630,8 +1630,14 @@ impl<'a> Document<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
+    ///
+    /// A malformed property degrades only its own control (see
+    /// [`crate::leniency::ContentControlDefect`]); the repairs are merged into
+    /// [`Document::tolerance_report`].
     pub fn content_controls(&self) -> Result<Vec<ContentControl>> {
         let xml_bytes = self.part.xml_bytes();
-        ContentControl::extract_from_document(xml_bytes)
+        let (controls, repaired) = ContentControl::extract_from_document_tolerant(xml_bytes)?;
+        self.merge_tolerance(&repaired);
+        Ok(controls)
     }
 }

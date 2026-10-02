@@ -602,3 +602,87 @@ fn conformant_section_columns_record_nothing() {
     assert!(inventory.tolerance_report().is_clean());
     assert!(opened.tolerance_report().is_clean());
 }
+
+// ---------------------------------------------------------------------------
+// F2.8 — one malformed w:sdtPr degrades only its control
+// ---------------------------------------------------------------------------
+
+fn sdt(properties: &str, text: &str) -> String {
+    format!(
+        r#"<w:sdt><w:sdtPr>{properties}</w:sdtPr><w:sdtContent><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:sdtContent></w:sdt>"#
+    )
+}
+
+#[test]
+fn malformed_sdt_properties_degrade_one_control_and_keep_the_listing() {
+    use litchi_docx::ContentControlDefect;
+    let body = [
+        sdt(r#"<w:id w:val="1"/><w:tag w:val="first"/><w:text/>"#, "one"),
+        sdt(
+            r#"<w:id w:val="2"/><w:tag w:val="second"/><w:lock w:val="frozen"/><w:dataBinding w:xpath="/root"/>"#,
+            "two",
+        ),
+        sdt(r#"<w:id w:val="3"/><w:tag w:val="third"/>"#, "three"),
+    ]
+    .concat();
+    let document = document_xml(&body);
+    let lock = offset_of(&document, r#"<w:lock w:val="frozen"/>"#);
+    let binding = offset_of(&document, r#"<w:dataBinding w:xpath="/root"/>"#);
+    let package = open(&package_bytes(&document, &[]));
+    let opened = package.document().expect("document");
+
+    let controls = opened
+        .content_controls()
+        .expect("one malformed sdtPr no longer kills the listing");
+    assert_eq!(
+        controls
+            .iter()
+            .map(|control| (control.id(), control.tag().map(str::to_owned)))
+            .collect::<Vec<_>>(),
+        [
+            (1, Some("first".to_owned())),
+            (2, Some("second".to_owned())),
+            (3, Some("third".to_owned())),
+        ]
+    );
+    assert!(!controls[1].is_lock_delete());
+    assert!(controls[1].data_bindings().is_empty());
+    assert_eq!(
+        opened.tolerance_report().defects(),
+        &[
+            ToleratedDefect {
+                defect: Defect::ContentControl(ContentControlDefect::UnknownLockValue),
+                context: lock,
+            },
+            ToleratedDefect {
+                defect: Defect::ContentControl(ContentControlDefect::InvalidProperty),
+                context: binding,
+            },
+        ]
+    );
+}
+
+#[test]
+fn conformant_sdt_properties_record_nothing() {
+    let body = sdt(
+        r#"<w:id w:val="1"/><w:tag w:val="first"/><w:lock w:val="sdtLocked"/><w:text/>"#,
+        "one",
+    );
+    let package = open(&package_bytes(&document_xml(&body), &[]));
+    let opened = package.document().expect("document");
+    assert_eq!(opened.content_controls().expect("controls").len(), 1);
+    assert!(opened.tolerance_report().is_clean());
+}
+
+#[test]
+fn nested_sdt_properties_stay_fatal() {
+    let body = r#"<w:sdt><w:sdtPr><w:id w:val="1"/><w:sdtPr/></w:sdtPr></w:sdt>"#;
+    let package = open(&package_bytes(&document_xml(body), &[]));
+    assert!(
+        package
+            .document()
+            .expect("document")
+            .content_controls()
+            .is_err()
+    );
+}

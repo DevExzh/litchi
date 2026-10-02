@@ -325,7 +325,16 @@ fn occurrences_preserve_missing_and_duplicate_ids_and_all_st_on_off_forms() {
     let invalid = format!(
         r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{MC}" xmlns:f="{FORMAT}" mc:Ignorable="f"><w:lock w:val="sdtLocked" f:formattingAllowed="true"/></w:sdtPr>"#
     );
-    assert!(Inventory::parse(invalid.as_bytes()).is_err());
+    // formattingAllowed on a non-content lock is dropped and recorded; the
+    // lock itself is kept (leniency F2.8).
+    let inventory = Inventory::parse(invalid.as_bytes()).unwrap();
+    assert!(
+        inventory.occurrences()[0]
+            .control()
+            .formatting_allowed()
+            .is_none()
+    );
+    assert_eq!(inventory.tolerance_report().total(), 1);
 }
 
 #[test]

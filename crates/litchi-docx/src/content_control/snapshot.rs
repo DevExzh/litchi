@@ -279,6 +279,14 @@ impl Snapshot {
 
     pub(crate) fn from_source(source: Source, limits: Limits) -> Result<Self> {
         let inventory = Inventory::parse_with_limits(source.as_slice(), &limits)?;
+        // Reads degrade a malformed sdtPr per control and record it
+        // (`ContentControlDefect`). An editable snapshot must address exact
+        // source properties, so it keeps refusing properties a read repaired.
+        if !inventory.tolerance_report().is_clean() {
+            return Err(invalid(
+                "content-control properties needed repair; editing requires conformant sdtPr",
+            ));
+        }
         let mut occurrences = scan(source.as_slice(), &limits)?;
         if occurrences.len() != inventory.occurrences().len() {
             return Err(invalid(format!(

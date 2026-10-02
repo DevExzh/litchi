@@ -379,6 +379,45 @@ impl SectionDefect {
     }
 }
 
+/// The class of content-control (`w:sdtPr`) defect the reader repairs per
+/// control, the way Word and LibreOffice render such a control.
+///
+/// This enumeration is closed by design. Each repair affects one property of
+/// one control; the control keeps its range, its content, and every other
+/// property, and the rest of the inventory is read normally — one malformed
+/// `w:sdtPr` never aborts [`Document::content_controls`](crate::Document::content_controls).
+/// Each is recorded on the [`content_control::Inventory`](crate::content_control::Inventory)
+/// ([`tolerance_report`](crate::content_control::Inventory::tolerance_report))
+/// with the byte offset of the offending `w:sdtPr` child within the visible
+/// (markup-compatibility processed) document XML, and
+/// `Document::content_controls` merges it into the document-level report.
+/// Nested `w:sdtPr`, resource limits, markup-compatibility violations, and
+/// ill-formed XML stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ContentControlDefect {
+    /// A `w:lock` has no `w:val` or a value outside `ST_Lock`. `CT_Lock`
+    /// declares the value optional; the control is read as unlocked.
+    UnknownLockValue,
+    /// A property failed validation: a missing or out-of-domain required
+    /// value, a repeated singleton property, a second control type, or a
+    /// data binding without `w:xpath`/`w:storeItemID` (both optional in
+    /// `CT_DataBinding`). The property is dropped — the first occurrence of a
+    /// repeated property wins — and the control is otherwise kept.
+    InvalidProperty,
+}
+
+impl ContentControlDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnknownLockValue => "read the content control as unlocked",
+            Self::InvalidProperty => "dropped the malformed property and kept the content control",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -398,6 +437,8 @@ pub enum Defect {
     Revision(RevisionDefect),
     /// A section column-model defect repaired the way Word lays it out.
     Section(SectionDefect),
+    /// A content-control property defect repaired per control.
+    ContentControl(ContentControlDefect),
 }
 
 impl Defect {
@@ -410,6 +451,7 @@ impl Defect {
             Self::Numbering(defect) => defect.repair(),
             Self::Revision(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
+            Self::ContentControl(defect) => defect.repair(),
         }
     }
 }
@@ -441,6 +483,12 @@ impl From<RevisionDefect> for Defect {
 impl From<SectionDefect> for Defect {
     fn from(defect: SectionDefect) -> Self {
         Self::Section(defect)
+    }
+}
+
+impl From<ContentControlDefect> for Defect {
+    fn from(defect: ContentControlDefect) -> Self {
+        Self::ContentControl(defect)
     }
 }
 
@@ -636,6 +684,8 @@ mod tests {
             Defect::from(SectionDefect::ColumnWidthMissing),
             Defect::from(SectionDefect::ColumnCountOutOfRange),
             Defect::from(SectionDefect::ColumnCountMismatch),
+            Defect::from(ContentControlDefect::UnknownLockValue),
+            Defect::from(ContentControlDefect::InvalidProperty),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

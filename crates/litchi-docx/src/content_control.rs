@@ -27,6 +27,7 @@
     reason = "the Result signature preserves a uniform fallible codec API"
 )]
 use crate::error::{Error, Result};
+use crate::leniency::{ContentControlDefect, ToleranceReport};
 /// Content control support for Word documents.
 ///
 /// Content controls are structured regions in a document that can contain
@@ -724,12 +725,24 @@ impl ContentControl {
     }
 
     /// Extract content controls from document XML bytes.
+    #[cfg(test)]
     pub(crate) fn extract_from_document(doc_xml: &[u8]) -> Result<Vec<ContentControl>> {
-        Ok(Inventory::parse(doc_xml)?
+        Ok(Self::extract_from_document_tolerant(doc_xml)?.0)
+    }
+
+    /// Extract content controls together with the per-control repairs the
+    /// inventory applied.
+    pub(crate) fn extract_from_document_tolerant(
+        doc_xml: &[u8],
+    ) -> Result<(Vec<ContentControl>, ToleranceReport)> {
+        let mut inventory = Inventory::parse(doc_xml)?;
+        let tolerance = std::mem::take(&mut inventory.tolerance);
+        let controls = inventory
             .into_controls()
             .into_iter()
             .filter(|control| control.id_opt().is_some())
-            .collect())
+            .collect();
+        Ok((controls, tolerance))
     }
 }
 
@@ -778,6 +791,7 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
     let mut bindings = 0usize;
     let mut list_items = 0usize;
     let mut metadata_bytes = 0usize;
+    let mut tolerance = ToleranceReport::default();
 
     loop {
         events = events.checked_add(1).ok_or_else(|| limit("event count"))?;
@@ -785,6 +799,9 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
             return Err(limit("event count"));
         }
         let decoder = reader.decoder();
+        // Text and comments are separate events, so the position before an
+        // element event is its `<` — the context for property repairs.
+        let element_offset = reader.buffer_position();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
@@ -814,8 +831,12 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
                         limits.max_list_items_per_control,
                     ));
                 } else if let Some(control) = pending.as_mut() {
-                    parse_property(
-                        &namespace, &element, decoder, &resolver, depth, false, control,
+                    tolerate_property(
+                        parse_property(
+                            &namespace, &element, decoder, &resolver, depth, false, control,
+                        ),
+                        &mut tolerance,
+                        element_offset,
                     )?;
                 }
             },
@@ -839,14 +860,18 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
                         limits,
                     )?;
                 } else if let Some(control) = pending.as_mut() {
-                    parse_property(
-                        &namespace,
-                        &element,
-                        decoder,
-                        &resolver,
-                        child_depth,
-                        true,
-                        control,
+                    tolerate_property(
+                        parse_property(
+                            &namespace,
+                            &element,
+                            decoder,
+                            &resolver,
+                            child_depth,
+                            true,
+                            control,
+                        ),
+                        &mut tolerance,
+                        element_offset,
                     )?;
                 }
             },
@@ -900,7 +925,47 @@ fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory
         }
     }
 
-    Ok(Inventory { occurrences })
+    Ok(Inventory {
+        occurrences,
+        tolerance,
+    })
+}
+
+/// Degrade one malformed content-control property instead of failing the
+/// inventory.
+///
+/// A property that fails validation — missing or out-of-domain attribute
+/// values, duplicate singleton properties, conflicting control types, a data
+/// binding without `w:xpath`/`w:storeItemID` — leaves the control as it was
+/// before that element (every property setter validates before it writes),
+/// so the control keeps its range, its content, and its other properties.
+/// That matches Word and LibreOffice, which render such a control as plain
+/// content. Resource limits, allocation failures, and XML errors stay fatal.
+fn tolerate_property(
+    result: Result<Result<PropertyOutcome>>,
+    tolerance: &mut ToleranceReport,
+    element_offset: u64,
+) -> Result<()> {
+    match result? {
+        Ok(PropertyOutcome::Applied) => Ok(()),
+        Ok(PropertyOutcome::Repaired(defect)) => {
+            tolerance.record(defect, element_offset);
+            Ok(())
+        },
+        Err(Error::InvalidFormat(_)) => {
+            tolerance.record(ContentControlDefect::InvalidProperty, element_offset);
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// What applying one content-control property did.
+enum PropertyOutcome {
+    /// The property conformed and was applied.
+    Applied,
+    /// The property was applied after a recorded repair.
+    Repaired(ContentControlDefect),
 }
 
 fn push_occurrence(
@@ -1150,13 +1215,26 @@ fn parse_property(
     depth: usize,
     empty: bool,
     control: &mut PendingContentControl,
-) -> Result<()> {
+) -> Result<Result<PropertyOutcome>> {
     if depth == control.depth + 1 {
-        parse_direct_property(namespace, element, decoder, resolver, depth, empty, control)
+        Ok(parse_direct_property(
+            namespace, element, decoder, resolver, depth, empty, control,
+        ))
     } else if depth == control.depth + 2 {
-        parse_nested_property(namespace, element, decoder, resolver, control)
+        // The per-control list-item bound is a resource limit, not a
+        // property defect: the outer result keeps it fatal.
+        if matches!(control.context, Some((PropertyContext::List, _)))
+            && is_word_element(namespace, element, b"listItem")
+            && control.list_items.len() >= control.max_list_items
+        {
+            return Err(limit("per-control list-item count"));
+        }
+        Ok(
+            parse_nested_property(namespace, element, decoder, resolver, control)
+                .map(|()| PropertyOutcome::Applied),
+        )
     } else {
-        Ok(())
+        Ok(Ok(PropertyOutcome::Applied))
     }
 }
 
@@ -1168,7 +1246,7 @@ fn parse_direct_property(
     depth: usize,
     empty: bool,
     control: &mut PendingContentControl,
-) -> Result<()> {
+) -> Result<PropertyOutcome> {
     let name = element.local_name();
     if is_wordprocessing_namespace(namespace) {
         match name.as_ref() {
@@ -1189,7 +1267,7 @@ fn parse_direct_property(
                 let value = required_word_attribute(element, b"val", decoder, resolver, "alias")?;
                 set_once(&mut control.title, value, "content-control alias")?;
             },
-            b"lock" => parse_lock(element, decoder, resolver, control)?,
+            b"lock" => return parse_lock(element, decoder, resolver, control),
             b"temporary" => {
                 let value = parse_on_off(element, decoder, resolver)?;
                 set_once(
@@ -1314,7 +1392,7 @@ fn parse_direct_property(
             _ => {},
         }
     }
-    Ok(())
+    Ok(PropertyOutcome::Applied)
 }
 
 fn parse_nested_property(
@@ -1354,9 +1432,6 @@ fn parse_nested_property(
             )?;
         },
         PropertyContext::List if is_word_element(namespace, element, b"listItem") => {
-            if control.list_items.len() >= control.max_list_items {
-                return Err(limit("per-control list-item count"));
-            }
             let value = required_word_attribute(element, b"value", decoder, resolver, "list item")?;
             let display = word_attribute_value(element, b"displayText", decoder, resolver)?
                 .unwrap_or_else(|| value.clone());
@@ -1413,23 +1488,24 @@ fn parse_lock(
     decoder: Decoder,
     resolver: &NamespaceResolver,
     control: &mut PendingContentControl,
-) -> Result<()> {
+) -> Result<PropertyOutcome> {
     if control.lock.is_some() {
         return Err(Error::InvalidFormat(
             "duplicate content-control lock".to_string(),
         ));
     }
-    let value = required_word_attribute(element, b"val", decoder, resolver, "lock")?;
-    let lock = match value.as_str() {
-        "unlocked" => Lock::Unlocked,
-        "sdtLocked" => Lock::SdtLocked,
-        "contentLocked" => Lock::ContentLocked,
-        "sdtContentLocked" => Lock::SdtContentLocked,
-        _ => {
-            return Err(Error::InvalidFormat(format!(
-                "invalid content-control lock value '{value}'"
-            )));
-        },
+    // CT_Lock's `w:val` is optional. Word and LibreOffice treat a missing or
+    // unknown lock value as no lock; do the same and record it.
+    let (lock, outcome) = match word_attribute_value(element, b"val", decoder, resolver)?.as_deref()
+    {
+        Some("unlocked") => (Lock::Unlocked, PropertyOutcome::Applied),
+        Some("sdtLocked") => (Lock::SdtLocked, PropertyOutcome::Applied),
+        Some("contentLocked") => (Lock::ContentLocked, PropertyOutcome::Applied),
+        Some("sdtContentLocked") => (Lock::SdtContentLocked, PropertyOutcome::Applied),
+        Some(_) | None => (
+            Lock::Unlocked,
+            PropertyOutcome::Repaired(ContentControlDefect::UnknownLockValue),
+        ),
     };
     let formatting = exact_extension_attribute_value(
         element,
@@ -1438,17 +1514,22 @@ fn parse_lock(
         decoder,
         resolver,
     )?;
+    let mut outcome = outcome;
     if let Some(value) = formatting {
-        if !lock.locks_content() {
-            return Err(Error::InvalidFormat(
-                "formattingAllowed requires contentLocked or sdtContentLocked".to_string(),
-            ));
+        // formattingAllowed only qualifies a content lock. On any other lock,
+        // or with a value outside ST_OnOff, keep the lock and drop the
+        // qualifier.
+        match parse_on_off_value(&value) {
+            Ok(allowed) if lock.locks_content() => {
+                control.formatting_allowed = Some(FormattingAllowed::from_bool(allowed));
+            },
+            Ok(_) | Err(_) => {
+                outcome = PropertyOutcome::Repaired(ContentControlDefect::InvalidProperty);
+            },
         }
-        control.formatting_allowed =
-            Some(FormattingAllowed::from_bool(parse_on_off_value(&value)?));
     }
     control.lock = Some((lock.locks_control(), lock.locks_content()));
-    Ok(())
+    Ok(outcome)
 }
 
 fn parse_data_binding(
@@ -2211,10 +2292,46 @@ mod tests {
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:placeholder/><w:placeholder/></w:sdtPr>"#,
             r#"<w:sdtPr xmlns:w="W"><w:id w:val="1"/><w:dataBinding w:xpath="/x"/></w:sdtPr>"#,
         ];
+        // Each malformed property degrades only itself and is recorded
+        // (leniency F2.8); the control and the inventory survive.
         for xml in invalid {
             let xml = xml.replace("xmlns:w=\"W\"", &format!("xmlns:w=\"{W}\""));
-            assert!(ContentControl::extract_from_document(xml.as_bytes()).is_err());
+            let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+            assert_eq!(inventory.occurrences().len(), 1, "{xml}");
+            assert_eq!(inventory.tolerance_report().total(), 1, "{xml}");
         }
+        let repaired = format!(
+            r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="7"/><w:id w:val="8"/><w:lock w:val="invalid"/><w:text/><w:picture/></w:sdtPr>"#
+        );
+        let inventory = Inventory::parse(repaired.as_bytes()).unwrap();
+        let control = inventory.occurrences()[0].control();
+        assert_eq!(control.id_opt(), Some(7));
+        assert!(!control.is_lock_delete() && !control.is_lock_content());
+        assert_eq!(control.kind().as_str(), "text");
+        let defects = inventory
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>();
+        let at = |needle: &str| repaired.find(needle).unwrap() as u64;
+        assert_eq!(
+            defects,
+            [
+                (
+                    crate::Defect::ContentControl(ContentControlDefect::InvalidProperty),
+                    at(r#"<w:id w:val="8"/>"#)
+                ),
+                (
+                    crate::Defect::ContentControl(ContentControlDefect::UnknownLockValue),
+                    at("<w:lock")
+                ),
+                (
+                    crate::Defect::ContentControl(ContentControlDefect::InvalidProperty),
+                    at("<w:picture/>")
+                ),
+            ]
+        );
 
         let duplicate = format!(
             r#"<w:document xmlns:w="{W}"><w:sdtPr><w:id w:val="1"/></w:sdtPr>
@@ -2330,7 +2447,12 @@ mod tests {
             mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
             format = FORMATTING_ALLOWED_NAMESPACE,
         );
-        assert!(Inventory::parse(invalid.as_bytes()).is_err());
+        // The lock is kept and the misplaced qualifier dropped (F2.8).
+        let inventory = Inventory::parse(invalid.as_bytes()).unwrap();
+        let control = inventory.occurrences()[0].control();
+        assert!(control.is_lock_delete());
+        assert!(control.formatting_allowed().is_none());
+        assert_eq!(inventory.tolerance_report().total(), 1);
     }
 
     #[test]

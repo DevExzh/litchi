@@ -55,9 +55,12 @@ fn rejects_invalid_visual_extension_values() {
         let source = format!(
             r#"<w:document xmlns:w="{W}" xmlns:w15="{W15}" xmlns:mc="{MC}" mc:Ignorable="w15"><w:body><w:sdtPr>{body}</w:sdtPr></w:body></w:document>"#
         );
-        assert!(
-            Inventory::parse(source.as_bytes()).is_err(),
-            "accepted {body}"
-        );
+        // Invalid values degrade only the property and are recorded
+        // (leniency F2.8).
+        let inventory = Inventory::parse(source.as_bytes()).unwrap();
+        let control = inventory.occurrences()[0].control();
+        assert_eq!(control.appearance(), None, "{body}");
+        assert_eq!(control.color(), None, "{body}");
+        assert_eq!(inventory.tolerance_report().total(), 1, "{body}");
     }
 }

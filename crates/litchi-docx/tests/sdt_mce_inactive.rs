@@ -81,6 +81,10 @@ fn parsed_content_control_ids_reject_values_above_int32() {
         r#"<w:document xmlns:w="{W}"><w:body><w:sdtPr><w:id w:val="2147483648"/></w:sdtPr></w:body></w:document>"#
     );
 
-    assert!(Inventory::parse(xml.as_bytes()).is_err());
+    // The read-only inventory drops the out-of-range ID and records it
+    // (leniency F2.8); the editable snapshot keeps refusing it.
+    let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+    assert_eq!(inventory.occurrences()[0].id(), None);
+    assert_eq!(inventory.tolerance_report().total(), 1);
     assert!(Snapshot::from_xml(xml.into_bytes()).is_err());
 }
