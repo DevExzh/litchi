@@ -156,7 +156,6 @@ impl<R: Read + Seek> Workbook<R> {
                 tolerance: &mut tolerance,
             },
         )?;
-        self.tolerance = tolerance.into_report();
 
         // Use Arc for zero-copy sharing across worksheets
         self.shared_strings = Some(Arc::new(strings));
@@ -212,6 +211,7 @@ impl<R: Read + Seek> Workbook<R> {
                 &encoding,
                 options.compatibility_profile(),
                 cells,
+                tolerance.report_mut(),
             ) {
                 Ok(worksheet) => {
                     let worksheet_index = self.worksheets.len();
@@ -227,6 +227,7 @@ impl<R: Read + Seek> Workbook<R> {
                 Err(_) => {},
             }
         }
+        self.tolerance = tolerance.into_report();
 
         crate::xml_map::validate_list_columns(self.xml_map.as_ref(), &self.worksheets)?;
 

@@ -349,12 +349,16 @@ fn parse_both(
             return "no BOF".into();
         }
         let start = u64::try_from(bof.encoded().len()).unwrap();
+        let region = super::codec::WorksheetStreamRegion {
+            stream_len: stream.len() as u64,
+            base_position: 0,
+            current_position: start,
+        };
+        let mut tolerance = crate::leniency::ToleranceReport::default();
         let result = if validate {
             Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 &mut framed,
-                stream.len() as u64,
-                0,
-                start,
+                region,
                 &inputs.encoding,
                 "Mutated",
                 std::sync::Arc::clone(&inputs.shared_strings),
@@ -363,13 +367,12 @@ fn parse_both(
                 std::sync::Arc::clone(&inputs.formatting),
                 profile,
                 &mut ValidateCells::new(kept),
+                &mut tolerance,
             )
         } else {
             Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 &mut framed,
-                stream.len() as u64,
-                0,
-                start,
+                region,
                 &inputs.encoding,
                 "Mutated",
                 std::sync::Arc::clone(&inputs.shared_strings),
@@ -378,6 +381,7 @@ fn parse_both(
                 std::sync::Arc::clone(&inputs.formatting),
                 profile,
                 &mut DecodeEveryCell,
+                &mut tolerance,
             )
         };
         match result {
@@ -1010,23 +1014,22 @@ fn package_outcome_agrees_under_worksheet_mutation() {
 /// (the complete reader's), three runs with identical output. The package walk
 /// swallows these refusals (`parse_workbook` drops the sheet), so only a
 /// worksheet-level matrix can see which one comes first.
+///
+/// The six cases whose first refusal was a cell-XF cross-reference changed
+/// when the Excel-compatible [`crate::CellFormatDefect::XfReference`] repair
+/// replaced that refusal: a bad `ixfe` no longer errors, so those cases now
+/// parse on to their next defect — or to `ok` when it was their only one.
 const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
-    (
-        "dup-then-bad-xf",
-        "Invalid record 0x00E0: cell references out-of-range XF 4095",
-    ),
+    ("dup-then-bad-xf", "ok"),
     (
         "bad-xf-then-truncated",
-        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+        "Invalid length: expected 14, found 10",
     ),
     (
         "truncated-then-bad-xf",
         "Invalid length: expected 14, found 10",
     ),
-    (
-        "reserved-xf-then-bad-xf",
-        "Invalid record 0x00E0: cell references reserved style-XF slot 3",
-    ),
+    ("reserved-xf-then-bad-xf", "ok"),
     (
         "pending-string-formula-then-stray-string",
         "Invalid record 0x0203: String-valued Formula must be followed by a String record",
@@ -1073,16 +1076,13 @@ const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
     ),
     (
         "mulblank-bad-xf-then-mulrk-bad-range",
-        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+        "Invalid data: MulRk column range 2..=9 does not match 2 cells",
     ),
     (
         "mulrk-bad-range-then-bad-xf",
         "Invalid data: MulRk column range 2..=9 does not match 2 cells",
     ),
-    (
-        "mulrk-over-number-then-reserved-xf",
-        "Invalid record 0x00E0: cell references reserved style-XF slot 3",
-    ),
+    ("mulrk-over-number-then-reserved-xf", "ok"),
     (
         "unmaterialized-member-behind-orphan",
         "Invalid record 0x0006: Formula at (3, 3) contains an orphan PtgExp",
@@ -1095,10 +1095,7 @@ const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
         "non-formula-member-with-duplicates",
         "Invalid record 0x0221: Array owner cannot attach to a non-Formula cell",
     ),
-    (
-        "outside-grid-duplicates-then-bad-xf",
-        "Invalid record 0x00E0: cell references out-of-range XF 4095",
-    ),
+    ("outside-grid-duplicates-then-bad-xf", "ok"),
     (
         "custom-view-end-without-begin-then-bad-xf",
         "Invalid record 0x01AB: UserSViewEnd without a matching UserSViewBegin",
@@ -1162,12 +1159,15 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
             let mut framed = Records::new(&stream);
             outcome(store(&mut framed))
         };
+        let region = super::codec::WorksheetStreamRegion {
+            stream_len: stream.len() as u64,
+            base_position: 0,
+            current_position: 0,
+        };
         let complete = parse(&mut |framed| {
             Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                 framed,
-                stream.len() as u64,
-                0,
-                0,
+                region,
                 &inputs.encoding,
                 "Matrix",
                 std::sync::Arc::clone(&inputs.shared_strings),
@@ -1176,15 +1176,14 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
                 std::sync::Arc::clone(&inputs.formatting),
                 CompatibilityProfile::Strict,
                 &mut DecodeEveryCell,
+                &mut crate::leniency::ToleranceReport::default(),
             )
         });
         for kept in [&[][..], every_position.as_slice()] {
             let validated = parse(&mut |framed| {
                 Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
                     framed,
-                    stream.len() as u64,
-                    0,
-                    0,
+                    region,
                     &inputs.encoding,
                     "Matrix",
                     std::sync::Arc::clone(&inputs.shared_strings),
@@ -1193,6 +1192,7 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
                     std::sync::Arc::clone(&inputs.formatting),
                     CompatibilityProfile::Strict,
                     &mut ValidateCells::new(kept),
+                    &mut crate::leniency::ToleranceReport::default(),
                 )
             });
             assert_eq!(

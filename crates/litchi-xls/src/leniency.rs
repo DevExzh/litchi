@@ -1,21 +1,33 @@
-//! Opt-in tolerance for non-structural formatting defects in legacy workbooks.
+//! Tolerance for non-structural defects in legacy workbooks.
 //!
-//! Real-world `.xls` producers emit workbooks whose *cosmetic* formatting
-//! metadata contradicts MS-XLS while the workbook itself is perfectly readable:
-//! a `Font` record with a `bFamily` byte outside the enumeration, an `XF` whose
-//! `fJustLast` bit is set without distributed alignment, an `XFCRC` whose
-//! `cxfs` disagrees with the number of `XF` records actually present. Excel
-//! opens all of these; by default this reader does not, because rejecting them
-//! is the only way to guarantee a caller never silently reads a value the file
-//! did not contain.
+//! Real-world `.xls` producers emit workbooks whose metadata contradicts
+//! MS-XLS while the workbook itself is perfectly readable: a `Font` record
+//! with a `bFamily` byte outside the enumeration, an `XF` whose `fJustLast`
+//! bit is set without distributed alignment, a cell whose `ixfe` names an
+//! XF index that does not exist. Excel opens all of these; this reader
+//! repairs them the same way and *records* every repair, so a caller can
+//! enumerate exactly what changed through [`ToleranceReport`]. Nothing is
+//! swallowed silently, and nothing outside the two closed enumerations
+//! changes — record framing, stream grammar, and encryption remain hard
+//! errors under every [`Leniency`] variant.
 //!
-//! [`Leniency::TolerateFormattingDefects`] trades that guarantee for reach:
-//! the defects enumerated by [`FormattingDefect`] are repaired with a
-//! documented substitute value and *recorded*, so the caller can enumerate
-//! exactly what was tolerated through [`ToleranceReport`]. Nothing is
-//! swallowed silently, and nothing outside that enumeration is affected —
-//! record framing, stream grammar, and encryption remain hard errors in both
-//! modes.
+//! **Excel-compatible repairs** are applied under every [`Leniency`] variant,
+//! including the default [`Leniency::Strict`]. They cover references MS-XLS
+//! makes a producer obligation but defines no reader-side refusal for —
+//! bytes Excel and LibreOffice read past without complaint, so rejecting
+//! them would cost the caller a whole worksheet over metadata that cannot
+//! change what a conforming workbook means. Each substitutes the value
+//! documented on the corresponding [`CellFormatDefect`] variant. This class
+//! currently holds a single repair: substituting the default cell XF for a
+//! cell, row, or column `ixfe` that cannot format a cell.
+//!
+//! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
+//! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
+//! formatting metadata that contradicts itself — are repaired with a
+//! documented substitute value only under
+//! [`Leniency::TolerateFormattingDefects`]; under [`Leniency::Strict`] they
+//! remain hard errors, because rejecting them is the only way to guarantee a
+//! caller never silently reads a value the file did not contain.
 
 use super::error::{Error, Result};
 
@@ -30,19 +42,23 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 ///
 /// Structural defects — malformed record framing, a broken workbook stream
 /// grammar, or unsupported/absent decryption material — are hard errors under
-/// every variant.
+/// every variant. The Excel-compatible repairs listed by [`CellFormatDefect`]
+/// are applied and recorded under every variant, including
+/// [`Leniency::Strict`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Leniency {
-    /// Every deviation from MS-XLS is a hard error.
+    /// Every deviation outside the Excel-compatible [`CellFormatDefect`]
+    /// repairs is a hard error.
     ///
-    /// This is the default and the historical behaviour: a workbook either
-    /// parses exactly as specified or it does not parse at all.
+    /// This is the default: the [`FormattingDefect`] classes are rejected,
+    /// while the [`CellFormatDefect`] repairs Excel itself applies are still
+    /// performed and recorded in the [`ToleranceReport`].
     #[default]
     Strict,
     /// Repair and record the cosmetic defects listed by [`FormattingDefect`].
     ///
     /// Each repair substitutes the value documented on the corresponding
-    /// [`FormattingDefect`] variant and appends an [`ToleratedDefect`] to
+    /// [`FormattingDefect`] variant and appends a [`ToleratedDefect`] to
     /// the workbook's [`ToleranceReport`].
     TolerateFormattingDefects,
 }
@@ -122,10 +138,97 @@ impl FormattingDefect {
     }
 }
 
-/// One repaired formatting defect, located within the workbook that carried it.
+/// The class of cell-format defect the reader repairs the way Excel repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// repairs a read applies under every [`Leniency`] variant, including
+/// [`Leniency::Strict`]. Each one matches what Excel and LibreOffice do with
+/// references MS-XLS leaves a producer obligation, so applying it never
+/// changes what a conforming workbook means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CellFormatDefect {
+    /// A cell, row, or column record's `ixfe` named an XF index that cannot
+    /// format a cell: it was out of range, named a reserved style slot
+    /// (1–14), or named a style XF.
+    ///
+    /// MS-XLS 2.5.115 CellIXF makes a valid reference a producer obligation
+    /// and defines no reader-side refusal. Excel renders the cell with
+    /// default formatting and LibreOffice clamps to the default XF, so the
+    /// reader substitutes the default cell XF — the mandatory first cell XF
+    /// at index 15 (MS-XLS 2.4.353). Only styling falls back; the cell's
+    /// value is never touched.
+    XfReference,
+}
+
+impl CellFormatDefect {
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            CellFormatDefect::XfReference => {
+                "Cell, row, or column references an XF that cannot format a cell"
+            },
+        }
+    }
+}
+
+/// One class of defect repaired while a workbook was read.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of what
+/// a read may change about a workbook. [`Defect::CellFormat`] classes are
+/// repaired under every [`Leniency`] variant; [`Defect::Formatting`] classes
+/// require [`Leniency::TolerateFormattingDefects`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Defect {
+    /// A cosmetic formatting defect repaired by the opt-in [`Leniency`]
+    /// variant.
+    Formatting(FormattingDefect),
+    /// A cell-format defect repaired the way Excel repairs it.
+    CellFormat(CellFormatDefect),
+}
+
+impl Defect {
+    /// The BIFF record type whose payload carried the defect.
+    ///
+    /// `None` for [`CellFormatDefect::XfReference`], whose carrying record
+    /// varies per occurrence: any cell record, `ROW` (0x0208), or `COLINFO`
+    /// (0x007D).
+    #[must_use]
+    pub fn record_type(self) -> Option<u16> {
+        match self {
+            Defect::Formatting(defect) => Some(defect.record_type()),
+            Defect::CellFormat(_) => None,
+        }
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            Defect::Formatting(defect) => defect.description(),
+            Defect::CellFormat(defect) => defect.description(),
+        }
+    }
+}
+
+impl From<FormattingDefect> for Defect {
+    fn from(defect: FormattingDefect) -> Self {
+        Self::Formatting(defect)
+    }
+}
+
+impl From<CellFormatDefect> for Defect {
+    fn from(defect: CellFormatDefect) -> Self {
+        Self::CellFormat(defect)
+    }
+}
+
+/// One repaired defect, located within the workbook that carried it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
-    defect: FormattingDefect,
+    defect: Defect,
     ordinal: u32,
     observed: u32,
 }
@@ -133,7 +236,7 @@ pub struct ToleratedDefect {
 impl ToleratedDefect {
     /// The class of defect that was repaired.
     #[must_use]
-    pub fn defect(&self) -> FormattingDefect {
+    pub fn defect(&self) -> Defect {
         self.defect
     }
 
@@ -145,7 +248,9 @@ impl ToleratedDefect {
     /// index. For [`FormattingDefect::FormatStringOverrun`] it is the
     /// zero-based ordinal of the `Format` record among the `Format` records
     /// parsed so far. For [`FormattingDefect::ExtendedFormatCountMismatch`]
-    /// it is the number of `XF` records that were actually parsed.
+    /// it is the number of `XF` records that were actually parsed. For
+    /// [`CellFormatDefect::XfReference`] it is the zero-based row of the
+    /// cell or `ROW` record, or the first column of the `COLINFO` record.
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -159,23 +264,29 @@ impl ToleratedDefect {
     /// [`FormattingDefect::ExtendedFormatCountMismatch`] it is the declared
     /// `cxfs`. For [`FormattingDefect::FormatStringOverrun`] it is the
     /// declared `cch`. For [`FormattingDefect::FontNameEmpty`] it is always
-    /// zero, since the defect *is* the value.
+    /// zero, since the defect *is* the value. For
+    /// [`CellFormatDefect::XfReference`] it is the `ixfe` the record carried.
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
     }
 
     /// The BIFF record type whose payload carried the defect.
+    ///
+    /// `None` when the carrying record type varies per occurrence; see
+    /// [`Defect::record_type`].
     #[must_use]
-    pub fn record_type(&self) -> u16 {
+    pub fn record_type(&self) -> Option<u16> {
         self.defect.record_type()
     }
 }
 
-/// Everything a lenient read repaired, in the order the defects were found.
+/// Everything a read repaired, in the order the defects were found.
 ///
-/// A strict read always produces an empty report. An empty report from a
-/// lenient read means the workbook needed no repairs at all.
+/// An empty report means the workbook conformed and no substitution was made.
+/// After a [`Leniency::Strict`] read the report can still list
+/// [`Defect::CellFormat`] repairs, which Excel itself applies; it never lists
+/// [`Defect::Formatting`] repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
@@ -219,7 +330,8 @@ impl ToleranceReport {
     /// Counts only individually recorded entries; compare
     /// [`ToleranceReport::unrecorded`] before treating a zero as absence.
     #[must_use]
-    pub fn count(&self, defect: FormattingDefect) -> usize {
+    pub fn count(&self, defect: impl Into<Defect>) -> usize {
+        let defect = defect.into();
         self.defects
             .iter()
             .filter(|entry| entry.defect == defect)
@@ -228,13 +340,29 @@ impl ToleranceReport {
 
     /// The maximum number of individually recorded defects.
     pub const RECORD_LIMIT: usize = MAX_RECORDED_DEFECTS;
+
+    /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored
+    /// entries; the excess is counted in [`ToleranceReport::unrecorded`].
+    pub(crate) fn record(&mut self, defect: impl Into<Defect>, ordinal: u32, observed: u32) {
+        if self.defects.len() < MAX_RECORDED_DEFECTS {
+            self.defects.push(ToleratedDefect {
+                defect: defect.into(),
+                ordinal,
+                observed,
+            });
+        } else {
+            self.unrecorded = self.unrecorded.saturating_add(1);
+        }
+    }
 }
 
-/// Reader-side policy holder that decides and records each repair.
+/// Reader-side policy holder that decides and records each opt-in repair.
 ///
 /// Parsers call [`ToleranceLog::tolerate`] at the exact point they would
 /// otherwise have returned an error, and continue with the documented
-/// substitute value only when it returns `Ok`.
+/// substitute value only when it returns `Ok`. Repairs that Excel itself
+/// applies bypass the policy decision and go straight to
+/// [`ToleranceReport::record`] through [`ToleranceLog::report_mut`].
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ToleranceLog {
     leniency: Leniency,
@@ -266,16 +394,14 @@ impl ToleranceLog {
         if !self.leniency.tolerates_formatting_defects() {
             return Err(on_strict());
         }
-        if self.report.defects.len() < MAX_RECORDED_DEFECTS {
-            self.report.defects.push(ToleratedDefect {
-                defect,
-                ordinal,
-                observed,
-            });
-        } else {
-            self.report.unrecorded = self.report.unrecorded.saturating_add(1);
-        }
+        self.report.record(defect, ordinal, observed);
         Ok(())
+    }
+
+    /// The report under construction, for repairs that need no policy
+    /// decision because Excel applies them under every [`Leniency`] variant.
+    pub(crate) fn report_mut(&mut self) -> &mut ToleranceReport {
+        &mut self.report
     }
 
     /// Consume the log and yield the report handed to the caller.
@@ -293,7 +419,7 @@ mod tests {
     }
 
     #[test]
-    fn strict_mode_rejects_every_defect_and_records_nothing() {
+    fn strict_mode_rejects_every_opt_in_defect_and_records_nothing() {
         let mut log = ToleranceLog::new(Leniency::Strict);
         let error = log
             .tolerate(FormattingDefect::FontFamily, 3, 32, strict_error)
@@ -327,12 +453,42 @@ mod tests {
         assert_eq!(report.count(FormattingDefect::FontNameEmpty), 0);
 
         let first = report.defects()[0];
-        assert_eq!(first.defect(), FormattingDefect::FontFamily);
+        assert_eq!(
+            first.defect(),
+            Defect::Formatting(FormattingDefect::FontFamily)
+        );
         assert_eq!(first.ordinal(), 3);
         assert_eq!(first.observed(), 32);
-        assert_eq!(first.record_type(), super::super::font::FONT_RECORD_TYPE);
+        assert_eq!(
+            first.record_type(),
+            Some(super::super::font::FONT_RECORD_TYPE)
+        );
         assert_eq!(report.defects()[1].ordinal(), 7);
         assert_eq!(report.defects()[2].observed(), 108);
+    }
+
+    #[test]
+    fn excel_compatible_repairs_are_recorded_under_every_leniency() {
+        // The `CellFormatDefect` classes need no policy decision: they record
+        // straight into the report, Strict included.
+        for leniency in [Leniency::Strict, Leniency::TolerateFormattingDefects] {
+            let mut log = ToleranceLog::new(leniency);
+            log.report_mut()
+                .record(CellFormatDefect::XfReference, 10, 4095);
+            let report = log.into_report();
+            assert_eq!(report.total(), 1, "{leniency:?} must record the repair");
+
+            let entry = report.defects()[0];
+            assert_eq!(
+                entry.defect(),
+                Defect::CellFormat(CellFormatDefect::XfReference)
+            );
+            assert_eq!(entry.ordinal(), 10);
+            assert_eq!(entry.observed(), 4095);
+            // The carrying record varies per occurrence (cell records, ROW,
+            // COLINFO), so the class has no single record type.
+            assert_eq!(entry.record_type(), None);
+        }
     }
 
     #[test]
@@ -380,8 +536,12 @@ mod tests {
             ),
         ];
         for (defect, record_type) in expectations {
-            assert_eq!(defect.record_type(), record_type);
+            let defect = Defect::from(defect);
+            assert_eq!(defect.record_type(), Some(record_type));
             assert!(!defect.description().is_empty());
         }
+        let cell = Defect::from(CellFormatDefect::XfReference);
+        assert_eq!(cell.record_type(), None);
+        assert!(!cell.description().is_empty());
     }
 }

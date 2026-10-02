@@ -670,7 +670,9 @@ pub use function_group::{BuiltInFunctionCategories, FunctionGroups};
 pub use header_footer_picture::HeaderFooterPicture;
 pub use interface_records::{InterfaceEnd, InterfaceHdr};
 pub use layout::{Column, Row};
-pub use leniency::{FormattingDefect, Leniency, ToleranceReport, ToleratedDefect};
+pub use leniency::{
+    CellFormatDefect, Defect, FormattingDefect, Leniency, ToleranceReport, ToleratedDefect,
+};
 pub use list_object::{
     CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,
     ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
@@ -748,8 +750,8 @@ pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};
 pub use web_pub::{WebPageType, WebPub, WebPubRange, WebSourceType};
 pub use workbook::{
-    OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedWorkbook,
-    SourceBackedWorksheet, SourceBackedWorksheetDescriptor, Workbook,
+    OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
+    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, Workbook,
 };
 pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;

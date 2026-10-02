@@ -2445,9 +2445,10 @@ fn snapshot_open_first_error_matrix_is_frozen() {
     }
 
     // Cell records, refused by the offset inventory. `cell-xf-past-end`
-    // matters most: the eager reader validates the same index through
-    // `Formatting::validate_cell_xf` with a different message, and the
-    // inventory's refusal shadows it because the inventory frames first.
+    // matters most: the eager reader repairs the same index through
+    // `Formatting::check_cell_xf` (the Excel-compatible default-XF
+    // substitution), so only the editing owner's stricter referential-integrity
+    // inventory refuses it — editing rewrites the file, reading does not.
     {
         let mut damaged = records.clone();
         let number = matrix_worksheet_index(&damaged, NUMBER);

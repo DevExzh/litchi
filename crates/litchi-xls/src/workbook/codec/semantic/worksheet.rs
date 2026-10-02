@@ -1,5 +1,6 @@
 //! Semantic collection of worksheet BIFF records.
 
+use super::super::WorksheetStreamRegion;
 use super::super::validation::cell_record_xf;
 use super::super::wire::{SharedFormulaTemplate, parse_shared_formula_template};
 use super::cells::{CellSlot, CellStore};
@@ -8,6 +9,7 @@ use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
 use crate::formula_metadata::array::{self, Owner as ArrayFormula};
 use crate::formula_metadata::{Cell as FormulaCell, Defect as FormulaDefect, FlagDefect};
+use crate::leniency::ToleranceReport;
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
@@ -230,6 +232,7 @@ impl<R: Read + Seek> Workbook<R> {
         encoding: &Encoding,
         compatibility_profile: CompatibilityProfile,
         store: &mut S,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Worksheet> {
         let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_error| {
             Error::InvalidData("worksheet position does not fit in usize".to_string())
@@ -269,9 +272,11 @@ impl<R: Read + Seek> Workbook<R> {
             .ok_or_else(|| Error::InvalidData("worksheet position overflows".to_string()))?;
         Self::parse_worksheet_records_with_compatibility(
             &mut records,
-            workbook_data.len() as u64,
-            worksheet_position,
-            current_position,
+            WorksheetStreamRegion {
+                stream_len: workbook_data.len() as u64,
+                base_position: worksheet_position,
+                current_position,
+            },
             encoding,
             &bound_sheet.name,
             shared_strings,
@@ -280,6 +285,7 @@ impl<R: Read + Seek> Workbook<R> {
             self.formatting.clone(),
             compatibility_profile,
             store,
+            tolerance,
         )
     }
 
@@ -297,11 +303,14 @@ impl<R: Read + Seek> Workbook<R> {
         formula_context: Option<&FormulaContext>,
         formatting: Arc<Formatting>,
     ) -> Result<Worksheet> {
+        let mut tolerance = ToleranceReport::default();
         Self::parse_worksheet_records_with_compatibility(
             records_iter,
-            stream_len,
-            base_position,
-            current_position,
+            WorksheetStreamRegion {
+                stream_len,
+                base_position,
+                current_position,
+            },
             encoding,
             name,
             shared_strings,
@@ -310,14 +319,13 @@ impl<R: Read + Seek> Workbook<R> {
             formatting,
             CompatibilityProfile::Strict,
             &mut super::cells::DecodeEveryCell,
+            &mut tolerance,
         )
     }
 
     pub(in crate::workbook) fn parse_worksheet_records_with_compatibility<S: CellStore>(
         records_iter: &mut Records<'_>,
-        stream_len: u64,
-        base_position: u64,
-        current_position: u64,
+        region: WorksheetStreamRegion,
         encoding: &Encoding,
         name: &str,
         shared_strings: Arc<Vec<String>>,
@@ -326,6 +334,7 @@ impl<R: Read + Seek> Workbook<R> {
         formatting: Arc<Formatting>,
         compatibility_profile: CompatibilityProfile,
         store: &mut S,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Worksheet> {
         // The decoded cells read the same shared-string table the worksheet
         // holds; the handle is kept here so decoding never borrows the
@@ -360,8 +369,10 @@ impl<R: Read + Seek> Workbook<R> {
         // (0x0895) that must not be mistaken for the sheet-level sort.
         let mut query_table_collector = crate::query_table::QueryTableCollector::new();
         let mut sort_data_collector = crate::sort_data::SortDataCollector::default();
-        let mut row_block_index_collector =
-            crate::row_block_index::RowBlockIndexCollector::new(stream_len, current_position);
+        let mut row_block_index_collector = crate::row_block_index::RowBlockIndexCollector::new(
+            region.stream_len,
+            region.current_position,
+        );
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
         let array_limits = array::Limits::default();
@@ -379,11 +390,16 @@ impl<R: Read + Seek> Workbook<R> {
 
         while let Some(record_result) = records_iter.next() {
             let record = record_result?;
-            let record_position = base_position + record.offset() as u64;
+            let record_position = region.base_position + record.offset() as u64;
             sheet_layout_collector.feed_record(record.kind().get(), record.payload())?;
             comment_collector.feed_record(record.kind().get(), record.payload())?;
             hyperlink_collector.feed_record(record.kind().get(), record.payload())?;
-            layout_collector.feed_record(record.kind().get(), record.payload(), &formatting)?;
+            layout_collector.feed_record(
+                record.kind().get(),
+                record.payload(),
+                &formatting,
+                tolerance,
+            )?;
             view_collector.feed_record(record.kind().get(), record.payload())?;
             page_setup_collector.feed_record(record.kind().get(), record.payload())?;
             protection_collector.feed_record(record.kind().get(), record.payload())?;
@@ -453,7 +469,11 @@ impl<R: Read + Seek> Workbook<R> {
                     if let CellRecord::Formula { value, .. } = &mut formula {
                         *value = FormulaValue::String(text);
                     }
-                    formatting.validate_cell_xf(cell_record_xf(&formula))?;
+                    formatting.check_cell_xf(
+                        cell_record_xf(&formula),
+                        u32::from(formula.row()),
+                        tolerance,
+                    );
                     add_cell(
                         store,
                         &mut worksheet,
@@ -688,7 +708,11 @@ impl<R: Read + Seek> Workbook<R> {
                             },
                         );
                     }
-                    formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
+                    formatting.check_cell_xf(
+                        cell_record_xf(&cell_record),
+                        u32::from(cell_record.row()),
+                        tolerance,
+                    );
                     if let Some(link) = FormulaLink::from_record(&cell_record) {
                         let position = (link.row, link.col);
                         if link.anchor.is_some() {
@@ -844,7 +868,11 @@ impl<R: Read + Seek> Workbook<R> {
 
                 0x00BD => { // MulRk
                     for cell_record in CellRecord::parse_mul_rk(record.payload())? {
-                        formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
+                        formatting.check_cell_xf(
+                        cell_record_xf(&cell_record),
+                        u32::from(cell_record.row()),
+                        tolerance,
+                    );
                         add_cell(
                             store,
                             &mut worksheet,
@@ -866,7 +894,11 @@ impl<R: Read + Seek> Workbook<R> {
 
                 0x00BE => { // MulBlank
                     for cell_record in CellRecord::parse_mul_blank(record.payload())? {
-                        formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
+                        formatting.check_cell_xf(
+                        cell_record_xf(&cell_record),
+                        u32::from(cell_record.row()),
+                        tolerance,
+                    );
                         add_cell(
                             store,
                             &mut worksheet,

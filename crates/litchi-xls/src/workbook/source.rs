@@ -11,7 +11,7 @@
 use super::query_cache::{CellSlot, IndexCandidate, QueryIndexCache, WorksheetCellIndex};
 use crate::cell::Cell;
 use crate::error::Error;
-use crate::leniency::{Leniency, ToleranceLog};
+use crate::leniency::{Leniency, ToleranceLog, ToleranceReport};
 use crate::number_format::{DateSystem, Formatting};
 use crate::records::{
     BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue,
@@ -110,23 +110,26 @@ pub struct SourceBackedLimits {
 
 impl Default for SourceBackedLimits {
     fn default() -> Self {
-        Self {
-            max_input_bytes: SharedOleFileLimits::MAX_INPUT_BYTES,
-            max_materialize_bytes: DEFAULT_MATERIALIZE_BYTES,
-            max_global_bytes: DEFAULT_GLOBAL_BYTES,
-            max_global_records: DEFAULT_GLOBAL_RECORDS,
-            max_sst_entries: DEFAULT_SST_ENTRIES,
-            max_worksheet_scan_bytes: DEFAULT_WORKSHEET_BYTES,
-            max_worksheet_scan_records: DEFAULT_WORKSHEET_RECORDS,
-            max_text_cells: DEFAULT_TEXT_CELLS,
-            max_text_bytes: DEFAULT_TEXT_BYTES,
-            max_sheet_count: DEFAULT_SHEET_COUNT,
-            max_query_index_bytes: DEFAULT_QUERY_INDEX_BYTES,
-        }
+        Self::DEFAULT
     }
 }
 
 impl SourceBackedLimits {
+    /// The default finite limits.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: SharedOleFileLimits::MAX_INPUT_BYTES,
+        max_materialize_bytes: DEFAULT_MATERIALIZE_BYTES,
+        max_global_bytes: DEFAULT_GLOBAL_BYTES,
+        max_global_records: DEFAULT_GLOBAL_RECORDS,
+        max_sst_entries: DEFAULT_SST_ENTRIES,
+        max_worksheet_scan_bytes: DEFAULT_WORKSHEET_BYTES,
+        max_worksheet_scan_records: DEFAULT_WORKSHEET_RECORDS,
+        max_text_cells: DEFAULT_TEXT_CELLS,
+        max_text_bytes: DEFAULT_TEXT_BYTES,
+        max_sheet_count: DEFAULT_SHEET_COUNT,
+        max_query_index_bytes: DEFAULT_QUERY_INDEX_BYTES,
+    };
+
     /// Creates defaults with an explicit CFB input ceiling.
     pub fn new(max_input_bytes: u64) -> std::result::Result<Self, SourceBackedError> {
         let limits = Self {
@@ -235,6 +238,64 @@ impl SourceBackedLimits {
         }
         SharedOleFileLimits::new(self.max_input_bytes).map_err(SourceBackedError::Cfb)?;
         Ok(self)
+    }
+}
+
+/// Options for opening a source-backed XLS owner.
+///
+/// Mirrors [`crate::OpenOptions`] for the source-backed open: the finite scan
+/// limits every query runs under plus the policy for non-structural
+/// formatting defects. The Excel-compatible [`crate::CellFormatDefect`]
+/// repairs are applied and recorded under every leniency variant; the
+/// [`crate::FormattingDefect`] classes are repaired only under
+/// [`Leniency::TolerateFormattingDefects`]. Everything repaired is enumerable
+/// through [`SourceBackedWorkbook::tolerance_report`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceBackedOptions {
+    limits: SourceBackedLimits,
+    leniency: Leniency,
+}
+
+impl SourceBackedOptions {
+    /// Creates default options: default finite limits, [`Leniency::Strict`].
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            limits: SourceBackedLimits::DEFAULT,
+            leniency: Leniency::Strict,
+        }
+    }
+
+    /// Current finite scan limits.
+    #[must_use]
+    pub const fn limits(&self) -> SourceBackedLimits {
+        self.limits
+    }
+
+    /// Sets the finite scan limits.
+    #[must_use]
+    pub const fn with_limits(mut self, limits: SourceBackedLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Current formatting-defect policy.
+    #[must_use]
+    pub const fn leniency(&self) -> Leniency {
+        self.leniency
+    }
+
+    /// Sets the formatting-defect policy.
+    #[must_use]
+    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
+}
+
+impl Default for SourceBackedOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -413,6 +474,25 @@ struct SourceInner {
     encoding: Encoding,
     limits: SourceBackedLimits,
     query_cache: Arc<QueryIndexCache>,
+    /// Repairs applied so far: the globals repairs the open made, plus the
+    /// cell-XF repairs lazy worksheet scans record as queries run.
+    tolerance: Mutex<ToleranceReport>,
+}
+
+impl SourceInner {
+    /// Record the Excel-compatible repair for a cell `ixfe` that cannot
+    /// format a cell, if it cannot. The lock is taken only on the defect
+    /// path, so a conforming sheet scan never synchronizes.
+    fn check_cell_xf(&self, formatting: &Formatting, index: u16, row: u16) {
+        if !formatting.cell_xf_needs_repair(index) {
+            return;
+        }
+        let mut report = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        formatting.check_cell_xf(index, u32::from(row), &mut report);
+    }
 }
 
 /// An immutable, cheaply cloned source-backed XLS workbook.
@@ -768,7 +848,7 @@ fn retained_text_bytes(value: &litchi_core::sheet::CellValue) -> u64 {
 impl SourceBackedWorkbook {
     /// Opens a positional source with default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceBackedLimits::default())
+        Self::from_read_at_with_options(source, SourceBackedOptions::default())
     }
 
     /// Opens a positional source with explicit finite limits.
@@ -776,12 +856,21 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         limits: SourceBackedLimits,
     ) -> Result<Self> {
+        Self::from_read_at_with_options(source, SourceBackedOptions::default().with_limits(limits))
+    }
+
+    /// Opens a positional source with explicit options.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: SourceBackedOptions,
+    ) -> Result<Self> {
+        let limits = options.limits();
         limits.validate()?;
         let cfb_limits =
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
         let cfb = SharedOleFile::open_with_limits(Arc::clone(&source), cfb_limits)
             .map_err(SourceBackedError::from)?;
-        Self::from_shared_ole_file_with_limits(Arc::new(cfb), limits)
+        Self::from_shared_ole_file_with_options(Arc::new(cfb), options)
     }
 
     /// Opens a filesystem path through the positional `FileSource` adapter.
@@ -797,8 +886,17 @@ impl SourceBackedWorkbook {
         path: impl AsRef<Path>,
         limits: SourceBackedLimits,
     ) -> Result<Self> {
+        Self::from_path_with_options(path, SourceBackedOptions::default().with_limits(limits))
+    }
+
+    /// Opens a filesystem path with explicit options.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_options(
+        path: impl AsRef<Path>,
+        options: SourceBackedOptions,
+    ) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
-        Self::from_read_at_with_limits(source, limits)
+        Self::from_read_at_with_options(source, options)
     }
 
     /// Extracts all ordinary worksheet text through the bounded source-backed
@@ -1044,10 +1142,11 @@ impl SourceBackedWorkbook {
     }
 
     /// Adopts an already-indexed positional CFB file.
-    pub(crate) fn from_shared_ole_file_with_limits(
+    pub(crate) fn from_shared_ole_file_with_options(
         cfb: Arc<SharedOleFile>,
-        limits: SourceBackedLimits,
+        options: SourceBackedOptions,
     ) -> Result<Self> {
+        let limits = options.limits();
         limits.validate()?;
         let source = cfb.source_arc();
         // `SharedOleFile::source_version` already observes the source this view
@@ -1068,7 +1167,13 @@ impl SourceBackedWorkbook {
         }
         let (workbook_path, workbook_stream_len) =
             select_workbook_stream(&cfb, &source, expected_version)?;
-        let mut parsed = parse_globals(&cfb, &workbook_path, workbook_stream_len, limits)?;
+        let mut parsed = parse_globals(
+            &cfb,
+            &workbook_path,
+            workbook_stream_len,
+            limits,
+            options.leniency(),
+        )?;
         validate_sheet_offsets(workbook_stream_len, parsed.global_end, &mut parsed.sheets)?;
         let mut worksheet_names = Vec::new();
         for sheet in &parsed.sheets {
@@ -1096,9 +1201,27 @@ impl SourceBackedWorkbook {
                 limits.max_query_index_bytes,
                 cache_sheet_count,
             )),
+            tolerance: Mutex::new(parsed.tolerance),
         });
         inner.ensure_current()?;
         Ok(Self { inner })
+    }
+
+    /// Repairs this owner has applied so far, in discovery order.
+    ///
+    /// The report opens with every repair the workbook-globals parse made and
+    /// grows as lazy worksheet scans repair cell-XF references the way Excel
+    /// does; a clean report means everything read so far conformed. The
+    /// returned snapshot reads only retained in-memory state, so unlike the
+    /// metadata queries it performs no source-consistency fence. See
+    /// [`crate::ToleranceReport`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        self.inner
+            .tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     /// Number of all workbook tabs, including chart and macro sheets.
@@ -1562,6 +1685,7 @@ struct ParsedGlobals {
     sst: SharedStringSstScan,
     formatting: Formatting,
     encoding: Encoding,
+    tolerance: ToleranceReport,
 }
 
 fn descriptor(sheet: &SheetEntry) -> SourceBackedWorksheetDescriptor {
@@ -1790,6 +1914,7 @@ fn parse_globals(
     path: &[String],
     stream_len: u64,
     limits: SourceBackedLimits,
+    leniency: Leniency,
 ) -> Result<ParsedGlobals> {
     let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
     let mut offset = 0_u64;
@@ -2111,7 +2236,7 @@ fn parse_globals(
             }));
         }
     }
-    let mut tolerance = ToleranceLog::new(Leniency::Strict);
+    let mut tolerance = ToleranceLog::new(leniency);
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
     let sst = scan_shared_string_records(&sst_refs).map_err(map_shared_string_error)?;
@@ -2159,6 +2284,7 @@ fn parse_globals(
         sst,
         formatting,
         encoding,
+        tolerance: tolerance.into_report(),
     })
 }
 
@@ -2941,10 +3067,10 @@ trait CellSink {
 
     /// Consumes one validated cell record the sink does not want.
     ///
-    /// Every implementation validates the XF index, exactly as
-    /// [`CellSink::accept`] does and in the same position, so that a malformed
-    /// cell format is refused wherever it sits whether or not the sink keeps
-    /// the cell.
+    /// Every implementation applies the Excel-compatible cell-XF repair,
+    /// exactly as [`CellSink::accept`] does and in the same position, so that
+    /// a cell format Excel would substitute is repaired and recorded wherever
+    /// it sits whether or not the sink keeps the cell.
     fn accept_measured(
         &mut self,
         measured: &MeasuredCell,
@@ -2952,9 +3078,9 @@ trait CellSink {
         scan: &ScanContext<'_>,
     ) -> Result<()> {
         let _ = occurrence;
-        scan.formatting
-            .validate_cell_xf(measured.xf_index)
-            .map_err(SourceBackedError::Parse)
+        scan.owner
+            .check_cell_xf(scan.formatting, measured.xf_index, measured.row);
+        Ok(())
     }
 }
 
@@ -3001,9 +3127,8 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
         scan: &ScanContext<'_>,
         strings: &mut SharedStringResolver<'_>,
     ) -> Result<()> {
-        scan.formatting
-            .validate_cell_xf(cell_xf_index(record))
-            .map_err(SourceBackedError::Parse)?;
+        scan.owner
+            .check_cell_xf(scan.formatting, cell_xf_index(record), record.row());
         if COLLECT_INDEX && let Some(index) = self.index.as_mut() {
             index.push(CellSlot {
                 stream_offset: occurrence.stream_offset,
@@ -3042,9 +3167,8 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
         occurrence: CellOccurrence,
         scan: &ScanContext<'_>,
     ) -> Result<()> {
-        scan.formatting
-            .validate_cell_xf(measured.xf_index)
-            .map_err(SourceBackedError::Parse)?;
+        scan.owner
+            .check_cell_xf(scan.formatting, measured.xf_index, measured.row);
         if COLLECT_INDEX && let Some(index) = self.index.as_mut() {
             index.push(CellSlot {
                 stream_offset: occurrence.stream_offset,
@@ -3106,9 +3230,8 @@ where
         scan: &ScanContext<'_>,
         strings: &mut SharedStringResolver<'_>,
     ) -> Result<()> {
-        scan.formatting
-            .validate_cell_xf(cell_xf_index(record))
-            .map_err(SourceBackedError::Parse)?;
+        scan.owner
+            .check_cell_xf(scan.formatting, cell_xf_index(record), record.row());
         let cell =
             Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting));
         let value = if let Some(string_index) = cell.shared_string_index() {
@@ -3669,10 +3792,7 @@ fn replay_indexed_slot(
             *value = FormulaValue::String(text);
         }
     }
-    owner
-        .formatting
-        .validate_cell_xf(cell_xf_index(&record))
-        .map_err(SourceBackedError::Parse)?;
+    owner.check_cell_xf(&owner.formatting, cell_xf_index(&record), record.row());
     target_cell_value(&record, owner, execution, strings)
 }
 
@@ -4321,9 +4441,7 @@ fn decode_source_cell(
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
 ) -> Result<Option<(u16, u16, litchi_core::sheet::CellValue)>> {
-    formatting
-        .validate_cell_xf(cell_xf_index(record))
-        .map_err(SourceBackedError::Parse)?;
+    owner.check_cell_xf(formatting, cell_xf_index(record), record.row());
     let cell = Cell::from_record_with_formula_context(record, None, None, Some(formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         if owner.sst.segments.is_empty() {

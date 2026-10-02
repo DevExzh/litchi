@@ -4,7 +4,10 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
 };
-use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook, Workbook};
+use litchi_xls::{
+    CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, Workbook,
+};
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -3433,11 +3436,57 @@ fn a_query_refuses_a_malformed_record_it_is_not_looking_for() {
     );
 }
 
-/// The XF index of every record is validated whether or not the sink keeps the
-/// record, so a cell that names a reserved style-XF slot is refused wherever it
+/// The source-backed open takes its leniency policy through
+/// [`SourceBackedOptions`] exactly the way the eager open takes it through
+/// `OpenOptions`: the opt-in formatting defects stay rejected by default,
+/// open under `TolerateFormattingDefects`, and land in the owner's tolerance
+/// report either way.
+#[test]
+fn an_open_with_options_threads_leniency_into_the_source_backed_open() {
+    // `SharedFormulaTest.xls` carries an XFCRC count disagreement, the same
+    // fixture `xls_leniency.rs` opens through the eager reader; the
+    // source-backed globals parse runs the same `Formatting` codec.
+    let bytes = fixture("SharedFormulaTest.xls");
+    assert!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).is_err(),
+        "the default policy must still reject the opt-in defect"
+    );
+
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceBackedOptions::new().with_leniency(Leniency::TolerateFormattingDefects),
+    )
+    .expect("a lenient source-backed open repairs the defect");
+    let report = owner.tolerance_report();
+    assert_eq!(report.unrecorded(), 0);
+    assert!(!report.is_clean());
+    assert_eq!(
+        report.count(FormattingDefect::ExtendedFormatCountMismatch),
+        report.defects().len(),
+        "the fixture isolates the XFCRC defect class"
+    );
+    assert_eq!(
+        report.defects()[0].defect(),
+        Defect::Formatting(FormattingDefect::ExtendedFormatCountMismatch)
+    );
+
+    // Default options agree with the default constructors on a conforming
+    // workbook, and the report is reachable and clean.
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(fixture("Simple.xls"))),
+        SourceBackedOptions::default(),
+    )
+    .unwrap();
+    assert!(owner.tolerance_report().is_clean());
+}
+
+/// The XF index of every record is checked whether or not the sink keeps the
+/// record, so a cell that names a reserved style-XF slot is repaired the way
+/// Excel repairs it — the cell falls back to the default cell XF, which never
+/// touches its value — and the substitution is recorded wherever the record
 /// sits on the sheet.
 #[test]
-fn a_query_refuses_a_bad_cell_format_it_is_not_looking_for() {
+fn a_query_repairs_a_bad_cell_format_it_is_not_looking_for() {
     // A structurally valid `Blank` at (10, 3) naming XF slot 1, which is
     // reserved for style formats.
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
@@ -3449,16 +3498,36 @@ fn a_query_refuses_a_bad_cell_format_it_is_not_looking_for() {
     .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
-    let walk = worksheet
-        .visit_cells(|_cell| Ok(()))
-        .unwrap_err()
-        .to_string();
+    // Nothing refuses anymore: the walk visits the repaired record as the
+    // empty cell it is, and selected-cell queries answer normally.
+    let cells = visited_cells(&owner, 0);
     assert!(
-        walk.contains("style-XF slot 1"),
-        "unexpected refusal: {walk}"
+        cells.iter().any(|(row, column, value)| {
+            *row == 10 && *column == 3 && *value == CellValue::Empty
+        }),
+        "the repaired Blank must be visited: {cells:?}"
     );
-    assert_eq!(worksheet.cell(0, 0).unwrap_err().to_string(), walk);
-    assert_eq!(worksheet.cell(40, 7).unwrap_err().to_string(), walk);
+    let report = owner.tolerance_report();
+    assert_eq!(report.unrecorded(), 0);
+    assert_eq!(report.total(), 1, "one scan, one repair: {report:?}");
+    let entry = report.defects()[0];
+    assert_eq!(
+        entry.defect(),
+        Defect::CellFormat(CellFormatDefect::XfReference)
+    );
+    assert_eq!(entry.ordinal(), 10, "the record's row");
+    assert_eq!(entry.observed(), 1, "the reserved slot the file named");
+    assert_eq!(entry.record_type(), None);
+
+    assert_eq!(
+        worksheet
+            .cell(10, 3)
+            .unwrap()
+            .map(SourceBackedCell::into_value),
+        Some(CellValue::Empty)
+    );
+    assert!(worksheet.cell(0, 0).unwrap().is_some());
+    assert!(worksheet.cell(40, 7).unwrap().is_none());
 }
 
 /// The scan decides whether to materialize a record from the `rw`/`col` header

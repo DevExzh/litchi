@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use litchi_xls::{FormattingDefect, Leniency, OpenOptions, ToleranceReport, Workbook};
+use litchi_xls::{Defect, FormattingDefect, Leniency, OpenOptions, ToleranceReport, Workbook};
 
 fn poi_fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -66,8 +66,8 @@ fn assert_repaired(
     assert!(!workbook.sheets().is_empty());
 
     let entry = report.defects()[0];
-    assert_eq!(entry.defect(), defect);
-    assert_eq!(entry.record_type(), defect.record_type());
+    assert_eq!(entry.defect(), Defect::Formatting(defect));
+    assert_eq!(entry.record_type(), Some(defect.record_type()));
     entry
 }
 
@@ -133,4 +133,122 @@ fn a_defect_free_report_is_the_default_state() {
     assert_eq!(report.defects(), &[]);
     assert_eq!(report.count(FormattingDefect::FontNameEmpty), 0);
     assert_eq!(report.total(), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Excel-compatible repairs: applied and recorded under the *default* policy
+// ---------------------------------------------------------------------------
+
+use std::io::Cursor;
+
+use litchi_cfb::{OleFile, OleWriter};
+use litchi_core::sheet::{Cell as SheetCell, CellValue};
+use litchi_xls::{CellFormatDefect, ExtendedFormat, Writer};
+
+/// BIFF `Number` record type.
+const NUMBER_RECORD: u16 = 0x0203;
+
+/// A one-cell workbook built by the crate writer, with the cell's `ixfe`
+/// rewritten to `ixfe` — one of the most common non-Microsoft-producer
+/// defects in the wild.
+fn workbook_with_cell_ixfe(ixfe: u16) -> Vec<u8> {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 0, 0, 42.5).unwrap();
+    let mut bytes = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+
+    let mut stream = OleFile::open(Cursor::new(&bytes))
+        .unwrap()
+        .open_stream(&["Workbook"])
+        .unwrap();
+    let mut cursor = 0;
+    let mut patched = false;
+    while cursor + 4 <= stream.len() {
+        let kind = u16::from_le_bytes([stream[cursor], stream[cursor + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[cursor + 2], stream[cursor + 3]]));
+        if kind == NUMBER_RECORD {
+            let payload = cursor + 4;
+            stream[payload + 4..payload + 6].copy_from_slice(&ixfe.to_le_bytes());
+            patched = true;
+            break;
+        }
+        cursor += 4 + length;
+    }
+    assert!(patched, "the writer workbook must contain a Number record");
+
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &stream).unwrap();
+    let mut package = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut package)).unwrap();
+    package
+}
+
+/// A cell whose `ixfe` cannot format a cell opens under the default policy:
+/// the value is untouched, the format falls back to the default cell XF, and
+/// the repair is recorded rather than silent.
+fn assert_default_open_repairs_cell_xf(ixfe: u16) {
+    let workbook = Workbook::new(Cursor::new(workbook_with_cell_ixfe(ixfe)))
+        .expect("the default policy applies the Excel-compatible repair");
+
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let cell = worksheet.get_cell(0, 0).unwrap();
+    // The value is never at risk...
+    assert_eq!(cell.value(), &CellValue::Float(42.5));
+    // ...the record's own claim is preserved raw...
+    assert_eq!(cell.xf_index(), ixfe);
+    // ...and the resolved format is the default cell XF — the very format the
+    // writer gave this cell before the mutation, since it writes ixfe 15.
+    let clean = Workbook::new(Cursor::new({
+        let mut writer = Writer::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_number(sheet, 0, 0, 42.5).unwrap();
+        let mut bytes = Vec::new();
+        writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+        bytes
+    }))
+    .unwrap();
+    let format = worksheet.format_for_cell(0, 0).expect("substituted format");
+    assert_eq!(
+        format.number_format_id(),
+        clean
+            .xls_worksheet(0)
+            .unwrap()
+            .format_for_cell(0, 0)
+            .map(ExtendedFormat::number_format_id)
+            .unwrap(),
+    );
+
+    let report = workbook.tolerance_report();
+    assert_eq!(report.unrecorded(), 0);
+    assert_eq!(report.total(), 1);
+    let entry = report.defects()[0];
+    assert_eq!(
+        entry.defect(),
+        Defect::CellFormat(CellFormatDefect::XfReference)
+    );
+    assert_eq!(entry.ordinal(), 0, "the cell's row");
+    assert_eq!(entry.observed(), u32::from(ixfe));
+    assert_eq!(entry.record_type(), None);
+}
+
+#[test]
+fn a_default_open_repairs_an_out_of_range_cell_xf_reference() {
+    assert_default_open_repairs_cell_xf(4095);
+}
+
+#[test]
+fn a_default_open_repairs_a_reserved_style_slot_cell_xf_reference() {
+    assert_default_open_repairs_cell_xf(3);
+}
+
+#[test]
+fn a_conforming_writer_workbook_reports_nothing() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 0, 0, 42.5).unwrap();
+    let mut bytes = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    assert!(workbook.tolerance_report().is_clean());
 }

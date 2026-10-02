@@ -139,6 +139,7 @@ impl<R: Read + Seek> Workbook<R> {
         encoding: &crate::records::Encoding,
         compatibility_profile: crate::CompatibilityProfile,
         cells: CellDecoding<'_>,
+        tolerance: &mut crate::leniency::ToleranceReport,
     ) -> Result<crate::worksheet::Worksheet> {
         match cells {
             CellDecoding::Every => self.parse_worksheet_from_position(
@@ -147,6 +148,7 @@ impl<R: Read + Seek> Workbook<R> {
                 encoding,
                 compatibility_profile,
                 &mut DecodeEveryCell,
+                tolerance,
             ),
             CellDecoding::Kept(kept) => self.parse_worksheet_from_position(
                 workbook_data,
@@ -154,6 +156,7 @@ impl<R: Read + Seek> Workbook<R> {
                 encoding,
                 compatibility_profile,
                 &mut ValidateCells::new(kept.for_tab(tab)),
+                tolerance,
             ),
         }
     }

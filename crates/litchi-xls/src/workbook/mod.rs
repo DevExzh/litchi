@@ -19,7 +19,7 @@ mod validation_only_tests;
 
 pub use model::{OpenOptions, Workbook};
 pub use source::{
-    SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedWorkbook,
-    SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
+    SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
+    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
 };
 pub(crate) use validation_only::{KeptCells, ValidationWorkbook};

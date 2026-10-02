@@ -11,7 +11,7 @@ use super::{
     XL_UNICODE_STRING_HIGH_BYTE,
 };
 use crate::error::Result;
-use crate::leniency::{FormattingDefect, ToleranceLog};
+use crate::leniency::{CellFormatDefect, Defect, FormattingDefect, ToleranceLog, ToleranceReport};
 
 /// Strict-mode shim used by both test modules: the production reader threads a
 /// tolerance log, but these tests exercise the default reject-everything policy.
@@ -214,7 +214,7 @@ fn a_lenient_policy_truncates_a_format_string_that_overstates_its_payload() {
     assert_eq!(report.count(FormattingDefect::FormatStringOverrun), 1);
     assert_eq!(report.defects()[0].ordinal(), ORDINAL);
     assert_eq!(report.defects()[0].observed(), u32::from(DECLARED));
-    assert_eq!(report.defects()[0].record_type(), FORMAT_RECORD);
+    assert_eq!(report.defects()[0].record_type(), Some(FORMAT_RECORD));
 }
 
 #[test]
@@ -530,5 +530,84 @@ mod real_world_tolerance_tests {
         let entry = report.defects()[0];
         assert_eq!(entry.ordinal(), MIN_XF_RECORDS as u32);
         assert_eq!(entry.observed(), MIN_XF_RECORDS as u32 + 1);
+    }
+}
+
+mod cell_xf_reference {
+    use super::*;
+
+    /// Fifteen mandatory style XFs, the mandatory first cell XF at index 15,
+    /// a distinctive custom cell XF at index 16, and a user style XF at 17.
+    fn formatting() -> Formatting {
+        let mut extended_formats = Vec::new();
+        for index in 0..15_u16 {
+            extended_formats.push(parse_xf(&semantic_xf(true, 0x0fff, 0), index).unwrap());
+        }
+        extended_formats.push(parse_xf(&semantic_xf(false, 0, 0), 15).unwrap());
+        let mut custom = semantic_xf(false, 0, 0);
+        custom[2..4].copy_from_slice(&14u16.to_le_bytes());
+        extended_formats.push(parse_xf(&custom, 16).unwrap());
+        extended_formats.push(parse_xf(&semantic_xf(true, 0x0fff, 0), 17).unwrap());
+        Formatting {
+            extended_formats,
+            ..Formatting::default()
+        }
+    }
+
+    #[test]
+    fn an_unusable_reference_resolves_to_the_default_cell_xf_and_is_recorded() {
+        let formatting = formatting();
+        let default = &formatting.extended_formats()[15];
+
+        for (index, row) in [(4095_u16, 7_u32), (3, 8), (1, 9)] {
+            let mut report = ToleranceReport::default();
+            formatting.check_cell_xf(index, row, &mut report);
+
+            // The repair substitutes the mandatory first cell XF...
+            let resolved = formatting.cell_format(index).expect("substituted");
+            assert!(std::ptr::eq(resolved, default), "index {index}");
+            // ...and records it rather than swallowing it.
+            assert_eq!(report.unrecorded(), 0);
+            assert_eq!(report.total(), 1, "index {index}");
+            let entry = report.defects()[0];
+            assert_eq!(
+                entry.defect(),
+                Defect::CellFormat(CellFormatDefect::XfReference)
+            );
+            assert_eq!(entry.ordinal(), row);
+            assert_eq!(entry.observed(), u32::from(index));
+        }
+    }
+
+    #[test]
+    fn a_style_xf_reference_is_repaired_like_any_other_unusable_reference() {
+        let formatting = formatting();
+        // Index 17 names a style XF, which cannot format a cell either.
+        let mut report = ToleranceReport::default();
+        formatting.check_cell_xf(17, 0, &mut report);
+        assert_eq!(report.count(CellFormatDefect::XfReference), 1);
+        assert!(std::ptr::eq(
+            formatting.cell_format(17).unwrap(),
+            &formatting.extended_formats()[15]
+        ));
+    }
+
+    #[test]
+    fn a_conforming_reference_resolves_to_itself_and_records_nothing() {
+        let formatting = formatting();
+        let mut report = ToleranceReport::default();
+
+        formatting.check_cell_xf(15, 0, &mut report);
+        formatting.check_cell_xf(16, 1, &mut report);
+        formatting.check_cell_xf(0, 2, &mut report);
+        assert!(report.is_clean());
+
+        assert!(std::ptr::eq(
+            formatting.cell_format(15).unwrap(),
+            &formatting.extended_formats()[15]
+        ));
+        assert_eq!(formatting.cell_format(16).unwrap().number_format_id(), 14);
+        // Zero stays accepted as stored: no format, no repair.
+        assert!(formatting.cell_format(0).is_none());
     }
 }

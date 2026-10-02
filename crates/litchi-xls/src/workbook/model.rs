@@ -69,7 +69,9 @@ pub struct Workbook<R: Read + Seek> {
     pub(super) pivot_cache_stream_ids: Vec<u16>,
     /// Typed, inert workbook XML maps from the root-level `XML` stream.
     pub(super) xml_map: Option<crate::xml_map::MapInfo>,
-    /// Formatting defects repaired while opening; always empty in strict mode.
+    /// Defects repaired while opening. Always empty of opt-in
+    /// [`FormattingDefect`] repairs in strict mode; the Excel-compatible
+    /// [`crate::CellFormatDefect`] repairs appear under every leniency.
     pub(super) tolerance: ToleranceReport,
 }
 
@@ -81,12 +83,15 @@ pub struct OpenOptions<'a> {
     password: Option<&'a str>,
     /// How non-structural formatting defects are treated.
     ///
-    /// Defaults to [`Leniency::Strict`], which rejects any deviation from
-    /// MS-XLS. Set [`Leniency::TolerateFormattingDefects`] to open the
-    /// widespread real-world workbooks whose cosmetic formatting metadata is
+    /// Defaults to [`Leniency::Strict`], which rejects the cosmetic
+    /// [`crate::FormattingDefect`] deviations from MS-XLS. Set
+    /// [`Leniency::TolerateFormattingDefects`] to open the widespread
+    /// real-world workbooks whose cosmetic formatting metadata is
     /// self-contradictory; everything repaired is then enumerable through
-    /// [`Workbook::tolerance_report`]. Structural defects — record framing,
-    /// stream grammar, and encryption — remain hard errors either way.
+    /// [`Workbook::tolerance_report`]. The Excel-compatible
+    /// [`crate::CellFormatDefect`] repairs are applied under either policy,
+    /// while structural defects — record framing, stream grammar, and
+    /// encryption — remain hard errors.
     leniency: Leniency,
     /// Explicit compatibility profile for precisely scoped producer quirks.
     ///
@@ -169,14 +174,14 @@ impl<R: Read + Seek> Workbook<R> {
         self.shared_string_properties.as_ref().map(Arc::clone)
     }
 
-    /// Formatting defects repaired while opening this workbook.
+    /// Defects repaired while opening this workbook.
     ///
-    /// Always clean under [`Leniency::Strict`], because a strict open either
-    /// rejects the defect or never encounters one. Under
-    /// [`Leniency::TolerateFormattingDefects`] every repair the reader made
-    /// is enumerable here; see [`crate::FormattingDefect`] for the
-    /// closed set of defects that can appear and the substitute value each one
-    /// produced.
+    /// The Excel-compatible [`crate::CellFormatDefect`] repairs are applied
+    /// and recorded under every policy, including [`Leniency::Strict`]; the
+    /// opt-in [`crate::FormattingDefect`] repairs appear only under
+    /// [`Leniency::TolerateFormattingDefects`]. See both enumerations for the
+    /// closed set of defects that can appear and the substitute value each
+    /// one produced.
     pub fn tolerance_report(&self) -> &ToleranceReport {
         &self.tolerance
     }

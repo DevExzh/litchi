@@ -1,6 +1,7 @@
 //! BIFF8 worksheet row and column layout records.
 
 use crate::error::{Error, Result};
+use crate::leniency::ToleranceReport;
 use crate::number_format::Formatting;
 use crate::worksheet::layout::DEF_COL_WIDTH_RECORD_TYPE;
 use std::collections::BTreeMap;
@@ -58,6 +59,7 @@ impl Collector {
         record_type: u16,
         data: &[u8],
         formatting: &Formatting,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         if self.saw_default_column_width
             && record_type != COLINFO_RECORD_TYPE
@@ -95,7 +97,11 @@ impl Collector {
                     ));
                 }
                 let column = column::parse(data)?;
-                formatting.validate_cell_xf(column.format_index())?;
+                formatting.check_cell_xf(
+                    column.format_index(),
+                    u32::from(column.first_column()),
+                    tolerance,
+                );
                 self.columns.push(column);
                 self.saw_columns = true;
             },
@@ -108,7 +114,7 @@ impl Collector {
                     ));
                 }
                 if let Some(index) = row.format_index() {
-                    formatting.validate_cell_xf(index)?;
+                    formatting.check_cell_xf(index, u32::from(row.row()), tolerance);
                 }
                 self.last_row = Some(row.row());
                 self.rows.insert(row.row(), row);
@@ -151,40 +157,83 @@ mod tests {
     #[test]
     fn collector_enforces_columns_and_sorted_rows() {
         let formatting = Formatting::default();
+        let mut tolerance = ToleranceReport::default();
         let mut collector = Collector::new();
         assert!(
             collector
-                .feed_record(COLINFO_RECORD_TYPE, &column_payload(0, 0, 0), &formatting)
+                .feed_record(
+                    COLINFO_RECORD_TYPE,
+                    &column_payload(0, 0, 0),
+                    &formatting,
+                    &mut tolerance
+                )
                 .is_err()
         );
         collector
-            .feed_record(DEF_COL_WIDTH_RECORD_TYPE, &8u16.to_le_bytes(), &formatting)
+            .feed_record(
+                DEF_COL_WIDTH_RECORD_TYPE,
+                &8u16.to_le_bytes(),
+                &formatting,
+                &mut tolerance,
+            )
             .unwrap();
         collector
-            .feed_record(COLINFO_RECORD_TYPE, &column_payload(0, 0, 0), &formatting)
+            .feed_record(
+                COLINFO_RECORD_TYPE,
+                &column_payload(0, 0, 0),
+                &formatting,
+                &mut tolerance,
+            )
             .unwrap();
-        collector.feed_record(0x0200, &[], &formatting).unwrap();
+        collector
+            .feed_record(0x0200, &[], &formatting, &mut tolerance)
+            .unwrap();
         assert!(
             collector
-                .feed_record(COLINFO_RECORD_TYPE, &column_payload(1, 1, 0), &formatting,)
+                .feed_record(
+                    COLINFO_RECORD_TYPE,
+                    &column_payload(1, 1, 0),
+                    &formatting,
+                    &mut tolerance,
+                )
                 .is_err()
         );
 
         let mut collector = Collector::new();
         collector
-            .feed_record(DEF_COL_WIDTH_RECORD_TYPE, &8u16.to_le_bytes(), &formatting)
+            .feed_record(
+                DEF_COL_WIDTH_RECORD_TYPE,
+                &8u16.to_le_bytes(),
+                &formatting,
+                &mut tolerance,
+            )
             .unwrap();
         collector
-            .feed_record(ROW_RECORD_TYPE, &row_payload(2), &formatting)
+            .feed_record(
+                ROW_RECORD_TYPE,
+                &row_payload(2),
+                &formatting,
+                &mut tolerance,
+            )
             .unwrap();
         assert!(
             collector
-                .feed_record(COLINFO_RECORD_TYPE, &column_payload(1, 1, 0), &formatting)
+                .feed_record(
+                    COLINFO_RECORD_TYPE,
+                    &column_payload(1, 1, 0),
+                    &formatting,
+                    &mut tolerance,
+                )
                 .is_err()
         );
         assert!(
             collector
-                .feed_record(ROW_RECORD_TYPE, &row_payload(1), &formatting)
+                .feed_record(
+                    ROW_RECORD_TYPE,
+                    &row_payload(1),
+                    &formatting,
+                    &mut tolerance
+                )
                 .is_err()
         );
     }

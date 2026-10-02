@@ -543,7 +543,7 @@ impl ReadAt for CountingSource {
             self.revision.fetch_add(1, Ordering::Relaxed);
         }
         let version =
-            SourceVersion::new(0x584C_535F_43414348, self.revision.load(Ordering::Relaxed));
+            SourceVersion::new(0x584C_535F_4341_4348, self.revision.load(Ordering::Relaxed));
         if self.bump_after.load(Ordering::Relaxed) == ordinal {
             self.revision.fetch_add(1, Ordering::Relaxed);
         }

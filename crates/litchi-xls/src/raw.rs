@@ -4,7 +4,7 @@
 //! CFB container types. Facades that already own a validated positional CFB
 //! catalog may use this module to transfer that catalog without rebuilding it.
 
-use crate::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook};
+use crate::{SourceBackedError, SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook};
 use litchi_cfb::SharedOleFile;
 use std::sync::Arc;
 
@@ -23,5 +23,8 @@ pub fn source_backed_workbook_from_shared_ole_file(
     cfb: Arc<SharedOleFile>,
     limits: SourceBackedLimits,
 ) -> Result<SourceBackedWorkbook, SourceBackedError> {
-    SourceBackedWorkbook::from_shared_ole_file_with_limits(cfb, limits)
+    SourceBackedWorkbook::from_shared_ole_file_with_options(
+        cfb,
+        SourceBackedOptions::default().with_limits(limits),
+    )
 }

@@ -12,41 +12,64 @@ use super::{
     XL_UNICODE_STRING_HIGH_BYTE,
 };
 use crate::error::{Error, Result};
-use crate::leniency::{FormattingDefect, ToleranceLog};
+use crate::leniency::{CellFormatDefect, FormattingDefect, ToleranceLog, ToleranceReport};
 use litchi_biff::RecordRef;
 
+/// The mandatory first cell XF (MS-XLS 2.4.353 reserves slots 0–14 for style
+/// XFs): the Excel-compatible substitute for a cell-XF reference that cannot
+/// format a cell.
+const DEFAULT_CELL_XF_INDEX: u16 = 15;
+
 impl Formatting {
+    /// The cell format `index` resolves to, applying the Excel-compatible
+    /// substitution for a reference that cannot format a cell.
+    ///
+    /// A valid cell-XF index resolves to its own format. An index of zero
+    /// resolves to no format, exactly as stored. Anything else — out of
+    /// range, a reserved style slot, or a style XF — resolves to the default
+    /// cell XF the way Excel renders it; [`Formatting::check_cell_xf`]
+    /// records that substitution at the point the reference is read.
     pub(crate) fn cell_format(&self, index: u16) -> Option<&ExtendedFormat> {
         if index == 0 {
             return None;
         }
         self.extended_format(index)
             .filter(|format| format.is_cell_format())
+            .or_else(|| self.default_cell_format())
     }
 
-    pub(crate) fn validate_cell_xf(&self, index: u16) -> Result<()> {
-        if self.extended_formats.is_empty() {
-            return Ok(());
+    /// The default cell XF: the mandatory first cell XF at
+    /// [`DEFAULT_CELL_XF_INDEX`], which `parse_globals` guarantees for every
+    /// parsed workbook. Absent only for tables built outside the reader.
+    fn default_cell_format(&self) -> Option<&ExtendedFormat> {
+        self.extended_format(DEFAULT_CELL_XF_INDEX)
+            .filter(|format| format.is_cell_format())
+    }
+
+    /// Whether a cell, row, or column `ixfe` cannot format a cell and is
+    /// repaired by the [`CellFormatDefect::XfReference`] substitution.
+    ///
+    /// Zero and every index into an empty table are accepted as stored, so
+    /// they never count as repairs.
+    pub(crate) fn cell_xf_needs_repair(&self, index: u16) -> bool {
+        if self.extended_formats.is_empty() || index == 0 {
+            return false;
         }
-        if index == 0 {
-            return Ok(());
-        }
-        if index < 15 {
-            return Err(invalid(
-                XF_RECORD,
-                format!("cell references reserved style-XF slot {index}"),
-            ));
-        }
-        match self.extended_format(index) {
-            Some(format) if format.is_cell_format() => Ok(()),
-            Some(_) => Err(invalid(
-                XF_RECORD,
-                format!("cell references style XF {index}"),
-            )),
-            None => Err(invalid(
-                XF_RECORD,
-                format!("cell references out-of-range XF {index}"),
-            )),
+        index < DEFAULT_CELL_XF_INDEX
+            || !self
+                .extended_format(index)
+                .is_some_and(|format| format.is_cell_format())
+    }
+
+    /// Record the Excel-compatible repair for `index` when it cannot format
+    /// a cell. `ordinal` locates the carrying record (the zero-based row of a
+    /// cell or `ROW` record, the first column of a `COLINFO` record).
+    ///
+    /// The substitution itself is applied by [`Formatting::cell_format`], so
+    /// every consumer of the index sees the default cell XF.
+    pub(crate) fn check_cell_xf(&self, index: u16, ordinal: u32, tolerance: &mut ToleranceReport) {
+        if self.cell_xf_needs_repair(index) {
+            tolerance.record(CellFormatDefect::XfReference, ordinal, u32::from(index));
         }
     }
 

@@ -18,6 +18,19 @@ use crate::records::{BoundSheetRecord, SharedStringProperties};
 pub(super) use semantic::cells::{DecodeEveryCell, Position, ValidateCells};
 pub(super) use wire::pivot_cache_stream_paths;
 
+/// Stream coordinates of one worksheet substream.
+///
+/// `stream_len` is the whole Workbook stream's length, `base_position` the
+/// worksheet BOF's offset within it, and `current_position` the offset just
+/// past that BOF; the row-block index and the per-record positions both
+/// derive from the three together.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct WorksheetStreamRegion {
+    pub(crate) stream_len: u64,
+    pub(crate) base_position: u64,
+    pub(crate) current_position: u64,
+}
+
 /// Inputs owned by the workbook package and consumed by the globals collector.
 pub(crate) struct WorkbookGlobalsSink<'a> {
     /// `BoundSheet8` entries in stream order.
