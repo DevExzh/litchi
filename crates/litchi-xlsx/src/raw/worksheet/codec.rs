@@ -32,7 +32,7 @@ use crate::cell::{Store, Text};
 use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, allocation, invalid};
 use crate::layout::{self, Defaults};
-use crate::leniency::{Location, ToleranceReport, WorksheetDefect};
+use crate::leniency::{CellDefect, Location, ToleranceReport, WorksheetDefect};
 use crate::row;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -1441,18 +1441,35 @@ impl<'c> Parser<'c> {
                 "worksheet value exceeds {MAX_CELL_CHARACTERS} characters"
             )));
         }
+        let address = Address::at(cell.row - 1, cell.column - 1)?;
         if let Some(kind) = cell.formula_kind.as_ref()
             && !matches!(kind, RawFormulaKind::Unknown(_))
             && cell.formula.trim_start().starts_with('=')
         {
-            return Err(invalid("worksheet formula must omit the leading '='"));
+            // Naive generators write `<f>=SUM(A1:A2)</f>`; LibreOffice's
+            // compiler accepts the `=` and Excel repairs (audit finding 4.9):
+            // strip one leading `=`. A second one stays fatal.
+            let error = invalid("worksheet formula must omit the leading '='");
+            let stripped = cell.formula.trim_start()[1..].to_owned();
+            let report = self.repair_sink().ok_or(error)?;
+            report.record(CellDefect::FormulaLeadingEquals, Location::Cell(address));
+            if stripped.trim_start().starts_with('=') {
+                return Err(invalid("worksheet formula must omit the leading '='"));
+            }
+            cell.formula = stripped;
         }
         if matches!(
             cell.formula_kind.as_ref(),
             Some(RawFormulaKind::Scalar | RawFormulaKind::Array(_))
         ) && cell.formula.is_empty()
         {
-            return Err(invalid("worksheet formula expression is empty"));
+            // An empty expression is schema-valid but meaningless;
+            // LibreOffice skips it (audit finding 4.9). The cell reads
+            // without a formula, keeping any cached value.
+            let error = invalid("worksheet formula expression is empty");
+            let report = self.repair_sink().ok_or(error)?;
+            report.record(CellDefect::EmptyFormula, Location::Cell(address));
+            cell.formula_kind = None;
         }
         if cell.saw_inline {
             cell.inline = decode_spreadsheet_text(&cell.inline)?;
@@ -1462,7 +1479,6 @@ impl<'c> Parser<'c> {
                 )));
             }
         }
-        let address = Address::at(cell.row - 1, cell.column - 1)?;
         let formula = cell.formula_kind.map(|kind| RawFormula {
             text: cell.formula,
             kind,

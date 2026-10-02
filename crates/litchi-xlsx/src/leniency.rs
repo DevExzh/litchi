@@ -114,6 +114,9 @@
 //!   [`CatalogDefect::SheetNameRules`] (finding 4.8, opt-in). The standalone
 //!   `raw::parse_catalog` and the feature snapshots that re-read the
 //!   catalog for editing keep the historical errors.
+//! * finding 4.9 — the worksheet event parser records
+//!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
+//!   at the cell; the selected-range scanner defers such a cell to it.
 //! * finding 4.6 — shared-formula resolution (`raw/worksheet/semantic.rs`)
 //!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
 //! * finding 4.3 — cell materialization records
@@ -239,11 +242,14 @@ pub enum CellDefect {
     /// as a plain cell holding its cached value. The location is the
     /// repaired cell. A `ref` that is not a range lexical stays fatal.
     BrokenSharedFormulaGroup,
-    /// A scalar or array `<f>` starts with `=` (audit finding 4.9).
-    /// *Roadmap contract:* one leading `=` is stripped.
+    /// An `<f>` starts with `=` (audit finding 4.9). Naive generators write
+    /// `<f>=SUM(A1:A2)</f>`; LibreOffice's compiler accepts the `=` and Excel
+    /// repairs. One leading `=` (after any leading whitespace) is stripped; a
+    /// second one stays a hard error.
     FormulaLeadingEquals,
-    /// A scalar or array `<f>` is empty (audit finding 4.9). *Roadmap
-    /// contract:* the cell reads without a formula.
+    /// A scalar or array `<f>` is empty (audit finding 4.9). LibreOffice
+    /// skips an empty formula; the cell reads without one, keeping its
+    /// cached value.
     EmptyFormula,
 }
 

@@ -463,3 +463,47 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
     assert!(Workbook::from_slice_with_leniency(&empty, lenient).is_err());
     assert!(SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(empty), lenient).is_err());
 }
+
+/// Finding 4.9: a leading `=` is stripped and an empty expression dropped,
+/// each recorded at the cell; a cold source-backed read defers to the
+/// repairing parse.
+#[test]
+fn leading_equals_and_empty_formulas_are_repaired_and_recorded() {
+    use litchi_xlsx::{Address, Cell, CellDefect as C, SourceCellView, Value};
+
+    let bytes = patched(&[
+        (
+            "xl/worksheets/sheet1.xml",
+            &replace(
+                r#"<c r="B3" s="7"/>"#,
+                r#"<c r="B3" s="7"><f>=1+1</f><v>2</v></c>"#,
+            ),
+        ),
+        (
+            "xl/worksheets/sheet2.xml",
+            &replace(
+                r#"<c r="C2" s="10"><v>17816.607951388887</v>"#,
+                r#"<c r="C2" s="10"><f></f><v>17816.607951388887</v>"#,
+            ),
+        ),
+    ]);
+
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    match source.sheet(0usize).unwrap().unwrap().cell("B3").unwrap() {
+        SourceCellView::Stored(Cell::Formula(formula)) => assert_eq!(formula.text(), "1+1"),
+        other => panic!("expected a formula, got {other:?}"),
+    }
+    assert!(matches!(
+        source.sheet(1usize).unwrap().unwrap().cell("C2").unwrap(),
+        SourceCellView::Stored(Cell::Value(Value::Number(_)))
+    ));
+
+    let cell = |a1: &str| ToleranceLocation::Cell(Address::from_a1(a1).unwrap());
+    assert_eq!(
+        worksheet_entries(&both_reports(&bytes)),
+        [
+            (Defect::Cell(C::FormulaLeadingEquals), Some(0), cell("B3")),
+            (Defect::Cell(C::EmptyFormula), Some(1), cell("C2")),
+        ]
+    );
+}

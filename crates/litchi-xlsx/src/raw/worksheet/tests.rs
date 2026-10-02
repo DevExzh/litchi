@@ -948,7 +948,75 @@ fn rejects_missing_shared_strings_bad_indexes_and_formula_markers() {
     let marked = format!(
         r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f>=1+1</f><v>2</v></c></row></sheetData></worksheet>"#
     );
-    assert!(parse(marked.as_bytes(), || Ok(None)).is_err());
+    assert!(super::parse_refusing_repairs(marked.as_bytes(), || Ok(None)).is_err());
+}
+
+/// Audit finding 4.9: one leading `=` is stripped and an empty scalar or
+/// array expression is dropped, each recorded at the cell; write-path
+/// admission keeps the errors and a doubled `=` stays fatal.
+#[test]
+fn repairs_and_records_leading_equals_and_empty_formulas() {
+    use crate::leniency::{CellDefect, Defect, Location};
+
+    let a1 = Address::from_a1("A1").expect("address");
+    let read = |cell: &str, defects: &[CellDefect]| {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}"><sheetData><row r="1">{cell}</row></sheetData></worksheet>"#
+        );
+        let store =
+            parse(xml.as_bytes(), || Ok(None)).unwrap_or_else(|error| panic!("{cell}: {error}"));
+        let recorded = store
+            .tolerance_report()
+            .iter()
+            .map(|entry| {
+                assert_eq!(entry.location, Location::Cell(a1));
+                entry.defect
+            })
+            .collect::<Vec<_>>();
+        let expected = defects
+            .iter()
+            .map(|defect| Defect::Cell(*defect))
+            .collect::<Vec<_>>();
+        assert_eq!(recorded, expected, "{cell}");
+        assert!(super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err());
+        store.get(a1).cloned()
+    };
+
+    match read(
+        r#"<c r="A1"><f> =SUM(B1:B2)</f><v>3</v></c>"#,
+        &[CellDefect::FormulaLeadingEquals],
+    ) {
+        Some(Cell::Formula(formula)) => assert_eq!(formula.text(), "SUM(B1:B2)"),
+        other => panic!("expected a formula, got {other:?}"),
+    }
+    match read(
+        r#"<c r="A1"><f t="array" ref="A1">=B1:B2*2</f><v>2</v></c>"#,
+        &[CellDefect::FormulaLeadingEquals],
+    ) {
+        Some(Cell::Formula(formula)) => assert_eq!(formula.text(), "B1:B2*2"),
+        other => panic!("expected a formula, got {other:?}"),
+    }
+    for cell in [
+        r#"<c r="A1"><f></f><v>7</v></c>"#,
+        r#"<c r="A1"><f/><v>7</v></c>"#,
+    ] {
+        assert!(matches!(
+            read(cell, &[CellDefect::EmptyFormula]),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "7"
+        ));
+    }
+    assert!(matches!(
+        read(
+            r#"<c r="A1"><f>=</f><v>7</v></c>"#,
+            &[CellDefect::FormulaLeadingEquals, CellDefect::EmptyFormula]
+        ),
+        Some(Cell::Value(Value::Number(_)))
+    ));
+
+    let doubled = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f>==B1</f></c></row></sheetData></worksheet>"#
+    );
+    assert!(parse(doubled.as_bytes(), || Ok(None)).is_err());
 }
 
 /// Audit finding 4.4: the read path repairs a dangling shared-string

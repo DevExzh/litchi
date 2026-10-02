@@ -1866,9 +1866,11 @@ impl<'a> Scanner<'a> {
                 return Err(invalid("formula cell cannot contain an inline string"));
             }
             if formula.trim().is_empty() || formula.trim_start().starts_with('=') {
-                return Err(invalid(
-                    "formula expression must be non-empty and omit the leading '='",
-                ));
+                // The materialized parser repairs and records an empty
+                // expression or a leading '=' (audit finding 4.9); this
+                // scanner never repairs.
+                self.mark(NotEligibleReason::FormulaSemantics);
+                return Ok(());
             }
             let formula = Formula::new(formula.clone())?;
             Some((formula.text().to_owned(), formula))
