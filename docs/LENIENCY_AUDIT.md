@@ -500,7 +500,7 @@ against the crate's public API.
   empty instruction), record `FldSimpleMissingInstr`.
 ### 2.12 Section header/footer reference rejects non-XML-ID relationship IDs — P2 (confidence: high on code; medium-low on frequency)
 > **Status: FIXED (2026-10-02)** — a non-empty, non-NCName header/footer `r:id` is kept and recorded as `SectionDefect::NonConformingRelationshipId`; an empty ID stays fatal and writers still require
-> an NCName. (litchi-opc still rejects non-XML-ID `.rels` Ids, so such a reference cannot resolve yet.)
+> an NCName. litchi-opc now keeps non-XML-ID `.rels` Ids verbatim (`RelationshipDefect::NonConformingId`), so numeric header/footer references resolve end to end.
 - **Location**: `crates/litchi-docx/src/section/codec.rs:1148` (`is_xml_id` check on
   `headerReference`/`footerReference` `r:id`; helper at :1159).
 - **Check**: `r:id` must be non-empty and start with a letter/underscore; otherwise
