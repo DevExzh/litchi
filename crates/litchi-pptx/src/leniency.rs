@@ -200,11 +200,72 @@
 //! by the part's shape scene ([`crate::shape::Scene::tolerance_report`]),
 //! so a caller enumerating `shapes()` reports sees every part that carried
 //! one; the other readers of the same part skip them consistently rather
-//! than record duplicates. DOCTYPE declarations stay rejected. The remaining
-//! feature codecs (fonts, view properties, media, comments, ink, and the
-//! like) and the lossless edit planners still reject processing
-//! instructions: those readers have no report carrier yet, and skipping
-//! there without recording would swallow the defect silently.
+//! than record duplicates. DOCTYPE declarations stay rejected everywhere.
+//!
+//! The feature readers that carry a report skip them too — removed from the
+//! semantic input before markup-compatibility processing, which itself
+//! refuses them — and record the skip once per part:
+//!
+//! * view properties
+//!   ([`crate::view_properties::load_from_package_with_tolerance`],
+//!   [`crate::view_properties::ViewProperties::parse_with_tolerance`]);
+//! * presentation properties
+//!   ([`crate::presentation_properties::load_from_package_with_tolerance`],
+//!   [`crate::presentation_properties::Properties::parse_with_tolerance`]);
+//!   the math edit transactions load through
+//!   [`crate::presentation_properties::Properties::parse_strict`] and refuse
+//!   such a part;
+//! * the chart inspection ([`crate::chart::Info::tolerance_report`]), which
+//!   previously ignored them without a record;
+//! * legacy comments and comment authors
+//!   ([`crate::comments::load_presentation_comments_with_tolerance`],
+//!   [`crate::comments::parse_slide_comments_with_tolerance`]), which
+//!   previously stripped them without a record. The strict comment load
+//!   behind the comment edits keeps accepting them, as before: the edits
+//!   regenerate the part from the model.
+//!
+//! The remaining rejection sites stay strict, for one of two reasons.
+//!
+//! *Source-bound planners and span scanners* account for every byte of the
+//! source they splice, patch, or prove unchanged, so an unmodelled
+//! instruction must stay a refusal: the opened-presentation transactions
+//! (`opened/xml.rs`, `opened/copy_plan.rs`, `opened/remove_plan.rs`),
+//! cross-presentation copy (`presentation/source_cross_copy.rs`), slide
+//! reordering (`presentation/order.rs`), source-backed picture, SVG, and
+//! slide-root queries (`presentation/source.rs`,
+//! `presentation/source/svg_lifecycle*`), master/layout edits
+//! (`master_layout/codec.rs`, `master_layout/package.rs`), fragment
+//! insertion for media, laser traces, ink, OLE frames, and content parts
+//! (`media_parts/package.rs`, `laser/package.rs`,
+//! `presentation/embedded/{ink/package.rs, ole/authoring.rs,
+//! content_parts/codec.rs}`, `presentation_properties/metadata/slide_patch`),
+//! font-embedding edits (`font/package.rs`), tag owner maps and shape spans
+//! (`tag/package/codec.rs`, `tag/shape/codec.rs`, `table/shape.rs` span
+//! scan), designer and classification sources (`shape/designer/*`,
+//! `shape/classification/codec.rs`), change tracking
+//! (`change_tracking/codec.rs`), the source-bound metadata layouts
+//! (`comments/collaboration/codec.rs`, `presentation_properties/
+//! {readonly_recommended, package.rs root-dialect probe}`,
+//! `presentation_properties/metadata/{guides, events, custom_show,
+//! structure layout}`, `modern_comments/wire/*`), the transition and
+//! animation-template validators used by edits
+//! (`presentation/transition.rs`, `animations/codec/validation.rs`), and
+//! the package validator (`validation.rs`).
+//!
+//! *Feature readers whose values have no report carrier yet* keep rejecting
+//! rather than skip silently: media parts (`media_parts/codec.rs`), table
+//! properties, text, and styles (`table/shape.rs`, `table/style/*`), tags
+//! (`tag/codec.rs`), notes (`notes/codec.rs`), embedded-font lists
+//! (`font/codec.rs`), laser traces (`laser/codec.rs`), 3D models
+//! (`model3d/codec.rs`), zoom (`shape/zoom/codec.rs`), `ChartEx`
+//! (`chart/extension/codec/xml.rs`), modern comments
+//! (`modern_comments/codec*`), presentation metadata parts
+//! (`presentation_properties/metadata/{revision, changes, structure,
+//! sections, designer_tags, tracks, protection}`,
+//! `presentation_properties/math/codec.rs`), and embedded ink, ink actions,
+//! controls, OLE objects, and content-part scans
+//! (`presentation/embedded/*`). Each needs a report on its returned value
+//! (or a `*_with_tolerance` companion) before it can skip them.
 //!
 //! # Semantic slide text (audit finding 6.9)
 //!
@@ -637,8 +698,10 @@ pub enum MarkupDefect {
     /// none; XSLT publishing pipelines, CMS re-serializers, and archival
     /// tools inject them, and `PowerPoint` and LibreOffice skip them through
     /// ordinary XML parsers. The reader skips them too. It is recorded once
-    /// per part, by the part's shape scene; the context is `0`. DOCTYPE
-    /// declarations remain rejected as a security posture.
+    /// per part — for slide-owner parts by the part's shape scene, for the
+    /// feature parts listed in the module documentation by that part's
+    /// reader; the context is `0`. DOCTYPE declarations remain rejected as a
+    /// security posture.
     ProcessingInstruction,
     /// Semantic slide text met an element named `t` outside the DrawingML
     /// namespace — a PresentationML `p:t`, or an extension payload's `x:t`

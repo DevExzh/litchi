@@ -17,7 +17,8 @@ pub mod metadata;
 
 pub use model::*;
 pub use package::{
-    load_from_package, load_math_from_package, put_math_to_package, remove_math_from_package,
+    load_from_package, load_from_package_with_tolerance, load_math_from_package,
+    put_math_to_package, remove_math_from_package,
 };
 
 pub(crate) const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

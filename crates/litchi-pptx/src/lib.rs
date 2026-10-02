@@ -87,6 +87,7 @@ pub mod format;
 pub mod hyperlinks;
 pub mod laser;
 pub mod leniency;
+pub(crate) mod markup;
 pub mod media_parts;
 pub mod model3d;
 pub mod modern_comments;
@@ -201,6 +202,7 @@ pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
     PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
+    load_from_package_with_tolerance as load_presentation_properties_with_tolerance,
 };
 pub use slide::{Key, Slide, SlideLayout, SlideMaster};
 pub use validation::{

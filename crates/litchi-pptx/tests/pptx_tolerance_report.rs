@@ -1320,3 +1320,107 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
         .replace(r#"sz="34615""#, r#"sz="wide""#);
     assert!(ViewProperties::parse(invalid.as_bytes()).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.3 remainder: feature readers with a report carrier.
+// ---------------------------------------------------------------------------
+
+const PI: &str = "<?publisher stage=\"2\"?>";
+
+fn with_instruction(xml: &str) -> String {
+    let at = xml.find("?>").unwrap() + 2;
+    let root_end = at + xml[at..].find('>').unwrap() + 1;
+    format!("{}{PI}{}{PI}", &xml[..root_end], &xml[root_end..])
+}
+
+fn instruction_at(part: &str) -> (Defect, u32, Option<&str>) {
+    (
+        Defect::Markup(MarkupDefect::ProcessingInstruction),
+        0,
+        Some(part),
+    )
+}
+
+#[test]
+fn feature_readers_skip_and_record_processing_instructions() {
+    // View properties.
+    let deck = shapes_with_member("ppt/viewProps.xml", with_instruction);
+    let package = Package::from_vec(deck).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let view =
+        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
+            .unwrap()
+            .unwrap();
+    assert!(view.normal.is_some());
+    assert_eq!(located(&report), [instruction_at(VIEW_PROPS)]);
+    let blob = package
+        .opc()
+        .unwrap()
+        .get_part(&PackURI::new(VIEW_PROPS).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    assert!(ViewProperties::parse_strict(&blob).is_err());
+
+    // Presentation properties.
+    let deck = shapes_with_member("ppt/presProps.xml", with_instruction);
+    let package = Package::from_vec(deck).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    assert!(
+        litchi_pptx::presentation_properties::load_from_package_with_tolerance(
+            package.opc().unwrap(),
+            &mut report,
+        )
+        .unwrap()
+        .is_some()
+    );
+    assert_eq!(located(&report), [instruction_at("/ppt/presProps.xml")]);
+    // The math edit transaction loads strictly and refuses the part (it
+    // accepts the conformant one).
+    let mut clean = Package::from_bytes(SHAPES).unwrap().opc().unwrap().clone();
+    litchi_pptx::presentation_properties::put_math_to_package(
+        &mut clean,
+        litchi_pptx::presentation_properties::math::Properties::default(),
+    )
+    .unwrap();
+    let mut opc = package.opc().unwrap().clone();
+    assert!(
+        litchi_pptx::presentation_properties::put_math_to_package(
+            &mut opc,
+            litchi_pptx::presentation_properties::math::Properties::default(),
+        )
+        .is_err()
+    );
+
+    // Chart inspection, through a part that also carries MCE markup.
+    let infos = chart_infos(archive_with_member(
+        PIE_CHART,
+        "ppt/charts/chart1.xml",
+        with_instruction,
+    ));
+    assert_eq!(infos[0].chart_type, ChartType::Pie);
+    assert_eq!(
+        located(infos[0].tolerance_report()),
+        [instruction_at(CHART1)]
+    );
+
+    // Legacy comments.
+    let deck = archive_with_member(COMMENTED, "ppt/comments/comment1.xml", with_instruction);
+    let package = Package::from_vec(deck).unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let comments = litchi_pptx::comments::load_presentation_comments_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(comments.slides[0].comments[0].text, "testdoc");
+    assert_eq!(located(&report), [instruction_at(COMMENT1)]);
+
+    // DOCTYPE stays rejected.
+    let doctype =
+        String::from_utf8(blob)
+            .unwrap()
+            .replacen("<p:viewPr", "<!DOCTYPE p:viewPr><p:viewPr", 1);
+    assert!(ViewProperties::parse(doctype.as_bytes()).is_err());
+}

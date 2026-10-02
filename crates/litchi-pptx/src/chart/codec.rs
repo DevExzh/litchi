@@ -53,10 +53,17 @@ impl Part<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn chart_info(&self) -> Result<Info> {
-        let xml = litchi_ooxml_common::mce::process_ooxml(self.xml_bytes())?;
-        let mut reader = NsReader::from_reader(xml.as_ref());
-
         let mut state = ChartScanState::new();
+        // Processing instructions are inert (audit finding 6.3): skipped
+        // from the semantic input, recorded once for the part.
+        let (xml, instructions) = crate::markup::without_processing_instructions(self.xml_bytes())?;
+        if instructions {
+            state
+                .tolerance
+                .record(crate::leniency::MarkupDefect::ProcessingInstruction, 0);
+        }
+        let xml = litchi_ooxml_common::mce::process_ooxml(&xml)?;
+        let mut reader = NsReader::from_reader(xml.as_ref());
 
         loop {
             let decoder = reader.decoder();

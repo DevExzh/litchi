@@ -21,13 +21,59 @@ use quick_xml::{
 };
 
 impl Properties {
+    /// Parse a presentation-properties part (`p:presentationPr`).
+    ///
+    /// Processing instructions are skipped (audit finding 6.3); use
+    /// [`Self::parse_with_tolerance`] to have the skip recorded, or
+    /// [`Self::parse_strict`] to refuse them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8]) -> Result<Self> {
+        Self::parse_inner(xml, Some(&mut crate::leniency::ToleranceReport::default()))
+    }
+
+    /// [`Self::parse`], recording a skipped processing instruction as
+    /// [`crate::MarkupDefect::ProcessingInstruction`] in `tolerance` (no
+    /// part is stamped).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse_with_tolerance(
+        xml: &[u8],
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::parse_inner(xml, Some(tolerance))
+    }
+
+    /// Parse without any repair: a processing instruction is an error. The
+    /// presentation-properties edit transactions load through this.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read, is malformed, or
+    /// carries a processing instruction.
+    pub fn parse_strict(xml: &[u8]) -> Result<Self> {
+        Self::parse_inner(xml, None)
+    }
+
+    fn parse_inner(
+        xml: &[u8],
+        tolerance: Option<&mut crate::leniency::ToleranceReport>,
+    ) -> Result<Self> {
         if xml.len() > MAX_BYTES {
             return Err(invalid("presentation properties exceed 8 MiB"));
         }
+        let (xml, instructions) = crate::markup::without_processing_instructions(xml)?;
+        if instructions {
+            let Some(tolerance) = tolerance else {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            };
+            tolerance.record(crate::leniency::MarkupDefect::ProcessingInstruction, 0);
+        }
+        let xml = xml.as_ref();
         let mut capabilities = Capabilities::ooxml_baseline();
         capabilities.understand_namespace(P1710_NS);
         let processed =

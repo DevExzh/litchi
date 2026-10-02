@@ -549,13 +549,14 @@ fn validate_positional_metadata(package: &litchi_opc::SourceBackedPackage) -> Re
                 }
             },
             MetadataOwner::PresentationProperties => {
-                let properties = crate::presentation_properties::Properties::parse(data.as_bytes())
-                    .map_err(|error| {
-                        metadata_refusal(
-                            owner,
-                            format!("presentation properties parse failed: {error}"),
-                        )
-                    })?;
+                let properties =
+                    crate::presentation_properties::Properties::parse_strict(data.as_bytes())
+                        .map_err(|error| {
+                            metadata_refusal(
+                                owner,
+                                format!("presentation properties parse failed: {error}"),
+                            )
+                        })?;
                 let html_has_range = properties.html_publish.as_ref().is_some_and(|html| {
                     matches!(
                         &html.slides,

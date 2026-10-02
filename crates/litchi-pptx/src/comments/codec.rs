@@ -4,17 +4,16 @@ use super::{
     Author, Comment, Conformance, MAX_AUTHORS, MAX_COMMENTS_PER_SLIDE, MAX_DEPTH, MAX_NODES,
     MAX_PART_BYTES, MAX_STRING_BYTES, PML, STRICT_PML, invalid,
 };
-use crate::leniency::{CommentDefect, ToleranceReport};
+use crate::leniency::{CommentDefect, MarkupDefect, ToleranceReport};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
-use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::{Reader, reader::NsReader};
-use std::{borrow::Cow, collections::HashSet, ops::Range};
+use quick_xml::reader::NsReader;
+use std::{borrow::Cow, collections::HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Attribute {
@@ -35,7 +34,19 @@ struct Node {
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn parse_comment_authors(xml: &[u8]) -> Result<Vec<Author>> {
-    let root = parse_document(xml)?;
+    parse_comment_authors_with(xml, None)
+}
+
+/// [`parse_comment_authors`], recording skipped processing instructions in
+/// `tolerance` when one is given.
+pub(super) fn parse_comment_authors_with(
+    xml: &[u8],
+    tolerance: Option<&mut ToleranceReport>,
+) -> Result<Vec<Author>> {
+    let (root, instructions) = parse_document(xml)?;
+    if instructions && let Some(tolerance) = tolerance {
+        tolerance.record(MarkupDefect::ProcessingInstruction, 0);
+    }
     let namespace = root_namespace(&root, "cmAuthorLst")?;
     no_attributes(&root, &[])?;
     whitespace_only(&root)?;
@@ -120,7 +131,10 @@ fn parse_slide_comments_inner(
     xml: &[u8],
     mut tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Vec<Comment>> {
-    let root = parse_document(xml)?;
+    let (root, instructions) = parse_document(xml)?;
+    if instructions && let Some(tolerance) = tolerance.as_deref_mut() {
+        tolerance.record(MarkupDefect::ProcessingInstruction, 0);
+    }
     let namespace = root_namespace(&root, "cmLst")?;
     no_attributes(&root, &[])?;
     whitespace_only(&root)?;
@@ -272,11 +286,13 @@ pub(super) fn validate_comment_list(comments: &[Comment]) -> Result<()> {
     Ok(())
 }
 
-fn parse_document(xml: &[u8]) -> Result<Node> {
+/// Parse a comment part into its node tree, and whether processing
+/// instructions were skipped.
+fn parse_document(xml: &[u8]) -> Result<(Node, bool)> {
     if xml.len() > MAX_PART_BYTES {
         return Err(invalid("presentation comment part is too large"));
     }
-    let processed = process_comment_mce(xml)?;
+    let (processed, instructions) = process_comment_mce(xml)?;
     if processed.len() > MAX_PART_BYTES {
         return Err(invalid(
             "MCE-expanded presentation comment part is too large",
@@ -388,80 +404,21 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         return Err(invalid("unterminated presentation comment XML"));
     }
     root.ok_or_else(|| invalid("missing presentation comment XML root"))
+        .map(|root| (root, instructions))
 }
 
 /// The common MCE processor rejects processing instructions while the legacy
 /// comments owner treats them as inert source markup. Remove PIs only from
 /// the temporary semantic input; source-bound collaboration codecs continue
-/// to retain the original bytes for exact no-ops and inverse patches.
-fn process_comment_mce(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
-    let ranges = processing_instruction_ranges(xml)?;
-    if ranges.is_empty() {
-        return Ok(process_ooxml(xml)?);
-    }
-    let mut removed = 0usize;
-    for range in &ranges {
-        removed = removed
-            .checked_add(range.end - range.start)
-            .ok_or_else(|| invalid("processing-instruction source size overflow"))?;
-    }
-    let output_len = xml
-        .len()
-        .checked_sub(removed)
-        .ok_or_else(|| invalid("processing-instruction source size underflow"))?;
-    let mut filtered = Vec::new();
-    filtered
-        .try_reserve_exact(output_len)
-        .map_err(|source| Error::Allocation {
-            resource: "presentation comment MCE source",
-            source,
-        })?;
-    let mut cursor = 0usize;
-    for range in &ranges {
-        filtered.extend_from_slice(&xml[cursor..range.start]);
-        cursor = range.end;
-    }
-    filtered.extend_from_slice(&xml[cursor..]);
-    if filtered.len() != output_len {
-        return Err(invalid("presentation comment MCE source length changed"));
-    }
-    Ok(match process_ooxml(&filtered)? {
-        Cow::Borrowed(_) => Cow::Owned(filtered),
-        Cow::Owned(processed) => Cow::Owned(processed),
-    })
-}
-
-fn processing_instruction_ranges(xml: &[u8]) -> Result<Vec<Range<usize>>> {
-    let mut reader = Reader::from_reader(xml);
-    let origin = ReaderOrigin::of(xml);
-    reader.config_mut().trim_text(false);
-    let mut ranges = Vec::new();
-    let mut buffer = Vec::new();
-    loop {
-        let before = origin
-            .offset(reader.buffer_position())
-            .ok_or_else(|| invalid("processing-instruction offset does not fit usize"))?;
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(xml_error)?
-            .into_owned();
-        let after = origin
-            .offset(reader.buffer_position())
-            .ok_or_else(|| invalid("processing-instruction offset does not fit usize"))?;
-        if matches!(event, Event::PI(_)) {
-            if ranges.len() >= MAX_NODES {
-                return Err(invalid(
-                    "presentation comment processing instructions exceed limit",
-                ));
-            }
-            ranges.push(before..after);
-        }
-        if matches!(event, Event::Eof) {
-            break;
-        }
-        buffer.clear();
-    }
-    Ok(ranges)
+/// to retain the original bytes for exact no-ops and inverse patches. The
+/// flag reports whether any were removed (audit finding 6.3).
+fn process_comment_mce(xml: &[u8]) -> Result<(Cow<'_, [u8]>, bool)> {
+    let (filtered, found) = crate::markup::without_processing_instructions(xml)?;
+    let processed = match filtered {
+        Cow::Borrowed(xml) => process_ooxml(xml)?,
+        Cow::Owned(filtered) => Cow::Owned(process_ooxml(&filtered)?.into_owned()),
+    };
+    Ok((processed, found))
 }
 
 fn make_node(

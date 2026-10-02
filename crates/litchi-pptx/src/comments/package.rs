@@ -1,8 +1,9 @@
 //! Presentation package graph lifecycle and CRUD for legacy comments.
 
 use super::codec::{
-    parse_comment_authors, parse_slide_comments_strict, parse_slide_comments_with_tolerance,
-    validate_authors, validate_comment_list, write_comment_authors, write_slide_comments,
+    parse_comment_authors, parse_comment_authors_with, parse_slide_comments_strict,
+    parse_slide_comments_with_tolerance, validate_authors, validate_comment_list,
+    write_comment_authors, write_slide_comments,
 };
 use super::{
     AUTHORS_CONTENT_TYPE, AUTHORS_REL, Author, COMMENTS_CONTENT_TYPE, COMMENTS_REL, Comment,
@@ -153,7 +154,16 @@ fn load_comments(
     let value = Comments {
         author_relationship_id: author_relationship.r_id().to_owned(),
         author_part_name: author_target.to_string(),
-        authors: parse_comment_authors(author_part.blob())?,
+        authors: match tolerance.as_deref_mut() {
+            Some(tolerance) => {
+                let mut repairs = ToleranceReport::default();
+                let authors = parse_comment_authors_with(author_part.blob(), Some(&mut repairs))?;
+                repairs.locate_in_part(author_target.as_str());
+                tolerance.append(&repairs);
+                authors
+            },
+            None => parse_comment_authors(author_part.blob())?,
+        },
         slides: slide_lists,
     };
     validate_package_value_with(&value, tolerance)?;

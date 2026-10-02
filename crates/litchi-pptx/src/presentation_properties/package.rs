@@ -2,6 +2,7 @@
 
 use super::model::Properties;
 use super::{CONTENT_TYPE, REL, STRICT_REL};
+use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -14,15 +15,53 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// Load the presentation-properties part through its relationship, reading
+/// it with the repairs of [`Properties::parse`].
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<Properties>> {
+    load_from_package_with_tolerance(package, &mut ToleranceReport::default())
+}
+
+/// [`load_from_package`], appending the read's repairs to `tolerance`,
+/// stamped with the presentation-properties part name.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_from_package_with_tolerance(
+    package: &OpcPackage,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<Properties>> {
+    load(package, Some(tolerance))
+}
+
+/// Load for an edit transaction: a part whose read would need a repair is
+/// refused, so a rewrite never drops what the repair skipped.
+fn load_strict(package: &OpcPackage) -> Result<Option<Properties>> {
+    load(package, None)
+}
+
+fn load(
+    package: &OpcPackage,
+    tolerance: Option<&mut ToleranceReport>,
+) -> Result<Option<Properties>> {
     let Some(uri) = find_properties_part(package)? else {
         return Ok(None);
     };
     let part = package.get_part(&uri)?;
-    let mut value = Properties::parse(part.blob())?;
+    let mut value = match tolerance {
+        Some(tolerance) => {
+            let mut repairs = ToleranceReport::default();
+            let value = Properties::parse_with_tolerance(part.blob(), &mut repairs)?;
+            repairs.locate_in_part(uri.as_str());
+            tolerance.append(&repairs);
+            value
+        },
+        None => Properties::parse_strict(part.blob())?,
+    };
     hydrate_html_target(part, &mut value)?;
     Ok(Some(value))
 }
@@ -56,7 +95,7 @@ pub fn put_math_to_package(
     let mut staged = package.clone();
     let properties = find_properties_part(&staged)?;
     let mut snapshot = if properties.is_some() {
-        load_from_package(&staged)?.ok_or_else(|| {
+        load_strict(&staged)?.ok_or_else(|| {
             invalid("presentation-properties relationship disappeared during staging")
         })?
     } else {
@@ -114,7 +153,7 @@ pub fn remove_math_from_package(
     let uri = find_properties_part(&staged)?.ok_or_else(|| {
         invalid("presentation-properties relationship disappeared during staging")
     })?;
-    let mut snapshot = load_from_package(&staged)?.ok_or_else(|| {
+    let mut snapshot = load_strict(&staged)?.ok_or_else(|| {
         invalid("presentation-properties relationship disappeared during staging")
     })?;
     let removed = snapshot.remove_math();

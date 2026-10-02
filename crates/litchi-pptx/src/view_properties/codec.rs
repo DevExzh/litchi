@@ -8,7 +8,7 @@ use super::model::{
     OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
     ViewKind, ViewProperties,
 };
-use crate::leniency::{ToleranceReport, ViewDefect};
+use crate::leniency::{Defect, MarkupDefect, ToleranceReport, ViewDefect};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::{
@@ -75,7 +75,16 @@ impl ViewProperties {
         if xml.len() > MAX {
             return Err(invalid("view properties exceed 8 MiB"));
         }
-        let x = litchi_ooxml_common::mce::process_ooxml(xml)?;
+        // Processing instructions are inert (audit finding 6.3): skipped
+        // from the semantic input, recorded once for the part.
+        let (xml, instructions) = crate::markup::without_processing_instructions(xml)?;
+        if instructions {
+            tol.repair(
+                MarkupDefect::ProcessingInstruction,
+                "processing instructions are rejected",
+            )?;
+        }
+        let x = litchi_ooxml_common::mce::process_ooxml(&xml)?;
         if x.len() > MAX {
             return Err(invalid("processed view properties exceed 8 MiB"));
         }
@@ -302,7 +311,7 @@ struct Tol<'r> {
 }
 
 impl Tol<'_> {
-    fn repair(&mut self, defect: ViewDefect, what: &str) -> Result<()> {
+    fn repair(&mut self, defect: impl Into<Defect>, what: &str) -> Result<()> {
         match self.report.as_deref_mut() {
             Some(report) => {
                 report.record(defect, 0);
