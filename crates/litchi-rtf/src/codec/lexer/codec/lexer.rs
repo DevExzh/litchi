@@ -31,6 +31,8 @@ pub(crate) struct Lexer<'a> {
     /// lets the lexer reject a destination payload before copying it into the
     /// arena while preserving the ordinary generic binary ceiling elsewhere.
     pub(super) binary_destinations: Vec<BinaryDestination>,
+    /// Repairs applied while tokenizing.
+    pub(super) tolerance: crate::leniency::ToleranceReport,
 }
 
 impl<'a> Lexer<'a> {
@@ -51,7 +53,13 @@ impl<'a> Lexer<'a> {
             limits,
             total_binary_bytes: 0,
             binary_destinations: Vec::with_capacity(crate::codec::parser::MAX_GROUP_NESTING_DEPTH),
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
+    }
+
+    /// Move out the repairs applied while tokenizing.
+    pub(crate) fn take_tolerance_report(&mut self) -> crate::leniency::ToleranceReport {
+        std::mem::take(&mut self.tolerance)
     }
 
     /// Return the hard destination ceiling that applies before a `binN`

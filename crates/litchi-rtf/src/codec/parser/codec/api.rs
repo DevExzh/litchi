@@ -16,6 +16,16 @@ impl<'a> Parser<'a> {
         Self::new_inner(tokens, Some(token_spans), Some(source), arena, limits)
     }
 
+    /// Seed the parser's report with the repairs the lexer already applied,
+    /// so the document reports both phases in discovery order.
+    pub(crate) fn with_tolerance_report(
+        mut self,
+        report: crate::leniency::ToleranceReport,
+    ) -> Self {
+        self.tolerance.append(report);
+        self
+    }
+
     fn new_inner(
         tokens: &'a [Token<'a>],
         token_spans: Option<&'a [Range<usize>]>,
@@ -33,6 +43,7 @@ impl<'a> Parser<'a> {
                 root_valid: false,
                 document_valid: false,
             },
+            tolerance: crate::leniency::ToleranceReport::default(),
             opaque_nodes: Vec::new(),
             opaque_bytes: 0,
             unknown_syntax_markers: 0,
@@ -612,6 +623,7 @@ impl<'a> Parser<'a> {
         self.parse_provenance.document_valid = true;
 
         Ok(ParsedDocument {
+            tolerance_report: self.tolerance,
             ordinary_body_source_span,
             font_table: self.font_table.into_inner(),
             file_table: self.file_table,

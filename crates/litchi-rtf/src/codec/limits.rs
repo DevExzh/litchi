@@ -171,6 +171,59 @@ impl Default for ParseLimits {
     }
 }
 
+/// How a document is opened: its finite resource profile and its repair
+/// posture.
+///
+/// The default options pair [`ParseLimits::default`] with
+/// [`Leniency::Strict`](crate::leniency::Leniency::Strict). Word-compatible
+/// repairs are applied and recorded under every leniency; see
+/// [`crate::leniency`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[must_use]
+pub struct ParseOptions {
+    limits: ParseLimits,
+    leniency: crate::leniency::Leniency,
+}
+
+impl ParseOptions {
+    /// The production-safe default resource profile with strict leniency.
+    pub const fn new() -> Self {
+        Self {
+            limits: ParseLimits::DEFAULT,
+            leniency: crate::leniency::Leniency::Strict,
+        }
+    }
+
+    /// Return options with a different finite resource profile.
+    pub const fn with_limits(mut self, limits: ParseLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Return options with a different repair posture.
+    pub const fn with_leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
+
+    /// The finite resource profile.
+    pub const fn limits(self) -> ParseLimits {
+        self.limits
+    }
+
+    /// The repair posture.
+    #[must_use]
+    pub const fn leniency(self) -> crate::leniency::Leniency {
+        self.leniency
+    }
+}
+
+impl From<ParseLimits> for ParseOptions {
+    fn from(limits: ParseLimits) -> Self {
+        Self::new().with_limits(limits)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +248,15 @@ mod tests {
         assert_eq!(limits.max_opaque_nodes(), 6);
         assert_eq!(limits.max_opaque_node_bytes(), 7);
         assert_eq!(limits.max_total_opaque_bytes(), 8);
+    }
+
+    #[test]
+    fn default_options_are_strict_with_the_default_profile() {
+        let options = ParseOptions::default();
+        assert_eq!(options, ParseOptions::new());
+        assert_eq!(options.limits(), ParseLimits::default());
+        assert_eq!(options.leniency(), crate::leniency::Leniency::Strict);
+        let limits = ParseLimits::default().with_max_tokens(9);
+        assert_eq!(ParseOptions::from(limits).limits(), limits);
     }
 }

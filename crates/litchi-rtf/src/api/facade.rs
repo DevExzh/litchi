@@ -1,7 +1,7 @@
 //! Immutable, lifetime-free RTF document facade.
 
 use crate::document::RtfDocument;
-use crate::{ParseLimits, RtfResult};
+use crate::{ParseLimits, ParseOptions, RtfResult};
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
@@ -66,6 +66,22 @@ impl Document {
         RtfDocument::parse_with_limits(input, limits).map(|model| Self::from_model(model, limits))
     }
 
+    /// Parse UTF-8 RTF source with explicit resource limits and repair
+    /// posture.
+    ///
+    /// Word-compatible repairs are applied under every leniency; the opt-in
+    /// repairs a [`Leniency`](crate::leniency::Leniency) variant names are
+    /// applied only when selected. Every repair is listed by
+    /// [`Self::tolerance_report`].
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn parse_with_options(input: &str, options: ParseOptions) -> RtfResult<Self> {
+        RtfDocument::parse_with_options(input, options)
+            .map(|model| Self::from_model(model, options.limits()))
+    }
+
     /// Parse original RTF transport bytes with the production-safe resource
     /// profile.
     ///
@@ -86,6 +102,17 @@ impl Document {
     pub fn from_bytes_with_limits(input: &[u8], limits: ParseLimits) -> RtfResult<Self> {
         RtfDocument::parse_bytes_with_limits(input, limits)
             .map(|model| Self::from_model(model, limits))
+    }
+
+    /// Parse original RTF transport bytes with explicit resource limits and
+    /// repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn from_bytes_with_options(input: &[u8], options: ParseOptions) -> RtfResult<Self> {
+        RtfDocument::parse_bytes_with_options(input, options)
+            .map(|model| Self::from_model(model, options.limits()))
     }
 
     /// Parse an owned RTF transport allocation and retain it without copying.
@@ -111,6 +138,17 @@ impl Document {
             .map(|model| Self::from_model(model, limits))
     }
 
+    /// Parse an owned RTF transport allocation with explicit resource limits
+    /// and repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn from_owned_bytes_with_options(input: Vec<u8>, options: ParseOptions) -> RtfResult<Self> {
+        RtfDocument::from_owned_bytes_with_options(input, options)
+            .map(|model| Self::from_model(model, options.limits()))
+    }
+
     /// Open an RTF file with the production-safe resource profile.
     ///
     /// # Errors
@@ -125,6 +163,16 @@ impl Document {
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: ParseLimits) -> RtfResult<Self> {
         RtfDocument::open_with_limits(path, limits).map(|model| Self::from_model(model, limits))
+    }
+
+    /// Open an RTF file with explicit resource limits and repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn open_with_options(path: impl AsRef<Path>, options: ParseOptions) -> RtfResult<Self> {
+        RtfDocument::open_with_options(path, options)
+            .map(|model| Self::from_model(model, options.limits()))
     }
 
     fn from_model(model: RtfDocument<'static>, limits: ParseLimits) -> Self {
@@ -142,6 +190,18 @@ impl Document {
     #[must_use]
     pub fn same_snapshot(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Every repair the parse applied, in discovery order.
+    ///
+    /// An empty report means the source conformed and nothing was
+    /// substituted. Word-compatible repairs are recorded under every
+    /// [`Leniency`](crate::leniency::Leniency), including the default
+    /// strict posture.
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        self.inner.model.tolerance_report()
     }
 
     /// Borrow the document's plain text.

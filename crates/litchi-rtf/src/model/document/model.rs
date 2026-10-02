@@ -13,7 +13,7 @@
 )]
 use super::super::error::{RtfError, RtfResult, try_reserve_one};
 use super::super::lexer::Lexer;
-use super::super::limits::ParseLimits;
+use super::super::limits::{ParseLimits, ParseOptions};
 use super::super::parser::Parser;
 use super::super::types::{
     ColorTable, FontTable, Formatting, Paragraph as RtfParagraph, Run, StyleBlock,
@@ -183,6 +183,8 @@ pub struct RtfDocument<'a> {
     preserved_source: Option<Vec<u8>>,
     /// Finite profile used for the parse that produced this model.
     parse_limits: ParseLimits,
+    /// Every Word-compatible or opt-in repair the parse applied.
+    tolerance_report: crate::leniency::ToleranceReport,
     /// Parser provenance for the complete root/header/document token stream.
     parse_provenance: crate::validation::ParseProvenance,
     /// Content-free markers retained by focused parsers for dropped syntax.
@@ -404,7 +406,19 @@ impl<'a> RtfDocument<'a> {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_with_limits(input: &str, limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal(input.as_bytes(), limits)
+        Self::parse_internal(input.as_bytes(), limits.into())
+    }
+
+    /// Parse an RTF string with explicit resource limits and repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn parse_with_options(
+        input: &str,
+        options: ParseOptions,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal(input.as_bytes(), options)
     }
 
     /// Parse RTF from its original byte representation.
@@ -426,7 +440,20 @@ impl<'a> RtfDocument<'a> {
         input: &[u8],
         limits: ParseLimits,
     ) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal(input, limits)
+        Self::parse_internal(input, limits.into())
+    }
+
+    /// Parse original RTF bytes with explicit resource limits and repair
+    /// posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn parse_bytes_with_options(
+        input: &[u8],
+        options: ParseOptions,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal(input, options)
     }
 
     /// Parse an owned RTF transport allocation and retain it without copying.
@@ -452,7 +479,20 @@ impl<'a> RtfDocument<'a> {
         bytes: Vec<u8>,
         limits: ParseLimits,
     ) -> RtfResult<RtfDocument<'static>> {
-        Self::parse_internal_owned(bytes, limits)
+        Self::parse_internal_owned(bytes, limits.into())
+    }
+
+    /// Parse an owned RTF transport allocation with explicit resource limits
+    /// and repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn from_owned_bytes_with_options(
+        bytes: Vec<u8>,
+        options: ParseOptions,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal_owned(bytes, options)
     }
 
     /// Parse the transport bytes into a detached model without retaining the
@@ -463,7 +503,8 @@ impl<'a> RtfDocument<'a> {
     /// phase source-free is important for compressed RTF: the retained source
     /// must remain the original LZFu/MELA frame while the decompressed bytes
     /// remain a temporary parser input.
-    fn parse_transport(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+    fn parse_transport(bytes: &[u8], options: ParseOptions) -> RtfResult<RtfDocument<'static>> {
+        let limits = options.limits();
         if bytes.len() > limits.max_source_bytes() {
             return Err(RtfError::LimitExceeded {
                 resource: "source bytes",
@@ -502,15 +543,25 @@ impl<'a> RtfDocument<'a> {
         };
 
         let retain_ordinary_body_source_span = !is_compressed && bytes.is_ascii();
-        let document =
-            Self::parse_string(input_str.as_ref(), limits, retain_ordinary_body_source_span)?;
+        let mut document = Self::parse_string(
+            input_str.as_ref(),
+            options,
+            retain_ordinary_body_source_span,
+        )?;
+        if matches!(input_str, Cow::Owned(_)) {
+            // The lexer saw the one-scalar-per-byte view; report offsets into
+            // the transport bytes the caller supplied.
+            document
+                .tolerance_report
+                .remap_latin1_offsets(input_str.as_ref());
+        }
         Ok(document)
     }
 
     /// Parse borrowed transport bytes and retain an independent copy for
     /// exact-source writing.
-    fn parse_internal(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
-        let mut document = Self::parse_transport(bytes, limits)?;
+    fn parse_internal(bytes: &[u8], options: ParseOptions) -> RtfResult<RtfDocument<'static>> {
+        let mut document = Self::parse_transport(bytes, options)?;
         let mut source = Vec::new();
         source
             .try_reserve(bytes.len())
@@ -527,9 +578,9 @@ impl<'a> RtfDocument<'a> {
     /// the retained source after the detached model has been built.
     fn parse_internal_owned(
         bytes: Vec<u8>,
-        limits: ParseLimits,
+        options: ParseOptions,
     ) -> RtfResult<RtfDocument<'static>> {
-        let mut document = Self::parse_transport(&bytes, limits)?;
+        let mut document = Self::parse_transport(&bytes, options)?;
         document.preserved_source = Some(bytes);
         Ok(document)
     }
@@ -567,19 +618,23 @@ impl<'a> RtfDocument<'a> {
     /// Parse an RTF document from a UTF-8 string (internal)
     fn parse_string(
         input: &str,
-        limits: ParseLimits,
+        options: ParseOptions,
         retain_ordinary_body_source_span: bool,
     ) -> RtfResult<RtfDocument<'static>> {
+        let limits = options.limits();
         // Create arena for temporary allocations during parsing
         let arena = Bump::new();
 
         // Lexer phase
         let mut lexer = Lexer::new_with_limits(input, &arena, limits);
         let (tokens, token_spans) = lexer.tokenize_with_spans()?;
+        let lexer_report = lexer.take_tolerance_report();
 
         // Parser phase
-        let parser = Parser::new_with_source(&tokens, &token_spans, input, &arena, limits);
+        let parser = Parser::new_with_source(&tokens, &token_spans, input, &arena, limits)
+            .with_tolerance_report(lexer_report);
         let parsed = parser.parse()?;
+        let tolerance_report = parsed.tolerance_report;
         let ordinary_body_source_span = retain_ordinary_body_source_span
             .then_some(parsed.ordinary_body_source_span)
             .flatten()
@@ -698,6 +753,7 @@ impl<'a> RtfDocument<'a> {
             opaque_nodes: parsed.opaque_nodes,
             preserved_source: None,
             parse_limits: limits,
+            tolerance_report,
             parse_provenance: parsed.parse_provenance,
             unknown_syntax_markers: parsed.unknown_syntax_markers,
             ordinary_body_source_span,
@@ -900,8 +956,20 @@ impl<'a> RtfDocument<'a> {
         path: P,
         limits: ParseLimits,
     ) -> RtfResult<RtfDocument<'static>> {
-        let bytes = read_file_with_limit(path.as_ref(), limits.max_source_bytes())?;
-        Self::parse_internal_owned(bytes, limits)
+        Self::open_with_options(path, limits.into())
+    }
+
+    /// Open an RTF file with explicit resource limits and repair posture.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed beyond what the selected
+    /// leniency repairs, or a configured limit is exceeded.
+    pub fn open_with_options<P: AsRef<Path>>(
+        path: P,
+        options: ParseOptions,
+    ) -> RtfResult<RtfDocument<'static>> {
+        let bytes = read_file_with_limit(path.as_ref(), options.limits().max_source_bytes())?;
+        Self::parse_internal_owned(bytes, options)
     }
 
     /// Parse an RTF document from bytes.
@@ -1200,6 +1268,15 @@ impl<'a> RtfDocument<'a> {
 
     pub(crate) const fn parse_limits(&self) -> ParseLimits {
         self.parse_limits
+    }
+
+    /// Every repair the parse applied, in discovery order.
+    ///
+    /// An empty report means the source conformed. Word-compatible repairs
+    /// are recorded under every leniency; see [`crate::leniency`].
+    #[must_use]
+    pub const fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance_report
     }
 
     pub(crate) const fn parse_provenance(&self) -> crate::validation::ParseProvenance {

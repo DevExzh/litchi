@@ -69,6 +69,7 @@ mod codec;
 mod content;
 mod drawing;
 pub mod edit;
+pub mod leniency;
 pub mod metadata;
 mod model;
 mod numbering;
@@ -122,7 +123,8 @@ use text::{
 /// Concise document-opening facade.
 pub mod read {
     pub use crate::api::Document;
-    pub use crate::codec::limits::ParseLimits as Limits;
+    pub use crate::codec::limits::{ParseLimits as Limits, ParseOptions as Options};
+    pub use crate::leniency::{Leniency, ToleranceReport};
 }
 
 /// Concise streaming writer facade.
@@ -358,7 +360,7 @@ mod native {
     pub use legacy_text_box::{
         LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
     };
-    pub use limits::ParseLimits;
+    pub use limits::{ParseLimits, ParseOptions};
     pub use list::{
         List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride,
         ListOverrideLevel, ListOverrideTable, ListTable,

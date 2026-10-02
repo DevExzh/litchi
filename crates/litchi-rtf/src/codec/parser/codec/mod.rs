@@ -1483,6 +1483,8 @@ pub(crate) struct Parser<'a> {
     source: Option<&'a str>,
     limits: ParseLimits,
     parse_provenance: crate::validation::ParseProvenance,
+    /// Repairs applied while tokenizing and parsing, in discovery order.
+    tolerance: crate::leniency::ToleranceReport,
     opaque_nodes: Vec<crate::opaque::Node>,
     opaque_bytes: usize,
     unknown_syntax_markers: usize,
@@ -2128,6 +2130,8 @@ struct LatentStyleExceptionBuilder {
 /// before being converted into the final `RtfDocument` structure.
 /// All fields are public to allow direct access during document construction.
 pub(crate) struct ParsedDocument<'a> {
+    /// Repairs applied while tokenizing and parsing, in discovery order.
+    pub tolerance_report: crate::leniency::ToleranceReport,
     /// Root-level body range proven during the parser's structural preflight.
     pub ordinary_body_source_span: Option<Range<usize>>,
     /// Font table
