@@ -761,6 +761,8 @@ visibility → `Visibility::Unknown`, unknown error values → `ErrorValue::Unkn
 `dimension` stored but never cross-checked, MCE/Strict namespaces accepted, foreign
 elements ignored.
 ### 4.1 Row/column geometry domain clamping fails the whole sheet — P1
+> **Status: FIXED (2026-10-02)** — row `ht` > 409pt / column width > 255 clamp to the domain edge, negative/NaN values are dropped (sheet default, LibreOffice), out-of-domain `sheetFormatPr` defaults
+> dropped; recorded as `WorksheetDefect`. Unparseable lexicals stay fatal; write-path admission stays strict. OPC/metadata repairs now fold into the xlsx workbook report.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/codec.rs:928` (row `ht` via
   `row::Height::new`), `row.rs:18-25` (0..=409 domain), `column.rs:17-23` (width
   0..=255), `raw/worksheet/validation.rs:33-48` (`sheetFormatPr` defaults).
@@ -796,6 +798,8 @@ elements ignored.
   and record one entry per affected range; keep `MAX_CELL_STYLE` as an allocation guard
   only.
 ### 4.3 Malformed cell-value lexicals (number / boolean / date) kill the whole sheet — P1
+> **Status: FIXED (2026-10-02)** — unparseable/non-finite numbers demote the cell to `Cell::Unknown` (lexical kept), booleans read as LibreOffice reads them, invalid `t="d"` values demote to text,
+> malformed cached values on formula cells are dropped (formula kept); each recorded at the cell.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/semantic.rs:127` (`Number::new`),
   `cell.rs:402-417` (f64 parse + finite check at :413-414), semantic.rs:151-154
   (boolean), `cell.rs:244-256` (`Date::new` ISO 8601 only).
@@ -829,6 +833,7 @@ elements ignored.
   semantics), record the cell address; record (don't fail) the missing-table case per
   cell.
 ### 4.5 Malformed `sst` count/uniqueCount hints are fatal in the production parser — P1
+> **Status: FIXED (2026-10-02)** — unparseable, negative or out-of-range `sst` count/uniqueCount hints are treated as absent (Excel/LibreOffice) and recorded as `SharedStringsDefect::CountHint`.
 - **Location**: `crates/litchi-xlsx/src/raw/strings.rs:646-654` (`reserve_hint`
   propagates), :773-788 (`parse_count_hint_value` rejects non-numeric, negative, >
   2³¹−1); contrast `raw/shared_strings.rs:219-235` (tolerant twin, tests at :927-940).
@@ -843,6 +848,8 @@ elements ignored.
 - **Suggested posture**: default-repair — treat unparseable hints as absent (as
   shared_strings.rs already does); at most record a note.
 ### 4.6 Broken shared-formula groups kill the whole sheet — P1 (confidence: medium)
+> **Status: FIXED (2026-10-02)** — a master that cannot anchor its group keeps its own expression (first master per `si` wins); members without a usable master read as plain cells with their cached
+> value (LibreOffice); recorded as `CellDefect::BrokenSharedFormulaGroup`. A non-range `ref` lexical stays fatal.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/semantic.rs:201-260`
   (`resolve_shared_formulas`: master missing `ref` :203, no expression :209, not first
   in range :217, duplicate master :235, follower with no master :243, member outside
@@ -858,6 +865,7 @@ elements ignored.
   empty/`Unknown` formula instead of translating; record per group. Only "member outside
   master range" (translation would invent content) might stay strict.
 ### 4.7 `activeTab` / `localSheetId` out of range kills the whole workbook — P1
+> **Status: FIXED (2026-10-02)** — an `activeTab` past the sheet list falls back to the first sheet and a `definedName` with a dangling `localSheetId` is dropped (LibreOffice), each recorded as a `CatalogDefect` at open.
 - **Location**: `crates/litchi-xlsx/src/raw/catalog.rs:202-209` ("workbook activeTab
   {active_tab} exceeds the {} available sheets" :207), :211-219 (definedName
   `localSheetId`).
@@ -872,6 +880,8 @@ elements ignored.
   demote out-of-range `localSheetId` names to workbook-global scope or drop just that
   name; record each.
 ### 4.8 Sheet-name authoring rules enforced at load time — P1 (confidence: medium)
+> **Status: FIXED (2026-10-02, opt-in)** — under `Leniency::TolerateSheetNameRules` (`*_with_leniency` opens), over-long, reserved-character or apostrophe-bounded sheet names are kept verbatim and
+> recorded as `CatalogDefect::SheetNameRules`; the default stays an error; empty names and collisions stay fatal; rename/create still enforce the rules.
 - **Location**: `crates/litchi-xlsx/src/raw/catalog.rs:591-592` (invokes `validate_str`),
   `sheet.rs:190-216` (`validate_str`).
 - **Check**: sheet names > 31 chars, containing `* ? / \ : [ ]`, NUL/U+0003, or with
@@ -887,6 +897,8 @@ elements ignored.
   reading (sheets are already keyed by position), record; enforce `validate_str` only at
   authoring/rename time.
 ### 4.9 Formula with leading `=` or empty expression kills the whole sheet — P2 (confidence: high on code; medium on frequency)
+> **Status: FIXED (2026-10-02)** — a formula with a leading `=` has one stripped and an empty expression is dropped so the cell reads its cached value (LibreOffice); recorded as
+> `CellDefect::{FormulaLeadingEquals, EmptyFormula}`.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/codec.rs:1388` ("worksheet formula
   must omit the leading '='"), :1384-1396 (empty expression error).
 - **Check**: a scalar/array `<f>` whose text starts with `=` or is empty aborts the
