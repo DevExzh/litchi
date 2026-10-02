@@ -88,10 +88,14 @@ pub struct OpenOptions<'a> {
     /// [`Leniency::TolerateFormattingDefects`] to open the widespread
     /// real-world workbooks whose cosmetic formatting metadata is
     /// self-contradictory; everything repaired is then enumerable through
-    /// [`Workbook::tolerance_report`]. The Excel-compatible
-    /// [`crate::CellFormatDefect`] repairs are applied under either policy,
-    /// while structural defects — record framing, stream grammar, and
-    /// encryption — remain hard errors.
+    /// [`Workbook::tolerance_report`]. Set
+    /// [`Leniency::TolerateSheetNameDefects`] to keep worksheet names that
+    /// break the MS-XLS naming rules (see [`crate::SheetNameDefect`]), or
+    /// [`Leniency::TolerateAllDefects`] for both opt-in classes. The
+    /// Excel-compatible repairs ([`crate::CellFormatDefect`],
+    /// [`crate::EncodingDefect`], ...) are applied under every policy, while
+    /// structural defects — record framing, stream grammar, and encryption —
+    /// remain hard errors.
     leniency: Leniency,
     /// Explicit compatibility profile for precisely scoped producer quirks.
     ///
@@ -176,12 +180,13 @@ impl<R: Read + Seek> Workbook<R> {
 
     /// Defects repaired while opening this workbook.
     ///
-    /// The Excel-compatible [`crate::CellFormatDefect`] repairs are applied
-    /// and recorded under every policy, including [`Leniency::Strict`]; the
-    /// opt-in [`crate::FormattingDefect`] repairs appear only under
-    /// [`Leniency::TolerateFormattingDefects`]. See both enumerations for the
-    /// closed set of defects that can appear and the substitute value each
-    /// one produced.
+    /// The Excel-compatible repairs ([`crate::CellFormatDefect`],
+    /// [`crate::EncodingDefect`], ...) are applied and recorded under every
+    /// policy, including [`Leniency::Strict`]; the opt-in
+    /// [`crate::FormattingDefect`] and [`crate::SheetNameDefect`] repairs
+    /// appear only under the [`Leniency`] variant that enables them. See
+    /// [`crate::Defect`] for the closed set of defects that can appear and
+    /// the substitute value each one produced.
     pub fn tolerance_report(&self) -> &ToleranceReport {
         &self.tolerance
     }

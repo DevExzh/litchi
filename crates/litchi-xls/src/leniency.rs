@@ -60,13 +60,35 @@ pub enum Leniency {
     /// [`FormattingDefect`] variant and appends a [`ToleratedDefect`] to
     /// the workbook's [`ToleranceReport`].
     TolerateFormattingDefects,
+    /// Repair and record the worksheet-name defects listed by
+    /// [`SheetNameDefect`].
+    ///
+    /// Each name is kept verbatim and the repair is recorded as a
+    /// [`ToleratedDefect`]; sheets stay addressable by index. The
+    /// [`FormattingDefect`] classes are still rejected.
+    TolerateSheetNameDefects,
+    /// Repair and record every opt-in class: both the [`FormattingDefect`]
+    /// and the [`SheetNameDefect`] classes.
+    TolerateAllDefects,
 }
 
 impl Leniency {
     /// Whether formatting defects are repaired rather than rejected.
     #[must_use]
     pub fn tolerates_formatting_defects(self) -> bool {
-        matches!(self, Leniency::TolerateFormattingDefects)
+        matches!(
+            self,
+            Leniency::TolerateFormattingDefects | Leniency::TolerateAllDefects
+        )
+    }
+
+    /// Whether worksheet-name defects are repaired rather than rejected.
+    #[must_use]
+    pub fn tolerates_sheet_name_defects(self) -> bool {
+        matches!(
+            self,
+            Leniency::TolerateSheetNameDefects | Leniency::TolerateAllDefects
+        )
     }
 }
 
@@ -136,6 +158,59 @@ impl FormattingDefect {
         }
     }
 }
+
+/// The class of worksheet-name defect an opt-in read is allowed to repair.
+///
+/// MS-XLS 2.4.28 constrains `BoundSheet8.stName` only as a producer
+/// obligation; POI performs no name validation on read and LibreOffice opens
+/// and renames. Because a name is how formulas and callers address a sheet,
+/// accepting one that breaks the rules is a judgment call, so these repairs
+/// apply only under [`Leniency::TolerateSheetNameDefects`] (or
+/// [`Leniency::TolerateAllDefects`]). Every repair keeps the name exactly as
+/// stored; nothing is renamed.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of
+/// what the opt-in may change about a workbook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SheetNameDefect {
+    /// The name was empty.
+    Empty,
+    /// The name had more than 31 UTF-16 code units.
+    TooLong,
+    /// The name contained NUL, U+0003, or one of `: \ * ? / [ ]`.
+    ForbiddenCharacter,
+    /// The name began or ended with an apostrophe.
+    EdgeApostrophe,
+    /// The name repeated, ignoring case, the name of an earlier sheet.
+    ///
+    /// Both sheets are kept; a lookup by name resolves to the earlier one,
+    /// while every sheet stays addressable by index.
+    Duplicate,
+}
+
+impl SheetNameDefect {
+    /// The BIFF record type whose payload carried the defect: `BoundSheet8`.
+    #[must_use]
+    pub fn record_type(self) -> u16 {
+        BOUND_SHEET_RECORD
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            SheetNameDefect::Empty => "BoundSheet8 declares an empty sheet name",
+            SheetNameDefect::TooLong => "Sheet name is longer than 31 UTF-16 code units",
+            SheetNameDefect::ForbiddenCharacter => "Sheet name contains a forbidden character",
+            SheetNameDefect::EdgeApostrophe => "Sheet name begins or ends with an apostrophe",
+            SheetNameDefect::Duplicate => "Sheet name repeats an earlier sheet name, ignoring case",
+        }
+    }
+}
+
+/// `BoundSheet8` (MS-XLS 2.4.28).
+const BOUND_SHEET_RECORD: u16 = 0x0085;
 
 /// The class of cell-format defect the reader repairs the way Excel repairs it.
 ///
@@ -229,8 +304,10 @@ const CODEPAGE_RECORD: u16 = 0x0042;
 /// This enumeration is closed by design: it is the exhaustive contract of what
 /// a read may change about a workbook. [`Defect::CellFormat`] and
 /// [`Defect::Encoding`] classes are repaired under every [`Leniency`]
-/// variant; [`Defect::Formatting`] classes
-/// require [`Leniency::TolerateFormattingDefects`].
+/// variant; [`Defect::Formatting`] classes require
+/// [`Leniency::TolerateFormattingDefects`] and [`Defect::SheetName`] classes
+/// [`Leniency::TolerateSheetNameDefects`] (either is implied by
+/// [`Leniency::TolerateAllDefects`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Defect {
@@ -241,6 +318,8 @@ pub enum Defect {
     CellFormat(CellFormatDefect),
     /// A text-encoding defect repaired the way Excel repairs it.
     Encoding(EncodingDefect),
+    /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
+    SheetName(SheetNameDefect),
 }
 
 impl Defect {
@@ -255,6 +334,7 @@ impl Defect {
             Defect::Formatting(defect) => Some(defect.record_type()),
             Defect::CellFormat(defect) => defect.record_type(),
             Defect::Encoding(defect) => defect.record_type(),
+            Defect::SheetName(defect) => Some(defect.record_type()),
         }
     }
 
@@ -265,6 +345,7 @@ impl Defect {
             Defect::Formatting(defect) => defect.description(),
             Defect::CellFormat(defect) => defect.description(),
             Defect::Encoding(defect) => defect.description(),
+            Defect::SheetName(defect) => defect.description(),
         }
     }
 }
@@ -278,6 +359,12 @@ impl From<FormattingDefect> for Defect {
 impl From<CellFormatDefect> for Defect {
     fn from(defect: CellFormatDefect) -> Self {
         Self::CellFormat(defect)
+    }
+}
+
+impl From<SheetNameDefect> for Defect {
+    fn from(defect: SheetNameDefect) -> Self {
+        Self::SheetName(defect)
     }
 }
 
@@ -314,7 +401,9 @@ impl ToleratedDefect {
     /// [`CellFormatDefect::XfReference`] it is the zero-based row of the
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
-    /// the `CODEPAGE` record within the Workbook stream.
+    /// the `CODEPAGE` record within the Workbook stream. For every
+    /// [`SheetNameDefect`] it is the zero-based workbook sheet index of the
+    /// `BoundSheet8` record.
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -331,7 +420,12 @@ impl ToleratedDefect {
     /// zero, since the defect *is* the value. For
     /// [`CellFormatDefect::XfReference`] it is the `ixfe` the record carried.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the raw `cv` code
-    /// page identifier.
+    /// page identifier. For [`SheetNameDefect::TooLong`] it is the name's
+    /// length in UTF-16 code units; for [`SheetNameDefect::ForbiddenCharacter`]
+    /// the first forbidden character's scalar value; for
+    /// [`SheetNameDefect::EdgeApostrophe`] the apostrophe (0x27); for
+    /// [`SheetNameDefect::Duplicate`] the sheet index of the earlier sheet it
+    /// repeats; and zero for [`SheetNameDefect::Empty`].
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
@@ -352,8 +446,8 @@ impl ToleratedDefect {
 /// An empty report means the workbook conformed and no substitution was made.
 /// After a [`Leniency::Strict`] read the report can still list
 /// [`Defect::CellFormat`] and [`Defect::Encoding`] repairs, which Excel
-/// itself applies; it never lists
-/// [`Defect::Formatting`] repairs.
+/// itself applies; it never lists the opt-in [`Defect::Formatting`] or
+/// [`Defect::SheetName`] repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
@@ -465,6 +559,23 @@ impl ToleranceLog {
         Ok(())
     }
 
+    /// Decide whether the worksheet-name `defect` may be repaired, recording
+    /// it if so; the counterpart of [`ToleranceLog::tolerate`] for
+    /// [`Leniency::TolerateSheetNameDefects`].
+    pub(crate) fn tolerate_sheet_name(
+        &mut self,
+        defect: SheetNameDefect,
+        ordinal: u32,
+        observed: u32,
+        on_strict: impl FnOnce() -> Error,
+    ) -> Result<()> {
+        if !self.leniency.tolerates_sheet_name_defects() {
+            return Err(on_strict());
+        }
+        self.report.record(defect, ordinal, observed);
+        Ok(())
+    }
+
     /// The report under construction, for repairs that need no policy
     /// decision because Excel applies them under every [`Leniency`] variant.
     pub(crate) fn report_mut(&mut self) -> &mut ToleranceReport {
@@ -500,6 +611,28 @@ mod tests {
         assert_eq!(Leniency::default(), Leniency::Strict);
         assert!(!Leniency::default().tolerates_formatting_defects());
         assert!(ToleranceLog::default().into_report().is_clean());
+    }
+
+    #[test]
+    fn each_opt_in_variant_enables_exactly_its_classes() {
+        let cases = [
+            (Leniency::Strict, false, false),
+            (Leniency::TolerateFormattingDefects, true, false),
+            (Leniency::TolerateSheetNameDefects, false, true),
+            (Leniency::TolerateAllDefects, true, true),
+        ];
+        for (leniency, formatting, sheet_names) in cases {
+            assert_eq!(leniency.tolerates_formatting_defects(), formatting);
+            assert_eq!(leniency.tolerates_sheet_name_defects(), sheet_names);
+            let mut log = ToleranceLog::new(leniency);
+            let outcome = log.tolerate_sheet_name(SheetNameDefect::Duplicate, 2, 0, strict_error);
+            assert_eq!(outcome.is_ok(), sheet_names, "{leniency:?}");
+            assert_eq!(log.into_report().total(), u64::from(sheet_names));
+        }
+        assert_eq!(
+            Defect::from(SheetNameDefect::TooLong).record_type(),
+            Some(0x0085)
+        );
     }
 
     #[test]

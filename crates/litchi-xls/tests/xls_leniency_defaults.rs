@@ -15,8 +15,8 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::Cell as _;
 use litchi_xls::{
-    Defect, EncodingDefect, SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook,
-    Writer,
+    Defect, EncodingDefect, Leniency, OpenOptions, SheetNameDefect, SourceBackedOptions,
+    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
 };
 
 const CODEPAGE: u16 = 0x0042;
@@ -146,21 +146,47 @@ impl Stream {
     }
 }
 
-/// Open `package` through both public read paths under default options and
-/// return both reports.
-fn open_both(package: &[u8]) -> (Workbook<Cursor<Vec<u8>>>, ToleranceReport) {
-    let workbook = Workbook::new(Cursor::new(package.to_vec()))
-        .expect("the default policy applies the Excel-compatible repair");
-    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(package.to_vec())))
-        .expect("the source-backed default policy applies the same repair");
-    let source_report = owner.tolerance_report();
-    (workbook, source_report)
+/// Open `package` through both public read paths under `leniency`, returning
+/// each path's outcome (the source-backed one reduced to its report).
+fn try_open_both(
+    package: &[u8],
+    leniency: Leniency,
+) -> (
+    Result<Workbook<Cursor<Vec<u8>>>, String>,
+    Result<ToleranceReport, String>,
+) {
+    let workbook = Workbook::new_with_options(
+        Cursor::new(package.to_vec()),
+        OpenOptions::new().with_leniency(leniency),
+    )
+    .map_err(|error| error.to_string());
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(package.to_vec())),
+        SourceBackedOptions::new().with_leniency(leniency),
+    )
+    .map(|owner| owner.tolerance_report())
+    .map_err(|error| error.to_string());
+    (workbook, owner)
 }
 
-/// Both read paths open `package` and record exactly the `expected` repairs,
-/// in order. Returns the eager workbook for further assertions.
-fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<Cursor<Vec<u8>>> {
-    let (workbook, source_report) = open_both(package);
+/// Open `package` through both public read paths under `leniency` and return
+/// the eager workbook plus both reports.
+fn open_both(package: &[u8], leniency: Leniency) -> (Workbook<Cursor<Vec<u8>>>, ToleranceReport) {
+    let (workbook, owner) = try_open_both(package, leniency);
+    (
+        workbook.expect("the eager open applies the repair"),
+        owner.expect("the source-backed open applies the same repair"),
+    )
+}
+
+/// Both read paths open `package` under `leniency` and record exactly the
+/// `expected` repairs, in order. Returns the eager workbook.
+fn assert_repairs_under(
+    package: &[u8],
+    leniency: Leniency,
+    expected: &[(Defect, u32, u32)],
+) -> Workbook<Cursor<Vec<u8>>> {
+    let (workbook, source_report) = open_both(package, leniency);
     for (path, report) in [
         ("eager", workbook.tolerance_report()),
         ("source-backed", &source_report),
@@ -179,15 +205,40 @@ fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<C
     workbook
 }
 
-/// Both read paths open `package` and record nothing.
-fn assert_clean(package: &[u8]) {
-    let (workbook, source_report) = open_both(package);
+/// Both read paths open `package` under the *default* policy and record
+/// exactly the `expected` repairs, in order. Returns the eager workbook.
+fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<Cursor<Vec<u8>>> {
+    assert_repairs_under(package, Leniency::default(), expected)
+}
+
+/// Both read paths refuse `package` under `leniency`, each with an error
+/// mentioning `needle`.
+fn assert_refused(package: &[u8], leniency: Leniency, needle: &str) {
+    let (workbook, owner) = try_open_both(package, leniency);
+    let Err(eager) = workbook else {
+        panic!("the eager open must refuse");
+    };
+    let Err(source) = owner else {
+        panic!("the source-backed open must refuse");
+    };
+    assert!(eager.contains(needle), "eager: {eager}");
+    assert!(source.contains(needle), "source-backed: {source}");
+}
+
+/// Both read paths open `package` under `leniency` and record nothing.
+fn assert_clean_under(package: &[u8], leniency: Leniency) {
+    let (workbook, source_report) = open_both(package, leniency);
     assert!(
         workbook.tolerance_report().is_clean(),
         "{:?}",
         workbook.tolerance_report()
     );
     assert!(source_report.is_clean(), "{source_report:?}");
+}
+
+/// Both read paths open `package` under the default policy and record nothing.
+fn assert_clean(package: &[u8]) {
+    assert_clean_under(package, Leniency::default());
 }
 
 #[test]
@@ -241,5 +292,111 @@ fn an_unsupported_code_page_falls_back_to_windows_1252() {
 fn a_supported_code_page_records_nothing() {
     for codepage in [1200_u16, 1252, 1251, 932] {
         assert_clean(&with_codepage(codepage).0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// F3.3: worksheet-name rules (opt-in: Leniency::TolerateSheetNameDefects)
+// ---------------------------------------------------------------------------
+
+/// Rewrite the `nth` sheet's `BoundSheet8.stName` to `name`, compressed when
+/// every character fits in one byte.
+fn set_sheet_name(stream: &mut Stream, nth: usize, name: &str) {
+    let payload = stream.payload_mut(BOUND_SHEET, nth);
+    payload.truncate(6);
+    let units = name.encode_utf16().collect::<Vec<_>>();
+    payload.push(u8::try_from(units.len()).unwrap());
+    if units.iter().all(|unit| *unit < 0x100) {
+        payload.push(0);
+        payload.extend(units.iter().map(|unit| *unit as u8));
+    } else {
+        payload.push(1);
+        payload.extend(units.iter().flat_map(|unit| unit.to_le_bytes()));
+    }
+}
+
+fn two_sheets() -> Stream {
+    Stream::from_writer(|writer| {
+        let first = writer.add_worksheet("Data").unwrap();
+        writer.write_number(first, 0, 0, 1.0).unwrap();
+        let second = writer.add_worksheet("Other").unwrap();
+        writer.write_number(second, 0, 0, 2.0).unwrap();
+    })
+}
+
+fn with_second_sheet_name(name: &str) -> Vec<u8> {
+    let mut stream = two_sheets();
+    set_sheet_name(&mut stream, 1, name);
+    stream.package()
+}
+
+#[test]
+fn a_rule_breaking_sheet_name_is_refused_by_default() {
+    for name in ["", "a:b", "'quoted", &"x".repeat(32)] {
+        let package = with_second_sheet_name(name);
+        for leniency in [Leniency::Strict, Leniency::TolerateFormattingDefects] {
+            assert_refused(&package, leniency, "Invalid BoundSheet8 sheet name");
+        }
+    }
+    let package = with_second_sheet_name("DATA");
+    for leniency in [Leniency::Strict, Leniency::TolerateFormattingDefects] {
+        assert_refused(
+            &package,
+            leniency,
+            "duplicate case-insensitive BoundSheet8 name",
+        );
+    }
+}
+
+#[test]
+fn the_sheet_name_opt_in_keeps_each_rule_breaking_name_verbatim() {
+    let long = "x".repeat(40);
+    let cases: [(&str, SheetNameDefect, u32); 6] = [
+        ("", SheetNameDefect::Empty, 0),
+        (&long, SheetNameDefect::TooLong, 40),
+        ("a:b", SheetNameDefect::ForbiddenCharacter, u32::from(':')),
+        ("Q1/Q2", SheetNameDefect::ForbiddenCharacter, u32::from('/')),
+        ("'quoted", SheetNameDefect::EdgeApostrophe, 0x27),
+        ("DATA", SheetNameDefect::Duplicate, 0),
+    ];
+    for leniency in [
+        Leniency::TolerateSheetNameDefects,
+        Leniency::TolerateAllDefects,
+    ] {
+        for (name, defect, observed) in cases {
+            let workbook = assert_repairs_under(
+                &with_second_sheet_name(name),
+                leniency,
+                &[(Defect::SheetName(defect), 1, observed)],
+            );
+            // The name is kept exactly as stored, and both sheets survive.
+            assert_eq!(workbook.sheets()[1].name(), name);
+            assert_eq!(workbook.sheets().len(), 2);
+            assert_eq!(
+                workbook
+                    .xls_worksheet(1)
+                    .unwrap()
+                    .get_cell(0, 0)
+                    .unwrap()
+                    .value(),
+                &litchi_core::sheet::CellValue::Float(2.0)
+            );
+            assert_eq!(
+                workbook.tolerance_report().defects()[0].record_type(),
+                Some(BOUND_SHEET)
+            );
+        }
+    }
+}
+
+#[test]
+fn the_sheet_name_opt_in_records_nothing_for_conforming_names() {
+    for leniency in [
+        Leniency::TolerateSheetNameDefects,
+        Leniency::TolerateAllDefects,
+    ] {
+        assert_clean_under(&two_sheets().package(), leniency);
+        // A name that differs from another by more than case is no duplicate.
+        assert_clean_under(&with_second_sheet_name("Data2"), leniency);
     }
 }

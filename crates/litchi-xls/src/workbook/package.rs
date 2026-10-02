@@ -24,7 +24,6 @@ use litchi_cfb::OleFile;
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
-use std::collections::HashSet;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -164,15 +163,10 @@ impl<R: Read + Seek> Workbook<R> {
             .iter()
             .map(|sheet| sheet.name.clone())
             .collect::<Vec<_>>();
-        let mut unique_sheet_names = HashSet::with_capacity(all_sheet_names.len());
-        for name in &all_sheet_names {
-            if !unique_sheet_names.insert(name.to_lowercase()) {
-                return Err(Error::InvalidRecord {
-                    record_type: 0x0085,
-                    message: format!("duplicate case-insensitive BoundSheet8 name: {name:?}"),
-                });
-            }
-        }
+        crate::records::check_duplicate_sheet_names(
+            all_sheet_names.iter().map(String::as_str),
+            &mut tolerance,
+        )?;
         self.sheets = bound_sheets
             .iter()
             .enumerate()

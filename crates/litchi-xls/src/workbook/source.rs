@@ -30,7 +30,7 @@ use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind,
     TextOutputError, TextOutputOptions, TextOutputReport,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Cursor, Write};
 use std::path::Path;
@@ -245,11 +245,13 @@ impl SourceBackedLimits {
 ///
 /// Mirrors [`crate::OpenOptions`] for the source-backed open: the finite scan
 /// limits every query runs under plus the policy for non-structural
-/// formatting defects. The Excel-compatible [`crate::CellFormatDefect`]
-/// repairs are applied and recorded under every leniency variant; the
-/// [`crate::FormattingDefect`] classes are repaired only under
-/// [`Leniency::TolerateFormattingDefects`]. Everything repaired is enumerable
-/// through [`SourceBackedWorkbook::tolerance_report`].
+/// formatting defects. The Excel-compatible repairs
+/// ([`crate::CellFormatDefect`], [`crate::EncodingDefect`], ...) are applied
+/// and recorded under every leniency variant; the
+/// [`crate::FormattingDefect`] and [`crate::SheetNameDefect`] classes are
+/// repaired only under the [`Leniency`] variant that enables them.
+/// Everything repaired is enumerable through
+/// [`SourceBackedWorkbook::tolerance_report`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceBackedOptions {
     limits: SourceBackedLimits,
@@ -2224,27 +2226,23 @@ fn parse_globals(
             resource: "BoundSheet8 records",
             requested: bound_payloads.len() as u64,
         })?;
-    for payload in bound_payloads {
-        bounds.push(BoundSheetRecord::parse(payload, &encoding).map_err(SourceBackedError::Parse)?);
+    for (sheet_index, payload) in (0_u32..).zip(bound_payloads) {
+        bounds.push(
+            BoundSheetRecord::parse_checked(payload, &encoding, sheet_index, &mut tolerance)
+                .map_err(SourceBackedError::Parse)?,
+        );
     }
-    let mut names = HashSet::new();
-    names
-        .try_reserve(bounds.len())
-        .map_err(|_error| SourceBackedError::Allocation {
+    crate::records::check_duplicate_sheet_names(
+        bounds.iter().map(|bound| bound.name.as_str()),
+        &mut tolerance,
+    )
+    .map_err(|error| match error {
+        Error::Allocation(_) => SourceBackedError::Allocation {
             resource: "BoundSheet8 names",
             requested: bounds.len() as u64,
-        })?;
-    for bound in &bounds {
-        if !names.insert(bound.name.to_lowercase()) {
-            return Err(SourceBackedError::Parse(Error::InvalidRecord {
-                record_type: BOUND_SHEET,
-                message: format!(
-                    "duplicate case-insensitive BoundSheet8 name: {:?}",
-                    bound.name
-                ),
-            }));
-        }
-    }
+        },
+        error => SourceBackedError::Parse(error),
+    })?;
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
     let sst = scan_shared_string_records(&sst_refs).map_err(map_shared_string_error)?;

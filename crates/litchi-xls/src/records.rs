@@ -5,6 +5,7 @@
 //! data including cell values, formatting, formulas, and metadata.
 
 use crate::error::{Error, Result};
+use crate::leniency::{Leniency, SheetNameDefect, ToleranceLog};
 use crate::utils;
 use litchi_biff::RecordRef;
 use litchi_codepage::{Mbcs, Page};
@@ -186,6 +187,18 @@ impl BoundSheetRecord {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
+        Self::parse_checked(data, encoding, 0, &mut ToleranceLog::new(Leniency::Strict))
+    }
+
+    /// Parse the `sheet_index`th `BoundSheet8` record, letting `tolerance`
+    /// decide whether a name that breaks the [MS-XLS] 2.4.28 rules is kept
+    /// verbatim (and recorded) or refused.
+    pub(crate) fn parse_checked(
+        data: &[u8],
+        encoding: &Encoding,
+        sheet_index: u32,
+        tolerance: &mut ToleranceLog,
+    ) -> Result<Self> {
         if data.len() < 8 {
             return Err(Error::InvalidLength {
                 expected: 8,
@@ -216,11 +229,24 @@ impl BoundSheetRecord {
         // Skip 2 bytes and parse the name
         let name_data = &data[6..];
         let name = utils::parse_short_string(name_data, encoding)?;
-        if sheet_name_fault(&name).is_some() {
-            return Err(Error::InvalidRecord {
-                record_type: 0x0085,
-                message: format!("Invalid BoundSheet8 sheet name: {name:?}"),
-            });
+        if let Some(fault) = sheet_name_fault(&name) {
+            let (defect, observed) = match fault {
+                SheetNameFault::Empty => (SheetNameDefect::Empty, 0),
+                SheetNameFault::TooLong { utf16_units } => (
+                    SheetNameDefect::TooLong,
+                    u32::try_from(utf16_units).unwrap_or(u32::MAX),
+                ),
+                SheetNameFault::ForbiddenCharacter(character) => {
+                    (SheetNameDefect::ForbiddenCharacter, u32::from(character))
+                },
+                SheetNameFault::EdgeApostrophe => (SheetNameDefect::EdgeApostrophe, 0x27),
+            };
+            tolerance.tolerate_sheet_name(defect, sheet_index, observed, || {
+                Error::InvalidRecord {
+                    record_type: 0x0085,
+                    message: format!("Invalid BoundSheet8 sheet name: {name:?}"),
+                }
+            })?;
         }
 
         Ok(BoundSheetRecord {
@@ -230,6 +256,38 @@ impl BoundSheetRecord {
             name,
         })
     }
+}
+
+/// Refuse — or, under [`Leniency::TolerateSheetNameDefects`], record — every
+/// sheet name that repeats an earlier one ignoring case. Both sheets are kept
+/// either way the caller continues; lookups by name find the earlier one.
+pub(crate) fn check_duplicate_sheet_names<'a>(
+    names: impl ExactSizeIterator<Item = &'a str>,
+    tolerance: &mut ToleranceLog,
+) -> Result<()> {
+    let mut first_index = std::collections::HashMap::<String, u32>::new();
+    first_index
+        .try_reserve(names.len())
+        .map_err(|_error| Error::Allocation("BoundSheet8 names"))?;
+    for (index, name) in (0_u32..).zip(names) {
+        match first_index.entry(name.to_lowercase()) {
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert(index);
+            },
+            std::collections::hash_map::Entry::Occupied(earlier) => {
+                tolerance.tolerate_sheet_name(
+                    SheetNameDefect::Duplicate,
+                    index,
+                    *earlier.get(),
+                    || Error::InvalidRecord {
+                        record_type: 0x0085,
+                        message: format!("duplicate case-insensitive BoundSheet8 name: {name:?}"),
+                    },
+                )?;
+            },
+        }
+    }
+    Ok(())
 }
 
 /// The most UTF-16 code units a worksheet name holds, `BoundSheet8.stName`

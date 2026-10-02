@@ -219,7 +219,12 @@ impl<R: Read + Seek> Workbook<R> {
                     },
                 0x0085 => {
                     // BoundSheet8
-                    let sheet = BoundSheetRecord::parse(record.payload(), encoding)?;
+                    let sheet = BoundSheetRecord::parse_checked(
+                        record.payload(),
+                        encoding,
+                        u32::try_from(bound_sheets.len()).unwrap_or(u32::MAX),
+                        tolerance,
+                    )?;
                     bound_sheets.push(sheet);
                 },
                 0x00D5 => {
