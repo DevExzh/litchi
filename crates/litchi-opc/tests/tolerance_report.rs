@@ -9,7 +9,7 @@
 //! tolerance report. A conformant control package reports clean through every
 //! ingress path.
 
-use litchi_opc::leniency::{Defect, RelationshipDefect, ToleranceReport};
+use litchi_opc::leniency::{ContentTypeDefect, Defect, RelationshipDefect, ToleranceReport};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -261,4 +261,66 @@ fn relationships_without_target_or_type_are_skipped_and_recorded() {
         "https://example.org/"
     );
     assert_round_trips(&bytes);
+}
+
+/// LENIENCY_AUDIT 8.9: duplicate `Default`/`Override` mappings keep the first
+/// mapping (LibreOffice's first-match lookup) and record the dropped ones.
+#[test]
+fn duplicate_content_type_mappings_keep_the_first_and_are_recorded() {
+    let content_types = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/document.xml" ContentType="application/xml"/></Types>"#;
+    let bytes = package(content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (
+                tolerated.defect(),
+                tolerated.part(),
+                tolerated.item(),
+                tolerated.value()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::ContentType(ContentTypeDefect::DuplicateDefault),
+                "/[Content_Types].xml",
+                Some("XML"),
+                Some("text/xml"),
+            ),
+            (
+                Defect::ContentType(ContentTypeDefect::DuplicateOverride),
+                "/[Content_Types].xml",
+                Some("/word/document.xml"),
+                Some("application/xml"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let content_type = |name: &str| {
+        package
+            .get_part(&PackURI::new(name).unwrap())
+            .unwrap()
+            .content_type()
+            .to_owned()
+    };
+    assert_eq!(
+        content_type("/word/document.xml"),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    );
+    assert_eq!(content_type("/word/styles.xml"), "application/xml");
+    assert_round_trips(&bytes);
+}
+
+/// Structural corruption stays fatal: a malformed relationships manifest,
+/// a relationship without an Id, and an ill-formed content-types manifest
+/// are still rejected.
+#[test]
+fn structural_manifest_corruption_stays_fatal() {
+    let unclosed = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:x" Target="styles.xml">"#;
+    assert!(OpcPackage::from_bytes(&package(CONTENT_TYPES, ROOT_RELS, unclosed)).is_err());
+    let no_id = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="urn:x" Target="styles.xml"/></Relationships>"#;
+    assert!(OpcPackage::from_bytes(&package(CONTENT_TYPES, ROOT_RELS, no_id)).is_err());
+    let ill_formed = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"></Types>"#;
+    assert!(OpcPackage::from_bytes(&package(ill_formed, ROOT_RELS, DOCUMENT_RELS)).is_err());
 }

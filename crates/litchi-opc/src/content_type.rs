@@ -2,9 +2,9 @@
 
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{ContentTypeDefect, ToleranceReport};
 use crate::limits::{ReadLimits, ReadResource};
-use crate::packuri::PackURI;
+use crate::packuri::{CONTENT_TYPES_URI, PackURI};
 use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -96,7 +96,6 @@ impl ContentTypeMap {
         limits: ReadLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
-        let _ = &report;
         limits.check(
             ReadResource::ContentTypesBytes,
             xml.len() as u64,
@@ -131,6 +130,7 @@ impl ContentTypeMap {
                         &mut root_seen,
                         &mut entry_count,
                         limits,
+                        report,
                     )?;
                     depth = next_depth;
                 },
@@ -143,6 +143,7 @@ impl ContentTypeMap {
                     &mut root_seen,
                     &mut entry_count,
                     limits,
+                    report,
                 )?,
                 Event::End(_) => {
                     depth = depth.checked_sub(1).ok_or_else(|| {
@@ -218,11 +219,26 @@ impl ContentTypeMap {
             .map(|(_, content_type)| content_type)
     }
 
-    fn add_default(&mut self, extension: String, content_type: ContentType) -> Result<()> {
+    /// Add a Default mapping. ECMA-376 Part 2 §9.1.2.2 allows one Default
+    /// per extension as a producer rule; a later duplicate (compared ASCII
+    /// case-insensitively) is dropped and recorded, keeping the first mapping
+    /// as LibreOffice's first-match lookup does (LENIENCY_AUDIT 8.9).
+    fn add_default(
+        &mut self,
+        extension: String,
+        content_type: ContentType,
+        report: &mut ToleranceReport,
+    ) -> Result<()> {
         validate_extension(&extension)?;
         let key = extension.to_ascii_lowercase();
         if self.defaults.contains_key(&key) {
-            return Err(OpcError::DuplicateContentTypeDefault(extension));
+            report.record(
+                ContentTypeDefect::DuplicateDefault,
+                CONTENT_TYPES_URI,
+                Some(&extension),
+                Some(content_type.as_str()),
+            );
+            return Ok(());
         }
         self.defaults
             .try_reserve(1)
@@ -231,13 +247,23 @@ impl ContentTypeMap {
         Ok(())
     }
 
-    fn add_override(&mut self, partname: PackURI, content_type: ContentType) -> Result<()> {
+    /// Add an Override mapping; a later duplicate for an equivalent part
+    /// name is dropped and recorded, as for [`Self::add_default`].
+    fn add_override(
+        &mut self,
+        partname: PackURI,
+        content_type: ContentType,
+        report: &mut ToleranceReport,
+    ) -> Result<()> {
         let key = partname.as_str().to_ascii_lowercase();
-        if let Some((existing, _)) = self.overrides.get(&key) {
-            return Err(OpcError::DuplicateContentTypeOverride {
-                existing: existing.to_string(),
-                candidate: partname.to_string(),
-            });
+        if self.overrides.contains_key(&key) {
+            report.record(
+                ContentTypeDefect::DuplicateOverride,
+                CONTENT_TYPES_URI,
+                Some(partname.as_str()),
+                Some(content_type.as_str()),
+            );
+            return Ok(());
         }
         self.overrides
             .try_reserve(1)
@@ -318,6 +344,7 @@ fn inspect_element(
     root_seen: &mut bool,
     entry_count: &mut usize,
     limits: ReadLimits,
+    report: &mut ToleranceReport,
 ) -> Result<()> {
     let in_content_types_namespace = matches!(
         resolved_namespace,
@@ -355,13 +382,13 @@ fn inspect_element(
         b"Default" => {
             let (extension, content_type) =
                 required_attributes(element, decoder, "Extension", "Default", limits)?;
-            map.add_default(extension, ContentType::new(content_type)?)
+            map.add_default(extension, ContentType::new(content_type)?, report)
         },
         b"Override" => {
             let (partname, content_type) =
                 required_attributes(element, decoder, "PartName", "Override", limits)?;
             let part_uri = PackURI::new(partname).map_err(OpcError::InvalidPackUri)?;
-            map.add_override(part_uri, ContentType::new(content_type)?)
+            map.add_override(part_uri, ContentType::new(content_type)?, report)
         },
         _ => Err(OpcError::InvalidContentTypesManifest(
             "only Default and Override children are permitted".to_string(),
@@ -506,22 +533,48 @@ mod tests {
     }
 
     #[test]
-    fn rejects_case_equivalent_defaults_and_overrides() {
-        let duplicate_defaults = manifest(
-            r#"<Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/>"#,
+    fn case_equivalent_defaults_and_overrides_keep_the_first_and_are_recorded() {
+        // LENIENCY_AUDIT 8.9: first-wins, as LibreOffice's first-match lookup.
+        let duplicates = manifest(
+            r#"<Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.first+xml"/><Override PartName="/WORD/DOCUMENT.XML" ContentType="text/xml"/>"#,
         );
-        assert!(matches!(
-            ContentTypeMap::from_xml(duplicate_defaults.as_bytes(), ReadLimits::default()),
-            Err(OpcError::DuplicateContentTypeDefault(_))
-        ));
-
-        let duplicate_overrides = manifest(
-            r#"<Override PartName="/word/document.xml" ContentType="application/xml"/><Override PartName="/WORD/DOCUMENT.XML" ContentType="text/xml"/>"#,
+        let mut report = ToleranceReport::default();
+        let map = ContentTypeMap::from_xml_reporting(
+            duplicates.as_bytes(),
+            ReadLimits::default(),
+            &mut report,
+        )
+        .unwrap();
+        assert_eq!(map.mapping_count(), 2);
+        assert_eq!(
+            map.get(&PackURI::new("/word/document.xml").unwrap()).unwrap(),
+            "application/vnd.first+xml"
         );
-        assert!(matches!(
-            ContentTypeMap::from_xml(duplicate_overrides.as_bytes(), ReadLimits::default()),
-            Err(OpcError::DuplicateContentTypeOverride { .. })
-        ));
+        assert_eq!(
+            map.get(&PackURI::new("/word/other.xml").unwrap()).unwrap(),
+            "application/xml"
+        );
+        let recorded: Vec<_> = report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.part(), tolerated.item(), tolerated.value()))
+            .collect();
+        assert_eq!(
+            recorded,
+            vec![
+                (
+                    ContentTypeDefect::DuplicateDefault.into(),
+                    CONTENT_TYPES_URI,
+                    Some("XML"),
+                    Some("text/xml"),
+                ),
+                (
+                    ContentTypeDefect::DuplicateOverride.into(),
+                    CONTENT_TYPES_URI,
+                    Some("/WORD/DOCUMENT.XML"),
+                    Some("text/xml"),
+                ),
+            ]
+        );
     }
 
     #[test]

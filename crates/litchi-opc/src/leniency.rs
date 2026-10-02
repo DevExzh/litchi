@@ -45,11 +45,11 @@
 //!
 //! # Status
 //!
-//! The carrier is wired through every ingress path. The defect classes are
-//! the contract for findings 8.5–8.9 of `docs/LENIENCY_AUDIT.md`; recording
-//! sites land finding by finding: 8.5 (duplicate relationship `Id`), 8.6
-//! (unresolvable internal target), 8.7 (`TargetMode` casing and value), 8.8
-//! (missing `Target`/`Type`).
+//! Live for findings 8.5–8.9 of `docs/LENIENCY_AUDIT.md`: duplicate
+//! relationship `Id` (8.5), unresolvable internal target (8.6), `TargetMode`
+//! casing and value (8.7), missing `Target`/`Type` (8.8), and duplicate
+//! content-type mappings (8.9). The P2 manifest findings 8.10–8.12 remain
+//! strict.
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays
