@@ -46,6 +46,10 @@ impl Package {
 
     /// Inspect the external template associated with this document without dereferencing it.
     ///
+    /// Settings repairs applied while reading (see
+    /// [`crate::leniency::SettingsDefect`]) are enumerable through
+    /// [`DocumentSettings::tolerance_report`] on [`crate::Document::settings`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.

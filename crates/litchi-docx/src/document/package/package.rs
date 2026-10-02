@@ -576,6 +576,11 @@ impl Document<'_> {
     /// Returns a `Settings` object providing access to document settings
     /// such as protection status, track revisions, and zoom level.
     ///
+    /// Word-compatible settings repairs (for example an unknown `w:compat`
+    /// flag, skipped) are recorded on the returned value's
+    /// [`DocumentSettings::tolerance_report`] and merged into
+    /// [`Document::tolerance_report`] on every call.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -620,7 +625,11 @@ impl Document<'_> {
         }
         let target = rel.target_partname()?;
         let settings_part = self.opc.get_part(&target)?;
-        Ok(Some(DocumentSettings::extract_from_part(settings_part)?))
+        let settings = DocumentSettings::extract_from_part(settings_part)?;
+        // The settings carry their own repairs; merge them into the
+        // document-level aggregation as well (see `crate::leniency`).
+        self.merge_tolerance(settings.tolerance_report());
+        Ok(Some(settings))
     }
 
     /// Load the ISO mail-merge recipient-data part referenced by `settings.xml`.

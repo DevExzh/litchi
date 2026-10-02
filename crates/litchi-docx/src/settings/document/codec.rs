@@ -27,6 +27,7 @@ use super::super::notes::{NoteNumberingProperties, NoteNumberingRestart, NotePos
 use super::model::{AttachedTemplate, DocumentSettings};
 use crate::Variables;
 use crate::error::{Error, Result};
+use crate::leniency::{SettingsDefect, ToleranceReport};
 use crate::mail_merge::{
     Settings as MailMergeSettings, parse_settings_mail_merge_processed,
     parse_settings_mail_merge_with_mce_limits,
@@ -99,9 +100,14 @@ impl DocumentSettings {
         let mut seen = SeenSettings::default();
         let mut saw_compat = false;
         let mut pending_group: Option<PendingGroup> = None;
+        let mut tolerance = ToleranceReport::default();
 
         loop {
             let decoder = reader.decoder();
+            // Text, comments, and processing instructions are separate events,
+            // so the position before an element event is its `<` offset — the
+            // context recorded for any repair applied to that element.
+            let element_offset = reader.buffer_position();
             let event = reader
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
@@ -146,6 +152,8 @@ impl DocumentSettings {
                                 &element,
                                 decoder,
                                 &resolver,
+                                &mut tolerance,
+                                element_offset,
                             )?;
                         }
                     }
@@ -186,6 +194,8 @@ impl DocumentSettings {
                                 &element,
                                 decoder,
                                 &resolver,
+                                &mut tolerance,
+                                element_offset,
                             )?;
                         }
                     }
@@ -221,6 +231,7 @@ impl DocumentSettings {
                 "settings part has no settings root".into(),
             ));
         }
+        settings.tolerance = tolerance;
         Ok(settings)
     }
 }
@@ -334,6 +345,8 @@ fn parse_group_child(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    tolerance: &mut ToleranceReport,
+    element_offset: u64,
 ) -> Result<()> {
     match group {
         PendingGroup::Compatibility { options, settings } => {
@@ -348,13 +361,22 @@ fn parse_group_child(
                 let raw = std::str::from_utf8(local_name.as_ref()).map_err(|_source_error| {
                     Error::InvalidFormat("compatibility flag name is not valid UTF-8".into())
                 })?;
-                let flag = raw.parse::<CompatFlag>().map_err(|_source_error| {
-                    Error::InvalidFormat(format!("invalid compatibility flag '{raw}'"))
-                })?;
+                let Ok(flag) = raw.parse::<CompatFlag>() else {
+                    // A flag outside the closed CT_Compat choice — usually one
+                    // a newer Word release or WPS introduced. LibreOffice
+                    // ignores unknown compat children and Word preserves
+                    // them; skip it and record the repair rather than failing
+                    // every settings read.
+                    tolerance.record(SettingsDefect::UnknownCompatFlag, element_offset);
+                    return Ok(());
+                };
                 if strict_wordprocessingml && !flag.is_strict() {
-                    return Err(Error::InvalidFormat(format!(
-                        "compatibility flag '{raw}' is not valid in Strict WordprocessingML"
-                    )));
+                    // Readers map both namespaces onto one flag set; keep the
+                    // declared value and record the deviation.
+                    tolerance.record(
+                        SettingsDefect::TransitionalCompatFlagInStrict,
+                        element_offset,
+                    );
                 }
                 if options.iter().any(|option| option.flag() == flag) {
                     return Err(Error::InvalidFormat(format!(

@@ -220,11 +220,18 @@ fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
         let strict = format!(
             r#"<w:settings xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:compat><w:{raw}/></w:compat></w:settings>"#
         );
-        let parsed = DocumentSettings::extract_from_xml(strict.as_bytes());
+        // Transitional-only flags in a Strict part are kept and recorded
+        // (leniency F2.2), never fatal.
+        let parsed = DocumentSettings::extract_from_xml(strict.as_bytes()).unwrap();
+        assert_eq!(parsed.compatibility_options()[0].flag(), flag);
         if flag.is_strict() {
-            assert_eq!(parsed.unwrap().compatibility_options()[0].flag(), flag);
+            assert!(parsed.tolerance_report().is_clean());
         } else {
-            assert!(parsed.is_err(), "Strict accepted Transitional-only {raw}");
+            assert_eq!(
+                parsed.tolerance_report().defects()[0].defect,
+                crate::Defect::Settings(crate::SettingsDefect::TransitionalCompatFlagInStrict),
+                "Strict accepted Transitional-only {raw} without recording it"
+            );
         }
     }
     assert_eq!(flags.len(), 65);
@@ -240,7 +247,13 @@ fn strict_and_transitional_compatibility_flag_domains_are_exhaustive() {
         let unknown = format!(
             r#"<w:settings xmlns:w="{namespace}"><w:compat><w:vendorCompat/></w:compat></w:settings>"#
         );
-        assert!(DocumentSettings::extract_from_xml(unknown.as_bytes()).is_err());
+        // Unknown flags are skipped and recorded (leniency F2.2).
+        let parsed = DocumentSettings::extract_from_xml(unknown.as_bytes()).unwrap();
+        assert!(parsed.compatibility_options().is_empty());
+        assert_eq!(
+            parsed.tolerance_report().defects()[0].defect,
+            crate::Defect::Settings(crate::SettingsDefect::UnknownCompatFlag)
+        );
 
         let duplicate = format!(
             r#"<w:settings xmlns:w="{namespace}"><w:compat><w:spaceForUL/><w:spaceForUL/></w:compat></w:settings>"#

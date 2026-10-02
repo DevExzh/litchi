@@ -172,6 +172,8 @@ pub(super) fn model_memory_requirement(
         .checked_add(model_slots.checked_mul(size_of::<SmartTagType>())?)?;
     let direct_model = size_of::<DocumentSettings>()
         .checked_add(direct_vectors)?
+        // Settings repairs are recorded on the model; the report is bounded.
+        .checked_add(crate::leniency::MAX_REPORT_HEAP_BYTES)?
         .checked_add(semantic_bytes)?
         // attachedTemplate r:id has no 1024-byte codec ceiling. Its decoded
         // String is bounded by the guarded token, with a capacity allowance.

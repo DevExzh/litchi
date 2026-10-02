@@ -50,6 +50,10 @@
 /// [`ToleranceReport::unrecorded`].
 const MAX_RECORDED_DEFECTS: usize = 1024;
 
+/// Upper bound on the heap a single [`ToleranceReport`] can retain, for
+/// workspace estimates that must account for every owner a parse can grow.
+pub(crate) const MAX_REPORT_HEAP_BYTES: usize = MAX_RECORDED_DEFECTS * size_of::<ToleratedDefect>();
+
 /// How the reader treats non-structural document defects.
 ///
 /// Structural defects — malformed OPC packaging, ill-formed XML, broken part
@@ -110,6 +114,52 @@ impl TextDefect {
     }
 }
 
+/// The class of `settings.xml` defect the reader repairs the way Word and
+/// LibreOffice repair it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// settings repairs a read applies under every [`Leniency`] variant, including
+/// [`Leniency::Strict`]. Each is recorded with the byte offset of the
+/// offending element's start tag within the visible (markup-compatibility
+/// processed) settings XML, and is carried by the parsed
+/// [`DocumentSettings`](crate::settings::DocumentSettings) itself
+/// ([`DocumentSettings::tolerance_report`](crate::settings::DocumentSettings::tolerance_report)),
+/// so every settings accessor reports it; [`Document::settings`](crate::Document::settings)
+/// also merges it into the document-level report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SettingsDefect {
+    /// A `w:compat` child is neither `w:compatSetting` nor one of the closed
+    /// ECMA-376 `CT_Compat` flag names — typically a flag introduced by a newer
+    /// Word release or a vendor such as WPS.
+    ///
+    /// LibreOffice dispatches compat flags by token and ignores unknown
+    /// children (`SettingsTable.cxx`); Word preserves and opens them. The
+    /// reader skips the element: it contributes no
+    /// [`CompatibilityOption`](crate::settings::CompatibilityOption), and every
+    /// other setting still parses.
+    UnknownCompatFlag,
+    /// A Transitional-only compat flag appeared in a Strict WordprocessingML
+    /// settings part. Strict readers map both namespaces onto the same flag
+    /// set, so the flag is kept with its declared value.
+    TransitionalCompatFlagInStrict,
+}
+
+impl SettingsDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnknownCompatFlag => {
+                "skipped the unknown compatibility flag; all other settings were still read"
+            },
+            Self::TransitionalCompatFlagInStrict => {
+                "kept the Transitional-only compatibility flag found in a Strict settings part"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -121,6 +171,8 @@ impl TextDefect {
 pub enum Defect {
     /// A semantic text-extraction defect repaired the way Word repairs it.
     Text(TextDefect),
+    /// A `settings.xml` defect repaired the way Word and LibreOffice repair it.
+    Settings(SettingsDefect),
 }
 
 impl Defect {
@@ -129,6 +181,7 @@ impl Defect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::Text(defect) => defect.repair(),
+            Self::Settings(defect) => defect.repair(),
         }
     }
 }
@@ -136,6 +189,12 @@ impl Defect {
 impl From<TextDefect> for Defect {
     fn from(defect: TextDefect) -> Self {
         Self::Text(defect)
+    }
+}
+
+impl From<SettingsDefect> for Defect {
+    fn from(defect: SettingsDefect) -> Self {
+        Self::Settings(defect)
     }
 }
 
@@ -301,7 +360,11 @@ mod tests {
 
     #[test]
     fn every_defect_class_describes_its_repair() {
-        let defects = [Defect::from(TextDefect::SkippedForeignMarkup)];
+        let defects = [
+            Defect::from(TextDefect::SkippedForeignMarkup),
+            Defect::from(SettingsDefect::UnknownCompatFlag),
+            Defect::from(SettingsDefect::TransitionalCompatFlagInStrict),
+        ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
         }

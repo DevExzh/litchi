@@ -2,6 +2,7 @@
 
 use super::super::model::Settings;
 use super::super::notes::NoteNumberingProperties;
+use crate::leniency::ToleranceReport;
 use crate::mail_merge::Settings as MailMergeSettings;
 use crate::numbering::Format;
 use crate::settings::{
@@ -62,6 +63,9 @@ pub struct DocumentSettings {
     pub(super) mail_merge: Option<MailMergeSettings>,
     /// Inert external attached-template reference.
     pub(super) attached_template: Option<AttachedTemplate>,
+    /// Everything repaired while this settings part was read; see
+    /// [`crate::leniency::SettingsDefect`].
+    pub(super) tolerance: ToleranceReport,
 }
 
 type OwnedSettings = Settings<Format>;
@@ -75,7 +79,20 @@ impl DocumentSettings {
             do_not_embed_smart_tags: false,
             mail_merge: None,
             attached_template: None,
+            tolerance: ToleranceReport::default(),
         }
+    }
+
+    /// Everything repaired while this settings part was read, in discovery
+    /// order.
+    ///
+    /// Settings repairs ([`crate::leniency::SettingsDefect`]) are recorded
+    /// here with the byte offset of the offending element within the visible
+    /// settings XML. The report is empty when the part conformed.
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Check if the document is protected.
