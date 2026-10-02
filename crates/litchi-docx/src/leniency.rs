@@ -12,9 +12,11 @@
 //! read past without complaint, so rejecting it would cost the caller the
 //! whole part over bytes that cannot change what a conforming file means.
 //! Each substitutes the behavior documented on the corresponding defect
-//! variant. [`TextDefect`] holds this class for semantic text extraction; its
-//! first variant is the roadmap contract for the foreign-subtree skip that
-//! `extract_word_text` already performs and the typed text codec will adopt.
+//! variant: [`TextDefect`] (semantic text extraction), [`SettingsDefect`]
+//! (`settings.xml`), [`NumberingDefect`] (`numbering.xml` and list
+//! resolution), [`RevisionDefect`] (tracked-change metadata),
+//! [`SectionDefect`] (section column models), and [`ContentControlDefect`]
+//! (`w:sdtPr` properties).
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. There are no opt-in repairs yet: [`Leniency::Strict`]
@@ -27,21 +29,42 @@
 //!
 //! # Carrier status
 //!
-//! The plumbing is in place — [`Package::document`](crate::Package::document)
-//! aggregates the report and [`Document::tolerance_report`](crate::Document::tolerance_report)
-//! exposes it — and the first recording site is live: the semantic text codec
-//! (`paragraph/codec/text.rs`, finding 2.1) skips foreign `*:t` subtrees such
-//! as OMML `m:t` instead of failing the extraction and records
-//! [`TextDefect::SkippedForeignMarkup`] with the byte offset of the element's
-//! start tag within the visible part XML. Because the codec runs lazily under
-//! the text-sink facades, each [`Document::write_text_to`](crate::Document::write_text_to)
-//! call parses into its own report and merges it into the document-level
-//! aggregation with `ToleranceReport::append` — the idiom `litchi-doc`
-//! established at open time. The aggregation sits behind a mutex so the sinks
-//! keep their `&self` receivers; `tolerance_report` returns a snapshot. The
-//! source-backed package facade carries the same surface; the pinned
-//! source-backed `Document` and story snapshots extract through the tolerant
-//! `extract_word_text` scanner and have no defect to record.
+//! [`Package::document`](crate::Package::document) aggregates the report and
+//! [`Document::tolerance_report`](crate::Document::tolerance_report) exposes
+//! it. Because the typed codecs run lazily under the read facades, each
+//! accessor call parses into its own report and merges it into the
+//! document-level aggregation with `ToleranceReport::append` — the idiom
+//! `litchi-doc` established at open time — so the report accumulates across
+//! calls in call order. The aggregation sits behind a mutex so the facades
+//! keep their `&self` receivers; `tolerance_report` returns a snapshot.
+//!
+//! Recording sites, by finding:
+//!
+//! - 2.1 — [`Document::write_text_to`](crate::Document::write_text_to) (and
+//!   the source-backed package sink) records [`TextDefect`].
+//! - 2.2, 2.3 — [`Document::settings`](crate::Document::settings) records
+//!   [`SettingsDefect`]; the parsed
+//!   [`DocumentSettings`](crate::settings::DocumentSettings) also carries its
+//!   own report for the package-level settings shortcuts.
+//! - 2.4, 2.6 — [`Document::numbering`](crate::Document::numbering),
+//!   [`Document::numbering_snapshot`](crate::Document::numbering_snapshot),
+//!   and the list resolvers ([`Document::list_items`](crate::Document::list_items)
+//!   and friends) record [`NumberingDefect`]; the
+//!   [`numbering::Collection`](crate::numbering::Collection) carries its own.
+//! - 2.5 — [`Document::revisions`](crate::Document::revisions) and the pinned
+//!   source-backed `Document::revisions` record [`RevisionDefect`].
+//! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
+//!   (and the source-backed inventories) record [`SectionDefect`];
+//!   [`Section`](crate::Section) and the inventory carry their own.
+//! - 2.8 — [`Document::content_controls`](crate::Document::content_controls)
+//!   records [`ContentControlDefect`]; the
+//!   [`content_control::Inventory`](crate::content_control::Inventory) carries
+//!   its own.
+//!
+//! Fragment-level accessors without a document handle (a standalone
+//! [`Paragraph`](crate::Paragraph)'s numbering or revisions, table revisions)
+//! apply the same repairs; the document-level accessor over the same part
+//! enumerates them.
 
 /// Upper bound on individually recorded defects.
 ///
@@ -58,8 +81,9 @@ pub(crate) const MAX_REPORT_HEAP_BYTES: usize = MAX_RECORDED_DEFECTS * size_of::
 ///
 /// Structural defects — malformed OPC packaging, ill-formed XML, broken part
 /// grammar, or unsupported/absent decryption material — are hard errors under
-/// every variant. The Word-compatible repairs listed by [`TextDefect`] are
-/// applied and recorded under every variant, including [`Leniency::Strict`].
+/// every variant. The Word-compatible repairs listed by the [`Defect`]
+/// classes are applied and recorded under every variant, including
+/// [`Leniency::Strict`].
 ///
 /// No opt-in repairs exist yet, so `Strict` is currently the only variant and
 /// the default: every read applies the same contract. Variants gate
@@ -69,8 +93,8 @@ pub enum Leniency {
     /// Reject every defect whose repair requires opting in.
     ///
     /// This is the default: there are no opt-in repairs to reject, while the
-    /// Word-compatible [`TextDefect`] repairs are still applied and recorded
-    /// in the [`ToleranceReport`].
+    /// Word-compatible [`Defect`] repairs are still applied and recorded in
+    /// the [`ToleranceReport`].
     #[default]
     Strict,
 }
@@ -421,7 +445,7 @@ impl ContentControlDefect {
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// a read may change about a document. [`Defect::Text`] classes are repaired
+/// a read may change about a document. Every class listed here is repaired
 /// under every [`Leniency`] variant; opt-in classes join the union together
 /// with the [`Leniency`] variants that gate them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

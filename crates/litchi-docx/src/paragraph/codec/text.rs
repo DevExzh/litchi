@@ -1296,10 +1296,18 @@ impl SemanticTextParser {
                 // Opaque foreign text: validated like any CDATA, never emitted.
                 Self::decode_cdata(&text).map_err(SemanticTextFailure::Document)?;
             },
-            Event::CData(_) => {
+            Event::CData(_) if self.budget.depth == 0 => {
                 return Err(SemanticTextFailure::Document(Error::InvalidFormat(
-                    "semantic DOCX CDATA is outside w:t".into(),
+                    "semantic DOCX XML has CDATA outside its root".into(),
                 )));
+            },
+            Event::CData(text) => {
+                // Character data outside `w:t` (for example in
+                // `w:instrText`) is conformant XML and contributes no text,
+                // exactly like the equivalent plain text event above: it is
+                // decoded and validated, never emitted. Nothing is repaired,
+                // so nothing is recorded.
+                Self::decode_cdata(&text).map_err(SemanticTextFailure::Document)?;
             },
             Event::GeneralRef(reference) if self.text_depth.is_some() => {
                 self.reference_event(&reference)
@@ -1310,10 +1318,17 @@ impl SemanticTextParser {
                 // decoded and checked like any other, never emitted.
                 Self::decode_reference(&reference).map_err(SemanticTextFailure::Document)?;
             },
-            Event::GeneralRef(_) => {
+            Event::GeneralRef(_) if self.budget.depth == 0 => {
                 return Err(SemanticTextFailure::Document(Error::InvalidFormat(
-                    "semantic DOCX XML reference is outside w:t".into(),
+                    "semantic DOCX XML has a reference outside its root".into(),
                 )));
+            },
+            Event::GeneralRef(reference) => {
+                // A reference outside `w:t` (`&quot;` in a field instruction)
+                // is ordinary escaped text that this sink does not emit. It is
+                // decoded and checked like any other — an undeclared entity
+                // stays fatal — and otherwise treated like its literal text.
+                Self::decode_reference(&reference).map_err(SemanticTextFailure::Document)?;
             },
             Event::Decl(_) => {
                 if self.declaration_seen || !declaration_is_first || self.root_seen {

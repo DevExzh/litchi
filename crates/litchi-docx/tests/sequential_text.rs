@@ -1012,3 +1012,51 @@ fn ill_formed_foreign_text_subtrees_remain_fatal() {
         Err(TextOutputError::Document { .. })
     ));
 }
+
+/// Escaped text outside `w:t` — an entity reference or CDATA in a field
+/// instruction — is conformant XML the sink does not emit. It must not fail
+/// the extraction in either facade, and it repairs nothing, so both reports
+/// stay clean. Undeclared entities remain fatal.
+#[test]
+fn references_and_cdata_outside_text_are_accepted_without_repair() {
+    let bytes = package_bytes(
+        &document_xml(
+            r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> HYPERLINK &quot;https://example.test/?a=1&amp;b=2&quot; </w:instrText></w:r><w:r><w:instrText><![CDATA[ \o "tip" ]]></w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>link</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let package = eager_package(&bytes);
+    let document = package.document().expect("document");
+    let mut output = Vec::new();
+    document
+        .write_text_to(&mut output, parity_options(false))
+        .expect("references outside w:t no longer fail the eager sink");
+    assert_eq!(output, b"link");
+    assert!(document.tolerance_report().is_clean());
+
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
+    let mut output = Vec::new();
+    source_package
+        .write_text_to(&mut output, parity_options(false))
+        .expect("references outside w:t no longer fail the source sink");
+    assert_eq!(output, b"link");
+    assert!(source_package.tolerance_report().is_clean());
+
+    for body in [
+        r#"<w:p><w:r><w:instrText>&bogus;</w:instrText></w:r></w:p>"#,
+        r#"<w:p><w:r><w:instrText>&#0;</w:instrText></w:r></w:p>"#,
+    ] {
+        let bytes = package_bytes(&document_xml(body), false);
+        let package = eager_package(&bytes);
+        let document = package.document().expect("document");
+        let mut output = Vec::new();
+        assert!(
+            matches!(
+                document.write_text_to(&mut output, parity_options(false)),
+                Err(TextOutputError::Document { .. })
+            ),
+            "{body}"
+        );
+    }
+}
