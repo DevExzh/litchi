@@ -629,8 +629,18 @@ fn corpus_ppt_files() -> Vec<std::path::PathBuf> {
     files
 }
 
+/// Corpus files whose metadata deviates from MS-OLEPS, with the property-set
+/// repairs they record: PowerPoint 7.0 wrote `VT_BOOL` user-defined
+/// properties as `0xFFFFFFFF`, filling the two padding bytes MS-OLEPS 2.15
+/// requires to be zero. Everything else in these decks conforms.
+const CORPUS_PROPERTY_SET_DEVIATIONS: &[(&str, &[u32])] = &[
+    ("slideshow/45543.ppt", &[8, 10]),
+    ("litchi-changed/45543-transition-litchi.ppt", &[8, 10]),
+];
+
 /// Every unencrypted `.ppt` in `test-data` opens through the default path
-/// with an empty report, open-time and per-slide/notes alike.
+/// with an empty report, open-time and per-slide/notes alike, except for the
+/// cataloged metadata deviations above, which record exactly their repairs.
 #[test]
 fn corpus_presentations_report_nothing() {
     let files = corpus_ppt_files();
@@ -655,6 +665,26 @@ fn corpus_presentations_report_nothing() {
         let report = presentation
             .collect_tolerance_report()
             .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        let name = path.to_string_lossy().replace('\\', "/");
+        if let Some((_, properties)) = CORPUS_PROPERTY_SET_DEVIATIONS
+            .iter()
+            .find(|(deviating, _)| name.ends_with(deviating))
+        {
+            let expected: Vec<_> = properties
+                .iter()
+                .map(|&property| {
+                    open_time(
+                        Defect::PropertySet(litchi_ole_common::leniency::Defect::Property(
+                            litchi_ole_common::leniency::PropertyDefect::NonZeroPadding,
+                        )),
+                        property,
+                        None,
+                    )
+                })
+                .collect();
+            assert_eq!(report.defects(), expected.as_slice(), "{name}");
+            continue;
+        }
         assert!(
             report.is_clean(),
             "{} reported {:?}",
@@ -1350,6 +1380,90 @@ fn container_repairs_join_the_open_time_report() {
         assert_eq!(
             presentation.collect_tolerance_report().unwrap().defects(),
             expected.as_slice()
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Property-set repairs join the open-time report.
+// ---------------------------------------------------------------------------
+
+/// A one-section `SummaryInformation` stream whose title is a `VT_LPWSTR`
+/// holding an unpaired high surrogate, which the property-set reader decodes
+/// lossily (U+FFFD) and records against the title's property identifier.
+fn summary_information_with_unpaired_surrogate() -> Vec<u8> {
+    const SUMMARY_INFORMATION_FMTID: [u8; 16] = [
+        0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3,
+        0xD9,
+    ];
+    let code_page = [2u16.to_le_bytes(), [0, 0], 1200u16.to_le_bytes(), [0, 0]].concat();
+    let title = [
+        0x1Fu16.to_le_bytes(),
+        [0, 0],
+        3u16.to_le_bytes(),
+        [0, 0],
+        0xD800u16.to_le_bytes(),
+        0x41u16.to_le_bytes(),
+        [0, 0],
+        [0, 0],
+    ]
+    .concat();
+    let table_end = 8 + 2 * 8;
+    let mut section = Vec::new();
+    section.extend_from_slice(&((table_end + code_page.len() + title.len()) as u32).to_le_bytes());
+    section.extend_from_slice(&2u32.to_le_bytes());
+    section.extend_from_slice(&1u32.to_le_bytes());
+    section.extend_from_slice(&(table_end as u32).to_le_bytes());
+    section.extend_from_slice(&2u32.to_le_bytes());
+    section.extend_from_slice(&((table_end + code_page.len()) as u32).to_le_bytes());
+    section.extend_from_slice(&code_page);
+    section.extend_from_slice(&title);
+    let mut stream = Vec::new();
+    stream.extend_from_slice(&0xFFFEu16.to_le_bytes());
+    stream.extend_from_slice(&0u16.to_le_bytes());
+    stream.extend_from_slice(&0u32.to_le_bytes());
+    stream.extend_from_slice(&[0; 16]);
+    stream.extend_from_slice(&1u32.to_le_bytes());
+    stream.extend_from_slice(&SUMMARY_INFORMATION_FMTID);
+    stream.extend_from_slice(&48u32.to_le_bytes());
+    stream.extend_from_slice(&section);
+    stream
+}
+
+/// A title with an unpaired surrogate in `\x05SummaryInformation` decodes
+/// lossily the way ole32 and POI decode it, and both open paths list the
+/// repair in the open-time report as a `Defect::PropertySet` entry located
+/// by the title's property identifier.
+#[test]
+fn property_set_repairs_join_the_open_time_report() {
+    let mut package = litchi_ole_common::object::Editor::open(
+        Deck::new(2).bytes,
+        litchi_ole_common::object::Targets::default(),
+        litchi_ole_common::object::Limits::default(),
+    )
+    .unwrap();
+    let path = vec!["\u{5}SummaryInformation".to_string()];
+    let stream = summary_information_with_unpaired_surrogate();
+    if package.stream(&path).is_some() {
+        package.put_stream(&path, stream).unwrap();
+    } else {
+        package.add_stream(path, stream).unwrap();
+    }
+    let bytes = package.finish().unwrap();
+
+    let expected = [open_time(
+        Defect::PropertySet(litchi_ole_common::leniency::Defect::String(
+            litchi_ole_common::leniency::StringDefect::LossyDecode,
+        )),
+        2,
+        None,
+    )];
+    for presentation in open_both(&bytes) {
+        assert_eq!(presentation.slides().unwrap().len(), 2);
+        assert_eq!(presentation.tolerance_report().defects(), &expected);
+        assert_eq!(
+            presentation.collect_tolerance_report().unwrap().defects(),
+            &expected
         );
     }
 }

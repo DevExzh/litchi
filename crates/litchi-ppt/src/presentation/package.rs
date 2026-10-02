@@ -9,6 +9,7 @@ use crate::parsers::RecordParser;
 use crate::persist::PersistMapping;
 use crate::slide::SlideDirectory;
 use litchi_cfb::{OleFile, SharedOleFile};
+use litchi_ole_common::property_set::{PropertySetReader as _, SharedPropertySetReader};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -166,6 +167,9 @@ impl Presentation {
         } else {
             None
         };
+
+        // The metadata streams' repairs follow every record-level repair.
+        tolerance.append_property_sets(|path| ole.property_set_stream(path));
 
         Ok(Self {
             powerpoint_document,
@@ -329,6 +333,10 @@ impl Presentation {
                 #[cfg(feature = "encryption")]
                 pictures_crypto,
             )
+        });
+        // The metadata streams' repairs follow every record-level repair.
+        tolerance.append_property_sets(|path| {
+            <SharedOleFile as SharedPropertySetReader>::property_set_stream(&shared, path)
         });
         shared.source_version()?;
 

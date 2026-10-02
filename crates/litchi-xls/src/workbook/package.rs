@@ -227,6 +227,10 @@ impl<R: Read + Seek> Workbook<R> {
             }
         }
         self.tolerance = tolerance.into_report();
+        // The metadata streams' repairs follow every BIFF-level repair.
+        let ole_file = &mut self.ole_file;
+        self.tolerance
+            .append_property_sets(|path| ole_file.property_set_stream(path));
 
         crate::xml_map::validate_list_columns(self.xml_map.as_ref(), &self.worksheets)?;
 

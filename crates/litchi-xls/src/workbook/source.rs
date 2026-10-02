@@ -1206,7 +1206,9 @@ impl SourceBackedWorkbook {
         let cache_sheet_count = parsed.sheets.len();
         // Container repairs come first: the compound-file reader applied them
         // while the positional index was built, before any BIFF record was
-        // read.
+        // read. The owner never reads the metadata property-set streams (its
+        // open reads each globals byte once and nothing else), so it records
+        // no `Defect::PropertySet` entries.
         let mut tolerance = ToleranceReport::default();
         tolerance.append_container(cfb.tolerance_report());
         tolerance.absorb(parsed.tolerance);

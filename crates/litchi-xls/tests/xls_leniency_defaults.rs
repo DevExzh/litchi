@@ -1063,3 +1063,93 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     let workbook = Workbook::from_ole_file(ole).unwrap();
     assert_eq!(workbook.tolerance_report().defects().len(), expected.len());
 }
+
+// ---------------------------------------------------------------------------
+// Property-set repairs join the workbook report
+// ---------------------------------------------------------------------------
+
+/// A one-section `SummaryInformation` stream whose title is a `VT_LPWSTR`
+/// holding an unpaired high surrogate (or, with `surrogate` false, a plain
+/// `A`).
+fn summary_information(surrogate: bool) -> Vec<u8> {
+    const SUMMARY_INFORMATION_FMTID: [u8; 16] = [
+        0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3,
+        0xD9,
+    ];
+    let first_unit: u16 = if surrogate { 0xD800 } else { 0x41 };
+    let code_page = [2u16.to_le_bytes(), [0, 0], 1200u16.to_le_bytes(), [0, 0]].concat();
+    let title = [
+        0x1Fu16.to_le_bytes(),
+        [0, 0],
+        3u16.to_le_bytes(),
+        [0, 0],
+        first_unit.to_le_bytes(),
+        0x41u16.to_le_bytes(),
+        [0, 0],
+        [0, 0],
+    ]
+    .concat();
+    let table_end = 8 + 2 * 8;
+    let mut section = Vec::new();
+    section.extend_from_slice(&((table_end + code_page.len() + title.len()) as u32).to_le_bytes());
+    section.extend_from_slice(&2u32.to_le_bytes());
+    section.extend_from_slice(&1u32.to_le_bytes());
+    section.extend_from_slice(&(table_end as u32).to_le_bytes());
+    section.extend_from_slice(&2u32.to_le_bytes());
+    section.extend_from_slice(&((table_end + code_page.len()) as u32).to_le_bytes());
+    section.extend_from_slice(&code_page);
+    section.extend_from_slice(&title);
+    let mut stream = Vec::new();
+    stream.extend_from_slice(&0xFFFEu16.to_le_bytes());
+    stream.extend_from_slice(&0u16.to_le_bytes());
+    stream.extend_from_slice(&0u32.to_le_bytes());
+    stream.extend_from_slice(&[0; 16]);
+    stream.extend_from_slice(&1u32.to_le_bytes());
+    stream.extend_from_slice(&SUMMARY_INFORMATION_FMTID);
+    stream.extend_from_slice(&48u32.to_le_bytes());
+    stream.extend_from_slice(&section);
+    stream
+}
+
+/// The simple fixture packaged with a `\x05SummaryInformation` stream.
+fn package_with_summary(surrogate: bool) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &Stream::simple().serialize())
+        .unwrap();
+    writer
+        .create_stream(
+            &["\u{5}SummaryInformation"],
+            &summary_information(surrogate),
+        )
+        .unwrap();
+    let mut package = Vec::new();
+    writer.write_to(&mut Cursor::new(&mut package)).unwrap();
+    package
+}
+
+/// A title with an unpaired surrogate in `\x05SummaryInformation` decodes
+/// lossily the way ole32 and POI decode it, and the eager open lists the
+/// repair as a `Defect::PropertySet` entry located by the title's property
+/// identifier; the source-backed owner, which reads no metadata stream, opens
+/// it with nothing to repair. The same metadata without the surrogate records
+/// nothing.
+#[test]
+fn property_set_repairs_join_the_eager_workbook_report() {
+    assert_clean(&package_with_summary(false));
+    let mut workbook = assert_eager_repairs(
+        &package_with_summary(true),
+        &[(
+            Defect::PropertySet(litchi_ole_common::leniency::Defect::String(
+                litchi_ole_common::leniency::StringDefect::LossyDecode,
+            )),
+            2,
+            0,
+        )],
+    );
+    // The metadata accessor still hands the lossy title back with its own
+    // report, and reading it does not grow the workbook report.
+    let summary = workbook.summary_information().unwrap().unwrap();
+    assert!(!summary.tolerance_report().is_clean());
+    assert_eq!(workbook.tolerance_report().defects().len(), 1);
+}

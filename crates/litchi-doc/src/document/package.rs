@@ -47,6 +47,7 @@ use crate::parts::text::TextExtractor;
 use crate::parts::text_services::TextServicesTables;
 use crate::parts::textbox_breaks::TextBoxBreakTables;
 use litchi_cfb::OleFile;
+use litchi_ole_common::property_set::PropertySetReader as _;
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -395,7 +396,8 @@ impl Document {
         // order: the container repairs and the optional auxiliary tables
         // above first, then the stylesheet's repairs, then the piece-table,
         // CHPX, and PAPX bin-table repairs, then the
-        // attached glossary's own stylesheet and PAPX repairs.
+        // attached glossary's own stylesheet and PAPX repairs, then the
+        // property-set repairs of the document metadata streams.
         if let Some(parsed) = &stylesheet {
             tolerance.append(parsed.tolerance_report());
         }
@@ -411,6 +413,9 @@ impl Document {
         if let Ok(Some(glossary)) = &attached_glossary {
             glossary.append_tolerance_to(&mut tolerance);
         }
+        // The document metadata streams come last: their repairs are read
+        // from the same container once the document itself has parsed.
+        append_property_set_repairs(ole, &mut tolerance);
 
         // Optional metadata readers defer semantic validation until their
         // accessors are called. Retain only their bounded FIB-selected ranges
@@ -653,5 +658,30 @@ fn locate_stream<R: Read + Seek>(
         },
         Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
         Err(error) => Err(error.into()),
+    }
+}
+
+/// The standard OLE property-set streams carrying the document metadata.
+const PROPERTY_SET_STREAMS: [&str; 2] = [
+    "\u{0005}SummaryInformation",
+    "\u{0005}DocumentSummaryInformation",
+];
+
+/// Record the repairs the property-set reader applies to the document
+/// metadata streams, so a lossy metadata decode is enumerable from
+/// [`Document::tolerance_report`].
+///
+/// An absent or unreadable stream records nothing and does not fail the open:
+/// the document body never depends on its metadata, and the property-set
+/// accessors (`Package::summary_information` and friends) still report the
+/// failure when the metadata is asked for.
+fn append_property_set_repairs<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    tolerance: &mut ToleranceReport,
+) {
+    for name in PROPERTY_SET_STREAMS {
+        if let Ok(stream) = ole.property_set_stream(&[name]) {
+            tolerance.append_property_set(stream.tolerance_report());
+        }
     }
 }

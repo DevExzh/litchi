@@ -29,6 +29,12 @@
 //! with the substitution documented on the corresponding [`StylesheetDefect`]
 //! variant.
 //!
+//! Two substrate reports join the document's: the compound-file repairs the
+//! container reader applied while the OLE file was opened
+//! ([`Defect::Container`], first) and the property-set repairs made while the
+//! standard metadata streams were read at open ([`Defect::PropertySet`],
+//! last).
+//!
 //! This mirrors the contract `XlsLeniency` provides for legacy workbooks so the
 //! two legacy readers behave the same way.
 
@@ -839,6 +845,12 @@ pub enum Defect {
     /// A character-property (`CHP`) operand defect repaired the way Word
     /// repairs it.
     Chp(ChpDefect),
+    /// A property-set repair the metadata reader applied while the
+    /// document's `\u{5}SummaryInformation` or
+    /// `\u{5}DocumentSummaryInformation` stream was read at open; see
+    /// [`litchi_ole_common::leniency::Defect`] for the closed set of
+    /// property-set repairs and their substitutions.
+    PropertySet(litchi_ole_common::leniency::Defect),
 }
 
 impl Defect {
@@ -860,6 +872,7 @@ impl Defect {
             Self::Container(defect) => defect.repair(),
             Self::Rsid(defect) => defect.repair(),
             Self::Chp(defect) => defect.repair(),
+            Self::PropertySet(defect) => defect.repair(),
         }
     }
 }
@@ -948,6 +961,12 @@ impl From<litchi_cfb::Defect> for Defect {
     }
 }
 
+impl From<litchi_ole_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ole_common::leniency::Defect) -> Self {
+        Self::PropertySet(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -969,10 +988,13 @@ pub struct ToleratedDefect {
     /// [`litchi_cfb::ToleratedDefect::context`]) for a [`Defect::Container`],
     /// the stored `reserved1` value for a [`Defect::Rsid`], and the SPRM
     /// opcode (the `PlcfBteChpx` page index for [`ChpDefect::Run`]) for a
-    /// [`Defect::Chp`].
+    /// [`Defect::Chp`], and the property-set context (a property identifier,
+    /// stored field value, or section index — see
+    /// [`litchi_ole_common::leniency::ToleratedDefect::context`]) for a
+    /// [`Defect::PropertySet`].
     ///
-    /// The field is 32 bits wide so container contexts are carried exactly;
-    /// every DOC-level context fits in 16 bits.
+    /// The field is 32 bits wide so container and property-set contexts are
+    /// carried exactly; every DOC-level context fits in 16 bits.
     pub context: u32,
 }
 
@@ -1053,6 +1075,19 @@ impl ToleranceReport {
             self.record_wide(Defect::Container(tolerated.defect), tolerated.context);
         }
         self.unrecorded = self.unrecorded.saturating_add(container.unrecorded());
+    }
+
+    /// Merge the repairs one parsed property-set stream recorded, as
+    /// [`Defect::PropertySet`] entries in discovery order. The stream's own
+    /// overflow count joins this report's unrecorded count.
+    pub(crate) fn append_property_set(
+        &mut self,
+        property_set: &litchi_ole_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in property_set.defects() {
+            self.record_wide(Defect::PropertySet(tolerated.defect), tolerated.context);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(property_set.unrecorded());
     }
 }
 
@@ -1206,6 +1241,9 @@ mod tests {
             Defect::from(ChpDefect::Run),
             Defect::from(litchi_cfb::Defect::Allocation(
                 litchi_cfb::AllocationDefect::ChainLongerThanSize,
+            )),
+            Defect::from(litchi_ole_common::leniency::Defect::String(
+                litchi_ole_common::leniency::StringDefect::LossyDecode,
             )),
         ];
         for defect in defects {

@@ -21,7 +21,11 @@
 //! [`PaletteDefect`], [`SheetDefect`], or [`SharedStringDefect`] variant.
 //! The compound-file repairs the container reader applied while the
 //! workbook's OLE file was opened join the same report as
-//! [`Defect::Container`] entries, ahead of every BIFF-level repair.
+//! [`Defect::Container`] entries, ahead of every BIFF-level repair, and the
+//! property-set repairs made while the eager [`crate::Workbook`] open reads
+//! the standard metadata streams join it as [`Defect::PropertySet`] entries,
+//! after them. (The source-backed owner reads no metadata stream, so its
+//! report never lists a property-set repair.)
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -35,6 +39,12 @@
 //! [`Leniency::TolerateAllDefects`] enables both opt-in classes.
 
 use super::error::{Error, Result};
+
+/// The standard OLE property-set streams carrying the workbook metadata.
+const PROPERTY_SET_STREAMS: [&str; 2] = [
+    "\u{0005}SummaryInformation",
+    "\u{0005}DocumentSummaryInformation",
+];
 
 /// Upper bound on individually recorded defects.
 ///
@@ -682,6 +692,14 @@ pub enum Defect {
     /// closed set of container repairs and their substitutions. Applied under
     /// every [`Leniency`] variant.
     Container(litchi_cfb::Defect),
+    /// A property-set repair the metadata reader applied while the
+    /// workbook's `\u{5}SummaryInformation` or
+    /// `\u{5}DocumentSummaryInformation` stream was read by the eager
+    /// [`crate::Workbook`] open (the source-backed owner reads neither); see
+    /// [`litchi_ole_common::leniency::Defect`] for the closed set of
+    /// property-set repairs and their substitutions. Applied under every
+    /// [`Leniency`] variant.
+    PropertySet(litchi_ole_common::leniency::Defect),
 }
 
 impl Defect {
@@ -689,7 +707,8 @@ impl Defect {
     ///
     /// `None` for [`CellFormatDefect::XfReference`], whose carrying record
     /// varies per occurrence: any cell record, `ROW` (0x0208), or `COLINFO`
-    /// (0x007D), and for [`Defect::Container`], which no BIFF record carries.
+    /// (0x007D), and for [`Defect::Container`] and [`Defect::PropertySet`],
+    /// which no BIFF record carries.
     #[must_use]
     pub fn record_type(self) -> Option<u16> {
         match self {
@@ -700,7 +719,7 @@ impl Defect {
             Defect::Sheet(defect) => Some(defect.record_type()),
             Defect::SharedString(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
-            Defect::Container(_) => None,
+            Defect::Container(_) | Defect::PropertySet(_) => None,
         }
     }
 
@@ -716,6 +735,7 @@ impl Defect {
             Defect::SharedString(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
             Defect::Container(defect) => defect.repair(),
+            Defect::PropertySet(defect) => defect.repair(),
         }
     }
 }
@@ -768,6 +788,12 @@ impl From<litchi_cfb::Defect> for Defect {
     }
 }
 
+impl From<litchi_ole_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ole_common::leniency::Defect) -> Self {
+        Self::PropertySet(defect)
+    }
+}
+
 /// One repaired defect, located within the workbook that carried it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -811,7 +837,10 @@ impl ToleratedDefect {
     /// offset of the `Palette` record within the Workbook stream. For a
     /// [`Defect::Container`] it is the compound-file context (a directory
     /// SID, sector index, or header field value — see
-    /// [`litchi_cfb::ToleratedDefect::context`]).
+    /// [`litchi_cfb::ToleratedDefect::context`]). For a
+    /// [`Defect::PropertySet`] it is the property-set context (a property
+    /// identifier, stored field value, or section index — see
+    /// [`litchi_ole_common::leniency::ToleratedDefect::context`]).
     #[must_use]
     pub fn ordinal(&self) -> u32 {
         self.ordinal
@@ -861,8 +890,8 @@ impl ToleratedDefect {
     /// it is the `stName` option byte, for [`SheetDefect::Visibility`] the
     /// `hsState` byte, for [`SheetDefect::SheetType`] the `dt` byte, and for
     /// [`SheetDefect::TrailingBytes`] the number of bytes ignored. For a
-    /// [`Defect::Container`] it is always zero; the container context is the
-    /// [`Self::ordinal`].
+    /// [`Defect::Container`] or [`Defect::PropertySet`] it is always zero;
+    /// the substrate's context is the [`Self::ordinal`].
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed
@@ -955,6 +984,35 @@ impl ToleranceReport {
             self.record(Defect::Container(tolerated.defect), tolerated.context, 0);
         }
         self.unrecorded = self.unrecorded.saturating_add(container.unrecorded());
+    }
+
+    /// Merge the repairs the property-set reader applies to the workbook's
+    /// metadata streams, as [`Defect::PropertySet`] entries in discovery
+    /// order, each stream's overflow count joining this report's.
+    ///
+    /// `read` parses one stream by path. An absent or unreadable stream
+    /// records nothing and does not fail the open: no workbook content
+    /// depends on the metadata, and the property-set accessors still report
+    /// the failure when the metadata is asked for.
+    pub(crate) fn append_property_sets(
+        &mut self,
+        mut read: impl FnMut(
+            &[&str],
+        ) -> std::result::Result<
+            litchi_ole_common::property_set::Stream,
+            litchi_cfb::OleError,
+        >,
+    ) {
+        for name in PROPERTY_SET_STREAMS {
+            let Ok(stream) = read(&[name]) else {
+                continue;
+            };
+            let parsed = stream.tolerance_report();
+            for tolerated in parsed.defects() {
+                self.record(Defect::PropertySet(tolerated.defect), tolerated.context, 0);
+            }
+            self.unrecorded = self.unrecorded.saturating_add(parsed.unrecorded());
+        }
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored

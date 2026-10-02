@@ -162,7 +162,9 @@ impl Presentation {
     /// slide-list repairs ([`crate::PersistDefect`],
     /// [`crate::SlideListDefect`]) made there are listed here, after the
     /// compound-file repairs the container reader applied while the OLE
-    /// file was opened ([`crate::Defect::Container`]).
+    /// file was opened ([`crate::Defect::Container`]) and before the
+    /// property-set repairs made while the standard metadata streams were
+    /// read ([`crate::Defect::PropertySet`]).
     /// Text-style and shape repairs ([`crate::TextPropDefect`],
     /// [`crate::ShapeDefect`]) fire while shapes are lazily parsed; they are
     /// reported per slide by
