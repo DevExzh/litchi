@@ -7,6 +7,7 @@
 mod codec;
 mod model;
 
+pub(crate) use codec::read_with_report;
 pub use codec::{
     Error, Result, parse_border, parse_cell_format, parse_direct_color, parse_fill, parse_font,
     parse_num_fmt, read,

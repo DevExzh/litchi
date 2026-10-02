@@ -105,6 +105,7 @@ where
             web_extension_bindings: Vec::new(),
             views,
             saw_web_extension_collection: false,
+            tolerance: crate::leniency::ToleranceReport::default(),
         })
     }
 

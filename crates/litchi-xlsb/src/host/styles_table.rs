@@ -62,6 +62,17 @@ impl StylesTable {
             .map_err(map_owner_error)
     }
 
+    /// Load styles from a styles.bin payload, recording every
+    /// Excel-compatible repair into `report` (see [`crate::leniency`]).
+    pub(crate) fn from_bytes_with_report(
+        bytes: &[u8],
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        crate::styles::read_with_report(bytes, report)
+            .map(Self::from_owner)
+            .map_err(map_owner_error)
+    }
+
     fn from_owner(owner: crate::styles::Table) -> Self {
         Self {
             fonts: owner.fonts,

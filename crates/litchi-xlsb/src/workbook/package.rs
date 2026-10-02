@@ -5,6 +5,7 @@ use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
 use crate::external_link::{Budget, ExternalLinkLimits};
+use crate::leniency::ToleranceReport;
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
@@ -1166,6 +1167,7 @@ impl Workbook {
             sheet_drawings: Vec::new(),
             drawing_load_policy,
             connections: None,
+            tolerance: ToleranceReport::default(),
         };
 
         workbook.load_workbook_info(
@@ -1187,7 +1189,7 @@ impl Workbook {
 
         let blob = workbook_part.blob();
         let mut iter = Records::new(blob);
-        let info = Self::read_workbook(&mut iter)?;
+        let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         // BrtSupBookSrc identifiers are workbook-stream metadata. The
@@ -1571,7 +1573,10 @@ impl Workbook {
     fn load_styles(&mut self) -> Result<()> {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
         match self.package.get_part(&styles_uri) {
-            Ok(styles_part) => self.styles = StylesTable::from_bytes(styles_part.blob())?,
+            Ok(styles_part) => {
+                self.styles =
+                    StylesTable::from_bytes_with_report(styles_part.blob(), &mut self.tolerance)?;
+            },
             Err(OpcError::PartNotFound(_)) => {},
             Err(error) => return Err(error.into()),
         }

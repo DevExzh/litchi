@@ -26,6 +26,7 @@
         clippy::decimal_bitwise_operands,
         clippy::default_constructed_unit_structs,
         clippy::default_trait_access,
+        clippy::expect_used,
         clippy::field_reassign_with_default,
         clippy::identity_op,
         clippy::inconsistent_digit_grouping,
@@ -123,6 +124,7 @@ pub mod date_utils;
 pub mod external_link;
 pub mod formula;
 pub mod hyperlinks;
+pub mod leniency;
 pub mod merged_cells;
 pub mod named_ranges;
 pub mod package;
@@ -147,6 +149,11 @@ pub use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
 pub mod writer;
 
 pub use raw::Error;
+
+pub use leniency::{
+    CachedNumberDefect, Defect, LayoutDefect, Leniency, ReservedFieldDefect, ToleranceReport,
+    ToleratedDefect, ValueEncodingDefect,
+};
 
 pub use custom_data::{
     Commit as CustomDataCommit, CustomData, CustomDataView, ExtensionList,

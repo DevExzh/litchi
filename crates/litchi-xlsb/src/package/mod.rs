@@ -13,6 +13,7 @@ use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
 
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
+use crate::leniency::ToleranceReport;
 use crate::package::error::Result;
 use crate::writer::{MutableWorksheet, WorkbookWriter};
 
@@ -106,7 +107,7 @@ pub use shared_strings::{
 /// only the XLSB package boundary and validates the workbook graph before a
 /// package is handed to callers.
 #[derive(Debug, Clone)]
-pub struct Package(OpcPackage, ExternalLinkLimits);
+pub struct Package(OpcPackage, ExternalLinkLimits, ToleranceReport);
 
 impl Package {
     /// Create a deterministic workbook containing one visible worksheet.
@@ -468,11 +469,23 @@ impl Package {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
-        Workbook::from_opc_package_with_external_link_limits(
+        let workbook = Workbook::from_opc_package_with_external_link_limits(
             package.clone(),
             external_link_limits,
         )?;
-        Ok(Self(package, external_link_limits))
+        let tolerance = workbook.into_tolerance_report();
+        Ok(Self(package, external_link_limits, tolerance))
+    }
+
+    /// Every repair the validating open applied while admitting this package.
+    ///
+    /// This is the [`Workbook::tolerance_report`] of the workbook graph that
+    /// was validated; see [`crate::leniency`] for the repair contract. A
+    /// package adopted without validation through `From<OpcPackage>` reports
+    /// clean because nothing was parsed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.2
     }
 
     /// Borrow the validated OPC package for lower-level package services.
@@ -569,7 +582,11 @@ impl From<Package> for OpcPackage {
 
 impl From<OpcPackage> for Package {
     fn from(package: OpcPackage) -> Self {
-        Self(package, ExternalLinkLimits::default())
+        Self(
+            package,
+            ExternalLinkLimits::default(),
+            ToleranceReport::default(),
+        )
     }
 }
 

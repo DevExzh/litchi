@@ -88,4 +88,6 @@ where
     /// Sheet views from the worksheet WSVIEWS collection.
     pub views: Vec<litchi_sheet::view::View>,
     pub(super) saw_web_extension_collection: bool,
+    /// Repairs applied while this worksheet stream was read.
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
 }

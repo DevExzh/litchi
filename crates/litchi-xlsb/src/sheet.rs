@@ -146,6 +146,7 @@ pub struct Worksheet {
     slicers: Option<slicer::Views>,
     timelines: Option<crate::timeline::Views>,
     sparkline_groups: Option<crate::sparkline::Groups>,
+    tolerance: crate::leniency::ToleranceReport,
 }
 
 impl Worksheet {
@@ -174,7 +175,23 @@ impl Worksheet {
             slicers: None,
             timelines: None,
             sparkline_groups: None,
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
+    }
+
+    /// Every repair applied while this worksheet's stream was parsed.
+    ///
+    /// Workbook-scope repairs (workbook stream, styles) are reported by the
+    /// owning workbook instead. An empty report means the worksheet stream
+    /// conformed; see [`crate::leniency`] for the repair contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Attach the repairs recorded while this worksheet's stream was parsed.
+    pub(crate) fn set_tolerance_report(&mut self, report: crate::leniency::ToleranceReport) {
+        self.tolerance = report;
     }
 
     /// Add a cell to the worksheet

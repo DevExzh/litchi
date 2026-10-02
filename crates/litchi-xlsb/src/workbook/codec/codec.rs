@@ -237,6 +237,7 @@ impl Workbook {
         worksheet.set_conditional_formattings(cells_reader.conditional_formattings);
         worksheet.set_web_extension_bindings(cells_reader.web_extension_bindings);
         worksheet.set_views(cells_reader.views);
+        worksheet.set_tolerance_report(cells_reader.tolerance);
 
         Ok(worksheet)
     }

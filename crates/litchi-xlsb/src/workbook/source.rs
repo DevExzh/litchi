@@ -18,6 +18,7 @@ use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
 use crate::external_link::{ExternalLinkLimits, Link};
+use crate::leniency::ToleranceReport;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
@@ -95,6 +96,9 @@ struct SourceInner {
     styles: SemanticCache<StylesTable>,
     tables: SemanticCache<TableDefinitions>,
     external_books: SemanticCache<ExternalBooks>,
+    /// Workbook-scope repairs: the workbook stream at open, then each lazily
+    /// parsed workbook-scope part once its semantic cache is initialized.
+    tolerance: Mutex<ToleranceReport>,
 }
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
@@ -419,7 +423,8 @@ impl SourceBackedWorkbook {
 
         let workbook_data = workbook_part.data()?;
         let mut records = Records::new(workbook_data.as_bytes());
-        let info = Workbook::read_workbook(&mut records)?;
+        let mut tolerance = ToleranceReport::default();
+        let info = Workbook::read_workbook(&mut records, &mut tolerance)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
@@ -660,8 +665,22 @@ impl SourceBackedWorkbook {
                 styles: SemanticCache::new(),
                 tables: SemanticCache::new(),
                 external_books: SemanticCache::new(),
+                tolerance: Mutex::new(tolerance),
             }),
         })
+    }
+
+    /// A snapshot of every workbook-scope repair applied so far.
+    ///
+    /// The workbook stream is parsed when the catalog opens; the styles part
+    /// is parsed lazily the first time a worksheet materialization needs it,
+    /// and its repairs join this report then, exactly once. Worksheet-stream
+    /// repairs are reported by [`Worksheet::tolerance_report`] on each
+    /// materialized worksheet. See [`crate::leniency`] for the repair
+    /// contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        self.inner.lock_tolerance().clone()
     }
 
     /// Return the number of external-link owners without reading their payloads.
@@ -1255,6 +1274,14 @@ impl<T> SemanticCache<T> {
 }
 
 impl SourceInner {
+    fn lock_tolerance(&self) -> std::sync::MutexGuard<'_, ToleranceReport> {
+        // The report is only ever appended to whole; a panic elsewhere while
+        // the lock was held cannot leave it half-written.
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn external_books(&self) -> Result<Arc<[ExternalBook]>> {
         let _ = preflight_package(&self.package)?;
         let external_books =
@@ -1332,13 +1359,14 @@ impl SourceInner {
         self.package.check_execution()?;
         self.package.source_version()?;
         let styles = self.styles.get_or_try_init(|| {
+            let mut report = ToleranceReport::default();
             self.package.check_execution()?;
             self.package.source_version()?;
             let styles = if let Some(partname) = self.styles_part.as_ref() {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let styles = StylesTable::from_bytes(data.as_bytes())?;
+                let styles = StylesTable::from_bytes_with_report(data.as_bytes(), &mut report)?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
                 styles
@@ -1348,6 +1376,10 @@ impl SourceInner {
             let styles = Arc::new(styles);
             self.package.check_execution()?;
             self.package.source_version()?;
+            // Publish the repairs only once the cache is about to be filled,
+            // so a failed (and later retried) initialization never records
+            // its defects twice.
+            self.lock_tolerance().append(&report);
             Ok::<_, Error>(styles)
         })?;
         self.package.check_execution()?;

@@ -7,6 +7,7 @@ use super::model::{
     Alignment, Border, BorderSide, BorderStyle, CellFormat, Fill, Font, HorizontalAlignment, Table,
     VerticalAlignment,
 };
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::raw::{Cursor, Records, kind};
 use std::collections::TryReserveError;
 use thiserror::Error;
@@ -35,8 +36,22 @@ pub enum Error {
     },
 }
 
-/// Read one complete XLSB styles stream.
+/// Read one complete XLSB styles stream, refusing every defect.
+///
+/// This standalone codec function cannot report repairs, so it rejects the
+/// deviations an opened workbook repairs and records; see
+/// [`crate::leniency`].
 pub fn read(bytes: &[u8]) -> Result<Table> {
+    read_with(bytes, Tolerance::refusing())
+}
+
+/// Read one complete XLSB styles stream, recording every Excel-compatible
+/// repair into `report`.
+pub(crate) fn read_with_report(bytes: &[u8], report: &mut ToleranceReport) -> Result<Table> {
+    read_with(bytes, Tolerance::recording(report))
+}
+
+fn read_with(bytes: &[u8], _tolerance: Tolerance<'_>) -> Result<Table> {
     let mut table = Table::default();
     let mut in_fonts = false;
     let mut in_fills = false;

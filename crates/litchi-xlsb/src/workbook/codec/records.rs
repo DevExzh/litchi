@@ -9,6 +9,7 @@
 
 use super::super::model::Workbook;
 use crate::calc::{self, Props};
+use crate::leniency::ToleranceReport;
 use crate::named_ranges::Definition;
 use crate::package::error::Result;
 use crate::package::formula::{
@@ -32,7 +33,12 @@ pub(in crate::workbook) struct ParsedWorkbookInfo {
 }
 
 impl Workbook {
-    pub(in crate::workbook) fn read_workbook(iter: &mut Records<'_>) -> Result<ParsedWorkbookInfo> {
+    /// Parse the workbook stream, recording every Excel-compatible repair
+    /// into `report` (see [`crate::leniency`]).
+    pub(in crate::workbook) fn read_workbook(
+        iter: &mut Records<'_>,
+        _report: &mut ToleranceReport,
+    ) -> Result<ParsedWorkbookInfo> {
         let mut info = ParsedWorkbookInfo::default();
         let worksheet_names = &mut info.worksheet_names;
         let worksheet_rel_ids = &mut info.worksheet_rel_ids;

@@ -5,6 +5,7 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
+use crate::leniency::ToleranceReport;
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
@@ -578,6 +579,7 @@ pub struct Snapshot {
     source: Arc<[u8]>,
     entries: Vec<Entry>,
     limits: Limits,
+    tolerance: ToleranceReport,
 }
 
 impl Snapshot {
@@ -664,6 +666,15 @@ impl Snapshot {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Every repair applied while this snapshot's worksheet stream was read.
+    ///
+    /// An empty report means the stream conformed; see [`crate::leniency`]
+    /// for the repair contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 }
 
@@ -1574,6 +1585,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
     }
 
     let mut entries = Vec::new();
+    let tolerance = ToleranceReport::default();
     let mut in_sheet_data = false;
     let mut current_row = None;
     let mut frt_depth = 0usize;
@@ -1657,6 +1669,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
         source,
         entries,
         limits,
+        tolerance,
     })
 }
 

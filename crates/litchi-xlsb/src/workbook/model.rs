@@ -52,6 +52,8 @@ pub struct Workbook {
     pub(super) sheet_drawings: Vec<crate::package::drawing::SheetDrawing>,
     pub(super) drawing_load_policy: DrawingLoadPolicy,
     pub(super) connections: Option<crate::package::connections::Connections>,
+    /// Repairs applied while the workbook-scope parts were parsed at open.
+    pub(super) tolerance: crate::leniency::ToleranceReport,
 }
 
 impl std::fmt::Debug for Workbook {
@@ -69,6 +71,23 @@ impl std::fmt::Debug for Workbook {
 }
 
 impl Workbook {
+    /// Every repair applied while this workbook was opened.
+    ///
+    /// Covers the parts parsed at open: the workbook stream (`workbook.bin`)
+    /// and the styles part (`styles.bin`). Worksheets are parsed lazily, so
+    /// their repairs are reported by [`Worksheet::tolerance_report`] on each
+    /// materialized worksheet. An empty report means the parsed parts
+    /// conformed; see [`crate::leniency`] for the repair contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Consume the workbook and keep only its open-time repair report.
+    pub(crate) fn into_tolerance_report(self) -> crate::leniency::ToleranceReport {
+        self.tolerance
+    }
+
     /// Return the drawing projection boundary selected when this workbook was
     /// opened.  Internal publication helpers must carry this state through
     /// every reconstruction; a skipped projection is an intentional opaque
