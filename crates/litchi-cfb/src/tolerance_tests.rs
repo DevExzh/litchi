@@ -431,3 +431,118 @@ fn sibling_tree_cycles_stay_fatal_when_ordering_is_tolerated() {
         Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
     ));
 }
+
+// --- F7.4: directory entries unreachable from the root ---
+
+/// Unlinks the entry named `name` from its parent sibling tree, provided it
+/// is a leaf there, and returns its SID.
+fn detach_leaf(bytes: &mut [u8], name: &str) -> u32 {
+    let (sid, offset) = entry(bytes, name);
+    assert_eq!(read_u32(bytes, offset + 68), crate::consts::NOSTREAM);
+    assert_eq!(read_u32(bytes, offset + 72), crate::consts::NOSTREAM);
+    for link in directory_offsets(bytes)
+        .into_iter()
+        .filter(|&entry| bytes[entry + 66] != 0)
+        .flat_map(|entry| [entry + 68, entry + 72, entry + 76])
+    {
+        if read_u32(bytes, link) == sid {
+            write_u32(bytes, link, crate::consts::NOSTREAM);
+            return sid;
+        }
+    }
+    panic!("{name} has no parent link");
+}
+
+/// A sibling-tree leaf among `names` in `bytes`.
+fn leaf_name<'a>(bytes: &[u8], names: &'a [String]) -> &'a str {
+    names
+        .iter()
+        .find(|name| {
+            let (_, offset) = entry(bytes, name);
+            read_u32(bytes, offset + 68) == crate::consts::NOSTREAM
+                && read_u32(bytes, offset + 72) == crate::consts::NOSTREAM
+        })
+        .unwrap()
+}
+
+#[test]
+fn unreachable_directory_entry_is_ignored_and_recorded() {
+    let names = sibling_names();
+    let paths: Vec<[&str; 1]> = names.iter().map(|name| [name.as_str()]).collect();
+    let contents: Vec<Vec<u8>> = (0..names.len())
+        .map(|index| pattern(64 + index, u8::try_from(index).unwrap()))
+        .collect();
+    let streams: Vec<(&[&str], &[u8])> = paths
+        .iter()
+        .zip(&contents)
+        .map(|(path, data)| (path.as_slice(), data.as_slice()))
+        .collect();
+    let mut bytes = build(&streams);
+    assert!(open_report(&bytes).is_clean());
+
+    let orphan_name = leaf_name(&bytes, &names).to_owned();
+    let orphan = detach_leaf(&mut bytes, &orphan_name);
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(crate::DirectoryDefect::UnreachableEntry.into(), orphan)]
+    );
+
+    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    assert!(file.directory_entry_by_sid(orphan).is_none());
+    assert!(matches!(
+        file.open_stream(&[orphan_name.as_str()]),
+        Err(OleError::StreamNotFound)
+    ));
+    assert_eq!(file.list_streams().len(), names.len() - 1);
+    for (path, data) in paths.iter().zip(&contents) {
+        if path[0] != orphan_name {
+            assert_eq!(&read_both(&bytes, path), data, "{path:?}");
+        }
+    }
+}
+
+#[test]
+fn unreachable_storage_subtree_and_its_sectors_are_recorded() {
+    let big = pattern(4096, 11);
+    let mut bytes = build(&[
+        (&["Keep"], b"kept"),
+        (&["Store", "Inner"], &big),
+        (&["Store", "Tiny"], b"tiny"),
+    ]);
+    assert!(open_report(&bytes).is_clean());
+    let (inner, inner_offset) = entry(&bytes, "Inner");
+    let (tiny, _) = entry(&bytes, "Tiny");
+    let inner_sectors = chain(&bytes, read_u32(&bytes, inner_offset + 116), 8, false);
+
+    // The root's sibling tree holds exactly Keep and Store. Make Keep the
+    // tree root on its own, leaving Store (and its subtree) unreachable.
+    let (store, store_offset) = entry(&bytes, "Store");
+    let (keep, keep_offset) = entry(&bytes, "Keep");
+    let root = directory_offsets(&bytes)[0];
+    write_u32(&mut bytes, root + 76, keep);
+    for offset in [keep_offset, store_offset] {
+        write_u32(&mut bytes, offset + 68, crate::consts::NOSTREAM);
+        write_u32(&mut bytes, offset + 72, crate::consts::NOSTREAM);
+    }
+
+    let report = open_report(&bytes);
+    let mut unreachable: Vec<u32> = report
+        .iter()
+        .filter(|tolerated| tolerated.defect == crate::DirectoryDefect::UnreachableEntry.into())
+        .map(|tolerated| tolerated.context)
+        .collect();
+    unreachable.sort_unstable();
+    let mut expected = vec![store, inner, tiny];
+    expected.sort_unstable();
+    assert_eq!(unreachable, expected);
+    let mut unclaimed: Vec<u32> = report
+        .iter()
+        .filter(|tolerated| tolerated.defect == AllocationDefect::UnclaimedAllocatedSector.into())
+        .map(|tolerated| tolerated.context)
+        .collect();
+    unclaimed.sort_unstable();
+    let mut inner_sorted = inner_sectors;
+    inner_sorted.sort_unstable();
+    assert_eq!(unclaimed, inner_sorted);
+    assert_eq!(read_both(&bytes, &["Keep"]), b"kept");
+}

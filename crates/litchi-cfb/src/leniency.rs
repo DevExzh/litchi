@@ -190,9 +190,9 @@ pub enum DirectoryDefect {
     ///
     /// POI and LibreOffice materialize only entries reachable from the root;
     /// orphans are the classic residue of crash-interrupted saves. The entry
-    /// is treated as unused (`STGTY_EMPTY`) and its sectors are not claimed.
-    ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// is treated as unused (`STGTY_EMPTY`) and its sectors are not claimed;
+    /// any allocated sectors it held are additionally recorded as
+    /// [`AllocationDefect::UnclaimedAllocatedSector`].
     UnreachableEntry,
     /// A directory node color byte was neither red nor black (F7.7).
     ///

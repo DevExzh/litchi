@@ -1934,15 +1934,18 @@ impl<R: Read + Seek> OleFile<R> {
             }
         }
 
-        for entry in entries.iter().flatten() {
-            let sid = usize::try_from(entry.sid).map_err(|_err| {
-                OleError::CorruptedFile("directory SID does not fit usize".to_string())
-            })?;
-            if !owned.contains(sid) {
-                return Err(OleError::CorruptedFile(format!(
-                    "CFB directory SID {} is not owned by a storage",
-                    entry.sid
-                )));
+        // MS-CFB never requires every entry to be reachable, and POI and
+        // LibreOffice materialize only what the root reaches; orphans are
+        // the residue of interrupted saves. An unreachable entry is treated
+        // as unused and recorded (leniency audit F7.4). Its sectors stay
+        // unclaimed, so no reader can reach them either.
+        for (sid, slot) in entries.iter_mut().enumerate() {
+            if slot.is_some() && !owned.contains(sid) {
+                let sid = u32::try_from(sid).map_err(|_err| {
+                    OleError::CorruptedFile("CFB directory contains too many entries".to_string())
+                })?;
+                *slot = None;
+                tolerance.record(DirectoryDefect::UnreachableEntry, sid);
             }
         }
         Ok((entries, misordered))
