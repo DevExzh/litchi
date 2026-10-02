@@ -8,6 +8,7 @@ impl TapParser<'_> {
         grpprl: &[u8],
         inside_conditional: bool,
         stylesheet: Option<&StyleSheet>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<TableProperties> {
         // Parse all SPRMs using arena for temporary storage
         let sprms = parse_sprms(grpprl)?;
@@ -27,7 +28,14 @@ impl TapParser<'_> {
         // Apply each TAP-type SPRM to the table properties
         for sprm in sprms {
             if Self::is_tap_sprm(sprm.opcode) {
-                self.apply_sprm_to_tap(&mut tap, &sprm, grpprl, inside_conditional, stylesheet)?;
+                self.apply_sprm_to_tap(
+                    &mut tap,
+                    &sprm,
+                    grpprl,
+                    inside_conditional,
+                    stylesheet,
+                    tolerance,
+                )?;
             }
         }
 

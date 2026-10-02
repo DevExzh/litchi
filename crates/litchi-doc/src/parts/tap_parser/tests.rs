@@ -9,6 +9,7 @@ use super::super::tap::{
     WidthType,
 };
 use super::TapParser;
+use crate::leniency::{Defect, SprmDefect, ToleranceReport, ToleratedDefect};
 use bumpalo::Bump;
 
 fn table_definition_grpprl(operand: &[u8]) -> Vec<u8> {
@@ -343,10 +344,119 @@ fn rejects_malformed_modern_table_borders() {
     assert!(parse_with(0xD61A, &[0; 4]).is_err());
     assert!(parse_with(0xD620, &[0; 6]).is_err());
     assert!(parse_with(0xD62F, &[2, 2, 1, 0, 0, 0, 0xFF, 8, 1, 0, 0]).is_err());
-    assert!(parse_with(0xD62F, &[0, 2, 0x40, 0, 0, 0, 0xFF, 8, 1, 0, 0]).is_err());
     assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 1, 8, 1, 0, 0]).is_err());
     assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]).is_err());
     assert!(TapParser::parse_border_code(&[8, 0x1A, 1, 0], 0).is_err());
+}
+
+/// The legacy operand defines only bits 0x01-0x08 (MS-DOC 2.9.304), but real
+/// producers set the diagonal bits there anyway. Word and LibreOffice apply
+/// the defined bits and ignore the rest, so the read masks and records the
+/// repair instead of rejecting the document.
+#[test]
+fn masks_undefined_legacy_border_side_flags_and_records_the_repair() {
+    let arena = Bump::new();
+    let parser = TapParser::new(&arena);
+
+    // Top border plus the diagonal-down bit the 7-byte operand does not define.
+    let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+    append_variable_sprm(&mut grpprl, 0xD620, &[0, 2, 0x11, 8, 1, 1, 0]);
+    let mut tolerance = ToleranceReport::default();
+    let tap = parser
+        .parse_tap_with_report(&grpprl, &mut tolerance)
+        .unwrap();
+    for cell in &tap.cell_properties {
+        let top = cell.borders.top.unwrap();
+        assert_eq!(top.width, 8);
+        assert_eq!(top.border_type, BorderType::Single);
+        assert!(cell.direct_style.border_top);
+        assert!(cell.borders.diagonal_down.is_none());
+        assert!(!cell.direct_style.border_diagonal_down);
+    }
+    assert_eq!(
+        tolerance.defects(),
+        &[ToleratedDefect {
+            defect: Defect::Sprm(SprmDefect::CellBorderSideFlags),
+            context: 0xD620,
+        }]
+    );
+
+    // A range carrying only undefined bits applies nothing but is still recorded.
+    let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+    append_variable_sprm(&mut grpprl, 0xD620, &[0, 2, 0x10, 8, 1, 1, 0]);
+    let mut tolerance = ToleranceReport::default();
+    let tap = parser
+        .parse_tap_with_report(&grpprl, &mut tolerance)
+        .unwrap();
+    assert!(tap.cell_properties.iter().all(|cell| {
+        cell.borders.top.is_none()
+            && cell.borders.left.is_none()
+            && cell.borders.bottom.is_none()
+            && cell.borders.right.is_none()
+            && cell.borders.diagonal_down.is_none()
+            && cell.borders.diagonal_up.is_none()
+    }));
+    assert_eq!(tolerance.total(), 1);
+}
+
+/// MS-DOC 2.9.305 defines bits 0x01-0x20 on the full operand; a bit above
+/// 0x3F is masked the same way, with every defined side still applied.
+#[test]
+fn masks_undefined_full_border_side_flags_and_records_the_repair() {
+    let arena = Bump::new();
+    let parser = TapParser::new(&arena);
+
+    let diagonal = full_border([10, 20, 30, 0], 4, 1, 0);
+    let mut range = vec![0, 2, 0x7F];
+    range.extend_from_slice(&diagonal);
+    let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+    append_variable_sprm(&mut grpprl, 0xD62F, &range);
+
+    let mut tolerance = ToleranceReport::default();
+    let tap = parser
+        .parse_tap_with_report(&grpprl, &mut tolerance)
+        .unwrap();
+    for cell in &tap.cell_properties {
+        for border in [
+            cell.borders.top,
+            cell.borders.left,
+            cell.borders.bottom,
+            cell.borders.right,
+            cell.borders.diagonal_down,
+            cell.borders.diagonal_up,
+        ] {
+            assert_eq!(border.unwrap().color, Some((10, 20, 30)));
+        }
+    }
+    assert_eq!(
+        tolerance.defects(),
+        &[ToleratedDefect {
+            defect: Defect::Sprm(SprmDefect::CellBorderSideFlags),
+            context: 0xD62F,
+        }]
+    );
+}
+
+/// A range whose side bits are all defined needs no repair and records none.
+#[test]
+fn conformant_cell_border_ranges_record_no_defect() {
+    let arena = Bump::new();
+    let parser = TapParser::new(&arena);
+
+    let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+    append_variable_sprm(&mut grpprl, 0xD620, &[0, 2, 0x0F, 8, 1, 1, 0]);
+    let diagonal = full_border([10, 20, 30, 0], 4, 1, 0);
+    let mut range = vec![0, 2, 0x30];
+    range.extend_from_slice(&diagonal);
+    append_variable_sprm(&mut grpprl, 0xD62F, &range);
+
+    let mut tolerance = ToleranceReport::default();
+    let tap = parser
+        .parse_tap_with_report(&grpprl, &mut tolerance)
+        .unwrap();
+    assert!(tolerance.is_clean());
+    assert!(tap.cell_properties[0].borders.diagonal_down.is_some());
+    assert!(tap.cell_properties[0].borders.diagonal_up.is_some());
 }
 
 #[test]

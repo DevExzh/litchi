@@ -7,6 +7,7 @@ impl TapParser<'_> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         let (condition_offset, grpprl_offset) =
@@ -34,7 +35,7 @@ impl TapParser<'_> {
             PackageError::Corrupted(format!("sprmTCnf contains invalid condition {code:#06x}"))
         })?;
         let raw_grpprl = operand[grpprl_offset..].to_vec();
-        let nested = self.parse_conditional_tap(&raw_grpprl)?;
+        let nested = self.parse_conditional_tap(&raw_grpprl, tolerance)?;
         tap.conditional_formats.push(TableConditionalFormatting {
             condition,
             properties: nested.style_defaults,

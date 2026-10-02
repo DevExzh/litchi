@@ -93,6 +93,9 @@ pub struct Document {
     /// Endnotes table
     pub(in crate::document) endnotes_table: Option<EndnotesTable>,
     /// Comments table
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Comments`]).
     pub(in crate::document) comments_table: CommentsTable,
     /// Bounded raw source for deferred annotation-bookmark tag parsing, or its
     /// deferred range/allocation diagnostic.
@@ -104,6 +107,9 @@ pub struct Document {
     /// Deferred strict parsing of the versioned document-property record.
     pub(in crate::document) document_properties: Result<Option<DocumentProperties>>,
     /// Standard bookmark tables
+    ///
+    /// Empty when the tables are absent or their parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Bookmarks`]).
     pub(in crate::document) bookmarks_table: BookmarksTable,
     /// Legacy Word smart-tag bookmarks, property bags, and recognizer ranges.
     pub(in crate::document) smart_tags: Option<DocumentSmartTags>,
@@ -139,6 +145,10 @@ pub struct Document {
     /// Master-document subdocument directory and referenced-file name table.
     pub(in crate::document) subdocuments: Option<Collection>,
     /// Revision-mark authors
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::RevisionAuthors`]);
+    /// revision marks that name an author then stay unresolved.
     pub(in crate::document) revision_authors: RevisionAuthorTable,
     /// Fixed associated-document strings
     pub(in crate::document) associated_strings: Option<DocumentAssociatedStrings>,
@@ -206,6 +216,10 @@ pub struct Document {
     /// Deferred strict secondary-FIB glossary parse for templates
     pub(in crate::document) attached_glossary: Result<Option<AttachedGlossary>>,
     /// Section ranges, layout, and property revision marks
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Sections`]). Section
+    /// ranges feed only layout queries, never structural offsets.
     pub(in crate::document) sections: SectionsTable,
     /// Floating-shape anchors from the Main Document `PlcfSpa` (empty when the
     /// document has no floating shapes in the main story).
@@ -225,6 +239,10 @@ pub struct Document {
     pub(in crate::document) list_tables: Option<ListTables>,
     /// Word 97+ stylesheet, including raw style UPX property sets.
     pub(in crate::document) stylesheet: Option<StyleSheet>,
+    /// Every non-structural defect repaired while the document was opened:
+    /// the degraded optional auxiliary tables first, then the stylesheet's
+    /// report, then the PAPX bin-table's report, in discovery order.
+    pub(in crate::document) tolerance: crate::leniency::ToleranceReport,
     /// Extracted MTEF data from OLE streams (`stream_name` -> `mtef_data`)
     #[allow(
         dead_code,

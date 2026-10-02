@@ -801,6 +801,11 @@ impl TableProperties {
 
     /// Parse table properties from SPRM (Single Property Modifier) data.
     ///
+    /// Word-compatible repairs (see [`crate::SprmDefect`]) are applied
+    /// unconditionally; this convenience entry point discards the per-parse
+    /// [`crate::ToleranceReport`]. Document reads surface it through
+    /// [`crate::Document::tolerance_report`].
+    ///
     /// # Arguments
     ///
     /// * `grpprl` - Group of SPRMs (property modifications)

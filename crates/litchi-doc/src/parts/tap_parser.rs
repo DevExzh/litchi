@@ -10,6 +10,7 @@ mod model;
 #[cfg(test)]
 mod tests;
 
+use crate::leniency::ToleranceReport;
 use crate::package::Result;
 use crate::parts::styles::StyleSheet;
 use crate::parts::tap::TableProperties;
@@ -38,8 +39,22 @@ impl<'arena> TapParser<'arena> {
     /// Parse table properties from SPRM list.
     ///
     /// Based on Apache POI's uncompressTAP method.
+    ///
+    /// Word-compatible repairs (see [`crate::SprmDefect`]) are applied
+    /// unconditionally; this convenience entry point discards the per-parse
+    /// [`ToleranceReport`]. Document reads surface it through
+    /// [`crate::Document::tolerance_report`].
     pub fn parse_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
-        self.parse_tap_context(grpprl, false, None)
+        self.parse_tap_context(grpprl, false, None, &mut ToleranceReport::default())
+    }
+
+    /// [`Self::parse_tap`] that records any Word-compatible repairs it applies.
+    pub(crate) fn parse_tap_with_report(
+        &self,
+        grpprl: &[u8],
+        tolerance: &mut ToleranceReport,
+    ) -> Result<TableProperties> {
+        self.parse_tap_context(grpprl, false, None, tolerance)
     }
 
     /// Parse direct table properties while resolving sprmTIstd against a stylesheet.
@@ -47,11 +62,16 @@ impl<'arena> TapParser<'arena> {
         &self,
         grpprl: &[u8],
         stylesheet: &StyleSheet,
+        tolerance: &mut ToleranceReport,
     ) -> Result<TableProperties> {
-        self.parse_tap_context(grpprl, false, Some(stylesheet))
+        self.parse_tap_context(grpprl, false, Some(stylesheet), tolerance)
     }
 
-    pub(crate) fn parse_conditional_tap(&self, grpprl: &[u8]) -> Result<TableProperties> {
-        self.parse_tap_context(grpprl, true, None)
+    pub(crate) fn parse_conditional_tap(
+        &self,
+        grpprl: &[u8],
+        tolerance: &mut ToleranceReport,
+    ) -> Result<TableProperties> {
+        self.parse_tap_context(grpprl, true, None, tolerance)
     }
 }

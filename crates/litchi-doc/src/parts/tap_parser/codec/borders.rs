@@ -213,6 +213,7 @@ impl TapParser<'_> {
         tap: &mut TableProperties,
         sprm: &Sprm,
         full: bool,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         let expected_len = if full { 11 } else { 7 };
@@ -229,12 +230,16 @@ impl TapParser<'_> {
                 "DOC cell border range exceeds the row".to_string(),
             ));
         }
-        let sides = operand[2];
+        let mut sides = operand[2];
         let allowed_sides = if full { 0x3F } else { 0x0F };
         if sides & !allowed_sides != 0 {
-            return Err(PackageError::Corrupted(
-                "DOC cell border range contains invalid side flags".to_string(),
-            ));
+            // MS-DOC 2.9.304 defines only the low four side bits on the legacy
+            // operand (0x3F on the full one, MS-DOC 2.9.305), but producers
+            // set the diagonal and stray bits anyway. Word and LibreOffice
+            // test the defined bits and ignore the rest, so the read masks
+            // rather than rejects and records the repair.
+            tolerance.record(SprmDefect::CellBorderSideFlags, sprm.opcode);
+            sides &= allowed_sides;
         }
         let border = if full {
             Self::parse_full_border(&operand[3..])?

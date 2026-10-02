@@ -3,7 +3,9 @@
 use super::codec::*;
 use super::model::*;
 use super::semantic::*;
-use crate::leniency::Leniency;
+use crate::leniency::{
+    AuxiliaryTableDefect, Defect, Leniency, StshifDefect, ToleranceReport, ToleratedDefect,
+};
 use crate::package::Result;
 
 fn parse(data: &[u8]) -> Result<StyleSheet> {
@@ -81,6 +83,13 @@ fn with_post_2000(std: Vec<u8>, info1: u16, revision_id: u32, info3: u16) -> Vec
     extended
 }
 
+/// A stylesheet whose header selects the 18-byte `Stdf` prefix.
+fn post_2000_stylesheet(slots: Vec<Option<Vec<u8>>>) -> Vec<u8> {
+    let mut data = stylesheet(slots);
+    data[4..6].copy_from_slice(&18u16.to_le_bytes());
+    data
+}
+
 fn valid_stylesheet() -> Vec<u8> {
     let normal = std_record(0, 1, NIL_STYLE, 0, "Normal,正文", &[&[], &[]]);
     let default_font = std_record(65, 2, NIL_STYLE, 10, "Default Paragraph Font", &[&[]]);
@@ -88,6 +97,154 @@ fn valid_stylesheet() -> Vec<u8> {
     slots[0] = Some(normal);
     slots[10] = Some(default_font);
     stylesheet(slots)
+}
+
+#[test]
+fn stshif_reserved_bits_and_fixed_count_are_ignored_and_recorded() {
+    let mut data = valid_stylesheet();
+    data[6..8].copy_from_slice(&0xBEEFu16.to_le_bytes()); // style-name flags
+    data[10..12].copy_from_slice(&12u16.to_le_bytes()); // istdMaxFixedWhenSaved
+
+    // MS-DOC 2.9.274 marks every bit here "MUST be ignored", so the strict
+    // default contract must parse the stylesheet and record the deviation.
+    let parsed = parse(&data).expect("Stshif reserved bytes must not be fatal");
+    assert_eq!(parsed.header().fixed_style_count, 12);
+    assert_eq!(parsed.styles().len(), 15);
+    assert_eq!(parsed.get(0).unwrap().name, "Normal");
+    assert_eq!(
+        parsed.tolerance_report().defects(),
+        &[
+            ToleratedDefect {
+                defect: Defect::Stshif(StshifDefect::StyleNameFlags),
+                context: 0xBEEF,
+            },
+            ToleratedDefect {
+                defect: Defect::Stshif(StshifDefect::FixedStyleCount),
+                context: 12,
+            },
+        ]
+    );
+
+    // Bit 0 clear still parses: fStdStylenamesWritten is informational only.
+    let mut cleared = valid_stylesheet();
+    cleared[6..8].copy_from_slice(&0u16.to_le_bytes());
+    let parsed = parse(&cleared).unwrap();
+    assert_eq!(
+        parsed.tolerance_report().defects(),
+        &[ToleratedDefect {
+            defect: Defect::Stshif(StshifDefect::StyleNameFlags),
+            context: 0,
+        }]
+    );
+
+    // A conforming header records nothing.
+    assert!(
+        parse(&valid_stylesheet())
+            .unwrap()
+            .tolerance_report()
+            .is_clean()
+    );
+}
+
+#[test]
+fn stshif_framing_stays_fatal() {
+    // The style count and STD prefix size select the record grammar, so they
+    // remain hard errors even though the reserved bytes above are ignored.
+    let mut bad_count = valid_stylesheet();
+    bad_count[2..4].copy_from_slice(&1u16.to_le_bytes());
+    assert!(parse(&bad_count).is_err());
+
+    let mut bad_prefix = valid_stylesheet();
+    bad_prefix[4..6].copy_from_slice(&12u16.to_le_bytes());
+    assert!(parse(&bad_prefix).is_err());
+}
+
+#[test]
+fn unresolvable_revision_style_authors_degrade_per_style() {
+    fn revision(author: i16) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&6u16.to_le_bytes()); // LPUpxRm.cbUpx
+        data.extend_from_slice(&0u32.to_le_bytes()); // UpxRm.date
+        data.extend_from_slice(&author.to_le_bytes()); // UpxRm.ibstAuthor
+        data.extend_from_slice(&0u16.to_le_bytes()); // LPUpxPapxRM.cbUpx
+        data.extend_from_slice(&0u16.to_le_bytes()); // LPUpxChpxRM.cbUpx
+        data
+    }
+
+    let mut slots = vec![None; 16];
+    slots[0] = Some(with_post_2000(
+        std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[], &revision(1)]),
+        0x1000,
+        0,
+        0,
+    ));
+    slots[10] = Some(with_post_2000(
+        std_record(65, 2, NIL_STYLE, 10, "Default Font", &[&[]]),
+        0,
+        0,
+        0,
+    ));
+    slots[15] = Some(with_post_2000(
+        std_record(0x0FFE, 1, 0, 0, "Broken", &[&[], &[], &revision(5)]),
+        0x1000,
+        0,
+        0,
+    ));
+    let mut parsed = parse(&post_2000_stylesheet(slots)).unwrap();
+    let authors = crate::parts::revisions::RevisionAuthorTable::from_authors(&["Unknown", "Alice"]);
+    parsed.resolve_revision_authors(&authors);
+
+    // The resolvable style is untouched; the broken one keeps its numeric
+    // index with the name unresolved, and only the broken one is recorded.
+    assert_eq!(
+        parsed
+            .get(0)
+            .unwrap()
+            .revision
+            .as_ref()
+            .unwrap()
+            .author
+            .as_deref(),
+        Some("Alice")
+    );
+    let broken = parsed.get(15).unwrap().revision.as_ref().unwrap();
+    assert_eq!(broken.author_index, 5);
+    assert_eq!(broken.author, None);
+    assert_eq!(
+        parsed.tolerance_report().defects(),
+        &[ToleratedDefect {
+            defect: Defect::AuxiliaryTable(AuxiliaryTableDefect::RevisionAuthorResolution),
+            context: 15,
+        }]
+    );
+
+    // A negative index cannot name an author either.
+    let mut slots = vec![None; 15];
+    slots[0] = Some(with_post_2000(
+        std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[], &revision(-1)]),
+        0x1000,
+        0,
+        0,
+    ));
+    slots[10] = Some(with_post_2000(
+        std_record(65, 2, NIL_STYLE, 10, "Default Font", &[&[]]),
+        0,
+        0,
+        0,
+    ));
+    let mut parsed = parse(&post_2000_stylesheet(slots)).unwrap();
+    parsed.resolve_revision_authors(&authors);
+    assert_eq!(
+        parsed.get(0).unwrap().revision.as_ref().unwrap().author,
+        None
+    );
+    assert_eq!(
+        parsed.tolerance_report().defects(),
+        &[ToleratedDefect {
+            defect: Defect::AuxiliaryTable(AuxiliaryTableDefect::RevisionAuthorResolution),
+            context: 0,
+        }]
+    );
 }
 
 #[test]
@@ -580,7 +737,7 @@ fn applies_table_styles_in_direct_sprm_order_and_preserves_sizing() {
     let arena = bumpalo::Bump::new();
     let parser = super::super::tap_parser::TapParser::new(&arena);
     let styled = parser
-        .parse_tap_with_stylesheet(&direct, &stylesheet)
+        .parse_tap_with_stylesheet(&direct, &stylesheet, &mut ToleranceReport::default())
         .unwrap();
     assert_eq!(styled.table_style_index, Some(15));
     assert_eq!(
@@ -600,7 +757,7 @@ fn applies_table_styles_in_direct_sprm_order_and_preserves_sizing() {
     append(&mut direct, 0x3404, &[0]);
     append(&mut direct, 0x3403, &[0]);
     let overridden = parser
-        .parse_tap_with_stylesheet(&direct, &stylesheet)
+        .parse_tap_with_stylesheet(&direct, &stylesheet, &mut ToleranceReport::default())
         .unwrap();
     assert_eq!(
         overridden.justification,
@@ -735,6 +892,7 @@ fn resolves_paragraph_and_character_style_property_arrays() {
         Some(16),
         &ordered_papx,
         &stylesheet,
+        &mut ToleranceReport::default(),
     )
     .unwrap();
     assert_eq!(switched.style_index, Some(15));
@@ -753,6 +911,7 @@ fn resolves_paragraph_and_character_style_property_arrays() {
         Some(16),
         &ordered_papx,
         &stylesheet,
+        &mut ToleranceReport::default(),
     )
     .unwrap();
     assert_eq!(
@@ -767,6 +926,7 @@ fn resolves_paragraph_and_character_style_property_arrays() {
             0, 16, 0, 16, 0, 15, 0, // style 16 maps to style 15
         ],
         &stylesheet,
+        &mut ToleranceReport::default(),
     )
     .unwrap();
     assert_eq!(permuted.style_index, Some(15));

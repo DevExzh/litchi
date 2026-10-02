@@ -360,13 +360,18 @@ impl std::fmt::Debug for Password {
 #[derive(Debug, Default)]
 pub struct OpenOptions {
     password: Option<Password>,
-    /// How non-structural stylesheet defects are treated.
+    /// How opt-in stylesheet-defect repairs are treated.
     ///
-    /// Defaults to [`crate::Leniency::Strict`], which is the historical behaviour.
+    /// Defaults to [`crate::Leniency::Strict`], under which those defects
+    /// remain hard errors. The Word-compatible repairs listed by
+    /// [`crate::SprmDefect`] are applied under every variant and recorded in
+    /// [`crate::Document::tolerance_report`]; this field does not gate them.
     pub leniency: crate::leniency::Leniency,
     /// Whether to accept the narrow producer PAPX alignment compatibility
-    /// profile. This is disabled by default; it is independent of stylesheet
-    /// leniency and does not relax the shared SPRM parser.
+    /// profile. This is disabled by default and is independent of stylesheet
+    /// leniency. The shared SPRM parser's only relaxation is the
+    /// Word-compatible border side-flag mask recorded through
+    /// [`crate::SprmDefect`], which this flag does not control.
     papx_alignment_padding: bool,
 }
 

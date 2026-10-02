@@ -118,6 +118,19 @@ impl Document {
         self.stylesheet.as_ref()
     }
 
+    /// Every non-structural defect the reader repaired while opening this
+    /// document, in discovery order.
+    ///
+    /// The report covers the opt-in [`crate::StylesheetDefect`] repairs a
+    /// lenient open performed and the Word-compatible [`crate::SprmDefect`],
+    /// [`crate::StshifDefect`], and [`crate::AuxiliaryTableDefect`] repairs
+    /// every open applies. An empty report means the document conformed; see
+    /// [`crate::ToleranceReport`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
     /// Get the document's fixed associated-string metadata table.
     ///
     /// Template and mail-merge paths are inert strings and are never opened.

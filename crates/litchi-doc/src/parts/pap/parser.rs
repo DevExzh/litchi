@@ -6,6 +6,7 @@ use super::model::{
     FrameVerticalPosition, Justification, LegacyBorderPosition, LegacyBorderStyle, LineSpacingType,
     ParagraphProperties, PhysicalJustification, TextBoxTightWrap,
 };
+use crate::leniency::ToleranceReport;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::{styles::StyleSheet, tap_parser::TapParser};
 use crate::sprm::{Sprm, parse_sprms};
@@ -33,23 +34,33 @@ impl ParagraphProperties {
     ///
     /// Based on Apache POI's `ParagraphSprmUncompressor`.
     ///
+    /// Word-compatible repairs (see [`crate::SprmDefect`]) are applied
+    /// unconditionally; this convenience entry point discards the per-parse
+    /// [`crate::ToleranceReport`]. Document reads surface it through
+    /// [`crate::Document::tolerance_report`].
+    ///
     /// # Arguments
     ///
     /// * `grpprl` - Group of SPRMs (property modifications)
     pub fn from_sprm(grpprl: &[u8]) -> Result<Self> {
-        Self::from_sprm_context(grpprl, None)
+        Self::from_sprm_context(grpprl, None, &mut ToleranceReport::default())
     }
 
-    pub(crate) fn from_sprm_with_stylesheet(
+    pub(crate) fn from_sprm_recording(
         grpprl: &[u8],
-        stylesheet: &StyleSheet,
+        stylesheet: Option<&StyleSheet>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
-        Self::from_sprm_context(grpprl, Some(stylesheet))
+        Self::from_sprm_context(grpprl, stylesheet, tolerance)
     }
 
-    fn from_sprm_context(grpprl: &[u8], stylesheet: Option<&StyleSheet>) -> Result<Self> {
+    fn from_sprm_context(
+        grpprl: &[u8],
+        stylesheet: Option<&StyleSheet>,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Self> {
         let sprms = parse_sprms(grpprl)?;
-        Self::from_sprm_parsed(grpprl, &sprms, stylesheet)
+        Self::from_sprm_parsed(grpprl, &sprms, stylesheet, tolerance)
     }
 
     /// [`Self::from_sprm_context`] over an already parsed `grpprl`.
@@ -60,6 +71,7 @@ impl ParagraphProperties {
         grpprl: &[u8],
         sprms: &[Sprm],
         stylesheet: Option<&StyleSheet>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
         let mut pap = Self::default();
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
@@ -82,9 +94,9 @@ impl ParagraphProperties {
             let arena = bumpalo::Bump::new();
             let parser = TapParser::new(&arena);
             pap.table_properties = Some(if let Some(stylesheet) = stylesheet {
-                parser.parse_tap_with_stylesheet(grpprl, stylesheet)?
+                parser.parse_tap_with_stylesheet(grpprl, stylesheet, tolerance)?
             } else {
-                parser.parse_tap(grpprl)?
+                parser.parse_tap_with_report(grpprl, tolerance)?
             });
         }
 
@@ -95,12 +107,14 @@ impl ParagraphProperties {
         initial_style_index: Option<u16>,
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
         Self::cascade_styles_on_baseline(
             &Self::default(),
             initial_style_index,
             direct_sprms,
             stylesheet,
+            tolerance,
         )
     }
 
@@ -129,6 +143,7 @@ impl ParagraphProperties {
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
         pre_parsed: Option<&[Sprm]>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
         Self::apply_direct_sprms(
             resolved_initial.clone(),
@@ -136,9 +151,16 @@ impl ParagraphProperties {
             direct_sprms,
             stylesheet,
             pre_parsed,
+            tolerance,
         )
     }
 
+    /// Cascade a table style's paragraph properties with a paragraph run's
+    /// direct SPRMs during table layout.
+    ///
+    /// Both inputs were already parsed — and any Word-compatible repairs
+    /// already recorded — when the document was opened, so this re-parse does
+    /// not retain another [`ToleranceReport`].
     pub(crate) fn cascade_table_style(
         table_style_sprms: &[u8],
         initial_style_index: Option<u16>,
@@ -151,6 +173,7 @@ impl ParagraphProperties {
             initial_style_index,
             direct_sprms,
             stylesheet,
+            &mut ToleranceReport::default(),
         )
     }
 
@@ -159,9 +182,10 @@ impl ParagraphProperties {
         initial_style_index: Option<u16>,
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
         let current = Self::paragraph_style_on_baseline(baseline, initial_style_index, stylesheet)?;
-        Self::apply_direct_sprms(current, baseline, direct_sprms, stylesheet, None)
+        Self::apply_direct_sprms(current, baseline, direct_sprms, stylesheet, None, tolerance)
     }
 
     fn apply_direct_sprms(
@@ -170,6 +194,7 @@ impl ParagraphProperties {
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
         pre_parsed: Option<&[Sprm]>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
         let owned;
         let sprms: &[Sprm] = match pre_parsed {
@@ -212,7 +237,7 @@ impl ParagraphProperties {
         // The table and table-revision state is derived from the very same
         // `grpprl` this function just walked, so it reuses that parse rather
         // than parsing the run a third time.
-        let table_state = Self::from_sprm_parsed(direct_sprms, sprms, Some(stylesheet))?;
+        let table_state = Self::from_sprm_parsed(direct_sprms, sprms, Some(stylesheet), tolerance)?;
         current.table_properties = table_state.table_properties;
         current.has_table_formatting_revision = table_state.has_table_formatting_revision;
         current.table_formatting_revision_author_index =

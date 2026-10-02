@@ -3,6 +3,7 @@
 pub(super) use super::super::TapParser;
 pub(super) use super::super::codec::binary_to_doc_result;
 pub(super) use super::{CellBoolProperty, WidthUsage};
+pub(super) use crate::leniency::ToleranceReport;
 pub(super) use crate::package::{Error as PackageError, Result};
 pub(super) use crate::parts::styles::StyleSheet;
 pub(super) use crate::parts::tap::{

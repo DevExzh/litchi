@@ -34,7 +34,14 @@
 
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
-use litchi_doc::{Leniency, OpenOptions, Package, StylesheetDefect};
+use litchi_doc::tracked_revision::Limits;
+use litchi_doc::writer::CommentEntry;
+use litchi_doc::{
+    AuxiliaryTableDefect, Defect, Leniency, OpenOptions, Package, StshifDefect, StylesheetDefect,
+    Writer,
+};
+use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use std::io::Cursor;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -86,7 +93,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
         report
             .defects()
             .iter()
-            .any(|d| d.defect == StylesheetDefect::DuplicateStyleName),
+            .any(|d| d.defect == Defect::Stylesheet(StylesheetDefect::DuplicateStyleName)),
         "expected a duplicate-style-name defect, got {:?}",
         report.defects()
     );
@@ -94,6 +101,18 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
         report.total(),
         report.defects().len() as u64,
         "the fixture is far below the recording bound, so nothing should be unrecorded"
+    );
+
+    // The document-level channel reports the same repair, so a caller that
+    // never touches the stylesheet still sees everything that was tolerated.
+    assert!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .any(|d| d.defect == Defect::Stylesheet(StylesheetDefect::DuplicateStyleName)),
+        "the document report must include the stylesheet repair, got {:?}",
+        document.tolerance_report().defects()
     );
 }
 
@@ -130,5 +149,262 @@ fn a_conforming_document_records_no_repairs() {
                 "{leniency:?} reported a repair on a conforming document"
             );
         }
+        assert!(
+            document.tolerance_report().is_clean(),
+            "{leniency:?} reported a repair on a conforming document"
+        );
     }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Optional auxiliary tables and Stshif reserved bytes (default repairs)
+// ──────────────────────────────────────────────────────────────────────────
+
+fn writer_document(build: impl FnOnce(&mut Writer)) -> Vec<u8> {
+    let mut writer = Writer::new();
+    writer
+        .add_paragraph("Body text for the leniency fixtures.")
+        .expect("fixture paragraph");
+    build(&mut writer);
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).expect("fixture DOC");
+    output.into_inner()
+}
+
+/// Rewrite the `WordDocument` stream inside a DOC package.
+fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
+    let mut package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+        .expect("fixture package");
+    let word_path = ["WordDocument".to_string()];
+    let mut word = package
+        .stream(&word_path)
+        .expect("WordDocument stream")
+        .to_vec();
+    edit(&mut word);
+    package
+        .put_stream(&word_path, word)
+        .expect("edited WordDocument stream");
+    package.finish().expect("edited package")
+}
+
+/// Point one FIB table entry at a one-byte range, which every auxiliary
+/// table parser rejects. The declared pointer count is raised when the index
+/// lies past the Writer's Word 2002 layout; the added entries land in the
+/// zeroed slack between the FIB and the text, never in document content.
+fn break_table_pointer(word: &mut [u8], index: usize) {
+    let declared = usize::from(u16::from_le_bytes([word[152], word[153]]));
+    if declared < index + 1 {
+        word[152..154].copy_from_slice(&u16::try_from(index + 1).unwrap().to_le_bytes());
+    }
+    let pair = 154 + index * 8;
+    word[pair..pair + 4].copy_from_slice(&0u32.to_le_bytes());
+    word[pair + 4..pair + 8].copy_from_slice(&1u32.to_le_bytes());
+}
+
+fn open_degraded(bytes: Vec<u8>) -> litchi_doc::Document {
+    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    package
+        .document()
+        .expect("degraded optional tables must not fail the open")
+}
+
+/// MS-DOC 2.5 makes every FIB-pointed auxiliary table independently optional
+/// metadata, so one malformed table — or all of them — must not cost the
+/// document. Each failure degrades to the table's absent value and is
+/// recorded with the table's FIB pointer index.
+#[test]
+fn malformed_auxiliary_tables_degrade_and_are_recorded() {
+    let bytes = writer_document(|writer| {
+        writer.add_comment(CommentEntry::new(4, "Review", "Alice", "A"));
+    });
+    const TABLES: &[(usize, AuxiliaryTableDefect)] = &[
+        (16, AuxiliaryTableDefect::Fields),
+        (4, AuxiliaryTableDefect::Comments),
+        (21, AuxiliaryTableDefect::Bookmarks),
+        (114, AuxiliaryTableDefect::SmartTags),
+        (113, AuxiliaryTableDefect::Rsids),
+        (94, AuxiliaryTableDefect::RmdThreading),
+        (61, AuxiliaryTableDefect::EmbeddedFonts),
+        (97, AuxiliaryTableDefect::Envelope),
+        (89, AuxiliaryTableDefect::AutoSummary),
+        (141, AuxiliaryTableDefect::ProtectedRanges),
+        (120, AuxiliaryTableDefect::FormatConsistency),
+        (137, AuxiliaryTableDefect::StructuredTags),
+        (136, AuxiliaryTableDefect::XmlSchemas),
+        (140, AuxiliaryTableDefect::CustomXmlTransform),
+        (85, AuxiliaryTableDefect::OleControls),
+        (44, AuxiliaryTableDefect::MailMerge),
+        (54, AuxiliaryTableDefect::Subdocuments),
+        (51, AuxiliaryTableDefect::RevisionAuthors),
+        (32, AuxiliaryTableDefect::AssociatedStrings),
+        (91, AuxiliaryTableDefect::ListNames),
+        (96, AuxiliaryTableDefect::ListTemplates),
+        (6, AuxiliaryTableDefect::Sections),
+    ];
+    let bytes = edit_word_stream(&bytes, |word| {
+        for &(index, _) in TABLES {
+            break_table_pointer(word, index);
+        }
+    });
+
+    let document = open_degraded(bytes);
+
+    // The primary content and the structural tables are fully readable.
+    let text = document.text().expect("text extraction");
+    assert!(text.contains("Body text for the leniency fixtures."));
+    assert!(
+        !document.paragraphs().expect("paragraphs").is_empty(),
+        "paragraph extraction survives auxiliary degradation"
+    );
+    assert!(document.stylesheet().is_some());
+
+    // Every degraded table reports the same absent value as a document that
+    // never carried it — no panics, no invented content.
+    assert!(document.fields_table().is_none());
+    assert!(document.comments().expect("comments").is_empty());
+    assert!(document.bookmarks().expect("bookmarks").is_empty());
+    assert!(document.smart_tags().is_none());
+    assert!(document.rsids().is_none());
+    assert!(document.rmd_threading().is_none());
+    assert!(document.embedded_fonts().is_none());
+    assert!(document.envelope().is_none());
+    assert!(document.auto_summary().is_none());
+    assert!(document.protected_ranges().is_none());
+    assert!(document.format_consistency_marks().is_none());
+    assert!(document.structured_tags().is_none());
+    assert!(document.xml_schemas().is_none());
+    assert!(document.custom_xml_transform_path().is_none());
+    assert!(document.ole_controls().is_none());
+    assert!(document.mail_merge().is_none());
+    assert!(document.subdocuments().is_none());
+    assert!(document.revision_authors().is_empty());
+    assert!(document.associated_strings().is_none());
+    assert!(document.list_names().is_none());
+    assert!(document.list_templates().is_none());
+    assert!(document.sections().is_empty());
+
+    // Every degradation is enumerated, each under its table's FIB index.
+    let report = document.tolerance_report();
+    for &(index, defect) in TABLES {
+        assert!(
+            report.defects().iter().any(|tolerated| {
+                tolerated.defect == Defect::AuxiliaryTable(defect)
+                    && usize::from(tolerated.context) == index
+            }),
+            "missing {defect:?} at FIB index {index}: {:?}",
+            report.defects()
+        );
+    }
+}
+
+/// A malformed `SttbfRMark` degrades only itself: sections and styles parse
+/// against the empty table without cascading failures or invented authors.
+#[test]
+fn a_malformed_revision_author_table_does_not_cascade() {
+    let bytes = writer_document(|_| {});
+    let bytes = edit_word_stream(&bytes, |word| break_table_pointer(word, 51));
+
+    let document = open_degraded(bytes);
+    assert!(document.revision_authors().is_empty());
+    assert!(
+        !document.sections().is_empty(),
+        "an unrelated table must survive the degradation"
+    );
+    assert!(
+        document
+            .text()
+            .expect("text extraction")
+            .contains("Body text")
+    );
+
+    let report = document.tolerance_report();
+    assert_eq!(
+        report.defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::AuxiliaryTable(AuxiliaryTableDefect::RevisionAuthors),
+            context: 51,
+        }],
+        "exactly one repair is recorded for exactly one broken table"
+    );
+}
+
+/// The stylesheet is mandatory in every Word 97+ file, so its Stshif
+/// reserved bytes — which MS-DOC 2.9.274 marks "MUST be ignored" — must not
+/// cost the document even under the strict default contract.
+#[test]
+fn stshif_reserved_bytes_are_ignored_and_recorded() {
+    let bytes = writer_document(|_| {});
+    let mut package =
+        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+    let word_path = ["WordDocument".to_string()];
+    let word = package
+        .stream(&word_path)
+        .expect("WordDocument stream")
+        .to_vec();
+    // FIB pointer 1 addresses the stylesheet; fWhichTblStm (bit 9 of the
+    // flags word at offset 10) selects the table stream.
+    let stsh_offset =
+        usize::try_from(u32::from_le_bytes(word[162..166].try_into().unwrap())).unwrap();
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_path = [table_name.to_string()];
+    let mut table = package.stream(&table_path).expect("table stream").to_vec();
+    // Stshif follows the two-byte cbStshi: flags at +4, fixed count at +8.
+    table[stsh_offset + 6..stsh_offset + 8].copy_from_slice(&0xBEEFu16.to_le_bytes());
+    table[stsh_offset + 10..stsh_offset + 12].copy_from_slice(&12u16.to_le_bytes());
+    package
+        .put_stream(&table_path, table)
+        .expect("edited table stream");
+    let bytes = package.finish().expect("edited package");
+
+    let document = open_degraded(bytes);
+    let stylesheet = document.stylesheet().expect("stylesheet parses");
+    assert_eq!(stylesheet.header().fixed_style_count, 12);
+    assert!(
+        !stylesheet.styles().is_empty(),
+        "style records are read past the ignored bytes"
+    );
+    assert!(
+        document
+            .text()
+            .expect("text extraction")
+            .contains("Body text")
+    );
+
+    let report = document.tolerance_report();
+    for (defect, context) in [
+        (Defect::Stshif(StshifDefect::StyleNameFlags), 0xBEEF),
+        (Defect::Stshif(StshifDefect::FixedStyleCount), 12),
+    ] {
+        assert!(
+            report
+                .defects()
+                .iter()
+                .any(|tolerated| tolerated.defect == defect && tolerated.context == context),
+            "missing {defect:?} with context {context:#06x}: {:?}",
+            report.defects()
+        );
+    }
+}
+
+/// Reserved-byte tolerance stops at framing: a stylesheet too short to hold
+/// its own header is structural corruption and stays a hard error.
+#[test]
+fn stylesheet_framing_stays_fatal() {
+    let bytes = writer_document(|_| {});
+    let bytes = edit_word_stream(&bytes, |word| {
+        // Truncate the stylesheet to four bytes: the STSHI header is
+        // incomplete, which is framing, not a reserved-bit deviation.
+        let pair = 154 + 8;
+        word[pair + 4..pair + 8].copy_from_slice(&4u32.to_le_bytes());
+    });
+
+    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    assert!(
+        package.document().is_err(),
+        "stylesheet framing must stay fatal under the default contract"
+    );
 }

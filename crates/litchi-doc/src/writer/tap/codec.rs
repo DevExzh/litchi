@@ -174,7 +174,10 @@ pub fn generate_table_style_sprms_with_conditionals(
         } else {
             let arena = bumpalo::Bump::new();
             crate::parts::tap_parser::TapParser::new(&arena)
-                .parse_conditional_tap(&conditional.raw_grpprl)
+                .parse_conditional_tap(
+                    &conditional.raw_grpprl,
+                    &mut crate::leniency::ToleranceReport::default(),
+                )
                 .map_err(|error| TapBuildError::InvalidConditionalProperties(error.to_string()))?;
             conditional.raw_grpprl.clone()
         };

@@ -8,23 +8,36 @@ use crate::parts::tap::{TableProperties, TableStyleCondition};
 use crate::sprm_operations::get_sprm_type;
 
 impl StyleSheet {
+    /// Resolve revision-marked style authors against `SttbfRMark`.
+    ///
+    /// One bad cross-reference must not cost the stylesheet: a style whose
+    /// author index is negative or outside the table keeps its numeric index
+    /// with the name left unresolved, and the skip is recorded as
+    /// [`AuxiliaryTableDefect::RevisionAuthorResolution`] with the style
+    /// index as context. This is the degradation Word performs — it renders
+    /// the revision with a generic author.
     pub(crate) fn resolve_revision_authors(
         &mut self,
         authors: &crate::parts::revisions::RevisionAuthorTable,
-    ) -> Result<()> {
+    ) {
         for style in self.styles.iter_mut().flatten() {
             let Some(revision) = &mut style.revision else {
                 continue;
             };
-            let index = u16::try_from(revision.author_index).map_err(|_| {
-                corrupted("revision-marked style author index must not be negative")
-            })?;
-            let author = authors.get(index).ok_or_else(|| {
-                corrupted("revision-marked style author index is outside SttbfRMark")
-            })?;
-            revision.author = Some(author.to_string());
+            let author = u16::try_from(revision.author_index)
+                .ok()
+                .and_then(|index| authors.get(index));
+            match author {
+                Some(author) => revision.author = Some(author.to_string()),
+                None => {
+                    revision.author = None;
+                    self.tolerance.record(
+                        crate::leniency::AuxiliaryTableDefect::RevisionAuthorResolution,
+                        style.index,
+                    );
+                },
+            }
         }
-        Ok(())
     }
 
     /// Resolve the table-property differences for a requested table style.
@@ -33,7 +46,25 @@ impl StyleSheet {
     /// empty, missing, or non-table style reference as the default table style
     /// at fixed index 11. Property arrays are concatenated parent-first, then
     /// parsed from defaults so the derived style overrides its ancestors.
+    ///
+    /// Word-compatible repairs (see [`crate::SprmDefect`]) are applied
+    /// unconditionally; this convenience entry point discards the per-parse
+    /// [`crate::leniency::ToleranceReport`]. Document reads surface it through
+    /// [`crate::Document::tolerance_report`].
     pub fn resolve_table_properties(&self, requested_index: u16) -> Result<(u16, TableProperties)> {
+        self.resolve_table_properties_recording(
+            requested_index,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
+
+    /// [`Self::resolve_table_properties`] that records any Word-compatible
+    /// repairs it applies.
+    pub(crate) fn resolve_table_properties_recording(
+        &self,
+        requested_index: u16,
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<(u16, TableProperties)> {
         let effective_index = self.effective_table_style_index(requested_index);
         let mut chain = Vec::new();
         let mut current = self.get(effective_index);
@@ -60,7 +91,8 @@ impl StyleSheet {
         }
 
         let arena = bumpalo::Bump::new();
-        let mut properties = crate::parts::tap_parser::TapParser::new(&arena).parse_tap(&grpprl)?;
+        let mut properties = crate::parts::tap_parser::TapParser::new(&arena)
+            .parse_tap_with_report(&grpprl, tolerance)?;
         // A sprmTIstd inside UpxTapx is explicitly ignored by MS-DOC.
         properties.table_style_index = None;
         Ok((effective_index, properties))

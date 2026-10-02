@@ -5,7 +5,7 @@ use super::super::model::{
     StyleSheetHeader,
 };
 use super::{corrupted, read_i16, read_u16, read_u32};
-use crate::leniency::{Leniency, ToleranceReport};
+use crate::leniency::{Leniency, StshifDefect, ToleranceReport};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::styles::semantic::{
@@ -58,6 +58,7 @@ impl StyleSheet {
         stream_offset: usize,
         leniency: Leniency,
     ) -> Result<Self> {
+        let mut tolerance = ToleranceReport::default();
         let cb_stshi = usize::from(read_u16(data, 0, "cbStshi")?);
         if cb_stshi < STSHIF_SIZE {
             return Err(corrupted("cbStshi is shorter than Stshif"));
@@ -77,13 +78,20 @@ impl StyleSheet {
         if stdf_size != 10 && stdf_size != 18 {
             return Err(corrupted("Stshif.cbSTDBaseInFile must be 10 or 18"));
         }
+        // MS-DOC 2.9.274: fStdStylenamesWritten "MUST be 1 and MUST be
+        // ignored" and fReserved "MUST be 0 and MUST be ignored". The word is
+        // never consulted after this point, so — like LibreOffice, which
+        // masks the word and reads on — only the deviation is recorded.
         let style_name_flags = read_u16(stshi, 4, "Stshif style-name flags")?;
         if style_name_flags != 1 {
-            return Err(corrupted("Stshif style-name flags are invalid"));
+            tolerance.record(StshifDefect::StyleNameFlags, style_name_flags);
         }
+        // istdMaxFixedWhenSaved is informational: fixed style slots are
+        // defined by the format and the count is never consulted for layout,
+        // so any stored value is kept verbatim.
         let fixed_style_count = read_u16(stshi, 8, "Stshif.istdMaxFixedWhenSaved")?;
         if fixed_style_count != MIN_STYLE_COUNT {
-            return Err(corrupted("Stshif fixed style count must be 15"));
+            tolerance.record(StshifDefect::FixedStyleCount, fixed_style_count);
         }
         let header = StyleSheetHeader {
             style_count,
@@ -138,7 +146,6 @@ impl StyleSheet {
             return Err(corrupted("stylesheet has trailing bytes"));
         }
 
-        let mut tolerance = ToleranceReport::default();
         validate_styles(&styles, leniency, &mut tolerance)?;
         Ok(Self {
             header,

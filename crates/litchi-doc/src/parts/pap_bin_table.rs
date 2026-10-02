@@ -14,6 +14,7 @@ use super::fkp::{PapxFkp, ParagraphHeight};
 use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
 use super::styles::StyleSheet;
+use crate::leniency::ToleranceReport;
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::{SPRM_P_HUGE_PAPX, SPRM_P_TABLE_PROPS};
 
@@ -53,6 +54,8 @@ pub struct ParagraphRun {
 #[derive(Debug)]
 pub struct PapBinTable {
     runs: Vec<ParagraphRun>,
+    /// Word-compatible repairs applied while the runs were parsed.
+    tolerance: ToleranceReport,
 }
 
 /// Bounded cache of style baselines resolved during one `PapBinTable::parse`.
@@ -105,7 +108,16 @@ impl StyleBaselineCache {
 impl PapBinTable {
     #[cfg(test)]
     pub(crate) fn from_runs_for_test(runs: Vec<ParagraphRun>) -> Self {
-        Self { runs }
+        Self {
+            runs,
+            tolerance: ToleranceReport::default(),
+        }
+    }
+
+    /// Word-compatible repairs applied while the PAPX runs were parsed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Reconstruct a paragraph bin table from its page index.
@@ -127,6 +139,7 @@ impl PapBinTable {
         }
 
         let mut runs = Vec::with_capacity(page_count.saturating_mul(10));
+        let mut tolerance = ToleranceReport::default();
         let mut style_baseline_cache = StyleBaselineCache::default();
         // One `PrcData` visit set, cleared per entry, rather than one per entry.
         let mut visited = HashSet::new();
@@ -184,6 +197,7 @@ impl PapBinTable {
                             stylesheet,
                             &mut style_baseline_cache,
                             &mut visited,
+                            &mut tolerance,
                         )?;
                     runs.push(ParagraphRun {
                         start_cp,
@@ -213,7 +227,7 @@ impl PapBinTable {
             true
         });
 
-        Ok(Some(Self { runs }))
+        Ok(Some(Self { runs, tolerance }))
     }
 
     /// Remove the single producer-compatibility byte after an odd PAPX SPRM
@@ -268,6 +282,7 @@ impl PapBinTable {
             stylesheet,
             &mut StyleBaselineCache::default(),
             &mut HashSet::new(),
+            &mut ToleranceReport::default(),
         )
     }
 
@@ -278,12 +293,11 @@ impl PapBinTable {
         stylesheet: Option<&StyleSheet>,
         style_baseline_cache: &mut StyleBaselineCache,
         visited: &mut HashSet<u32>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<(ParagraphProperties, Vec<u8>, Option<u16>)> {
         if grpprl_and_istd.is_empty() {
-            let properties = stylesheet.map_or_else(
-                || ParagraphProperties::from_sprm(piece_modifier),
-                |styles| ParagraphProperties::from_sprm_with_stylesheet(piece_modifier, styles),
-            )?;
+            let properties =
+                ParagraphProperties::from_sprm_recording(piece_modifier, stylesheet, tolerance)?;
             return Ok((properties, piece_modifier.to_vec(), None));
         }
 
@@ -328,12 +342,13 @@ impl PapBinTable {
                     &direct_grpprl,
                     styles,
                     pre_parsed,
+                    tolerance,
                 )?
             },
             (Some(styles), None) => {
-                ParagraphProperties::cascade_styles(None, &direct_grpprl, styles)?
+                ParagraphProperties::cascade_styles(None, &direct_grpprl, styles, tolerance)?
             },
-            (None, _) => ParagraphProperties::from_sprm(&direct_grpprl)?,
+            (None, _) => ParagraphProperties::from_sprm_recording(&direct_grpprl, None, tolerance)?,
         };
         if properties.style_index.is_none() {
             properties.style_index = style_index;
@@ -622,6 +637,7 @@ mod tests {
             Some(&stylesheet),
             &mut cache,
             &mut visited,
+            &mut ToleranceReport::default(),
         )
         .unwrap();
         let scalar = PapBinTable::parse_properties_with_direct(
@@ -644,6 +660,7 @@ mod tests {
             Some(&stylesheet),
             &mut cache,
             &mut visited,
+            &mut ToleranceReport::default(),
         )
         .unwrap();
         let scalar = PapBinTable::parse_properties_with_direct(
@@ -666,6 +683,7 @@ mod tests {
             Some(&stylesheet),
             &mut cache,
             &mut visited,
+            &mut ToleranceReport::default(),
         )
         .unwrap();
         assert_eq!(keys(&cache), vec![16, 15]);
@@ -679,6 +697,7 @@ mod tests {
             Some(&stylesheet),
             &mut cache,
             &mut visited,
+            &mut ToleranceReport::default(),
         )
         .unwrap();
         assert_eq!(keys(&cache), vec![16, 15]);

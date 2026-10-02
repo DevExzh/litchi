@@ -1,20 +1,33 @@
-//! Opt-in tolerance for non-structural stylesheet defects in binary documents.
+//! Repair reporting for non-structural defects in binary documents.
 //!
-//! MS-DOC 2.9 states that a style's name and each of its aliases "MUST NOT be
-//! empty and MUST be unique within all names in the stylesheet". Word enforces
-//! that when it writes, but files produced by other tools — and by localized
-//! Word builds — do reach users with a duplicated name, and Word opens them
-//! without complaint. Rejecting such a file costs the caller the entire
-//! document: its text, tables, and everything else, over metadata that only
-//! affects how a style is labelled.
+//! Two kinds of repair can happen while a document is read, and both are
+//! *recorded*, so a caller can enumerate exactly what changed through
+//! [`ToleranceReport`]. Nothing is swallowed silently, and nothing outside
+//! the two closed enumerations changes: piece tables, FIB structure, stream
+//! grammar, and encryption remain hard errors under every variant.
 //!
-//! [`Leniency::TolerateStylesheetDefects`] trades strict conformance for
-//! reach. Every repair substitutes the value documented on the corresponding
-//! [`StylesheetDefect`] variant and is *recorded*, so a caller can enumerate
-//! exactly what was tolerated through [`ToleranceReport`]. Nothing is
-//! swallowed silently, and nothing outside that enumeration changes: piece
-//! tables, FIB structure, stream grammar, and encryption remain hard errors
-//! under every variant.
+//! **Word-compatible repairs** are applied under every [`Leniency`] variant,
+//! including the default [`Leniency::Strict`]. They cover bytes MS-DOC leaves
+//! undefined but real producers emit anyway — bytes Word and LibreOffice read
+//! past without complaint, so rejecting them would cost the caller the entire
+//! document over metadata that cannot change what a conforming file means.
+//! Each substitutes the value documented on the corresponding [`SprmDefect`],
+//! [`StshifDefect`], or [`AuxiliaryTableDefect`] variant. The established
+//! examples are masking undefined cell-border side flags out of
+//! `sprmTSetBrc80`/`sprmTSetBrc`, ignoring the Stshif reserved bits MS-DOC
+//! 2.9.274 tells readers to ignore, and degrading a malformed optional
+//! FIB-pointed metadata table to its absent value instead of failing the
+//! whole document open.
+//!
+//! **Opt-in repairs** trade strict conformance for reach and stay gated by
+//! [`Leniency`] variants. MS-DOC 2.9 states that a style's name and each of
+//! its aliases "MUST NOT be empty and MUST be unique within all names in the
+//! stylesheet". Word enforces that when it writes, but files produced by
+//! other tools — and by localized Word builds — do reach users with a
+//! duplicated name, and Word opens them without complaint. [`Leniency::Strict`]
+//! rejects such a file; [`Leniency::TolerateStylesheetDefects`] repairs it
+//! with the substitution documented on the corresponding [`StylesheetDefect`]
+//! variant.
 //!
 //! This mirrors the contract `XlsLeniency` provides for legacy workbooks so the
 //! two legacy readers behave the same way.
@@ -26,17 +39,20 @@
 /// [`ToleranceReport::unrecorded`].
 const MAX_RECORDED_DEFECTS: usize = 1024;
 
-/// How the reader treats non-structural stylesheet defects.
+/// How the reader treats non-structural document defects.
 ///
 /// Structural defects — malformed FIB or piece-table framing, a broken stream
 /// grammar, or unsupported/absent decryption material — are hard errors under
-/// every variant.
+/// every variant. The Word-compatible repairs listed by [`SprmDefect`],
+/// [`StshifDefect`], and [`AuxiliaryTableDefect`] are applied and recorded
+/// under every variant, including [`Leniency::Strict`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Leniency {
-    /// Every deviation from MS-DOC is a hard error.
+    /// Reject every defect whose repair requires opting in.
     ///
-    /// This is the default and the historical behaviour: a document either
-    /// parses exactly as specified or it does not parse at all.
+    /// This is the default: the [`StylesheetDefect`] classes are hard errors,
+    /// while the Word-compatible [`SprmDefect`] repairs are still applied and
+    /// recorded in the [`ToleranceReport`].
     #[default]
     Strict,
     /// Repair and record the defects listed by [`StylesheetDefect`].
@@ -78,19 +94,366 @@ impl StylesheetDefect {
     }
 }
 
+/// The class of table SPRM defect the reader repairs the way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// repairs a read applies under every [`Leniency`] variant, including
+/// [`Leniency::Strict`]. Each one matches what Word and LibreOffice do with
+/// bytes MS-DOC leaves undefined, so applying it never changes what a
+/// conforming document means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SprmDefect {
+    /// `sprmTSetBrc80` (0xD620) or `sprmTSetBrc` (0xD62F) carried
+    /// `bordersToApply` side bits outside the set its operand variant defines.
+    ///
+    /// MS-DOC 2.9.304 defines only bits 0x01–0x08 on the legacy 7-byte
+    /// `TableBrc80Operand`, and MS-DOC 2.9.305 defines bits 0x01–0x20 on the
+    /// 11-byte `TableBrcOperand`, but producers set the diagonal bits on the
+    /// legacy operand — and stray bits on either — anyway. Word and
+    /// LibreOffice test the defined bits and ignore the rest, so the reader
+    /// masks `bordersToApply` down to the defined set (0x0F on the legacy
+    /// operand, 0x3F on the full one) and still applies the border to every
+    /// side whose bit survives.
+    CellBorderSideFlags,
+}
+
+impl SprmDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::CellBorderSideFlags => {
+                "masked bordersToApply to the side bits the operand defines; surviving sides were still applied"
+            },
+        }
+    }
+}
+
+/// The class of stylesheet-header (`Stshif`) defect the reader repairs the
+/// way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// Stshif repairs a read applies under every [`Leniency`] variant, including
+/// [`Leniency::Strict`]. The stylesheet is mandatory in every Word 97+ file,
+/// so rejecting it over bytes MS-DOC tells readers to ignore would cost the
+/// whole document; LibreOffice masks the flag word and reads on
+/// (`ww8scan.cxx:6905`). The recorded [`ToleratedDefect::context`] is the
+/// offending 16-bit word as stored in the file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StshifDefect {
+    /// The 16-bit style-name flag word was not exactly `0x0001`.
+    ///
+    /// MS-DOC 2.9.274: `fStdStylenamesWritten` (bit 0) "MUST be 1 and MUST be
+    /// ignored" and `fReserved` (bits 1-15) "MUST be 0 and MUST be ignored".
+    /// The word carries no information the reader acts on, so only the
+    /// deviation is recorded.
+    StyleNameFlags,
+    /// `Stshif.istdMaxFixedWhenSaved` was not 15.
+    ///
+    /// Fixed style slots are defined by the format, not by the count, and the
+    /// count is never consulted for layout, so the stored value is kept
+    /// verbatim in `StyleSheetHeader::fixed_style_count`.
+    FixedStyleCount,
+}
+
+impl StshifDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::StyleNameFlags => {
+                "ignored every style-name flag bit except fStdStylenamesWritten, as MS-DOC 2.9.274 requires"
+            },
+            Self::FixedStyleCount => {
+                "kept the stored count; fixed style slots are defined by the format, so the value is never consulted"
+            },
+        }
+    }
+}
+
+/// The optional FIB-pointed auxiliary table whose parse failure was degraded
+/// instead of aborting the document open.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of
+/// which metadata tables a read may drop. MS-DOC 2.5 makes each of these
+/// fc/lcb pairs an independently optional metadata table; a malformed one
+/// invalidates nothing else, and Word and LibreOffice open the document and
+/// ignore the broken sub-structure. The degraded table reports the same
+/// empty/absent value as a document that simply does not carry the table, so
+/// no accessor ever panics or invents content. The recorded
+/// [`ToleratedDefect::context`] is the table's FIB `rgFcLcb` pointer index
+/// (for multi-table groups, the index of the group's primary table), except
+/// for [`Self::RevisionAuthorResolution`], whose context is the index of the
+/// style whose author could not be resolved.
+///
+/// Tables whose bytes feed structural framing — the FIB itself, the piece
+/// table/CLX, encryption material, and stylesheet framing — are not here:
+/// they remain hard errors under every [`Leniency`] variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AuxiliaryTableDefect {
+    /// The story field PLCFs (`PlcffldMom` and its siblings, FIB index 16
+    /// and onward) failed to parse. The document reports no fields and no
+    /// field-derived hyperlinks.
+    Fields,
+    /// The comment tables (`PlcfandRef`/`PlcfandTxt`, primary FIB index 4)
+    /// failed to parse. The document reports no comments.
+    Comments,
+    /// The standard bookmark tables (`SttbfBkmk`/`PlcfBkf`/`PlcfBkl`, primary
+    /// FIB index 21) failed to parse. The document reports no bookmarks.
+    Bookmarks,
+    /// The smart-tag bookmark and recognizer tables (primary FIB index 114)
+    /// failed to parse. The document reports no smart tags.
+    SmartTags,
+    /// The revision-save identifier table (`PLRSID`, FIB index 113) failed
+    /// to parse. The document reports no rsids.
+    Rsids,
+    /// The e-mail review threading table (`RmdThreading`, FIB index 94)
+    /// failed to parse. The document reports no threading data.
+    RmdThreading,
+    /// The embedded font description table (`SttbTtmbd`, FIB index 61)
+    /// failed to parse. The document reports no embedded fonts.
+    EmbeddedFonts,
+    /// The `MsoEnvelopeCLSID` range (FIB index 97) failed to parse. The
+    /// document reports no envelope.
+    Envelope,
+    /// The `AutoSummary` table (`PlcfAsumy`, FIB index 89) failed to parse.
+    /// The document reports no auto-summary ranges.
+    AutoSummary,
+    /// The range-level protection tables (primary FIB index 141) failed to
+    /// parse. The document reports no protected ranges.
+    ProtectedRanges,
+    /// The format consistency-checker bookmark tables (primary FIB index
+    /// 120) failed to parse. The document reports no consistency marks.
+    FormatConsistency,
+    /// The structured document tag bookmark tables (primary FIB index 137)
+    /// failed to parse. The document reports no structured tags.
+    StructuredTags,
+    /// The XML schema reference table (`Hplxsdr`, FIB index 136) failed to
+    /// parse. The document reports no XML schema references.
+    XmlSchemas,
+    /// The custom XML save transform path (`fcCustomXForm`, FIB index 140)
+    /// failed to parse. The document reports no transform path.
+    CustomXmlTransform,
+    /// The OLE control table (`RgxOcxInfo`, FIB index 85) failed to parse.
+    /// The document reports no OLE controls.
+    OleControls,
+    /// The mail-merge state (`Pms` and the ODSO property set, primary FIB
+    /// index 44) failed to parse. The document reports no mail-merge state.
+    MailMerge,
+    /// The master-document subdocument directory (`PlcfWKB`/`SttbFnm`,
+    /// primary FIB index 54) failed to parse. The document reports no
+    /// subdocuments.
+    Subdocuments,
+    /// The revision-mark author table (`SttbfRMark`, FIB index 51) failed to
+    /// parse. The document reports no revision authors; revision marks that
+    /// name an author stay unresolved rather than aborting the read.
+    RevisionAuthors,
+    /// The fixed associated-string table (`SttbfAssoc`, FIB index 32) failed
+    /// to parse. The document reports no associated strings.
+    AssociatedStrings,
+    /// The list-name table (`SttbListNames`, FIB index 91) failed to parse.
+    /// The document reports no list names.
+    ListNames,
+    /// The list-level template table (`SttbRgtplc`, FIB index 96) failed to
+    /// parse. The document reports no list templates.
+    ListTemplates,
+    /// The section table (`PlcfSed`, FIB index 6) failed to parse. The
+    /// document reports no section layout; text and property extraction are
+    /// unaffected because section ranges feed only layout queries.
+    Sections,
+    /// A revision-marked style named an author index outside `SttbfRMark`.
+    /// The style keeps its numeric author index and its author name is left
+    /// unresolved.
+    RevisionAuthorResolution,
+}
+
+impl AuxiliaryTableDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Fields => "discarded the malformed field tables; the document reports no fields",
+            Self::Comments => {
+                "discarded the malformed comment tables; the document reports no comments"
+            },
+            Self::Bookmarks => {
+                "discarded the malformed bookmark tables; the document reports no bookmarks"
+            },
+            Self::SmartTags => {
+                "discarded the malformed smart-tag tables; the document reports no smart tags"
+            },
+            Self::Rsids => "discarded the malformed PLRSID table; the document reports no rsids",
+            Self::RmdThreading => {
+                "discarded the malformed RmdThreading table; the document reports no threading data"
+            },
+            Self::EmbeddedFonts => {
+                "discarded the malformed SttbTtmbd table; the document reports no embedded fonts"
+            },
+            Self::Envelope => {
+                "discarded the malformed envelope range; the document reports no envelope"
+            },
+            Self::AutoSummary => {
+                "discarded the malformed PlcfAsumy table; the document reports no auto-summary ranges"
+            },
+            Self::ProtectedRanges => {
+                "discarded the malformed protection tables; the document reports no protected ranges"
+            },
+            Self::FormatConsistency => {
+                "discarded the malformed consistency-mark tables; the document reports no marks"
+            },
+            Self::StructuredTags => {
+                "discarded the malformed structured-tag tables; the document reports no structured tags"
+            },
+            Self::XmlSchemas => {
+                "discarded the malformed Hplxsdr table; the document reports no XML schema references"
+            },
+            Self::CustomXmlTransform => {
+                "discarded the malformed transform path; the document reports no custom XML transform"
+            },
+            Self::OleControls => {
+                "discarded the malformed RgxOcxInfo table; the document reports no OLE controls"
+            },
+            Self::MailMerge => {
+                "discarded the malformed mail-merge state; the document reports no mail merge"
+            },
+            Self::Subdocuments => {
+                "discarded the malformed subdocument directory; the document reports no subdocuments"
+            },
+            Self::RevisionAuthors => {
+                "discarded the malformed SttbfRMark table; the document reports no revision authors"
+            },
+            Self::AssociatedStrings => {
+                "discarded the malformed SttbfAssoc table; the document reports no associated strings"
+            },
+            Self::ListNames => {
+                "discarded the malformed SttbListNames table; the document reports no list names"
+            },
+            Self::ListTemplates => {
+                "discarded the malformed SttbRgtplc table; the document reports no list templates"
+            },
+            Self::Sections => {
+                "discarded the malformed PlcfSed table; the document reports no section layout"
+            },
+            Self::RevisionAuthorResolution => {
+                "left the revision author unresolved; the style keeps its numeric author index"
+            },
+        }
+    }
+
+    /// The FIB `rgFcLcb` pointer index recorded as the defect context.
+    ///
+    /// [`Self::RevisionAuthorResolution`] is recorded with the index of the
+    /// style whose author could not be resolved; the index returned here is
+    /// the `SttbfRMark` table the resolution references.
+    pub(crate) const fn fib_index(self) -> u16 {
+        match self {
+            Self::Fields => 16,
+            Self::Comments => 4,
+            Self::Bookmarks => 21,
+            Self::SmartTags => 114,
+            Self::Rsids => 113,
+            Self::RmdThreading => 94,
+            Self::EmbeddedFonts => 61,
+            Self::Envelope => 97,
+            Self::AutoSummary => 89,
+            Self::ProtectedRanges => 141,
+            Self::FormatConsistency => 120,
+            Self::StructuredTags => 137,
+            Self::XmlSchemas => 136,
+            Self::CustomXmlTransform => 140,
+            Self::OleControls => 85,
+            Self::MailMerge => 44,
+            Self::Subdocuments => 54,
+            Self::RevisionAuthors | Self::RevisionAuthorResolution => 51,
+            Self::AssociatedStrings => 32,
+            Self::ListNames => 91,
+            Self::ListTemplates => 96,
+            Self::Sections => 6,
+        }
+    }
+}
+
+/// One class of defect repaired while a document was read.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of what
+/// a read may change about a document. [`Defect::Stylesheet`] classes require
+/// [`Leniency::TolerateStylesheetDefects`]; [`Defect::Sprm`],
+/// [`Defect::Stshif`], and [`Defect::AuxiliaryTable`] classes are repaired
+/// under every [`Leniency`] variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Defect {
+    /// A stylesheet defect repaired by an opt-in [`Leniency`] variant.
+    Stylesheet(StylesheetDefect),
+    /// A table SPRM defect repaired the way Word repairs it.
+    Sprm(SprmDefect),
+    /// A stylesheet-header defect repaired the way Word repairs it.
+    Stshif(StshifDefect),
+    /// An optional FIB-pointed auxiliary table whose parse failure was
+    /// degraded to the table's absent value.
+    AuxiliaryTable(AuxiliaryTableDefect),
+}
+
+impl Defect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Stylesheet(defect) => defect.repair(),
+            Self::Sprm(defect) => defect.repair(),
+            Self::Stshif(defect) => defect.repair(),
+            Self::AuxiliaryTable(defect) => defect.repair(),
+        }
+    }
+}
+
+impl From<StylesheetDefect> for Defect {
+    fn from(defect: StylesheetDefect) -> Self {
+        Self::Stylesheet(defect)
+    }
+}
+
+impl From<SprmDefect> for Defect {
+    fn from(defect: SprmDefect) -> Self {
+        Self::Sprm(defect)
+    }
+}
+
+impl From<StshifDefect> for Defect {
+    fn from(defect: StshifDefect) -> Self {
+        Self::Stshif(defect)
+    }
+}
+
+impl From<AuxiliaryTableDefect> for Defect {
+    fn from(defect: AuxiliaryTableDefect) -> Self {
+        Self::AuxiliaryTable(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
-    pub defect: StylesheetDefect,
-    /// Index of the style within the stylesheet that carried the defect.
-    pub style_index: u16,
+    pub defect: Defect,
+    /// Where the defect was found: the style index within the stylesheet for
+    /// a [`Defect::Stylesheet`], the SPRM opcode for a [`Defect::Sprm`], the
+    /// offending 16-bit Stshif word for a [`Defect::Stshif`], and the FIB
+    /// `rgFcLcb` pointer index for a [`Defect::AuxiliaryTable`] (the style
+    /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]).
+    pub context: u16,
 }
 
-/// Everything a lenient read repaired, in the order the defects were found.
+/// Everything a read repaired, in the order the defects were found.
 ///
-/// An empty report means the document conformed and no substitution was made,
-/// which is always the case after a [`Leniency::Strict`] read.
+/// An empty report means the document conformed and no substitution was made.
+/// After a [`Leniency::Strict`] read the report can still list
+/// [`Defect::Sprm`], [`Defect::Stshif`], and [`Defect::AuxiliaryTable`]
+/// repairs, which Word itself applies; it never lists [`Defect::Stylesheet`]
+/// repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
@@ -127,15 +490,26 @@ impl ToleranceReport {
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
-    pub(crate) fn record(&mut self, defect: StylesheetDefect, style_index: u16) {
+    pub(crate) fn record(&mut self, defect: impl Into<Defect>, context: u16) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
             self.defects.push(ToleratedDefect {
-                defect,
-                style_index,
+                defect: defect.into(),
+                context,
             });
         } else {
             self.unrecorded = self.unrecorded.saturating_add(1);
         }
+    }
+
+    /// Merge another parse's report into this one, keeping discovery order.
+    ///
+    /// The stored-entry bound applies to the merged report as a whole; entries
+    /// that no longer fit join the unrecorded count.
+    pub(crate) fn append(&mut self, other: &ToleranceReport) {
+        for tolerated in other.defects() {
+            self.record(tolerated.defect, tolerated.context);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
     }
 }
 
@@ -161,17 +535,22 @@ mod tests {
     fn recorded_defects_are_returned_in_discovery_order() {
         let mut report = ToleranceReport::default();
         report.record(StylesheetDefect::DuplicateStyleName, 15);
+        report.record(SprmDefect::CellBorderSideFlags, 0xD620);
         report.record(StylesheetDefect::DuplicateStyleName, 42);
 
         assert!(!report.is_clean());
-        assert_eq!(report.total(), 2);
+        assert_eq!(report.total(), 3);
         assert_eq!(
             report
                 .defects()
                 .iter()
-                .map(|d| d.style_index)
+                .map(|d| (d.defect, d.context))
                 .collect::<Vec<_>>(),
-            vec![15, 42]
+            vec![
+                (Defect::Stylesheet(StylesheetDefect::DuplicateStyleName), 15),
+                (Defect::Sprm(SprmDefect::CellBorderSideFlags), 0xD620),
+                (Defect::Stylesheet(StylesheetDefect::DuplicateStyleName), 42),
+            ]
         );
     }
 
@@ -182,9 +561,124 @@ mod tests {
         for index in 0..(MAX_RECORDED_DEFECTS + 5) {
             report.record(StylesheetDefect::DuplicateStyleName, index as u16);
         }
+        for _ in 0..3 {
+            report.record(SprmDefect::CellBorderSideFlags, 0xD62F);
+        }
 
         assert_eq!(report.defects().len(), MAX_RECORDED_DEFECTS);
-        assert_eq!(report.unrecorded(), 5);
-        assert_eq!(report.total(), MAX_RECORDED_DEFECTS as u64 + 5);
+        assert_eq!(report.unrecorded(), 8);
+        assert_eq!(report.total(), MAX_RECORDED_DEFECTS as u64 + 8);
+    }
+
+    #[test]
+    fn appended_reports_merge_within_the_bound() {
+        let mut base = ToleranceReport::default();
+        base.record(StylesheetDefect::DuplicateStyleName, 7);
+
+        let mut parsed = ToleranceReport::default();
+        parsed.record(SprmDefect::CellBorderSideFlags, 0xD620);
+        for _ in 1..MAX_RECORDED_DEFECTS {
+            parsed.record(SprmDefect::CellBorderSideFlags, 0xD62F);
+        }
+        assert_eq!(parsed.unrecorded(), 0);
+
+        base.append(&parsed);
+        assert_eq!(base.defects().len(), MAX_RECORDED_DEFECTS);
+        assert_eq!(base.unrecorded(), 1);
+        assert_eq!(base.total(), MAX_RECORDED_DEFECTS as u64 + 1);
+        assert_eq!(
+            base.defects()[0],
+            ToleratedDefect {
+                defect: Defect::Stylesheet(StylesheetDefect::DuplicateStyleName),
+                context: 7,
+            }
+        );
+
+        let mut clean = ToleranceReport::default();
+        clean.append(&ToleranceReport::default());
+        assert!(clean.is_clean());
+    }
+
+    #[test]
+    fn every_defect_class_describes_its_repair() {
+        let defects = [
+            Defect::from(StylesheetDefect::DuplicateStyleName),
+            Defect::from(SprmDefect::CellBorderSideFlags),
+            Defect::from(StshifDefect::StyleNameFlags),
+            Defect::from(StshifDefect::FixedStyleCount),
+            Defect::from(AuxiliaryTableDefect::Fields),
+            Defect::from(AuxiliaryTableDefect::Comments),
+            Defect::from(AuxiliaryTableDefect::Bookmarks),
+            Defect::from(AuxiliaryTableDefect::SmartTags),
+            Defect::from(AuxiliaryTableDefect::Rsids),
+            Defect::from(AuxiliaryTableDefect::RmdThreading),
+            Defect::from(AuxiliaryTableDefect::EmbeddedFonts),
+            Defect::from(AuxiliaryTableDefect::Envelope),
+            Defect::from(AuxiliaryTableDefect::AutoSummary),
+            Defect::from(AuxiliaryTableDefect::ProtectedRanges),
+            Defect::from(AuxiliaryTableDefect::FormatConsistency),
+            Defect::from(AuxiliaryTableDefect::StructuredTags),
+            Defect::from(AuxiliaryTableDefect::XmlSchemas),
+            Defect::from(AuxiliaryTableDefect::CustomXmlTransform),
+            Defect::from(AuxiliaryTableDefect::OleControls),
+            Defect::from(AuxiliaryTableDefect::MailMerge),
+            Defect::from(AuxiliaryTableDefect::Subdocuments),
+            Defect::from(AuxiliaryTableDefect::RevisionAuthors),
+            Defect::from(AuxiliaryTableDefect::AssociatedStrings),
+            Defect::from(AuxiliaryTableDefect::ListNames),
+            Defect::from(AuxiliaryTableDefect::ListTemplates),
+            Defect::from(AuxiliaryTableDefect::Sections),
+            Defect::from(AuxiliaryTableDefect::RevisionAuthorResolution),
+        ];
+        for defect in defects {
+            assert!(!defect.repair().is_empty());
+        }
+        assert_eq!(
+            Defect::Stylesheet(StylesheetDefect::DuplicateStyleName).repair(),
+            StylesheetDefect::DuplicateStyleName.repair()
+        );
+        assert_eq!(
+            Defect::Sprm(SprmDefect::CellBorderSideFlags).repair(),
+            SprmDefect::CellBorderSideFlags.repair()
+        );
+        assert_eq!(
+            Defect::Stshif(StshifDefect::StyleNameFlags).repair(),
+            StshifDefect::StyleNameFlags.repair()
+        );
+        assert_eq!(
+            Defect::AuxiliaryTable(AuxiliaryTableDefect::Sections).repair(),
+            AuxiliaryTableDefect::Sections.repair()
+        );
+    }
+
+    #[test]
+    fn every_auxiliary_table_defect_locates_a_fib_pointer() {
+        let indexes = [
+            (AuxiliaryTableDefect::Fields, 16),
+            (AuxiliaryTableDefect::Comments, 4),
+            (AuxiliaryTableDefect::Bookmarks, 21),
+            (AuxiliaryTableDefect::SmartTags, 114),
+            (AuxiliaryTableDefect::Rsids, 113),
+            (AuxiliaryTableDefect::RmdThreading, 94),
+            (AuxiliaryTableDefect::EmbeddedFonts, 61),
+            (AuxiliaryTableDefect::Envelope, 97),
+            (AuxiliaryTableDefect::AutoSummary, 89),
+            (AuxiliaryTableDefect::ProtectedRanges, 141),
+            (AuxiliaryTableDefect::FormatConsistency, 120),
+            (AuxiliaryTableDefect::StructuredTags, 137),
+            (AuxiliaryTableDefect::XmlSchemas, 136),
+            (AuxiliaryTableDefect::CustomXmlTransform, 140),
+            (AuxiliaryTableDefect::OleControls, 85),
+            (AuxiliaryTableDefect::MailMerge, 44),
+            (AuxiliaryTableDefect::Subdocuments, 54),
+            (AuxiliaryTableDefect::RevisionAuthors, 51),
+            (AuxiliaryTableDefect::AssociatedStrings, 32),
+            (AuxiliaryTableDefect::ListNames, 91),
+            (AuxiliaryTableDefect::ListTemplates, 96),
+            (AuxiliaryTableDefect::Sections, 6),
+        ];
+        for (defect, index) in indexes {
+            assert_eq!(defect.fib_index(), index, "{defect:?}");
+        }
     }
 }

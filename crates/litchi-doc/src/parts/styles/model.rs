@@ -11,7 +11,12 @@ pub struct StyleSheetHeader {
     pub stdf_size: u16,
     /// Largest built-in style identifier known when the file was saved, plus one.
     pub max_builtin_style: u16,
-    /// Count of fixed-index style slots. This is always 15 for Word 97+.
+    /// Count of fixed-index style slots as stored in the file.
+    ///
+    /// MS-DOC 2.9.274 requires Word to write 15 and requires readers to
+    /// ignore the value: fixed style slots are defined by the format, so the
+    /// count is never consulted. A tolerated file may carry another value
+    /// (recorded as [`crate::StshifDefect::FixedStyleCount`]).
     pub fixed_style_count: u16,
     /// Built-in style-name version.
     pub builtin_name_version: u16,
@@ -168,7 +173,10 @@ pub struct StyleSheet {
 impl StyleSheet {
     /// Non-structural defects a lenient parse repaired.
     ///
-    /// Always empty after a strict parse.
+    /// After a strict parse the report can still list the Word-compatible
+    /// [`crate::StshifDefect`] and [`crate::AuxiliaryTableDefect`] repairs,
+    /// which Word itself applies; it never lists the opt-in
+    /// [`crate::StylesheetDefect`] repairs.
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &ToleranceReport {

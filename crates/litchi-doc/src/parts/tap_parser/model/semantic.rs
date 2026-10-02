@@ -14,6 +14,7 @@ impl TapParser<'_> {
         grpprl: &[u8],
         inside_conditional: bool,
         stylesheet: Option<&StyleSheet>,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         // Use shared SPRM operation extraction
         let operation = get_sprm_operation(sprm.opcode);
@@ -212,7 +213,7 @@ impl TapParser<'_> {
                     Self::parse_wrap_distance(sprm, "sprmTDyaFromTextBottom")?;
             },
             // Legacy range border override.
-            0x20 => self.parse_cell_border_range(tap, sprm, false)?,
+            0x20 => self.parse_cell_border_range(tap, sprm, false, tolerance)?,
             // sprmTInsert (0x7621) - Insert cells
             0x21 => {
                 self.handle_insert_cells(tap, sprm)?;
@@ -228,7 +229,7 @@ impl TapParser<'_> {
             0x2D => self.parse_full_cell_shading_range(tap, sprm, false)?,
             0x2E => self.parse_full_cell_shading_range(tap, sprm, true)?,
             // Full-color range border override.
-            0x2F => self.parse_cell_border_range(tap, sprm, true)?,
+            0x2F => self.parse_cell_border_range(tap, sprm, true, tolerance)?,
             // Full-color shading applied to every cell in the table row.
             0x60 => self.parse_full_table_shading(tap, sprm)?,
             0x61 => tap.preferred_indent = Self::parse_fts_width(sprm, WidthUsage::Indent)?,
@@ -250,7 +251,8 @@ impl TapParser<'_> {
                 }
                 let requested = binary_to_doc_result(read_u16_le(operand, 0))?;
                 if let Some(stylesheet) = stylesheet {
-                    let (effective, style) = stylesheet.resolve_table_properties(requested)?;
+                    let (effective, style) =
+                        stylesheet.resolve_table_properties_recording(requested, tolerance)?;
                     Self::apply_table_style(tap, style, effective);
                 } else {
                     tap.table_style_index = Some(requested);
@@ -336,7 +338,7 @@ impl TapParser<'_> {
                         "sprmTCnf cannot be nested inside another sprmTCnf".to_string(),
                     ));
                 }
-                self.parse_conditional_formatting(tap, sprm)?;
+                self.parse_conditional_formatting(tap, sprm, tolerance)?;
             },
             0x69 => {
                 let operand = sprm.operand_bytes();

@@ -303,7 +303,7 @@ impl AttachedGlossary {
             .then(|| StyleSheet::parse(&fib, table_stream))
             .transpose()?;
         if let Some(stylesheet) = &mut stylesheet {
-            stylesheet.resolve_revision_authors(&revision_authors)?;
+            stylesheet.resolve_revision_authors(&revision_authors);
         }
         let piece_table = table_slice(&fib, table_stream, 33)?.and_then(PieceTable::parse);
         let chpx_data = table_slice(&fib, table_stream, 12)?;

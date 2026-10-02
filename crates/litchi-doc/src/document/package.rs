@@ -2,6 +2,7 @@
 
 use super::model::Document;
 use crate::encryption::decrypt_document_streams;
+use crate::leniency::{AuxiliaryTableDefect, ToleranceReport};
 use crate::package::{
     Error as PackageError, Limits, OpenOptions, ResourceKind, ResourceLimit, Result,
 };
@@ -166,8 +167,21 @@ impl Document {
         // Create text extractor
         let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
 
+        // Word-compatible repairs recorded while the optional FIB-pointed
+        // auxiliary tables below are parsed. MS-DOC 2.5 makes each of these
+        // fc/lcb pairs independently optional metadata, so a malformed table
+        // degrades to its absent value with a recorded
+        // `AuxiliaryTableDefect` instead of aborting the open — the same
+        // posture Word and LibreOffice take, and the one this function
+        // already used for headers, footnotes, endnotes, and list tables.
+        let mut tolerance = ToleranceReport::default();
+
         // Parse fields table to identify embedded equations and hyperlinks
-        let fields_table = Some(FieldsTable::parse(&fib, &table_stream)?);
+        let fields_table = auxiliary_or_absent(
+            FieldsTable::parse(&fib, &table_stream).map(Some),
+            AuxiliaryTableDefect::Fields,
+            &mut tolerance,
+        );
 
         // Parse headers/footers table
         let headers_table = HeadersTable::parse(&fib, &table_stream).ok();
@@ -175,7 +189,11 @@ impl Document {
         // Parse footnotes and endnotes tables
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
-        let comments_table = CommentsTable::parse(&fib, &table_stream)?;
+        let comments_table = auxiliary_or_default(
+            CommentsTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::Comments,
+            &mut tolerance,
+        );
         let annotation_bookmarks_source = capture_optional_table_range(
             &fib,
             &table_stream,
@@ -184,27 +202,105 @@ impl Document {
             "SttbfAtnBkmk",
         );
         let document_properties = DocumentProperties::parse(&fib, &table_stream);
-        let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
-        let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
-        let rsids = DocumentRsids::parse(&fib, &table_stream)?;
-        let rmd_threading = DocumentRmdThreading::parse(&fib, &table_stream)?;
-        let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
-        let envelope = Envelope::parse_fib(&fib, &table_stream)?;
-        let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
+        let bookmarks_table = auxiliary_or_default(
+            BookmarksTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::Bookmarks,
+            &mut tolerance,
+        );
+        let smart_tags = auxiliary_or_absent(
+            DocumentSmartTags::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::SmartTags,
+            &mut tolerance,
+        );
+        let rsids = auxiliary_or_absent(
+            DocumentRsids::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::Rsids,
+            &mut tolerance,
+        );
+        let rmd_threading = auxiliary_or_absent(
+            DocumentRmdThreading::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::RmdThreading,
+            &mut tolerance,
+        );
+        let embedded_fonts = auxiliary_or_absent(
+            DocumentEmbeddedFonts::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::EmbeddedFonts,
+            &mut tolerance,
+        );
+        let envelope = auxiliary_or_absent(
+            Envelope::parse_fib(&fib, &table_stream),
+            AuxiliaryTableDefect::Envelope,
+            &mut tolerance,
+        );
+        let auto_summary = auxiliary_or_absent(
+            DocumentAutoSummary::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::AutoSummary,
+            &mut tolerance,
+        );
         let route_slip = Metadata::parse(&fib, &table_stream);
-        let protected_ranges = Ranges::parse(&fib, &table_stream)?;
-        let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
-        let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
-        let xml_schemas = crate::parts::xml_schemas::Collection::parse(&fib, &table_stream)?;
-        let custom_xml_transform_path =
-            crate::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
-        let ole_controls = RgxOcxInfo::parse(&fib, &table_stream)?;
-        let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
-        let subdocuments = Collection::parse(&fib, &table_stream)?;
-        let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;
-        let associated_strings = DocumentAssociatedStrings::parse(&fib, &table_stream)?;
-        let list_names = ListNamesTable::parse(&fib, &table_stream)?;
-        let list_templates = ListTemplateTable::parse(&fib, &table_stream)?;
+        let protected_ranges = auxiliary_or_absent(
+            Ranges::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ProtectedRanges,
+            &mut tolerance,
+        );
+        let format_consistency_marks = auxiliary_or_absent(
+            DocumentFormatConsistencyMarks::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::FormatConsistency,
+            &mut tolerance,
+        );
+        let structured_tags = auxiliary_or_absent(
+            DocumentStructuredTags::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::StructuredTags,
+            &mut tolerance,
+        );
+        let xml_schemas = auxiliary_or_absent(
+            crate::parts::xml_schemas::Collection::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::XmlSchemas,
+            &mut tolerance,
+        );
+        let custom_xml_transform_path = auxiliary_or_absent(
+            crate::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream),
+            AuxiliaryTableDefect::CustomXmlTransform,
+            &mut tolerance,
+        );
+        let ole_controls = auxiliary_or_absent(
+            RgxOcxInfo::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::OleControls,
+            &mut tolerance,
+        );
+        let mail_merge = auxiliary_or_absent(
+            DocumentMailMerge::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::MailMerge,
+            &mut tolerance,
+        );
+        let subdocuments = auxiliary_or_absent(
+            Collection::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::Subdocuments,
+            &mut tolerance,
+        );
+        // The revision-author table feeds section and style author
+        // resolution below. Degrading it to empty cannot corrupt those reads:
+        // an unresolved author stays unresolved (recorded), never invented.
+        let revision_authors = auxiliary_or_default(
+            RevisionAuthorTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::RevisionAuthors,
+            &mut tolerance,
+        );
+        let associated_strings = auxiliary_or_absent(
+            DocumentAssociatedStrings::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::AssociatedStrings,
+            &mut tolerance,
+        );
+        let list_names = auxiliary_or_absent(
+            ListNamesTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ListNames,
+            &mut tolerance,
+        );
+        let list_templates = auxiliary_or_absent(
+            ListTemplateTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ListTemplates,
+            &mut tolerance,
+        );
         let proofing_tables = ProofingTables::parse(&fib, &table_stream);
         let grammar_cookies = GrammarCookieTables::parse(&fib, &table_stream);
         let table_char_cache = TableCharacterCache::parse(&fib, &table_stream);
@@ -226,8 +322,14 @@ impl Document {
             data_stream.as_deref(),
             options.allows_papx_alignment_padding(),
         );
-        let sections =
-            SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors)?;
+        // Section ranges feed only layout queries (`sections()`,
+        // `section_at_cp()`), never structural offsets, so a malformed
+        // PlcfSed degrades to the same empty table an absent one produces.
+        let sections = auxiliary_or_default(
+            SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors),
+            AuxiliaryTableDefect::Sections,
+            &mut tolerance,
+        );
         let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
         let header_shape_anchors = Self::parse_header_shape_anchors(&fib, &table_stream);
         let textbox_entries = Self::parse_textbox_entries(
@@ -258,7 +360,7 @@ impl Document {
             .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.leniency))
             .transpose()?;
         if let Some(stylesheet) = &mut stylesheet {
-            stylesheet.resolve_revision_authors(&revision_authors)?;
+            stylesheet.resolve_revision_authors(&revision_authors);
         }
 
         // Extract MTEF data from OLE streams
@@ -291,6 +393,16 @@ impl Document {
         } else {
             None
         };
+
+        // Everything repaired while the document was opened, in discovery
+        // order: the optional auxiliary tables above first, then the
+        // stylesheet's repairs, then the PAPX bin-table repairs.
+        if let Some(parsed) = &stylesheet {
+            tolerance.append(parsed.tolerance_report());
+        }
+        if let Some(table) = &pap_bin_table {
+            tolerance.append(table.tolerance_report());
+        }
 
         // Optional metadata readers defer semantic validation until their
         // accessors are called. Retain only their bounded FIB-selected ranges
@@ -411,9 +523,47 @@ impl Document {
             hyperlinks_table,
             list_tables,
             stylesheet,
+            tolerance,
             mtef_data,
             parsed_mtef,
         })
+    }
+}
+
+/// Read one optional FIB-pointed auxiliary table, degrading a parse failure
+/// to the table's absent value and recording the defect instead of aborting
+/// the document open.
+///
+/// The stream-level resource limits were already enforced before the table
+/// stream was read, so dropping the table here never bypasses a size cap; it
+/// only skips interpreting bytes the document can live without.
+fn auxiliary_or_absent<T>(
+    result: Result<Option<T>>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> Option<T> {
+    match result {
+        Ok(table) => table,
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            None
+        },
+    }
+}
+
+/// [`auxiliary_or_absent`] for tables whose stored form is a plain value
+/// with an empty default rather than an `Option`.
+fn auxiliary_or_default<T: Default>(
+    result: Result<T>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> T {
+    match result {
+        Ok(table) => table,
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            T::default()
+        },
     }
 }
 
