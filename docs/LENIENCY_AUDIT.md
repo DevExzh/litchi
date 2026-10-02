@@ -1422,6 +1422,8 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
 - **Suggested posture**: default-repair — skip unreachable entries (treat as
   `STGTY_EMPTY`), record count.
 ### 7.5 MiniFAT/DIFAT start-sector vs count cross-check is fatal — P2 (confidence: medium)
+> **Status: FIXED (2026-10-02)** — a zero MiniFAT/DIFAT count ignores the start sector, and a nonzero MiniFAT count with an ENDOFCHAIN/FREESECT start reads as no MiniFAT (POI/LO), recorded;
+> a nonzero DIFAT count with no start, and a mini stream needing the absent MiniFAT, stay fatal.
 - **Location**: `crates/litchi-cfb/src/file.rs:1033` ("MiniFAT start sector and sector
   count disagree"), :1038 (DIFAT same).
 - **Check**: `(count == 0) != (first == ENDOFCHAIN)` → `InvalidFormat`, rejecting e.g.
@@ -1437,6 +1439,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   ignore start; count>0 with a non-sector start ⇒ treat the table as empty (mini streams
   fall back like a missing MiniFAT); record.
 ### 7.6 CFB header reserved bytes must be zero — P2 (confidence: high that references ignore; medium-low prevalence)
+> **Status: FIXED (2026-10-02)** — non-zero CFB header reserved bytes are ignored and recorded (POI, LibreOffice and ole32 never read them).
 - **Location**: `crates/litchi-cfb/src/file.rs:977` ("Reserved CFB header bytes must be
   zero").
 - **Check**: `header[0x22..0x28] != [0; 6]` → `InvalidFormat`, aborting open.
@@ -1448,6 +1451,8 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
 - **Suggested posture**: default-repair — ignore, record. Same logic already applied to
   the header DIFAT tail at file.rs:1192.
 ### 7.7 Directory-entry field byte-exactness bundle — P2 (confidence: high on references; medium-low prevalence per sub-check)
+> **Status: FIXED (2026-10-02)** — directory-entry fields meaningless on read (undefined color, storage start/size, stream child link, root name/siblings, unused-entry residue, forbidden name
+> characters) are ignored and recorded; entry type, name length, termination and encoding stay fatal.
 - **Location**: `crates/litchi-cfb/src/file.rs:272` ("invalid CFB directory node color"),
   :1893-1901 (storage start/size nonzero → fatal), :1902-1906 (stream `sid_child !=
   NOSTREAM` → fatal), :1709 (root must be named exactly "Root Entry" with
@@ -1468,6 +1473,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   root name (canonicalize for lookup only), treat forbidden-char names as opaque lookup
   keys, treat garbage in empty entries as empty. Keep SID/type/bounds checks.
 ### 7.8 Property-set strings: strict MBCS and UTF-16 decode, no lossy fallback — P1
+> **Status: FIXED (2026-10-02)** — malformed MBCS / unpaired UTF-16 in property-set strings decode with U+FFFD and are recorded per PID; the property-set `Editor` refuses to rewrite a stream read through a lossy repair.
 - **Location**: `crates/litchi-ole-common/src/property_set/codec/binary/wire.rs:456`
   (ANSI via `Mbcs::require`/strict decode) and :419-438 (`decode_utf16` with hard error
   on lone surrogates).
@@ -1485,6 +1491,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   `String::from_utf16_lossy`, record (mirroring the VBA precedent for which `recover`
   exists).
 ### 7.9 Property-set PID 1 codepage outside the supported table kills the stream — P1 (confidence: high on references; medium on prevalence)
+> **Status: FIXED (2026-10-02)** — an unsupported PID 1 code page falls back to Windows-1252 (LibreOffice) and is recorded with the stored ID.
 - **Location**: `crates/litchi-ole-common/src/property_set/codec/binary/validation.rs:589`
   (`CodePage::try_from`; error text "unsupported Property Set code page {page}" at
   `crates/litchi-ole-common/src/property_set/model.rs:247`).
@@ -1502,6 +1509,7 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   (the already-used default when PID 1 is absent, validation.rs:594) and record; bytes
   0x00-0x7F decode identically either way.
 ### 7.10 Property-set strings must be NUL-terminated exactly as sized — P1 (confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — property-set strings are read to their declared size, up to the first NUL if any (POI), and a missing terminator is recorded per PID.
 - **Location**: `crates/litchi-ole-common/src/property_set/codec/binary/wire.rs:381`
   ("{description} is not NUL-terminated" — ANSI CodePageString; UTF-16 variant :405),
   :369, and validation.rs:680/688 (dictionary entries).
@@ -1518,6 +1526,8 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   bytes, strip a trailing NUL if present, record when absent. Lossless given the explicit
   size field.
 ### 7.11 One malformed property fails the entire property-set stream; nested reserved-zero/padding checks — P1 (confidence: high on achievability; medium on frequency)
+> **Status: FIXED (2026-10-02)** — a property whose value fails to parse is dropped (with its dictionary name) and recorded, keeping the rest of the section; nested reserved words and padding are
+> ignored and recorded; allocation/limit failures, PID 1 and the dictionary stay fatal.
 - **Location**: `crates/litchi-ole-common/src/property_set/codec/binary/validation.rs:613-627`
   (per-property parse error wrapped and propagated), semantic.rs:584/:653 (variant
   vector/array element reserved word must be zero), composite.rs:83/:187 (HeadingPairs
@@ -1540,6 +1550,8 @@ revisiting only if IRM/encrypted files from non-Microsoft producers become a tar
   known from the offset table, validation.rs:564-576) and record, instead of failing the
   section.
 ### 7.12 Property-set stream header exactness (version 0/1, section count 1..=2, duplicate descriptors, section size equality) — P2 (confidence: medium)
+> **Status: PARTIALLY FIXED (2026-10-02)** — an overrunning section size is clamped and recorded. Version ∉ {0,1} and section count ∉ 1..=2 deliberately stay errors (POI rejects them,
+> and they may carry semantics the parser cannot represent); duplicate/out-of-range section offsets stay fatal.
 - **Location**: `crates/litchi-ole-common/src/property_set/codec/binary/validation.rs:46`
   (version), :55-57 ("Property Set section count {section_count} is outside 1..=2"), :84
   (duplicate FMTID/offset), :99 (overlap), :507 (declared section size must equal its
@@ -2020,6 +2032,8 @@ duplicate-check-free `ManifestImport` tolerates them.
   `doctype-present`. Entity safety is unaffected (undeclared `GeneralRef`s remain
   rejected).
 ### 9.12 RTF: unsupported `\fcharset` / `\cpg` values in the font table are fatal — P2 (confidence: high on LO fallback; medium on frequency)
+> **Status: FIXED (2026-10-02)** — an undefined `\fcharset`, undecodable `\cpg`, or unmapped charset falls back to the document's `\ansicpg` page (LibreOffice), decodes lossily, and records
+> `FontDefect::{UnsupportedCharset, UnsupportedCodePage, UnmappedCharset}`; Symbol/Mac-CJK glyphs are an approximation. Edit paths now re-read under the document's original options.
 - **Location**: `crates/litchi-rtf/src/codec/parser/codec/resources.rs:408` ("unsupported
   RTF font charset {charset_id}"), :442 ("unsupported RTF font code page {page}");
   companion: :518-523 (known charset without an exact page mapping + non-ASCII font name
