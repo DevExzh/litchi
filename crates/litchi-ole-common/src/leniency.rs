@@ -91,9 +91,11 @@ pub enum StringDefect {
     /// An ANSI string held a malformed multibyte sequence, or a UTF-16
     /// string an unpaired surrogate (F7.8).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation. The
-    /// repair decodes lossily with U+FFFD substitution, as
-    /// `MultiByteToWideChar` and Java's replacing decoders do.
+    /// The string is decoded with U+FFFD substituted for each malformed
+    /// sequence, as `MultiByteToWideChar` and Java's replacing decoders do;
+    /// one entry is recorded per affected property (PID 0 for the
+    /// dictionary). The original bytes are not retained, so the property-set
+    /// editor refuses to rewrite such a stream.
     LossyDecode,
     /// A string was not NUL-terminated within its declared size (F7.10).
     ///
@@ -218,6 +220,25 @@ impl Defect {
             Self::Stream(defect) => defect.repair(),
         }
     }
+
+    /// Whether the repaired value carries exactly the source's content.
+    ///
+    /// A content-preserving repair only changes framing a re-serialization
+    /// writes canonically anyway. A content-changing one (a lossy decode, a
+    /// code-page fallback, a dropped property, a skipped section) must not be
+    /// written back as if it were the source; the property-set editor
+    /// refuses to rewrite a stream that needed one.
+    #[must_use]
+    pub const fn preserves_content(self) -> bool {
+        match self {
+            Self::String(StringDefect::MissingTerminator)
+            | Self::Property(PropertyDefect::NonZeroPadding)
+            | Self::Stream(StreamDefect::SectionSizeMismatch) => true,
+            Self::String(StringDefect::LossyDecode | StringDefect::UnsupportedCodePage)
+            | Self::Property(PropertyDefect::MalformedValue)
+            | Self::Stream(StreamDefect::UnsupportedVersion | StreamDefect::SectionCount) => false,
+        }
+    }
 }
 
 impl From<StringDefect> for Defect {
@@ -291,6 +312,20 @@ impl ToleranceReport {
     #[must_use]
     pub fn total(&self) -> u64 {
         self.defects.len() as u64 + u64::from(self.unrecorded)
+    }
+
+    /// Whether every repair kept the source's content (see
+    /// [`Defect::preserves_content`]).
+    ///
+    /// Once defects overflowed the record bound their classes are unknown,
+    /// so an overflowed report is conservatively not content-preserving.
+    #[must_use]
+    pub fn preserves_content(&self) -> bool {
+        self.unrecorded == 0
+            && self
+                .defects
+                .iter()
+                .all(|tolerated| tolerated.defect.preserves_content())
     }
 
     /// Whether any recorded defect is of class `defect`.

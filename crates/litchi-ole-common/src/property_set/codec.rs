@@ -50,7 +50,16 @@ pub(crate) fn decode_non_simple_unknown_property(
     encoded.extend_from_slice(&variant_type.to_le_bytes());
     encoded.extend_from_slice(&0u16.to_le_bytes());
     encoded.extend_from_slice(data);
-    binary::parse_typed_property_for_non_simple_property(&encoded, codepage, 0, property_identifier)
+    let (value, repairs) = binary::parse_typed_property_for_non_simple_property(
+        &encoded,
+        codepage,
+        0,
+        property_identifier,
+    )?;
+    // An indirect value has no tolerance report to record a repair in, so it
+    // stays strict.
+    repairs.require_none("Non-simple indirect property value")?;
+    Ok(value)
 }
 
 // Keep the existing private property_set::codec test seam available to the

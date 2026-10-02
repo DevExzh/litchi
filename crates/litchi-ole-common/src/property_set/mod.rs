@@ -28,6 +28,12 @@ pub mod user_defined;
     reason = "tests use concise assertions while exercising fallible malformed-input paths"
 )]
 mod tests;
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "tests use concise assertions while exercising malformed-input repairs"
+)]
+mod tolerance_tests;
 
 pub use alternate_stream::{
     ALTERNATE_STREAM_CONTROL_NAME, AlternateStreamControl, NonSimpleAlternateStreamName,

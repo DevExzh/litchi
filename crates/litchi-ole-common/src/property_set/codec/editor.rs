@@ -74,7 +74,7 @@ impl Editor {
     where
         F: FnOnce(&mut Section) -> Result<(), OleError>,
     {
-        let mut stream = self.load_stream(kind)?.unwrap_or_else(|| {
+        let mut stream = self.load_stream_for_rewrite(kind)?.unwrap_or_else(|| {
             let base = if kind == Binding::UserDefinedProperties {
                 Binding::DocumentSummaryInformation.format_identifier()
             } else {
@@ -134,7 +134,7 @@ impl Editor {
         };
         if kind == Binding::UserDefinedProperties {
             let mut stream = self
-                .load_stream(kind)?
+                .load_stream_for_rewrite(kind)?
                 .ok_or_else(|| invalid("Property Set stream disappeared during removal"))?;
             stream.remove_section(USER_DEFINED_PROPERTIES_FMTID);
             self.stage(kind, Some(stream.to_bytes()?))?;
@@ -198,6 +198,24 @@ impl Editor {
         }
         self.staged.insert(key, replacement);
         Ok(())
+    }
+
+    /// Loads a stream that is about to be re-serialized.
+    ///
+    /// A read repair that changed content (a lossy decode, a dropped
+    /// property) would be written back as if it were the source, so such a
+    /// stream is refused here; content-preserving repairs simply rewrite in
+    /// canonical form.
+    fn load_stream_for_rewrite(&self, kind: Binding) -> Result<Option<Stream>, OleError> {
+        let stream = self.load_stream(kind)?;
+        if let Some(stream) = &stream {
+            if !stream.tolerance_report().preserves_content() {
+                return Err(invalid(
+                    "Property Set stream was read with content-changing repairs; refusing to rewrite it",
+                ));
+            }
+        }
+        Ok(stream)
     }
 
     fn load_stream(&self, kind: Binding) -> Result<Option<Stream>, OleError> {

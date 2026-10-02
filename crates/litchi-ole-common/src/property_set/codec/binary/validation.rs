@@ -14,10 +14,10 @@ use super::semantic::{
 };
 use super::wire::{
     ByteSink, ByteWriter, CountingWriter, ValueReader, append_ansi, append_bytes, append_u32,
-    checked_range, decode_ansi, decode_utf16, encoded_ansi_len, pad4, read_guid, read_u16,
-    read_u32, reserve_bytes,
+    checked_range, decode_ansi_lossy, decode_utf16_lossy, encoded_ansi_len, pad4, read_guid,
+    read_u16, read_u32, reserve_bytes,
 };
-use super::{parse_typed_property, parse_typed_property_for_property};
+use super::{Repairs, parse_typed_property, parse_typed_property_for_property};
 use crate::leniency::ToleranceReport;
 use litchi_cfb::OleError;
 use litchi_cfb::consts::VT_I2;
@@ -101,6 +101,7 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
         return Err(invalid("Property Set sections overlap"));
     }
 
+    let mut tolerance = ToleranceReport::default();
     let mut sections = try_vec_with_capacity(section_count, "property-set sections")?;
     for (format_identifier, start, end) in descriptors {
         sections.push(parse_section(
@@ -108,6 +109,7 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
             format_identifier,
             version,
             allow_indirect,
+            &mut tolerance,
         )?);
     }
     Ok(Stream {
@@ -115,9 +117,7 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
         system_identifier,
         class_identifier,
         sections,
-        // No property-set repair has landed yet (leniency audit F7.8-F7.12),
-        // so every successful parse is a conformant one.
-        tolerance: ToleranceReport::default(),
+        tolerance,
     })
 }
 
@@ -506,6 +506,7 @@ fn parse_section(
     format_identifier: Guid,
     version: u16,
     allow_indirect: bool,
+    tolerance: &mut ToleranceReport,
 ) -> Result<Section, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
     let declared_size = usize::try_from(read_u32(data, 0, "section size")?)
@@ -598,7 +599,11 @@ fn parse_section(
     let effective_codepage = codepage.unwrap_or(CodePage::WINDOWS_1252).id();
 
     let (dictionary, dictionary_order) = match property_slice(PID_DICTIONARY)? {
-        Some((offset, bytes)) => parse_dictionary(bytes, effective_codepage, offset)?,
+        Some((offset, bytes)) => {
+            let (dictionary, order, repairs) = parse_dictionary(bytes, effective_codepage, offset)?;
+            repairs.record(tolerance, PID_DICTIONARY);
+            (dictionary, order)
+        },
         None => (HashMap::new(), Vec::new()),
     };
     let mut properties =
@@ -629,6 +634,8 @@ fn parse_section(
                 "Property {identifier} at section offset {start} is invalid: {error}"
             ))
         })?;
+        let (value, repairs) = value;
+        repairs.record(tolerance, *identifier);
         properties.insert(*identifier, value);
     }
     let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;
@@ -649,7 +656,7 @@ fn parse_dictionary(
     data: &[u8],
     codepage: u16,
     property_offset: usize,
-) -> Result<(HashMap<u32, String>, Vec<u32>), OleError> {
+) -> Result<(HashMap<u32, String>, Vec<u32>, Repairs), OleError> {
     let mut reader = ValueReader::new(data, property_offset);
     let count = usize::try_from(reader.read_u32("dictionary count")?)
         .map_err(|_conversion_error| invalid("Dictionary count is too large"))?;
@@ -684,7 +691,8 @@ fn parse_dictionary(
             if reader.read_u16("dictionary Unicode terminator")? != 0 {
                 return Err(invalid("Dictionary Unicode string is not terminated"));
             }
-            let decoded = decode_utf16(raw, "dictionary Unicode string")?;
+            let decoded =
+                decode_utf16_lossy(raw, "dictionary Unicode string", &mut reader.repairs)?;
             reader.align4(false, "dictionary Unicode padding")?;
             decoded
         } else {
@@ -692,7 +700,7 @@ fn parse_dictionary(
             if reader.read_u8("dictionary terminator")? != 0 {
                 return Err(invalid("Dictionary string is not terminated"));
             }
-            decode_ansi(raw, codepage, "dictionary string")?
+            decode_ansi_lossy(raw, codepage, "dictionary string", &mut reader.repairs)?
         };
         if dictionary.insert(identifier, name).is_some() {
             return Err(invalid(format!(
@@ -702,5 +710,5 @@ fn parse_dictionary(
         order.push(identifier);
     }
     reader.finish_zero_padding("dictionary padding")?;
-    Ok((dictionary, order))
+    Ok((dictionary, order, reader.repairs))
 }

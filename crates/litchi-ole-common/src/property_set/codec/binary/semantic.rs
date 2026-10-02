@@ -8,7 +8,7 @@ use super::super::super::model::{
 };
 use super::composite;
 use super::wire::{
-    ByteSink, ValueReader, append_ansi, append_bytes, append_u16, append_u32, append_u64,
+    ByteSink, Repairs, ValueReader, append_ansi, append_bytes, append_u16, append_u32, append_u64,
     encoded_ansi_len, pad4, read_codepage_string, read_u16, read_unicode_string, reserve_bytes,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -279,12 +279,17 @@ fn append_codepage_string<S: ByteSink + ?Sized>(
     pad4(out)?;
     Ok(())
 }
+/// Strictly parses one typed value: a value that would need a repair is an
+/// error, because this path has no report to record it in.
 pub(crate) fn parse_typed_property(
     data: &[u8],
     codepage: u16,
     property_offset: usize,
 ) -> Result<Value, OleError> {
-    parse_typed_property_context(data, codepage, property_offset, None, false)
+    let (value, repairs) =
+        parse_typed_property_context(data, codepage, property_offset, None, false)?;
+    repairs.require_none("Typed property value")?;
+    Ok(value)
 }
 
 pub(crate) fn parse_typed_property_for_property(
@@ -292,7 +297,7 @@ pub(crate) fn parse_typed_property_for_property(
     codepage: u16,
     property_offset: usize,
     property_identifier: u32,
-) -> Result<Value, OleError> {
+) -> Result<(Value, Repairs), OleError> {
     parse_typed_property_context(
         data,
         codepage,
@@ -307,7 +312,7 @@ pub(crate) fn parse_typed_property_for_non_simple_property(
     codepage: u16,
     property_offset: usize,
     property_identifier: u32,
-) -> Result<Value, OleError> {
+) -> Result<(Value, Repairs), OleError> {
     parse_typed_property_context(
         data,
         codepage,
@@ -323,7 +328,7 @@ fn parse_typed_property_context(
     property_offset: usize,
     property_identifier: Option<u32>,
     allow_indirect: bool,
-) -> Result<Value, OleError> {
+) -> Result<(Value, Repairs), OleError> {
     if data.len() < 4 {
         return Err(invalid("Typed property value is truncated"));
     }
@@ -363,7 +368,7 @@ fn parse_typed_property_context(
                 ))
             })?;
     }
-    Ok(value)
+    Ok((value, reader.repairs))
 }
 
 fn parse_value_body(

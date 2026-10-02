@@ -84,7 +84,8 @@ fn parses_the_checked_in_heading_pair_wire_example() {
         0,
         PID_HEADING_PAIRS,
     )
-    .expect("the MS-OSHARED heading-pair example should parse");
+    .expect("the MS-OSHARED heading-pair example should parse")
+    .0;
     let expected = HeadingPairs::new(vec![
         HeadingPair::new("Title", 1).unwrap(),
         HeadingPair::new("Headings", 8).unwrap(),
@@ -135,7 +136,8 @@ fn parses_unaligned_ansi_parts_without_inventing_padding() {
         0,
         PID_DOC_PARTS,
     )
-    .expect("unaligned document parts should parse");
+    .expect("unaligned document parts should parse")
+    .0;
     assert_eq!(
         value,
         Value::DocParts(DocParts::ansi(vec!["A".into(), "BCD".into()]).unwrap())
@@ -166,14 +168,16 @@ fn preserves_generic_variant_vectors_outside_the_well_known_pid() {
     body.extend_from_slice(&7i32.to_le_bytes());
     let value =
         parse_typed_property_for_property(&typed(VT_VECTOR | VT_VARIANT, &body), 1252, 0, 42)
-            .expect("generic variant vector should remain supported");
+            .expect("generic variant vector should remain supported")
+            .0;
     assert!(matches!(value, Value::Vector(_)));
 }
 
 #[test]
 fn preserves_unknown_property_values_outside_the_well_known_pids() {
     let value = parse_typed_property_for_property(&typed(0x7777, &[1, 2, 3]), 1252, 0, 42)
-        .expect("unknown property values should remain readable");
+        .expect("unknown property values should remain readable")
+        .0;
     assert_eq!(
         value,
         Value::Unknown {

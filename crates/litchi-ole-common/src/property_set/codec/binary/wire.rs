@@ -4,6 +4,7 @@ use super::super::super::model::{
     Guid, UNICODE_CODEPAGE, checked_add, invalid, try_clone_string, try_vec_with_capacity,
 };
 use super::super::support::allocation;
+use crate::leniency::{StringDefect, ToleranceReport};
 use litchi_cfb::OleError;
 use litchi_codepage::Mbcs;
 use std::borrow::Cow;
@@ -151,10 +152,47 @@ impl ByteSink for CountingWriter {
     }
 }
 
+/// The reference-compatible repairs one property's parse applied.
+///
+/// Readers set these while decoding; the section parser records them in the
+/// stream's [`ToleranceReport`] against the property identifier, so one
+/// property contributes at most one entry per repair class.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Repairs {
+    /// A string held malformed MBCS or unpaired UTF-16 (F7.8).
+    pub(crate) lossy_decode: bool,
+}
+
+impl Repairs {
+    pub(crate) const fn is_empty(self) -> bool {
+        !self.lossy_decode
+    }
+
+    /// Records every repair class set here against `property_identifier`.
+    pub(crate) fn record(self, report: &mut ToleranceReport, property_identifier: u32) {
+        if self.lossy_decode {
+            report.record(StringDefect::LossyDecode, property_identifier);
+        }
+    }
+
+    /// Refuses any repair, for callers that cannot record one.
+    pub(crate) fn require_none(self, description: &str) -> Result<(), OleError> {
+        if self.is_empty() {
+            Ok(())
+        } else {
+            Err(invalid(format!(
+                "{description} needs a repair this path cannot record"
+            )))
+        }
+    }
+}
+
 pub(super) struct ValueReader<'a> {
     data: &'a [u8],
     position: usize,
     alignment_base: usize,
+    /// Repairs applied while reading through this reader.
+    pub(super) repairs: Repairs,
 }
 
 impl<'a> ValueReader<'a> {
@@ -163,6 +201,9 @@ impl<'a> ValueReader<'a> {
             data,
             position: 0,
             alignment_base,
+            repairs: Repairs {
+                lossy_decode: false,
+            },
         }
     }
 
@@ -375,13 +416,13 @@ pub(super) fn read_codepage_string(
             .iter()
             .position(|pair| *pair == [0, 0])
             .map_or(raw.len(), |terminator_index| terminator_index * 2);
-        decode_utf16(&raw[..end], description)?
+        decode_utf16_lossy(&raw[..end], description, &mut reader.repairs)?
     } else {
         if raw.last() != Some(&0) {
             return Err(invalid(format!("{description} is not NUL-terminated")));
         }
         let end = raw.iter().position(|byte| *byte == 0).unwrap_or(raw.len());
-        decode_ansi(&raw[..end], codepage, description)?
+        decode_ansi_lossy(&raw[..end], codepage, description, &mut reader.repairs)?
     };
     reader.align4(top_level, &format!("{description} padding"))?;
     Ok(value)
@@ -410,54 +451,67 @@ pub(super) fn read_unicode_string(
             .iter()
             .position(|pair| *pair == [0, 0])
             .map_or(raw.len(), |terminator_index| terminator_index * 2);
-        decode_utf16(&raw[..end], description)?
+        decode_utf16_lossy(&raw[..end], description, &mut reader.repairs)?
     };
     reader.align4(top_level, &format!("{description} padding"))?;
     Ok(value)
 }
 
-pub(super) fn decode_utf16(data: &[u8], description: &str) -> Result<String, OleError> {
+/// Decodes UTF-16LE, substituting U+FFFD for unpaired surrogates (leniency
+/// audit F7.8) and noting the substitution in `repairs`.
+///
+/// Windows' property reader and POI's replacing decoders do the same; one
+/// malformed string must not cost the caller every other property.
+pub(super) fn decode_utf16_lossy(
+    data: &[u8],
+    description: &str,
+    repairs: &mut Repairs,
+) -> Result<String, OleError> {
     if !data.len().is_multiple_of(2) {
         return Err(invalid(format!("{description} has an odd byte length")));
     }
-    let mut utf8_len = 0usize;
-    for decoded in std::char::decode_utf16(
+    let units = || {
         data.as_chunks::<2>()
             .0
             .iter()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
-    ) {
-        let character = decoded
-            .map_err(|_utf16_error| invalid(format!("{description} contains invalid UTF-16")))?;
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+    };
+    let mut utf8_len = 0usize;
+    let mut lossy = false;
+    for decoded in std::char::decode_utf16(units()) {
+        let character = decoded.unwrap_or_else(|_unpaired| {
+            lossy = true;
+            char::REPLACEMENT_CHARACTER
+        });
         utf8_len = checked_add(utf8_len, character.len_utf8(), description)?;
     }
     let mut value = String::new();
     value
         .try_reserve_exact(utf8_len)
         .map_err(|source| allocation("decoded UTF-16 string", source))?;
-    for decoded in std::char::decode_utf16(
-        data.as_chunks::<2>()
-            .0
-            .iter()
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]])),
-    ) {
-        let character = decoded
-            .map_err(|_utf16_error| invalid(format!("{description} contains invalid UTF-16")))?;
-        value.push(character);
-    }
+    value.extend(
+        std::char::decode_utf16(units())
+            .map(|decoded| decoded.unwrap_or(char::REPLACEMENT_CHARACTER)),
+    );
+    repairs.lossy_decode |= lossy;
     Ok(value)
 }
 
-pub(super) fn decode_ansi(
+/// Decodes an MBCS string, substituting U+FFFD for malformed sequences
+/// (leniency audit F7.8) and noting the substitution in `repairs`.
+///
+/// `MultiByteToWideChar`, which ole32's property reader uses, substitutes a
+/// default character the same way. An unsupported code page stays an error.
+pub(super) fn decode_ansi_lossy(
     data: &[u8],
     codepage: u16,
     description: &str,
+    repairs: &mut Repairs,
 ) -> Result<String, OleError> {
     let page = Mbcs::require(u32::from(codepage))
         .map_err(|error| invalid(format!("Could not decode {description}: {error}")))?;
-    let decoded = page
-        .decode(data)
-        .map_err(|error| invalid(format!("Could not decode {description}: {error}")))?;
+    let (decoded, lossy) = page.recover(data);
+    repairs.lossy_decode |= lossy;
     match decoded {
         Cow::Borrowed(value) => try_clone_string(value, "decoded ANSI string"),
         Cow::Owned(value) => Ok(value),

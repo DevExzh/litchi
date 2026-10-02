@@ -28,6 +28,7 @@ use super::super::model::Value;
 use litchi_cfb::OleError;
 
 pub(crate) use semantic::{filetime_to_date, filetime_to_duration};
+pub(crate) use wire::Repairs;
 
 impl Stream {
     /// Parse a complete Property Set stream with section-local bounds.
@@ -76,7 +77,7 @@ pub(crate) fn parse_typed_property_for_property(
     codepage: u16,
     property_offset: usize,
     property_identifier: u32,
-) -> Result<Value, OleError> {
+) -> Result<(Value, Repairs), OleError> {
     semantic::parse_typed_property_for_property(
         data,
         codepage,
@@ -90,7 +91,7 @@ pub(crate) fn parse_typed_property_for_non_simple_property(
     codepage: u16,
     property_offset: usize,
     property_identifier: u32,
-) -> Result<Value, OleError> {
+) -> Result<(Value, Repairs), OleError> {
     semantic::parse_typed_property_for_non_simple_property(
         data,
         codepage,
