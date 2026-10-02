@@ -300,7 +300,7 @@ fn inventory_materializes_inherited_namespaces_after_quoted_gt_and_refuses_malfo
 }
 
 #[test]
-fn inventory_rejects_unbound_prefixes_and_non_xml_relationship_ids() {
+fn inventory_rejects_unbound_prefixes_and_records_non_xml_relationship_ids() {
     let unbound_relationship = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr><w:headerReference w:type="default" r:id="rId1"/></w:sectPr></w:body></w:document>"#;
     assert!(Inventory::parse(unbound_relationship).is_err());
 
@@ -311,14 +311,35 @@ fn inventory_rejects_unbound_prefixes_and_non_xml_relationship_ids() {
         let xml = format!(
             r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:sectPr><w:headerReference w:type="default" r:id="{relationship_id}"/></w:sectPr></w:body></w:document>"#
         );
-        assert!(
-            Inventory::parse(xml.as_bytes()).is_err(),
-            "accepted invalid relationship ID {relationship_id:?}"
+        // Relationship lookup is literal: the ID is kept and recorded.
+        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            inventory.sections()[0].headers()[0].relationship_id,
+            relationship_id
+        );
+        assert_eq!(
+            inventory
+                .tolerance_report()
+                .defects()
+                .iter()
+                .map(|tolerated| (tolerated.defect, tolerated.context))
+                .collect::<Vec<_>>(),
+            [(
+                crate::leniency::Defect::Section(
+                    crate::leniency::SectionDefect::NonConformingRelationshipId
+                ),
+                xml.find("<w:headerReference").unwrap() as u64
+            )]
         );
     }
 
     let valid = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:sectPr><w:headerReference w:type="default" r:id="_header-1.2"/></w:sectPr></w:body></w:document>"#;
-    assert!(Inventory::parse(valid).is_ok());
+    assert!(
+        Inventory::parse(valid)
+            .unwrap()
+            .tolerance_report()
+            .is_clean()
+    );
 }
 
 #[test]

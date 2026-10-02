@@ -66,6 +66,9 @@
 //! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
 //!   (and the source-backed inventories) record [`SectionDefect`];
 //!   [`Section`](crate::Section) and the inventory carry their own.
+//! - 2.12 — the section decoders record
+//!   [`SectionDefect::NonConformingRelationshipId`] through the same carriers
+//!   as 2.7.
 //! - 2.8 — [`Document::content_controls`](crate::Document::content_controls)
 //!   records [`ContentControlDefect`]; the
 //!   [`content_control::Inventory`](crate::content_control::Inventory) carries
@@ -493,11 +496,12 @@ impl RevisionDefect {
     }
 }
 
-/// The class of section-layout (`w:sectPr`) defect the reader repairs the
-/// way Word and LibreOffice lay it out.
+/// The class of section (`w:sectPr`) defect the reader repairs the way Word
+/// and LibreOffice read the section.
 ///
 /// This enumeration is closed by design. Each repair degrades only the
-/// column model of one section instead of failing that section's semantic
+/// column model (or keeps one header/footer reference as written) of one
+/// section instead of failing that section's semantic
 /// decode — and with it [`Section::columns`](crate::Section::columns), the
 /// section inventory, and the layout snapshot. Each is recorded on the
 /// decoded section ([`Section::tolerance_report`](crate::Section::tolerance_report),
@@ -524,6 +528,13 @@ pub enum SectionDefect {
     /// there are 1 to 45 of them; otherwise the section uses equal-width
     /// columns.
     ColumnCountMismatch,
+    /// A `w:headerReference`/`w:footerReference` `r:id` is not an XML ID
+    /// (for example a numeric `"1"`). `ST_RelationshipId` is an `xsd:ID`, but
+    /// OPC resolves a relationship by literal string equality, so Word and
+    /// LibreOffice follow it; the reference is kept as written. Rewriting
+    /// such a section through the section writers still requires an
+    /// `NCName`.
+    NonConformingRelationshipId,
 }
 
 impl SectionDefect {
@@ -535,6 +546,9 @@ impl SectionDefect {
             Self::ColumnCountOutOfRange => "clamped the column count to 1..=45",
             Self::ColumnCountMismatch => {
                 "took the column count from the explicit columns (or used equal widths)"
+            },
+            Self::NonConformingRelationshipId => {
+                "kept the header/footer relationship ID that is not an XML ID"
             },
         }
     }
@@ -1000,6 +1014,7 @@ mod tests {
             Defect::from(SectionDefect::ColumnWidthMissing),
             Defect::from(SectionDefect::ColumnCountOutOfRange),
             Defect::from(SectionDefect::ColumnCountMismatch),
+            Defect::from(SectionDefect::NonConformingRelationshipId),
             Defect::from(ContentControlDefect::UnknownLockValue),
             Defect::from(ContentControlDefect::InvalidProperty),
             Defect::from(litchi_opc::leniency::Defect::from(

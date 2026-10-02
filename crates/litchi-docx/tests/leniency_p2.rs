@@ -9,7 +9,8 @@ use std::io;
 use std::path::Path;
 
 use litchi_docx::{
-    Defect, DrawingDefect, FieldDefect, NumberingDefect, Package, StyleDefect, source_backed,
+    Defect, DrawingDefect, FieldDefect, NumberingDefect, Package, SectionDefect, StyleDefect,
+    source_backed,
 };
 use litchi_drawingml::geom::Preset;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -494,6 +495,117 @@ fn unbalanced_simple_field_stays_fatal() {
         open(&bytes)
             .document()
             .and_then(|document| document.fields())
+            .is_err()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// F2.12 — header/footer relationship ID that is not an XML ID
+// ---------------------------------------------------------------------------
+
+const HEADERS: &str = "headerFooter.docx";
+const DEFAULT_HEADER: &str = r#"<w:headerReference w:type="default" r:id="rId5"/>"#;
+const UNUSED_MCE_BINDING: &str =
+    r#" xmlns:ve="http://schemas.openxmlformats.org/markup-compatibility/2006""#;
+
+/// `headerFooter.docx` without its unused markup-compatibility namespace
+/// binding, which the source-backed section inventory refuses outright.
+fn header_fixture() -> Vec<u8> {
+    patch(
+        &fixture(HEADERS),
+        "word/document.xml",
+        UNUSED_MCE_BINDING,
+        "",
+    )
+}
+
+/// The header fixture with the default header reference written as the
+/// numeric ID `5`. (The OPC reader itself requires XML IDs in `.rels`, so
+/// the reference cannot name an existing relationship.)
+fn numeric_header_id() -> Vec<u8> {
+    patch(
+        &header_fixture(),
+        "word/document.xml",
+        DEFAULT_HEADER,
+        r#"<w:headerReference w:type="default" r:id="5"/>"#,
+    )
+}
+
+fn section_defects(report: &litchi_docx::ToleranceReport) -> Vec<Defect> {
+    report
+        .defects()
+        .iter()
+        .map(|tolerated| tolerated.defect)
+        .collect()
+}
+
+#[test]
+fn numeric_header_relationship_id_is_kept_and_recorded() {
+    let bytes = numeric_header_id();
+    let xml = visible(&member(&bytes, "word/document.xml"));
+    let reference = xml
+        .find(r#"<w:headerReference w:type="default" r:id="5">"#)
+        .or_else(|| xml.find(r#"<w:headerReference w:type="default" r:id="5"/>"#))
+        .expect("reference") as u64;
+    let expected = [(
+        Defect::Section(SectionDefect::NonConformingRelationshipId),
+        reference,
+    )];
+
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let inventory = document
+        .section_inventory()
+        .expect("a numeric r:id no longer fails the section inventory");
+    let ids = inventory.sections()[0]
+        .headers()
+        .iter()
+        .map(|header| header.relationship_id.clone())
+        .collect::<Vec<_>>();
+    assert!(ids.contains(&"5".to_owned()), "{ids:?}");
+    assert_eq!(defects(inventory.tolerance_report()), expected);
+    assert_eq!(defects(&document.tolerance_report()), expected);
+
+    let source = open_source_backed(&bytes);
+    let pinned = source.document().expect("pinned document");
+    let inventory = pinned.section_inventory().expect("section inventory");
+    assert_eq!(
+        section_defects(inventory.tolerance_report()),
+        [Defect::Section(SectionDefect::NonConformingRelationshipId)]
+    );
+    assert_eq!(
+        section_defects(&pinned.tolerance_report()),
+        [Defect::Section(SectionDefect::NonConformingRelationshipId)]
+    );
+}
+
+#[test]
+fn conformant_header_relationship_ids_record_nothing() {
+    let bytes = header_fixture();
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    document.section_inventory().expect("sections");
+    assert!(document.tolerance_report().is_clean());
+    let source = open_source_backed(&bytes);
+    let pinned = source.document().expect("pinned");
+    pinned.section_inventory().expect("sections");
+    assert!(pinned.tolerance_report().is_clean());
+}
+
+#[test]
+fn empty_header_relationship_id_stays_fatal() {
+    let bytes = patch(
+        &header_fixture(),
+        "word/document.xml",
+        DEFAULT_HEADER,
+        r#"<w:headerReference w:type="default" r:id=""/>"#,
+    );
+    let package = open(&bytes);
+    assert!(
+        package
+            .document()
+            .expect("document")
+            .section_inventory()
             .is_err()
     );
 }

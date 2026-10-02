@@ -1035,8 +1035,16 @@ fn decode_state(raw: &Raw, tolerance: &mut ToleranceReport) -> Result<State> {
                 }
                 state.columns = Some(parse_columns(raw, child, child_offset, tolerance)?);
             },
-            "headerReference" => state.headers.push(parse_reference(raw, child)?),
-            "footerReference" => state.footers.push(parse_reference(raw, child)?),
+            "headerReference" => {
+                state
+                    .headers
+                    .push(parse_reference(raw, child, child_offset, tolerance)?);
+            },
+            "footerReference" => {
+                state
+                    .footers
+                    .push(parse_reference(raw, child, child_offset, tolerance)?);
+            },
             _ => {},
         }
     }
@@ -1186,7 +1194,14 @@ fn parse_columns(
     Ok(columns)
 }
 
-fn parse_reference(raw: &Raw, xml: &[u8]) -> Result<Reference> {
+/// `offset` is the byte offset of the reference's start tag in the section
+/// XML.
+fn parse_reference(
+    raw: &Raw,
+    xml: &[u8],
+    offset: usize,
+    tolerance: &mut ToleranceReport,
+) -> Result<Reference> {
     let attrs = attributes(raw, xml, AttributeFamily::Reference)?;
     let kind = Kind::from_xml(required_attr(&attrs, "type")?.as_str())
         .ok_or_else(|| Error::InvalidFormat("invalid section header/footer type".into()))?;
@@ -1197,9 +1212,10 @@ fn parse_reference(raw: &Raw, xml: &[u8]) -> Result<Reference> {
         ));
     }
     if !is_xml_id(&relationship_id) {
-        return Err(Error::InvalidFormat(
-            "section header/footer relationship ID is not an XML ID".into(),
-        ));
+        // ST_RelationshipId is an xsd:ID, but relationship lookup is literal
+        // string equality, so Word and LibreOffice resolve a numeric ID such
+        // as "0" or "1" (LENIENCY_AUDIT 2.12). Keep it and record it.
+        tolerance.record(SectionDefect::NonConformingRelationshipId, offset as u64);
     }
     Ok(Reference {
         kind,
