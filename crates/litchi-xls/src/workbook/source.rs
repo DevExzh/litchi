@@ -495,6 +495,23 @@ impl SourceInner {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         formatting.check_cell_xf(index, u32::from(row), &mut report);
     }
+
+    /// Record the Excel-compatible lossy decode of a `Label` record whose
+    /// text holds an unpaired UTF-16 surrogate, if it does. Like
+    /// [`Self::check_cell_xf`], the lock is taken only on the defect path.
+    fn check_label_text(&self, kind: u16, payload: &[u8]) {
+        let Some((row, col, _unit)) = CellRecord::label_unpaired_surrogate(kind, payload) else {
+            return;
+        };
+        self.tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .record(
+                EncodingDefect::LabelSurrogate,
+                u32::from(row),
+                u32::from(col),
+            );
+    }
 }
 
 /// An immutable, cheaply cloned source-backed XLS workbook.
@@ -2245,7 +2262,8 @@ fn parse_globals(
     })?;
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
-    let sst = scan_shared_string_records(&sst_refs).map_err(map_shared_string_error)?;
+    let sst = scan_shared_string_records(&sst_refs, tolerance.report_mut())
+        .map_err(map_shared_string_error)?;
 
     let mut sheets = Vec::new();
     sheets
@@ -2852,6 +2870,7 @@ fn scan_text_sheet(
                 let payload = scan.read_payload(&frame)?;
                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
+                owner.check_label_text(frame.kind, payload);
                 collect_source_cell(&cell, owner, &mut collected, execution, strings)?;
             },
             0x00BD => {
@@ -3456,6 +3475,7 @@ fn scan_worksheet<S: CellSink>(
             },
             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
                 let payload = scan.read_payload(&frame)?;
+                owner.check_label_text(frame.kind, payload);
                 if !wants_record(sink, payload) {
                     let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
                         .map_err(SourceBackedError::Parse)?;
@@ -3718,6 +3738,7 @@ fn replay_indexed_slot(
         0x0006 | 0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
             let record = CellRecord::parse(kind, &payload, &owner.encoding)
                 .map_err(SourceBackedError::Parse)?;
+            owner.check_label_text(kind, &payload);
             if record.row() != slot.row
                 || record.col() != slot.column
                 || cell_xf_index(&record) != slot.xf

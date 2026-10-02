@@ -1,6 +1,6 @@
 //! BIFF8 workbook font table support.
 
-use super::leniency::{FormattingDefect, ToleranceLog};
+use super::leniency::{EncodingDefect, FormattingDefect, ToleranceLog, first_unpaired_surrogate};
 use super::{Color, Error, Palette, Result};
 
 /// MS-XLS 2.4.122 `Font` record type.
@@ -364,15 +364,23 @@ impl Font {
 
         let name_bytes = &data[16..];
         let name = if wide {
-            char::decode_utf16(
-                name_bytes
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
-                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
-            )
-            .collect::<Result<String, _>>()
-            .map_err(|error| invalid(format!("Font name is invalid UTF-16: {error}")))?
+            let units = name_bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .collect::<Vec<_>>();
+            String::from_utf16(&units).unwrap_or_else(|_| {
+                // Excel-compatible under every policy: an unpaired surrogate
+                // decodes to U+FFFD, as POI and LibreOffice decode it.
+                let unit = first_unpaired_surrogate(units.iter().copied()).unwrap_or_default();
+                tolerance.report_mut().record(
+                    EncodingDefect::FontNameSurrogate,
+                    u32::from(index),
+                    u32::from(unit),
+                );
+                String::from_utf16_lossy(&units)
+            })
         } else {
             name_bytes.iter().map(|&value| char::from(value)).collect()
         };

@@ -5,7 +5,10 @@
 //! data including cell values, formatting, formulas, and metadata.
 
 use crate::error::{Error, Result};
-use crate::leniency::{Leniency, SheetDefect, SheetNameDefect, ToleranceLog};
+use crate::leniency::{
+    Leniency, SharedStringDefect, SheetDefect, SheetNameDefect, ToleranceLog, ToleranceReport,
+    first_unpaired_surrogate,
+};
 use crate::utils;
 use litchi_biff::RecordRef;
 use litchi_codepage::{Mbcs, Page};
@@ -531,7 +534,21 @@ impl SharedStringTable {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    ///
+    /// Shared-string defects Excel reads past — an unpaired UTF-16 surrogate
+    /// (decoded to U+FFFD) or an out-of-order formatting or phonetic run
+    /// (dropped) — are repaired; a workbook open lists those repairs in its
+    /// [`crate::ToleranceReport`] as [`crate::SharedStringDefect`]s.
     pub fn parse_from_records(records: &[RecordRef<'_>], encoding: &Encoding) -> Result<Self> {
+        Self::parse_from_records_tolerant(records, encoding, &mut ToleranceReport::default())
+    }
+
+    /// [`Self::parse_from_records`], recording every repair in `report`.
+    pub(crate) fn parse_from_records_tolerant(
+        records: &[RecordRef<'_>],
+        encoding: &Encoding,
+        report: &mut ToleranceReport,
+    ) -> Result<Self> {
         if records.is_empty() {
             return Ok(SharedStringTable {
                 strings: Vec::new(),
@@ -558,17 +575,21 @@ impl SharedStringTable {
         }
 
         let segments: Vec<&[u8]> = records.iter().map(|record| record.payload()).collect();
-        Self::parse_segments(&segments, encoding)
+        Self::parse_segments(&segments, encoding, report)
     }
 
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn parse(data: &[u8], encoding: &Encoding) -> Result<Self> {
-        Self::parse_segments(&[data], encoding)
+        Self::parse_segments(&[data], encoding, &mut ToleranceReport::default())
     }
 
-    fn parse_segments(segments: &[&[u8]], _encoding: &Encoding) -> Result<Self> {
+    fn parse_segments(
+        segments: &[&[u8]],
+        _encoding: &Encoding,
+        report: &mut ToleranceReport,
+    ) -> Result<Self> {
         let mut cursor = SstCursor::new(segments);
         cursor.ensure_current(8, "SST header")?;
         let total_count = cursor.read_u32_continued("SST total count")?;
@@ -604,6 +625,7 @@ impl SharedStringTable {
             })?;
 
         for string_index in 0..unique_count {
+            cursor.string_index = string_index;
             cursor.ensure_current(3, "shared string header")?;
             let character_count = cursor.read_u16_continued("shared string character count")?;
             let flags = cursor.read_u8_continued("shared string flags")?;
@@ -636,6 +658,7 @@ impl SharedStringTable {
                     &extension,
                     character_count,
                     string_index,
+                    &mut cursor.repairs,
                 )?)
             } else {
                 None
@@ -651,6 +674,7 @@ impl SharedStringTable {
             strings.push(text);
             properties.push(property);
         }
+        report.absorb(std::mem::take(&mut cursor.repairs));
 
         Ok(SharedStringTable {
             strings,
@@ -839,6 +863,12 @@ struct SstCursor<'a> {
     /// a debug assertion in `logical_position` recomputes the old sum and
     /// compares, so every test run proves the two agree.
     logical_base: usize,
+    /// Zero-based index of the shared string being walked: the ordinal of
+    /// every repair recorded while walking it.
+    string_index: usize,
+    /// Repairs applied so far; the caller absorbs them into the workbook's
+    /// report once the walk succeeds.
+    repairs: ToleranceReport,
 }
 
 /// A cursor position that [`SstCursor::seek`] can restore exactly.
@@ -856,6 +886,8 @@ impl<'a> SstCursor<'a> {
             segment_index: 0,
             offset: 0,
             logical_base: 0,
+            string_index: 0,
+            repairs: ToleranceReport::default(),
         }
     }
 
@@ -865,6 +897,8 @@ impl<'a> SstCursor<'a> {
             segment_index: 0,
             offset: 0,
             logical_base: 0,
+            string_index: 0,
+            repairs: ToleranceReport::default(),
         }
     }
 
@@ -1050,11 +1084,26 @@ impl<'a> SstCursor<'a> {
         Ok(())
     }
 
+    /// Record `defect` against the shared string being walked.
+    fn record(&mut self, defect: SharedStringDefect, observed: u32) {
+        let ordinal = u32::try_from(self.string_index).unwrap_or(u32::MAX);
+        self.repairs.record(defect, ordinal, observed);
+    }
+
+    /// Decodes the character data, replacing each unpaired surrogate with
+    /// U+FFFD as POI and LibreOffice do, and recording the repair as
+    /// [`SharedStringDefect::UnpairedSurrogate`].
     fn read_characters(&mut self, count: u16, high_byte: bool) -> Result<String> {
         let mut sink = CollectedCodeUnits::with_capacity(count)?;
         self.walk_characters(count, high_byte, &mut sink)?;
-        String::from_utf16(&sink.units)
-            .map_err(|error| Error::Encoding(format!("UTF-16 decoding error: {error}")))
+        match String::from_utf16(&sink.units) {
+            Ok(text) => Ok(text),
+            Err(_) => {
+                let unit = first_unpaired_surrogate(sink.units.iter().copied()).unwrap_or_default();
+                self.record(SharedStringDefect::UnpairedSurrogate, u32::from(unit));
+                Ok(String::from_utf16_lossy(&sink.units))
+            },
+        }
     }
 
     /// Advances over exactly the character data [`Self::read_characters`] would
@@ -1063,8 +1112,8 @@ impl<'a> SstCursor<'a> {
     ///
     /// UTF-16 well-formedness is still decided, streaming, as the walk runs. A
     /// malformed string takes a cold path that rewinds and materializes the
-    /// same span, so that the refusal is produced by `String::from_utf16`
-    /// itself and its message is byte-identical to the materializing path's.
+    /// same span, so that its repair is recorded by the identical code as the
+    /// materializing path's.
     fn measure_characters(&mut self, count: u16, high_byte: bool) -> Result<()> {
         let restart = self.position();
         let mut sink = SurrogatePairing::default();
@@ -1109,15 +1158,17 @@ impl<'a> SstCursor<'a> {
         for _ in 0..count {
             let character_index = self.read_u16_continued("shared string formatting run")?;
             let font_index = self.read_u16_continued("shared string formatting run")?;
-            if character_index > character_count {
-                return Err(Error::InvalidData(format!(
-                    "shared string {string_index} has a formatting run past its text"
-                )));
-            }
-            if previous.is_some_and(|value| character_index <= value) {
-                return Err(Error::InvalidData(format!(
-                    "shared string {string_index} formatting runs are not strictly increasing"
-                )));
+            if character_index > character_count
+                || previous.is_some_and(|value| character_index <= value)
+            {
+                // A run past the text or out of order is dropped; the text and
+                // every other run survive.
+                debug_assert_eq!(string_index, self.string_index);
+                self.record(
+                    SharedStringDefect::FormattingRun,
+                    u32::from(character_index),
+                );
+                continue;
             }
             previous = Some(character_index);
             if character_index < character_count {
@@ -1135,7 +1186,9 @@ fn parse_phonetic_string(
     data: &[u8],
     base_character_count: u16,
     string_index: usize,
+    repairs: &mut ToleranceReport,
 ) -> Result<PhoneticString> {
+    let ordinal = u32::try_from(string_index).unwrap_or(u32::MAX);
     if data.len() < 14 {
         return Err(Error::InvalidLength {
             expected: 14,
@@ -1195,15 +1248,22 @@ fn parse_phonetic_string(
         .iter()
         .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
         .collect();
-    let text = String::from_utf16(&text_words)
-        .map_err(|error| Error::Encoding(format!("ExtRst UTF-16 decoding error: {error}")))?;
+    let text = String::from_utf16(&text_words).unwrap_or_else(|_| {
+        let unit = first_unpaired_surrogate(text_words.iter().copied()).unwrap_or_default();
+        repairs.record(
+            SharedStringDefect::PhoneticSurrogate,
+            ordinal,
+            u32::from(unit),
+        );
+        String::from_utf16_lossy(&text_words)
+    });
 
     let mut runs = Vec::with_capacity(run_count as usize);
     let mut offset = 14 + text_byte_length;
     let mut previous_phonetic = None;
     let mut previous_base = None;
     let mut total_base_length = 0usize;
-    for _ in 0..run_count {
+    for run_index in 0..run_count {
         let phonetic_text_index = binary::read_u16_le(data, offset)?;
         let base_text_index = binary::read_u16_le(data, offset + 2)?;
         let base_text_length = binary::read_u16_le(data, offset + 4)?;
@@ -1215,9 +1275,14 @@ fn parse_phonetic_string(
             || previous_phonetic.is_some_and(|value| phonetic_text_index <= value)
             || previous_base.is_some_and(|value| base_text_index <= value)
         {
-            return Err(Error::InvalidData(format!(
-                "shared string {string_index} has an invalid ExtRst phonetic run"
-            )));
+            // The run is dropped; the phonetic text and the other runs stay.
+            repairs.record(
+                SharedStringDefect::PhoneticRun,
+                ordinal,
+                u32::from(run_index),
+            );
+            offset += 6;
+            continue;
         }
         total_base_length = total_base_length.saturating_add(base_text_length as usize);
         previous_phonetic = Some(phonetic_text_index);
@@ -1230,9 +1295,12 @@ fn parse_phonetic_string(
         offset += 6;
     }
     if total_base_length > base_character_count as usize {
-        return Err(Error::InvalidData(format!(
-            "shared string {string_index} ExtRst runs exceed the base string"
-        )));
+        repairs.record(
+            SharedStringDefect::PhoneticRun,
+            ordinal,
+            u32::from(run_count),
+        );
+        runs.clear();
     }
 
     Ok(PhoneticString {
@@ -1397,6 +1465,7 @@ fn walk_one_shared_string<T: SharedStringText>(
     cursor: &mut SstCursor<'_>,
     string_index: usize,
 ) -> Result<T, SharedStringScanError> {
+    cursor.string_index = string_index;
     cursor
         .ensure_current(3, "shared string header")
         .map_err(SharedStringScanError::Biff)?;
@@ -1446,16 +1515,24 @@ fn walk_one_shared_string<T: SharedStringText>(
         let extension = cursor
             .read_bytes(extension_length, "shared string ExtRst")
             .map_err(SharedStringScanError::Biff)?;
-        parse_phonetic_string(&extension, character_count, string_index)
-            .map_err(SharedStringScanError::Biff)?;
+        parse_phonetic_string(
+            &extension,
+            character_count,
+            string_index,
+            &mut cursor.repairs,
+        )
+        .map_err(SharedStringScanError::Biff)?;
     }
     Ok(value)
 }
 
+/// Scan the SST for each string's location, recording in `report` every
+/// repair a decode of the string will apply (see [`SharedStringDefect`]).
 pub(crate) fn scan_shared_string_records(
     records: &[RecordRef<'_>],
+    report: &mut ToleranceReport,
 ) -> Result<SharedStringSstScan, SharedStringScanError> {
-    scan_shared_string_records_as::<MeasuredText>(records)
+    scan_shared_string_records_as::<MeasuredText>(records, report)
 }
 
 /// The SST offset scan, parameterised by what it does with each string's
@@ -1467,6 +1544,7 @@ pub(crate) fn scan_shared_string_records(
 /// framing walk rather than two hand-written walks that could drift apart.
 fn scan_shared_string_records_as<T: SharedStringText>(
     records: &[RecordRef<'_>],
+    report: &mut ToleranceReport,
 ) -> Result<SharedStringSstScan, SharedStringScanError> {
     if records.is_empty() {
         return Ok(SharedStringSstScan::empty());
@@ -1553,10 +1631,14 @@ fn scan_shared_string_records_as<T: SharedStringText>(
         let end = cursor.logical_position();
         entries.push(SharedStringEntryLocation { start, end });
     }
+    report.absorb(std::mem::take(&mut cursor.repairs));
 
     Ok(SharedStringSstScan { segments, entries })
 }
 
+/// Decode one shared string located by a prior scan. The scan already
+/// recorded every repair the decode applies, so the decode's own record of
+/// them is discarded.
 pub(crate) fn decode_shared_string_entry(
     segments: &[&[u8]],
 ) -> Result<String, SharedStringScanError> {
@@ -1573,13 +1655,11 @@ mod sst_measure_tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    /// The message `String::from_utf16` produces for malformed UTF-16, which is
-    /// the refusal the open-time scan has always reported and must keep
-    /// reporting. `char::decode_utf16` would say `unpaired surrogate found: …`
-    /// instead; that difference is the whole reason the measure-only walk takes
-    /// a cold path through `String::from_utf16` rather than reporting itself.
-    const LONE_SURROGATE_MESSAGE: &str =
-        "UTF-16 decoding error: invalid utf-16: lone surrogate found";
+    /// The outcome [`scan_both_ways`] reports for a scan that succeeded by
+    /// decoding an unpaired surrogate lossily and recording the repair. Both
+    /// walks record it through the identical `read_characters` code, the
+    /// measure-only walk on its cold path.
+    const LOSSY_SURROGATE: &str = "lossy: unpaired surrogate repaired";
 
     fn frame(kind: u16, payload: &[u8]) -> Frame {
         let mut encoder = Encoder::new();
@@ -1626,16 +1706,45 @@ mod sst_measure_tests {
         }
     }
 
+    /// One instantiation of the scan, described together with its repairs.
+    fn scan_with<T: SharedStringText>(records: &[RecordRef<'_>]) -> String {
+        let mut report = ToleranceReport::default();
+        let result = scan_shared_string_records_as::<T>(records, &mut report);
+        let repairs = report
+            .defects()
+            .iter()
+            .map(|entry| {
+                format!(
+                    "{:?}@{}={:#x}",
+                    entry.defect(),
+                    entry.ordinal(),
+                    entry.observed()
+                )
+            })
+            .collect::<Vec<_>>();
+        if repairs.is_empty() {
+            describe(&result)
+        } else {
+            format!("{} repaired {repairs:?}", describe(&result))
+        }
+    }
+
     /// Runs both instantiations of the scan over the same records and asserts
-    /// they agree exactly. Returns that shared outcome.
+    /// they agree exactly — outcome and repairs. Returns that shared outcome,
+    /// condensed to [`LOSSY_SURROGATE`] when it succeeded by repairing an
+    /// unpaired surrogate.
     fn scan_both_ways(records: &[RecordRef<'_>]) -> String {
-        let measured = describe(&scan_shared_string_records_as::<MeasuredText>(records));
-        let materialized = describe(&scan_shared_string_records_as::<String>(records));
+        let measured = scan_with::<MeasuredText>(records);
+        let materialized = scan_with::<String>(records);
         assert_eq!(
             measured, materialized,
             "the measure-only walk and the materializing walk disagree"
         );
-        measured
+        if measured.starts_with("ok ") && measured.contains("UnpairedSurrogate") {
+            LOSSY_SURROGATE.to_string()
+        } else {
+            measured
+        }
     }
 
     fn scan_payloads(payloads: &[Vec<u8>]) -> String {
@@ -1715,28 +1824,33 @@ mod sst_measure_tests {
     }
 
     #[test]
-    fn a_lone_high_surrogate_keeps_the_from_utf16_message() {
+    fn a_lone_high_surrogate_is_decoded_lossily_and_recorded() {
         let frames = sst_frames(&one_wide_string(&[0xD800]));
         let records: Vec<RecordRef<'_>> = frames.iter().map(Frame::as_ref).collect();
 
-        let error = scan_shared_string_records(&records)
-            .expect_err("a shared string ending in a high surrogate is refused");
-        let SharedStringScanError::Biff(Error::Encoding(message)) = &error else {
-            panic!("expected a typed encoding refusal, got {error:?}");
-        };
-        assert_eq!(message, LONE_SURROGATE_MESSAGE);
-        assert!(
-            !message.contains("unpaired surrogate"),
-            "the refusal must not be produced by char::decode_utf16: {message}"
-        );
+        let mut report = ToleranceReport::default();
+        let scan = scan_shared_string_records(&records, &mut report)
+            .unwrap_or_else(|_| panic!("a lone high surrogate is decoded lossily"));
+        assert_eq!(scan.entries.len(), 1);
+        assert_eq!(report.total(), 1);
+        let entry = report.defects()[0];
         assert_eq!(
-            scan_both_ways(&records),
-            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+            entry.defect(),
+            crate::leniency::Defect::SharedString(SharedStringDefect::UnpairedSurrogate)
         );
+        assert_eq!(entry.ordinal(), 0, "the shared-string index");
+        assert_eq!(entry.observed(), 0xD800, "the unpaired code unit");
+        assert_eq!(scan_both_ways(&records), LOSSY_SURROGATE);
+
+        // The lazy decode the source-backed reader runs later yields U+FFFD.
+        let payload = records[0].payload();
+        let text = decode_shared_string_entry(&[&payload[8..]])
+            .unwrap_or_else(|_| panic!("the lazy decode is lossy too"));
+        assert_eq!(text, "\u{FFFD}");
     }
 
     #[test]
-    fn every_unpaired_surrogate_shape_keeps_the_from_utf16_message() {
+    fn every_unpaired_surrogate_shape_is_decoded_lossily() {
         let shapes: [(&str, Vec<u16>); 6] = [
             ("trailing high surrogate", vec![0x0041, 0xD800]),
             ("leading low surrogate", vec![0xDC00, 0x0041]),
@@ -1748,11 +1862,7 @@ mod sst_measure_tests {
         for (name, units) in shapes {
             let frames = sst_frames(&one_wide_string(&units));
             let records: Vec<RecordRef<'_>> = frames.iter().map(Frame::as_ref).collect();
-            assert_eq!(
-                scan_both_ways(&records),
-                format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}"),
-                "{name}"
-            );
+            assert_eq!(scan_both_ways(&records), LOSSY_SURROGATE, "{name}");
         }
     }
 
@@ -1765,25 +1875,19 @@ mod sst_measure_tests {
     }
 
     #[test]
-    fn a_high_surrogate_stranded_by_a_compressed_continuation_is_refused() {
+    fn a_high_surrogate_stranded_by_a_compressed_continuation_is_repaired() {
         // No compressed code unit can be a low surrogate, so the pending high
         // surrogate from the previous record can never be completed.
         let payloads = wide_head_compressed_tail(&[0x0041, 0xD800], b"BC");
-        assert_eq!(
-            scan_payloads(&payloads),
-            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
-        );
+        assert_eq!(scan_payloads(&payloads), LOSSY_SURROGATE);
     }
 
     #[test]
-    fn a_high_surrogate_ending_a_string_before_a_compressed_continuation_is_refused() {
+    fn a_high_surrogate_ending_a_string_before_a_compressed_continuation_is_repaired() {
         // The pending high surrogate is the last unit of the wide run and the
         // continuation carries no unit at all, which is the end-of-input case.
         let payloads = wide_head_compressed_tail(&[0xD800], b"");
-        assert_eq!(
-            scan_payloads(&payloads),
-            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
-        );
+        assert_eq!(scan_payloads(&payloads), LOSSY_SURROGATE);
     }
 
     #[test]
@@ -1800,7 +1904,7 @@ mod sst_measure_tests {
             ];
             assert_eq!(
                 scan_payloads(&one_string_in_runs(&runs)),
-                format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}"),
+                LOSSY_SURROGATE,
                 "a pair must not form across {middle:?}"
             );
         }
@@ -1857,10 +1961,7 @@ mod sst_measure_tests {
         let mut units = vec![0x0041u16; 512];
         units.push(0xD800);
         let payloads = one_wide_string(&units);
-        assert_eq!(
-            scan_payloads(&payloads),
-            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
-        );
+        assert_eq!(scan_payloads(&payloads), LOSSY_SURROGATE);
 
         units.push(0xDC00);
         let payloads = one_wide_string(&units);
@@ -1943,14 +2044,11 @@ mod sst_measure_tests {
         payload.extend_from_slice(&9u16.to_le_bytes()); // a run past the text
         payload.extend_from_slice(&0u16.to_le_bytes());
 
-        assert_eq!(
-            scan_payloads(&[payload]),
-            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
-        );
+        assert_eq!(scan_payloads(&[payload]), LOSSY_SURROGATE);
     }
 
     #[test]
-    fn a_bad_formatting_run_is_still_reported_when_the_text_is_well_formed() {
+    fn a_bad_formatting_run_is_dropped_and_recorded_when_the_text_is_well_formed() {
         let mut payload = sst_header(1, 1);
         payload.extend_from_slice(&1u16.to_le_bytes());
         payload.push(0x09);
@@ -1960,9 +2058,42 @@ mod sst_measure_tests {
         payload.extend_from_slice(&0u16.to_le_bytes());
 
         assert_eq!(
-            scan_payloads(&[payload]),
-            "biff Invalid data: shared string 0 has a formatting run past its text"
+            scan_payloads(&[payload.clone()]),
+            "ok [(8, 19)] repaired [\"SharedString(FormattingRun)@0=0x9\"]"
         );
+
+        // The eager table keeps the text and drops the run.
+        let mut report = ToleranceReport::default();
+        let table = SharedStringTable::parse_segments(&[&payload], &Encoding::Utf16Le, &mut report)
+            .unwrap();
+        assert_eq!(table.strings, ["A"]);
+        assert_eq!(table.properties, [None]);
+        assert_eq!(report.count(SharedStringDefect::FormattingRun), 1);
+    }
+
+    #[test]
+    fn out_of_order_formatting_runs_are_dropped_and_the_rest_kept() {
+        let mut payload = sst_header(1, 1);
+        payload.extend_from_slice(&3u16.to_le_bytes());
+        payload.push(0x08); // rich text, compressed
+        payload.extend_from_slice(&3u16.to_le_bytes());
+        payload.extend_from_slice(b"abc");
+        for (character, font) in [(1u16, 5u16), (1, 6), (2, 7)] {
+            payload.extend_from_slice(&character.to_le_bytes());
+            payload.extend_from_slice(&font.to_le_bytes());
+        }
+        let mut report = ToleranceReport::default();
+        let table = SharedStringTable::parse_segments(&[&payload], &Encoding::Utf16Le, &mut report)
+            .unwrap();
+        let runs = &table.properties[0].as_ref().unwrap().formatting_runs;
+        assert_eq!(
+            runs.iter()
+                .map(|run| (run.character_index, run.font_index))
+                .collect::<Vec<_>>(),
+            [(1, 5), (2, 7)]
+        );
+        assert_eq!(report.total(), 1);
+        assert_eq!(report.defects()[0].observed(), 1);
     }
 
     #[test]
@@ -2142,8 +2273,12 @@ mod sst_measure_tests {
                 continue;
             };
 
-            let measured = scan_shared_string_records_as::<MeasuredText>(&records);
-            let materialized = scan_shared_string_records_as::<String>(&records);
+            let measured = scan_shared_string_records_as::<MeasuredText>(
+                &records,
+                &mut ToleranceReport::default(),
+            );
+            let materialized =
+                scan_shared_string_records_as::<String>(&records, &mut ToleranceReport::default());
             match (&measured, &materialized) {
                 (Ok(left), Ok(right)) => {
                     let left: Vec<(usize, usize)> =
@@ -2241,7 +2376,7 @@ mod sst_measure_tests {
             else {
                 continue;
             };
-            let result = scan_shared_string_records(&records);
+            let result = scan_shared_string_records(&records, &mut ToleranceReport::default());
             let detail = match &result {
                 Ok(scan) => {
                     let mut detail = String::new();
@@ -2378,6 +2513,49 @@ mod shared_string_tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn repairs_phonetic_surrogates_and_runs() {
+        // ExtRst head: reserved, cb, ifnt, options, runs = 2, cch = 2 twice.
+        let mut extension = Vec::new();
+        for value in [1u16, 26, 7, 10, 2, 2, 2] {
+            extension.extend_from_slice(&value.to_le_bytes());
+        }
+        for unit in [0x3068u16, 0xDC00] {
+            extension.extend_from_slice(&unit.to_le_bytes());
+        }
+        // A valid run, then one whose base index is past the base string.
+        for value in [0u16, 0, 1, 1, 9, 1] {
+            extension.extend_from_slice(&value.to_le_bytes());
+        }
+        let mut report = ToleranceReport::default();
+        let phonetic = parse_phonetic_string(&extension, 2, 4, &mut report).unwrap();
+        assert_eq!(phonetic.text, "と\u{FFFD}");
+        assert_eq!(phonetic.runs.len(), 1);
+        let found = report
+            .defects()
+            .iter()
+            .map(|entry| (entry.defect(), entry.ordinal(), entry.observed()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            found,
+            [
+                (SharedStringDefect::PhoneticSurrogate.into(), 4, 0xDC00),
+                (SharedStringDefect::PhoneticRun.into(), 4, 1),
+            ]
+        );
+
+        // Runs that together overrun the base string are all dropped.
+        let mut overrun = extension[..18].to_vec();
+        for value in [0u16, 0, 2, 1, 1, 2] {
+            overrun.extend_from_slice(&value.to_le_bytes());
+        }
+        let mut report = ToleranceReport::default();
+        let phonetic = parse_phonetic_string(&overrun, 2, 0, &mut report).unwrap();
+        assert!(phonetic.runs.is_empty());
+        assert_eq!(report.count(SharedStringDefect::PhoneticRun), 1);
+        assert_eq!(report.defects()[1].observed(), 2, "the run count");
     }
 
     #[test]
@@ -2707,8 +2885,8 @@ impl CellRecord {
     ///
     /// It is not a second parser. Each kind's checks are the *same* code the
     /// materializing parse runs — [`Self::cell_head`] for the five fixed-width
-    /// kinds, `utils::measure_string_record` and `parse_string_record` over one
-    /// shared framing for `Label`, and `formula_metadata::measure_record` over
+    /// kinds, `utils::measure_string_record` and `parse_string_record_lossy` over
+    /// one shared framing for `Label`, and `formula_metadata::measure_record` over
     /// `frame_record`/`check_token_stream` for `Formula`.
     pub(crate) fn measure(
         record_type: u16,
@@ -2877,15 +3055,32 @@ impl CellRecord {
         ))
     }
 
+    /// For a well-framed `Label` record whose text holds an unpaired UTF-16
+    /// surrogate, the cell's row, column, and first unpaired code unit: the
+    /// context of the [`crate::EncodingDefect::LabelSurrogate`] repair the
+    /// lossy decode applies. `None` for every other record.
+    pub(crate) fn label_unpaired_surrogate(
+        record_type: u16,
+        data: &[u8],
+    ) -> Option<(u16, u16, u16)> {
+        if record_type != 0x0204 || data.len() < 8 {
+            return None;
+        }
+        let unit = utils::string_record_unpaired_surrogate(&data[6..])?;
+        let row = u16::from_le_bytes([data[0], data[1]]);
+        let col = u16::from_le_bytes([data[2], data[3]]);
+        Some((row, col, unit))
+    }
+
     #[inline]
     fn measure_fixed(data: &[u8], expected: usize) -> Result<MeasuredCell> {
         let (row, col, xf_index) = Self::cell_head(data, expected)?;
         Ok(MeasuredCell { row, col, xf_index })
     }
 
-    fn measure_label(data: &[u8], encoding: &Encoding) -> Result<MeasuredCell> {
+    fn measure_label(data: &[u8], _encoding: &Encoding) -> Result<MeasuredCell> {
         let (row, col, xf_index) = Self::cell_head(data, 8)?;
-        utils::measure_string_record(&data[6..], encoding)?;
+        utils::measure_string_record(&data[6..])?;
 
         Ok(MeasuredCell { row, col, xf_index })
     }
@@ -2912,9 +3107,11 @@ impl CellRecord {
         })
     }
 
-    fn parse_label(data: &[u8], encoding: &Encoding) -> Result<Self> {
+    fn parse_label(data: &[u8], _encoding: &Encoding) -> Result<Self> {
         let (row, col, xf_index) = Self::cell_head(data, 8)?;
-        let value = utils::parse_string_record(&data[6..], encoding)?;
+        // An unpaired surrogate decodes to U+FFFD; the worksheet scan records
+        // it through `label_unpaired_surrogate`.
+        let value = utils::parse_string_record_lossy(&data[6..])?;
 
         Ok(CellRecord::Label {
             row,
@@ -3385,31 +3582,35 @@ mod cell_measure_tests {
         );
     }
 
-    /// A `Label` whose characters are UTF-16 with an unpaired high surrogate.
-    /// The measure path decides malformedness without allocating and then
-    /// rebuilds the refusal through `parse_string_record`, so the message must
-    /// be `String::from_utf16`'s and not `char::decode_utf16`'s.
+    /// A `Label` whose characters are UTF-16 with an unpaired high surrogate
+    /// decodes lossily on both paths, and the scan locates the repair.
     #[test]
-    fn a_lone_surrogate_label_keeps_the_from_utf16_message() {
+    fn a_lone_surrogate_label_decodes_lossily_on_both_paths() {
         let mut payload = vec![1, 0, 2, 0, 3, 0]; // row, col, ixfe
-        payload.extend_from_slice(&1u16.to_le_bytes()); // cch
+        payload.extend_from_slice(&2u16.to_le_bytes()); // cch
         payload.push(0x01); // fHighByte
+        payload.extend_from_slice(&0x0041u16.to_le_bytes());
         payload.extend_from_slice(&0xD800u16.to_le_bytes());
 
         let measured = CellRecord::measure(0x0204, &payload, &Encoding::Utf16Le)
-            .expect_err("a lone high surrogate is refused");
-        let parsed = CellRecord::parse(0x0204, &payload, &Encoding::Utf16Le)
-            .expect_err("a lone high surrogate is refused");
+            .expect("the lossy decode accepts every code unit sequence");
+        assert_eq!((measured.row, measured.col, measured.xf_index), (1, 2, 3));
+        let CellRecord::Label { value, .. } =
+            CellRecord::parse(0x0204, &payload, &Encoding::Utf16Le).unwrap()
+        else {
+            panic!("a Label parses to a Label");
+        };
+        assert_eq!(value, "A\u{FFFD}");
+        assert_eq!(
+            CellRecord::label_unpaired_surrogate(0x0204, &payload),
+            Some((1, 2, 0xD800))
+        );
 
-        assert_eq!(measured.to_string(), parsed.to_string());
-        assert!(
-            measured.to_string().contains("invalid utf-16"),
-            "expected String::from_utf16's wording, got {measured}"
-        );
-        assert!(
-            !measured.to_string().contains("unpaired surrogate"),
-            "char::decode_utf16's wording leaked into the refusal: {measured}"
-        );
+        // A well-formed label, and any other record kind, reports nothing.
+        payload[11] = 0x00;
+        payload[12] = 0x00;
+        assert_eq!(CellRecord::label_unpaired_surrogate(0x0204, &payload), None);
+        assert_eq!(CellRecord::label_unpaired_surrogate(0x0203, &payload), None);
     }
 
     /// Every surrogate-pair shape, so that neither path accepts a string the

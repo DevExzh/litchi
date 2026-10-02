@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
 use crate::formula_metadata::array::{self, Owner as ArrayFormula};
 use crate::formula_metadata::{Cell as FormulaCell, Defect as FormulaDefect, FlagDefect};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{EncodingDefect, ToleranceReport};
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
@@ -687,6 +687,15 @@ impl<R: Read + Seek> Workbook<R> {
                     } else {
                         (CellRecord::parse(record.kind().get(), record.payload(), encoding)?, None)
                     };
+                    if let Some((row, col, _unit)) =
+                        CellRecord::label_unpaired_surrogate(record.kind().get(), record.payload())
+                    {
+                        tolerance.record(
+                            EncodingDefect::LabelSurrogate,
+                            u32::from(row),
+                            u32::from(col),
+                        );
+                    }
                     if matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp)) {
                         if formula_metadata_defects.len() >= tracking_limit {
                             return Err(Error::InvalidRecord {

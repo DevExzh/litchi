@@ -315,7 +315,11 @@ impl<R: Read + Seek> Workbook<R> {
                         sst_idx += 1;
                     }
 
-                    let sst = SharedStringTable::parse_from_records(&sst_records, encoding)?;
+                    let sst = SharedStringTable::parse_from_records_tolerant(
+                        &sst_records,
+                        encoding,
+                        tolerance.report_mut(),
+                    )?;
                     self.shared_string_reference_count = sst.total_count;
                     strings.extend(sst.strings);
                     string_properties.extend(sst.properties);

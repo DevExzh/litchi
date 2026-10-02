@@ -13,11 +13,11 @@ use std::sync::Arc;
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
-use litchi_core::sheet::Cell as _;
+use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::{
     CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
-    PaletteDefect, SheetDefect, SheetNameDefect, SourceBackedOptions, SourceBackedWorkbook,
-    ToleranceReport, ToleratedDefect, Workbook, Writer,
+    PaletteDefect, SharedStringDefect, SheetDefect, SheetNameDefect, SourceBackedOptions,
+    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
 };
 
 const CODEPAGE: u16 = 0x0042;
@@ -25,6 +25,9 @@ const BOUND_SHEET: u16 = 0x0085;
 const PALETTE: u16 = 0x0092;
 const FONT: u16 = 0x0031;
 const XF: u16 = 0x00E0;
+const SST: u16 = 0x00FC;
+const NUMBER: u16 = 0x0203;
+const LABEL: u16 = 0x0204;
 const INDEX: u16 = 0x020B;
 
 /// One BIFF record of a Workbook stream, remembering where it sat in the
@@ -320,7 +323,7 @@ fn an_unsupported_code_page_falls_back_to_windows_1252() {
                 .get_cell(0, 0)
                 .unwrap()
                 .value(),
-            &litchi_core::sheet::CellValue::Float(42.5)
+            &CellValue::Float(42.5)
         );
         let entry = workbook.tolerance_report().defects()[0];
         assert_eq!(entry.record_type(), Some(CODEPAGE));
@@ -418,7 +421,7 @@ fn the_sheet_name_opt_in_keeps_each_rule_breaking_name_verbatim() {
                     .get_cell(0, 0)
                     .unwrap()
                     .value(),
-                &litchi_core::sheet::CellValue::Float(2.0)
+                &CellValue::Float(2.0)
             );
             assert_eq!(
                 workbook.tolerance_report().defects()[0].record_type(),
@@ -638,7 +641,7 @@ fn an_unknown_sheet_type_reads_as_a_worksheet_and_is_recorded() {
             .get_cell(0, 0)
             .unwrap()
             .value(),
-        &litchi_core::sheet::CellValue::Float(2.0)
+        &CellValue::Float(2.0)
     );
 }
 
@@ -729,9 +732,194 @@ fn undefined_xf_enumerations_read_as_defaults_and_are_recorded() {
     assert_eq!(format.fill().pattern(), litchi_xls::FillPattern::None);
     assert_eq!(
         worksheet.get_cell(0, 0).unwrap().value(),
-        &litchi_core::sheet::CellValue::Float(42.5)
+        &CellValue::Float(42.5)
     );
     for entry in workbook.tolerance_report().defects() {
         assert_eq!(entry.record_type(), Some(XF));
     }
+}
+
+// ---------------------------------------------------------------------------
+// F3.8: unpaired UTF-16 surrogates and out-of-order formatting runs
+// ---------------------------------------------------------------------------
+
+/// A one-string `SST` payload holding `units` as uncompressed UTF-16, with
+/// the given rich-text runs.
+fn sst_payload(units: &[u16], runs: &[(u16, u16)]) -> Vec<u8> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&1u32.to_le_bytes());
+    payload.extend_from_slice(&1u32.to_le_bytes());
+    payload.extend_from_slice(&u16::try_from(units.len()).unwrap().to_le_bytes());
+    payload.push(if runs.is_empty() { 0x01 } else { 0x09 });
+    if !runs.is_empty() {
+        payload.extend_from_slice(&u16::try_from(runs.len()).unwrap().to_le_bytes());
+    }
+    for unit in units {
+        payload.extend_from_slice(&unit.to_le_bytes());
+    }
+    for (character, font) in runs {
+        payload.extend_from_slice(&character.to_le_bytes());
+        payload.extend_from_slice(&font.to_le_bytes());
+    }
+    payload
+}
+
+/// A one-sheet workbook whose only cell is shared string 0, with the SST
+/// replaced by `payload`.
+fn with_sst(payload: Vec<u8>) -> Vec<u8> {
+    let mut stream = Stream::from_writer(|writer| {
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_string(sheet, 0, 0, "x").unwrap();
+    });
+    *stream.payload_mut(SST, 0) = payload;
+    stream.package()
+}
+
+/// The text of cell (0, 0) through both read paths.
+fn cell_text_both(package: &[u8]) -> (CellValue, CellValue) {
+    let (workbook, _) = open_both(package, Leniency::default());
+    let eager = workbook
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .unwrap()
+        .value()
+        .clone();
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(package.to_vec()))).unwrap();
+    let source = owner
+        .worksheet_by_index(0)
+        .unwrap()
+        .unwrap()
+        .cell(0, 0)
+        .unwrap()
+        .unwrap()
+        .into_value();
+    (eager, source)
+}
+
+#[test]
+fn an_unpaired_shared_string_surrogate_decodes_to_the_replacement_character() {
+    let package = with_sst(sst_payload(&[0x0041, 0xD800, 0x0042], &[]));
+    assert_repairs(
+        &package,
+        &[(
+            Defect::SharedString(SharedStringDefect::UnpairedSurrogate),
+            0,
+            0xD800,
+        )],
+    );
+    let expected = CellValue::String("A\u{FFFD}B".to_string());
+    assert_eq!(cell_text_both(&package), (expected.clone(), expected));
+}
+
+#[test]
+fn an_out_of_order_formatting_run_is_dropped_and_recorded() {
+    let package = with_sst(sst_payload(&[0x0041, 0x0042, 0x0043], &[(2, 5), (1, 6)]));
+    assert_repairs(
+        &package,
+        &[(
+            Defect::SharedString(SharedStringDefect::FormattingRun),
+            0,
+            1,
+        )],
+    );
+    let expected = CellValue::String("ABC".to_string());
+    assert_eq!(cell_text_both(&package), (expected.clone(), expected));
+}
+
+#[test]
+fn well_formed_shared_strings_record_nothing() {
+    // A valid surrogate pair (U+1F600) and increasing runs.
+    assert_clean(&with_sst(sst_payload(
+        &[0xD83D, 0xDE00, 0x0041],
+        &[(0, 5), (2, 6)],
+    )));
+}
+
+/// A `Label` payload for (row, col) with XF 15 holding `units` as UTF-16.
+fn label_payload(row: u16, col: u16, units: &[u16]) -> Vec<u8> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(&row.to_le_bytes());
+    payload.extend_from_slice(&col.to_le_bytes());
+    payload.extend_from_slice(&15u16.to_le_bytes());
+    payload.extend_from_slice(&u16::try_from(units.len()).unwrap().to_le_bytes());
+    payload.push(0x01);
+    for unit in units {
+        payload.extend_from_slice(&unit.to_le_bytes());
+    }
+    payload
+}
+
+/// The fixture with its number cell replaced by a `Label` holding `units`.
+fn with_label(units: &[u16]) -> Vec<u8> {
+    let mut stream = Stream::simple();
+    let index = stream.position(NUMBER, 0);
+    stream.records[index].kind = LABEL;
+    stream.records[index].payload = label_payload(0, 0, units);
+    stream.package()
+}
+
+#[test]
+fn an_unpaired_label_surrogate_decodes_to_the_replacement_character() {
+    let package = with_label(&[0xDC00, 0x0041]);
+    let expected_repair = (Defect::Encoding(EncodingDefect::LabelSurrogate), 0, 0);
+    // The eager open decodes every cell at open time. The source-backed open
+    // reads worksheets lazily, so — like the cell-XF repair — it records the
+    // repair when a query scans the cell, not at open.
+    let workbook = assert_eager_repairs(&package, &[expected_repair]);
+    assert_eq!(
+        workbook.tolerance_report().defects()[0].record_type(),
+        Some(LABEL)
+    );
+    let expected = CellValue::String("\u{FFFD}A".to_string());
+    assert_eq!(
+        cell_text_both(&package),
+        (expected.clone(), expected.clone())
+    );
+
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(package.clone()))).unwrap();
+    let value = owner
+        .worksheet_by_index(0)
+        .unwrap()
+        .unwrap()
+        .cell(0, 0)
+        .unwrap()
+        .unwrap()
+        .into_value();
+    assert_eq!(value, expected);
+    let found = owner
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|entry| (entry.defect(), entry.ordinal(), entry.observed()))
+        .collect::<Vec<_>>();
+    assert_eq!(found, [expected_repair]);
+}
+
+#[test]
+fn a_well_formed_label_records_nothing() {
+    assert_clean(&with_label(&[0xD83D, 0xDE00, 0x0041]));
+}
+
+#[test]
+fn an_unpaired_font_name_surrogate_decodes_to_the_replacement_character() {
+    let mut stream = Stream::simple();
+    let payload = stream.payload_mut(FONT, 0);
+    payload.truncate(14);
+    payload.extend_from_slice(&[2, 0x01]); // cch, fHighByte
+    payload.extend_from_slice(&0x0041u16.to_le_bytes());
+    payload.extend_from_slice(&0xDBFFu16.to_le_bytes());
+    let package = stream.package();
+    // The source-backed open never reads Font records.
+    let workbook = assert_eager_repairs(
+        &package,
+        &[(
+            Defect::Encoding(EncodingDefect::FontNameSurrogate),
+            0,
+            0xDBFF,
+        )],
+    );
+    assert_eq!(workbook.font(0).unwrap().name(), "A\u{FFFD}");
 }

@@ -18,7 +18,7 @@
 //! them would cost the caller a whole worksheet over metadata that cannot
 //! change what a conforming workbook means. Each substitutes the value
 //! documented on the corresponding [`CellFormatDefect`], [`EncodingDefect`],
-//! [`PaletteDefect`], or [`SheetDefect`] variant.
+//! [`PaletteDefect`], [`SheetDefect`], or [`SharedStringDefect`] variant.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -390,6 +390,15 @@ pub enum EncodingDefect {
     /// record is absent, and the page LibreOffice and POI fall back to. The
     /// page is total, so every byte still decodes to some character.
     UnsupportedCodePage,
+    /// A `Label` cell's text held an unpaired UTF-16 surrogate.
+    ///
+    /// Each unpaired surrogate decodes to U+FFFD, exactly as POI and
+    /// LibreOffice decode it; every well-formed character survives.
+    LabelSurrogate,
+    /// A `Font` record's name held an unpaired UTF-16 surrogate.
+    ///
+    /// Each unpaired surrogate decodes to U+FFFD.
+    FontNameSurrogate,
 }
 
 impl EncodingDefect {
@@ -398,6 +407,8 @@ impl EncodingDefect {
     pub fn record_type(self) -> Option<u16> {
         match self {
             EncodingDefect::UnsupportedCodePage => Some(CODEPAGE_RECORD),
+            EncodingDefect::LabelSurrogate => Some(LABEL_RECORD),
+            EncodingDefect::FontNameSurrogate => Some(super::font::FONT_RECORD_TYPE),
         }
     }
 
@@ -408,8 +419,79 @@ impl EncodingDefect {
             EncodingDefect::UnsupportedCodePage => {
                 "CODEPAGE names a code page without a supported codec"
             },
+            EncodingDefect::LabelSurrogate => "Label cell text has an unpaired UTF-16 surrogate",
+            EncodingDefect::FontNameSurrogate => "Font name has an unpaired UTF-16 surrogate",
         }
     }
+}
+
+/// `Label` (MS-XLS 2.4.148).
+const LABEL_RECORD: u16 = 0x0204;
+
+/// The class of shared-string defect the reader repairs the way Excel, POI,
+/// and LibreOffice repair it.
+///
+/// Repaired and recorded under every [`Leniency`] variant: each repair keeps
+/// every well-formed string and the cell grid intact instead of discarding
+/// the whole shared-string table — and with it the workbook — over one
+/// string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SharedStringDefect {
+    /// A shared string's text held an unpaired UTF-16 surrogate.
+    ///
+    /// Each unpaired surrogate decodes to U+FFFD.
+    UnpairedSurrogate,
+    /// A shared string's phonetic (`ExtRst`) text held an unpaired UTF-16
+    /// surrogate.
+    ///
+    /// Each unpaired surrogate decodes to U+FFFD.
+    PhoneticSurrogate,
+    /// A rich-text formatting run started past the string's text or did not
+    /// start after the previous run.
+    ///
+    /// The run is dropped; the surrounding runs and the text are kept.
+    FormattingRun,
+    /// A phonetic (`ExtRst`) run pointed outside its texts or did not follow
+    /// the previous run, or the runs together overran the base string.
+    ///
+    /// The offending run is dropped — every run, for an overrun — and the
+    /// phonetic text is kept.
+    PhoneticRun,
+}
+
+impl SharedStringDefect {
+    /// The BIFF record type whose payload carried the defect: `SST`.
+    #[must_use]
+    pub fn record_type(self) -> u16 {
+        SST_RECORD
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            SharedStringDefect::UnpairedSurrogate => {
+                "Shared string has an unpaired UTF-16 surrogate"
+            },
+            SharedStringDefect::PhoneticSurrogate => {
+                "Shared string phonetic text has an unpaired UTF-16 surrogate"
+            },
+            SharedStringDefect::FormattingRun => {
+                "Shared string formatting run is out of order or past its text"
+            },
+            SharedStringDefect::PhoneticRun => "Shared string phonetic run is invalid",
+        }
+    }
+}
+
+/// `SST` (MS-XLS 2.4.265).
+const SST_RECORD: u16 = 0x00FC;
+
+/// The first unpaired surrogate in `units`, if any: the code unit an
+/// [`EncodingDefect`] or [`SharedStringDefect`] surrogate repair reports.
+pub(crate) fn first_unpaired_surrogate(units: impl IntoIterator<Item = u16>) -> Option<u16> {
+    char::decode_utf16(units).find_map(|unit| unit.err().map(|error| error.unpaired_surrogate()))
 }
 
 /// `CODEPAGE` (MS-XLS 2.4.52).
@@ -532,6 +614,8 @@ pub enum Defect {
     Palette(PaletteDefect),
     /// A `BoundSheet8` defect repaired the way Excel repairs it.
     Sheet(SheetDefect),
+    /// A shared-string defect repaired the way Excel repairs it.
+    SharedString(SharedStringDefect),
     /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
     SheetName(SheetNameDefect),
 }
@@ -550,6 +634,7 @@ impl Defect {
             Defect::Encoding(defect) => defect.record_type(),
             Defect::Palette(defect) => Some(defect.record_type()),
             Defect::Sheet(defect) => Some(defect.record_type()),
+            Defect::SharedString(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
         }
     }
@@ -563,6 +648,7 @@ impl Defect {
             Defect::Encoding(defect) => defect.description(),
             Defect::Palette(defect) => defect.description(),
             Defect::Sheet(defect) => defect.description(),
+            Defect::SharedString(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
         }
     }
@@ -583,6 +669,12 @@ impl From<CellFormatDefect> for Defect {
 impl From<SheetNameDefect> for Defect {
     fn from(defect: SheetNameDefect) -> Self {
         Self::SheetName(defect)
+    }
+}
+
+impl From<SharedStringDefect> for Defect {
+    fn from(defect: SharedStringDefect) -> Self {
+        Self::SharedString(defect)
     }
 }
 
@@ -633,8 +725,11 @@ impl ToleratedDefect {
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
     /// For the other [`CellFormatDefect`] classes it is the `XF` index.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
-    /// the `CODEPAGE` record within the Workbook stream. For every
-    /// [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
+    /// the `CODEPAGE` record within the Workbook stream. For
+    /// [`EncodingDefect::LabelSurrogate`] it is the cell's zero-based row; for
+    /// [`EncodingDefect::FontNameSurrogate`] the font's logical index. For
+    /// every [`SharedStringDefect`] it is the zero-based shared-string index.
+    /// For every [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
     /// `BoundSheet8` record. For every [`PaletteDefect`] it is the byte
     /// offset of the `Palette` record within the Workbook stream.
     #[must_use]
@@ -661,7 +756,14 @@ impl ToleratedDefect {
     /// [`CellFormatDefect::DiagonalBorder`] it is the stored flags and style
     /// packed as `fDgDown | fDgUp << 1 | dgDiag << 2`.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the raw `cv` code
-    /// page identifier. For [`SheetNameDefect::TooLong`] it is the name's
+    /// page identifier; for [`EncodingDefect::LabelSurrogate`] the cell's
+    /// zero-based column; for [`EncodingDefect::FontNameSurrogate`],
+    /// [`SharedStringDefect::UnpairedSurrogate`], and
+    /// [`SharedStringDefect::PhoneticSurrogate`] the first unpaired surrogate
+    /// code unit. For [`SharedStringDefect::FormattingRun`] it is the dropped
+    /// run's first character index; for [`SharedStringDefect::PhoneticRun`]
+    /// the zero-based index of the dropped run, or the run count when an
+    /// overrun dropped every run. For [`SheetNameDefect::TooLong`] it is the name's
     /// length in UTF-16 code units; for [`SheetNameDefect::ForbiddenCharacter`]
     /// the first forbidden character's scalar value; for
     /// [`SheetNameDefect::EdgeApostrophe`] the apostrophe (0x27); for
@@ -748,6 +850,14 @@ impl ToleranceReport {
 
     /// The maximum number of individually recorded defects.
     pub const RECORD_LIMIT: usize = MAX_RECORDED_DEFECTS;
+
+    /// Append every repair `other` holds, in order, after this report's own.
+    pub(crate) fn absorb(&mut self, other: ToleranceReport) {
+        for entry in other.defects {
+            self.record(entry.defect, entry.ordinal, entry.observed);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored
     /// entries; the excess is counted in [`ToleranceReport::unrecorded`].
