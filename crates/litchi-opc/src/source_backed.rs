@@ -8,6 +8,7 @@ use crate::accounting::OpcOperationAccounting;
 use crate::constants::{content_type, namespace, relationship_type};
 use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
+use crate::leniency::ToleranceReport;
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, PartNameIndex};
 use crate::package::OpcPackage;
@@ -6454,6 +6455,8 @@ pub struct SourceBackedPackage {
     /// work; those opens retain the bounded linear fallback instead.
     casefold_order: Option<Vec<usize>>,
     non_part_members: Vec<NonPartMember>,
+    /// Reference-compatible repairs applied while the catalog was admitted.
+    tolerance_report: ToleranceReport,
     cache: PartCache,
     catalog_object_reservation: Option<Arc<Reservation>>,
 }
@@ -6556,6 +6559,7 @@ impl SourceBackedPackage {
             relationship_xml_metrics,
             non_part_members,
             content_types_member,
+            tolerance_report,
         } = catalog;
         snapshot
             .ensure_current()
@@ -6620,6 +6624,7 @@ impl SourceBackedPackage {
             parts_by_name,
             casefold_order,
             non_part_members,
+            tolerance_report,
             cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
             catalog_object_reservation: None,
         })
@@ -6951,6 +6956,7 @@ impl SourceBackedPackage {
             relationship_xml_metrics,
             non_part_members,
             content_types_member,
+            tolerance_report,
         } = catalog;
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
@@ -7041,6 +7047,7 @@ impl SourceBackedPackage {
             parts_by_name,
             casefold_order,
             non_part_members,
+            tolerance_report,
             cache,
             catalog_object_reservation,
         })
@@ -7457,6 +7464,16 @@ impl SourceBackedPackage {
     #[must_use]
     pub fn non_part_members(&self) -> &[NonPartMember] {
         &self.non_part_members
+    }
+
+    /// Reference-compatible repairs applied while the source was admitted.
+    ///
+    /// Same contract as [`OpcPackage::tolerance_report`]: an empty report
+    /// means the package conformed, and materializing this package into an
+    /// [`OpcPackage`] carries the report over.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance_report
     }
 
     /// Return content-free payload-cache and managed-publication activity.
@@ -7953,6 +7970,7 @@ impl SourceBackedPackage {
             self.finish_stage(result)?;
         }
         package.set_non_part_members(non_part_members);
+        package.set_tolerance_report(self.tolerance_report.clone());
         package.mark_source_ingress_signature_policy();
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;

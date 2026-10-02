@@ -8,6 +8,7 @@ use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
+use crate::leniency::ToleranceReport;
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{PACKAGE_URI, PackURI};
@@ -432,6 +433,8 @@ pub(crate) struct SourceCatalog {
     pub(crate) non_part_members: Vec<NonPartMember>,
     /// Exact spelling of the reserved content-types member in the source ZIP.
     pub(crate) content_types_member: String,
+    /// Reference-compatible repairs applied while the catalog was admitted.
+    pub(crate) tolerance_report: ToleranceReport,
 }
 
 /// Opaque, structurally validated information about an OPC package.
@@ -780,6 +783,9 @@ pub struct PackageReader {
 
     /// ZIP items that were present but are not OPC parts
     non_part_members: Vec<NonPartMember>,
+
+    /// Reference-compatible repairs applied while the package was admitted.
+    tolerance_report: ToleranceReport,
 }
 
 impl PackageReader {
@@ -805,12 +811,15 @@ impl PackageReader {
         let mut ledger = RelationshipLedger::default();
         ledger.preflight_xml_bytes(limits, xml.len() as u64)?;
         ledger.retain_xml_bytes(limits, xml.len() as u64)?;
+        // The owner's manifest was admitted, and its repairs recorded, when
+        // the package was opened; an edit re-derives it under the same rules.
         let serialized = Self::parse_rels_xml_with_source(
             xml,
             owner.base_uri(),
             Some(owner.as_str()),
             limits,
             &mut ledger,
+            &mut ToleranceReport::default(),
         )?;
         let mut relationships = if owner.as_str() == PACKAGE_URI {
             crate::Relationships::new(PACKAGE_URI.into())
@@ -879,7 +888,11 @@ impl PackageReader {
             limits.max_content_types_bytes() as u64,
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let content_types = ContentTypeMap::from_xml_reporting(
+            content_types_xml.as_bytes(),
+            limits,
+            &mut relationship_ledger.report,
+        )?;
         let source_content_types_xml =
             content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
@@ -913,6 +926,7 @@ impl PackageReader {
             pkg_srels,
             sparts,
             non_part_members,
+            tolerance_report: relationship_ledger.report,
         })
     }
 
@@ -970,7 +984,11 @@ impl PackageReader {
             limits.max_content_types_bytes() as u64,
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let content_types = ContentTypeMap::from_xml_reporting(
+            content_types_xml.as_bytes(),
+            limits,
+            &mut relationship_ledger.report,
+        )?;
         let source_content_types_xml =
             content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
@@ -1001,6 +1019,7 @@ impl PackageReader {
             pkg_srels,
             sparts,
             non_part_members,
+            tolerance_report: relationship_ledger.report,
         })
     }
 
@@ -1041,7 +1060,11 @@ impl PackageReader {
             limits.max_content_types_bytes() as u64,
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let content_types = ContentTypeMap::from_xml_reporting(
+            content_types_xml.as_bytes(),
+            limits,
+            &mut relationship_ledger.report,
+        )?;
         let source_content_types_xml =
             content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
@@ -1079,6 +1102,7 @@ impl PackageReader {
             pkg_srels,
             sparts,
             non_part_members,
+            tolerance_report: relationship_ledger.report,
         })
     }
 
@@ -1118,16 +1142,27 @@ impl PackageReader {
         let mut ledger = RelationshipLedger::default();
         ledger.preflight_xml_bytes(limits, rels_xml.len() as u64)?;
         ledger.retain_xml_bytes(limits, rels_xml.len() as u64)?;
-        Self::parse_rels_xml_with_source(rels_xml, base_uri, None, limits, &mut ledger)
+        Self::parse_rels_xml_with_source(
+            rels_xml,
+            base_uri,
+            None,
+            limits,
+            &mut ledger,
+            &mut ToleranceReport::default(),
+        )
     }
 
+    /// Parse one relationships manifest, recording every reference-compatible
+    /// repair into `report` with `source_uri` (or `base_uri`) as its part.
     fn parse_rels_xml_with_source(
         rels_xml: &[u8],
         base_uri: &str,
         source_uri: Option<&str>,
         limits: ReadLimits,
         ledger: &mut RelationshipLedger,
+        report: &mut ToleranceReport,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
+        let _ = &report;
         let mut srels = SmallVec::new();
         let mut reader = NsReader::from_reader(rels_xml);
         reader.config_mut().trim_text(true);
@@ -1237,13 +1272,21 @@ impl PackageReader {
                 let rels_xml = read_structural_member(archive, rels_path)?;
                 ledger.retain_xml_bytes(limits, rels_xml.as_bytes().len() as u64)?;
                 let event_start = ledger.xml_events;
+                let mut report = ToleranceReport::default();
                 let relationships = Self::parse_rels_xml_with_source(
                     rels_xml.as_bytes(),
                     source_uri.base_uri(),
                     Some(source_uri.as_str()),
                     limits,
                     ledger,
+                    &mut report,
                 )?;
+                // An owner can be read more than once while the graph and the
+                // typed-part catalog are assembled; its repairs are recorded
+                // once, alongside its metrics.
+                if !ledger.relationship_xml_metrics.contains_key(source_uri) {
+                    ledger.report.absorb(report);
+                }
                 let event_count = ledger.xml_events.checked_sub(event_start).ok_or_else(|| {
                     OpcError::InvalidRelationshipsManifest(
                         "relationship XML event metrics underflow".to_string(),
@@ -1725,7 +1768,8 @@ impl PackageReader {
             limits.max_content_types_bytes() as u64,
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let content_types =
+            ContentTypeMap::from_xml_reporting(content_types_xml.as_bytes(), limits, &mut ledger.report)?;
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels = Self::load_rels_lazy(archive, &package_uri, limits, &mut ledger)?;
         let mut non_part_members = Vec::new();
@@ -1747,6 +1791,7 @@ impl PackageReader {
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
+            tolerance_report: ledger.report,
         })
     }
 
@@ -1798,8 +1843,9 @@ impl PackageReader {
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
         let content_types_xml = read_structural_member(archive, content_types_member)
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)
-            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let content_types =
+            ContentTypeMap::from_xml_reporting(content_types_xml.as_bytes(), limits, &mut ledger.report)
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
         let package_uri = PackURI::new(PACKAGE_URI)
             .map_err(OpcError::InvalidPackUri)
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
@@ -1825,6 +1871,7 @@ impl PackageReader {
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
+            tolerance_report: ledger.report,
         })
     }
 
@@ -1999,11 +2046,27 @@ impl PackageReader {
     pub fn take_non_part_members(&mut self) -> Vec<NonPartMember> {
         std::mem::take(&mut self.non_part_members)
     }
+
+    /// Reference-compatible repairs applied while the package was admitted.
+    ///
+    /// See [`crate::leniency`]; a conformant package reports clean.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance_report
+    }
+
+    /// Take ownership of the tolerance report (zero-copy move).
+    pub fn take_tolerance_report(&mut self) -> ToleranceReport {
+        std::mem::take(&mut self.tolerance_report)
+    }
 }
 
 #[derive(Default)]
 struct RelationshipLedger {
     source_xml: Option<HashMap<PackURI, Arc<Vec<u8>>>>,
+    /// Reference-compatible repairs recorded while the package's manifests
+    /// were admitted, in discovery order.
+    report: ToleranceReport,
     relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     declared_xml_bytes: u64,
     retained_xml_bytes: u64,
@@ -2860,7 +2923,14 @@ mod tests {
         ledger.retain_xml_bytes(limits, xml.len() as u64).unwrap();
         let event_start = ledger.xml_events;
         let relationships =
-            PackageReader::parse_rels_xml_with_source(xml, "/", Some("/"), limits, &mut ledger)
+            PackageReader::parse_rels_xml_with_source(
+                xml,
+                "/",
+                Some("/"),
+                limits,
+                &mut ledger,
+                &mut ToleranceReport::default(),
+            )
                 .unwrap();
         let event_count = ledger.xml_events.checked_sub(event_start).unwrap();
         ledger

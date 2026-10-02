@@ -2,6 +2,7 @@
 
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
+use crate::leniency::ToleranceReport;
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
 use crate::xml_attributes::BytesStartExt as _;
@@ -78,7 +79,24 @@ impl ContentTypeMap {
         self.defaults.len().saturating_add(self.overrides.len())
     }
 
+    /// Parse a content-types manifest, discarding the record of any
+    /// reference-compatible repair.
+    ///
+    /// Used where the bytes were already admitted (and their repairs
+    /// recorded) at ingress, or where an edit re-derives a manifest: the
+    /// mapping semantics are identical to [`Self::from_xml_reporting`].
     pub(crate) fn from_xml(xml: &[u8], limits: ReadLimits) -> Result<Self> {
+        Self::from_xml_reporting(xml, limits, &mut ToleranceReport::default())
+    }
+
+    /// Parse a content-types manifest, recording every reference-compatible
+    /// repair into `report` (see [`crate::leniency`]).
+    pub(crate) fn from_xml_reporting(
+        xml: &[u8],
+        limits: ReadLimits,
+        report: &mut ToleranceReport,
+    ) -> Result<Self> {
+        let _ = &report;
         limits.check(
             ReadResource::ContentTypesBytes,
             xml.len() as u64,

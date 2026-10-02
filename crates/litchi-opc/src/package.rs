@@ -8,6 +8,7 @@ use crate::constants::relationship_type;
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
+use crate::leniency::ToleranceReport;
 use crate::limits::ReadLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI, PartNameConflict};
@@ -457,6 +458,9 @@ pub struct OpcPackage {
     /// ZIP items the reader found but did not model as parts
     non_part_members: Vec<NonPartMember>,
 
+    /// Reference-compatible repairs applied while the source was read.
+    tolerance_report: ToleranceReport,
+
     /// Save preferences
     save_options: SaveOptions,
 }
@@ -479,6 +483,7 @@ impl std::fmt::Debug for OpcPackage {
             .field("signature_api_authored", &self.signature_api_authored)
             .field("has_preservation_provenance", &self.preservation.is_some())
             .field("non_part_members", &self.non_part_members)
+            .field("tolerance_report", &self.tolerance_report)
             .field("save_options", &self.save_options)
             .finish()
     }
@@ -507,6 +512,7 @@ impl OpcPackage {
             signature_api_authored: false,
             preservation: None,
             non_part_members: Vec::new(),
+            tolerance_report: ToleranceReport::default(),
             save_options: SaveOptions::default(),
         }
     }
@@ -539,6 +545,27 @@ impl OpcPackage {
     /// the classification; mutable package callers cannot manufacture it.
     pub(crate) fn set_non_part_members(&mut self, members: Vec<NonPartMember>) {
         self.non_part_members = members;
+    }
+
+    /// Reference-compatible repairs applied while this package was read.
+    ///
+    /// The report describes the opened source, in discovery order: an empty
+    /// report means the package conformed. Repairs are applied under the
+    /// default contract of [`crate::leniency`] — ZIP framing, XML
+    /// well-formedness, and read limits stay hard errors. A newly created
+    /// package reports clean, and edits never add to the report. Format crates
+    /// fold this report into their own document-level report.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance_report
+    }
+
+    /// Replace the reader-reported tolerance report.
+    ///
+    /// Crate-private for the same reason as [`Self::set_non_part_members`]:
+    /// only package ingress can establish what was repaired.
+    pub(crate) fn set_tolerance_report(&mut self, report: ToleranceReport) {
+        self.tolerance_report = report;
     }
 
     pub(crate) fn source_relationships_member_present(&self, partname: &PackURI) -> bool {
@@ -1172,6 +1199,7 @@ impl OpcPackage {
             pkg_reader.take_source_content_types();
         let sparts = pkg_reader.take_sparts();
         package.non_part_members = pkg_reader.take_non_part_members();
+        package.tolerance_report = pkg_reader.take_tolerance_report();
         package.source_content_types_xml = Some(source_content_types_xml);
         package.source_content_types = Some(Arc::new(source_content_types));
 
