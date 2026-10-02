@@ -1,7 +1,7 @@
 use super::{
     BookmarkSpan, ControlWord, Cow, CustomXmlSpan, Destination, MAX_BOOKMARK_NAME_BYTES,
     MAX_BOOKMARKS, OpenBookmark, OpenCustomXmlTag, ParsedBodyStoryEvent, Parser, RtfError,
-    RtfResult, SmallVec, Token, control_symbol_text,
+    RtfResult, Token, control_symbol_text,
 };
 
 fn decode_move_hex(value: &str) -> RtfResult<(u16, u32)> {
@@ -88,23 +88,13 @@ impl Parser<'_> {
                     last_column = Some(*value);
                 },
                 Some(Token::Control(ControlWord::BookmarkPublic)) => is_public = true,
-                Some(Token::Control(ControlWord::Unicode(_))) => {
-                    let mut utf16 = SmallVec::<[u16; 4]>::new();
-                    while let Some(Token::Control(ControlWord::Unicode(code))) =
-                        self.tokens.get(self.pos)
-                    {
-                        #[allow(
-                            clippy::cast_possible_truncation,
-                            clippy::cast_sign_loss,
-                            reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-                        )]
-                        utf16.push(*code as u16);
-                        self.pos += 1;
-                    }
-                    name.push_str(&String::from_utf16(&utf16).map_err(|error| {
-                        RtfError::InvalidUnicode(format!("invalid Unicode bookmark name: {error}"))
-                    })?);
-                    fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let mut utf16 = super::unicode::UnicodeRun::default();
+                    let skip = unicode_skip;
+                    let awaiting_fallback =
+                        self.collect_unicode_run(*first, skip, &mut utf16, false)?;
+                    self.decode_unicode_run(&utf16, &mut name);
+                    fallback_skip = skip.saturating_mul(awaiting_fallback);
                     continue;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(value))) => {
@@ -684,24 +674,12 @@ impl Parser<'_> {
                 self.pos += 1;
                 Ok(true)
             },
-            Some(Token::Control(ControlWord::Unicode(_))) => {
-                let mut utf16 = SmallVec::<[u16; 4]>::new();
-                while let Some(Token::Control(ControlWord::Unicode(code))) =
-                    self.tokens.get(self.pos)
-                {
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        clippy::cast_sign_loss,
-                        reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-                    )]
-                    utf16.push(*code as u16);
-                    self.pos += 1;
-                }
-                let decoded = String::from_utf16(&utf16).map_err(|error| {
-                    RtfError::InvalidUnicode(format!(
-                        "invalid Unicode RTF custom XML {context}: {error}"
-                    ))
-                })?;
+            Some(Token::Control(ControlWord::Unicode(first))) => {
+                let mut utf16 = super::unicode::UnicodeRun::default();
+                let skip = *unicode_skip;
+                let awaiting_fallback = self.collect_unicode_run(first, skip, &mut utf16, false)?;
+                let mut decoded = String::new();
+                self.decode_unicode_run(&utf16, &mut decoded);
                 Self::ensure_destination_text_capacity(
                     value.len(),
                     decoded.len(),
@@ -709,7 +687,7 @@ impl Parser<'_> {
                     context,
                 )?;
                 value.push_str(&decoded);
-                *fallback_skip = unicode_skip.saturating_mul(utf16.len());
+                *fallback_skip = skip.saturating_mul(awaiting_fallback);
                 Ok(true)
             },
             Some(Token::Control(ControlWord::UnicodeSkip(count))) => {

@@ -976,7 +976,14 @@ impl<'a> Parser<'a> {
     /// `String::from_utf16` allocates before its caller can enforce a limit;
     /// the explicit decoder keeps both the logical output and its reserved
     /// capacity within the same 64 KiB intermediate budget.
-    pub(super) fn decode_bounded_utf16(utf16: &[u16], resource: &'static str) -> RtfResult<String> {
+    ///
+    /// Unpaired surrogates become U+FFFD and are recorded; see
+    /// [`Self::decode_unicode_run`].
+    pub(super) fn decode_bounded_utf16(
+        &mut self,
+        utf16: &super::unicode::UnicodeRun,
+        resource: &'static str,
+    ) -> RtfResult<String> {
         let worst_case = utf16.len().saturating_mul(4);
         if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
             return Err(RtfError::LimitExceeded {
@@ -992,12 +999,7 @@ impl<'a> Parser<'a> {
                 resource,
                 requested: worst_case,
             })?;
-        for result in std::char::decode_utf16(utf16.iter().copied()) {
-            let character = result.map_err(|error| {
-                RtfError::InvalidUnicode(format!("invalid {resource}: {error}"))
-            })?;
-            decoded.push(character);
-        }
+        self.decode_unicode_run(utf16, &mut decoded);
         Ok(decoded)
     }
 
@@ -2917,16 +2919,11 @@ impl<'a> Parser<'a> {
         first_code: i32,
         unicode_skip: i32,
     ) -> RtfResult<(String, String)> {
-        let mut utf16 = SmallVec::<[u16; 4]>::new();
-        Self::push_bounded_unicode_code(&mut utf16, first_code)?;
-        self.pos += 1;
-        while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
-            Self::push_bounded_unicode_code(&mut utf16, *code)?;
-            self.pos += 1;
-        }
+        let skip = unicode_skip.max(0).cast_unsigned() as usize;
+        let mut utf16 = super::unicode::UnicodeRun::default();
+        let awaiting_fallback = self.collect_unicode_run(first_code, skip, &mut utf16, true)?;
 
-        let mut fallback_skip =
-            (unicode_skip.max(0).cast_unsigned() as usize).saturating_mul(utf16.len());
+        let mut fallback_skip = skip.saturating_mul(awaiting_fallback);
         let mut remainder = String::new();
         while fallback_skip > 0 && self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -2985,7 +2982,7 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let decoded = Self::decode_bounded_utf16(&utf16, "RTF style name Unicode")?;
+        let decoded = self.decode_bounded_utf16(&utf16, "RTF style name Unicode")?;
         Ok((decoded, remainder))
     }
 

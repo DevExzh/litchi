@@ -1,7 +1,7 @@
 use super::{
     ControlWord, Cow, Destination, DrawingStoryCapture, InfoTextField, InfoTimeField,
-    MAX_GROUP_NESTING_DEPTH, MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, SmallVec, State,
-    Token, control_symbol_text,
+    MAX_GROUP_NESTING_DEPTH, MAX_INFO_TEXT_BYTES, Parser, RtfError, RtfResult, State, Token,
+    control_symbol_text,
 };
 use std::mem::size_of;
 
@@ -65,25 +65,13 @@ impl<'a> Parser<'a> {
                     value.push_str(&self.decode_transport_text(&remainder)?);
                     self.pos += 1;
                 },
-                Some(Token::Control(ControlWord::Unicode(_))) => {
-                    let mut utf16 = SmallVec::<[u16; 4]>::new();
-                    while let Some(Token::Control(ControlWord::Unicode(code))) =
-                        self.tokens.get(self.pos)
-                    {
-                        #[allow(
-                            clippy::cast_possible_truncation,
-                            clippy::cast_sign_loss,
-                            reason = "RTF \\uN parameters are signed 16-bit; the u16 wrap implements the specified negative-value conversion"
-                        )]
-                        utf16.push(*code as u16);
-                        self.pos += 1;
-                    }
-                    value.push_str(&String::from_utf16(&utf16).map_err(|error| {
-                        RtfError::InvalidUnicode(format!("Invalid info Unicode: {error}"))
-                    })?);
-                    fallback_skip = self.current_state()?.unicode_skip.max(0).cast_unsigned()
-                        as usize
-                        * utf16.len();
+                Some(Token::Control(ControlWord::Unicode(first))) => {
+                    let mut utf16 = super::unicode::UnicodeRun::default();
+                    let skip = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
+                    let awaiting_fallback =
+                        self.collect_unicode_run(*first, skip, &mut utf16, false)?;
+                    self.decode_unicode_run(&utf16, &mut value);
+                    fallback_skip = skip * awaiting_fallback;
                 },
                 Some(Token::Control(ControlWord::UnicodeSkip(count))) => {
                     self.current_state_mut()?.unicode_skip = *count;

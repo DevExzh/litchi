@@ -243,23 +243,20 @@ impl<'a> Parser<'a> {
                     }
                     let unit = *value as i16 as u16;
                     if (0xD800..=0xDBFF).contains(&unit) {
-                        if pending_high_surrogate.replace(unit).is_some() {
-                            output.push('\u{FFFD}');
+                        if let Some((_, token)) = pending_high_surrogate.replace((unit, self.pos)) {
+                            self.substitute_unpaired_surrogate(&mut output, token);
                         }
-                    } else if let Some(high) = pending_high_surrogate.take() {
-                        output.push(
-                            char::decode_utf16([high, unit])
-                                .next()
-                                .and_then(Result::ok)
-                                .unwrap_or('\u{FFFD}'),
-                        );
+                    } else if let Some((high, token)) = pending_high_surrogate.take() {
+                        if let Some(Ok(character)) = char::decode_utf16([high, unit]).next()
+                            && character.len_utf16() == 2
+                        {
+                            output.push(character);
+                        } else {
+                            self.substitute_unpaired_surrogate(&mut output, token);
+                            self.push_single_unicode_unit(&mut output, unit);
+                        }
                     } else {
-                        output.push(
-                            char::decode_utf16([unit])
-                                .next()
-                                .and_then(Result::ok)
-                                .unwrap_or('\u{FFFD}'),
-                        );
+                        self.push_single_unicode_unit(&mut output, unit);
                     }
                     skip_fallback = unicode_skip.max(0);
                     self.pos += 1;
@@ -302,8 +299,8 @@ impl<'a> Parser<'a> {
                 .decode(&bytes);
             output.push_str(&decoded);
         }
-        if pending_high_surrogate.is_some() {
-            output.push('\u{FFFD}');
+        if let Some((_, token)) = pending_high_surrogate {
+            self.substitute_unpaired_surrogate(&mut output, token);
         }
         if output.len() > limit {
             return Err(RtfError::MalformedDocument(format!(

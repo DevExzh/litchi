@@ -213,8 +213,8 @@ fn targeted_malformed_documents_fail_typed() {
         "{\rtf1\\\x01}",
         // Binary length beyond the safety cap.
         r"{\rtf1{\object\objemb{\*\objdata 00}{\*\objdata 01}}}",
-        // Invalid UCS-2 escape (lone surrogate half).
-        r"{\rtf1\u55296 ?}",
+        // A lone surrogate half (`\u55296`) is no longer here: it decodes to
+        // U+FFFD and is recorded (tests/leniency.rs).
         // Empty document.
         r"",
         // Not an RTF document at all.

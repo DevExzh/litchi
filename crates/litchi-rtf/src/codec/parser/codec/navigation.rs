@@ -2,7 +2,7 @@ use super::{
     ControlWord, Cow, Destination, IndexEntry, IndexPageReference, MAX_NAVIGATION_ENTRIES,
     MAX_NAVIGATION_ENTRY_DEPTH, MAX_NAVIGATION_ENTRY_TEXT_BYTES,
     MAX_NAVIGATION_ENTRY_TEXT_TOTAL_BYTES, NavigationEntry, ParsedBodyStoryEvent, Parser, RtfError,
-    RtfResult, SmallVec, TableOfContentsEntry, Token, control_symbol_text,
+    RtfResult, TableOfContentsEntry, Token, control_symbol_text,
 };
 
 impl<'a> Parser<'a> {
@@ -572,11 +572,11 @@ impl<'a> Parser<'a> {
         first_code: i32,
     ) -> RtfResult<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
-        let mut utf16 = SmallVec::<[u16; 4]>::new();
+        let mut utf16 = super::unicode::UnicodeRun::default();
         let mut code = first_code;
         let mut remainder = String::new();
         loop {
-            utf16.push(code as u16);
+            utf16.push(code as u16, self.pos);
             self.pos += 1;
             let mut fallback_skip = skip_count;
             while fallback_skip > 0 {
@@ -606,9 +606,8 @@ impl<'a> Parser<'a> {
                 _ => break,
             }
         }
-        let mut decoded = String::from_utf16(&utf16).map_err(|error| {
-            RtfError::InvalidUnicode(format!("invalid navigation-entry Unicode: {error}"))
-        })?;
+        let mut decoded = String::new();
+        self.decode_unicode_run(&utf16, &mut decoded);
         decoded.push_str(&self.decode_transport_text(&remainder)?);
         Ok(decoded)
     }

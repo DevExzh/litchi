@@ -516,15 +516,11 @@ impl<'a> Parser<'a> {
         encoding: RtfEncoding,
     ) -> RtfResult<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
-        let mut utf16 = SmallVec::<[u16; 4]>::new();
-        Self::push_bounded_unicode_code(&mut utf16, first_code)?;
-        self.pos += 1;
-        while let Some(Token::Control(ControlWord::Unicode(code))) = self.tokens.get(self.pos) {
-            Self::push_bounded_unicode_code(&mut utf16, *code)?;
-            self.pos += 1;
-        }
+        let mut utf16 = super::unicode::UnicodeRun::default();
+        let awaiting_fallback =
+            self.collect_unicode_run(first_code, skip_count, &mut utf16, true)?;
 
-        let mut fallback_skip = skip_count.saturating_mul(utf16.len());
+        let mut fallback_skip = skip_count.saturating_mul(awaiting_fallback);
         let mut remainder = String::new();
         while fallback_skip > 0 && self.pos < self.tokens.len() {
             match self.tokens.get(self.pos) {
@@ -583,7 +579,7 @@ impl<'a> Parser<'a> {
                 },
             }
         }
-        let mut decoded = Self::decode_bounded_utf16(&utf16, "RTF destination Unicode")?;
+        let mut decoded = self.decode_bounded_utf16(&utf16, "RTF destination Unicode")?;
         let fallback = self.decode_transport_text_strict_with_encoding(&remainder, encoding)?;
         let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
             RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())

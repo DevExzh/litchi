@@ -8,7 +8,9 @@
 //! default, opt-in repairs only under a named `Leniency`, and conformant input
 //! reports clean.
 
-use litchi_rtf::leniency::{Defect, Leniency, SyntaxDefect, ToleranceReport, ToleratedDefect};
+use litchi_rtf::leniency::{
+    Defect, Leniency, SyntaxDefect, ToleranceReport, ToleratedDefect, UnicodeDefect,
+};
 use litchi_rtf::read::{Limits, Options};
 use litchi_rtf::{Document, RtfDocument, compress};
 
@@ -19,7 +21,7 @@ const CONFORMANT: &str = concat!(
     r"{\stylesheet{\s0 Normal;}{\s1\b Heading;}}",
     r"{\info{\title Conformant}}",
     r"\pard\s1\b\fs28 Title\b0\par",
-    r"\pard\plain\fs24 caf\'e9 荤?\tab \i italic\i0\line next\par",
+    r"\pard\plain\fs24 caf\'e9 \u233?\tab \i italic\i0\line next\par",
     r"\trowd\cellx2000\cellx4000\pard\intbl A\cell B\cell\row",
     r"\pard\hyphpar1\page{\*\unknowndest ignored}\par}",
 );
@@ -145,4 +147,71 @@ fn undefined_control_symbol_offsets_count_transport_bytes() {
         recorded(document.tolerance_report()),
         vec![(Defect::Syntax(SyntaxDefect::UnknownControlSymbol), offset)]
     );
+}
+
+// F9.6: unpaired UTF-16 surrogates decode to U+FFFD, as Word and LibreOffice
+// show them, and each substitution is recorded.
+#[test]
+fn unpaired_surrogates_become_replacement_characters_and_are_recorded() {
+    let source = r"{\rtf1\ansi\uc1\pard a\u-10179?b\u-9047?c\u-10179?\u-8694?d\u-10179?\u-10179?\u-8694?\par}";
+    let document = Document::parse(source).unwrap();
+    // Lone high, lone low, a valid pair (U+1F60A), then a high orphaned by
+    // the next high that does pair.
+    assert_eq!(
+        document.text(),
+        "a\u{fffd}b\u{fffd}c\u{1f60a}d\u{fffd}\u{1f60a}\n"
+    );
+    let surrogate = Defect::Unicode(UnicodeDefect::UnpairedSurrogate);
+    let lone_high = source.find(r"\u-10179?b").unwrap() as u64;
+    let lone_low = source.find(r"\u-9047").unwrap() as u64;
+    let orphan = source.find(r"\u-10179?\u-10179").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (surrogate, lone_high),
+            (surrogate, lone_low),
+            (surrogate, orphan)
+        ]
+    );
+}
+
+#[test]
+fn unpaired_surrogates_are_repaired_in_destination_text() {
+    let source = concat!(
+        r"{\rtf1\ansi{\fonttbl{\f0\fnil A\u-10179?;}}",
+        r"{\info{\title T\u-10179?}}",
+        r"{\stylesheet{\s0 N\u-9047?;}}",
+        r"{\header H\u-10179?\par}",
+        r"\pard x{\footnote F\u-9047?}\par}",
+    );
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{fffd}");
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 5, "{report:?}");
+    assert!(
+        report
+            .iter()
+            .all(|tolerated| tolerated.defect == Defect::Unicode(UnicodeDefect::UnpairedSurrogate))
+    );
+}
+
+#[test]
+fn paired_surrogates_are_not_defects() {
+    let document = Document::parse(r"{\rtf1\ansi\uc1\pard \u-10179?\u-8694?\u233?\par}").unwrap();
+    assert_eq!(document.text(), "\u{1f60a}\u{e9}\n");
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
+    // Word writes each surrogate half with its own `\ucN` fallback.
+    let pair = r"\u-10179?\u-8694?";
+    let source = format!(
+        r"{{\rtf1\ansi\uc1{{\fonttbl{{\f0\fnil A{pair};}}}}{{\info{{\title T{pair}}}}}\pard x{pair}y\par}}"
+    );
+    let document = Document::parse(&source).unwrap();
+    assert_eq!(document.text(), "x\u{1f60a}y\n");
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{1f60a}");
+    assert_eq!(document.info().title.as_deref(), Some("T\u{1f60a}"));
+    assert_clean(document.tolerance_report());
 }
