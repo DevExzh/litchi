@@ -8,7 +8,7 @@
 //! default, opt-in repairs only under a named `Leniency`, and conformant input
 //! reports clean.
 
-use litchi_rtf::leniency::{Leniency, ToleranceReport};
+use litchi_rtf::leniency::{Defect, Leniency, SyntaxDefect, ToleranceReport, ToleratedDefect};
 use litchi_rtf::read::{Limits, Options};
 use litchi_rtf::{Document, RtfDocument, compress};
 
@@ -84,4 +84,65 @@ fn opening_a_file_with_options_reports_clean() {
     let document = Document::open_with_options(&path, Options::new()).unwrap();
     assert_clean(document.tolerance_report());
     std::fs::remove_dir_all(&directory).unwrap();
+}
+
+fn recorded(report: &ToleranceReport) -> Vec<(Defect, u64)> {
+    report.iter().map(|d| (d.defect, d.offset)).collect()
+}
+
+// F9.4: undefined control symbols are ignored the way Word and LibreOffice
+// ignore them, and every one is recorded.
+#[test]
+fn undefined_control_symbols_are_ignored_and_recorded_by_default() {
+    let source = r"{\rtf1\ansi\pard before\!after \;x\par}";
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.text(), "beforeafter x\n");
+    let unknown = Defect::Syntax(SyntaxDefect::UnknownControlSymbol);
+    let first = source.find(r"\!").unwrap() as u64;
+    let second = source.find(r"\;").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(unknown, first), (unknown, second)]
+    );
+    assert!(!SyntaxDefect::UnknownControlSymbol.repair().is_empty());
+}
+
+#[test]
+fn undefined_control_symbols_are_tolerated_in_header_destinations() {
+    let source = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Arial\!;}}{\info{\title A\?B}}\pard x\1y\par}";
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.text(), "xy\n");
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "Arial");
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 3);
+    assert!(report.iter().all(|tolerated| matches!(
+        tolerated,
+        ToleratedDefect {
+            defect: Defect::Syntax(SyntaxDefect::UnknownControlSymbol),
+            ..
+        }
+    )));
+}
+
+#[test]
+fn defined_control_symbols_without_a_model_are_not_defects() {
+    // `\|` (formula character) and `\:` (index subentry) are RTF 1.9.1
+    // control symbols; they are retained inertly and the report stays clean.
+    let document = Document::parse(r"{\rtf1\ansi\pard a\|b\:c\par}").unwrap();
+    assert_eq!(document.text(), "abc\n");
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn undefined_control_symbol_offsets_count_transport_bytes() {
+    let mut bytes = br"{\rtf1\ansi\ansicpg1252\pard caf".to_vec();
+    bytes.push(0xE9);
+    let offset = bytes.len() as u64;
+    bytes.extend_from_slice(br"\!\par}");
+    let document = Document::from_bytes(&bytes).unwrap();
+    assert_eq!(document.text(), "caf\u{e9}\n");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(Defect::Syntax(SyntaxDefect::UnknownControlSymbol), offset)]
+    );
 }

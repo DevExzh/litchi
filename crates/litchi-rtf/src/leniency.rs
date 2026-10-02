@@ -253,10 +253,6 @@ impl ToleranceReport {
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the first Word-compatible repair wires recording")
-    )]
     pub(crate) fn record(&mut self, defect: impl Into<Defect>, offset: usize) {
         self.push(ToleratedDefect {
             defect: defect.into(),

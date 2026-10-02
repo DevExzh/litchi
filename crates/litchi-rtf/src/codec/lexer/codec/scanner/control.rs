@@ -78,11 +78,7 @@ impl<'a> Lexer<'a> {
         }
 
         if start == self.pos {
-            // No alphabetic characters, might be a control symbol
-            return Err(RtfError::InvalidControlWord(format!(
-                "Invalid control word at position {}",
-                self.pos
-            )));
+            return self.parse_unhandled_control_symbol(start);
         }
 
         let word = self.source_range(start, self.pos)?;
@@ -105,6 +101,29 @@ impl<'a> Lexer<'a> {
         }
 
         Ok(Token::Control(control))
+    }
+
+    /// Tokenize a control symbol the lexer does not translate itself.
+    ///
+    /// RTF 1.9.1 defines `\|` (formula character) and `\:` (index
+    /// subentry), which the model does not interpret. Any other
+    /// non-alphabetic character after a backslash is undefined; RTF 1.9.1
+    /// tells readers to ignore control symbols they do not recognize, and
+    /// Word and LibreOffice (`RTFTokenizer::dispatchKeyword`) do. Both kinds
+    /// become [`ControlWord::Unknown`], which the parser retains as an inert
+    /// opaque control exactly like an unknown control word; only the
+    /// undefined symbols are recorded as repairs. Control symbols take no
+    /// delimiter, so a following space stays text.
+    fn parse_unhandled_control_symbol(&mut self, start: usize) -> RtfResult<Token<'a>> {
+        self.advance()?;
+        let symbol = self.source_range(start, self.pos)?;
+        if !matches!(symbol, "|" | ":") {
+            self.tolerance.record(
+                crate::leniency::SyntaxDefect::UnknownControlSymbol,
+                start.saturating_sub(1),
+            );
+        }
+        Ok(Token::Control(ControlWord::Unknown(symbol, None)))
     }
 
     /// Parse numeric parameter after control word.
