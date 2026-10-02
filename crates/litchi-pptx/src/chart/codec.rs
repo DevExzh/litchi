@@ -4,6 +4,7 @@
 
 use super::model::{Chart, Info, Series, Type};
 use super::package::Part;
+use crate::leniency::{ChartDefect, ToleranceReport};
 use crate::writer::shape::escape_xml;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::{
@@ -151,15 +152,21 @@ impl Part<'_> {
         }
 
         if !state.seen_chart || !state.seen_plot_area {
-            return Err(Error::Invalid(
-                "DrawingML chart is missing its chart or plotArea element".to_string(),
-            ));
+            // `CT_ChartSpace` requires `c:chart` and `CT_Chart` requires
+            // `c:plotArea`; without them no plot type can be found, so the
+            // chart type stays unknown (audit finding 6.10).
+            state.chart_type = Type::Unknown;
+            state.tolerance.record(ChartDefect::MissingElement, 0);
         }
+        state
+            .tolerance
+            .locate_in_part(self.part.partname().as_str());
 
         Ok(Info {
             chart_type: state.chart_type,
             title: state.title,
             has_legend: state.has_legend,
+            tolerance: state.tolerance,
         })
     }
 }
@@ -180,6 +187,7 @@ struct ChartScanState {
     seen_plot_area: bool,
     seen_title: bool,
     seen_legend: bool,
+    tolerance: ToleranceReport,
 }
 
 impl ChartScanState {
@@ -200,6 +208,7 @@ impl ChartScanState {
             seen_plot_area: false,
             seen_title: false,
             seen_legend: false,
+            tolerance: ToleranceReport::default(),
         }
     }
 }
@@ -214,35 +223,19 @@ fn inspect_chart_start(
     if state.root_depth.is_some_and(|root| depth == root + 1)
         && is_drawingml_chart_name(namespace, element.name(), b"chart")
     {
-        if state.seen_chart {
-            return Err(Error::Invalid(
-                "duplicate DrawingML chart element".to_string(),
-            ));
+        if state.first_occurrence(StructuralElement::Chart) {
+            state.chart_depth = Some(depth);
         }
-        state.seen_chart = true;
-        state.chart_depth = Some(depth);
     } else if state.chart_depth.is_some_and(|chart| depth == chart + 1) {
         if is_drawingml_chart_name(namespace, element.name(), b"title") {
-            if state.seen_title {
-                return Err(Error::Invalid(
-                    "duplicate DrawingML chart title".to_string(),
-                ));
+            if state.first_occurrence(StructuralElement::Title) {
+                state.title_depth = Some(depth);
             }
-            state.seen_title = true;
-            state.title_depth = Some(depth);
         } else if is_drawingml_chart_name(namespace, element.name(), b"legend") {
-            if state.seen_legend {
-                return Err(Error::Invalid(
-                    "duplicate DrawingML chart legend".to_string(),
-                ));
-            }
-            state.seen_legend = true;
-            state.has_legend = true;
-        } else if is_drawingml_chart_name(namespace, element.name(), b"plotArea") {
-            if state.seen_plot_area {
-                return Err(Error::Invalid("duplicate DrawingML plot area".to_string()));
-            }
-            state.seen_plot_area = true;
+            state.first_occurrence(StructuralElement::Legend);
+        } else if is_drawingml_chart_name(namespace, element.name(), b"plotArea")
+            && state.first_occurrence(StructuralElement::PlotArea)
+        {
             state.plot_area_depth = Some(depth);
         }
     }
@@ -272,33 +265,14 @@ fn inspect_chart_empty(
     if state.root_depth.is_some_and(|root| depth == root + 1)
         && is_drawingml_chart_name(namespace, element.name(), b"chart")
     {
-        if state.seen_chart {
-            return Err(Error::Invalid(
-                "duplicate DrawingML chart element".to_string(),
-            ));
-        }
-        state.seen_chart = true;
+        state.first_occurrence(StructuralElement::Chart);
     } else if state.chart_depth.is_some_and(|chart| depth == chart + 1) {
         if is_drawingml_chart_name(namespace, element.name(), b"title") {
-            if state.seen_title {
-                return Err(Error::Invalid(
-                    "duplicate DrawingML chart title".to_string(),
-                ));
-            }
-            state.seen_title = true;
+            state.first_occurrence(StructuralElement::Title);
         } else if is_drawingml_chart_name(namespace, element.name(), b"legend") {
-            if state.seen_legend {
-                return Err(Error::Invalid(
-                    "duplicate DrawingML chart legend".to_string(),
-                ));
-            }
-            state.seen_legend = true;
-            state.has_legend = true;
+            state.first_occurrence(StructuralElement::Legend);
         } else if is_drawingml_chart_name(namespace, element.name(), b"plotArea") {
-            if state.seen_plot_area {
-                return Err(Error::Invalid("duplicate DrawingML plot area".to_string()));
-            }
-            state.seen_plot_area = true;
+            state.first_occurrence(StructuralElement::PlotArea);
         }
     }
     inspect_plot_element(namespace, element, decoder, depth, state)?;
@@ -333,19 +307,52 @@ fn inspect_plot_element(
         .is_some_and(|bar_chart| depth == bar_chart + 1)
         && is_drawingml_chart_name(namespace, element.name(), b"barDir")
     {
-        let direction = unqualified_attribute_value(element, b"val", decoder)?
-            .ok_or_else(|| Error::Invalid("barDir is missing its val attribute".to_string()))?;
-        state.chart_type = match direction.as_str() {
-            "col" => Type::Column,
-            "bar" => Type::Bar,
+        let direction = unqualified_attribute_value(element, b"val", decoder)?;
+        state.chart_type = match direction.as_deref() {
+            Some("col") => Type::Column,
+            Some("bar") => Type::Bar,
+            // `ST_BarDir` has only `bar` and `col`; LibreOffice reads the
+            // attribute with `getToken(XML_val, XML_col)`, so a missing or
+            // unknown direction is a column chart (audit finding 6.10).
             _ => {
-                return Err(Error::Invalid(format!(
-                    "invalid barDir value '{direction}'"
-                )));
+                state.tolerance.record(ChartDefect::BarDirection, 0);
+                Type::Column
             },
         };
     }
     Ok(())
+}
+
+/// A `CT_Chart`/`CT_ChartSpace` child the inspection allows once.
+#[derive(Clone, Copy)]
+enum StructuralElement {
+    Chart,
+    Title,
+    Legend,
+    PlotArea,
+}
+
+impl ChartScanState {
+    /// Mark `element` seen; `false` (and a recorded
+    /// [`ChartDefect::DuplicateElement`]) when an earlier occurrence already
+    /// won, so the caller ignores this one (audit finding 6.10).
+    fn first_occurrence(&mut self, element: StructuralElement) -> bool {
+        let seen = match element {
+            StructuralElement::Chart => &mut self.seen_chart,
+            StructuralElement::Title => &mut self.seen_title,
+            StructuralElement::Legend => &mut self.seen_legend,
+            StructuralElement::PlotArea => &mut self.seen_plot_area,
+        };
+        if *seen {
+            self.tolerance.record(ChartDefect::DuplicateElement, 0);
+            return false;
+        }
+        *seen = true;
+        if matches!(element, StructuralElement::Legend) {
+            self.has_legend = true;
+        }
+        true
+    }
 }
 
 fn append_title(title: &mut Option<String>, text: &str) {
@@ -955,9 +962,6 @@ mod tests {
     #[test]
     fn malformed_chart_info_is_rejected() {
         let invalid = [
-            format!(
-                r#"<c:chartSpace xmlns:c="{C}"><c:chart><c:plotArea><c:barChart><c:barDir val="bad"/></c:barChart></c:plotArea></c:chart></c:chartSpace>"#
-            ),
             format!(r#"<c:chartSpace xmlns:c="{C}"><c:chart>"#),
             "<chartSpace/>".to_string(),
         ];

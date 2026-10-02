@@ -1167,3 +1167,84 @@ fn foreign_text_elements_are_skipped_and_recorded_by_text_extraction() {
     let presentation = package.presentation().unwrap();
     assert!(presentation.slides().unwrap()[0].text().is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.10: chart-info barDir, duplicates, missing structure.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::ChartDefect;
+use litchi_pptx::chart::Type as ChartType;
+
+const PIE_CHART: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/pie-chart.pptx");
+const CHART1: &str = "/ppt/charts/chart1.xml";
+
+fn chart_infos(deck: Vec<u8>) -> Vec<litchi_pptx::chart::Info> {
+    let package = Package::from_vec(deck).unwrap();
+    let presentation = package.presentation().unwrap();
+    presentation
+        .slides()
+        .unwrap()
+        .iter()
+        .flat_map(|slide| slide.charts().unwrap())
+        .map(|chart| chart.chart_info().unwrap())
+        .collect()
+}
+
+fn chart_with(edit: impl FnOnce(&str) -> String) -> litchi_pptx::chart::Info {
+    let mut infos = chart_infos(archive_with_member(
+        PIE_CHART,
+        "ppt/charts/chart1.xml",
+        edit,
+    ));
+    assert_eq!(infos.len(), 1);
+    infos.remove(0)
+}
+
+#[test]
+fn chart_info_repairs_are_applied_and_recorded() {
+    let conformant = chart_infos(PIE_CHART.to_vec());
+    assert_eq!(conformant.len(), 1);
+    assert_eq!(conformant[0].chart_type, ChartType::Pie);
+    assert_clean(conformant[0].tolerance_report());
+
+    let bar = chart_with(|xml| {
+        xml.replace("<c:pieChart>", r#"<c:barChart><c:barDir val="diagonal"/>"#)
+            .replace("</c:pieChart>", "</c:barChart>")
+    });
+    assert_eq!(bar.chart_type, ChartType::Column);
+    assert_eq!(
+        located(bar.tolerance_report()),
+        [(Defect::Chart(ChartDefect::BarDirection), 0, Some(CHART1))]
+    );
+
+    let duplicated = chart_with(|xml| {
+        xml.replace(
+            "</c:plotArea>",
+            "</c:plotArea><c:plotArea><c:lineChart/></c:plotArea><c:legend/><c:legend/>",
+        )
+    });
+    assert_eq!(duplicated.chart_type, ChartType::Pie);
+    assert!(duplicated.has_legend);
+    let duplicate = (
+        Defect::Chart(ChartDefect::DuplicateElement),
+        0,
+        Some(CHART1),
+    );
+    assert_eq!(
+        located(duplicated.tolerance_report()),
+        // The fixture's own legend follows the plot area, so both inserted
+        // legends repeat it.
+        [duplicate, duplicate, duplicate]
+    );
+
+    let missing = chart_with(|xml| {
+        let start = xml.find("<c:plotArea>").unwrap();
+        let end = xml.find("</c:plotArea>").unwrap() + "</c:plotArea>".len();
+        format!("{}{}", &xml[..start], &xml[end..])
+    });
+    assert_eq!(missing.chart_type, ChartType::Unknown);
+    assert_eq!(
+        located(missing.tolerance_report()),
+        [(Defect::Chart(ChartDefect::MissingElement), 0, Some(CHART1))]
+    );
+}

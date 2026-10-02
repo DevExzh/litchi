@@ -223,6 +223,19 @@
 //! unbalanced DrawingML `a:t`, and the size/depth/count limits stay hard
 //! errors.
 //!
+//! # Chart inspection (audit finding 6.10)
+//!
+//! [`crate::chart::Part::chart_info`] no longer fails the inspection over
+//! chart structure LibreOffice reads past. A missing or unknown `c:barDir`
+//! value reads as a column chart ([`ChartDefect::BarDirection`]); a repeated
+//! `c:chart`, `c:title`, `c:legend`, or `c:plotArea` keeps the first
+//! occurrence ([`ChartDefect::DuplicateElement`]); a chart without
+//! `c:chart` or `c:plotArea` reports [`crate::chart::Type::Unknown`]
+//! ([`ChartDefect::MissingElement`]). The repairs are carried by the
+//! returned [`crate::chart::Info::tolerance_report`], stamped with the chart
+//! part. XML well-formedness, a missing or foreign `c:chartSpace` root, and
+//! nested title text stay hard errors.
+//!
 //! # Shape metadata (audit finding 6.8)
 //!
 //! A `p:cNvPr@id` that is not an `unsignedInt` leaves the shape without an
@@ -358,6 +371,8 @@ pub enum Defect {
     Package(litchi_opc::leniency::Defect),
     /// A legacy slide-comment defect repaired on the comment carrying it.
     Comment(CommentDefect),
+    /// A chart-part defect repaired by the chart inspection.
+    Chart(ChartDefect),
     /// A core- or custom-properties defect repaired by
     /// `litchi_ooxml_common` while the document metadata was read, folded
     /// into the presentation's report.
@@ -376,6 +391,7 @@ impl Defect {
             Self::Markup(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
             Self::Comment(defect) => defect.repair(),
+            Self::Chart(defect) => defect.repair(),
             Self::Properties(defect) => defect.repair(),
         }
     }
@@ -667,6 +683,55 @@ impl CommentDefect {
                 "kept the comment repeating an earlier author/index key after the first"
             },
         }
+    }
+}
+
+/// The class of chart-part defect the chart inspection
+/// ([`crate::chart::Part::chart_info`], audit finding 6.10) repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant. The
+/// context is `0`; the part is the chart part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ChartDefect {
+    /// The primary bar chart's `c:barDir` had no `val` or a value outside
+    /// `ST_BarDir` (`bar`, `col`).
+    ///
+    /// LibreOffice reads it with `getToken(XML_val, XML_col)`; the reader
+    /// reports a column chart, LibreOffice's default.
+    BarDirection,
+    /// `c:chart`, or the chart's `c:title`, `c:legend`, or `c:plotArea`,
+    /// occurred more than once.
+    ///
+    /// The schema allows each once. The first occurrence is inspected and
+    /// later ones are ignored, as LibreOffice's model keeps the first.
+    DuplicateElement,
+    /// The chart space had no `c:chart`, or the chart no `c:plotArea`, both
+    /// required by the schema.
+    ///
+    /// No plot can be found, so the chart type is
+    /// [`crate::chart::Type::Unknown`]; a title or legend that was present
+    /// is still reported.
+    MissingElement,
+}
+
+impl ChartDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::BarDirection => "read the missing or unknown bar direction as a column chart",
+            Self::DuplicateElement => "inspected the first occurrence of a repeated chart element",
+            Self::MissingElement => {
+                "reported an unknown chart type for a chart without a chart or plot area"
+            },
+        }
+    }
+}
+
+impl From<ChartDefect> for Defect {
+    fn from(defect: ChartDefect) -> Self {
+        Self::Chart(defect)
     }
 }
 
@@ -1041,6 +1106,9 @@ mod tests {
             Defect::from(PresentationDefect::SlideListContent),
             Defect::from(MarkupDefect::ProcessingInstruction),
             Defect::from(MarkupDefect::ForeignTextElement),
+            Defect::from(ChartDefect::BarDirection),
+            Defect::from(ChartDefect::DuplicateElement),
+            Defect::from(ChartDefect::MissingElement),
             Defect::from(CommentDefect::ZeroIndex),
             Defect::from(CommentDefect::DuplicateKey),
             Defect::from(litchi_opc::leniency::Defect::Relationship(

@@ -18,11 +18,25 @@ pub enum Type {
 }
 
 /// Basic information discovered in a chart part.
+///
+/// Only the chart reader constructs it: it carries the report of the
+/// repairs the inspection applied ([`Self::tolerance_report`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Info {
     pub chart_type: Type,
     pub title: Option<String>,
     pub has_legend: bool,
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
+}
+
+impl Info {
+    /// The repairs the chart inspection applied, stamped with the chart
+    /// part name (audit finding 6.10, [`crate::leniency::ChartDefect`]). An
+    /// empty report means the inspected structure conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
 }
 
 /// One chart data series.

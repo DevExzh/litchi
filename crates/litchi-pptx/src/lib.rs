@@ -149,8 +149,8 @@ pub use error::{
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 pub use leniency::{
-    CommentDefect, Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect, TimingDefect,
-    ToleranceReport, ToleratedDefect, TransitionDefect,
+    ChartDefect, CommentDefect, Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect,
+    TimingDefect, ToleranceReport, ToleratedDefect, TransitionDefect,
 };
 #[cfg(feature = "encryption")]
 pub use litchi_crypto::ooxml as encryption;
