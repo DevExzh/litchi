@@ -6,7 +6,20 @@ use std::collections::{BTreeMap, HashSet};
 
 const USER_EDIT: u16 = 4085;
 
-pub(crate) fn read(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u32, u32>, u32)> {
+/// Walk the `UserEdit` chain from `edit_offset`, newest first. Every
+/// deviation is an error; the editor uses this.
+pub(crate) fn read(document: &[u8], edit_offset: u32) -> Result<(BTreeMap<u32, u32>, u32)> {
+    read_reporting(document, edit_offset, None)
+}
+
+/// Walk the `UserEdit` chain from `edit_offset`, newest first, repairing
+/// persist-directory defects into `report` when one is given (the read
+/// path; see [`directory::merge_reporting`]).
+pub(crate) fn read_reporting(
+    document: &[u8],
+    mut edit_offset: u32,
+    mut report: Option<&mut crate::leniency::ToleranceReport>,
+) -> Result<(BTreeMap<u32, u32>, u32)> {
     let mut mapping = BTreeMap::new();
     let mut seen = HashSet::new();
     let mut document_id = 0;
@@ -29,7 +42,7 @@ pub(crate) fn read(document: &[u8], mut edit_offset: u32) -> Result<(BTreeMap<u3
             document_id = rewrite::u32_at(data, 16)?;
         }
         let directory = rewrite::slice(document, rewrite::u32_at(data, 12)? as usize)?;
-        directory::merge(&mut mapping, directory)?;
+        directory::merge_reporting(&mut mapping, directory, report.as_deref_mut())?;
         edit_offset = rewrite::u32_at(data, 8)?;
     }
 

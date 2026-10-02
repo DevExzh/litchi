@@ -75,12 +75,14 @@ impl Editor {
 
     /// Read the live persist mapping from the `UserEdit` chain whose newest
     /// atom sits at `head_offset` (see
-    /// `crate::slide::directory::locate_head_user_edit`).
+    /// `crate::slide::directory::locate_head_user_edit`), repairing
+    /// persist-directory defects into `report` (finding F5.7).
     pub(crate) fn inspect_live_mapping_at(
         document: &[u8],
         head_offset: u32,
+        report: &mut crate::leniency::ToleranceReport,
     ) -> Result<crate::persist::PersistMapping> {
-        lifecycle::inspect_live_mapping_at(document, head_offset)
+        lifecycle::inspect_live_mapping_at(document, head_offset, report)
     }
 
     /// Opens a transactional editor over an OLE-backed `PowerPoint` package.

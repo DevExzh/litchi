@@ -1015,3 +1015,164 @@ fn user_edit_chain_corruption_stays_fatal() {
         assert!(error.to_string().contains("UserEditAtom"), "{error}");
     }
 }
+
+/// File offsets of every record header with type `record_type`.
+fn record_headers(bytes: &[u8], record_type: u16) -> Vec<usize> {
+    let [low, high] = record_type.to_le_bytes();
+    bytes
+        .windows(4)
+        .enumerate()
+        .filter(|(_, window)| window[2] == low && window[3] == high && window[0] & 0x0f == 0)
+        .map(|(offset, _)| offset)
+        .collect()
+}
+
+/// A two-slide deck whose second slide's text was edited through the
+/// incremental text-edit path: the stream then carries two `UserEditAtom`s,
+/// each with a full persist directory `[1..=4]`, and the newer directory
+/// maps the second slide (persist ID 4) to its edited copy.
+struct EditedDeck {
+    deck: Deck,
+    /// File offset of the newer directory's payload.
+    directory: usize,
+    /// File offset of the newer `UserEditAtom`'s payload.
+    user_edit: usize,
+}
+
+impl EditedDeck {
+    fn new() -> Self {
+        use litchi_ppt::text_edit::{Position, Snapshot, Target};
+
+        let deck = Deck::new(2);
+        let mut edit = Snapshot::from_bytes(deck.bytes.clone())
+            .unwrap()
+            .edit_text(Target::new(Position::new(1), Position::new(0)))
+            .unwrap();
+        edit.set_text("edited").unwrap();
+        let bytes = edit.commit().unwrap().snapshot().bytes().to_vec();
+        let directories = record_headers(&bytes, 0x1772);
+        let user_edits = record_headers(&bytes, 0x0FF5);
+        assert_eq!((directories.len(), user_edits.len()), (2, 2));
+        let edited = Self {
+            deck: Deck {
+                bytes,
+                slides: deck.slides,
+            },
+            directory: directories[1] + 8,
+            user_edit: user_edits[1] + 8,
+        };
+        // The newer directory is one full run of four persist IDs.
+        assert_eq!(edited.directory_word(0), 0x0040_0001);
+        assert_eq!(edited.second_slide_text(), "edited");
+        edited
+    }
+
+    fn directory_word(&self, index: usize) -> u32 {
+        let at = self.directory + 4 * index;
+        u32::from_le_bytes(self.deck.bytes[at..at + 4].try_into().unwrap())
+    }
+
+    /// Rewrite the newer directory's five words in place.
+    fn with_directory(mut self, words: [u32; 5]) -> Self {
+        for (index, word) in words.into_iter().enumerate() {
+            let at = self.directory + 4 * index;
+            self.deck.bytes[at..at + 4].copy_from_slice(&word.to_le_bytes());
+        }
+        self
+    }
+
+    /// The second slide's text, read through both default paths.
+    fn second_slide_text(&self) -> String {
+        let texts: Vec<String> = open_both(&self.deck.bytes)
+            .iter()
+            .map(|presentation| {
+                let slides = presentation.slides().unwrap();
+                let shapes = slides[1].shapes().unwrap();
+                let ShapeEnum::TextBox(textbox) = &shapes[0] else {
+                    panic!("expected a text box");
+                };
+                textbox.text().to_owned()
+            })
+            .collect();
+        assert_eq!(texts[0], texts[1]);
+        texts[0].clone()
+    }
+}
+
+#[test]
+fn edited_deck_control_reports_nothing() {
+    let edited = EditedDeck::new();
+    edited.deck.assert_opens(&[0, 1], &[]);
+}
+
+#[test]
+fn duplicate_persist_id_keeps_the_first_offset_and_is_recorded() {
+    let edited = EditedDeck::new();
+    let (slide, edited_offset) = (edited.directory_word(3), edited.directory_word(4));
+    // [4] -> edited copy, [3, 4] -> slide 1 and a bogus offset for 4.
+    let edited = edited.with_directory([0x0010_0004, edited_offset, 0x0020_0003, slide, 1]);
+    edited.deck.assert_opens(
+        &[0, 1],
+        &[ToleratedDefect {
+            defect: Defect::Persist(PersistDefect::DuplicatePersistId),
+            context: 4,
+            location: DefectLocation {
+                persist_id: Some(4),
+                shape_id: None,
+            },
+        }],
+    );
+    assert_eq!(edited.second_slide_text(), "edited");
+}
+
+#[test]
+fn zero_count_persist_run_is_skipped_and_recorded() {
+    let edited = EditedDeck::new();
+    let (slide, edited_offset) = (edited.directory_word(3), edited.directory_word(4));
+    let edited = edited.with_directory([0x0010_0004, edited_offset, 0x0010_0003, slide, 7]);
+    edited.deck.assert_opens(
+        &[0, 1],
+        &[open_time(PersistDefect::ZeroCountPersistRun, 7, None)],
+    );
+    assert_eq!(edited.second_slide_text(), "edited");
+}
+
+#[test]
+fn persist_directory_pointer_to_another_record_is_ignored_and_recorded() {
+    let mut edited = EditedDeck::new();
+    // Point the newer edit's offsetPersistDirectory (payload word 3) at the
+    // older UserEditAtom (its offsetLastEdit, payload word 2).
+    let at = edited.user_edit;
+    let previous: [u8; 4] = edited.deck.bytes[at + 8..at + 12].try_into().unwrap();
+    edited.deck.bytes[at + 12..at + 16].copy_from_slice(&previous);
+    edited.deck.assert_opens(
+        &[0, 1],
+        &[open_time(
+            PersistDefect::PersistDirectoryRecordType,
+            0x0FF5,
+            None,
+        )],
+    );
+    // The older directory now supplies persist ID 4: the pre-edit slide.
+    assert_eq!(edited.second_slide_text(), "slide 1");
+}
+
+#[test]
+fn truncated_persist_directory_stays_fatal() {
+    let edited = EditedDeck::new();
+    // A run claiming 0xFFF offsets overruns the directory.
+    let edited = edited.with_directory([0xFFF0_0001, 0, 0, 0, 0]);
+    for result in [
+        Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+            .and_then(|mut package| package.presentation())
+            .err(),
+        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(edited.deck.bytes.clone())))
+            .and_then(|package| package.presentation())
+            .err(),
+    ] {
+        assert!(
+            result.is_some(),
+            "a truncated persist directory stays fatal"
+        );
+    }
+}

@@ -44,14 +44,21 @@ pub(crate) fn inspect_live_mapping(
     current_user: &[u8],
 ) -> Result<crate::persist::PersistMapping> {
     validate_current_user(current_user)?;
-    inspect_live_mapping_at(document, rewrite::u32_at(current_user, 16)?)
+    inspect_live_mapping_at(
+        document,
+        rewrite::u32_at(current_user, 16)?,
+        &mut crate::leniency::ToleranceReport::default(),
+    )
 }
 
+/// Read the live persist mapping, repairing persist-directory defects into
+/// `report` (finding F5.7).
 pub(crate) fn inspect_live_mapping_at(
     document: &[u8],
     current_edit_offset: u32,
+    report: &mut crate::leniency::ToleranceReport,
 ) -> Result<crate::persist::PersistMapping> {
-    let (mappings, _) = mapping::read(document, current_edit_offset)?;
+    let (mappings, _) = mapping::read_reporting(document, current_edit_offset, Some(report))?;
     let mut result = crate::persist::PersistMapping::new();
     for (persist_id, offset) in mappings {
         result.add_mapping(persist_id, offset);

@@ -79,6 +79,16 @@
 //!   document stream's top-level records for the last one, LibreOffice's
 //!   algorithm. A recovered atom that names an encryption session is
 //!   rejected rather than read as plaintext.
+//! - **F5.7** ([`PersistDefect::PersistDirectoryRecordType`],
+//!   [`PersistDefect::ZeroCountPersistRun`],
+//!   [`PersistDefect::DuplicatePersistId`]) — persist-directory decoding on
+//!   the read path ignores a directory pointer to another record type, skips
+//!   zero-count entry headers, and keeps the first offset of a persist ID
+//!   repeated within one directory, as LibreOffice does. The public
+//!   [`crate::PersistPtrHolder::parse_with_report`] and
+//!   [`crate::PersistMapping::build_from_records_with_report`] apply the
+//!   same repairs per entry instead of dropping a whole holder. A truncated
+//!   or misaligned directory stays an error.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -408,7 +418,7 @@ impl SlideListDefect {
 }
 
 /// The class of `UserEdit`/persist-chain defect the reader repairs the way
-/// LibreOffice repairs it (finding F5.6).
+/// LibreOffice repairs it (findings F5.6 and F5.7).
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]; the context is
@@ -431,6 +441,21 @@ pub enum PersistDefect {
     /// scan as [`Self::MissingCurrentUser`] (finding F5.6). The context is
     /// the recovered atom's stream offset.
     UnusableCurrentEditOffset,
+    /// A `UserEditAtom`'s `offsetPersistDirectory` pointed at a record other
+    /// than a `PersistDirectoryAtom`; that edit contributes no persist
+    /// entries and the chain walk continues, as LibreOffice only processes
+    /// the directory when the target record is one (`svdfppt.cxx`) (finding
+    /// F5.7). The context is the record type found there.
+    PersistDirectoryRecordType,
+    /// A `PersistDirectoryEntry` header declared zero offsets; it is skipped
+    /// (LibreOffice's read loop simply does not run for it, and POI advances
+    /// past it) (finding F5.7). The context is the entry's base persist ID.
+    ZeroCountPersistRun,
+    /// A persist ID appeared more than once within one persist directory;
+    /// the first offset wins, matching LibreOffice (`svdfppt.cxx`) and the
+    /// newest-first merge of the chain (finding F5.7). The context is the
+    /// persist ID.
+    DuplicatePersistId,
 }
 
 impl PersistDefect {
@@ -443,6 +468,13 @@ impl PersistDefect {
             },
             Self::UnusableCurrentEditOffset => {
                 "recovered the live UserEditAtom by scanning the document stream because the current edit offset is unusable"
+            },
+            Self::PersistDirectoryRecordType => {
+                "ignored a persist-directory pointer to a record that is not a PersistDirectoryAtom"
+            },
+            Self::ZeroCountPersistRun => "skipped a persist-directory entry with a zero count",
+            Self::DuplicatePersistId => {
+                "kept the first offset of a persist ID repeated within one persist directory"
             },
         }
     }
@@ -837,6 +869,9 @@ mod tests {
             Defect::from(SlideListDefect::StaleSlidePersistRef),
             Defect::from(PersistDefect::MissingCurrentUser),
             Defect::from(PersistDefect::UnusableCurrentEditOffset),
+            Defect::from(PersistDefect::PersistDirectoryRecordType),
+            Defect::from(PersistDefect::ZeroCountPersistRun),
+            Defect::from(PersistDefect::DuplicatePersistId),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),

@@ -127,12 +127,14 @@ impl Presentation {
             crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
                 head_user_edit,
+                &mut tolerance,
             )?
         };
         #[cfg(not(feature = "encryption"))]
         let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
             head_user_edit,
+            &mut tolerance,
         )?;
         let slide_directory = SlideDirectory::build_from_head(
             &powerpoint_document,
@@ -289,12 +291,14 @@ impl Presentation {
             crate::embedded::object::Editor::inspect_live_mapping_at(
                 &powerpoint_document,
                 head_user_edit,
+                &mut tolerance,
             )?
         };
         #[cfg(not(feature = "encryption"))]
         let persist_mapping = crate::embedded::object::Editor::inspect_live_mapping_at(
             &powerpoint_document,
             head_user_edit,
+            &mut tolerance,
         )?;
         let slide_directory = SlideDirectory::build_from_head(
             &powerpoint_document,

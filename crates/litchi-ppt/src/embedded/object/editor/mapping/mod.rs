@@ -3,4 +3,4 @@
 pub(super) mod chain;
 mod directory;
 
-pub(super) use chain::read;
+pub(super) use chain::{read, read_reporting};

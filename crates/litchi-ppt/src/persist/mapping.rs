@@ -30,6 +30,12 @@ impl PersistMapping {
 
     /// Build mapping from all `PersistPtrHolder` records using functional iterator patterns.
     ///
+    /// Each holder is parsed per entry
+    /// ([`PersistPtrHolder::parse_with_report`]): a zero-count entry or a
+    /// duplicated persist ID no longer voids the holder (finding F5.7). The
+    /// repairs are not enumerable through this method; use
+    /// [`Self::build_from_records_with_report`] to enumerate them.
+    ///
     /// # Performance
     ///
     /// - Filters records using iterator chaining
@@ -37,29 +43,28 @@ impl PersistMapping {
     /// - Later records override earlier ones (most recent wins)
     #[must_use]
     pub fn build_from_records(records: &[Record]) -> Self {
-        // Count PersistPtrHolder records for capacity estimation
-        let ptr_holder_count = records
-            .iter()
-            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
-            .count();
+        Self::build_from_records_with_report(
+            records,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
 
-        // Pre-allocate with estimated capacity (assume ~10 slides per holder on average)
-        let mut mappings = HashMap::with_capacity(ptr_holder_count * 10);
-
-        // Process all PersistPtrHolder records in order
-        records
-            .iter()
-            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
-            .filter_map(|r| PersistPtrHolder::parse(r).ok())
-            .for_each(|holder| {
-                // Extend mappings (later entries override earlier ones)
-                mappings.extend(holder.slide_locations().iter().map(|(&k, &v)| (k, v)));
-            });
-
-        Self { mappings }
+    /// Build mapping from all `PersistPtrHolder` records, recording every
+    /// repaired per-entry defect ([`crate::PersistDefect`]) in `report`.
+    ///
+    /// A holder whose directory is truncated or misaligned contributes no
+    /// entries.
+    #[must_use]
+    pub fn build_from_records_with_report(
+        records: &[Record],
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Self {
+        Self::build(records.iter(), report)
     }
 
     /// Build mapping from record references (zero-copy version).
+    ///
+    /// Repairs per-entry defects like [`Self::build_from_records`].
     ///
     /// # Performance
     ///
@@ -68,9 +73,19 @@ impl PersistMapping {
     /// - Same logic as `build_from_records` but more efficient
     #[must_use]
     pub fn build_from_records_ref(records: &[&Record]) -> Self {
+        Self::build(
+            records.iter().copied(),
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
+
+    fn build<'a>(
+        records: impl Iterator<Item = &'a Record> + Clone,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Self {
         // Count PersistPtrHolder records for capacity estimation
         let ptr_holder_count = records
-            .iter()
+            .clone()
             .filter(|r| r.record_type == RecordType::PersistPtrHolder)
             .count();
 
@@ -78,14 +93,17 @@ impl PersistMapping {
         let mut mappings = HashMap::with_capacity(ptr_holder_count * 10);
 
         // Process all PersistPtrHolder records in order
-        records
-            .iter()
-            .filter(|r| r.record_type == RecordType::PersistPtrHolder)
-            .filter_map(|r| PersistPtrHolder::parse(r).ok())
-            .for_each(|holder| {
+        for record in records.filter(|r| r.record_type == RecordType::PersistPtrHolder) {
+            let checkpoint = report.checkpoint();
+            match PersistPtrHolder::parse_with_report(record, report) {
                 // Extend mappings (later entries override earlier ones)
-                mappings.extend(holder.slide_locations().iter().map(|(&k, &v)| (k, v)));
-            });
+                Ok(holder) => {
+                    mappings.extend(holder.slide_locations().iter().map(|(&k, &v)| (k, v)));
+                },
+                // A structurally broken holder contributes nothing.
+                Err(_) => report.rollback(checkpoint),
+            }
+        }
 
         Self { mappings }
     }
