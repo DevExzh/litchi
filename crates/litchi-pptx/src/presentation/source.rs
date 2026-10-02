@@ -3258,11 +3258,27 @@ impl SourceSlide {
     /// Returns an error if the source changed, the selected slide exceeds the
     /// retained OPC limits, or its PresentationML is malformed.
     pub fn text(&self) -> Result<String> {
+        self.text_with_tolerance(&mut crate::leniency::ToleranceReport::default())
+    }
+
+    /// [`Self::text`], appending the repairs the extraction applied to
+    /// `tolerance`, stamped with the slide's part name (see
+    /// [`crate::parts::SlidePart::text_with_tolerance`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::text`] returns.
+    pub fn text_with_tolerance(
+        &self,
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<String> {
         self.owner.package.check_execution()?;
         let part = self.part()?;
-        let text = SlidePart::from_part(&part)?.text()?;
+        let mut repairs = crate::leniency::ToleranceReport::default();
+        let text = SlidePart::from_part(&part)?.text_with_tolerance(&mut repairs)?;
         self.owner.package.check_execution()?;
         self.owner.package.source_version()?;
+        tolerance.append(&repairs);
         Ok(text)
     }
 

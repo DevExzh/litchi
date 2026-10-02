@@ -14,6 +14,7 @@ use super::{
     MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
     related_part_by_type, validate_content_type,
 };
+use crate::leniency::{MarkupDefect, ToleranceReport};
 use crate::notes::SlideRootProof;
 use crate::shape::Scene;
 use crate::{Error, Result};
@@ -549,6 +550,12 @@ struct SemanticTextParser<'a> {
     runs: usize,
     objects: usize,
     paragraph_separator: &'a str,
+    /// Depth of the foreign `*:t` element (not DrawingML `a:t`) whose
+    /// subtree is being skipped, if any (audit finding 6.9).
+    foreign_text_depth: Option<usize>,
+    /// The repairs this parse applied: one
+    /// [`MarkupDefect::ForeignTextElement`] per skipped foreign subtree.
+    tolerance: ToleranceReport,
     /// Whether the raw scan validates each event before this parser reads it.
     ///
     /// Only the single-pass route sets it. There the raw scan has already
@@ -572,6 +579,8 @@ impl<'a> SemanticTextParser<'a> {
             runs: 0,
             objects: 0,
             paragraph_separator,
+            foreign_text_depth: None,
+            tolerance: ToleranceReport::default(),
             raw_validated: false,
         }
     }
@@ -676,11 +685,14 @@ impl<'a> SemanticTextParser<'a> {
         element: &quick_xml::events::BytesStart<'_>,
     ) -> Result<()> {
         self.validate_attributes(element)?;
+        if self.foreign_text_depth.is_some() {
+            return Ok(());
+        }
         if element.name().local_name().as_ref() == b"t" {
             if !is_drawingml_element(namespace, element.name(), b"t") {
-                return Err(invalid(
-                    "foreign text element is not a DrawingML a:t element",
-                ));
+                self.skip_foreign_text();
+                self.foreign_text_depth = Some(self.budget.depth);
+                return Ok(());
             }
             if self.active_text_depth.is_some() {
                 return Err(invalid("nested DrawingML text elements are not permitted"));
@@ -708,11 +720,13 @@ impl<'a> SemanticTextParser<'a> {
         element: &quick_xml::events::BytesStart<'_>,
     ) -> Result<()> {
         self.validate_attributes(element)?;
+        if self.foreign_text_depth.is_some() {
+            return Ok(());
+        }
         if element.name().local_name().as_ref() == b"t" {
             if !is_drawingml_element(namespace, element.name(), b"t") {
-                return Err(invalid(
-                    "foreign text element is not a DrawingML a:t element",
-                ));
+                self.skip_foreign_text();
+                return Ok(());
             }
             if self.active_text_depth.is_some() {
                 return Err(invalid("nested DrawingML text elements are not permitted"));
@@ -740,6 +754,12 @@ impl<'a> SemanticTextParser<'a> {
         namespace: &ResolveResult<'_>,
         element: &quick_xml::events::BytesEnd<'_>,
     ) -> Result<()> {
+        if let Some(depth) = self.foreign_text_depth {
+            if depth == self.budget.depth {
+                self.foreign_text_depth = None;
+            }
+            return Ok(());
+        }
         if element.name().local_name().as_ref() == b"t" {
             if !is_drawingml_element(namespace, element.name(), b"t") {
                 return Err(invalid(
@@ -752,6 +772,18 @@ impl<'a> SemanticTextParser<'a> {
             self.finish_text()?
         }
         Ok(())
+    }
+
+    /// Skip a foreign `*:t` element (an extension payload's `x:t`, a
+    /// PresentationML `p:t`) and its subtree, recording the skip: text
+    /// extraction reads only DrawingML `a:t` (audit finding 6.9).
+    fn skip_foreign_text(&mut self) {
+        self.tolerance.record(MarkupDefect::ForeignTextElement, 0);
+    }
+
+    /// Whether character data belongs to the DrawingML text being read.
+    fn reading_text(&self) -> bool {
+        self.active_text_depth.is_some() && self.foreign_text_depth.is_none()
     }
 
     fn text_event(&mut self, text: &quick_xml::events::BytesText<'_>) -> Result<()> {
@@ -860,13 +892,13 @@ impl<'a> SemanticTextParser<'a> {
                 self.end_element(&namespace, &element)?;
                 self.budget.end()?;
             },
-            Event::Text(text) if self.active_text_depth.is_some() => {
+            Event::Text(text) if self.reading_text() => {
                 self.text_event(&text)?;
             },
-            Event::CData(text) if self.active_text_depth.is_some() => {
+            Event::CData(text) if self.reading_text() => {
                 self.cdata_event(&text)?;
             },
-            Event::GeneralRef(reference) if self.active_text_depth.is_some() => {
+            Event::GeneralRef(reference) if self.reading_text() => {
                 self.reference_event(&reference)?;
             },
             Event::Decl(_) => {
@@ -902,11 +934,38 @@ impl<'a> SemanticTextParser<'a> {
                     });
                 }
             },
-            Event::CData(_) => {
-                return Err(invalid("slide XML has CDATA outside DrawingML text"));
+            // Character data outside DrawingML text is ordinary XML that
+            // carries no slide text (audit finding 6.9): it is validated and
+            // ignored, like a text node there. Inside the root only; the
+            // root-level forms are refused above and by the raw scan.
+            Event::CData(_) if self.budget.depth == 0 => {
+                return Err(invalid("slide XML has CDATA outside its document root"));
             },
-            Event::GeneralRef(_) => {
-                return Err(invalid("XML entity reference is outside DrawingML text"));
+            Event::GeneralRef(_) if self.budget.depth == 0 => {
+                return Err(invalid("XML entity reference is outside the document root"));
+            },
+            Event::CData(text) => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        resource: "semantic slide decoded text event bytes",
+                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                    return Err(Error::Limit {
+                        resource: "semantic slide XML reference bytes",
+                        limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                    });
+                }
+                let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
             },
             Event::DocType(_) => {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
@@ -933,7 +992,32 @@ impl<'a> SemanticTextParser<'a> {
 }
 
 fn semantic_text_from_part(part: &dyn Part, paragraph_separator: &str) -> Result<String> {
-    let raw = part.blob();
+    semantic_text_from_part_with_tolerance(
+        part,
+        paragraph_separator,
+        &mut ToleranceReport::default(),
+    )
+}
+
+/// [`semantic_text_from_part`], appending the repairs the read applied to
+/// `tolerance`, stamped with the part name.
+fn semantic_text_from_part_with_tolerance(
+    part: &dyn Part,
+    paragraph_separator: &str,
+    tolerance: &mut ToleranceReport,
+) -> Result<String> {
+    let (text, mut repairs) = semantic_text_and_repairs(part.blob(), paragraph_separator)?;
+    if !repairs.is_clean() {
+        repairs.locate_in_part(part.partname().as_str());
+        tolerance.append(&repairs);
+    }
+    Ok(text)
+}
+
+fn semantic_text_and_repairs(
+    raw: &[u8],
+    paragraph_separator: &str,
+) -> Result<(String, ToleranceReport)> {
     check_semantic_text_raw_len(raw)?;
     // Markup-compatibility processing is a pure function of the raw bytes,
     // so running it before the raw scan changes no value; only the order in
@@ -971,7 +1055,7 @@ fn semantic_text_from_part(part: &dyn Part, paragraph_separator: &str) -> Result
 }
 
 /// The semantic pass over already-scanned, MCE-processed slide XML.
-fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<String> {
+fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<(String, ToleranceReport)> {
     let mut reader = semantic_text_reader(xml);
     let mut parser = SemanticTextParser::new(paragraph_separator);
     loop {
@@ -983,7 +1067,7 @@ fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<String> 
         // attribute names can be resolved while it is held.
         let (namespace, event) = reader.resolver().resolve_event(event);
         if parser.consume_event(&reader, namespace, event)? {
-            return Ok(parser.output);
+            return Ok((parser.output, parser.tolerance));
         }
     }
 }
@@ -999,7 +1083,10 @@ fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<String> 
 /// recorded failure is returned only if the raw scan passed. The semantic
 /// pass consumes exactly the prefix of the stream it would have consumed
 /// alone, so its value and its first failure are unchanged.
-fn semantic_text_single_pass(xml: &[u8], paragraph_separator: &str) -> Result<String> {
+fn semantic_text_single_pass(
+    xml: &[u8],
+    paragraph_separator: &str,
+) -> Result<(String, ToleranceReport)> {
     let mut reader = semantic_text_reader(xml);
     let mut scan = RawTextScan::default();
     let mut parser = SemanticTextParser::after_raw_scan(paragraph_separator);
@@ -1025,7 +1112,7 @@ fn semantic_text_single_pass(xml: &[u8], paragraph_separator: &str) -> Result<St
         if complete {
             return match deferred {
                 Some(error) => Err(error),
-                None => Ok(parser.output),
+                None => Ok((parser.output, parser.tolerance)),
             };
         }
     }
@@ -1201,6 +1288,18 @@ impl<'a> SlidePart<'a> {
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
         Ok(text_from_part(self.part)?.unwrap_or_default())
+    }
+
+    /// [`Self::text`], appending the repairs the extraction applied to
+    /// `tolerance`, stamped with this part's name: each foreign `*:t`
+    /// element whose subtree was skipped is a
+    /// [`crate::MarkupDefect::ForeignTextElement`] (audit finding 6.9).
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::text`] returns.
+    pub fn text_with_tolerance(&self, tolerance: &mut ToleranceReport) -> Result<String> {
+        semantic_text_from_part_with_tolerance(self.part, "\n", tolerance)
     }
 
     /// Read the producer-visible name and flattened text while preserving the

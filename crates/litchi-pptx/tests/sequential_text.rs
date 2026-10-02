@@ -308,7 +308,7 @@ fn custom_paragraph_separator_has_eager_and_source_parity() {
 }
 
 #[test]
-fn mce_fallback_is_processed_and_foreign_text_is_not_accepted() {
+fn mce_fallback_is_processed_and_foreign_text_is_skipped() {
     let mce_slide = format!(
         r#"<p:sld xmlns:p="{PML}" xmlns:a="{DRAWINGML}" xmlns:mc="{MCE}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree><mc:AlternateContent><mc:Choice Requires="x"><a:t>ignored</a:t></mc:Choice><mc:Fallback><a:t>fallback</a:t></mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#
     )
@@ -323,11 +323,12 @@ fn mce_fallback_is_processed_and_foreign_text_is_not_accepted() {
     let package = Package::from_bytes(&foreign).expect("foreign-text package");
     let presentation = package.presentation().expect("foreign-text presentation");
     let mut output = Vec::new();
-    assert!(matches!(
-        presentation.write_text_to(&mut output, parity_options(true)),
-        Err(TextOutputError::Document { .. })
-    ));
-    assert!(output.is_empty());
+    // A foreign `*:t` is skipped, not read as text (leniency audit 6.9); the
+    // skip is recorded by `Slide::text_with_tolerance`.
+    presentation
+        .write_text_to(&mut output, parity_options(true))
+        .expect("foreign text is skipped");
+    assert_eq!(output, b"valid");
 }
 
 #[test]

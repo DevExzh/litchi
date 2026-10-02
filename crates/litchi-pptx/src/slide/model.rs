@@ -81,6 +81,20 @@ impl<'a> Slide<'a> {
         codec::slide_text(&self.part)
     }
 
+    /// [`Self::text`], appending the repairs the extraction applied to
+    /// `tolerance`, stamped with the slide's part name (see
+    /// [`crate::parts::SlidePart::text_with_tolerance`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::text`] returns.
+    pub fn text_with_tolerance(
+        &self,
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<String> {
+        self.part.text_with_tolerance(tolerance)
+    }
+
     /// Build the bounded borrowed scene for the slide.
     ///
     /// # Errors

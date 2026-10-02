@@ -1101,3 +1101,69 @@ fn conformant_comments_record_nothing_and_malformed_comments_stay_fatal() {
     let package = Package::from_vec(deck).unwrap();
     assert!(litchi_pptx::comments::load_presentation_comments(package.opc().unwrap()).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.9: foreign `t` elements and character data outside `a:t`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn foreign_text_elements_are_skipped_and_recorded_by_text_extraction() {
+    let original_text = {
+        let package = Package::from_bytes(SHAPES).unwrap();
+        let presentation = package.presentation().unwrap();
+        let slides = presentation.slides().unwrap();
+        let mut report = litchi_pptx::ToleranceReport::default();
+        let text = slides[0].text_with_tolerance(&mut report).unwrap();
+        assert_clean(&report);
+        text
+    };
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace(
+            "</p:sld>",
+            concat!(
+                r#"<p:extLst><p:ext uri="{00000000-0000-0000-0000-000000000001}">"#,
+                r#"<x:note xmlns:x="urn:example:x"><x:t>hidden <x:t>deeper</x:t></x:t>"#,
+                r#"a &amp; b<![CDATA[<raw>]]><x:t/></x:note>"#,
+                r#"</p:ext></p:extLst></p:sld>"#,
+            ),
+        )
+    });
+    let deck = deck_bytes_with_part(SLIDE1, slide);
+    let package = Package::from_vec(deck.clone()).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+
+    let mut report = litchi_pptx::ToleranceReport::default();
+    let text = slides[0].text_with_tolerance(&mut report).unwrap();
+    assert_eq!(text, original_text);
+    assert_eq!(slides[0].text().unwrap(), original_text);
+    let foreign = (
+        Defect::Markup(MarkupDefect::ForeignTextElement),
+        0,
+        Some(SLIDE1),
+    );
+    assert_eq!(located(&report), [foreign, foreign]);
+
+    let source = SourceBackedPresentation::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(deck),
+    ))
+    .unwrap();
+    let slide = source.slides().next().unwrap();
+    let mut report = litchi_pptx::ToleranceReport::default();
+    assert_eq!(
+        slide.text_with_tolerance(&mut report).unwrap(),
+        original_text
+    );
+    assert_eq!(located(&report), [foreign, foreign]);
+
+    // Nested DrawingML text stays a grammar error.
+    let nested = patched_part(SLIDE1, |xml| {
+        xml.replace(
+            "<a:t>Learning PPTX</a:t>",
+            "<a:t>Learning <a:t>PPTX</a:t></a:t>",
+        )
+    });
+    let package = Package::from_vec(deck_bytes_with_part(SLIDE1, nested)).unwrap();
+    let presentation = package.presentation().unwrap();
+    assert!(presentation.slides().unwrap()[0].text().is_err());
+}

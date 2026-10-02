@@ -206,6 +206,23 @@
 //! instructions: those readers have no report carrier yet, and skipping
 //! there without recording would swallow the defect silently.
 //!
+//! # Semantic slide text (audit finding 6.9)
+//!
+//! Slide text extraction ([`crate::Slide::text`], the source-backed slide
+//! text, and the presentation text sink) no longer fails over markup that
+//! carries no DrawingML text. An element named `t` outside the DrawingML
+//! namespace (`p:t`, an extension's `x:t`) is skipped with its subtree and
+//! recorded as [`MarkupDefect::ForeignTextElement`]; the `*_with_tolerance`
+//! text companions ([`crate::Slide::text_with_tolerance`],
+//! [`crate::parts::SlidePart::text_with_tolerance`],
+//! [`crate::SourceSlide::text_with_tolerance`]) collect it, stamped with the
+//! slide part. CDATA sections and entity references outside `a:t` are
+//! ordinary XML and are validated and ignored like a text node there —
+//! nothing is repaired, so nothing is recorded. XML well-formedness,
+//! undefined entities, character data outside the document root, nested or
+//! unbalanced DrawingML `a:t`, and the size/depth/count limits stay hard
+//! errors.
+//!
 //! # Shape metadata (audit finding 6.8)
 //!
 //! A `p:cNvPr@id` that is not an `unsignedInt` leaves the shape without an
@@ -586,6 +603,16 @@ pub enum MarkupDefect {
     /// per part, by the part's shape scene; the context is `0`. DOCTYPE
     /// declarations remain rejected as a security posture.
     ProcessingInstruction,
+    /// Semantic slide text met an element named `t` outside the DrawingML
+    /// namespace — a PresentationML `p:t`, or an extension payload's `x:t`
+    /// (`CT_ExtensionList` admits arbitrary foreign content).
+    ///
+    /// Text extraction reads only DrawingML `a:t`; `PowerPoint` and the
+    /// crate's own shape-text extractor ignore foreign lookalikes. The
+    /// reader skips the element and its subtree. Recorded once per skipped
+    /// element by the text read ([`crate::Slide::text_with_tolerance`]); the
+    /// context is `0`.
+    ForeignTextElement,
 }
 
 impl MarkupDefect {
@@ -594,6 +621,9 @@ impl MarkupDefect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::ProcessingInstruction => "skipped the part's processing instructions",
+            Self::ForeignTextElement => {
+                "skipped a non-DrawingML text element and its subtree during text extraction"
+            },
         }
     }
 }
@@ -1010,6 +1040,7 @@ mod tests {
             Defect::from(PresentationDefect::DuplicateSlideTarget),
             Defect::from(PresentationDefect::SlideListContent),
             Defect::from(MarkupDefect::ProcessingInstruction),
+            Defect::from(MarkupDefect::ForeignTextElement),
             Defect::from(CommentDefect::ZeroIndex),
             Defect::from(CommentDefect::DuplicateKey),
             Defect::from(litchi_opc::leniency::Defect::Relationship(
