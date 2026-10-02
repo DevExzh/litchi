@@ -11,6 +11,7 @@ mod runs;
 mod text;
 mod xml;
 
+pub(crate) use paragraph_properties::DirectNumbering;
 pub(crate) use text::{
     extract_word_text, for_each_word_text_chunk, semantic_text_raw_xml_limit, write_text_to,
     write_text_to_with_operation_check,

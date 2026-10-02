@@ -244,6 +244,18 @@ pub enum NumberingDefect {
     /// the other list resolvers; the context is the zero-based index of the
     /// paragraph in the main story, not a byte offset.
     MissingNumberingInstance,
+    /// A paragraph's `w:numPr` has no `w:numId` — typically only a `w:ilvl`
+    /// level override, as LibreOffice and RTF converters emit. `CT_NumPr`
+    /// makes both children optional; Word and LibreOffice take the
+    /// numbering from the paragraph style and apply the `w:ilvl` override.
+    /// [`Paragraph::numbering`](crate::Paragraph::numbering) reports no
+    /// direct numbering, `Paragraph::style_id` is unaffected, and list
+    /// resolution applies the override to the style-inherited numbering.
+    ///
+    /// Recorded by [`Document::list_items`](crate::Document::list_items) and
+    /// the other list resolvers; the context is the zero-based index of the
+    /// paragraph in the main story, not a byte offset.
+    NumPrMissingNumId,
 }
 
 impl NumberingDefect {
@@ -266,6 +278,9 @@ impl NumberingDefect {
             },
             Self::MissingNumberingInstance => {
                 "left the paragraph unnumbered because its numbering instance does not exist"
+            },
+            Self::NumPrMissingNumId => {
+                "took the numbering from the paragraph style, applying the direct level override"
             },
         }
     }
@@ -551,6 +566,7 @@ mod tests {
             Defect::from(NumberingDefect::MissingAbstractDefinition),
             Defect::from(NumberingDefect::MismatchedOverrideLevel),
             Defect::from(NumberingDefect::MissingNumberingInstance),
+            Defect::from(NumberingDefect::NumPrMissingNumId),
             Defect::from(RevisionDefect::MissingAuthor),
             Defect::from(RevisionDefect::InvalidDate),
             Defect::from(RevisionDefect::InvalidDateUtc),

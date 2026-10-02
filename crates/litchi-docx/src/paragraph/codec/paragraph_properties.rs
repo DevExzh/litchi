@@ -28,23 +28,42 @@ use super::xml::{
 impl Paragraph {
     /// Return direct paragraph numbering properties, including `numId=0` cancellation.
     ///
+    /// A `w:numPr` without `w:numId` (for example only a `w:ilvl` level
+    /// override, which ECMA-376 `CT_NumPr` permits) names no numbering
+    /// instance of its own: the paragraph's numbering comes from its style,
+    /// so this returns `None`. List resolution applies the `w:ilvl` override
+    /// to the style-inherited numbering and records
+    /// [`crate::leniency::NumberingDefect::NumPrMissingNumId`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn numbering(&self) -> Result<Option<crate::numbering::Paragraph>> {
-        Ok(self.list_properties()?.0)
+        Ok(self.list_properties()?.numbering?.direct)
     }
 
     /// Return the paragraph style identifier from `<w:pPr>`.
+    ///
+    /// A malformed numbering property never affects the style identifier;
+    /// only XML that is not well-formed fails both.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn style_id(&self) -> Result<Option<String>> {
-        Ok(self.list_properties()?.1)
+        self.list_properties()?.style_id
     }
 
-    fn list_properties(&self) -> Result<(Option<crate::numbering::Paragraph>, Option<String>)> {
+    /// Return the direct numbering together with a `w:ilvl` that applies to
+    /// style-inherited numbering because the `w:numPr` has no `w:numId`.
+    pub(crate) fn numbering_with_level_override(&self) -> Result<DirectNumbering> {
+        self.list_properties()?.numbering
+    }
+
+    /// Scan `w:pPr` once for numbering and style, keeping each property's
+    /// failure to itself so one malformed property cannot poison the other.
+    /// Only XML errors fail the whole scan.
+    fn list_properties(&self) -> Result<ListProperties> {
         let _parser_admission = self.parser_admission()?;
         let mut reader = NsReader::from_reader(self.xml_bytes());
         let mut depth = 0usize;
@@ -55,6 +74,8 @@ impl Paragraph {
         let mut num_id = None;
         let mut level = None;
         let mut style_id = None;
+        let mut numbering_error = None;
+        let mut style_error = None;
 
         loop {
             let decoder = reader.decoder();
@@ -62,7 +83,7 @@ impl Paragraph {
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
                 .into_owned();
-            match event {
+            let (element, child_depth) = match event {
                 Event::Start(element) => {
                     depth = depth.checked_add(1).ok_or_else(|| {
                         Error::InvalidFormat("paragraph XML nesting is too deep".to_owned())
@@ -73,44 +94,23 @@ impl Paragraph {
                     if !same_word_prefix(&element, word_prefix.as_deref()) {
                         continue;
                     }
-                    match element.local_name().as_ref() {
-                        b"pPr" if depth == 2 => ppr_depth = Some(depth),
-                        b"numPr" if ppr_depth.is_some_and(|value| depth == value + 1) => {
-                            if saw_numpr {
-                                return Err(Error::InvalidFormat(
-                                    "paragraph has duplicate numPr".to_owned(),
-                                ));
-                            }
-                            saw_numpr = true;
-                            numpr_depth = Some(depth);
-                        },
-                        b"pStyle" if ppr_depth.is_some_and(|value| depth == value + 1) => {
-                            set_paragraph_property(
-                                &mut style_id,
-                                paragraph_attribute(&element, b"val", decoder)?,
-                                "pStyle",
-                            )?;
-                        },
-                        b"numId" if numpr_depth.is_some_and(|value| depth == value + 1) => {
-                            let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw.parse::<u32>().map_err(|_source_error| {
-                                Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
-                            })?;
-                            set_paragraph_property(&mut num_id, parsed, "numId")?;
-                        },
-                        b"ilvl" if numpr_depth.is_some_and(|value| depth == value + 1) => {
-                            let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw
-                                .parse::<u8>()
-                                .ok()
-                                .filter(|value| *value <= 8)
-                                .ok_or_else(|| {
-                                    Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
-                                })?;
-                            set_paragraph_property(&mut level, parsed, "ilvl")?;
-                        },
-                        _ => {},
+                    if element.local_name().as_ref() == b"pPr" && depth == 2 {
+                        ppr_depth = Some(depth);
+                        continue;
                     }
+                    if element.local_name().as_ref() == b"numPr"
+                        && ppr_depth.is_some_and(|value| depth == value + 1)
+                    {
+                        if saw_numpr {
+                            numbering_error.get_or_insert_with(|| {
+                                Error::InvalidFormat("paragraph has duplicate numPr".to_owned())
+                            });
+                        }
+                        saw_numpr = true;
+                        numpr_depth = Some(depth);
+                        continue;
+                    }
+                    (element, depth)
                 },
                 Event::Empty(element) => {
                     let child_depth = depth.checked_add(1).ok_or_else(|| {
@@ -119,39 +119,19 @@ impl Paragraph {
                     if !same_word_prefix(&element, word_prefix.as_deref()) {
                         continue;
                     }
-                    match element.local_name().as_ref() {
-                        b"pStyle" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
-                            set_paragraph_property(
-                                &mut style_id,
-                                paragraph_attribute(&element, b"val", decoder)?,
-                                "pStyle",
-                            )?;
-                        },
-                        b"numPr" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
-                            return Err(Error::InvalidFormat(
-                                "paragraph numPr is missing numId".to_owned(),
-                            ));
-                        },
-                        b"numId" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
-                            let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw.parse::<u32>().map_err(|_source_error| {
-                                Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
-                            })?;
-                            set_paragraph_property(&mut num_id, parsed, "numId")?;
-                        },
-                        b"ilvl" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
-                            let raw = paragraph_attribute(&element, b"val", decoder)?;
-                            let parsed = raw
-                                .parse::<u8>()
-                                .ok()
-                                .filter(|value| *value <= 8)
-                                .ok_or_else(|| {
-                                    Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
-                                })?;
-                            set_paragraph_property(&mut level, parsed, "ilvl")?;
-                        },
-                        _ => {},
+                    if element.local_name().as_ref() == b"numPr"
+                        && ppr_depth.is_some_and(|value| child_depth == value + 1)
+                    {
+                        // An empty `w:numPr` carries neither numId nor ilvl.
+                        if saw_numpr {
+                            numbering_error.get_or_insert_with(|| {
+                                Error::InvalidFormat("paragraph has duplicate numPr".to_owned())
+                            });
+                        }
+                        saw_numpr = true;
+                        continue;
                     }
+                    (element, child_depth)
                 },
                 Event::End(element) => {
                     if same_word_prefix_end(&element, word_prefix.as_deref()) {
@@ -164,6 +144,7 @@ impl Paragraph {
                     depth = depth.checked_sub(1).ok_or_else(|| {
                         Error::InvalidFormat("invalid paragraph XML nesting".to_owned())
                     })?;
+                    continue;
                 },
                 Event::Eof => break,
                 Event::Text(_)
@@ -172,21 +153,85 @@ impl Paragraph {
                 | Event::Decl(_)
                 | Event::PI(_)
                 | Event::DocType(_)
-                | Event::GeneralRef(_) => {},
+                | Event::GeneralRef(_) => continue,
+            };
+            match element.local_name().as_ref() {
+                b"pStyle" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    if let Err(error) = paragraph_attribute(&element, b"val", decoder)
+                        .and_then(|value| set_paragraph_property(&mut style_id, value, "pStyle"))
+                    {
+                        style_error.get_or_insert(error);
+                    }
+                },
+                b"numId" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    let parsed = paragraph_attribute(&element, b"val", decoder).and_then(|raw| {
+                        raw.parse::<u32>().map_err(|_source_error| {
+                            Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
+                        })
+                    });
+                    if let Err(error) =
+                        parsed.and_then(|value| set_paragraph_property(&mut num_id, value, "numId"))
+                    {
+                        numbering_error.get_or_insert(error);
+                    }
+                },
+                b"ilvl" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    let parsed = paragraph_attribute(&element, b"val", decoder).and_then(|raw| {
+                        raw.parse::<u8>()
+                            .ok()
+                            .filter(|value| *value <= 8)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
+                            })
+                    });
+                    if let Err(error) =
+                        parsed.and_then(|value| set_paragraph_property(&mut level, value, "ilvl"))
+                    {
+                        numbering_error.get_or_insert(error);
+                    }
+                },
+                _ => {},
             }
         }
-        let numbering = if saw_numpr {
-            Some(crate::numbering::Paragraph {
-                num_id: num_id.ok_or_else(|| {
-                    Error::InvalidFormat("paragraph numPr is missing numId".to_owned())
-                })?,
-                level: level.unwrap_or(0),
-            })
-        } else {
-            None
+        let numbering = match numbering_error {
+            Some(error) => Err(error),
+            None => Ok(DirectNumbering {
+                direct: num_id.map(|num_id| crate::numbering::Paragraph {
+                    num_id,
+                    level: level.unwrap_or(0),
+                }),
+                level_override: if saw_numpr && num_id.is_none() {
+                    Some(level)
+                } else {
+                    None
+                },
+            }),
         };
-        Ok((numbering, style_id))
+        let style_id = match style_error {
+            Some(error) => Err(error),
+            None => Ok(style_id),
+        };
+        Ok(ListProperties {
+            numbering,
+            style_id,
+        })
     }
+}
+
+/// The per-property results of one `w:pPr` scan.
+struct ListProperties {
+    numbering: Result<DirectNumbering>,
+    style_id: Result<Option<String>>,
+}
+
+/// Direct paragraph numbering as authored.
+pub(crate) struct DirectNumbering {
+    /// The direct numbering, when `w:numPr` names a `w:numId`.
+    pub(crate) direct: Option<crate::numbering::Paragraph>,
+    /// Set when a `w:numPr` is present without `w:numId`: the authored
+    /// `w:ilvl` (if any), which overrides the level of the style-inherited
+    /// numbering.
+    pub(crate) level_override: Option<Option<u8>>,
 }
 
 impl Paragraph {

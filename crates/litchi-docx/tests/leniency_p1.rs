@@ -443,3 +443,100 @@ fn ill_formed_revision_xml_stays_fatal() {
     let package = open(&package_bytes(&document, &[]));
     assert!(package.document().expect("document").revisions().is_err());
 }
+
+// ---------------------------------------------------------------------------
+// F2.6 — w:numPr with only w:ilvl
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ilvl_only_numpr_inherits_style_numbering_and_keeps_style_id() {
+    use litchi_docx::NumberingDefect;
+    let numbering_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl><w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2."/></w:lvl><w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3)"/></w:lvl></w:abstractNum><w:num w:numId="4"><w:abstractNumId w:val="0"/></w:num></w:numbering>"#
+    );
+    let styles = r#"<w:style w:type="paragraph" w:styleId="ListPara"><w:name w:val="List Para"/><w:pPr><w:numPr><w:numId w:val="4"/></w:numPr></w:pPr></w:style>"#;
+    let body = r#"<w:p><w:pPr><w:pStyle w:val="ListPara"/><w:numPr><w:ilvl w:val="2"/></w:numPr></w:pPr><w:r><w:t>override</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="ListPara"/><w:numPr/></w:pPr><w:r><w:t>empty</w:t></w:r></w:p>"#;
+    let bytes = package_bytes(
+        &document_xml(body),
+        &[
+            Extra {
+                path: "word/numbering.xml",
+                content_type: NUMBERING_CT,
+                relationship: NUMBERING_REL,
+                xml: numbering_xml,
+            },
+            styles_extra(styles),
+        ],
+    );
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+
+    let paragraphs = document.paragraphs().expect("paragraphs");
+    assert_eq!(paragraphs[0].numbering().expect("numbering"), None);
+    assert_eq!(
+        paragraphs[0].style_id().expect("style id is not poisoned"),
+        Some("ListPara".to_owned())
+    );
+
+    let items = document.list_items().expect("list items");
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].numbering.num_id, 4);
+    assert_eq!(items[0].numbering.level, 2);
+    assert_eq!(
+        items[0].marker,
+        litchi_docx::list::ListMarker::Text("i)".to_owned())
+    );
+    assert_eq!(items[1].numbering.level, 0);
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>(),
+        [
+            (Defect::Numbering(NumberingDefect::NumPrMissingNumId), 0),
+            (Defect::Numbering(NumberingDefect::NumPrMissingNumId), 1),
+        ]
+    );
+}
+
+#[test]
+fn malformed_numpr_value_does_not_poison_style_id() {
+    let document = document_xml(
+        r#"<w:p><w:pPr><w:pStyle w:val="Body"/><w:numPr><w:numId w:val="many"/></w:numPr></w:pPr><w:r><w:t>x</w:t></w:r></w:p>"#,
+    );
+    let package = open(&package_bytes(&document, &[]));
+    let paragraphs = package
+        .document()
+        .expect("document")
+        .paragraphs()
+        .expect("paragraphs");
+    assert!(paragraphs[0].numbering().is_err());
+    assert_eq!(
+        paragraphs[0].style_id().expect("style id"),
+        Some("Body".to_owned())
+    );
+}
+
+#[test]
+fn complete_numpr_records_nothing() {
+    let numbering_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>"#
+    );
+    let package = open(&numbering_package(
+        &numbering_xml,
+        &numbered_paragraph(1, "only"),
+    ));
+    let document = package.document().expect("document");
+    let paragraphs = document.paragraphs().expect("paragraphs");
+    assert_eq!(
+        paragraphs[0]
+            .numbering()
+            .expect("numbering")
+            .map(|n| n.num_id),
+        Some(1)
+    );
+    assert_eq!(document.list_items().expect("list items").len(), 1);
+    assert!(document.tolerance_report().is_clean());
+}

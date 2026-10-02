@@ -825,11 +825,28 @@ fn resolve_list_item(
     counters: &mut crate::list::ListCounterState,
     tolerance: &mut crate::leniency::ToleranceReport,
 ) -> Result<Option<crate::list::ResolvedListItem>> {
-    let direct = paragraph.numbering()?;
+    let crate::paragraph::DirectNumbering {
+        direct,
+        level_override,
+    } = paragraph.numbering_with_level_override()?;
     let style_id = paragraph.style_id()?;
+    if level_override.is_some() {
+        // A `w:numPr` without `w:numId` (CT_NumPr makes both children
+        // optional): Word and LibreOffice take the numbering from the
+        // paragraph style and apply any `w:ilvl` as a level override.
+        tolerance.record(
+            crate::leniency::NumberingDefect::NumPrMissingNumId,
+            paragraph_index as u64,
+        );
+    }
     let inherited = if direct.is_none() {
         match style_id.as_deref() {
-            Some(style_id) => styles.resolved_numbering(style_id)?,
+            Some(style_id) => styles.resolved_numbering(style_id)?.map(|mut inherited| {
+                if let Some(Some(level)) = level_override {
+                    inherited.level = level;
+                }
+                inherited
+            }),
             None => None,
         }
     } else {
