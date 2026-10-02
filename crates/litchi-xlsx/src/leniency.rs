@@ -37,7 +37,13 @@
 //! and no interior mutability:
 //!
 //! * **Open time (workbook level).** Each workbook handle owns a report built
-//!   while the catalog was parsed. Catalog findings (4.7 `activeTab` /
+//!   while it was opened. It starts with the OPC packaging repairs of the
+//!   package the workbook was opened from (`OpcPackage::tolerance_report` /
+//!   `SourceBackedPackage::tolerance_report`), folded in as
+//!   [`Defect::Package`] entries at [`Location::Part`] together with the
+//!   packaging report's unrecorded count, so every open path — owned,
+//!   source-backed, `Package::workbook`, decrypted — lists the manifest
+//!   repairs its package made. Catalog findings (4.7 `activeTab` /
 //!   `localSheetId`, 4.8 sheet names) thread `&mut ToleranceReport` into the
 //!   catalog parse and record [`CatalogDefect`]s located at
 //!   [`Location::Workbook`] or [`Location::DefinedName`].
@@ -85,6 +91,15 @@
 //! * finding 4.4 — cell materialization (`raw/worksheet/semantic.rs`)
 //!   records [`CellDefect::SharedStringIndexOutOfRange`] and
 //!   [`CellDefect::MissingSharedStringTable`] at the cell.
+//!
+//! * OPC packaging findings 8.5–8.9 — folded from the package's own report
+//!   at open as [`Defect::Package`]. Shared metadata repairs (core and
+//!   custom document properties, findings 8.1–8.4) are not read by the
+//!   workbook facades; a caller that reads them with
+//!   `litchi_ooxml_common::properties::read_with_report` folds that report
+//!   in with [`ToleranceReport::append_properties`] as
+//!   [`Defect::Properties`]. Custom properties read through
+//!   `Package::custom_props` carry their own report on the returned value.
 //!
 //! Write paths stay strict: the value-only cell editor parses with repairs
 //! refused and keeps its historical errors, and commit-time readback
@@ -368,6 +383,14 @@ pub enum Defect {
     SharedStrings(SharedStringsDefect),
     /// A theme color-scheme defect.
     Theme(ThemeDefect),
+    /// An OPC packaging defect (relationship or content-types manifest)
+    /// repaired while the workbook's package was read; see
+    /// `litchi_opc::leniency`. Located at [`Location::Part`].
+    Package(litchi_opc::leniency::Defect),
+    /// A shared OOXML metadata defect (core or custom document properties)
+    /// repaired while the package metadata was read; see
+    /// `litchi_ooxml_common::leniency`. Located at [`Location::Part`].
+    Properties(litchi_ooxml_common::leniency::Defect),
 }
 
 impl Defect {
@@ -380,7 +403,21 @@ impl Defect {
             Self::Catalog(defect) => defect.repair(),
             Self::SharedStrings(defect) => defect.repair(),
             Self::Theme(defect) => defect.repair(),
+            Self::Package(defect) => defect.repair(),
+            Self::Properties(defect) => defect.repair(),
         }
+    }
+}
+
+impl From<litchi_opc::leniency::Defect> for Defect {
+    fn from(defect: litchi_opc::leniency::Defect) -> Self {
+        Self::Package(defect)
+    }
+}
+
+impl From<litchi_ooxml_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ooxml_common::leniency::Defect) -> Self {
+        Self::Properties(defect)
     }
 }
 
@@ -418,7 +455,7 @@ impl From<ThemeDefect> for Defect {
 ///
 /// Worksheet locations are relative to the worksheet named by
 /// [`ToleratedDefect::sheet`]; coordinates are zero-based.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Location {
     /// The workbook catalog part as a whole (for example `workbookView`).
@@ -444,10 +481,24 @@ pub enum Location {
     },
     /// The zero-based slot of a theme color-scheme entry.
     ColorSchemeSlot(u8),
+    /// A package part, for defects folded in from the OPC packaging report
+    /// ([`Defect::Package`]) or the shared metadata report
+    /// ([`Defect::Properties`]). The strings are those the lower layer
+    /// recorded, bounded by the read limits that admitted them.
+    Part {
+        /// The part name the defect belongs to (for example `/` for package
+        /// relationships, or `/[Content_Types].xml`).
+        part: Box<str>,
+        /// The item within the part — a relationship `Id`, a content-type
+        /// key, or a property name — when one is known.
+        item: Option<Box<str>>,
+        /// The raw value the repair replaced or discarded, when one exists.
+        value: Option<Box<str>>,
+    },
 }
 
 /// One repaired defect, with enough context to locate it in the workbook.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
@@ -536,9 +587,47 @@ impl ToleranceReport {
     /// that no longer fit join the unrecorded count.
     pub(crate) fn append(&mut self, other: &Self) {
         for tolerated in other.iter() {
-            self.push(*tolerated);
+            self.push(tolerated.clone());
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+
+    /// Fold an OPC packaging report into this one.
+    ///
+    /// Every packaging repair becomes a [`Defect::Package`] entry located at
+    /// [`Location::Part`], and the packaging report's unrecorded count is
+    /// carried over, so the merged total stays exact.
+    pub(crate) fn append_package(&mut self, package: &litchi_opc::leniency::ToleranceReport) {
+        for tolerated in package {
+            self.push(ToleratedDefect {
+                defect: Defect::Package(tolerated.defect()),
+                sheet: None,
+                location: part_location(tolerated.part(), tolerated.item(), tolerated.value()),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(package.unrecorded());
+    }
+
+    /// Fold a shared metadata (core/custom document properties) report into
+    /// this one.
+    ///
+    /// Every metadata repair becomes a [`Defect::Properties`] entry located at
+    /// [`Location::Part`], and the metadata report's unrecorded count is
+    /// carried over. Callers that read package metadata alongside a workbook
+    /// (for example through `litchi_ooxml_common::properties::read_with_report`)
+    /// use this to keep one report for the whole document.
+    pub fn append_properties(
+        &mut self,
+        properties: &litchi_ooxml_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in properties {
+            self.push(ToleratedDefect {
+                defect: Defect::Properties(tolerated.defect()),
+                sheet: None,
+                location: part_location(tolerated.part(), tolerated.item(), tolerated.value()),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(properties.unrecorded());
     }
 
     /// Merge one worksheet's report, stamping each entry with the worksheet's
@@ -548,10 +637,18 @@ impl ToleranceReport {
         for tolerated in other.iter() {
             self.push(ToleratedDefect {
                 sheet,
-                ..*tolerated
+                ..tolerated.clone()
             });
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+}
+
+fn part_location(part: &str, item: Option<&str>, value: Option<&str>) -> Location {
+    Location::Part {
+        part: part.into(),
+        item: item.map(Into::into),
+        value: value.map(Into::into),
     }
 }
 
@@ -598,7 +695,7 @@ mod tests {
         assert_eq!(
             (&report)
                 .into_iter()
-                .map(|d| (d.defect, d.sheet, d.location))
+                .map(|d| (d.defect, d.sheet, d.location.clone()))
                 .collect::<Vec<_>>(),
             vec![
                 (

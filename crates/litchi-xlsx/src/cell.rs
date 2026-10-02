@@ -950,7 +950,7 @@ impl Store {
                 if let Location::Cell(address) = tolerated.location
                     && omitted.iter().any(|range| range.contains(address))
                 {
-                    carried.record(tolerated.defect, tolerated.location);
+                    carried.record(tolerated.defect, tolerated.location.clone());
                 }
             }
             tolerance.append(&carried);

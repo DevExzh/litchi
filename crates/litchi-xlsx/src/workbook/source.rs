@@ -459,9 +459,11 @@ impl SourceBackedWorkbook {
         let styles_uri = validate_styles(&package, &workbook)?;
         check_execution(execution.as_ref())?;
 
-        // Open-time recording sites (catalog findings 4.7/4.8) thread
-        // `&mut tolerance` into the catalog parse; see `crate::leniency`.
-        let tolerance = ToleranceReport::default();
+        // The packaging repairs come first (they were made before the
+        // workbook part could be read), then the open-time catalog sites
+        // (findings 4.7/4.8); see `crate::leniency`.
+        let mut tolerance = ToleranceReport::default();
+        tolerance.append_package(package.tolerance_report());
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
         let mut sheets = Vec::new();
         sheets
