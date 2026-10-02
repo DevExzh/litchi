@@ -15,7 +15,7 @@
 //! variant: [`TextDefect`] (semantic text extraction), [`SettingsDefect`]
 //! (`settings.xml`), [`NumberingDefect`] (`numbering.xml` and list
 //! resolution), [`StyleDefect`] (`styles.xml`), [`DrawingDefect`] (drawing
-//! inventory), [`RevisionDefect`]
+//! inventory), [`FieldDefect`] (field listing), [`RevisionDefect`]
 //! (tracked-change metadata),
 //! [`SectionDefect`] (section column models), and [`ContentControlDefect`]
 //! (`w:sdtPr` properties).
@@ -59,6 +59,8 @@
 //! - 2.10 — [`Document::drawing_objects`](crate::Document::drawing_objects)
 //!   (and the pinned source-backed one) record [`DrawingDefect`]; each
 //!   [`Object`](crate::drawing::Object) keeps its raw preset token.
+//! - 2.11 — [`Document::fields`](crate::Document::fields) (and the pinned
+//!   source-backed one) record [`FieldDefect`].
 //! - 2.5 — [`Document::revisions`](crate::Document::revisions) and the pinned
 //!   source-backed `Document::revisions` record [`RevisionDefect`].
 //! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
@@ -416,6 +418,35 @@ impl DrawingDefect {
     }
 }
 
+/// The class of field-listing defect the reader repairs per field.
+///
+/// This enumeration is closed by design. Each repair keeps the field — its
+/// order, cached result, and dirty/lock state — so one malformed field never
+/// empties the listing. Each is recorded by
+/// [`Document::fields`](crate::Document::fields) (and the pinned source-backed
+/// `Document::fields`) with the byte offset of the field's start tag within
+/// the main document XML. Ill-formed XML and unbalanced fields stay hard
+/// errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FieldDefect {
+    /// A `w:fldSimple` has no `w:instr`, which `CT_SimpleField` requires.
+    /// LibreOffice starts the field with an empty command and keeps its
+    /// result; the field is kept with an empty instruction (an unknown,
+    /// opaque field type).
+    MissingInstruction,
+}
+
+impl FieldDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::MissingInstruction => "kept the simple field with an empty instruction",
+        }
+    }
+}
+
 /// The class of tracked-revision defect the reader repairs the way Word
 /// repairs it.
 ///
@@ -569,6 +600,8 @@ pub enum Defect {
     Style(StyleDefect),
     /// A drawing-inventory preset-geometry defect repaired per object.
     Drawing(DrawingDefect),
+    /// A field-listing defect repaired per field.
+    Field(FieldDefect),
     /// A section column-model defect repaired the way Word lays it out.
     Section(SectionDefect),
     /// A content-control property defect repaired per control.
@@ -596,6 +629,7 @@ impl Defect {
             Self::Revision(defect) => defect.repair(),
             Self::Style(defect) => defect.repair(),
             Self::Drawing(defect) => defect.repair(),
+            Self::Field(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
             Self::ContentControl(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
@@ -637,6 +671,12 @@ impl From<StyleDefect> for Defect {
 impl From<DrawingDefect> for Defect {
     fn from(defect: DrawingDefect) -> Self {
         Self::Drawing(defect)
+    }
+}
+
+impl From<FieldDefect> for Defect {
+    fn from(defect: FieldDefect) -> Self {
+        Self::Field(defect)
     }
 }
 
@@ -956,6 +996,7 @@ mod tests {
             Defect::from(StyleDefect::OutlineLevelOutOfRange),
             Defect::from(DrawingDefect::UnknownPreset),
             Defect::from(DrawingDefect::MissingPreset),
+            Defect::from(FieldDefect::MissingInstruction),
             Defect::from(SectionDefect::ColumnWidthMissing),
             Defect::from(SectionDefect::ColumnCountOutOfRange),
             Defect::from(SectionDefect::ColumnCountMismatch),

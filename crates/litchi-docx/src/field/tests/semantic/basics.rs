@@ -80,7 +80,33 @@ fn extracts_simple_fields_in_source_order_with_flags_and_nested_results() {
 }
 
 #[test]
-fn rejects_simple_fields_without_instructions() {
-    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:fldSimple><w:r><w:t>result</w:t></w:r></w:fldSimple></w:p></w:body></w:document>"#;
-    assert!(Field::extract_from_document(xml).is_err());
+fn keeps_simple_fields_without_instructions_and_records_them() {
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:fldSimple w:instr="PAGE"/><w:fldSimple><w:r><w:t>result</w:t></w:r></w:fldSimple><w:fldSimple/></w:p></w:body></w:document>"#;
+    let (fields, tolerance) = Field::extract_from_document_tolerant(xml).unwrap();
+    assert_eq!(fields.len(), 3);
+    assert_eq!(fields[0].instruction(), "PAGE");
+    assert_eq!(fields[1].instruction(), "");
+    assert_eq!(fields[1].result(), Some("result"));
+    assert_eq!(fields[2].instruction(), "");
+    let text = std::str::from_utf8(xml).unwrap();
+    let first = text.find("<w:fldSimple>").unwrap() as u64;
+    let second = text.find("<w:fldSimple/>").unwrap() as u64;
+    assert_eq!(
+        tolerance
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>(),
+        [
+            (
+                crate::leniency::Defect::Field(crate::leniency::FieldDefect::MissingInstruction),
+                first
+            ),
+            (
+                crate::leniency::Defect::Field(crate::leniency::FieldDefect::MissingInstruction),
+                second
+            ),
+        ]
+    );
+    assert_eq!(Field::extract_from_document(xml).unwrap().len(), 3);
 }

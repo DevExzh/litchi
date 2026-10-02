@@ -128,9 +128,15 @@ impl<'a> Document<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
+    ///
+    /// A `w:fldSimple` without `w:instr` is kept with an empty instruction
+    /// and recorded as [`crate::leniency::FieldDefect::MissingInstruction`]
+    /// in [`Document::tolerance_report`](crate::Document::tolerance_report).
     pub fn fields(&self) -> Result<Vec<Field>> {
         let xml_bytes = self.part.xml_bytes();
-        Field::extract_from_document(xml_bytes)
+        let (fields, repaired) = Field::extract_from_document_tolerant(xml_bytes)?;
+        self.merge_tolerance(&repaired);
+        Ok(fields)
     }
 
     /// Get the number of fields in the document.

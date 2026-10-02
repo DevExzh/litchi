@@ -3331,6 +3331,26 @@ impl Document {
         Ok(Some(text))
     }
 
+    /// Return the fields of the main story in document order, as
+    /// [`crate::Document::fields`] does.
+    ///
+    /// A `w:fldSimple` without `w:instr` is kept with an empty instruction
+    /// and recorded as [`crate::leniency::FieldDefect`] in
+    /// [`Self::tolerance_report`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the field markup is malformed.
+    pub fn fields(&self) -> Result<Vec<crate::Field>> {
+        self.check_selective_operation("document fields")?;
+        let DocumentPayload::Owned(xml) = &self.xml else {
+            unreachable!("managed document payload rejected above")
+        };
+        let (fields, repaired) = crate::Field::extract_from_document_tolerant(xml)?;
+        self.merge_tolerance(&repaired);
+        Ok(fields)
+    }
+
     /// Return the drawing objects of the main-story paragraphs in document
     /// order.
     ///

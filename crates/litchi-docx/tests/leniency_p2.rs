@@ -8,7 +8,9 @@
 use std::io;
 use std::path::Path;
 
-use litchi_docx::{Defect, DrawingDefect, NumberingDefect, Package, StyleDefect, source_backed};
+use litchi_docx::{
+    Defect, DrawingDefect, FieldDefect, NumberingDefect, Package, StyleDefect, source_backed,
+};
 use litchi_drawingml::geom::Preset;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -390,4 +392,108 @@ fn malformed_shape_preset_attribute_stays_fatal() {
     // A duplicated attribute is ill-formed XML: the document does not open.
     assert!(open(&bytes).document().is_err());
     assert!(open_source_backed(&bytes).document().is_err());
+}
+
+// ---------------------------------------------------------------------------
+// F2.11 — `w:fldSimple` without `w:instr`
+// ---------------------------------------------------------------------------
+
+const MAIL_MERGE: &str = "../../libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx";
+const MERGE_FIELD: &str = r#"<w:fldSimple w:instr=" MERGEFIELD Name ">"#;
+
+fn field_summary(fields: &[litchi_docx::Field]) -> Vec<(String, Option<String>)> {
+    fields
+        .iter()
+        .map(|field| {
+            (
+                field.instruction().to_owned(),
+                field.result().map(str::to_owned),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn simple_field_without_instruction_is_kept_and_recorded() {
+    let original = fixture(MAIL_MERGE);
+    // A well-formed PAGE field, then the merge field stripped of w:instr.
+    let bytes = patch(
+        &original,
+        "word/document.xml",
+        MERGE_FIELD,
+        r#"<w:fldSimple w:instr=" PAGE "><w:r><w:t>1</w:t></w:r></w:fldSimple><w:fldSimple>"#,
+    );
+    let expected_summary = vec![
+        ("PAGE".to_owned(), Some("1".to_owned())),
+        (String::new(), Some("«Name»".to_owned())),
+    ];
+
+    let package = open(&bytes);
+    let document = package.document().expect("document");
+    let fields = document.fields().expect("field listing survives");
+    assert_eq!(field_summary(&fields), expected_summary);
+    let recorded = document.tolerance_report();
+    assert_eq!(
+        recorded
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        [Defect::Field(FieldDefect::MissingInstruction)]
+    );
+    // Offsets are within the visible (markup-compatibility processed) XML.
+    let xml = visible(&member(&bytes, "word/document.xml"));
+    let bad = xml.find("<w:fldSimple>").expect("bad field") as u64;
+    assert_eq!(recorded.defects()[0].context, bad);
+    // Typed projections over the listing read past the empty instruction.
+    document.hyperlink_fields().expect("hyperlink fields");
+    assert_eq!(document.field_count().expect("count"), 2);
+
+    let source = open_source_backed(&bytes);
+    let pinned = source.document().expect("pinned document");
+    let fields = pinned.fields().expect("field listing survives");
+    assert_eq!(field_summary(&fields), expected_summary);
+    assert_eq!(
+        pinned
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        [Defect::Field(FieldDefect::MissingInstruction)]
+    );
+    assert_eq!(pinned.tolerance_report().defects()[0].context, bad);
+}
+
+#[test]
+fn conformant_simple_fields_record_nothing() {
+    let original = fixture(MAIL_MERGE);
+    let package = open(&original);
+    let document = package.document().expect("document");
+    assert_eq!(
+        field_summary(&document.fields().expect("fields")),
+        [("MERGEFIELD Name".to_owned(), Some("«Name»".to_owned()))]
+    );
+    assert!(document.tolerance_report().is_clean());
+    let source = open_source_backed(&original);
+    let pinned = source.document().expect("pinned");
+    pinned.fields().expect("fields");
+    assert!(pinned.tolerance_report().is_clean());
+}
+
+#[test]
+fn unbalanced_simple_field_stays_fatal() {
+    let bytes = patch(
+        &fixture(MAIL_MERGE),
+        "word/document.xml",
+        MERGE_FIELD,
+        r#"</w:fldSimple><w:fldSimple w:instr=" MERGEFIELD Name ">"#,
+    );
+    // Ill-formed XML: an end tag with no start.
+    assert!(
+        open(&bytes)
+            .document()
+            .and_then(|document| document.fields())
+            .is_err()
+    );
 }

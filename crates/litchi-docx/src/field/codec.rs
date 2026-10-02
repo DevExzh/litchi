@@ -38,7 +38,20 @@ impl Field {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
+    ///
+    /// A `w:fldSimple` without `w:instr` is kept with an empty instruction
+    /// (see [`crate::leniency::FieldDefect`]); use
+    /// [`Document::fields`](crate::Document::fields) to have that repair
+    /// recorded.
     pub fn extract_from_document(doc_xml: &[u8]) -> Result<Vec<Field>> {
+        Ok(Self::extract_from_document_tolerant(doc_xml)?.0)
+    }
+
+    /// Extract all fields together with the repairs the extraction applied.
+    pub(crate) fn extract_from_document_tolerant(
+        doc_xml: &[u8],
+    ) -> Result<(Vec<Field>, crate::leniency::ToleranceReport)> {
+        let mut tolerance = crate::leniency::ToleranceReport::default();
         let mut reader = Reader::from_reader(doc_xml);
         reader.config_mut().trim_text(false);
 
@@ -57,6 +70,9 @@ impl Field {
         let mut simple_fields = Vec::new();
 
         loop {
+            // Text is never trimmed, so the position before an element event
+            // is its `<`.
+            let offset = reader.buffer_position();
             match reader.read_event() {
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"t" => {
                     in_result_text = false;
@@ -67,12 +83,20 @@ impl Field {
                         &e,
                         reader.decoder(),
                         next_order,
+                        offset,
+                        &mut tolerance,
                     )?);
                     next_order += 1;
                     in_simple_result_text = false;
                 },
                 Ok(Event::Empty(e)) if e.local_name().as_ref() == b"fldSimple" => {
-                    let field = PendingSimpleField::parse(&e, reader.decoder(), next_order)?;
+                    let field = PendingSimpleField::parse(
+                        &e,
+                        reader.decoder(),
+                        next_order,
+                        offset,
+                        &mut tolerance,
+                    )?;
                     next_order += 1;
                     fields.push((field.order, field.finish()));
                 },
@@ -281,7 +305,10 @@ impl Field {
         }
 
         fields.sort_unstable_by_key(|(order, _)| *order);
-        Ok(fields.into_iter().map(|(_, field)| field).collect())
+        Ok((
+            fields.into_iter().map(|(_, field)| field).collect(),
+            tolerance,
+        ))
     }
 }
 pub(super) fn has_field_switch(switches: &[Switch], name: char) -> bool {
@@ -1346,7 +1373,13 @@ struct PendingSimpleField {
 }
 
 impl PendingSimpleField {
-    fn parse(element: &BytesStart<'_>, decoder: Decoder, order: usize) -> Result<Self> {
+    fn parse(
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        order: usize,
+        offset: u64,
+        tolerance: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
         let mut instruction = None;
         let mut dirty = false;
         let mut locked = false;
@@ -1362,8 +1395,14 @@ impl PendingSimpleField {
                 _ => {},
             }
         }
-        let instruction = instruction
-            .ok_or_else(|| Error::Invalid("DOCX simple field is missing w:instr".to_string()))?;
+        // `CT_SimpleField@instr` is required, but LibreOffice starts the
+        // field with whatever instruction it has (none) and keeps its result,
+        // and Word keeps the rest of the document's fields. Keep the field
+        // with an empty instruction and record it (LENIENCY_AUDIT 2.11).
+        let instruction = instruction.unwrap_or_else(|| {
+            tolerance.record(crate::leniency::FieldDefect::MissingInstruction, offset);
+            String::new()
+        });
         Ok(Self {
             order,
             instruction,
