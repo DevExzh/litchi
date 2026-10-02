@@ -115,6 +115,8 @@ pub struct Spreadsheet {
     settings: Option<crate::settings::Settings>,
     cell_queries: AtomicUsize,
     cell_locator: OnceLock<Option<cell_locator::CellLocator>>,
+    /// Package repairs followed by the content repairs of the open parse.
+    tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
 impl Spreadsheet {
@@ -216,6 +218,8 @@ impl Spreadsheet {
             crate::open_parse::OpenParse::run(package.content_xml())?.finish()?;
         let definitions = outputs.definitions;
         let mut sheets = outputs.sheets;
+        let mut tolerance = package.tolerance_report().clone();
+        tolerance.append(&outputs.tolerance);
         // `OpenParse` owns the fused worksheet pass, while table title and
         // description are deliberately applied in the small metadata pass
         // shared with the source-backed facade.  Keep this post-pass here so
@@ -230,6 +234,7 @@ impl Spreadsheet {
             settings,
             cell_queries: AtomicUsize::new(0),
             cell_locator: OnceLock::new(),
+            tolerance,
         })
     }
 
@@ -284,7 +289,7 @@ impl Spreadsheet {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        self.package.tolerance_report()
+        &self.tolerance
     }
 
     /// Return worksheet names in document order.

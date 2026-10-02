@@ -42,7 +42,10 @@ pub use core::{
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
     write_content_xml_to_stream_with_options,
 };
-pub use leniency::{Defect, Leniency, PackageDefect, ToleranceReport, ToleratedDefect};
+pub use leniency::{
+    ContentDefect, Defect, DefectLocation, Leniency, PackageDefect, ToleranceReport,
+    ToleratedDefect,
+};
 pub use repair::{
     Destructive, MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR,
     MIMETYPE_REPAIR_PLAN_SCHEMA, MimetypeRepairPlan, NonDestructive, OdfRepairLimits,

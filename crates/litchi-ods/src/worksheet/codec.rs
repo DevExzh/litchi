@@ -5,6 +5,7 @@ use super::{model::Merge, validation};
 use crate::model::hyperlink::{Actuate, Link, Show};
 use crate::model::source::CellRange;
 use litchi_core::{Error, Result, xml::escape_xml};
+use litchi_odf_common::leniency::{ContentDefect, DefectLocation, ToleranceReport};
 use quick_xml::{
     XmlVersion,
     encoding::Decoder,
@@ -210,7 +211,22 @@ impl Attributes {
         Ok(result)
     }
 
-    fn cell(self, text: String, hyperlinks: Vec<Link>) -> Result<Cell> {
+    /// Build the cell run, degrading an unreadable typed value.
+    ///
+    /// A typed value that cannot be read (LENIENCY_AUDIT F9.8) is kept as
+    /// [`CellValue::Unknown`] with its declared type and raw lexical, the
+    /// way LibreOffice keeps the cell and continues the import; the second
+    /// element is then the [`ContentDefect::CellValueUnparseable`] context
+    /// for the caller to record with the cell's location.
+    fn cell(self, text: String, hyperlinks: Vec<Link>) -> Result<(Cell, Option<u16>)> {
+        let mut degraded = None;
+        let mut degrade = |kind: &str, raw: Option<String>, context: u16| {
+            degraded = Some(context);
+            CellValue::Unknown {
+                kind: kind.to_string(),
+                value: raw,
+            }
+        };
         let value_type = self.value_type.as_deref();
         let value = match value_type {
             None => {
@@ -221,31 +237,38 @@ impl Attributes {
                 }
             },
             Some("string") => CellValue::Text(text.clone()),
-            Some("float" | "double" | "decimal") => CellValue::Number(parse_float(
-                self.value.as_deref().unwrap_or_default(),
-                "office:value",
-            )?),
-            Some("currency") => CellValue::Currency {
-                value: parse_float(self.value.as_deref().unwrap_or_default(), "office:value")?,
-                currency: self.currency.unwrap_or_default(),
+            Some(kind @ ("float" | "double" | "decimal")) => {
+                match finite_float(self.value.as_deref()) {
+                    Some(value) => CellValue::Number(value),
+                    None => degrade(kind, self.value, CELL_VALUE_FLOAT),
+                }
             },
-            Some("percentage") => CellValue::Percentage(parse_float(
-                self.value.as_deref().unwrap_or_default(),
-                "office:value",
-            )?),
-            Some("boolean") => CellValue::Boolean(parse_bool(
-                self.boolean_value
-                    .as_deref()
-                    .or(self.value.as_deref())
-                    .unwrap_or_default(),
-                "office:boolean-value",
-            )?),
-            Some("date") => CellValue::Date(self.date_value.or(self.value).ok_or_else(|| {
-                Error::InvalidFormat("date cells require office:date-value".to_string())
-            })?),
-            Some("time") => CellValue::Time(self.time_value.or(self.value).ok_or_else(|| {
-                Error::InvalidFormat("time cells require office:time-value".to_string())
-            })?),
+            Some(kind @ "currency") => match finite_float(self.value.as_deref()) {
+                Some(value) => CellValue::Currency {
+                    value,
+                    currency: self.currency.unwrap_or_default(),
+                },
+                None => degrade(kind, self.value, CELL_VALUE_CURRENCY),
+            },
+            Some(kind @ "percentage") => match finite_float(self.value.as_deref()) {
+                Some(value) => CellValue::Percentage(value),
+                None => degrade(kind, self.value, CELL_VALUE_PERCENTAGE),
+            },
+            Some(kind @ "boolean") => {
+                let raw = self.boolean_value.or(self.value);
+                match raw.as_deref().and_then(boolean_lexical) {
+                    Some(value) => CellValue::Boolean(value),
+                    None => degrade(kind, raw, CELL_VALUE_BOOLEAN),
+                }
+            },
+            Some(kind @ "date") => match self.date_value.or(self.value) {
+                Some(value) => CellValue::Date(value),
+                None => degrade(kind, None, CELL_VALUE_DATE),
+            },
+            Some(kind @ "time") => match self.time_value.or(self.value) {
+                Some(value) => CellValue::Time(value),
+                None => degrade(kind, None, CELL_VALUE_TIME),
+            },
             Some(kind) => CellValue::Unknown {
                 kind: kind.to_string(),
                 value: self.value.or(self.date_value).or(self.time_value),
@@ -272,7 +295,70 @@ impl Attributes {
         } else {
             Merge::None
         };
-        Ok(cell)
+        Ok((cell, degraded))
+    }
+}
+
+/// [`ContentDefect::CellValueUnparseable`] contexts: the declared value type.
+const CELL_VALUE_FLOAT: u16 = 0;
+const CELL_VALUE_CURRENCY: u16 = 1;
+const CELL_VALUE_PERCENTAGE: u16 = 2;
+const CELL_VALUE_BOOLEAN: u16 = 3;
+const CELL_VALUE_DATE: u16 = 4;
+const CELL_VALUE_TIME: u16 = 5;
+
+/// Read a finite `xsd:double` cell value, or `None` when it is absent or
+/// unreadable.
+fn finite_float(value: Option<&str>) -> Option<f64> {
+    value
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+}
+
+/// Read an `xsd:boolean` cell value, or `None` when it is unreadable.
+fn boolean_lexical(value: &str) -> Option<bool> {
+    match value {
+        "true" | "1" => Some(true),
+        "false" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+/// The logical location of the next cell appended to `row`, which is the
+/// next row of `sheet`, itself sheet number `sheet_index`.
+fn next_cell_location(
+    sheet_index: usize,
+    sheet: Option<&Sheet>,
+    row: Option<&Row>,
+) -> DefectLocation {
+    let saturate = |value: usize| u64::try_from(value).unwrap_or(u64::MAX);
+    let row_index = sheet.map_or(0, |sheet| {
+        sheet
+            .rows
+            .iter()
+            .fold(0usize, |total, row| total.saturating_add(row.repeat()))
+    });
+    DefectLocation::Cell {
+        sheet: u32::try_from(sheet_index).unwrap_or(u32::MAX),
+        row: saturate(row_index),
+        column: saturate(row.map_or(0, Row::logical_cell_count)),
+    }
+}
+
+/// Record a degraded cell value at the location of the cell being appended.
+fn record_degraded_cell(
+    tolerance: &mut ToleranceReport,
+    degraded: Option<u16>,
+    sheet_index: usize,
+    sheet: Option<&Sheet>,
+    row: Option<&Row>,
+) {
+    if let Some(context) = degraded {
+        tolerance.record_at(
+            ContentDefect::CellValueUnparseable,
+            context,
+            next_cell_location(sheet_index, sheet, row),
+        );
     }
 }
 
@@ -453,13 +539,13 @@ fn reserve_parser_push<T>(
 
 /// Parse all direct spreadsheet tables from an ODS content part.
 pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
-    parse_impl(xml, true)
+    parse_impl(xml, true, &mut ToleranceReport::default())
 }
 
 /// Parse flat spreadsheet tables while retaining duplicate names for
 /// selector-time ambiguity reporting.
-pub(crate) fn parse_flat(xml: &str) -> Result<Vec<Sheet>> {
-    parse_impl(xml, false)
+pub(crate) fn parse_flat(xml: &str, tolerance: &mut ToleranceReport) -> Result<Vec<Sheet>> {
+    parse_impl(xml, false, tolerance)
 }
 
 /// Shared worksheet parse over one dedicated reader.
@@ -467,7 +553,11 @@ pub(crate) fn parse_flat(xml: &str) -> Result<Vec<Sheet>> {
 /// This standalone path intentionally keeps the historical inline event loop
 /// for latency parity on non-fused callers (eager open, commit readback); the
 /// fused open parse drives the equivalent [`WorksheetHandler`] instead.
-fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
+fn parse_impl(
+    xml: &str,
+    require_unique_names: bool,
+    tolerance: &mut ToleranceReport,
+) -> Result<Vec<Sheet>> {
     validation::validate_content_xml_size(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -696,17 +786,29 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                         sheet.rows.push(row);
                     },
                     Kind::Cell => {
-                        let row = current_row.as_mut().ok_or_else(|| {
-                            Error::InvalidFormat(
+                        if current_row.is_none() {
+                            return Err(Error::InvalidFormat(
                                 "empty table cell is outside a worksheet row".to_string(),
-                            )
-                        })?;
+                            ));
+                        }
                         let attributes = Attributes::from_element(
                             &element,
                             &reader,
                             is_covered(namespace, local.as_ref()),
                         )?;
-                        let cell = attributes.cell(String::new(), Vec::new())?;
+                        let (cell, degraded) = attributes.cell(String::new(), Vec::new())?;
+                        record_degraded_cell(
+                            tolerance,
+                            degraded,
+                            sheets.len(),
+                            current_sheet.as_ref(),
+                            current_row.as_ref(),
+                        );
+                        let row = current_row.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "empty table cell is outside a worksheet row".to_string(),
+                            )
+                        })?;
                         reserve_parser_push(
                             &mut row.cells,
                             validation::MAX_PHYSICAL_RUNS,
@@ -792,10 +894,22 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                         let open = current_cell.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell close has no open cell".to_string())
                         })?;
+                        if current_row.is_none() {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell closed outside a row".to_string(),
+                            ));
+                        }
+                        let (cell, degraded) = open.attributes.cell(open.text, open.hyperlinks)?;
+                        record_degraded_cell(
+                            tolerance,
+                            degraded,
+                            sheets.len(),
+                            current_sheet.as_ref(),
+                            current_row.as_ref(),
+                        );
                         let row = current_row.as_mut().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell closed outside a row".to_string())
                         })?;
-                        let cell = open.attributes.cell(open.text, open.hyperlinks)?;
                         reserve_parser_push(
                             &mut row.cells,
                             validation::MAX_PHYSICAL_RUNS,
@@ -1204,6 +1318,7 @@ pub(crate) struct WorksheetHandler {
     current_row: Option<Row>,
     current_cell: Option<OpenCell>,
     require_unique_names: bool,
+    tolerance: ToleranceReport,
 }
 
 impl WorksheetHandler {
@@ -1217,6 +1332,7 @@ impl WorksheetHandler {
             current_row: None,
             current_cell: None,
             require_unique_names,
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -1450,18 +1566,30 @@ impl WorksheetHandler {
                         sheet.rows.push(row);
                     },
                     Kind::Cell => {
-                        let row = self.current_row.as_mut().ok_or_else(|| {
-                            Error::InvalidFormat(
+                        if self.current_row.is_none() {
+                            return Err(Error::InvalidFormat(
                                 "empty table cell is outside a worksheet row".to_string(),
-                            )
-                        })?;
+                            ));
+                        }
                         let attributes = Attributes::from_resolved(
                             element,
                             resolver,
                             decoder,
                             is_covered(namespace, local.as_ref()),
                         )?;
-                        let cell = attributes.cell(String::new(), Vec::new())?;
+                        let (cell, degraded) = attributes.cell(String::new(), Vec::new())?;
+                        record_degraded_cell(
+                            &mut self.tolerance,
+                            degraded,
+                            self.sheets.len(),
+                            self.current_sheet.as_ref(),
+                            self.current_row.as_ref(),
+                        );
+                        let row = self.current_row.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "empty table cell is outside a worksheet row".to_string(),
+                            )
+                        })?;
                         reserve_parser_push(
                             &mut row.cells,
                             validation::MAX_PHYSICAL_RUNS,
@@ -1548,10 +1676,22 @@ impl WorksheetHandler {
                         let open = self.current_cell.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell close has no open cell".to_string())
                         })?;
+                        if self.current_row.is_none() {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell closed outside a row".to_string(),
+                            ));
+                        }
+                        let (cell, degraded) = open.attributes.cell(open.text, open.hyperlinks)?;
+                        record_degraded_cell(
+                            &mut self.tolerance,
+                            degraded,
+                            self.sheets.len(),
+                            self.current_sheet.as_ref(),
+                            self.current_row.as_ref(),
+                        );
                         let row = self.current_row.as_mut().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell closed outside a row".to_string())
                         })?;
-                        let cell = open.attributes.cell(open.text, open.hyperlinks)?;
                         reserve_parser_push(
                             &mut row.cells,
                             validation::MAX_PHYSICAL_RUNS,
@@ -1613,7 +1753,10 @@ impl WorksheetHandler {
     }
 
     /// Validate the end-of-document state and build the worksheet list.
-    pub(crate) fn finish(self) -> Result<Vec<Sheet>> {
+    ///
+    /// The second element lists the cell values degraded while parsing
+    /// (LENIENCY_AUDIT F9.8).
+    pub(crate) fn finish(self) -> Result<(Vec<Sheet>, ToleranceReport)> {
         if !self.stack.is_empty()
             || self.current_sheet.is_some()
             || self.current_row.is_some()
@@ -1637,7 +1780,7 @@ impl WorksheetHandler {
                 validation::validate_sheet(sheet)?;
             }
         }
-        Ok(sheets)
+        Ok((sheets, self.tolerance))
     }
 }
 
@@ -2122,25 +2265,9 @@ fn positive(value: &str, name: &str) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat(format!("ODS {name} must be positive")))
 }
 
-fn parse_float(value: &str, name: &str) -> Result<f64> {
-    let value = value.parse::<f64>().map_err(|_error| {
-        Error::InvalidFormat(format!("ODS {name} requires a finite decimal value"))
-    })?;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(Error::InvalidFormat(format!("ODS {name} must be finite")))
-    }
-}
-
 fn parse_bool(value: &str, name: &str) -> Result<bool> {
-    match value {
-        "true" | "1" => Ok(true),
-        "false" | "0" => Ok(false),
-        _ => Err(Error::InvalidFormat(format!(
-            "ODS {name} has invalid Boolean value"
-        ))),
-    }
+    boolean_lexical(value)
+        .ok_or_else(|| Error::InvalidFormat(format!("ODS {name} has invalid Boolean value")))
 }
 
 fn set_unique<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {

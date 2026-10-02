@@ -40,6 +40,9 @@ pub(crate) struct OpenOutputs {
     pub(crate) definitions: Vec<Definition>,
     /// The typed worksheets in document order (pass 4).
     pub(crate) sheets: Vec<Sheet>,
+    /// The content repairs applied while parsing (LENIENCY_AUDIT F9.8),
+    /// for the opening document handle to carry after its package report.
+    pub(crate) tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
 /// The two-phase fused open parse over `content.xml`.
@@ -261,7 +264,7 @@ impl OpenParse {
         if let Some(error) = self.worksheet_error {
             return Err(error);
         }
-        let sheets = self.worksheet.finish()?;
+        let (sheets, tolerance) = self.worksheet.finish()?;
 
         Ok((
             calculation,
@@ -269,6 +272,7 @@ impl OpenParse {
                 location,
                 definitions: scan.definitions,
                 sheets,
+                tolerance,
             },
         ))
     }

@@ -85,6 +85,7 @@ struct State {
     sheets: Arc<[Sheet]>,
     metadata: Metadata,
     odf_metadata: OdfMetadata,
+    tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
 /// Immutable, Arc-backed, lossless flat-spreadsheet snapshot.
@@ -121,7 +122,8 @@ impl Snapshot {
             return Err(invalid("flat ODS XML exceeds the input byte limit"));
         }
         validate_flat_xml(&source)?;
-        let sheets = crate::worksheet::codec::parse_flat(&source)?;
+        let mut tolerance = litchi_odf_common::leniency::ToleranceReport::default();
+        let sheets = crate::worksheet::codec::parse_flat(&source, &mut tolerance)?;
         crate::dde::Snapshot::parse(&source).map_err(|error| {
             Error::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
         })?;
@@ -138,6 +140,7 @@ impl Snapshot {
                 sheets: Arc::from(sheets),
                 metadata,
                 odf_metadata,
+                tolerance,
             }),
         })
     }
@@ -145,6 +148,16 @@ impl Snapshot {
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.state.source.as_bytes()
+    }
+
+    /// Everything a tolerant read repaired while this snapshot was parsed.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        &self.state.tolerance
     }
 
     /// Share the exact source owner without copying its bytes.

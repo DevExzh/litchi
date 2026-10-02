@@ -72,6 +72,8 @@ pub struct SourceBackedSpreadsheet {
     cell_locator: OnceLock<Option<super::cell_locator::CellLocator>>,
     edit_protection: OnceLock<(bool, Vec<String>)>,
     content_layout: OnceLock<crate::worksheet::package::ContentLayout>,
+    /// Package repairs followed by the content repairs of the open parse.
+    tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheet {
@@ -257,6 +259,7 @@ impl SourceBackedSpreadsheet {
                 location: _location,
                 definitions,
                 mut sheets,
+                tolerance: content_tolerance,
             } = outputs;
             crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
             Ok((
@@ -266,10 +269,13 @@ impl SourceBackedSpreadsheet {
                 sheets,
                 metadata,
                 settings,
+                content_tolerance,
             ))
         })();
-        let (content_xml, styles_xml, definitions, sheets, metadata, settings) =
+        let (content_xml, styles_xml, definitions, sheets, metadata, settings, content_tolerance) =
             prefer_current(source.as_ref(), source_version, parsed)?;
+        let mut tolerance = package.tolerance_report().clone();
+        tolerance.append(&content_tolerance);
 
         Ok(Self {
             package,
@@ -285,6 +291,7 @@ impl SourceBackedSpreadsheet {
             cell_locator: OnceLock::new(),
             edit_protection: OnceLock::new(),
             content_layout: OnceLock::new(),
+            tolerance,
         })
     }
 
@@ -339,7 +346,7 @@ impl SourceBackedSpreadsheet {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        self.package.tolerance_report()
+        &self.tolerance
     }
 
     /// Return the source identity captured during open.

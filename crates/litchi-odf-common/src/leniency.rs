@@ -23,6 +23,13 @@
 //! LibreOffice's media-type fallback does; two non-empty values that disagree
 //! stay a hard error. A conforming package yields an empty report.
 //!
+//! **LibreOffice-compatible content repairs** ([`ContentDefect`]) apply the
+//! same posture inside a document's XML parts: one malformed value or one
+//! unknown element degrades or is skipped locally — exactly as LibreOffice's
+//! import does — instead of failing the whole document, and each is
+//! recorded with a [`DefectLocation`] where one exists. Well-formedness,
+//! entity safety, and resource limits are never relaxed.
+//!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. No ODF repair currently requires a judgment call,
 //! so [`Leniency::Strict`] is the only variant; opt-in variants land here as
@@ -155,16 +162,78 @@ impl PackageDefect {
     }
 }
 
+/// The class of document-content defect the reader repairs the way
+/// LibreOffice's import repairs it.
+///
+/// This enumeration is closed by design. Each variant documents its repair,
+/// its [`ToleratedDefect::context`], and its [`DefectLocation`]. Applying one
+/// never changes what a conforming document means: the repair engages only
+/// on content LibreOffice itself reads past.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ContentDefect {
+    /// An ODS cell's typed value could not be read: a `float`, `currency`, or
+    /// `percentage` cell whose `office:value` is absent or not a finite
+    /// decimal (a locale-comma `"1,5"`, `"NaN"`, an empty string), a
+    /// `boolean` cell whose value is not `true`/`false`/`1`/`0`, or a `date`
+    /// or `time` cell without its value attribute (LENIENCY_AUDIT F9.8).
+    ///
+    /// LibreOffice's Calc import never aborts on one bad cell value: a failed
+    /// numeric conversion leaves the cell at a default value and the import
+    /// continues (`ScXMLTableRowCellContext`, xmlcelli.cxx). The repair keeps
+    /// the cell, its displayed text, formula, style and span, and stores the
+    /// value as `CellValue::Unknown { kind, value }` with the declared value
+    /// type and the raw lexical (or `None` when the attribute was absent), so
+    /// nothing is invented and an edit can never silently rewrite it. The
+    /// context is the declared value type: 0 `float`/`double`/`decimal`, 1
+    /// `currency`, 2 `percentage`, 3 `boolean`, 4 `date`, 5 `time`. The
+    /// location is the cell ([`DefectLocation::Cell`]).
+    CellValueUnparseable,
+}
+
+impl ContentDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::CellValueUnparseable => {
+                "kept the cell and its displayed text and stored its unreadable typed value as an uninterpreted value instead of failing the spreadsheet"
+            },
+        }
+    }
+}
+
+/// Where in a document a [`ContentDefect`] was found.
+///
+/// Every index is zero-based and counts logical positions, so repeated rows
+/// and cells (`table:number-rows-repeated`,
+/// `table:number-columns-repeated`) are expanded when counting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DefectLocation {
+    /// A spreadsheet cell.
+    Cell {
+        /// Sheet index in document order.
+        sheet: u32,
+        /// Logical row within the sheet.
+        row: u64,
+        /// Logical column within the row.
+        column: u64,
+    },
+}
+
 /// One class of defect repaired while a package was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
-/// a read may change about a document. [`Defect::Package`] classes are
-/// repaired under every [`Leniency`] variant.
+/// a read may change about a document. [`Defect::Package`] and
+/// [`Defect::Content`] classes are repaired under every [`Leniency`] variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Defect {
     /// A package-container defect repaired the way LibreOffice repairs it.
     Package(PackageDefect),
+    /// A document-content defect repaired the way LibreOffice repairs it.
+    Content(ContentDefect),
 }
 
 impl Defect {
@@ -173,6 +242,7 @@ impl Defect {
     pub const fn repair(self) -> &'static str {
         match self {
             Self::Package(defect) => defect.repair(),
+            Self::Content(defect) => defect.repair(),
         }
     }
 }
@@ -183,17 +253,27 @@ impl From<PackageDefect> for Defect {
     }
 }
 
+impl From<ContentDefect> for Defect {
+    fn from(defect: ContentDefect) -> Self {
+        Self::Content(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
-    /// Where the defect was found: the declared ZIP compression method ID for
+    /// What was found: the declared ZIP compression method ID for
     /// [`PackageDefect::MimetypeDeflated`]; 0 (root entry absent) or 1 (root
     /// entry with an empty media type) for
     /// [`PackageDefect::ManifestRootMediaTypeMissing`]; 0 for the other
-    /// [`Defect::Package`] classes.
+    /// [`Defect::Package`] classes. Each [`ContentDefect`] variant documents
+    /// its own context.
     pub context: u16,
+    /// Where the defect was found inside the document, for the
+    /// [`ContentDefect`] classes that have a location; `None` otherwise.
+    pub location: Option<DefectLocation>,
 }
 
 /// Everything a read repaired, in the order the defects were found.
@@ -243,11 +323,30 @@ impl ToleranceReport {
     /// API.
     #[doc(hidden)]
     pub fn record(&mut self, defect: impl Into<Defect>, context: u16) {
+        self.push(ToleratedDefect {
+            defect: defect.into(),
+            context,
+            location: None,
+        });
+    }
+
+    /// Record one repair found at `location`, saturating like
+    /// [`Self::record`].
+    ///
+    /// This is format-family plumbing; it is hidden because recording is
+    /// part of a read, not caller API.
+    #[doc(hidden)]
+    pub fn record_at(&mut self, defect: impl Into<Defect>, context: u16, location: DefectLocation) {
+        self.push(ToleratedDefect {
+            defect: defect.into(),
+            context,
+            location: Some(location),
+        });
+    }
+
+    fn push(&mut self, tolerated: ToleratedDefect) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
-            self.defects.push(ToleratedDefect {
-                defect: defect.into(),
-                context,
-            });
+            self.defects.push(tolerated);
         } else {
             self.unrecorded = self.unrecorded.saturating_add(1);
         }
@@ -264,7 +363,7 @@ impl ToleranceReport {
     #[doc(hidden)]
     pub fn append(&mut self, other: &ToleranceReport) {
         for tolerated in other.defects() {
-            self.record(tolerated.defect, tolerated.context);
+            self.push(*tolerated);
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
     }
@@ -347,6 +446,7 @@ mod tests {
             ToleratedDefect {
                 defect: Defect::Package(PackageDefect::MimetypeNotFirst),
                 context: 0,
+                location: None,
             }
         );
 
@@ -356,12 +456,36 @@ mod tests {
     }
 
     #[test]
+    fn located_defects_keep_their_location_across_a_merge() {
+        let cell = DefectLocation::Cell {
+            sheet: 1,
+            row: 7,
+            column: 3,
+        };
+        let mut parsed = ToleranceReport::default();
+        parsed.record_at(ContentDefect::CellValueUnparseable, 3, cell);
+        let mut base = ToleranceReport::default();
+        base.record(PackageDefect::MimetypeNotFirst, 0);
+        base.append(&parsed);
+        assert_eq!(base.defects()[0].location, None);
+        assert_eq!(
+            base.defects()[1],
+            ToleratedDefect {
+                defect: Defect::Content(ContentDefect::CellValueUnparseable),
+                context: 3,
+                location: Some(cell),
+            }
+        );
+    }
+
+    #[test]
     fn every_defect_class_describes_its_repair() {
         let defects = [
             Defect::from(PackageDefect::MimetypeDeflated),
             Defect::from(PackageDefect::MimetypeExtraField),
             Defect::from(PackageDefect::MimetypeNotFirst),
             Defect::from(PackageDefect::ManifestRootMediaTypeMissing),
+            Defect::from(ContentDefect::CellValueUnparseable),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
