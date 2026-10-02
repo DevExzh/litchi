@@ -546,3 +546,18 @@ fn unreachable_storage_subtree_and_its_sectors_are_recorded() {
     assert_eq!(unclaimed, inner_sorted);
     assert_eq!(read_both(&bytes, &["Keep"]), b"kept");
 }
+
+// --- F7.6: CFB header reserved bytes must be zero ---
+
+#[test]
+fn nonzero_reserved_header_bytes_are_ignored_and_recorded() {
+    let data = pattern(700, 12);
+    let mut bytes = build(&[(&["Data"], &data)]);
+    assert_eq!(bytes[0x22..0x28], [0; 6]);
+    bytes[0x22..0x28].copy_from_slice(&[1, 2, 3, 4, 5, 6]);
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(crate::HeaderDefect::ReservedBytes.into(), 0)]
+    );
+    assert_eq!(read_both(&bytes, &["Data"]), data);
+}

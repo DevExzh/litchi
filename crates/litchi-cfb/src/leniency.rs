@@ -91,8 +91,9 @@ pub enum Leniency {
 pub enum HeaderDefect {
     /// The six reserved header bytes at offset 0x22 were not zero (F7.6).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation. The
-    /// repair ignores the bytes, as POI, LibreOffice, and ole32 do.
+    /// The bytes are ignored, as POI (`HeaderBlock`), LibreOffice
+    /// (`StgHeader::Load`), and ole32 do; they carry no semantics. The
+    /// context is zero.
     ReservedBytes,
     /// The MiniFAT start sector and sector count disagreed (F7.5).
     ///

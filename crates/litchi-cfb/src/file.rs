@@ -5,7 +5,7 @@ use super::consts::{
     TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
-use crate::leniency::{AllocationDefect, DirectoryDefect, ToleranceReport};
+use crate::leniency::{AllocationDefect, DirectoryDefect, HeaderDefect, ToleranceReport};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -984,11 +984,10 @@ impl<R: Read + Seek> OleFile<R> {
         if byte_order != 0xFFFE {
             return Err(OleError::InvalidFormat("Invalid byte order".to_string()));
         }
-        if header[0x22..0x28] != [0; 6] {
-            return Err(OleError::InvalidFormat(
-                "Reserved CFB header bytes must be zero".to_string(),
-            ));
-        }
+        // MS-CFB 2.2 asks producers to zero these six bytes; they carry no
+        // semantics and POI, LibreOffice, and ole32 never read them. Ignore
+        // and record (leniency audit F7.6).
+        let reserved_header_bytes = header[0x22..0x28] != [0; 6];
 
         // Validate shifts before using them. Untrusted shift counts must never reach `<<`.
         let expected_sector_shift = match dll_version {
@@ -1122,6 +1121,9 @@ impl<R: Read + Seek> OleFile<R> {
             tolerance: ToleranceReport::default(),
             misordered_siblings: false,
         };
+        if reserved_header_bytes {
+            ole.tolerance.record(HeaderDefect::ReservedBytes, 0);
+        }
 
         // Load FAT (File Allocation Table)
         ole.load_fat(
