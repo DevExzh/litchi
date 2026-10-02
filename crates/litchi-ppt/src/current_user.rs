@@ -27,6 +27,10 @@ pub struct CurrentUser {
     encrypted: bool,
     /// Username (UTF-16LE encoded)
     username: String,
+    /// The raw `lenUserName` when it exceeded 255 or the stream truncated
+    /// the username/release fields, so the username was treated as absent
+    /// (finding F5.8, the POI posture).
+    unusable_username_length: Option<u16>,
 }
 
 impl CurrentUser {
@@ -44,9 +48,9 @@ impl CurrentUser {
         }
         let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
         if username_len > 255 {
-            return Err(Error::InvalidFormat(format!(
-                "Invalid CurrentUser username length: {username_len}"
-            )));
+            // The parser treats the username as absent and reads only the
+            // fixed fields (finding F5.8).
+            return Ok(stream_len.min(CURRENT_USER_MIN_SIZE));
         }
         let release_end = CURRENT_USER_MIN_SIZE
             .checked_add(username_len)
@@ -124,29 +128,27 @@ impl CurrentUser {
             },
         };
         let current_edit_offset = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
-        let username_len = u16::from_le_bytes([data[20], data[21]]) as usize;
-        if username_len > 255 {
-            return Err(Error::InvalidFormat(format!(
-                "Invalid CurrentUser username length: {username_len}"
-            )));
-        }
+        let username_length = u16::from_le_bytes([data[20], data[21]]);
+        let username_len = usize::from(username_length);
         let document_version = u16::from_le_bytes([data[22], data[23]]);
 
+        // MS-PPT 2.3.2 caps lenUserName at 255. POI treats an invalid length
+        // "as if there was no username set" (CurrentUserAtom.java) and
+        // LibreOffice ignores it; only offsetToCurrentEdit and the token are
+        // load-bearing. Do the same when the length is out of range or the
+        // stream truncates the username and release fields (finding F5.8).
         let ansi_start = CURRENT_USER_MIN_SIZE;
-        let Some(release_start) = ansi_start.checked_add(username_len) else {
-            return Err(Error::Corrupted(
-                "CurrentUser username length overflow".to_string(),
-            ));
-        };
-        let Some(unicode_start) = release_start.checked_add(4) else {
-            return Err(Error::Corrupted(
-                "CurrentUser release offset overflow".to_string(),
-            ));
-        };
-        if unicode_start > data.len() {
-            return Err(Error::Corrupted(
-                "CurrentUser stream truncates the ANSI username or release version".to_string(),
-            ));
+        let release_start = ansi_start + username_len;
+        let unicode_start = release_start + 4;
+        if username_len > 255 || unicode_start > data.len() {
+            return Ok(Self {
+                current_edit_offset,
+                release_version: 0,
+                document_version,
+                encrypted,
+                username: String::new(),
+                unusable_username_length: Some(username_length),
+            });
         }
 
         let release_version_raw = u32::from_le_bytes([
@@ -172,7 +174,14 @@ impl CurrentUser {
             document_version,
             encrypted,
             username,
+            unusable_username_length: None,
         })
+    }
+
+    /// The raw `lenUserName` when it was out of range or truncated and the
+    /// username was therefore treated as absent (finding F5.8).
+    pub(crate) fn unusable_username_length(&self) -> Option<u16> {
+        self.unusable_username_length
     }
 
     /// Get the offset to the current `UserEditAtom` record.
@@ -314,6 +323,34 @@ mod tests {
 
         assert_eq!(current_user.username(), "\u{80}é");
         assert!(current_user.is_encrypted());
+    }
+
+    /// An out-of-range or truncated username length reads as no username
+    /// (F5.8, the POI posture); the load-bearing fields still parse.
+    #[test]
+    fn unusable_username_length_reads_as_no_username() {
+        let mut long = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
+        long[20..22].copy_from_slice(&300u16.to_le_bytes());
+        let mut truncated = current_user_stream(b"AB", None, UNENCRYPTED_HEADER_TOKEN);
+        truncated[20..22].copy_from_slice(&200u16.to_le_bytes());
+        for (data, raw) in [(long, 300), (truncated, 200)] {
+            let current_user = CurrentUser::parse(&data).unwrap();
+            assert_eq!(current_user.current_edit_offset(), 0x1000);
+            assert_eq!(current_user.username(), "");
+            assert_eq!(current_user.release_version(), 0);
+            assert_eq!(current_user.unusable_username_length(), Some(raw));
+            assert_eq!(
+                CurrentUser::source_prefix_len(&data, data.len()).unwrap(),
+                if raw > 255 { 28 } else { data.len() }
+            );
+        }
+        let conformant = current_user_stream(b"AB", Some("AB"), UNENCRYPTED_HEADER_TOKEN);
+        assert_eq!(
+            CurrentUser::parse(&conformant)
+                .unwrap()
+                .unusable_username_length(),
+            None
+        );
     }
 
     #[test]

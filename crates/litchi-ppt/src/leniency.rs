@@ -89,6 +89,11 @@
 //!   [`crate::PersistMapping::build_from_records_with_report`] apply the
 //!   same repairs per entry instead of dropping a whole holder. A truncated
 //!   or misaligned directory stays an error.
+//! - **F5.8** (username-length part,
+//!   [`PersistDefect::CurrentUserNameLength`]) — a "Current User"
+//!   `lenUserName` above 255, or one the stream truncates, reads as no
+//!   username (POI's posture) instead of failing the open; the edit offset
+//!   and header token are still read and validated.
 //!
 //! Record framing, the `UserEdit`/persist chain, container structure,
 //! encryption, and the configured record/interaction resource limits are not
@@ -418,7 +423,7 @@ impl SlideListDefect {
 }
 
 /// The class of `UserEdit`/persist-chain defect the reader repairs the way
-/// LibreOffice repairs it (findings F5.6 and F5.7).
+/// LibreOffice or POI repairs it (findings F5.6, F5.7, and F5.8).
 ///
 /// These repairs happen while the presentation is opened, so they are
 /// recorded in [`crate::Presentation::tolerance_report`]; the context is
@@ -441,6 +446,12 @@ pub enum PersistDefect {
     /// scan as [`Self::MissingCurrentUser`] (finding F5.6). The context is
     /// the recovered atom's stream offset.
     UnusableCurrentEditOffset,
+    /// The "Current User" stream's `lenUserName` exceeded the 255 MS-PPT
+    /// 2.3.2 allows, or the stream truncated the username and release
+    /// fields; the username is treated as absent, as POI treats it
+    /// (`CurrentUserAtom.java`), and LibreOffice never reads it (finding
+    /// F5.8). The context is the raw `lenUserName`.
+    CurrentUserNameLength,
     /// A `UserEditAtom`'s `offsetPersistDirectory` pointed at a record other
     /// than a `PersistDirectoryAtom`; that edit contributes no persist
     /// entries and the chain walk continues, as LibreOffice only processes
@@ -468,6 +479,9 @@ impl PersistDefect {
             },
             Self::UnusableCurrentEditOffset => {
                 "recovered the live UserEditAtom by scanning the document stream because the current edit offset is unusable"
+            },
+            Self::CurrentUserNameLength => {
+                "treated a Current User username with an invalid or truncated length as absent"
             },
             Self::PersistDirectoryRecordType => {
                 "ignored a persist-directory pointer to a record that is not a PersistDirectoryAtom"
@@ -869,6 +883,7 @@ mod tests {
             Defect::from(SlideListDefect::StaleSlidePersistRef),
             Defect::from(PersistDefect::MissingCurrentUser),
             Defect::from(PersistDefect::UnusableCurrentEditOffset),
+            Defect::from(PersistDefect::CurrentUserNameLength),
             Defect::from(PersistDefect::PersistDirectoryRecordType),
             Defect::from(PersistDefect::ZeroCountPersistRun),
             Defect::from(PersistDefect::DuplicatePersistId),

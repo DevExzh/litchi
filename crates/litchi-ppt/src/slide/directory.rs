@@ -345,6 +345,9 @@ pub(crate) fn locate_head_user_edit(
     let defect = match current_user_data {
         Some(data) => {
             let current_user = CurrentUser::parse_with_limits(data, limits)?;
+            if let Some(raw) = current_user.unusable_username_length() {
+                report.record(PersistDefect::CurrentUserNameLength, u32::from(raw));
+            }
             let offset = current_user.current_edit_offset();
             if current_user.is_encrypted() || is_live_user_edit(document_data, offset) {
                 return Ok(offset);

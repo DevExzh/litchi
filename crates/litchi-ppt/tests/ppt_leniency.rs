@@ -1176,3 +1176,15 @@ fn truncated_persist_directory_stays_fatal() {
         );
     }
 }
+
+#[test]
+fn out_of_range_current_user_name_length_reads_as_no_username() {
+    let deck = Deck::new(2);
+    // lenUserName follows headerToken and offsetToCurrentEdit.
+    let at = deck.current_edit_field() + 4;
+    let deck = deck.patch_u16(at, 300);
+    deck.assert_opens(
+        &[0, 1],
+        &[open_time(PersistDefect::CurrentUserNameLength, 300, None)],
+    );
+}
