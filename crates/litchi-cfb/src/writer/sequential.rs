@@ -299,6 +299,15 @@ fn validate_staged_candidate(
             report,
         },
     })?;
+    // The writer generated every structure itself, so the candidate must be
+    // conformant: a default read repair here would be a writer defect.
+    validated
+        .require_conformant()
+        .map_err(|source| SequentialWriteError::CandidateValidation {
+            source,
+            progress: staged(),
+            report,
+        })?;
     drop(validated);
     Ok(())
 }

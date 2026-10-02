@@ -454,7 +454,9 @@ mod benchmark {
                 "Invalid sector marker 0xFFFFFFFD in regular stream chain".to_owned()
             },
             GuardCase::InvalidIndex => format!("Invalid sector index {next} in regular stream"),
-            GuardCase::LateExcess => "regular stream chain exceeds its declared length".to_owned(),
+            // A chain that continues past the declared size is a recorded
+            // default repair (leniency audit F7.1): the file opens.
+            GuardCase::LateExcess => return Ok((target, next, None)),
             GuardCase::Valid => unreachable!("valid case returned above"),
         };
         Ok((target, next, Some(expected)))

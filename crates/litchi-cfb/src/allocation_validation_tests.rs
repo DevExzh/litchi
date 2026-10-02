@@ -94,6 +94,15 @@ fn assert_open_corrupted(bytes: Vec<u8>, expected: &str) {
     ));
 }
 
+fn assert_open_repairs_surplus_chain(bytes: Vec<u8>, expected: &[u8]) {
+    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    assert!(
+        file.tolerance_report()
+            .contains(crate::AllocationDefect::ChainLongerThanSize)
+    );
+    assert_eq!(file.open_stream(&["Data"]).unwrap(), expected);
+}
+
 #[derive(Debug)]
 struct ReportedLengthReader {
     bytes: Vec<u8>,
@@ -579,17 +588,15 @@ fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
         "regular stream chain ends before its declared length",
     );
 
-    let mut excess = regular_stream_file();
-    let terminal = regular_data_terminal_sector(&excess);
-    let offset = fat_entry_offset(&excess, terminal);
-    write_u32(&mut excess, offset, terminal + 1);
-    assert_open_corrupted(excess, "regular stream chain exceeds its declared length");
-
-    let mut free = regular_stream_file();
-    let terminal = regular_data_terminal_sector(&free);
-    let offset = fat_entry_offset(&free, terminal);
-    write_u32(&mut free, offset, FREESECT);
-    assert_open_corrupted(free, "regular stream chain exceeds its declared length");
+    // A chain continuing past the declared size is a recorded default
+    // repair (leniency audit F7.1), whatever the surplus link holds.
+    for surplus in [FREESECT, 0] {
+        let mut excess = regular_stream_file();
+        let terminal = regular_data_terminal_sector(&excess);
+        let offset = fat_entry_offset(&excess, terminal);
+        write_u32(&mut excess, offset, surplus);
+        assert_open_repairs_surplus_chain(excess, &[0u8; 4096]);
+    }
 
     let mut explicit_terminal = regular_stream_file();
     let terminal = regular_data_terminal_sector(&explicit_terminal);
@@ -606,17 +613,13 @@ fn open_rejects_minifat_stream_short_excess_and_terminal_markers() {
     write_u32(&mut short, offset, ENDOFCHAIN);
     assert_open_corrupted(short, "mini stream chain ends before its declared length");
 
-    let mut excess = mini_stream_file();
-    let terminal = mini_data_terminal_sector(&excess);
-    let offset = minifat_entry_offset(&excess, terminal);
-    write_u32(&mut excess, offset, terminal + 1);
-    assert_open_corrupted(excess, "mini stream chain exceeds its declared length");
-
-    let mut free = mini_stream_file();
-    let terminal = mini_data_terminal_sector(&free);
-    let offset = minifat_entry_offset(&free, terminal);
-    write_u32(&mut free, offset, FREESECT);
-    assert_open_corrupted(free, "mini stream chain exceeds its declared length");
+    for surplus in [FREESECT, 0] {
+        let mut excess = mini_stream_file();
+        let terminal = mini_data_terminal_sector(&excess);
+        let offset = minifat_entry_offset(&excess, terminal);
+        write_u32(&mut excess, offset, surplus);
+        assert_open_repairs_surplus_chain(excess, &[0u8; 128]);
+    }
 
     let mut explicit_terminal = mini_stream_file();
     let terminal = mini_data_terminal_sector(&explicit_terminal);

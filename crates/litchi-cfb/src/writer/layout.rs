@@ -959,6 +959,7 @@ impl ReusePlan {
             .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
         let limits = OleFileLimits::for_writer(output_length, directory_length)?;
         let check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        check.require_conformant()?;
         let view = PlanView {
             plan: self,
             streams,
@@ -987,6 +988,7 @@ impl ReusePlan {
             .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
         let limits = OleFileLimits::for_writer(output_length, directory_length)?;
         let mut check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        check.require_conformant()?;
         for stream in streams {
             let mut refs = Vec::new();
             refs.try_reserve_exact(stream.path.len())

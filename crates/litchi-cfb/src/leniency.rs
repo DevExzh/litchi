@@ -127,7 +127,8 @@ impl HeaderDefect {
 #[non_exhaustive]
 pub enum AllocationDefect {
     /// A stream's FAT or MiniFAT chain continued past the sectors its
-    /// declared size needs (F7.1).
+    /// declared size needs, or its last needed sector carried a marker other
+    /// than `ENDOFCHAIN` (F7.1).
     ///
     /// MS-CFB 2.6.1 makes the stream size authoritative. POI
     /// (`DocumentInputStream`) and LibreOffice (`StgDataStrm`) read exactly
@@ -135,8 +136,6 @@ pub enum AllocationDefect {
     /// terminates the chain after the last sector the size needs; the surplus
     /// sectors are left alone. The context is the stream's directory SID
     /// (SID 0 for the root mini stream).
-    ///
-    /// Not yet repaired: the reader currently rejects this deviation.
     ChainLongerThanSize,
     /// A physical sector no validated structure or stream claims carried an
     /// allocation marker instead of `FREESECT` (F7.1).
@@ -145,8 +144,6 @@ pub enum AllocationDefect {
     /// MS-CFB defines no reader behavior for unreferenced sectors and no
     /// reference reader inspects them; the sector is never read. The
     /// context is the physical sector index.
-    ///
-    /// Not yet repaired: the reader currently rejects this deviation.
     UnclaimedAllocatedSector,
     /// A zero-length stream's start sector was not `ENDOFCHAIN` (F7.2).
     ///

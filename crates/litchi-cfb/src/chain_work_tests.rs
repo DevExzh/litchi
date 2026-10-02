@@ -284,8 +284,13 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
     }
     let root_sector_count = usize::try_from(root_size.div_ceil(file.sector_size as u64))
         .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
-    let root_chain =
-        collect_sector_chain_exact(&file.fat, root_start, root_sector_count, "root mini stream")?;
+    let (root_chain, root_end) =
+        collect_sector_chain_bounded(&file.fat, root_start, root_sector_count, "root mini stream")?;
+    if root_end == ChainEnd::Surplus {
+        OleFile::<Cursor<Vec<u8>>>::terminate_chain(&mut file.fat, &root_chain);
+        file.tolerance
+            .record(AllocationDefect::ChainLongerThanSize, 0);
+    }
     file.claim_chain(&root_chain, PhysicalSectorRole::MiniStream)?;
     file.root_chain = root_chain;
     let mini_sector_capacity = usize::try_from(root_size.div_ceil(file.mini_sector_size as u64))
@@ -300,7 +305,8 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
         if entry.entry_type != STGTY_STREAM {
             continue;
         }
-        let (is_minifat, start_sector, size) = (entry.is_minifat, entry.start_sector, entry.size);
+        let (sid, is_minifat, start_sector, size) =
+            (entry.sid, entry.is_minifat, entry.start_sector, entry.size);
         if file.sector_size == SECTOR_SIZE_V4 && !is_minifat && start_sector == RANGE_LOCK_SECTOR_V4
         {
             return Err(OleError::CorruptedFile(
@@ -310,12 +316,17 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
         if is_minifat {
             let sector_count = usize::try_from(size.div_ceil(file.mini_sector_size as u64))
                 .map_err(|_err| OleError::CorruptedFile("Mini stream is too large".to_string()))?;
-            let chain = collect_sector_chain_exact(
+            let (chain, end) = collect_sector_chain_bounded(
                 &file.minifat,
                 start_sector,
                 sector_count,
                 "mini stream",
             )?;
+            if end == ChainEnd::Surplus {
+                OleFile::<Cursor<Vec<u8>>>::terminate_chain(&mut file.minifat, &chain);
+                file.tolerance
+                    .record(AllocationDefect::ChainLongerThanSize, sid);
+            }
             for &sector in &chain {
                 let sector_index = usize::try_from(sector).map_err(|_err| {
                     OleError::CorruptedFile(
@@ -344,12 +355,17 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
                 usize::try_from(size.div_ceil(file.sector_size as u64)).map_err(|_err| {
                     OleError::CorruptedFile("Regular stream is too large".to_string())
                 })?;
-            let chain = collect_sector_chain_exact(
+            let (chain, end) = collect_sector_chain_bounded(
                 &file.fat,
                 start_sector,
                 sector_count,
                 "regular stream",
             )?;
+            if end == ChainEnd::Surplus {
+                OleFile::<Cursor<Vec<u8>>>::terminate_chain(&mut file.fat, &chain);
+                file.tolerance
+                    .record(AllocationDefect::ChainLongerThanSize, sid);
+            }
             file.claim_chain(&chain, PhysicalSectorRole::RegularStream)?;
         }
     }
@@ -523,6 +539,20 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
                 reused.root_chain, fresh.root_chain,
                 "file {file_index} case {case}"
             );
+            // So do the repairs: the recorded defects and the in-memory
+            // tables a surplus chain was terminated in.
+            assert_eq!(
+                reused.tolerance, fresh.tolerance,
+                "file {file_index} case {case}"
+            );
+            assert_eq!(reused.fat, fresh.fat, "file {file_index} case {case}");
+            assert_eq!(
+                reused.minifat, fresh.minifat,
+                "file {file_index} case {case}"
+            );
+            if oracle.is_ok() && !fresh.tolerance.is_clean() {
+                *outcomes.entry("repaired".to_string()).or_default() += 1;
+            }
             // The message with its numbers masked, so cases group by check.
             let key = match &oracle {
                 Ok(()) => "accepted".to_string(),
@@ -540,8 +570,9 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
             *outcomes.entry(key).or_default() += 1;
         }
     }
-    // The faults reach the cycle, overlap, truncation, excess, marker,
-    // bounds and ownership refusals, and some leave the file valid.
+    // The faults reach the cycle, overlap, truncation, marker, bounds and
+    // ownership refusals, the recorded surplus-chain repair (leniency audit
+    // F7.1), and some leave the file valid.
     let seen = |needle: &str| outcomes.keys().any(|key| key.contains(needle));
     for needle in [
         "accepted",
@@ -551,7 +582,7 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
         "is claimed by both regular stream and regular stream",
         "Mini sector # is claimed by multiple streams",
         "ends before its declared length",
-        "exceeds its declared length",
+        "repaired",
         "Invalid sector index",
         "Invalid sector marker",
         "Invalid start marker",

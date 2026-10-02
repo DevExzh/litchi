@@ -54,7 +54,9 @@ impl From<ValidationReportError> for CfbValidationError {
 /// The single declared `cfb.container.ingress` capability runs the crate's
 /// canonical ingress pipeline. On accepted input that pipeline checks the CFB
 /// header, DIFAT/FAT, directory graph, MiniFAT, exact stream chains, allocation
-/// overlap, and physical-sector reconciliation. A definite structural
+/// overlap, and physical-sector reconciliation. A file that opens only after
+/// the reference-compatible repairs of [`crate::leniency`] completes the
+/// capability with one warning issue counting them. A definite structural
 /// rejection completes the capability with an error issue; the parser may
 /// stop at that first conclusive violation. Encryption, signatures, and
 /// application-level stream semantics are outside this capability and are not
@@ -104,7 +106,8 @@ pub fn validate_source_with_limits(
     }
 
     let report = match SharedOleFile::open_with_limits(source.clone(), source_limits) {
-        Ok(_validated) => complete_report(report_limits),
+        Ok(validated) if validated.tolerance_report().is_clean() => complete_report(report_limits),
+        Ok(validated) => tolerated_report(validated.tolerance_report(), report_limits),
         Err(error) if is_directory_limit_error(&error) => blocked_report(
             "directory stream exceeds the configured CFB validation ceiling",
             report_limits,
@@ -181,6 +184,42 @@ fn complete_report(limits: ValidationLimits) -> Result<ValidateReport, CfbValida
     ValidateReport::try_new(
         [ValidationCheck::new(check, CheckStatus::Complete)],
         [],
+        limits,
+    )
+    .map_err(Into::into)
+}
+
+/// A complete report for a file the ingress opened only after applying
+/// reference-compatible repairs (see [`crate::leniency`]).
+///
+/// The repairs are surfaced as one warning issue counting them, so a
+/// validation of a non-conformant file never reads as a clean pass.
+fn tolerated_report(
+    tolerance: &crate::ToleranceReport,
+    limits: ValidationLimits,
+) -> Result<ValidateReport, CfbValidationError> {
+    let check = CheckCapabilityId::try_new(INGRESS_CHECK, limits)?;
+    let location = IssueLocation::try_new(Some("compound-file"), None, None, None, None, limits)?;
+    let repairs = IssueEvidence::try_new(
+        "repairs.total",
+        EvidenceValue::Count(tolerance.total()),
+        limits,
+    )?;
+    let issue = ValidationIssue::try_new(
+        check.clone(),
+        "cfb.container.tolerated",
+        IssueSeverity::Warning,
+        "The CFB ingress applied reference-compatible repairs to non-conformant metadata",
+        [location],
+        [repairs],
+        None,
+        CompatibilityImpact::ApplicationSpecific,
+        RepairAvailability::Unavailable,
+        limits,
+    )?;
+    ValidateReport::try_new(
+        [ValidationCheck::new(check, CheckStatus::Complete)],
+        [issue],
         limits,
     )
     .map_err(Into::into)

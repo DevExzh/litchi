@@ -5,7 +5,7 @@ use super::consts::{
     TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{AllocationDefect, ToleranceReport};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -1145,6 +1145,25 @@ impl<R: Read + Seek> OleFile<R> {
         self.file_size
     }
 
+    /// Refuses a file whose open needed any repair.
+    ///
+    /// Writers use this on their own output: a structure the crate generated
+    /// must be conformant, so a default read repair there is a writer defect
+    /// rather than a producer quirk to tolerate.
+    pub(crate) fn require_conformant(&self) -> Result<(), OleError> {
+        match self.tolerance.defects().first() {
+            None if self.tolerance.is_clean() => Ok(()),
+            first => Err(OleError::CorruptedFile(format!(
+                "CFB output is not conformant: {} repair(s) needed{}",
+                self.tolerance.total(),
+                first.map_or_else(String::new, |tolerated| format!(
+                    ", first {:?} at {}",
+                    tolerated.defect, tolerated.context
+                )),
+            ))),
+        }
+    }
+
     /// Every reference-compatible repair applied while opening this file.
     ///
     /// The report is empty for a conformant file. See [`crate::leniency`]
@@ -1558,12 +1577,17 @@ impl<R: Read + Seek> OleFile<R> {
         }
         let root_sector_count = usize::try_from(root_size.div_ceil(self.sector_size as u64))
             .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
-        let root_chain = collect_sector_chain_exact(
+        let (root_chain, root_end) = collect_sector_chain_bounded(
             &self.fat,
             root_start,
             root_sector_count,
             "root mini stream",
         )?;
+        if root_end == ChainEnd::Surplus {
+            Self::terminate_chain(&mut self.fat, &root_chain);
+            self.tolerance
+                .record(AllocationDefect::ChainLongerThanSize, 0);
+        }
         self.claim_chain(&root_chain, PhysicalSectorRole::MiniStream)?;
         self.root_chain = root_chain;
 
@@ -1588,8 +1612,8 @@ impl<R: Read + Seek> OleFile<R> {
             if entry.entry_type != STGTY_STREAM {
                 continue;
             }
-            let (is_minifat, start_sector, size) =
-                (entry.is_minifat, entry.start_sector, entry.size);
+            let (sid, is_minifat, start_sector, size) =
+                (entry.sid, entry.is_minifat, entry.start_sector, entry.size);
             if self.sector_size == SECTOR_SIZE_V4
                 && !is_minifat
                 && start_sector == RANGE_LOCK_SECTOR_V4
@@ -1603,12 +1627,17 @@ impl<R: Read + Seek> OleFile<R> {
                     .map_err(|_err| {
                         OleError::CorruptedFile("Mini stream is too large".to_string())
                     })?;
-                mini_scratch.collect_exact(
+                let end = mini_scratch.collect_bounded(
                     &self.minifat,
                     start_sector,
                     sector_count,
                     "mini stream",
                 )?;
+                if end == ChainEnd::Surplus {
+                    Self::terminate_chain(&mut self.minifat, mini_scratch.sectors());
+                    self.tolerance
+                        .record(AllocationDefect::ChainLongerThanSize, sid);
+                }
                 for &sector in mini_scratch.sectors() {
                     let sector_index = usize::try_from(sector).map_err(|_err| {
                         OleError::CorruptedFile(
@@ -1647,16 +1676,38 @@ impl<R: Read + Seek> OleFile<R> {
                     .map_err(|_err| {
                         OleError::CorruptedFile("Regular stream is too large".to_string())
                     })?;
-                regular_scratch.collect_exact(
+                let end = regular_scratch.collect_bounded(
                     &self.fat,
                     start_sector,
                     sector_count,
                     "regular stream",
                 )?;
+                if end == ChainEnd::Surplus {
+                    Self::terminate_chain(&mut self.fat, regular_scratch.sectors());
+                    self.tolerance
+                        .record(AllocationDefect::ChainLongerThanSize, sid);
+                }
                 self.claim_chain(regular_scratch.sectors(), PhysicalSectorRole::RegularStream)?;
             }
         }
         Ok(())
+    }
+
+    /// Ends a chain whose FAT or MiniFAT entries continue past its declared
+    /// length at its last declared sector (leniency audit F7.1).
+    ///
+    /// Only the in-memory table changes: every reader then stops exactly
+    /// where the declared size does, as POI's and LibreOffice's
+    /// size-bounded readers do, and never follows the surplus link. The
+    /// source bytes are not modified.
+    fn terminate_chain(allocation_table: &mut [u32], chain: &[u32]) {
+        if let Some(entry) = chain
+            .last()
+            .and_then(|&last| usize::try_from(last).ok())
+            .and_then(|last| allocation_table.get_mut(last))
+        {
+            *entry = ENDOFCHAIN;
+        }
     }
 
     /// Ensure the physical file is reconciled with the FAT after all chains
@@ -1671,7 +1722,13 @@ impl<R: Read + Seek> OleFile<R> {
     /// every chain walk is bounds-checked against the physical file, so the
     /// markers are inert; rejecting them would refuse files that Word itself
     /// opens.
-    fn validate_physical_sector_layout(&self) -> Result<(), OleError> {
+    ///
+    /// An unclaimed physical sector that still carries an allocation marker
+    /// is what surplus chain links and interrupted saves leave behind. No
+    /// validated chain reaches it and no reader reads it, so it is recorded
+    /// as [`AllocationDefect::UnclaimedAllocatedSector`] rather than
+    /// rejected (leniency audit F7.1).
+    fn validate_physical_sector_layout(&mut self) -> Result<(), OleError> {
         for (sector, role) in self.sector_roles.iter().enumerate() {
             let entry = self.fat.get(sector).copied().ok_or_else(|| {
                 OleError::CorruptedFile(format!(
@@ -1679,9 +1736,13 @@ impl<R: Read + Seek> OleFile<R> {
                 ))
             })?;
             if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
-                return Err(OleError::CorruptedFile(format!(
-                    "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
-                )));
+                let sector = u32::try_from(sector).map_err(|_err| {
+                    OleError::CorruptedFile(format!(
+                        "unclaimed physical sector {sector} does not fit a sector index"
+                    ))
+                })?;
+                self.tolerance
+                    .record(AllocationDefect::UnclaimedAllocatedSector, sector);
             }
         }
         Ok(())
@@ -3982,19 +4043,49 @@ fn walk_chain_to_end(
     Ok(())
 }
 
+/// How a chain walked to its declared length ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChainEnd {
+    /// The last sector the declared length needs links to `ENDOFCHAIN`.
+    Terminated,
+    /// The last sector the declared length needs links onward (or to any
+    /// other marker). The surplus link was not followed.
+    Surplus,
+}
+
+fn chain_exceeds_declared_length(table_name: &str) -> OleError {
+    OleError::CorruptedFile(format!("{table_name} chain exceeds its declared length"))
+}
+
 fn collect_sector_chain_exact(
     allocation_table: &[u32],
     start_sector: u32,
     expected_count: usize,
     table_name: &str,
 ) -> Result<Vec<u32>, OleError> {
+    match collect_sector_chain_bounded(allocation_table, start_sector, expected_count, table_name)?
+    {
+        (sectors, ChainEnd::Terminated) => Ok(sectors),
+        (_, ChainEnd::Surplus) => Err(chain_exceeds_declared_length(table_name)),
+    }
+}
+
+/// Collects exactly the `expected_count` sectors a declared length needs,
+/// with every check of [`collect_sector_chain_exact`] except the terminator
+/// after the last one, which is reported instead of enforced.
+fn collect_sector_chain_bounded(
+    allocation_table: &[u32],
+    start_sector: u32,
+    expected_count: usize,
+    table_name: &str,
+) -> Result<(Vec<u32>, ChainEnd), OleError> {
     if expected_count == 0 {
         if start_sector != ENDOFCHAIN {
             return Err(OleError::CorruptedFile(format!(
                 "Empty {table_name} chain must start with ENDOFCHAIN"
             )));
         }
-        return Ok(Vec::new());
+        return Ok((Vec::new(), ChainEnd::Terminated));
     }
     if start_sector >= MAXREGSECT {
         return Err(OleError::CorruptedFile(format!(
@@ -4007,6 +4098,7 @@ fn collect_sector_chain_exact(
         )));
     }
 
+    let mut end = ChainEnd::Terminated;
     let mut sectors = try_vec_with_capacity(expected_count, "sector-chain entries")?;
     let mut visited = CheckedBitSet::try_with_capacity(allocation_table.len(), "sector-chain map")?;
     let mut sector = start_sector;
@@ -4031,9 +4123,7 @@ fn collect_sector_chain_exact(
         })?;
         if index + 1 == expected_count {
             if next != ENDOFCHAIN {
-                return Err(OleError::CorruptedFile(format!(
-                    "{table_name} chain exceeds its declared length"
-                )));
+                end = ChainEnd::Surplus;
             }
         } else {
             if next == ENDOFCHAIN {
@@ -4049,7 +4139,7 @@ fn collect_sector_chain_exact(
             sector = next;
         }
     }
-    Ok(sectors)
+    Ok((sectors, end))
 }
 
 /// Reusable fallible buffers for exact chain validation.
@@ -4095,6 +4185,10 @@ impl SectorChainScratch {
         self.visited.cover(bit_len, "sector-chain map")
     }
 
+    /// The strict form: a chain that continues past its declared length is
+    /// an error. Open-time validation uses [`Self::collect_bounded`]; this
+    /// form stays as the oracle tests hold the strict checks to.
+    #[cfg(test)]
     fn collect_exact(
         &mut self,
         allocation_table: &[u32],
@@ -4102,6 +4196,27 @@ impl SectorChainScratch {
         expected_count: usize,
         table_name: &str,
     ) -> Result<(), OleError> {
+        match self.collect_bounded(allocation_table, start_sector, expected_count, table_name)? {
+            ChainEnd::Terminated => Ok(()),
+            ChainEnd::Surplus => {
+                // A strict caller treats the surplus as a failed walk, which
+                // leaves no recorded chain behind.
+                self.reset();
+                Err(chain_exceeds_declared_length(table_name))
+            },
+        }
+    }
+
+    /// [`Self::collect_exact`] without enforcing the terminator after the
+    /// last declared sector; see [`collect_sector_chain_bounded`]. On
+    /// success the recorded chain is exactly the declared sectors.
+    fn collect_bounded(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        expected_count: usize,
+        table_name: &str,
+    ) -> Result<ChainEnd, OleError> {
         debug_assert!(
             self.visited.is_clear(),
             "a reusable chain map must be all-clear when a walk starts"
@@ -4114,7 +4229,7 @@ impl SectorChainScratch {
                         "Empty {table_name} chain must start with ENDOFCHAIN"
                     )));
                 }
-                return Ok(());
+                return Ok(ChainEnd::Terminated);
             }
             if start_sector >= MAXREGSECT {
                 return Err(OleError::CorruptedFile(format!(
@@ -4136,6 +4251,7 @@ impl SectorChainScratch {
                     .map_err(|source| OleError::allocation("sector-chain entries", source))?;
             }
             self.prepare_visited(allocation_table.len())?;
+            let mut end = ChainEnd::Terminated;
             let mut sector = start_sector;
             for index in 0..expected_count {
                 let slot = usize::try_from(sector).map_err(|_err| {
@@ -4165,9 +4281,7 @@ impl SectorChainScratch {
                 })?;
                 if index + 1 == expected_count {
                     if next != ENDOFCHAIN {
-                        return Err(OleError::CorruptedFile(format!(
-                            "{table_name} chain exceeds its declared length"
-                        )));
+                        end = ChainEnd::Surplus;
                     }
                 } else {
                     if next == ENDOFCHAIN {
@@ -4183,7 +4297,7 @@ impl SectorChainScratch {
                     sector = next;
                 }
             }
-            Ok(())
+            Ok(end)
         })();
         // Restore the all-clear map. Each `insert` above is immediately
         // followed by the infallible `push` of its sector, so a successful
@@ -5157,13 +5271,20 @@ mod tests {
                 let result = file.validate_physical_sector_layout();
                 let case = format!("{role_label}/{marker_label}");
 
+                assert!(result.is_ok(), "{case}: {result:?}");
+                // An allocated sector no chain claims is recorded, not
+                // rejected (leniency audit F7.1).
                 if role == PhysicalSectorRole::Unclaimed && marker != FREESECT {
-                    assert_claim_error(
-                        result,
-                        &format!("unclaimed physical sector 0 has FAT marker 0x{marker:08X}"),
+                    assert_eq!(
+                        file.tolerance.defects(),
+                        [crate::ToleratedDefect {
+                            defect: AllocationDefect::UnclaimedAllocatedSector.into(),
+                            context: 0,
+                        }],
+                        "{case}"
                     );
                 } else {
-                    assert!(result.is_ok(), "{case}: {result:?}");
+                    assert!(file.tolerance.is_clean(), "{case}");
                 }
                 assert_eq!(file.sector_roles, roles_before, "{case}");
                 assert_eq!(file.fat, fat_before, "{case}");
@@ -5215,10 +5336,10 @@ mod tests {
                 Some("FAT does not contain an entry for physical sector 0"),
             ),
             (
-                "prefix marker beats later missing",
+                "recorded prefix marker before later missing",
                 vec![PhysicalSectorRole::Unclaimed, PhysicalSectorRole::Fat],
                 vec![ENDOFCHAIN],
-                Some("unclaimed physical sector 0 has FAT marker 0xFFFFFFFE"),
+                Some("FAT does not contain an entry for physical sector 1"),
             ),
             (
                 "long padding",

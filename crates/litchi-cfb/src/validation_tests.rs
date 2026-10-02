@@ -227,6 +227,27 @@ fn fat_topology_rejection_is_a_deterministic_structured_issue() {
 }
 
 #[test]
+fn tolerated_repairs_complete_with_a_warning_rather_than_a_clean_pass() {
+    let mut bytes = sample_file();
+    let sector_size = 1usize << u16::from_le_bytes([bytes[0x1e], bytes[0x1f]]);
+    // Append one physical sector that the FAT marks allocated but no chain
+    // claims: a recorded default repair (leniency audit F7.1).
+    bytes.resize(bytes.len() + sector_size, 0);
+    let orphan = bytes.len() / sector_size - 2;
+    let first_fat_sector = read_u32(&bytes, 0x4c) as usize;
+    let marker_offset = (first_fat_sector + 1) * sector_size + orphan * 4;
+    write_u32(&mut bytes, marker_offset, 0xffff_fffe);
+
+    let report = validate_source(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+    assert!(report.is_complete());
+    assert!(!report.has_errors());
+    assert!(!report.has_fatal());
+    assert_eq!(report.issues().len(), 1);
+    assert_eq!(report.issues()[0].code(), "cfb.container.tolerated");
+}
+
+#[test]
 fn directory_topology_rejection_is_a_structured_issue() {
     let mut bytes = sample_file();
     let sector_size = 1usize << u16::from_le_bytes([bytes[0x1e], bytes[0x1f]]);
