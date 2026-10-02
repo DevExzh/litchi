@@ -200,6 +200,8 @@ pub struct AttachedGlossary {
     fields_table: FieldsTable,
     chp_bin_table: Option<ChpBinTable>,
     pap_bin_table: Option<PapBinTable>,
+    /// Repairs made while the glossary's own piece table was parsed.
+    piece_tolerance: crate::leniency::ToleranceReport,
     stylesheet: Option<StyleSheet>,
     revision_authors: RevisionAuthorTable,
     images: Vec<super::super::image::Image>,
@@ -212,11 +214,13 @@ pub struct AttachedGlossary {
 
 impl AttachedGlossary {
     /// Merge the Word-compatible repairs made while the glossary's own
-    /// stylesheet and paragraph bin table were parsed into `report`.
+    /// stylesheet, piece table, and paragraph bin table were parsed into
+    /// `report`.
     pub(crate) fn append_tolerance_to(&self, report: &mut crate::leniency::ToleranceReport) {
         if let Some(stylesheet) = &self.stylesheet {
             report.append(stylesheet.tolerance_report());
         }
+        report.append(&self.piece_tolerance);
         if let Some(table) = &self.pap_bin_table {
             report.append(table.tolerance_report());
         }
@@ -360,6 +364,10 @@ impl AttachedGlossary {
             fields_table,
             chp_bin_table,
             pap_bin_table,
+            piece_tolerance: piece_table
+                .as_ref()
+                .map(|table| table.tolerance_report().clone())
+                .unwrap_or_default(),
             stylesheet,
             revision_authors,
             images,

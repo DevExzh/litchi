@@ -38,8 +38,8 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    PapxDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect, StylesheetDefect,
-    TableDefinitionDefect, Writer,
+    PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
+    StylesheetDefect, TableDefinitionDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -856,5 +856,43 @@ fn section_page_border_defects_are_repaired_and_recorded() {
             (Defect::Section(SectionDefect::BorderColor), 0x702B),
             (Defect::Section(SectionDefect::ReservedBits), 0x702B),
         ]
+    );
+}
+
+/// One `Pcd.prm` that cannot be resolved costs only that piece's modifier.
+/// Previously it silently discarded the whole piece table and with it every
+/// character and paragraph property; now the formatting survives and the
+/// piece is recorded.
+#[test]
+fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
+    let clean = writer_document(|_| {});
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    let original_paragraphs = format!("{:?}", original.paragraphs().expect("paragraphs"));
+
+    let bytes = edit_table_stream(clean, |word, table| {
+        let clx = table_pointer(word, 33);
+        assert_eq!(table[clx], 0x02, "the Writer emits no RgPrc");
+        let lcb = usize::try_from(u32::from_le_bytes(
+            table[clx + 1..clx + 5].try_into().unwrap(),
+        ))
+        .unwrap();
+        let pieces = (lcb - 4) / 12;
+        let pcd = clx + 5 + (pieces + 1) * 4;
+        // Prm1 naming RgPrc entry 9, which does not exist.
+        table[pcd + 6..pcd + 8].copy_from_slice(&((9u16 << 1) | 1).to_le_bytes());
+    });
+    let document = open_degraded(bytes);
+    assert_eq!(
+        format!("{:?}", document.paragraphs().expect("paragraphs")),
+        original_paragraphs,
+        "the piece keeps its text and FKP formatting"
+    );
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::Piece(PieceDefect::PropertyModifier),
+            context: 0,
+        }]
     );
 }

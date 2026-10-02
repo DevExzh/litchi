@@ -1,3 +1,4 @@
+use crate::leniency::{PieceDefect, ToleranceReport};
 use crate::plcf::Plcf;
 /// Piece Table parser for DOC files.
 ///
@@ -118,6 +119,8 @@ pub struct PieceTable {
     /// range lookup skip every earlier piece that cannot overlap without
     /// assuming that physical intervals are disjoint.
     physical_index: Vec<PhysicalPiece>,
+    /// Word-compatible repairs applied while the pieces were parsed.
+    tolerance: ToleranceReport,
 }
 
 #[derive(Debug, Clone)]
@@ -198,6 +201,7 @@ impl PieceTable {
         let plcf = Plcf::parse(plcpcd_data, 8)?;
 
         let mut pieces = Vec::new();
+        let mut tolerance = ToleranceReport::default();
 
         // Extract TextPieces from PlcPcd
         for i in 0..plcf.count() {
@@ -227,8 +231,20 @@ impl PieceTable {
                 fc /= 2;
             }
 
+            // A Prm modifies only its own piece (MS-DOC 2.9.215), and an
+            // unknown isprm or out-of-range Prm1 index carries no reader
+            // rejection rule. Like Word, ignore the uninterpretable modifier
+            // and keep the piece's text and FKP formatting, recording the
+            // piece index — never discard the whole table over one piece.
             let prm = read_u16_le(pcd_data, 6).unwrap_or(0);
-            let property_modifier = Self::resolve_property_modifier(prm, &property_groups)?;
+            let property_modifier = Self::resolve_property_modifier(prm, &property_groups)
+                .unwrap_or_else(|| {
+                    tolerance.record(
+                        PieceDefect::PropertyModifier,
+                        u16::try_from(i).unwrap_or(u16::MAX),
+                    );
+                    Vec::new()
+                });
 
             pieces.push(TextPiece {
                 cp_start,
@@ -247,7 +263,14 @@ impl PieceTable {
         Some(Self {
             pieces,
             physical_index,
+            tolerance,
         })
+    }
+
+    /// Word-compatible repairs applied while the pieces were parsed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 
     /// Get all text pieces.
@@ -448,6 +471,7 @@ mod tests {
         PieceTable {
             pieces,
             physical_index,
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -657,6 +681,54 @@ mod tests {
             Some(groups[0].clone())
         );
         assert!(PieceTable::resolve_property_modifier(3, &groups).is_none());
+    }
+
+    /// One unresolvable Prm costs only its own piece's modifier: the table
+    /// is kept (no silent loss of every bin table) and the piece recorded.
+    #[test]
+    fn unresolvable_piece_modifiers_are_ignored_per_piece() {
+        use crate::leniency::{Defect, ToleratedDefect};
+
+        let clx = |prms: [u16; 2]| {
+            let mut plc = Vec::new();
+            for cp in [0u32, 4, 8] {
+                plc.extend_from_slice(&cp.to_le_bytes());
+            }
+            for (index, prm) in prms.into_iter().enumerate() {
+                plc.extend_from_slice(&0u16.to_le_bytes());
+                plc.extend_from_slice(&(0x4000_0000u32 | (0x800 + index as u32 * 8)).to_le_bytes());
+                plc.extend_from_slice(&prm.to_le_bytes());
+            }
+            let mut clx = vec![0x01];
+            clx.extend_from_slice(&3u16.to_le_bytes());
+            clx.extend_from_slice(&[0x03, 0x24, 0x02]);
+            clx.push(0x02);
+            clx.extend_from_slice(&(plc.len() as u32).to_le_bytes());
+            clx.extend_from_slice(&plc);
+            clx
+        };
+
+        // Prm1 index 0 resolves; Prm1 index 5 does not exist.
+        let table = PieceTable::parse(&clx([1, (5 << 1) | 1])).expect("the table is kept");
+        assert_eq!(table.pieces().len(), 2);
+        assert_eq!(table.pieces()[0].property_modifier(), [0x03, 0x24, 0x02]);
+        assert!(table.pieces()[1].property_modifier().is_empty());
+        assert_eq!(
+            table.tolerance_report().defects(),
+            &[ToleratedDefect {
+                defect: Defect::Piece(PieceDefect::PropertyModifier),
+                context: 1,
+            }]
+        );
+
+        // An unlisted Prm0.isprm (0x01) is ignored the same way.
+        let table = PieceTable::parse(&clx([(1 << 8) | (0x01 << 1), 0])).unwrap();
+        assert!(table.pieces()[0].property_modifier().is_empty());
+        assert_eq!(table.tolerance_report().defects()[0].context, 0);
+
+        // Resolvable modifiers record nothing.
+        let table = PieceTable::parse(&clx([1, 0])).unwrap();
+        assert!(table.tolerance_report().is_clean());
     }
 
     /// A piece table's character positions ascend, but a corrupt or hostile

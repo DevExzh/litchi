@@ -686,6 +686,41 @@ impl SectionDefect {
     }
 }
 
+/// The class of piece-table (`Pcd`) defect the reader repairs the way Word
+/// repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// per-piece repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. The CLX framing itself stays structural:
+/// a malformed `RgPrc`/`Pcdt`/`PlcPcd` still yields no piece table. The
+/// recorded [`ToleratedDefect::context`] is the piece's index in `PlcPcd`
+/// (saturating at `u16::MAX`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PieceDefect {
+    /// A piece's `Pcd.prm` could not be resolved: a `Prm1` index beyond the
+    /// `RgPrc` array or a `Prm0.isprm` MS-DOC 2.9.215 does not list.
+    ///
+    /// The modifier applies to its own piece only, so that piece reads with
+    /// no modifier — its text and FKP formatting are kept, as in Word — and
+    /// every other piece is unaffected. Before this repair one such piece
+    /// silently discarded the whole piece table and with it all character
+    /// and paragraph formatting.
+    PropertyModifier,
+}
+
+impl PieceDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::PropertyModifier => {
+                "ignored the unresolvable piece property modifier; the piece keeps its FKP formatting"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -719,6 +754,8 @@ pub enum Defect {
     Papx(PapxDefect),
     /// A section-property (`SEPX`) defect repaired the way Word repairs it.
     Section(SectionDefect),
+    /// A piece-table (`Pcd`) defect repaired the way Word repairs it.
+    Piece(PieceDefect),
 }
 
 impl Defect {
@@ -736,6 +773,7 @@ impl Defect {
             Self::TableDefinition(defect) => defect.repair(),
             Self::Papx(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
+            Self::Piece(defect) => defect.repair(),
         }
     }
 }
@@ -800,6 +838,12 @@ impl From<SectionDefect> for Defect {
     }
 }
 
+impl From<PieceDefect> for Defect {
+    fn from(defect: PieceDefect) -> Self {
+        Self::Piece(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -815,7 +859,8 @@ pub struct ToleratedDefect {
     /// index in `PlcfBkf` for a [`Defect::Bookmark`], and the cell (or
     /// boundary) index within the row for a [`Defect::TableDefinition`], and
     /// the `PlcfBtePapx` page index for a [`Defect::Papx`], and the SPRM
-    /// opcode for a [`Defect::Section`].
+    /// opcode for a [`Defect::Section`], and the piece index in `PlcPcd` for
+    /// a [`Defect::Piece`].
     pub context: u16,
 }
 
@@ -1026,6 +1071,7 @@ mod tests {
             Defect::from(SectionDefect::BorderColor),
             Defect::from(SectionDefect::EnumValue),
             Defect::from(SectionDefect::Boolean),
+            Defect::from(PieceDefect::PropertyModifier),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
