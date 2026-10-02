@@ -73,6 +73,7 @@ impl Paragraph {
         let mut saw_numpr = false;
         let mut num_id = None;
         let mut level = None;
+        let mut level_clamped = false;
         let mut style_id = None;
         let mut numbering_error = None;
         let mut style_error = None;
@@ -177,17 +178,17 @@ impl Paragraph {
                 },
                 b"ilvl" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
                     let parsed = paragraph_attribute(&element, b"val", decoder).and_then(|raw| {
-                        raw.parse::<u8>()
-                            .ok()
-                            .filter(|value| *value <= 8)
-                            .ok_or_else(|| {
-                                Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
-                            })
+                        crate::numbering::parse_list_level(&raw).ok_or_else(|| {
+                            Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
+                        })
                     });
-                    if let Err(error) =
-                        parsed.and_then(|value| set_paragraph_property(&mut level, value, "ilvl"))
-                    {
-                        numbering_error.get_or_insert(error);
+                    match parsed.and_then(|(value, clamped)| {
+                        set_paragraph_property(&mut level, value, "ilvl").map(|()| clamped)
+                    }) {
+                        Ok(clamped) => level_clamped |= clamped,
+                        Err(error) => {
+                            numbering_error.get_or_insert(error);
+                        },
                     }
                 },
                 _ => {},
@@ -205,6 +206,7 @@ impl Paragraph {
                 } else {
                     None
                 },
+                level_clamped,
             }),
         };
         let style_id = match style_error {
@@ -232,6 +234,9 @@ pub(crate) struct DirectNumbering {
     /// `w:ilvl` (if any), which overrides the level of the style-inherited
     /// numbering.
     pub(crate) level_override: Option<Option<u8>>,
+    /// Set when the authored `w:ilvl` exceeded 8 and was clamped to 8
+    /// ([`crate::leniency::NumberingDefect::LevelOutOfRange`]).
+    pub(crate) level_clamped: bool,
 }
 
 impl Paragraph {

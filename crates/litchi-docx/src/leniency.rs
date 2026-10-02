@@ -14,7 +14,8 @@
 //! Each substitutes the behavior documented on the corresponding defect
 //! variant: [`TextDefect`] (semantic text extraction), [`SettingsDefect`]
 //! (`settings.xml`), [`NumberingDefect`] (`numbering.xml` and list
-//! resolution), [`RevisionDefect`] (tracked-change metadata),
+//! resolution), [`StyleDefect`] (`styles.xml`), [`RevisionDefect`]
+//! (tracked-change metadata),
 //! [`SectionDefect`] (section column models), and [`ContentControlDefect`]
 //! (`w:sdtPr` properties).
 //!
@@ -51,6 +52,9 @@
 //!   and the list resolvers ([`Document::list_items`](crate::Document::list_items)
 //!   and friends) record [`NumberingDefect`]; the
 //!   [`numbering::Collection`](crate::numbering::Collection) carries its own.
+//! - 2.9 — the list resolvers record [`NumberingDefect::LevelOutOfRange`]
+//!   for a paragraph `w:ilvl` above 8 and merge the [`StyleDefect`]s of the
+//!   [`Styles`](crate::styles::Styles) they load, which carries its own.
 //! - 2.5 — [`Document::revisions`](crate::Document::revisions) and the pinned
 //!   source-backed `Document::revisions` record [`RevisionDefect`].
 //! - 2.7 — [`Document::section_inventory`](crate::Document::section_inventory)
@@ -296,6 +300,17 @@ pub enum NumberingDefect {
     /// the other list resolvers; the context is the zero-based index of the
     /// paragraph in the main story, not a byte offset.
     NumPrMissingNumId,
+    /// A paragraph's `w:numPr/w:ilvl` exceeds 8. `ST_DecimalNumber` is
+    /// unbounded, but Word models only list levels 0–8; the level is clamped
+    /// to 8, the deepest level, so the paragraph stays numbered (LibreOffice,
+    /// which models a tenth level, ignores values of 10 and above).
+    /// [`Paragraph::numbering`](crate::Paragraph::numbering) reports the
+    /// clamped level and `Paragraph::style_id` is unaffected.
+    ///
+    /// Recorded by [`Document::list_items`](crate::Document::list_items) and
+    /// the other list resolvers; the context is the zero-based index of the
+    /// paragraph in the main story, not a byte offset.
+    LevelOutOfRange,
 }
 
 impl NumberingDefect {
@@ -322,6 +337,41 @@ impl NumberingDefect {
             Self::NumPrMissingNumId => {
                 "took the numbering from the paragraph style, applying the direct level override"
             },
+            Self::LevelOutOfRange => "clamped the list level to 8, the deepest level Word models",
+        }
+    }
+}
+
+/// The class of `styles.xml` defect the reader repairs per property, the way
+/// Word and LibreOffice read the style.
+///
+/// This enumeration is closed by design. Each repair affects one property of
+/// one style; the rest of the style table loads normally. Each is recorded on
+/// the loaded [`Styles`](crate::styles::Styles)
+/// ([`tolerance_report`](crate::styles::Styles::tolerance_report)) with the
+/// byte offset of the offending element's start tag within the visible
+/// (markup-compatibility processed) styles XML, and the list resolvers
+/// ([`Document::list_items`](crate::Document::list_items) and friends) merge
+/// it into the document-level report. Ill-formed XML, a non-integer level,
+/// and repeated numbering or outline properties stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StyleDefect {
+    /// A style's `w:numPr/w:ilvl` exceeds 8 (`ST_DecimalNumber` is
+    /// unbounded; Word models levels 0–8). The level is clamped to 8.
+    LevelOutOfRange,
+    /// A style's `w:outlineLvl` exceeds 9 (0–8 are heading levels, 9 is body
+    /// text). Word ignores such a value, so the style has no outline level.
+    OutlineLevelOutOfRange,
+}
+
+impl StyleDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::LevelOutOfRange => "clamped the style's list level to 8",
+            Self::OutlineLevelOutOfRange => "ignored the out-of-range outline level",
         }
     }
 }
@@ -475,6 +525,8 @@ pub enum Defect {
     Numbering(NumberingDefect),
     /// A tracked-revision metadata defect repaired the way Word repairs it.
     Revision(RevisionDefect),
+    /// A `styles.xml` property defect repaired per style.
+    Style(StyleDefect),
     /// A section column-model defect repaired the way Word lays it out.
     Section(SectionDefect),
     /// A content-control property defect repaired per control.
@@ -500,6 +552,7 @@ impl Defect {
             Self::Settings(defect) => defect.repair(),
             Self::Numbering(defect) => defect.repair(),
             Self::Revision(defect) => defect.repair(),
+            Self::Style(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
             Self::ContentControl(defect) => defect.repair(),
             Self::Package(defect) => defect.repair(),
@@ -529,6 +582,12 @@ impl From<NumberingDefect> for Defect {
 impl From<RevisionDefect> for Defect {
     fn from(defect: RevisionDefect) -> Self {
         Self::Revision(defect)
+    }
+}
+
+impl From<StyleDefect> for Defect {
+    fn from(defect: StyleDefect) -> Self {
+        Self::Style(defect)
     }
 }
 
@@ -839,10 +898,13 @@ mod tests {
             Defect::from(NumberingDefect::MismatchedOverrideLevel),
             Defect::from(NumberingDefect::MissingNumberingInstance),
             Defect::from(NumberingDefect::NumPrMissingNumId),
+            Defect::from(NumberingDefect::LevelOutOfRange),
             Defect::from(RevisionDefect::MissingAuthor),
             Defect::from(RevisionDefect::InvalidDate),
             Defect::from(RevisionDefect::InvalidDateUtc),
             Defect::from(RevisionDefect::NonIntegerId),
+            Defect::from(StyleDefect::LevelOutOfRange),
+            Defect::from(StyleDefect::OutlineLevelOutOfRange),
             Defect::from(SectionDefect::ColumnWidthMissing),
             Defect::from(SectionDefect::ColumnCountOutOfRange),
             Defect::from(SectionDefect::ColumnCountMismatch),

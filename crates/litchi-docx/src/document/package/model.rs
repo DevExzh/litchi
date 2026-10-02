@@ -128,6 +128,9 @@ impl<'a> Document<'a> {
             }
             Ok(())
         })();
+        if let Some(loaded) = styles.loaded_tolerance() {
+            self.merge_tolerance(loaded);
+        }
         self.merge_tolerance(&repaired);
         outcome.map(|()| items)
     }
@@ -175,6 +178,9 @@ impl<'a> Document<'a> {
             }
             Ok(())
         })();
+        if let Some(loaded) = styles.loaded_tolerance() {
+            self.merge_tolerance(loaded);
+        }
         self.merge_tolerance(&repaired);
         outcome.map(|()| resolved)
     }
@@ -828,8 +834,16 @@ fn resolve_list_item(
     let crate::paragraph::DirectNumbering {
         direct,
         level_override,
+        level_clamped,
     } = paragraph.numbering_with_level_override()?;
     let style_id = paragraph.style_id()?;
+    if level_clamped {
+        // Word models list levels 0-8; a deeper `w:ilvl` uses the deepest.
+        tolerance.record(
+            crate::leniency::NumberingDefect::LevelOutOfRange,
+            paragraph_index as u64,
+        );
+    }
     if level_override.is_some() {
         // A `w:numPr` without `w:numId` (CT_NumPr makes both children
         // optional): Word and LibreOffice take the numbering from the

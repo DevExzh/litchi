@@ -172,6 +172,9 @@ impl Conformance {
 #[derive(Debug, Clone)]
 pub struct StyleDefinitions {
     styles: Arc<[Style]>,
+    /// Repairs applied while the projection was read; see
+    /// [`crate::leniency::StyleDefect`].
+    tolerance: Arc<crate::leniency::ToleranceReport>,
 }
 
 /// Short alias for the read-only style projection.
@@ -190,9 +193,19 @@ impl StyleDefinitions {
         let part = BlobPart::new_shared(part_name, CONTENT_TYPE.to_owned(), Arc::clone(xml));
         let mut styles = Styles::from_part(&part);
         let values = styles.iter()?.cloned().collect::<Vec<_>>();
+        let tolerance = styles.tolerance_report()?.clone();
         Ok(Self {
             styles: Arc::from(values.into_boxed_slice()),
+            tolerance: Arc::new(tolerance),
         })
+    }
+
+    /// Repairs applied while the projected style definitions were read, in
+    /// discovery order (see [`crate::leniency::StyleDefect`]); empty when
+    /// they conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
     }
 
     /// Number of projected style definitions.

@@ -164,6 +164,9 @@ pub struct Styles<'a> {
     part: &'a dyn Part,
     /// Cached list of styles
     style_list: Option<SmallVec<[Style; 32]>>,
+    /// Repairs applied while the style list was loaded; see
+    /// [`crate::leniency::StyleDefect`].
+    tolerance: crate::leniency::ToleranceReport,
 }
 
 impl std::fmt::Debug for Styles<'_> {
@@ -186,7 +189,25 @@ impl<'a> Styles<'a> {
         Self {
             part,
             style_list: None,
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
+    }
+
+    /// Repairs applied while the style list was loaded, in discovery order
+    /// (see [`crate::leniency::StyleDefect`]); empty when `styles.xml`
+    /// conformed. Loads the style list first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the style list cannot be loaded.
+    pub fn tolerance_report(&mut self) -> Result<&crate::leniency::ToleranceReport> {
+        self.ensure_styles_loaded()?;
+        Ok(&self.tolerance)
+    }
+
+    /// The load repairs, when the style list has been loaded.
+    pub(crate) fn loaded_tolerance(&self) -> Option<&crate::leniency::ToleranceReport> {
+        self.style_list.as_ref().map(|_| &self.tolerance)
     }
 
     /// Get the number of styles in the document.
@@ -320,9 +341,16 @@ impl<'a> Styles<'a> {
         let mut in_num_pr = false;
         let mut pending_num_id = None;
         let mut pending_level = None;
+        let mut tolerance = crate::leniency::ToleranceReport::default();
 
         loop {
-            let event = match reader.read_event() {
+            let raw_event = reader.read_event();
+            // Start-tag offset of a property leaf within the visible XML: the
+            // reader has consumed exactly `<`, the tag body, and `/>` (or `>`
+            // for a leaf expanded into a start/end pair).
+            let end = reader.buffer_position();
+            let mut expanded = false;
+            let event = match raw_event {
                 // Markup-compatibility processing re-serializes a part whose
                 // root declares `mc:Ignorable`, expanding every empty element
                 // into a start/end pair. Read a property leaf in either form.
@@ -330,10 +358,13 @@ impl<'a> Styles<'a> {
                     if current_style.is_some()
                         && is_style_property_leaf(e.local_name().as_ref()) =>
                 {
+                    expanded = true;
                     Ok(Event::Empty(e))
                 },
                 other => other,
             };
+            let tag_offset =
+                |body: usize| end.saturating_sub(body as u64 + if expanded { 2 } else { 3 });
             match event {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"style" => {
                     // Start a new style
@@ -416,14 +447,17 @@ impl<'a> Styles<'a> {
                                 ));
                             }
                             let raw = required_style_value(&e, reader.decoder())?;
-                            pending_level = Some(
-                                raw.parse::<u8>()
-                                    .ok()
-                                    .filter(|value| *value <= 8)
-                                    .ok_or_else(|| {
-                                        Error::InvalidFormat(format!("invalid style ilvl '{raw}'"))
-                                    })?,
-                            );
+                            let (level, clamped) = crate::numbering::parse_list_level(&raw)
+                                .ok_or_else(|| {
+                                    Error::InvalidFormat(format!("invalid style ilvl '{raw}'"))
+                                })?;
+                            if clamped {
+                                tolerance.record(
+                                    crate::leniency::StyleDefect::LevelOutOfRange,
+                                    tag_offset(e.len()),
+                                );
+                            }
+                            pending_level = Some(level);
                         },
                         b"outlineLvl" if in_ppr => {
                             if builder.saw_outline {
@@ -433,17 +467,25 @@ impl<'a> Styles<'a> {
                             }
                             builder.saw_outline = true;
                             let raw = required_style_value(&e, reader.decoder())?;
-                            let level = raw.parse::<u8>().map_err(|_source_error| {
-                                Error::InvalidFormat(format!("invalid style outlineLvl '{raw}'"))
-                            })?;
-                            // 0-8 are heading levels; 9 is Word's body-text
-                            // level, which has no outline rank.
-                            if level != BODY_TEXT_OUTLINE_LEVEL {
-                                builder.outline = Some(Outline::new(level).ok_or_else(|| {
-                                    Error::InvalidFormat(format!(
-                                        "invalid style outlineLvl '{raw}'"
-                                    ))
-                                })?);
+                            let digits = raw.strip_prefix('+').unwrap_or(&raw);
+                            if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                                return Err(Error::InvalidFormat(format!(
+                                    "invalid style outlineLvl '{raw}'"
+                                )));
+                            }
+                            // 0-8 are heading levels and 9 is Word's body-text
+                            // level (no outline). Word ignores larger values
+                            // (LibreOffice `DomainMapper`: "invalid value is
+                            // ignored by MS Word"), so they are dropped and
+                            // recorded.
+                            match digits.parse::<u8>() {
+                                Ok(level) if level <= BODY_TEXT_OUTLINE_LEVEL => {
+                                    builder.outline = Outline::new(level);
+                                },
+                                _ => tolerance.record(
+                                    crate::leniency::StyleDefect::OutlineLevelOutOfRange,
+                                    tag_offset(e.len()),
+                                ),
                             }
                         },
                         b"name" => {
@@ -542,6 +584,7 @@ impl<'a> Styles<'a> {
         }
 
         self.style_list = Some(styles);
+        self.tolerance = tolerance;
         Ok(())
     }
 }
@@ -574,8 +617,8 @@ struct StyleBuilder {
     based_on: Option<String>,
     numbering: Option<Paragraph>,
     outline: Option<Outline>,
-    /// Whether a `w:outlineLvl` was seen (the body-text level leaves
-    /// `outline` unset).
+    /// Whether an `w:outlineLvl` was seen (a body-text or ignored value
+    /// leaves `outline` unset).
     saw_outline: bool,
     priority: Option<i32>,
     is_quick_style: bool,
@@ -808,7 +851,7 @@ mod tests {
         with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#, |cycle| {
             assert!(cycle.resolved_numbering("A").is_err());
         });
-        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="9"/></w:numPr></w:pPr></w:style></w:styles>"#, |malformed| {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="x"/><w:numId w:val="1"/></w:numPr></w:pPr></w:style></w:styles>"#, |malformed| {
             assert!(malformed.len().is_err());
         });
     }
@@ -825,11 +868,25 @@ mod tests {
                 Some(Outline::H1)
             );
         });
-        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="10"/></w:pPr></w:style></w:styles>"#, |styles| {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="x"/></w:pPr></w:style></w:styles>"#, |styles| {
             assert!(styles.len().is_err());
         });
-        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Body"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style></w:styles>"#, |styles| {
+        // 9 is Word's body-text level; larger values are ignored and recorded.
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Body"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Deep"><w:pPr><w:outlineLvl w:val="10"/></w:pPr></w:style></w:styles>"#, |styles| {
             assert_eq!(styles.get_by_id("Body").unwrap().unwrap().outline(), None);
+            assert_eq!(styles.get_by_id("Deep").unwrap().unwrap().outline(), None);
+            assert_eq!(
+                styles
+                    .tolerance_report()
+                    .unwrap()
+                    .defects()
+                    .iter()
+                    .map(|tolerated| tolerated.defect)
+                    .collect::<Vec<_>>(),
+                [crate::leniency::Defect::Style(
+                    crate::leniency::StyleDefect::OutlineLevelOutOfRange
+                )]
+            );
         });
     }
 
