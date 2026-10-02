@@ -419,6 +419,10 @@ impl SourceLayout {
     /// represented.
     pub(super) fn parse(source: &[u8]) -> Result<Self, OleError> {
         let ole = OleFile::open(Cursor::new(source))?;
+        // Layout reuse copies source metadata into the output, so only a
+        // conformant source is adopted; one that opened through read repairs
+        // (see `crate::leniency`) is serialized from scratch instead.
+        ole.require_conformant()?;
         let file_size = ole.file_size();
         let index = ole.into_parsed_index();
         let sector_size = index.sector_size;

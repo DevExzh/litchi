@@ -1039,12 +1039,33 @@ impl<R: Read + Seek> OleFile<R> {
         // of their last used sector. A short final sector is therefore accepted
         // and reads as zeroes past the end of the file; a sector that starts at
         // or beyond the end is still rejected.
-        if (num_minifat_sectors == 0) != (first_minifat_sector == ENDOFCHAIN) {
-            return Err(OleError::InvalidFormat(
-                "MiniFAT start sector and sector count disagree".to_string(),
-            ));
-        }
-        if (num_difat_sectors == 0) != (first_difat_sector == ENDOFCHAIN) {
+        // MS-CFB 2.2 defines each table's start sector and count separately.
+        // The count is authoritative (leniency audit F7.5): with a zero count
+        // the start is ignored, as POI (`HeaderBlock`) never reads it and
+        // zero-initializing writers store 0 there; a MiniFAT with a nonzero
+        // count but a special start marker (ENDOFCHAIN or FREESECT, which
+        // LibreOffice accepts as known specials) is read as absent. Both are
+        // recorded below. A DIFAT with a nonzero count and no start sector
+        // still fails: its FAT sector locations would be missing.
+        let mut header_repairs: SmallVec<[(HeaderDefect, u32); 2]> = SmallVec::new();
+        let (first_minifat_sector, num_minifat_sectors) = if num_minifat_sectors == 0 {
+            if first_minifat_sector != ENDOFCHAIN {
+                header_repairs.push((HeaderDefect::MiniFatStartCount, first_minifat_sector));
+            }
+            (ENDOFCHAIN, 0)
+        } else if matches!(first_minifat_sector, ENDOFCHAIN | FREESECT) {
+            header_repairs.push((HeaderDefect::MiniFatStartCount, first_minifat_sector));
+            (ENDOFCHAIN, 0)
+        } else {
+            (first_minifat_sector, num_minifat_sectors)
+        };
+        let first_difat_sector = if num_difat_sectors == 0 && first_difat_sector != ENDOFCHAIN {
+            header_repairs.push((HeaderDefect::DifatStartCount, first_difat_sector));
+            ENDOFCHAIN
+        } else {
+            first_difat_sector
+        };
+        if num_difat_sectors != 0 && first_difat_sector == ENDOFCHAIN {
             return Err(OleError::InvalidFormat(
                 "DIFAT start sector and sector count disagree".to_string(),
             ));
@@ -1123,6 +1144,9 @@ impl<R: Read + Seek> OleFile<R> {
         };
         if reserved_header_bytes {
             ole.tolerance.record(HeaderDefect::ReservedBytes, 0);
+        }
+        for (defect, start) in header_repairs {
+            ole.tolerance.record(defect, start);
         }
 
         // Load FAT (File Allocation Table)

@@ -97,13 +97,18 @@ pub enum HeaderDefect {
     ReservedBytes,
     /// The MiniFAT start sector and sector count disagreed (F7.5).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation. The
-    /// repair treats the count as authoritative, as POI does.
+    /// The count is authoritative, as in POI: a zero count ignores the start
+    /// sector, and a nonzero count with an `ENDOFCHAIN`/`FREESECT` start
+    /// (LibreOffice's known specials) reads as no MiniFAT, so the file opens
+    /// unless a stream needs one. The context is the stored start sector.
     MiniFatStartCount,
-    /// The DIFAT start sector and sector count disagreed (F7.5).
+    /// The DIFAT sector count was zero but the start sector was not
+    /// `ENDOFCHAIN` (F7.5).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation. The
-    /// repair treats the count as authoritative, as POI does.
+    /// The start sector is ignored, as POI never reads it for a zero count.
+    /// A nonzero count without a start sector stays fatal, because the FAT
+    /// sector locations it should hold would be missing. The context is the
+    /// stored start sector.
     DifatStartCount,
 }
 

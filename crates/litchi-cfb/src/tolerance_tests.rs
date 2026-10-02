@@ -561,3 +561,56 @@ fn nonzero_reserved_header_bytes_are_ignored_and_recorded() {
     );
     assert_eq!(read_both(&bytes, &["Data"]), data);
 }
+
+// --- F7.5: MiniFAT/DIFAT start-sector vs count cross-check ---
+
+#[test]
+fn table_start_sectors_disagreeing_with_a_zero_count_are_ignored_and_recorded() {
+    let data = pattern(5000, 13);
+    let bytes = build(&[(&["Data"], &data)]);
+    assert_eq!(read_u32(&bytes, 0x40), 0, "fixture has no MiniFAT");
+    assert_eq!(read_u32(&bytes, 0x48), 0, "fixture has no DIFAT");
+    assert!(open_report(&bytes).is_clean());
+
+    // Zero-initializing writers store sector 0 as both start sectors.
+    let mut zeroed = bytes.clone();
+    write_u32(&mut zeroed, 0x3c, 0);
+    write_u32(&mut zeroed, 0x44, 0);
+    assert_eq!(
+        recorded(&open_report(&zeroed)),
+        [
+            (crate::HeaderDefect::MiniFatStartCount.into(), 0),
+            (crate::HeaderDefect::DifatStartCount.into(), 0),
+        ]
+    );
+    assert_eq!(read_both(&zeroed, &["Data"]), data);
+
+    // A nonzero MiniFAT count with no start sector reads as no MiniFAT.
+    let mut counted = bytes;
+    write_u32(&mut counted, 0x40, 1);
+    assert_eq!(
+        recorded(&open_report(&counted)),
+        [(
+            crate::HeaderDefect::MiniFatStartCount.into(),
+            crate::consts::ENDOFCHAIN
+        )]
+    );
+    assert_eq!(read_both(&counted, &["Data"]), data);
+}
+
+#[test]
+fn table_start_count_repairs_never_invent_missing_tables() {
+    // A mini stream still needs the MiniFAT the header no longer locates.
+    let mut mini = build(&[(&["Data"], b"small")]);
+    assert_ne!(read_u32(&mini, 0x40), 0);
+    write_u32(&mut mini, 0x3c, crate::consts::ENDOFCHAIN);
+    assert!(OleFile::open(Cursor::new(mini)).is_err());
+
+    // A nonzero DIFAT count without a start sector stays fatal.
+    let mut difat = build(&[(&["Data"], &pattern(5000, 14))]);
+    write_u32(&mut difat, 0x48, 1);
+    assert!(matches!(
+        OleFile::open(Cursor::new(difat)),
+        Err(OleError::InvalidFormat(message)) if message.contains("DIFAT start sector")
+    ));
+}
