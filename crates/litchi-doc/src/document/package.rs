@@ -215,8 +215,8 @@ impl Document {
             AuxiliaryTableDefect::SmartTags,
             &mut tolerance,
         );
-        let rsids = auxiliary_or_absent(
-            DocumentRsids::parse(&fib, &table_stream),
+        let rsids = auxiliary_recorded(
+            DocumentRsids::parse_recording(&fib, &table_stream),
             AuxiliaryTableDefect::Rsids,
             &mut tolerance,
         );

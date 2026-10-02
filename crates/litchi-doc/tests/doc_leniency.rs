@@ -952,3 +952,44 @@ fn container_repairs_join_the_document_report() {
         "only container repairs are recorded: {defects:?}"
     );
 }
+
+/// MS-DOC 2.9.203's `PLRSID.reserved1` constant is a writer rule on an inert
+/// lookup table: a Word document carrying another value keeps its RSIDs and
+/// records the repair.
+#[test]
+fn a_wrong_plrsid_reserved_marker_is_ignored_and_recorded() {
+    let bytes = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/poi/test-data/document/47950_normal.doc"),
+    )
+    .expect("fixture");
+    let rsid_defect = Defect::Rsid(litchi_doc::RsidDefect::ReservedMarker);
+    let original = open_degraded(bytes.clone());
+    assert_eq!(original.rsids().expect("PLRSID").ids().len(), 3);
+    assert!(
+        original
+            .tolerance_report()
+            .defects()
+            .iter()
+            .all(|tolerated| tolerated.defect != rsid_defect)
+    );
+
+    let bytes = edit_table_stream(bytes, |word, table| {
+        let plrsid = table_pointer(word, 113);
+        table[plrsid + 12..plrsid + 16].copy_from_slice(&0xBEEFu32.to_le_bytes());
+    });
+    let document = open_degraded(bytes);
+    assert_eq!(
+        document.rsids().expect("PLRSID still read").ids(),
+        original.rsids().unwrap().ids()
+    );
+    assert!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .any(|tolerated| tolerated.defect == rsid_defect && tolerated.context == 0xBEEF),
+        "{:?}",
+        document.tolerance_report().defects()
+    );
+}

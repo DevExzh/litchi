@@ -721,6 +721,33 @@ impl PieceDefect {
     }
 }
 
+/// The class of revision-save identifier table (`PLRSID`) defect the reader
+/// repairs the way Word repairs it.
+///
+/// This enumeration is closed by design. RSIDs only drive per-session change
+/// UI, so Word ignores an odd table header. A `cbRsidInFile` or
+/// `cbHeadExtraInFile` other than the mandated value changes the element
+/// layout and leaves the table unreadable; that degrades the whole table to
+/// absent ([`AuxiliaryTableDefect::Rsids`]) instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RsidDefect {
+    /// `PLRSID.reserved1` was not 229 (MS-DOC 2.9.203). The field describes
+    /// nothing, so it is ignored and the identifiers are read. The recorded
+    /// [`ToleratedDefect::context`] is the stored value.
+    ReservedMarker,
+}
+
+impl RsidDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ReservedMarker => "ignored the PLRSID reserved1 marker",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -760,6 +787,9 @@ pub enum Defect {
     /// document's OLE file was opened; see [`litchi_cfb::Defect`] for the
     /// closed set of container repairs and their substitutions.
     Container(litchi_cfb::Defect),
+    /// A revision-save identifier table (`PLRSID`) defect repaired the way
+    /// Word repairs it.
+    Rsid(RsidDefect),
 }
 
 impl Defect {
@@ -779,6 +809,7 @@ impl Defect {
             Self::Section(defect) => defect.repair(),
             Self::Piece(defect) => defect.repair(),
             Self::Container(defect) => defect.repair(),
+            Self::Rsid(defect) => defect.repair(),
         }
     }
 }
@@ -849,6 +880,12 @@ impl From<PieceDefect> for Defect {
     }
 }
 
+impl From<RsidDefect> for Defect {
+    fn from(defect: RsidDefect) -> Self {
+        Self::Rsid(defect)
+    }
+}
+
 impl From<litchi_cfb::Defect> for Defect {
     fn from(defect: litchi_cfb::Defect) -> Self {
         Self::Container(defect)
@@ -873,7 +910,8 @@ pub struct ToleratedDefect {
     /// opcode for a [`Defect::Section`], the piece index in `PlcPcd` for
     /// a [`Defect::Piece`], and the compound-file context (a directory SID,
     /// sector index, or header field value — see
-    /// [`litchi_cfb::ToleratedDefect::context`]) for a [`Defect::Container`].
+    /// [`litchi_cfb::ToleratedDefect::context`]) for a [`Defect::Container`],
+    /// and the stored `reserved1` value for a [`Defect::Rsid`].
     ///
     /// The field is 32 bits wide so container contexts are carried exactly;
     /// every DOC-level context fits in 16 bits.
@@ -927,7 +965,7 @@ impl ToleranceReport {
     }
 
     /// [`Self::record`] for a 32-bit context (container repairs).
-    fn record_wide(&mut self, defect: impl Into<Defect>, context: u32) {
+    pub(crate) fn record_wide(&mut self, defect: impl Into<Defect>, context: u32) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
             self.defects.push(ToleratedDefect {
                 defect: defect.into(),
@@ -1103,6 +1141,7 @@ mod tests {
             Defect::from(SectionDefect::EnumValue),
             Defect::from(SectionDefect::Boolean),
             Defect::from(PieceDefect::PropertyModifier),
+            Defect::from(RsidDefect::ReservedMarker),
             Defect::from(litchi_cfb::Defect::Allocation(
                 litchi_cfb::AllocationDefect::ChainLongerThanSize,
             )),

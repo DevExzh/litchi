@@ -5,6 +5,7 @@
 //! drive revision behavior.
 
 use super::fib::FileInformationBlock;
+use crate::leniency::{RsidDefect, ToleranceReport};
 use crate::package::{Error as PackageError, Result};
 
 /// Table-pointer index of `fcPlrsid`/`lcbPlrsid`.
@@ -45,12 +46,25 @@ impl DocumentRsids {
 
     /// Parse the `PLRSID` from the table stream, or `None` when the document
     /// predates revision-save identifiers.
+    ///
+    /// Word-compatible repairs are applied but their record is discarded; use
+    /// [`Self::parse_recording`] to enumerate them.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<DocumentRsids>> {
+        Self::parse_recording(fib, table_stream).map(|(table, _)| table)
+    }
+
+    /// Parse the `PLRSID`, returning the repairs [`RsidDefect`] lists
+    /// alongside the table.
+    pub(crate) fn parse_recording(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Result<(Option<DocumentRsids>, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
         let Some((offset, length)) = fib.get_table_pointer(PLRSID) else {
-            return Ok(None);
+            return Ok((None, tolerance));
         };
         if length == 0 {
-            return Ok(None);
+            return Ok((None, tolerance));
         }
         let start = usize::try_from(offset)
             .map_err(|_| corrupted("PLRSID offset does not fit in memory"))?;
@@ -63,11 +77,17 @@ impl DocumentRsids {
         let data = table_stream
             .get(start..end)
             .ok_or_else(|| corrupted("PLRSID extends past the table stream"))?;
-        Self::parse_bytes(data).map(Some)
+        let table = Self::parse_bytes(data, &mut tolerance)?;
+        Ok((Some(table), tolerance))
     }
 
     /// Parse one `PLRSID` structure.
-    fn parse_bytes(data: &[u8]) -> Result<DocumentRsids> {
+    ///
+    /// `cbRsidInFile` and `cbHeadExtraInFile` determine the element layout,
+    /// so a value other than the mandated one leaves the table unreadable
+    /// (the caller degrades it to absent). `reserved1` describes nothing;
+    /// like Word, a value other than 229 is ignored and recorded.
+    fn parse_bytes(data: &[u8], tolerance: &mut ToleranceReport) -> Result<DocumentRsids> {
         if data.len() < HEADER_LEN {
             return Err(corrupted("PLRSID header is truncated"));
         }
@@ -82,8 +102,9 @@ impl DocumentRsids {
         if read_u32(8) != CB_HEAD_EXTRA_IN_FILE {
             return Err(corrupted("PLRSID cbHeadExtraInFile is not 8"));
         }
-        if read_u32(12) != RESERVED1 {
-            return Err(corrupted("PLRSID reserved1 is not 229"));
+        let reserved1 = read_u32(12);
+        if reserved1 != RESERVED1 {
+            tolerance.record_wide(RsidDefect::ReservedMarker, reserved1);
         }
         let expected = HEADER_LEN
             .checked_add(
@@ -125,31 +146,54 @@ mod tests {
 
     #[test]
     fn parses_identifier_table() {
-        let parsed = DocumentRsids::parse_bytes(&plrsid(&[0x0042_0001, 0x00FF_AA55])).unwrap();
+        let mut tolerance = ToleranceReport::default();
+        let parsed =
+            DocumentRsids::parse_bytes(&plrsid(&[0x0042_0001, 0x00FF_AA55]), &mut tolerance)
+                .unwrap();
+        assert!(tolerance.is_clean());
         assert_eq!(parsed.ids(), &[0x0042_0001, 0x00FF_AA55]);
         assert!(parsed.contains(0x00FF_AA55));
         assert!(!parsed.contains(1));
     }
 
+    /// MS-DOC 2.9.203's `reserved1` constant is a writer rule over an inert
+    /// lookup table: a different value is ignored and recorded.
+    #[test]
+    fn ignores_and_records_a_wrong_reserved_marker() {
+        use crate::leniency::{Defect, ToleratedDefect};
+
+        let mut wrong_marker = plrsid(&[7]);
+        wrong_marker[12..16].copy_from_slice(&0x1234u32.to_le_bytes());
+        let mut tolerance = ToleranceReport::default();
+        let parsed = DocumentRsids::parse_bytes(&wrong_marker, &mut tolerance).unwrap();
+        assert_eq!(parsed.ids(), &[7]);
+        assert_eq!(
+            tolerance.defects(),
+            &[ToleratedDefect {
+                defect: Defect::Rsid(RsidDefect::ReservedMarker),
+                context: 0x1234,
+            }]
+        );
+    }
+
     #[test]
     fn rejects_malformed_tables() {
         // Truncated header.
-        assert!(DocumentRsids::parse_bytes(&plrsid(&[1])[..20]).is_err());
+        assert!(
+            DocumentRsids::parse_bytes(&plrsid(&[1])[..20], &mut ToleranceReport::default())
+                .is_err()
+        );
         // Wrong cbRsidInFile.
         let mut wrong_size = plrsid(&[1]);
         wrong_size[4] = 8;
-        assert!(DocumentRsids::parse_bytes(&wrong_size).is_err());
+        assert!(DocumentRsids::parse_bytes(&wrong_size, &mut ToleranceReport::default()).is_err());
         // Wrong cbHeadExtraInFile.
         let mut wrong_extra = plrsid(&[1]);
         wrong_extra[8] = 4;
-        assert!(DocumentRsids::parse_bytes(&wrong_extra).is_err());
-        // Wrong reserved1 marker.
-        let mut wrong_marker = plrsid(&[1]);
-        wrong_marker[12] = 0;
-        assert!(DocumentRsids::parse_bytes(&wrong_marker).is_err());
+        assert!(DocumentRsids::parse_bytes(&wrong_extra, &mut ToleranceReport::default()).is_err());
         // Count disagreeing with the table size.
         let mut wrong_count = plrsid(&[1]);
         wrong_count[0] = 2;
-        assert!(DocumentRsids::parse_bytes(&wrong_count).is_err());
+        assert!(DocumentRsids::parse_bytes(&wrong_count, &mut ToleranceReport::default()).is_err());
     }
 }
