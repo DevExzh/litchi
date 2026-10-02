@@ -116,8 +116,8 @@ pub(super) struct SourceInner {
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: ReadLimits,
     /// Every non-structural defect repaired while the source was opened, in
-    /// discovery order. Empty until an open-time recording site lands; repairs
-    /// a deferred slide read performs surface at that read's own entry point.
+    /// discovery order: the slide-list repairs of audit finding 6.7. Repairs a
+    /// deferred slide read performs surface at that read's own entry point.
     /// See [`crate::leniency`].
     pub(super) tolerance: crate::leniency::ToleranceReport,
 }
@@ -1151,7 +1151,8 @@ impl SourceBackedPresentation {
         limits: ReadLimits,
     ) -> Result<Self> {
         package.check_execution()?;
-        let catalog = source_catalog(&package)?;
+        let mut tolerance = crate::leniency::ToleranceReport::default();
+        let catalog = source_catalog(&package, Some(&mut tolerance))?;
         package.check_execution()?;
 
         Ok(Self {
@@ -1160,7 +1161,7 @@ impl SourceBackedPresentation {
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
                 limits,
-                tolerance: crate::leniency::ToleranceReport::default(),
+                tolerance,
             }),
         })
     }
@@ -1598,7 +1599,8 @@ impl SourceBackedPresentationEditor {
         limits: ReadLimits,
     ) -> Result<Self> {
         package.check_execution()?;
-        let catalog = source_catalog(&package)?;
+        // The lossless editor keeps the strict slide-list contract.
+        let catalog = source_catalog(&package, None)?;
         package.check_execution()?;
         let package_relationships = Arc::from(catalog.package_relationships);
         let presentation_binding = Arc::new(catalog.presentation_binding);
@@ -4865,7 +4867,12 @@ fn source_slide_output_limit(limits: ReadLimits) -> usize {
         .min(crate::shape::Limits::DEFAULT.output_bytes())
 }
 
-fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
+/// Build the source catalog. With `tolerance` the slide list is read with
+/// the audit-6.7 repairs recorded there; without it, strictly (editors).
+fn source_catalog(
+    package: &SourceBackedPackage,
+    tolerance: Option<&mut crate::leniency::ToleranceReport>,
+) -> Result<SourceCatalog> {
     #[cfg(test)]
     SOURCE_CATALOG_BUILDS.set(SOURCE_CATALOG_BUILDS.get() + 1);
     package.check_execution()?;
@@ -4873,7 +4880,11 @@ fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
     let presentation = SourcePart::from_view(&view, view.data()?)?;
     package.check_execution()?;
     let presentation_binding = part_binding(package, &view)?;
-    let references = PresentationPart::from_part(&presentation)?.slide_references()?;
+    let main = PresentationPart::from_part(&presentation)?;
+    let references = match tolerance {
+        Some(tolerance) => main.slide_references_with_tolerance(tolerance)?,
+        None => main.slide_references_strict()?,
+    };
     package.check_execution()?;
     let slides = validate_slide_graph(package, &view, &references)?;
     package.check_execution()?;

@@ -21,7 +21,7 @@ use crate::{Error, Package, Result, SlideCopyRefusal, SlideRemovalRefusal};
 fn legacy_capture_catalog(package: &Package) -> Result<Vec<super::Slide>> {
     let presentation = crate::parts::PresentationPart::from_package(&package.opc)?;
     let presentation_name = presentation.part().partname().clone();
-    let references = presentation.slide_references()?;
+    let references = presentation.slide_references_strict()?;
     let view = crate::presentation::Presentation::new(presentation, &package.opc);
     let contextual = view.slides()?;
     if references.len() != contextual.len() {

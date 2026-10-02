@@ -17,8 +17,8 @@ pub struct Package {
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
     /// Every non-structural defect repaired while the package was opened, in
-    /// discovery order. Empty until an open-time recording site lands; repairs
-    /// a lazy slide parse performs surface at that parse's own entry point.
+    /// discovery order: the slide-list repairs of audit finding 6.7. Repairs a
+    /// lazy slide parse performs surface at that parse's own entry point.
     /// See [`crate::leniency`].
     pub(crate) tolerance: crate::leniency::ToleranceReport,
     /// Payload digests of `opc`'s parts, refreshed at every

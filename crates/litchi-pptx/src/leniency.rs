@@ -34,10 +34,12 @@
 //!
 //! * The owned document handles, [`crate::Package`] and
 //!   [`crate::SourceBackedPresentation`], carry the report assembled while
-//!   the package was opened and expose it as `tolerance_report()`. No
-//!   open-time repair exists yet, so for now these reports are always empty;
-//!   open-time recording sites will thread `&mut ToleranceReport` down the
-//!   constructor.
+//!   the package was opened and expose it as `tolerance_report()`. Opening
+//!   reads the presentation slide list, so its [`PresentationDefect`]
+//!   repairs (audit finding 6.7) are recorded here, stamped with the
+//!   presentation part name. For [`crate::Package`] the open-time catalog
+//!   read is advisory: a slide list it cannot read stays the lazy
+//!   accessors' error, exactly as before.
 //! * A lazy parse carries the repairs it performed itself, the way
 //!   `PapBinTable::tolerance_report` lets litchi-doc aggregate part reports
 //!   after the fact. [`crate::Slide::animations`] (and the free
@@ -157,6 +159,25 @@
 //! original value. Duplicate attributes, nested markup inside typed
 //! effects, XML well-formedness, and the read limits stay hard errors.
 //!
+//! # Slide-list repairs (audit finding 6.7)
+//!
+//! [`crate::parts::PresentationPart::slide_references`] — behind
+//! [`crate::Presentation::slides`] and the source-backed catalog — keeps the
+//! first `p:sldId` carrying a slide ID, relationship ID, or target part and
+//! skips a later repeat ([`PresentationDefect::DuplicateSlideId`],
+//! [`PresentationDefect::DuplicateSlideRelationship`],
+//! [`PresentationDefect::DuplicateSlideTarget`], context = the skipped
+//! entry's slide ID), mirroring LibreOffice's tolerant
+//! `presentationfragmenthandler` import. Foreign children (their subtrees are
+//! skipped), attributes, and character data inside `p:sldIdLst` are ignored
+//! and recorded as [`PresentationDefect::SlideListContent`]. An entry
+//! missing `id`/`r:id`, an ID outside `ST_SlideId` (256..2^31), a stray
+//! `p:sldId` outside the list, repeated lists, XML well-formedness, and the
+//! slide-count limit stay hard errors. The lossless edit planners —
+//! [`crate::SourceBackedPresentationEditor`], cross-presentation copy, and
+//! the opened-presentation transactions — keep the strict contract and
+//! refuse a slide list that needed a repair.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -253,6 +274,8 @@ pub enum Defect {
     Shape(ShapeDefect),
     /// A slide-transition defect repaired on the one transition carrying it.
     Transition(TransitionDefect),
+    /// A presentation slide-list defect repaired when the package is opened.
+    Presentation(PresentationDefect),
 }
 
 impl Defect {
@@ -263,6 +286,7 @@ impl Defect {
             Self::Timing(defect) => defect.repair(),
             Self::Shape(defect) => defect.repair(),
             Self::Transition(defect) => defect.repair(),
+            Self::Presentation(defect) => defect.repair(),
         }
     }
 }
@@ -407,6 +431,61 @@ impl TransitionDefect {
     }
 }
 
+/// The class of presentation slide-list defect the catalog reader repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant. The
+/// repairs apply to `p:sldIdLst` in the presentation part and are recorded
+/// when the package is opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PresentationDefect {
+    /// A `p:sldId` repeated the slide ID (`@id`) of an earlier entry.
+    ///
+    /// `CT_SlideIdList` states no uniqueness constraint; LibreOffice reads
+    /// every entry (overwriting its ID map on repeats) and `PowerPoint` opens
+    /// decks with duplicated IDs, which script generators produce. The
+    /// reader keeps the first entry and skips the repeat. The context is the
+    /// repeated slide ID.
+    DuplicateSlideId,
+    /// A `p:sldId` repeated the relationship ID (`r:id`) of an earlier
+    /// entry, so it would list the same slide twice. The first entry wins;
+    /// the context is the skipped entry's slide ID.
+    DuplicateSlideRelationship,
+    /// A `p:sldId` resolved, through a distinct relationship, to the same
+    /// slide part as an earlier entry. The first entry wins; the context is
+    /// the skipped entry's slide ID.
+    DuplicateSlideTarget,
+    /// `p:sldIdLst` carried something other than `p:sldId` children and
+    /// namespace declarations: a foreign child element (its subtree is
+    /// skipped), a non-namespace attribute, or non-whitespace character
+    /// data. The schema admits none of it, and `PowerPoint` ignores what it
+    /// does not understand; the reader ignores it. The context is `0`.
+    SlideListContent,
+}
+
+impl PresentationDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::DuplicateSlideId => "skipped the slide-list entry repeating an earlier slide ID",
+            Self::DuplicateSlideRelationship => {
+                "skipped the slide-list entry repeating an earlier relationship ID"
+            },
+            Self::DuplicateSlideTarget => {
+                "skipped the slide-list entry repeating an earlier slide part"
+            },
+            Self::SlideListContent => "ignored foreign content inside the slide list",
+        }
+    }
+}
+
+impl From<PresentationDefect> for Defect {
+    fn from(defect: PresentationDefect) -> Self {
+        Self::Presentation(defect)
+    }
+}
+
 impl From<TransitionDefect> for Defect {
     fn from(defect: TransitionDefect) -> Self {
         Self::Transition(defect)
@@ -444,7 +523,10 @@ pub struct ToleratedDefect {
     ///   the part locates it; the context is the offending spoke count for
     ///   [`TransitionDefect::SpokeCount`], the original time (saturated to
     ///   `u32::MAX`) for [`TransitionDefect::TimeClamped`], and `0`
-    ///   otherwise.
+    ///   otherwise;
+    /// * [`Defect::Presentation`] — the slide ID (`p:sldId@id`) of the
+    ///   skipped slide-list entry, or `0` for
+    ///   [`PresentationDefect::SlideListContent`].
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -655,6 +737,10 @@ mod tests {
             Defect::from(TransitionDefect::EffectToken),
             Defect::from(TransitionDefect::AttributeToken),
             Defect::from(TransitionDefect::TimeClamped),
+            Defect::from(PresentationDefect::DuplicateSlideId),
+            Defect::from(PresentationDefect::DuplicateSlideRelationship),
+            Defect::from(PresentationDefect::DuplicateSlideTarget),
+            Defect::from(PresentationDefect::SlideListContent),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

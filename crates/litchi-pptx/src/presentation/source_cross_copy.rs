@@ -854,8 +854,8 @@ fn prepare(
         execution_context,
     )?;
 
-    let source_refs = source_main.slide_references()?;
-    let destination_refs = destination_main.slide_references()?;
+    let source_refs = source_main.slide_references_strict()?;
+    let destination_refs = destination_main.slide_references_strict()?;
     validate_slide_refs(&source_refs, "source", execution_context)?;
     validate_slide_refs(&destination_refs, "destination", execution_context)?;
     if source_refs.len() != source.inner.slides.len()

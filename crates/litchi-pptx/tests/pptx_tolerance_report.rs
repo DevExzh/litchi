@@ -634,3 +634,98 @@ fn out_of_domain_transition_tokens_and_times_are_repaired_and_recorded() {
         ]
     );
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.7: presentation slide-list uniqueness and child hygiene.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::PresentationDefect;
+
+const PRESENTATION: &str = "/ppt/presentation.xml";
+
+fn deck_with_slide_list(edit: impl FnOnce(&str) -> String) -> Vec<u8> {
+    deck_bytes_with_part(PRESENTATION, patched_part(PRESENTATION, edit))
+}
+
+#[test]
+fn slide_list_defects_are_repaired_first_wins_and_recorded_at_open() {
+    let deck = deck_with_slide_list(|xml| {
+        xml.replace("<p:sldIdLst>", r#"<p:sldIdLst foo="1">"#)
+            .replace(
+                r#"<p:sldId id="256" r:id="rId2"/>"#,
+                concat!(
+                    r#"<p:sldId id="256" r:id="rId2"/>"#,
+                    r#"<p:sldId id="256" r:id="rId6"/>"#,
+                    r#"<p:sldId id="300" r:id="rId2"/>"#,
+                    r#"<x:future xmlns:x="urn:x"><p:sldId id="301" r:id="rId9"/></x:future>"#,
+                    "junk",
+                ),
+            )
+    });
+
+    let content = Defect::Presentation(PresentationDefect::SlideListContent);
+    let expected = [
+        (content, 0, Some(PRESENTATION)),
+        (
+            Defect::Presentation(PresentationDefect::DuplicateSlideId),
+            256,
+            Some(PRESENTATION),
+        ),
+        (
+            Defect::Presentation(PresentationDefect::DuplicateSlideRelationship),
+            300,
+            Some(PRESENTATION),
+        ),
+        (content, 0, Some(PRESENTATION)),
+        (content, 0, Some(PRESENTATION)),
+    ];
+
+    let package = Package::from_vec(deck.clone()).unwrap();
+    assert_eq!(located(package.tolerance_report()), expected);
+    let presentation = package.presentation().unwrap();
+    let ids: Vec<u32> = presentation
+        .slide_references()
+        .unwrap()
+        .iter()
+        .map(litchi_pptx::parts::SlideReference::id)
+        .collect();
+    assert_eq!(ids, [256, 258, 257, 259, 260, 261]);
+    assert_eq!(presentation.slides().unwrap().len(), 6);
+
+    let source = SourceBackedPresentation::from_read_at(std::sync::Arc::new(
+        litchi_core::source::OwnedSource::new(deck.clone()),
+    ))
+    .unwrap();
+    assert_eq!(located(source.tolerance_report()), expected);
+
+    // The lossless editor keeps the strict slide-list contract.
+    assert!(
+        litchi_pptx::SourceBackedPresentationEditor::from_read_at(std::sync::Arc::new(
+            litchi_core::source::OwnedSource::new(deck),
+        ))
+        .is_err()
+    );
+}
+
+#[test]
+fn conformant_slide_list_records_nothing_and_invalid_entries_stay_fatal() {
+    let package = Package::from_bytes(SHAPES).unwrap();
+    assert_clean(package.tolerance_report());
+
+    // An entry whose own value is outside ST_SlideId is grammar, not a
+    // uniqueness repair: the slide list still fails, lazily, as before.
+    let invalid = deck_with_slide_list(|xml| {
+        xml.replace(
+            r#"<p:sldId id="256" r:id="rId2"/>"#,
+            r#"<p:sldId id="255" r:id="rId2"/>"#,
+        )
+    });
+    let package = Package::from_vec(invalid).unwrap();
+    assert_clean(package.tolerance_report());
+    assert!(
+        package
+            .presentation()
+            .and_then(|presentation| presentation.slide_references())
+            .is_err()
+    );
+}

@@ -11,6 +11,7 @@ use super::{
     MAX_SLIDES, expected_main_content_type, invalid, processed_xml, relationship_attribute,
     validate_content_type,
 };
+use crate::leniency::{PresentationDefect, ToleranceReport};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -113,10 +114,56 @@ impl<'a> PresentationPart<'a> {
 
     /// Read the ordered slide references without hydrating slide parts.
     ///
+    /// Slide-list defects `PowerPoint` and LibreOffice read past are
+    /// repaired (audit finding 6.7): a `p:sldId` repeating an earlier entry's
+    /// slide ID, relationship ID, or target part is skipped (first wins), and
+    /// foreign children, attributes, or character data inside `p:sldIdLst`
+    /// are ignored. The owned handles record these repairs at open
+    /// ([`crate::Package::tolerance_report`],
+    /// [`crate::SourceBackedPresentation::tolerance_report`]); use
+    /// [`Self::slide_references_with_tolerance`] to collect them here.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn slide_references(&self) -> Result<Vec<SlideReference>> {
+        self.slide_references_with_tolerance(&mut ToleranceReport::default())
+    }
+
+    /// [`Self::slide_references`], appending each repair to `tolerance`
+    /// stamped with the presentation part name and the skipped entry's
+    /// slide ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn slide_references_with_tolerance(
+        &self,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Vec<SlideReference>> {
+        let mut repairs = ToleranceReport::default();
+        let references = self.scan_slide_references(Some(&mut repairs))?;
+        repairs.locate_in_part(self.part.partname().as_str());
+        tolerance.append(&repairs);
+        Ok(references)
+    }
+
+    /// The pre-leniency slide-list contract, for lossless edit planners:
+    /// every defect [`Self::slide_references`] repairs is an error instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide list is malformed or carries a defect.
+    pub(crate) fn slide_references_strict(&self) -> Result<Vec<SlideReference>> {
+        self.scan_slide_references(None)
+    }
+
+    /// Scan `p:sldIdLst`, repairing into `tolerance` or, without one,
+    /// rejecting every repairable defect.
+    fn scan_slide_references(
+        &self,
+        mut tolerance: Option<&mut ToleranceReport>,
+    ) -> Result<Vec<SlideReference>> {
         let xml = processed_xml(self.part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut references = Vec::new();
@@ -127,8 +174,30 @@ impl<'a> PresentationPart<'a> {
         let mut roots = 0usize;
         let mut lists = 0usize;
         let mut list_depth = None;
+        // Depth of a foreign `p:sldIdLst` child whose subtree is skipped.
+        let mut skipping: Option<usize> = None;
         loop {
             let (namespace, event) = reader.read_resolved_event()?;
+            if let Some(skip_depth) = skipping {
+                match event {
+                    Event::Start(_) => {
+                        depth = depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("presentation XML depth overflow"))?;
+                    },
+                    Event::End(_) => {
+                        depth = depth
+                            .checked_sub(1)
+                            .ok_or_else(|| invalid("presentation XML depth underflow"))?;
+                        if depth == skip_depth {
+                            skipping = None;
+                        }
+                    },
+                    Event::Eof => break,
+                    _ => {},
+                }
+                continue;
+            }
             match event {
                 Event::Start(element) => {
                     let is_presentation = crate::namespace::is_presentationml_name(
@@ -168,7 +237,7 @@ impl<'a> PresentationPart<'a> {
                         if lists != 1 {
                             return Err(invalid("presentation has multiple slide-ID lists"));
                         }
-                        reject_slide_id_list_attributes(&element)?;
+                        reject_slide_id_list_attributes(&element, tolerance.as_deref_mut())?;
                         list_depth = Some(depth + 1);
                     } else if is_slide {
                         if list_depth != Some(depth) {
@@ -184,11 +253,11 @@ impl<'a> PresentationPart<'a> {
                             self.part,
                             &element,
                             &reader,
+                            tolerance.as_deref_mut(),
                         )?;
                     } else if list_depth == Some(depth) {
-                        return Err(invalid(
-                            "presentation slide-ID list contains a non-slide child",
-                        ));
+                        foreign_slide_list_content(tolerance.as_deref_mut(), "a non-slide child")?;
+                        skipping = Some(depth);
                     }
                     depth = depth
                         .checked_add(1)
@@ -229,7 +298,7 @@ impl<'a> PresentationPart<'a> {
                         lists = lists
                             .checked_add(1)
                             .ok_or_else(|| invalid("presentation slide-ID list count overflow"))?;
-                        reject_slide_id_list_attributes(&element)?;
+                        reject_slide_id_list_attributes(&element, tolerance.as_deref_mut())?;
                     } else if is_slide {
                         if list_depth != Some(depth) {
                             return Err(invalid(
@@ -244,11 +313,10 @@ impl<'a> PresentationPart<'a> {
                             self.part,
                             &element,
                             &reader,
+                            tolerance.as_deref_mut(),
                         )?;
                     } else if list_depth == Some(depth) {
-                        return Err(invalid(
-                            "presentation slide-ID list contains a non-slide child",
-                        ));
+                        foreign_slide_list_content(tolerance.as_deref_mut(), "a non-slide child")?;
                     }
                 },
                 Event::End(element) => {
@@ -284,13 +352,11 @@ impl<'a> PresentationPart<'a> {
                         .trim()
                         .is_empty()
                     {
-                        return Err(invalid("presentation slide-ID list contains text content"));
+                        foreign_slide_list_content(tolerance.as_deref_mut(), "text content")?;
                     }
                 },
                 Event::CData(_) | Event::GeneralRef(_) if list_depth == Some(depth) => {
-                    return Err(invalid(
-                        "presentation slide-ID list contains unsupported content",
-                    ));
+                    foreign_slide_list_content(tolerance.as_deref_mut(), "unsupported content")?;
                 },
                 Event::Eof => break,
                 _ => {},
@@ -399,19 +465,44 @@ impl<'a> PresentationPart<'a> {
     }
 }
 
-fn reject_slide_id_list_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+fn reject_slide_id_list_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    tolerance: Option<&mut ToleranceReport>,
+) -> Result<()> {
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key != b"xmlns" && !key.starts_with(b"xmlns:") {
-            return Err(invalid(
-                "presentation slide-ID list permits only namespace declarations",
-            ));
+            let Some(tolerance) = tolerance else {
+                return Err(invalid(
+                    "presentation slide-ID list permits only namespace declarations",
+                ));
+            };
+            // One record per list: the attributes are ignored together.
+            tolerance.record(PresentationDefect::SlideListContent, 0);
+            break;
         }
     }
     Ok(())
 }
 
+/// Ignore and record foreign `p:sldIdLst` content, or reject it strictly.
+fn foreign_slide_list_content(tolerance: Option<&mut ToleranceReport>, what: &str) -> Result<()> {
+    match tolerance {
+        Some(tolerance) => {
+            tolerance.record(PresentationDefect::SlideListContent, 0);
+            Ok(())
+        },
+        None => Err(invalid(format!(
+            "presentation slide-ID list contains {what}"
+        ))),
+    }
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the slide-list scan threads its uniqueness sets and repair sink"
+)]
 fn append_slide_reference(
     references: &mut Vec<SlideReference>,
     slide_ids: &mut HashSet<u32>,
@@ -420,6 +511,7 @@ fn append_slide_reference(
     part: &dyn Part,
     element: &quick_xml::events::BytesStart<'_>,
     reader: &NsReader<&[u8]>,
+    tolerance: Option<&mut ToleranceReport>,
 ) -> Result<()> {
     if references.len() == MAX_SLIDES {
         return Err(Error::Limit {
@@ -438,42 +530,67 @@ fn append_slide_reference(
             "presentation slide reference id is outside 256..=2147483647",
         ));
     }
+    let target_key = match part.rels().get(&relationship_id) {
+        Some(relationship) if !relationship.is_external() => Some(
+            relationship
+                .target_partname()?
+                .as_str()
+                .to_ascii_lowercase(),
+        ),
+        _ => None,
+    };
+    // The first entry carrying a slide ID, relationship ID, or target wins;
+    // a later repeat is skipped whole so no set keeps half of it.
+    let duplicate = if slide_ids.contains(&id) {
+        Some((
+            PresentationDefect::DuplicateSlideId,
+            "presentation slide reference ids must be unique",
+        ))
+    } else if relationship_ids.contains(&relationship_id) {
+        Some((
+            PresentationDefect::DuplicateSlideRelationship,
+            "presentation slide reference relationship ids must be unique",
+        ))
+    } else if target_key
+        .as_ref()
+        .is_some_and(|target| target_part_names.contains(target))
+    {
+        Some((
+            PresentationDefect::DuplicateSlideTarget,
+            "presentation slide reference targets must be unique",
+        ))
+    } else {
+        None
+    };
+    if let Some((defect, message)) = duplicate {
+        let Some(tolerance) = tolerance else {
+            return Err(invalid(message));
+        };
+        tolerance.record(defect, id);
+        return Ok(());
+    }
     slide_ids
         .try_reserve(1)
         .map_err(|source| Error::Allocation {
             resource: "presentation slide reference IDs",
             source,
         })?;
-    if !slide_ids.insert(id) {
-        return Err(invalid("presentation slide reference ids must be unique"));
-    }
+    slide_ids.insert(id);
     relationship_ids
         .try_reserve(1)
         .map_err(|source| Error::Allocation {
             resource: "presentation slide reference relationship IDs",
             source,
         })?;
-    if !relationship_ids.insert(relationship_id.clone()) {
-        return Err(invalid(
-            "presentation slide reference relationship ids must be unique",
-        ));
-    }
-    if let Some(relationship) = part.rels().get(&relationship_id)
-        && !relationship.is_external()
-    {
-        let target = relationship.target_partname()?;
-        let target_key = target.as_str().to_ascii_lowercase();
+    relationship_ids.insert(relationship_id.clone());
+    if let Some(target_key) = target_key {
         target_part_names
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
                 resource: "presentation slide reference target names",
                 source,
             })?;
-        if !target_part_names.insert(target_key) {
-            return Err(invalid(
-                "presentation slide reference targets must be unique",
-            ));
-        }
+        target_part_names.insert(target_key);
     }
     references
         .try_reserve(1)

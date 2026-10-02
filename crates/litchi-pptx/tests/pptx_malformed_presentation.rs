@@ -168,7 +168,7 @@ fn slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids() {
 }
 
 #[test]
-fn slide_reference_owner_rejects_case_equivalent_target_parts() {
+fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     let mut package = Package::new().unwrap();
     let presentation = package.presentation_mut().unwrap();
@@ -177,15 +177,15 @@ fn slide_reference_owner_rejects_case_equivalent_target_parts() {
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
-    let second_relationship_id = package
+    let second = package
         .presentation()
         .unwrap()
         .slide_references()
         .unwrap()
         .get(1)
         .unwrap()
-        .relationship_id()
-        .to_owned();
+        .clone();
+    let second_relationship_id = second.relationship_id().to_owned();
     package
         .edit_opc(|opc| {
             let presentation = opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())?;
@@ -202,7 +202,27 @@ fn slide_reference_owner_rejects_case_equivalent_target_parts() {
     let presentation = package
         .presentation()
         .expect("presentation root should remain valid");
-    assert!(presentation.slide_references().is_err());
+    // The second entry resolves to the first slide's part: it is skipped
+    // (leniency audit finding 6.7) and the repair is recorded at open.
+    let references = presentation.slide_references().unwrap();
+    assert_eq!(references.len(), 1);
+    assert_ne!(references[0].id(), second.id());
+    let repairs: Vec<_> = package
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| (tolerated.defect, tolerated.context, tolerated.part()))
+        .collect();
+    assert_eq!(
+        repairs,
+        [(
+            litchi_pptx::Defect::Presentation(
+                litchi_pptx::PresentationDefect::DuplicateSlideTarget
+            ),
+            second.id(),
+            Some("/ppt/presentation.xml")
+        )]
+    );
 }
 
 #[test]

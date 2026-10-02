@@ -737,7 +737,8 @@ fn capture_internal(
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
-    let references = presentation.slide_references()?;
+    // Edit transactions keep the strict slide-list contract.
+    let references = presentation.slide_references_strict()?;
     if references.len() > limits.max_parts {
         return Err(Error::Limit {
             resource: "opened-presentation slides",

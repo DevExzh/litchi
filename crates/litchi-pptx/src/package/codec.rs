@@ -269,13 +269,18 @@ impl Package {
         physical_source_provenance: bool,
     ) -> Result<Self> {
         let main = opc.main_document_part()?;
-        PresentationPart::from_part(main)?;
+        let presentation = PresentationPart::from_part(main)?;
+        // Slide-list repairs (audit finding 6.7) are recorded at open. A slide
+        // list the catalog reader rejects stays the lazy accessors' error, as
+        // before: opening never parsed the slide list to fail on it.
+        let mut tolerance = crate::leniency::ToleranceReport::default();
+        let _deferred_catalog_error = presentation.slide_references_with_tolerance(&mut tolerance);
         Ok(Self {
             opc,
             mutable_pres: None,
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance,
-            tolerance: crate::leniency::ToleranceReport::default(),
+            tolerance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]
