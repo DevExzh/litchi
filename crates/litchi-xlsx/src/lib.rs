@@ -95,6 +95,7 @@ pub mod header_footer;
 pub mod hyperlinks;
 pub mod ignored_errors;
 pub mod layout;
+pub mod leniency;
 pub mod merge;
 pub mod named_sheet_view;
 pub mod ole_objects;
@@ -235,6 +236,10 @@ pub use hyperlinks::{Hyperlink, HyperlinkReference};
 pub use ignored_errors::{
     IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
     IgnoredErrorsExtension, parse_worksheet_ignored_errors,
+};
+pub use leniency::{
+    CatalogDefect, CellDefect, Defect, Leniency, Location as ToleranceLocation,
+    SharedStringsDefect, ThemeDefect, ToleranceReport, ToleratedDefect, WorksheetDefect,
 };
 pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,

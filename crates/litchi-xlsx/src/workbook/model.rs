@@ -18,6 +18,7 @@ use once_cell::sync::OnceCell;
 
 use crate::cell::{Extents, SharedStringLineage, Store, Text};
 use crate::error::{Error, Result, invalid};
+use crate::leniency::ToleranceReport;
 use crate::raw;
 use crate::style::StyleLineage;
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
@@ -407,6 +408,8 @@ pub(crate) struct Inner {
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
     pub(super) page_break_cache: Arc<PageBreakProjectionCache>,
+    /// Repairs made while the workbook catalog was parsed at open time.
+    pub(super) tolerance: ToleranceReport,
 }
 
 /// Immutable, cheap-to-share XLSX workbook snapshot.
@@ -622,6 +625,9 @@ impl Workbook {
             )
         };
 
+        // Open-time recording sites (catalog findings 4.7/4.8) thread
+        // `&mut tolerance` into the catalog parse; see `crate::leniency`.
+        let tolerance = ToleranceReport::default();
         let active_sheet = if catalog.sheets.is_empty() {
             None
         } else {
@@ -715,6 +721,7 @@ impl Workbook {
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
                 page_break_cache: lineage_page_break_cache,
+                tolerance,
             }),
             #[cfg(feature = "encryption")]
             encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
@@ -766,6 +773,25 @@ impl Workbook {
                 .map_err(|_| invalid("validated worksheet cache was already initialized"))?;
         }
         Ok(())
+    }
+
+    /// Every repair made while reading this workbook so far, in sheet order.
+    ///
+    /// The report merges the repairs made when the workbook was opened with
+    /// those of every worksheet whose cells have been parsed, each stamped
+    /// with its sheet position. Worksheets parse lazily, on first cell access;
+    /// a worksheet not yet read contributes nothing until it is. An empty
+    /// report means everything parsed so far conformed. See
+    /// [`crate::leniency`] for the contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        let mut report = self.inner.tolerance.clone();
+        for sheet in self.inner.sheets.iter() {
+            if let Some(store) = sheet.cells.get() {
+                report.append_sheet(store.tolerance_report(), sheet.position);
+            }
+        }
+        report
     }
 
     /// Workbook flavor derived from package content, never its filename.
@@ -1674,6 +1700,18 @@ impl Worksheet {
     /// formatted, and content extents.
     pub fn stored_extent(&self) -> Result<Option<Rect>> {
         Ok(self.store()?.extents().stored())
+    }
+
+    /// The repairs made while parsing this worksheet's cells.
+    ///
+    /// This parses the worksheet if it has not been read yet. Locations are
+    /// relative to this worksheet, so [`crate::ToleratedDefect::sheet`] is
+    /// `None`. A chart, dialog, or other non-cell sheet reports clean.
+    pub fn tolerance_report(&self) -> Result<&ToleranceReport> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Ok(&crate::leniency::CLEAN);
+        }
+        Ok(self.store()?.tolerance_report())
     }
 
     pub(super) fn store(&self) -> Result<&Store> {

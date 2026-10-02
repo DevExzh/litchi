@@ -33,6 +33,7 @@ use litchi_sheet::{Area, At, Cell as Address, Rect};
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
 use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
+use crate::leniency::ToleranceReport;
 use crate::raw;
 use crate::raw::selected_worksheet::SelectedPayload;
 
@@ -96,6 +97,8 @@ struct SourceInner {
     /// sorted position index is equivalent to the previous linear search while
     /// avoiding a second allocation of every key string.
     sheet_name_order: Box<[usize]>,
+    /// Repairs made while the workbook catalog was parsed at open time.
+    tolerance: ToleranceReport,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -456,6 +459,9 @@ impl SourceBackedWorkbook {
         let styles_uri = validate_styles(&package, &workbook)?;
         check_execution(execution.as_ref())?;
 
+        // Open-time recording sites (catalog findings 4.7/4.8) thread
+        // `&mut tolerance` into the catalog parse; see `crate::leniency`.
+        let tolerance = ToleranceReport::default();
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
         let mut sheets = Vec::new();
         sheets
@@ -513,8 +519,28 @@ impl SourceBackedWorkbook {
                 active_sheet,
                 sheets,
                 sheet_name_order,
+                tolerance,
             }),
         })
+    }
+
+    /// Every repair made while reading this workbook so far, in sheet order.
+    ///
+    /// The report merges the repairs made when the workbook was opened with
+    /// those of every worksheet whose cells have been materialized, each
+    /// stamped with its sheet position. Worksheets parse lazily; a cold
+    /// selected read that meets an irregular dependency falls back to the
+    /// materializing parse, which records. An empty report means everything
+    /// parsed so far conformed. See [`crate::leniency`] for the contract.
+    #[must_use]
+    pub fn tolerance_report(&self) -> ToleranceReport {
+        let mut report = self.inner.tolerance.clone();
+        for sheet in self.inner.sheets.iter() {
+            if let Some(store) = sheet.cells.get() {
+                report.append_sheet(store.tolerance_report(), sheet.position);
+            }
+        }
+        report
     }
 
     /// Workbook flavor derived from the mandatory workbook catalog.
@@ -697,6 +723,19 @@ impl SourceWorksheet {
     #[must_use]
     pub fn is_active(&self) -> bool {
         self.owner.active_sheet == Some(self.data.position)
+    }
+
+    /// The repairs made while parsing this worksheet's cells.
+    ///
+    /// This materializes the worksheet if it has not been yet. Locations are
+    /// relative to this worksheet, so [`crate::ToleratedDefect::sheet`] is
+    /// `None`. A chart, dialog, or other non-cell sheet reports clean.
+    pub fn tolerance_report(&self) -> Result<&ToleranceReport> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Ok(&crate::leniency::CLEAN);
+        }
+        let store = self.store();
+        self.finish_result(store).map(Store::tolerance_report)
     }
 
     /// Look up an exact logical cell state, returning an owning semantic value.

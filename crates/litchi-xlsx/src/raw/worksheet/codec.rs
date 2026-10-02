@@ -32,6 +32,7 @@ use crate::cell::{Store, Text};
 use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, allocation, invalid};
 use crate::layout::{self, Defaults};
+use crate::leniency::ToleranceReport;
 use crate::row;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -624,13 +625,19 @@ impl<'c> Parser<'c> {
         let columns = column::resolve(self.columns)?;
         let defaults = self.defaults;
         let merges = self.merges;
+        // Cell-level recording sites (crate::leniency) thread `&mut tolerance`
+        // through materialization; the report travels inside the store.
+        let tolerance = ToleranceReport::default();
         for cell in self.lane_cells {
             cells.push(materialize(cell.into_raw(), strings)?);
         }
         for cell in self.cells {
             cells.push(materialize(cell, strings)?);
         }
-        Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)
+        let mut store =
+            Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)?;
+        store.set_tolerance_report(tolerance);
+        Ok(store)
     }
 
     /// Advance the ordinary worksheet parser by one XML event.

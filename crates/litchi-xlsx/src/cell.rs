@@ -12,6 +12,7 @@ use crate::column;
 use crate::error::{Result, allocation, invalid};
 use crate::formula::{Formula, Kind};
 use crate::layout::Defaults;
+use crate::leniency::{Location, ToleranceReport};
 use crate::merge;
 use crate::row;
 
@@ -683,6 +684,8 @@ pub(crate) struct Store {
     defaults: Option<Defaults>,
     merges: merge::Index,
     extents: Extents,
+    /// Repairs made while this store was built; see `crate::leniency`.
+    tolerance: ToleranceReport,
 }
 
 #[derive(Debug)]
@@ -811,7 +814,18 @@ impl Store {
                 content: content.finish()?,
                 styled: styled.finish()?,
             },
+            tolerance: ToleranceReport::default(),
         })
+    }
+
+    /// Repairs made while this store was built, in discovery order.
+    pub(crate) const fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Attach the repairs the parse that built this store made.
+    pub(crate) fn set_tolerance_report(&mut self, report: ToleranceReport) {
+        self.tolerance = report;
     }
 
     /// Merge source cell records named by reduced-readback provenance into a
@@ -845,6 +859,7 @@ impl Store {
             defaults,
             merges,
             extents,
+            tolerance,
             ..
         } = parsed;
         cells.extend(parsed_cells.into_vec());
@@ -864,7 +879,22 @@ impl Store {
             merge_ranges,
             extents.declared,
         )
-        .map(Some)
+        .map(|mut merged| {
+            // The omitted records were copied from `source` as already
+            // repaired, so their repairs travel with them.
+            let mut tolerance = tolerance;
+            let mut carried = ToleranceReport::default();
+            for tolerated in source.tolerance.iter() {
+                if let Location::Cell(address) = tolerated.location
+                    && omitted.iter().any(|range| range.contains(address))
+                {
+                    carried.record(tolerated.defect, tolerated.location);
+                }
+            }
+            tolerance.append(&carried);
+            merged.tolerance = tolerance;
+            Some(merged)
+        })
     }
 
     /// Whether `omitted` are ordered single-row ranges none of which holds a
