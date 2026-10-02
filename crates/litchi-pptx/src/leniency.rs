@@ -193,6 +193,14 @@
 //! instructions: those readers have no report carrier yet, and skipping
 //! there without recording would swallow the defect silently.
 //!
+//! # Shape metadata (audit finding 6.8)
+//!
+//! A `p:cNvPr@id` that is not an `unsignedInt` leaves the shape without an
+//! ID ([`ShapeDefect::InvalidShapeId`]), and an unparseable `p:ph@idx`
+//! falls back to the schema default `0`
+//! ([`ShapeDefect::InvalidPlaceholderIndex`]); the scene, the shape, and its
+//! siblings are kept.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -355,6 +363,20 @@ pub enum ShapeDefect {
     /// ([`crate::shape::Placeholder::type_extension`] is `None`), skipping
     /// the rest of its extension list.
     PlaceholderTypeExtension,
+    /// A non-visual shape ID (`p:cNvPr@id`) was not an `unsignedInt`
+    /// (`ST_DrawingElementId`), for example empty or 64-bit.
+    ///
+    /// The ID is non-structural metadata the scene already models as
+    /// optional; `PowerPoint` re-assigns broken IDs on load and LibreOffice
+    /// never parses them eagerly. The reader reports the shape with no ID
+    /// ([`crate::shape::Shape::id`] is `None`). The context is `0`, since
+    /// the shape has no usable ID.
+    InvalidShapeId,
+    /// A placeholder index (`p:ph@idx`) was not an `unsignedInt`.
+    ///
+    /// The reader applies the schema default `0`, as for an omitted `idx`.
+    /// The context is the shape ID (or `0`).
+    InvalidPlaceholderIndex,
 }
 
 impl ShapeDefect {
@@ -370,6 +392,10 @@ impl ShapeDefect {
             },
             Self::PlaceholderTypeExtension => {
                 "dropped the placeholder's malformed p232 type extension; the placeholder was kept"
+            },
+            Self::InvalidShapeId => "reported the shape with no ID in place of its unparseable ID",
+            Self::InvalidPlaceholderIndex => {
+                "used the default placeholder index 0 in place of the unparseable index"
             },
         }
     }
@@ -785,6 +811,8 @@ mod tests {
             Defect::from(ShapeDefect::MalformedTransform),
             Defect::from(ShapeDefect::PlaceholderExtensionOwner),
             Defect::from(ShapeDefect::PlaceholderTypeExtension),
+            Defect::from(ShapeDefect::InvalidShapeId),
+            Defect::from(ShapeDefect::InvalidPlaceholderIndex),
             Defect::from(TransitionDefect::SpokeCount),
             Defect::from(TransitionDefect::EffectToken),
             Defect::from(TransitionDefect::AttributeToken),

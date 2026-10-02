@@ -804,13 +804,18 @@ impl<'a> Scanner<'a> {
             active.seen_non_visual = true;
             let index = active.index as usize;
             let name = unqualified_attribute_value(element, b"name", decoder)?;
-            let id = unqualified_attribute_value(element, b"id", decoder)?
-                .map(|value| {
-                    value.parse::<u32>().map_err(|_err| {
-                        Error::Invalid(format!("invalid non-visual shape ID '{value}'"))
-                    })
-                })
-                .transpose()?;
+            // An unparseable ID is non-structural metadata the record
+            // already models as absent (audit finding 6.8).
+            let id = match unqualified_attribute_value(element, b"id", decoder)? {
+                Some(value) => {
+                    let parsed = value.parse::<u32>().ok();
+                    if parsed.is_none() {
+                        self.tolerance.record(ShapeDefect::InvalidShapeId, 0);
+                    }
+                    parsed
+                },
+                None => None,
+            };
             let name = name
                 .as_deref()
                 .map(|value| self.retain(value))
@@ -831,14 +836,20 @@ impl<'a> Scanner<'a> {
                 ));
             }
             active.seen_placeholder = true;
-            let record_index = active.index as usize;
+            let owner = active.index;
+            let record_index = owner as usize;
             let kind = unqualified_attribute_value(element, b"type", decoder)?;
+            // An unparseable index falls back to the schema default `0`
+            // (audit finding 6.8).
             let index = match unqualified_attribute_value(element, b"idx", decoder)? {
-                Some(value) => value
-                    .parse::<u32>()
-                    .map_err(|_err| Error::Invalid(format!("invalid placeholder index '{value}'"))),
-                None => Ok(0),
-            }?;
+                Some(value) => value.parse::<u32>().unwrap_or_else(|_err| {
+                    let id = shape_id(&self.records, owner);
+                    self.tolerance
+                        .record(ShapeDefect::InvalidPlaceholderIndex, id);
+                    0
+                }),
+                None => 0,
+            };
             let kind = kind
                 .as_deref()
                 .map(|value| self.retain(value))

@@ -782,3 +782,38 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
             .replacen("<p:sld ", "<!DOCTYPE p:sld><p:sld ", 1);
     assert!(litchi_pptx::shape::Scene::read(doctype.as_bytes()).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.8: unparseable shape ID / placeholder index.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn unparseable_shape_id_and_placeholder_index_degrade_and_are_recorded() {
+    let slide = patched_part(SLIDE2, |xml| {
+        xml.replace(r#"<p:cNvPr id="3" "#, r#"<p:cNvPr id="" "#)
+            .replace(
+                r#"<p:ph type="subTitle" idx="1"/>"#,
+                r#"<p:ph type="subTitle" idx="x1"/>"#,
+            )
+    });
+    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let scene = slides[1].shapes().unwrap();
+    let placeholders: Vec<_> = scene
+        .placeholders()
+        .map(|shape| (shape.id(), shape.placeholder().unwrap().index()))
+        .collect();
+    assert_eq!(placeholders, [(None, 0), (Some(4), 0)]);
+    assert_eq!(
+        located(scene.tolerance_report()),
+        [
+            (Defect::Shape(ShapeDefect::InvalidShapeId), 0, Some(SLIDE2)),
+            (
+                Defect::Shape(ShapeDefect::InvalidPlaceholderIndex),
+                4,
+                Some(SLIDE2)
+            ),
+        ]
+    );
+}
