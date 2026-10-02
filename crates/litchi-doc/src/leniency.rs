@@ -472,6 +472,54 @@ impl CommentDefect {
     }
 }
 
+/// The class of standard-bookmark defect the reader repairs the way Word
+/// repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// per-bookmark repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. Each repair is confined to the one
+/// bookmark that carries it; the framing of `SttbfBkmk`/`PlcfBkf`/`PlcfBkl`
+/// (presence, sizes, counts, CP ordering) stays a hard error for the table.
+/// The recorded [`ToleratedDefect::context`] is the bookmark's index in
+/// `SttbfBkmk`/`PlcfBkf` (saturating at `u16::MAX`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum BookmarkDefect {
+    /// The `BKC.fPub` bit was set.
+    ///
+    /// MS-DOC 2.9.8: fPub "MUST be 0, and MUST be ignored". The bookmark is
+    /// kept and decoded from its other bits.
+    ReservedPublicFlag,
+    /// `FBKF.ibkl` was out of range or already claimed by an earlier
+    /// bookmark. The bookmark has no end of its own, so it is dropped; the
+    /// first bookmark to claim an end entry keeps it.
+    EndIndex,
+    /// The bookmark's start CP lay after its end CP. The bookmark cannot
+    /// denote a range, so it is dropped.
+    ReversedRange,
+    /// A column bookmark (`BKC.fCol`) had an empty or reversed column range.
+    /// The bookmark's text range is still valid, so it is kept as an
+    /// ordinary text bookmark with no column restriction.
+    ColumnRange,
+}
+
+impl BookmarkDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ReservedPublicFlag => "ignored the reserved BKC fPub bit",
+            Self::EndIndex => {
+                "dropped the bookmark whose end index was out of range or already claimed"
+            },
+            Self::ReversedRange => "dropped the bookmark whose start followed its end",
+            Self::ColumnRange => {
+                "kept the bookmark as a text bookmark; its column range was empty or reversed"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -495,6 +543,8 @@ pub enum Defect {
     /// A comment-descriptor (`ATRDPre10`) defect repaired the way Word
     /// repairs it.
     Comment(CommentDefect),
+    /// A standard-bookmark defect repaired the way Word repairs it.
+    Bookmark(BookmarkDefect),
 }
 
 impl Defect {
@@ -508,6 +558,7 @@ impl Defect {
             Self::AuxiliaryTable(defect) => defect.repair(),
             Self::Style(defect) => defect.repair(),
             Self::Comment(defect) => defect.repair(),
+            Self::Bookmark(defect) => defect.repair(),
         }
     }
 }
@@ -548,6 +599,12 @@ impl From<CommentDefect> for Defect {
     }
 }
 
+impl From<BookmarkDefect> for Defect {
+    fn from(defect: BookmarkDefect) -> Self {
+        Self::Bookmark(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -559,7 +616,8 @@ pub struct ToleratedDefect {
     /// `rgFcLcb` pointer index for a [`Defect::AuxiliaryTable`] (the style
     /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]), and
     /// the style index (`istd`) for a [`Defect::Style`], and the comment
-    /// index in `PlcfandRef` for a [`Defect::Comment`].
+    /// index in `PlcfandRef` for a [`Defect::Comment`], and the bookmark
+    /// index in `PlcfBkf` for a [`Defect::Bookmark`].
     pub context: u16,
 }
 
@@ -750,6 +808,10 @@ mod tests {
             Defect::from(CommentDefect::ReservedFields),
             Defect::from(CommentDefect::AuthorIndex),
             Defect::from(CommentDefect::BookmarkTag),
+            Defect::from(BookmarkDefect::ReservedPublicFlag),
+            Defect::from(BookmarkDefect::EndIndex),
+            Defect::from(BookmarkDefect::ReversedRange),
+            Defect::from(BookmarkDefect::ColumnRange),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

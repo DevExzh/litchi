@@ -35,10 +35,10 @@
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::writer::CommentEntry;
+use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
-    AuxiliaryTableDefect, CommentDefect, Defect, Leniency, OpenOptions, Package, StshifDefect,
-    StyleDefect, StylesheetDefect, Writer,
+    AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
+    StshifDefect, StyleDefect, StylesheetDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -555,6 +555,45 @@ fn comment_descriptor_defects_are_repaired_per_comment() {
             (Defect::Comment(CommentDefect::AuthorIndex), 0),
             (Defect::Comment(CommentDefect::ReservedFields), 0),
             (Defect::Comment(CommentDefect::BookmarkTag), 0),
+        ]
+    );
+}
+
+/// MS-DOC 2.9.8 marks BKC.fPub "MUST be ignored", and a broken ibkl
+/// cross-reference costs only the bookmark carrying it, never the table.
+#[test]
+fn bookmark_defects_are_repaired_per_bookmark() {
+    let clean = writer_document(|writer| {
+        writer.add_bookmark(BookmarkEntry::new("First", 0, 4));
+        writer.add_bookmark(BookmarkEntry::new("Second", 5, 9));
+    });
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    let original_bookmarks = original.bookmarks().expect("bookmarks");
+    assert_eq!(original_bookmarks.len(), 2);
+
+    let bytes = edit_table_stream(clean, |word, table| {
+        // PlcfBkf (FIB pointer 22): three CPs, then one FBKF per bookmark.
+        let fbkf = table_pointer(word, 22) + 12;
+        table[fbkf + 2] |= 0x80; // First: BKC.fPub
+        let first_ibkl = [table[fbkf], table[fbkf + 1]];
+        table[fbkf + 4..fbkf + 6].copy_from_slice(&first_ibkl); // Second: duplicate ibkl
+    });
+    let document = open_degraded(bytes);
+    let bookmarks = document.bookmarks().expect("bookmarks");
+    assert_eq!(bookmarks.len(), 1, "only the broken bookmark is dropped");
+    assert_eq!(bookmarks[0], original_bookmarks[0]);
+    assert!(document.text().unwrap().contains("Body text"));
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>(),
+        vec![
+            (Defect::Bookmark(BookmarkDefect::ReservedPublicFlag), 0),
+            (Defect::Bookmark(BookmarkDefect::EndIndex), 1),
         ]
     );
 }

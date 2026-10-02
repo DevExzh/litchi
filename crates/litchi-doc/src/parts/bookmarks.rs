@@ -3,6 +3,7 @@
 use super::super::bookmark::Bookmark;
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
+use crate::leniency::{BookmarkDefect, ToleranceReport};
 use crate::plcf::Plcf;
 use std::collections::HashSet;
 
@@ -14,11 +15,28 @@ pub struct BookmarksTable {
 
 impl BookmarksTable {
     /// Parse `SttbfBkmk`, `PlcfBkf`, and `PlcfBkl`.
+    ///
+    /// Word-compatible per-bookmark repairs are applied but their record is
+    /// discarded; use [`Self::parse_recording`] to enumerate them.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
+        Self::parse_recording(fib, table_stream).map(|(table, _)| table)
+    }
+
+    /// Parse the standard bookmark tables, returning the repairs
+    /// [`BookmarkDefect`] lists alongside the table.
+    ///
+    /// Table framing — the three tables' presence, sizes, counts, and CP
+    /// ordering — stays a hard error; only one bookmark's own descriptor
+    /// defects are repaired, and only on that bookmark.
+    pub(crate) fn parse_recording(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Result<(Self, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
         let lengths = [21usize, 22, 23]
             .map(|index| fib.get_table_pointer(index).map_or(0, |(_, length)| length));
         if lengths.iter().all(|&length| length == 0) {
-            return Ok(Self::default());
+            return Ok((Self::default(), tolerance));
         }
         if lengths.contains(&0) {
             return Err(PackageError::Corrupted(
@@ -76,39 +94,43 @@ impl BookmarksTable {
         let mut used_end_indexes = HashSet::with_capacity(names.len());
         let mut bookmarks = Vec::with_capacity(names.len());
         for (index, name) in names.into_iter().enumerate() {
+            let context = u16::try_from(index).unwrap_or(u16::MAX);
             let property = starts
                 .property(index)
                 .ok_or_else(|| PackageError::Corrupted("PlcfBkf is missing an FBKF".to_string()))?;
+            // ibkl uniqueness and the start/end ordering are consistency
+            // rules between this bookmark's own entries, not table framing:
+            // like Word, drop the one bookmark that breaks them and keep the
+            // rest. The first bookmark to claim an end entry keeps it.
             let end_index = usize::from(read_u16(property, 0, "bookmark ibkl")?);
             if end_index >= ends.len() - 1 || !used_end_indexes.insert(end_index) {
-                return Err(PackageError::Corrupted(
-                    "bookmark ibkl values must be unique and in range".to_string(),
-                ));
+                tolerance.record(BookmarkDefect::EndIndex, context);
+                continue;
             }
+            // MS-DOC 2.9.8: fPub "MUST be 0, and MUST be ignored".
             let bkc = read_u16(property, 2, "bookmark BKC")?;
             if bkc & 0x0080 != 0 {
-                return Err(PackageError::Corrupted(
-                    "bookmark BKC fPub must be zero".to_string(),
-                ));
+                tolerance.record(BookmarkDefect::ReservedPublicFlag, context);
             }
             let start = starts.position(index).ok_or_else(|| {
                 PackageError::Corrupted("PlcfBkf is missing a start CP".to_string())
             })?;
             let end = ends[end_index];
             if start > end {
-                return Err(PackageError::Corrupted(
-                    "bookmark start CP exceeds its end CP".to_string(),
-                ));
+                tolerance.record(BookmarkDefect::ReversedRange, context);
+                continue;
             }
             let column_range = if bkc & 0x8000 != 0 {
                 let first = (bkc & 0x007F) as u8;
                 let limit = ((bkc >> 8) & 0x003F) as u8;
                 if first >= limit {
-                    return Err(PackageError::Corrupted(
-                        "bookmark BKC column range is empty or reversed".to_string(),
-                    ));
+                    // The text range is still well-formed; only the column
+                    // restriction is unusable, so read it as a text bookmark.
+                    tolerance.record(BookmarkDefect::ColumnRange, context);
+                    None
+                } else {
+                    Some((first, limit))
                 }
-                Some((first, limit))
             } else {
                 None
             };
@@ -121,7 +143,7 @@ impl BookmarksTable {
             });
         }
 
-        Ok(Self { bookmarks })
+        Ok((Self { bookmarks }, tolerance))
     }
 
     /// All standard bookmarks in start-CP order.
@@ -327,6 +349,89 @@ mod tests {
     }
 
     #[test]
+    fn repairs_individual_bookmark_defects() {
+        use crate::leniency::{Defect, ToleratedDefect};
+
+        let (fib, table, starts_offset) = fixture();
+        let (_, report) = BookmarksTable::parse_recording(&fib, &table).unwrap();
+        assert!(report.is_clean(), "a conforming table records nothing");
+
+        let defects = |data: &[u8]| {
+            let (parsed, report) = BookmarksTable::parse_recording(&fib, data).unwrap();
+            let names = parsed
+                .bookmarks()
+                .iter()
+                .map(|bookmark| bookmark.name.clone())
+                .collect::<Vec<_>>();
+            (names, report.defects().to_vec())
+        };
+        let defect = |defect, context| ToleratedDefect {
+            defect: Defect::Bookmark(defect),
+            context,
+        };
+
+        // A duplicated ibkl drops only the second claimant.
+        let mut duplicate_ibkl = table.clone();
+        duplicate_ibkl[starts_offset + 16..starts_offset + 18].copy_from_slice(&1u16.to_le_bytes());
+        assert_eq!(
+            defects(&duplicate_ibkl),
+            (
+                vec!["Outer".to_string()],
+                vec![defect(BookmarkDefect::EndIndex, 1)]
+            )
+        );
+
+        // An ibkl past the end table drops only that bookmark.
+        let mut far_ibkl = table.clone();
+        far_ibkl[starts_offset + 12..starts_offset + 14].copy_from_slice(&9u16.to_le_bytes());
+        assert_eq!(
+            defects(&far_ibkl),
+            (
+                vec!["_Cell".to_string()],
+                vec![defect(BookmarkDefect::EndIndex, 0)]
+            )
+        );
+
+        // fPub is masked: the bookmark is kept and decoded unchanged.
+        let mut public = table.clone();
+        public[starts_offset + 14] |= 0x80;
+        let (parsed, report) = BookmarksTable::parse_recording(&fib, &public).unwrap();
+        assert_eq!(
+            parsed.bookmarks(),
+            BookmarksTable::parse(&fib, &table).unwrap().bookmarks()
+        );
+        assert_eq!(
+            report.defects(),
+            &[defect(BookmarkDefect::ReservedPublicFlag, 0)]
+        );
+
+        // A start after its end drops only that bookmark: "_Cell" starts at
+        // CP 2 and now ends at CP 1 (PlcfBkl directly follows PlcfBkf).
+        let mut reversed = table.clone();
+        let ends_offset = starts_offset + 20;
+        reversed[ends_offset..ends_offset + 4].copy_from_slice(&1u32.to_le_bytes());
+        assert_eq!(
+            defects(&reversed),
+            (
+                vec!["Outer".to_string()],
+                vec![defect(BookmarkDefect::ReversedRange, 1)]
+            )
+        );
+
+        // An empty column range demotes to a text bookmark.
+        let mut reversed_columns = table.clone();
+        reversed_columns[starts_offset + 18..starts_offset + 20]
+            .copy_from_slice(&0x8102u16.to_le_bytes());
+        let (parsed, report) = BookmarksTable::parse_recording(&fib, &reversed_columns).unwrap();
+        assert_eq!(parsed.bookmarks()[1].column_range, None);
+        assert_eq!(
+            (parsed.bookmarks()[1].start, parsed.bookmarks()[1].end),
+            (2, 5)
+        );
+        assert_eq!(report.defects(), &[defect(BookmarkDefect::ColumnRange, 1)]);
+    }
+
+    #[test]
     fn rejects_malformed_standard_bookmark_tables() {
         let (fib, table, starts_offset) = fixture();
 
@@ -340,19 +445,6 @@ mod tests {
         let mut out_of_range_start = table.clone();
         out_of_range_start[starts_offset..starts_offset + 4].copy_from_slice(&11u32.to_le_bytes());
         assert!(BookmarksTable::parse(&fib, &out_of_range_start).is_err());
-
-        let mut duplicate_ibkl = table.clone();
-        duplicate_ibkl[starts_offset + 16..starts_offset + 18].copy_from_slice(&1u16.to_le_bytes());
-        assert!(BookmarksTable::parse(&fib, &duplicate_ibkl).is_err());
-
-        let mut public = table.clone();
-        public[starts_offset + 14] |= 0x80;
-        assert!(BookmarksTable::parse(&fib, &public).is_err());
-
-        let mut reversed_columns = table.clone();
-        reversed_columns[starts_offset + 18..starts_offset + 20]
-            .copy_from_slice(&0x8102u16.to_le_bytes());
-        assert!(BookmarksTable::parse(&fib, &reversed_columns).is_err());
 
         let duplicate_names = bookmark_names(&["Same", "Same"]);
         assert!(parse_names(&duplicate_names).is_err());

@@ -202,8 +202,8 @@ impl Document {
             "SttbfAtnBkmk",
         );
         let document_properties = DocumentProperties::parse(&fib, &table_stream);
-        let bookmarks_table = auxiliary_or_default(
-            BookmarksTable::parse(&fib, &table_stream),
+        let bookmarks_table = auxiliary_recorded(
+            BookmarksTable::parse_recording(&fib, &table_stream),
             AuxiliaryTableDefect::Bookmarks,
             &mut tolerance,
         );
