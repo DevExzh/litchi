@@ -4081,7 +4081,7 @@ impl Edit {
             encoded_body_text(&replacement, self.source.limits())?
         };
         let bytes = splice_body(source_bytes, span, &replacement_bytes, self.source.limits())?;
-        let snapshot = Snapshot::from_bytes_with_limits(&bytes, self.source.limits())?;
+        let snapshot = Snapshot::from_bytes_with_options(&bytes, self.source.options())?;
         validate_opaque_preservation(&self.source, &snapshot, &self.operations)?;
         if snapshot.text() != replacement {
             return Err(Error::UnsupportedSource(
@@ -4294,7 +4294,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                     boundary,
                     edit.source.limits(),
                 )?;
-                let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+                let snapshot = Snapshot::from_bytes_with_options(&bytes, edit.source.options())?;
                 ordinary_paragraph_source_map(&snapshot)?;
                 let (left, right) = actual.split_at(*offset);
                 if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_add(1)
@@ -4353,7 +4353,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                     ));
                 }
                 let bytes = splice_body(source_bytes, boundary.clone(), &[], edit.source.limits())?;
-                let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+                let snapshot = Snapshot::from_bytes_with_options(&bytes, edit.source.options())?;
                 let merged = merged_paragraph_text(left, right, edit.source.limits())?;
                 if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_sub(1)
                     || paragraph_text_at(&snapshot, *position)? != merged
@@ -4493,8 +4493,10 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
 
-    let mut model =
-        crate::document::RtfDocument::parse_bytes_with_limits(source_bytes, edit.source.limits())?;
+    let mut model = crate::document::RtfDocument::parse_bytes_with_options(
+        source_bytes,
+        edit.source.options(),
+    )?;
     for operation in &edit.operations {
         match operation {
             Operation::TableCellText { path, after, .. } => {
@@ -4559,7 +4561,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             limit,
         });
     }
-    let snapshot = Snapshot::from_bytes_with_limits(&bytes, edit.source.limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(&bytes, edit.source.options())?;
     if snapshot.text() != edit.source.text() {
         return Err(Error::UnsupportedSource(
             "canonical destination edit changed the ordinary body story",
@@ -4699,7 +4701,7 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
             "ordinary-root transfer refuses unknown target destinations",
         ));
     }
-    let snapshot = Snapshot::from_bytes_with_limits(after, edit.source.limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(after, edit.source.options())?;
     if !snapshot.opaque().is_empty() {
         return Err(Error::UnsupportedSource(
             "ordinary-root transfer produced unknown destinations",
@@ -4992,7 +4994,7 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
                 "ordinary paragraph source span is not losslessly proven",
             ))?
     } else {
-        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.limits())?
+        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
     };
     if body_span.start >= body_span.end || body_span.end > source_bytes.len() {
         return Err(Error::UnsupportedSource(
@@ -5031,7 +5033,8 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
     let body_input = std::str::from_utf8(body_bytes)
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits());
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut paragraphs = Vec::new();
     paragraphs
@@ -5173,12 +5176,13 @@ fn semantic_text_starts_with_empty_paragraph(text: &str) -> bool {
 fn ordinary_paragraph_body_source_span(
     source: &[u8],
     semantic_text: &str,
-    limits: crate::ParseLimits,
+    options: crate::ParseOptions,
 ) -> Result<Range<usize>, Error> {
     let lexical = std::str::from_utf8(source)
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(lexical, &arena, limits);
+    let mut lexer = crate::lexer::Lexer::new_with_limits(lexical, &arena, options.limits())
+        .for_document(options.leniency());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut depth = 0usize;
     let mut start = None;
@@ -7795,7 +7799,7 @@ fn retained_or_located_body_source_span(
             Ok(span)
         },
         Some(_) | None => {
-            ordinary_body_source_span(source_bytes, source.text(), source.limits(), false)
+            ordinary_body_source_span(source_bytes, source.text(), source.options(), false)
         },
     }
 }
@@ -7813,7 +7817,7 @@ fn retained_or_located_layout_body_source_span(
             Ok(span)
         },
         Some(_) | None => {
-            ordinary_body_source_span(source_bytes, source.text(), source.limits(), true)
+            ordinary_body_source_span(source_bytes, source.text(), source.options(), true)
         },
     }
 }
@@ -7821,7 +7825,7 @@ fn retained_or_located_layout_body_source_span(
 fn ordinary_body_source_span(
     source: &[u8],
     semantic_text: &str,
-    limits: crate::ParseLimits,
+    options: crate::ParseOptions,
     allow_nested_root_groups: bool,
 ) -> Result<Range<usize>, Error> {
     let lexical = if source.is_ascii() {
@@ -7832,7 +7836,8 @@ fn ordinary_body_source_span(
         source.iter().map(|byte| char::from(*byte)).collect()
     };
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(&lexical, &arena, limits);
+    let mut lexer = crate::lexer::Lexer::new_with_limits(&lexical, &arena, options.limits())
+        .for_document(options.leniency());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut depth = 0usize;
     let mut start = None;

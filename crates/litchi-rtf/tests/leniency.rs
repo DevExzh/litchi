@@ -422,3 +422,37 @@ fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
         ]
     );
 }
+
+// Edits splice the original source and re-read it; the snapshot keeps the
+// options it was opened with, so an opt-in-opened document stays editable.
+#[test]
+fn documents_opened_through_an_opt_in_stay_editable() {
+    let options = Options::new().with_leniency(Leniency::TolerateSyntaxDefects);
+    let source = r"{\rtf1\ansi First\par caf\'e9 bad\'g1\par Third";
+    assert!(Document::parse(source).is_err());
+    let document = Document::parse_with_options(source, options).unwrap();
+    assert_eq!(document.paragraph_count(), 3);
+
+    for (index, expected) in [(0, "Second"), (2, "Last")] {
+        let mut edit = document.edit();
+        edit.replace_paragraph_text(index, expected).unwrap();
+        let commit = edit.commit().unwrap();
+        let snapshot = commit.snapshot();
+        assert!(snapshot.text().contains(expected), "{:?}", snapshot.text());
+        assert!(snapshot.text().contains("caf\u{e9} bad\u{1}"));
+        // The re-read applies the original leniency: whatever defects the
+        // spliced source still carries are repaired and recorded again.
+        let report = snapshot.tolerance_report();
+        assert!(!report.is_clean());
+        assert!(
+            report
+                .iter()
+                .all(|tolerated| matches!(tolerated.defect, Defect::Syntax(_)))
+        );
+    }
+
+    let mut edit = document.edit();
+    edit.remove_paragraph(0).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().paragraph_count(), 2);
+}

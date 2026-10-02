@@ -64,6 +64,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Apply `leniency`'s opt-in lexical repairs to a document fragment or a
+    /// complete source that is not tokenized as one root group.
+    pub(crate) fn with_leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
+
     /// Tokenize a complete document under `leniency`.
     ///
     /// Reading stops at the root group's closing brace, as Word and

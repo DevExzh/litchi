@@ -564,7 +564,8 @@ fn canonical_candidate(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
-    let mut model = crate::document::RtfDocument::parse_bytes_with_limits(bytes, target.limits())?;
+    let mut model =
+        crate::document::RtfDocument::parse_bytes_with_options(bytes, target.options())?;
     mutation(&mut model)?;
     let limit = target.limits().max_source_bytes();
     let mut output = BoundedOutput::new(limit);
@@ -578,7 +579,7 @@ fn canonical_candidate(
             limit,
         });
     }
-    let reopened = Snapshot::from_bytes_with_limits(&output, target.limits())?;
+    let reopened = Snapshot::from_bytes_with_options(&output, target.options())?;
     if !reopened.opaque().is_empty() {
         return Err(Error::UnsupportedSource(
             "ordinary-root transfer produced unknown destinations",

@@ -380,7 +380,7 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
         target.copy_from_slice(&operation.after_transport);
     }
 
-    let snapshot = Snapshot::from_bytes_with_limits(&candidate_bytes, edit.source.limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_candidate(&edit.source, &snapshot, &edit.operations)?;
     Ok(Commit::new(
         edit.source,
@@ -446,7 +446,7 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
         Error::UnsupportedSource("picture group provenance leaves the source"),
     )?);
 
-    let snapshot = Snapshot::from_bytes_with_limits(&candidate_bytes, edit.source.limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_removal_candidate(&edit.source, &snapshot, &edit.operations)?;
     let changes = super::semantic_changes(&edit.operations, &[]);
     Ok(Commit::new(
@@ -675,7 +675,7 @@ pub(super) fn apply_durable_insertion_patch(
             Error::DurablePatch("picture insertion cursor is invalid".to_string())
         })?,
     );
-    let snapshot = Snapshot::from_bytes_with_limits(&candidate, source.limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(&candidate, source.options())?;
     verify_insertion_candidate(source, &snapshot, &insertions)?;
     let mut removal_positions = insertions
         .iter()
@@ -910,7 +910,8 @@ fn locate_standalone_pictures(source: &Snapshot) -> Result<Vec<LocatedPicture>, 
         Error::UnsupportedSource("picture payload source is not an ASCII string")
     })?;
     let arena = Bump::new();
-    let mut lexer = Lexer::new_with_limits(input, &arena, source.limits());
+    let mut lexer = Lexer::new_with_limits(input, &arena, source.limits())
+        .for_document(source.options().leniency());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut located = Vec::new();
     located

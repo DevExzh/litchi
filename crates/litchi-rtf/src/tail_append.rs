@@ -1081,7 +1081,7 @@ impl TailAppendEdit {
         output.extend_from_slice(&inserted);
         output.extend_from_slice(suffix);
 
-        let candidate = Document::from_bytes_with_limits(&output, self.source.limits())?;
+        let candidate = Document::from_bytes_with_options(&output, self.source.options())?;
         verify_candidate(
             &self.source,
             &candidate,
@@ -4183,7 +4183,10 @@ impl DurableTailAppendPatch {
         if BlobId::of(&output).as_hex() != self.after_digest {
             return Err(TailAppendError::PatchConflict);
         }
-        Ok(Document::from_bytes_with_limits(&output, source.limits())?)
+        Ok(Document::from_bytes_with_options(
+            &output,
+            source.options(),
+        )?)
     }
 }
 

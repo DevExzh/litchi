@@ -9,7 +9,7 @@ use std::sync::{Arc, OnceLock};
 
 struct Inner {
     model: RtfDocument<'static>,
-    limits: ParseLimits,
+    options: ParseOptions,
     text: OnceLock<Box<str>>,
 }
 
@@ -63,7 +63,8 @@ impl Document {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn parse_with_limits(input: &str, limits: ParseLimits) -> RtfResult<Self> {
-        RtfDocument::parse_with_limits(input, limits).map(|model| Self::from_model(model, limits))
+        RtfDocument::parse_with_limits(input, limits)
+            .map(|model| Self::from_model(model, limits.into()))
     }
 
     /// Parse UTF-8 RTF source with explicit resource limits and repair
@@ -79,7 +80,7 @@ impl Document {
     /// leniency repairs, or a configured limit is exceeded.
     pub fn parse_with_options(input: &str, options: ParseOptions) -> RtfResult<Self> {
         RtfDocument::parse_with_options(input, options)
-            .map(|model| Self::from_model(model, options.limits()))
+            .map(|model| Self::from_model(model, options))
     }
 
     /// Parse original RTF transport bytes with the production-safe resource
@@ -101,7 +102,7 @@ impl Document {
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn from_bytes_with_limits(input: &[u8], limits: ParseLimits) -> RtfResult<Self> {
         RtfDocument::parse_bytes_with_limits(input, limits)
-            .map(|model| Self::from_model(model, limits))
+            .map(|model| Self::from_model(model, limits.into()))
     }
 
     /// Parse original RTF transport bytes with explicit resource limits and
@@ -112,7 +113,7 @@ impl Document {
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_bytes_with_options(input: &[u8], options: ParseOptions) -> RtfResult<Self> {
         RtfDocument::parse_bytes_with_options(input, options)
-            .map(|model| Self::from_model(model, options.limits()))
+            .map(|model| Self::from_model(model, options))
     }
 
     /// Parse an owned RTF transport allocation and retain it without copying.
@@ -135,7 +136,7 @@ impl Document {
     /// exceeded.
     pub fn from_owned_bytes_with_limits(input: Vec<u8>, limits: ParseLimits) -> RtfResult<Self> {
         RtfDocument::from_owned_bytes_with_limits(input, limits)
-            .map(|model| Self::from_model(model, limits))
+            .map(|model| Self::from_model(model, limits.into()))
     }
 
     /// Parse an owned RTF transport allocation with explicit resource limits
@@ -146,7 +147,7 @@ impl Document {
     /// leniency repairs, or a configured limit is exceeded.
     pub fn from_owned_bytes_with_options(input: Vec<u8>, options: ParseOptions) -> RtfResult<Self> {
         RtfDocument::from_owned_bytes_with_options(input, options)
-            .map(|model| Self::from_model(model, options.limits()))
+            .map(|model| Self::from_model(model, options))
     }
 
     /// Open an RTF file with the production-safe resource profile.
@@ -162,7 +163,8 @@ impl Document {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: ParseLimits) -> RtfResult<Self> {
-        RtfDocument::open_with_limits(path, limits).map(|model| Self::from_model(model, limits))
+        RtfDocument::open_with_limits(path, limits)
+            .map(|model| Self::from_model(model, limits.into()))
     }
 
     /// Open an RTF file with explicit resource limits and repair posture.
@@ -171,15 +173,14 @@ impl Document {
     /// Returns an error when the input is malformed beyond what the selected
     /// leniency repairs, or a configured limit is exceeded.
     pub fn open_with_options(path: impl AsRef<Path>, options: ParseOptions) -> RtfResult<Self> {
-        RtfDocument::open_with_options(path, options)
-            .map(|model| Self::from_model(model, options.limits()))
+        RtfDocument::open_with_options(path, options).map(|model| Self::from_model(model, options))
     }
 
-    fn from_model(model: RtfDocument<'static>, limits: ParseLimits) -> Self {
+    fn from_model(model: RtfDocument<'static>, options: ParseOptions) -> Self {
         Self {
             inner: Arc::new(Inner {
                 model,
-                limits,
+                options,
                 text: OnceLock::new(),
             }),
         }
@@ -451,7 +452,15 @@ impl Document {
     }
 
     pub(crate) fn limits(&self) -> ParseLimits {
-        self.inner.limits
+        self.inner.options.limits()
+    }
+
+    /// The resource limits and repair posture this snapshot was opened with.
+    ///
+    /// Edits re-read their spliced output under the same options, so a
+    /// document opened through an opt-in repair stays editable.
+    pub(crate) fn options(&self) -> ParseOptions {
+        self.inner.options
     }
 
     pub(crate) fn source_bytes(&self) -> Option<&[u8]> {

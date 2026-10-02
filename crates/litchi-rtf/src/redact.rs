@@ -597,7 +597,7 @@ fn rewrite_candidate(
         return Ok((source.clone(), diagnostics));
     }
     let candidate =
-        Document::from_bytes_with_limits(&output, source.limits()).map_err(Error::Rtf)?;
+        Document::from_bytes_with_options(&output, source.options()).map_err(Error::Rtf)?;
     if candidate.text() != source.text() {
         return Err(Error::UnsupportedSource(
             "external-reference redaction changed visible text",
