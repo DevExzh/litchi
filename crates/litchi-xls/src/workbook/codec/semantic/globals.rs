@@ -325,7 +325,7 @@ impl<R: Read + Seek> Workbook<R> {
                 },
                 0x000A => {
                     // EOF - End of workbook globals
-                    crate::font::validate_font_table(&self.fonts)?;
+                    crate::font::validate_font_table(&self.fonts, tolerance)?;
                     self.protection = protection_collector.finish()?;
                     self.calculation = calculation_collector.finish();
                     self.vba_metadata = vba_collector.finish();

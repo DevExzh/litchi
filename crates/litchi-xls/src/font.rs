@@ -173,11 +173,15 @@ impl Font {
 
     /// Parse a `Font` record under an explicit leniency policy.
     ///
-    /// Under [`super::Leniency::TolerateFormattingDefects`] an out-of-range
-    /// `bFamily` degrades to [`FontFamily::NotApplicable`] and a zero `cch`
-    /// yields an empty name; both are recorded in `tolerance`. Every other
-    /// deviation — including a payload whose length disagrees with `cch` — stays
-    /// a hard error, because that is a framing defect rather than a cosmetic one.
+    /// Under [`super::Leniency::TolerateFormattingDefects`] each scalar field
+    /// outside its MS-XLS 2.4.122 enumeration degrades to the substitute
+    /// documented on its [`FormattingDefect`] variant (height and weight are
+    /// clamped into range, an invalid color becomes automatic, an unknown
+    /// escapement `Normal`, underline `Single`, family `NotApplicable`,
+    /// charset `Default`), and an empty, over-long, or NUL-carrying name is
+    /// kept as stored; every repair is recorded in `tolerance`. A payload whose
+    /// length disagrees with `cch` stays a hard error, because that is a
+    /// framing defect rather than a cosmetic one.
     pub(crate) fn parse_record(
         index: u16,
         data: &[u8],
@@ -192,31 +196,63 @@ impl Font {
             )));
         }
 
-        let height_twips = u16::from_le_bytes([data[0], data[1]]);
+        let mut height_twips = u16::from_le_bytes([data[0], data[1]]);
         if height_twips != 0 && !(20..=8191).contains(&height_twips) {
-            return Err(invalid(format!(
-                "Font height is {height_twips} twips; expected zero or 20..=8191"
-            )));
+            tolerance.tolerate(
+                FormattingDefect::FontHeight,
+                u32::from(index),
+                u32::from(height_twips),
+                || {
+                    invalid(format!(
+                        "Font height is {height_twips} twips; expected zero or 20..=8191"
+                    ))
+                },
+            )?;
+            height_twips = height_twips.clamp(20, 8191);
         }
         let flags = u16::from_le_bytes([data[2], data[3]]);
 
-        let color_index = u16::from_le_bytes([data[4], data[5]]);
+        let mut color_index = u16::from_le_bytes([data[4], data[5]]);
         if !valid_color_index(color_index) {
-            return Err(invalid(format!(
-                "Font color index {color_index:#06x} is not a valid Icv"
-            )));
+            tolerance.tolerate(
+                FormattingDefect::FontColor,
+                u32::from(index),
+                u32::from(color_index),
+                || {
+                    invalid(format!(
+                        "Font color index {color_index:#06x} is not a valid Icv"
+                    ))
+                },
+            )?;
+            color_index = AUTOMATIC_FONT_COLOR;
         }
-        let weight = u16::from_le_bytes([data[6], data[7]]);
+        let mut weight = u16::from_le_bytes([data[6], data[7]]);
         if weight != 0 && !(100..=1000).contains(&weight) {
-            return Err(invalid(format!(
-                "Font weight is {weight}; expected zero or 100..=1000"
-            )));
+            tolerance.tolerate(
+                FormattingDefect::FontWeight,
+                u32::from(index),
+                u32::from(weight),
+                || {
+                    invalid(format!(
+                        "Font weight is {weight}; expected zero or 100..=1000"
+                    ))
+                },
+            )?;
+            weight = weight.clamp(100, 1000);
         }
         let escapement = match u16::from_le_bytes([data[8], data[9]]) {
             0 => FontEscapement::Normal,
             1 => FontEscapement::Superscript,
             2 => FontEscapement::Subscript,
-            value => return Err(invalid(format!("Font escapement {value} is invalid"))),
+            value => {
+                tolerance.tolerate(
+                    FormattingDefect::FontEscapement,
+                    u32::from(index),
+                    u32::from(value),
+                    || invalid(format!("Font escapement {value} is invalid")),
+                )?;
+                FontEscapement::Normal
+            },
         };
         let underline = match data[10] {
             0x00 => FontUnderline::None,
@@ -224,7 +260,15 @@ impl Font {
             0x02 => FontUnderline::Double,
             0x21 => FontUnderline::SingleAccounting,
             0x22 => FontUnderline::DoubleAccounting,
-            value => return Err(invalid(format!("Font underline {value:#04x} is invalid"))),
+            value => {
+                tolerance.tolerate(
+                    FormattingDefect::FontUnderline,
+                    u32::from(index),
+                    u32::from(value),
+                    || invalid(format!("Font underline {value:#04x} is invalid")),
+                )?;
+                FontUnderline::Single
+            },
         };
         let family = match data[11] {
             0 => FontFamily::NotApplicable,
@@ -268,9 +312,13 @@ impl Font {
             0xee => FontCharset::EastEurope,
             0xff => FontCharset::Oem,
             value => {
-                return Err(invalid(format!(
-                    "Font character set {value:#04x} is invalid"
-                )));
+                tolerance.tolerate(
+                    FormattingDefect::FontCharset,
+                    u32::from(index),
+                    u32::from(value),
+                    || invalid(format!("Font character set {value:#04x} is invalid")),
+                )?;
+                FontCharset::Default
             },
         };
 
@@ -285,9 +333,18 @@ impl Font {
                 ))
             })?;
         } else if character_count > MAX_FONT_NAME_LENGTH {
-            return Err(invalid(format!(
-                "Font name has {character_count} characters; expected {MIN_FONT_NAME_LENGTH}..={MAX_FONT_NAME_LENGTH}"
-            )));
+            // The payload length is still checked against `cch` below, so the
+            // name is well framed; only the authoring limit is exceeded.
+            tolerance.tolerate(
+                FormattingDefect::FontNameLength,
+                u32::from(index),
+                u32::try_from(character_count).unwrap_or(u32::MAX),
+                || {
+                    invalid(format!(
+                        "Font name has {character_count} characters; expected {MIN_FONT_NAME_LENGTH}..={MAX_FONT_NAME_LENGTH}"
+                    ))
+                },
+            )?;
         }
         let string_flags = data[15];
         let wide = string_flags & 0x01 != 0;
@@ -320,7 +377,9 @@ impl Font {
             name_bytes.iter().map(|&value| char::from(value)).collect()
         };
         if name.contains('\0') {
-            return Err(invalid("Font name contains a null character"));
+            tolerance.tolerate(FormattingDefect::FontNameNul, u32::from(index), 0, || {
+                invalid("Font name contains a null character")
+            })?;
         }
 
         Ok(Self {
@@ -364,12 +423,20 @@ pub(crate) fn validate_font_index(index: u16) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_font_table(fonts: &[Font]) -> Result<()> {
+/// Check the parsed font table: logical indices must follow the physical
+/// order (skipping the reserved index 4), and MS-XLS requires at least four
+/// fonts. A shorter table is indexed as read under
+/// [`super::Leniency::TolerateFormattingDefects`], recorded as
+/// [`FormattingDefect::FontCount`].
+pub(crate) fn validate_font_table(fonts: &[Font], tolerance: &mut ToleranceLog) -> Result<()> {
     if fonts.len() < 4 {
-        return Err(invalid(format!(
-            "workbook has {} Font records; expected at least four",
-            fonts.len()
-        )));
+        let count = u32::try_from(fonts.len()).unwrap_or(u32::MAX);
+        tolerance.tolerate(FormattingDefect::FontCount, count, count, || {
+            invalid(format!(
+                "workbook has {} Font records; expected at least four",
+                fonts.len()
+            ))
+        })?;
     }
     for (physical_index, font) in fonts.iter().enumerate() {
         let expected_index = logical_font_index(physical_index)?;
@@ -382,6 +449,10 @@ pub(crate) fn validate_font_table(fonts: &[Font]) -> Result<()> {
     }
     Ok(())
 }
+
+/// `Icv` 0x7FFF: the window-text (automatic) font color, the substitute for
+/// an invalid font color index.
+const AUTOMATIC_FONT_COLOR: u16 = 0x7fff;
 
 pub(crate) fn valid_color_index(index: u16) -> bool {
     matches!(index, 0x0000..=0x0041 | 0x004d..=0x004f | 0x0051 | 0x7fff)
@@ -494,13 +565,22 @@ mod tests {
 
     #[test]
     fn validates_required_default_font_prefix() {
+        let strict = || ToleranceLog::new(Leniency::Strict);
         let fonts = required_prefix();
-        validate_font_table(&fonts).unwrap();
+        validate_font_table(&fonts, &mut strict()).unwrap();
 
-        assert!(validate_font_table(&fonts[..3]).is_err());
+        assert!(validate_font_table(&fonts[..3], &mut strict()).is_err());
+        let mut lenient = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+        validate_font_table(&fonts[..3], &mut lenient).unwrap();
+        let report = lenient.into_report();
+        assert_eq!(report.count(FormattingDefect::FontCount), 1);
+        assert_eq!(report.defects()[0].observed(), 3);
+
         let mut wrong = fonts;
         wrong[1].index = 5;
-        assert!(validate_font_table(&wrong).is_err());
+        assert!(validate_font_table(&wrong, &mut strict()).is_err());
+        let mut lenient = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+        assert!(validate_font_table(&wrong, &mut lenient).is_err());
     }
 
     #[test]
@@ -521,6 +601,83 @@ mod tests {
             data[offset] = value;
             assert!(parse_record(0, &data).is_err());
         }
+    }
+
+    #[test]
+    fn the_formatting_opt_in_repairs_each_invalid_scalar_field() {
+        let cases: [(usize, &[u8], FormattingDefect, u32); 9] = [
+            (0, &19u16.to_le_bytes(), FormattingDefect::FontHeight, 19),
+            (
+                0,
+                &9000u16.to_le_bytes(),
+                FormattingDefect::FontHeight,
+                9000,
+            ),
+            (
+                4,
+                &0x0042u16.to_le_bytes(),
+                FormattingDefect::FontColor,
+                0x42,
+            ),
+            (6, &99u16.to_le_bytes(), FormattingDefect::FontWeight, 99),
+            (
+                6,
+                &1200u16.to_le_bytes(),
+                FormattingDefect::FontWeight,
+                1200,
+            ),
+            (8, &3u16.to_le_bytes(), FormattingDefect::FontEscapement, 3),
+            (10, &[3], FormattingDefect::FontUnderline, 3),
+            (12, &[3], FormattingDefect::FontCharset, 3),
+            (12, &[0xde], FormattingDefect::FontCharset, 0xde),
+        ];
+        for (offset, bytes, defect, observed) in cases {
+            let mut data = font_record(400, false, 0x7fff, "Arial");
+            data[offset..offset + bytes.len()].copy_from_slice(bytes);
+            assert!(parse_record(5, &data).is_err(), "{defect:?} strict");
+
+            let mut log = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+            let font = Font::parse_record(5, &data, &mut log).unwrap();
+            let report = log.into_report();
+            assert_eq!(report.total(), 1, "{defect:?}");
+            let entry = report.defects()[0];
+            assert_eq!(entry.defect(), crate::leniency::Defect::Formatting(defect));
+            assert_eq!(entry.ordinal(), 5, "the font index");
+            assert_eq!(entry.observed(), observed);
+            assert_eq!(font.name(), "Arial");
+            match defect {
+                FormattingDefect::FontHeight => {
+                    assert!((20..=8191).contains(&font.height_twips()));
+                },
+                FormattingDefect::FontColor => assert_eq!(font.color_index(), 0x7fff),
+                FormattingDefect::FontWeight => assert!((100..=1000).contains(&font.weight())),
+                FormattingDefect::FontEscapement => {
+                    assert_eq!(font.escapement(), FontEscapement::Normal);
+                },
+                FormattingDefect::FontUnderline => {
+                    assert_eq!(font.underline(), FontUnderline::Single);
+                },
+                FormattingDefect::FontCharset => assert_eq!(font.charset(), FontCharset::Default),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    #[test]
+    fn the_formatting_opt_in_keeps_long_and_nul_carrying_names_verbatim() {
+        let long = "A".repeat(40);
+        let mut log = ToleranceLog::new(Leniency::TolerateFormattingDefects);
+        let font =
+            Font::parse_record(0, &font_record(400, false, 0x7fff, &long), &mut log).unwrap();
+        assert_eq!(font.name(), long);
+        let font =
+            Font::parse_record(1, &font_record(400, false, 0x7fff, "A\0B"), &mut log).unwrap();
+        assert_eq!(font.name(), "A\0B");
+        let report = log.into_report();
+        assert_eq!(report.count(FormattingDefect::FontNameLength), 1);
+        assert_eq!(report.defects()[0].observed(), 40);
+        assert_eq!(report.count(FormattingDefect::FontNameNul), 1);
+        assert_eq!(report.defects()[1].ordinal(), 1);
     }
 
     #[test]

@@ -127,6 +127,45 @@ pub enum FormattingDefect {
     /// Repaired by decoding only the characters the record actually contains,
     /// which yields a truncated but well-formed number-format code.
     FormatStringOverrun,
+    /// `Font.dyHeight` was neither zero nor within `20..=8191` twips.
+    ///
+    /// Repaired by clamping into `20..=8191`.
+    FontHeight,
+    /// `Font.icv` was not a valid `Icv`.
+    ///
+    /// Repaired to 0x7FFF, the automatic (window-text) font color.
+    FontColor,
+    /// `Font.bls` was neither zero nor within `100..=1000`.
+    ///
+    /// Repaired by clamping into `100..=1000`.
+    FontWeight,
+    /// `Font.sss` (escapement) was outside `0..=2`.
+    ///
+    /// Repaired to `Normal`: no superscript or subscript.
+    FontEscapement,
+    /// `Font.uls` was not one of the five defined underline styles.
+    ///
+    /// Repaired to `Single`, keeping the record's claim that the text is
+    /// underlined.
+    FontUnderline,
+    /// `Font.bCharSet` was outside the character-set enumeration.
+    ///
+    /// Repaired to `Default` (1). The name and glyphs are unaffected; BIFF8
+    /// font names are stored as Unicode.
+    FontCharset,
+    /// `Font.cch` exceeded 31 characters, though the payload held them all.
+    ///
+    /// Repaired by keeping the whole name as stored.
+    FontNameLength,
+    /// The font name contained a NUL character.
+    ///
+    /// Repaired by keeping the name as stored, NUL included.
+    FontNameNul,
+    /// The workbook held fewer than the four `Font` records MS-XLS requires.
+    ///
+    /// Repaired by indexing the font table as read; references to an absent
+    /// font resolve to no font.
+    FontCount,
 }
 
 impl FormattingDefect {
@@ -134,9 +173,17 @@ impl FormattingDefect {
     #[must_use]
     pub fn record_type(self) -> u16 {
         match self {
-            FormattingDefect::FontFamily | FormattingDefect::FontNameEmpty => {
-                super::font::FONT_RECORD_TYPE
-            },
+            FormattingDefect::FontFamily
+            | FormattingDefect::FontNameEmpty
+            | FormattingDefect::FontHeight
+            | FormattingDefect::FontColor
+            | FormattingDefect::FontWeight
+            | FormattingDefect::FontEscapement
+            | FormattingDefect::FontUnderline
+            | FormattingDefect::FontCharset
+            | FormattingDefect::FontNameLength
+            | FormattingDefect::FontNameNul
+            | FormattingDefect::FontCount => super::font::FONT_RECORD_TYPE,
             FormattingDefect::AlignmentJustifyLastLine => super::number_format::XF_RECORD,
             FormattingDefect::ExtendedFormatCountMismatch => super::number_format::XFCRC_RECORD,
             FormattingDefect::FormatStringOverrun => super::number_format::FORMAT_RECORD,
@@ -158,6 +205,15 @@ impl FormattingDefect {
             FormattingDefect::FormatStringOverrun => {
                 "Format record character count overstates its payload"
             },
+            FormattingDefect::FontHeight => "Font height is outside 20..=8191 twips",
+            FormattingDefect::FontColor => "Font color index is not a valid Icv",
+            FormattingDefect::FontWeight => "Font weight is outside 100..=1000",
+            FormattingDefect::FontEscapement => "Font escapement is outside the enumeration",
+            FormattingDefect::FontUnderline => "Font underline style is outside the enumeration",
+            FormattingDefect::FontCharset => "Font character set is outside the enumeration",
+            FormattingDefect::FontNameLength => "Font name is longer than 31 characters",
+            FormattingDefect::FontNameNul => "Font name contains a NUL character",
+            FormattingDefect::FontCount => "Workbook has fewer than four Font records",
         }
     }
 }
@@ -450,8 +506,9 @@ impl ToleratedDefect {
 
     /// Where the defect was found.
     ///
-    /// For [`FormattingDefect::FontFamily`] and
-    /// [`FormattingDefect::FontNameEmpty`] this is the font's logical index.
+    /// For every `Font*` [`FormattingDefect`] except
+    /// [`FormattingDefect::FontCount`] this is the font's logical index; for
+    /// [`FormattingDefect::FontCount`] it is the number of fonts read.
     /// For [`FormattingDefect::AlignmentJustifyLastLine`] it is the `XF`
     /// index. For [`FormattingDefect::FormatStringOverrun`] it is the
     /// zero-based ordinal of the `Format` record among the `Format` records
@@ -472,7 +529,10 @@ impl ToleratedDefect {
     /// The offending value read from the file.
     ///
     /// For [`FormattingDefect::FontFamily`] this is the out-of-range
-    /// `bFamily` byte. For [`FormattingDefect::AlignmentJustifyLastLine`] it
+    /// `bFamily` byte; for the other scalar `Font*` classes it is likewise the
+    /// raw field value, for [`FormattingDefect::FontNameLength`] the declared
+    /// `cch`, for [`FormattingDefect::FontCount`] the number of fonts read,
+    /// and zero for [`FormattingDefect::FontNameNul`]. For [`FormattingDefect::AlignmentJustifyLastLine`] it
     /// is the `alcH` value that accompanied the flag. For
     /// [`FormattingDefect::ExtendedFormatCountMismatch`] it is the declared
     /// `cxfs`. For [`FormattingDefect::FormatStringOverrun`] it is the

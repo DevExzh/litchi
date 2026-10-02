@@ -15,13 +15,15 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::Cell as _;
 use litchi_xls::{
-    Defect, EncodingDefect, Leniency, OpenOptions, PaletteDefect, SheetNameDefect,
-    SourceBackedOptions, SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
+    Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions, PaletteDefect,
+    SheetNameDefect, SourceBackedOptions, SourceBackedWorkbook, ToleranceReport, ToleratedDefect,
+    Workbook, Writer,
 };
 
 const CODEPAGE: u16 = 0x0042;
 const BOUND_SHEET: u16 = 0x0085;
 const PALETTE: u16 = 0x0092;
+const FONT: u16 = 0x0031;
 const INDEX: u16 = 0x020B;
 
 /// One BIFF record of a Workbook stream, remembering where it sat in the
@@ -522,4 +524,73 @@ fn a_palette_whose_length_contradicts_its_count_is_still_refused() {
     };
     let error = error.to_string();
     assert!(error.contains("Palette"), "{error}");
+}
+
+// ---------------------------------------------------------------------------
+// F3.5: Font scalar fields (opt-in: Leniency::TolerateFormattingDefects)
+// ---------------------------------------------------------------------------
+
+/// The fixture with the physical-index-`nth` font's weight set to `weight`
+/// and its character set to `charset`.
+fn with_font_fields(nth: usize, weight: u16, charset: u8) -> Vec<u8> {
+    let mut stream = Stream::simple();
+    let payload = stream.payload_mut(FONT, nth);
+    payload[6..8].copy_from_slice(&weight.to_le_bytes());
+    payload[12] = charset;
+    stream.package()
+}
+
+fn open_eager(package: &[u8], leniency: Leniency) -> Result<Workbook<Cursor<Vec<u8>>>, String> {
+    Workbook::new_with_options(
+        Cursor::new(package.to_vec()),
+        OpenOptions::new().with_leniency(leniency),
+    )
+    .map_err(|error| error.to_string())
+}
+
+#[test]
+fn invalid_font_scalars_stay_refused_by_default() {
+    let package = with_font_fields(3, 1200, 3);
+    for leniency in [Leniency::Strict, Leniency::TolerateSheetNameDefects] {
+        let Err(error) = open_eager(&package, leniency) else {
+            panic!("{leniency:?} must refuse");
+        };
+        assert!(error.contains("Font weight"), "{error}");
+    }
+}
+
+#[test]
+fn the_formatting_opt_in_repairs_invalid_font_scalars() {
+    let package = with_font_fields(3, 1200, 3);
+    for leniency in [
+        Leniency::TolerateFormattingDefects,
+        Leniency::TolerateAllDefects,
+    ] {
+        let workbook = open_eager(&package, leniency).expect("the opt-in repairs the font");
+        let found = workbook
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|entry| (entry.defect(), entry.ordinal(), entry.observed()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            found,
+            [
+                (Defect::Formatting(FormattingDefect::FontWeight), 3, 1200),
+                (Defect::Formatting(FormattingDefect::FontCharset), 3, 3),
+            ]
+        );
+        let font = workbook.font(3).expect("the repaired font is indexed");
+        assert_eq!(font.weight(), 1000);
+    }
+    // The source-backed open never reads Font records.
+    assert!(SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(package))).is_ok());
+}
+
+#[test]
+fn conforming_fonts_record_nothing_under_the_opt_in() {
+    assert_clean_under(
+        &Stream::simple().package(),
+        Leniency::TolerateFormattingDefects,
+    );
 }
