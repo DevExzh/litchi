@@ -729,3 +729,56 @@ fn conformant_slide_list_records_nothing_and_invalid_entries_stay_fatal() {
             .is_err()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.3: processing instructions are skipped, recorded once.
+// ---------------------------------------------------------------------------
+
+use litchi_pptx::MarkupDefect;
+
+#[test]
+fn processing_instructions_are_skipped_and_recorded_once_per_part() {
+    let slide = patched_part(SLIDE1, |xml| {
+        xml.replace("<p:spTree>", "<p:spTree><?publisher stage=\"2\"?>")
+            .replace(
+                "<a:t>Learning PPTX</a:t>",
+                "<a:t>Learning <?mark?>PPTX</a:t>",
+            )
+            .replace(
+                "</p:clrMapOvr>",
+                r#"</p:clrMapOvr><p:transition><p:fade><?fx?></p:fade></p:transition>"#,
+            )
+    });
+    let package = deck_with_slide(slide);
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+
+    let scene = slides[0].shapes().unwrap();
+    assert_eq!(
+        located(scene.tolerance_report()),
+        [(
+            Defect::Markup(MarkupDefect::ProcessingInstruction),
+            0,
+            Some(SLIDE1)
+        )]
+    );
+    assert!(slides[0].text().unwrap().contains("Learning PPTX"));
+    assert!(slides[0].animations().is_ok());
+
+    let blob = package
+        .opc()
+        .unwrap()
+        .get_part(&PackURI::new(SLIDE1).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let transition = litchi_pptx::transition::read(&blob).unwrap().unwrap();
+    assert_eq!(transition.kind(), &TransitionKind::Fade { black: None });
+
+    // DOCTYPE stays rejected.
+    let doctype =
+        String::from_utf8(blob)
+            .unwrap()
+            .replacen("<p:sld ", "<!DOCTYPE p:sld><p:sld ", 1);
+    assert!(litchi_pptx::shape::Scene::read(doctype.as_bytes()).is_err());
+}

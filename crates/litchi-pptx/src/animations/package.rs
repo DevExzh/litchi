@@ -391,10 +391,11 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
                     .checked_sub(1)
                     .ok_or_else(|| animation_relationship_error("unbalanced slide XML"))?;
             },
-            Event::DocType(_) | Event::PI(_) => {
-                return invalid_relationship(
-                    "DTD and processing instructions are rejected in slide XML",
-                );
+            // Processing instructions are skipped like the timing parser
+            // skips them (audit finding 6.3); the slide's shape scene records
+            // them.
+            Event::DocType(_) => {
+                return invalid_relationship("DTDs are rejected in slide XML");
             },
             Event::Eof => break,
             _ => {},

@@ -16,7 +16,7 @@ use quick_xml::{
 };
 use thiserror::Error as ThisError;
 
-use crate::leniency::{ShapeDefect, ToleranceReport};
+use crate::leniency::{MarkupDefect, ShapeDefect, ToleranceReport};
 use crate::{Error, Result};
 
 use super::model::{
@@ -492,6 +492,7 @@ struct Scanner<'a> {
     /// One flag set per open element: [`PARENT_NV_PR`] / [`PARENT_XFRM`].
     parent_stack: Vec<u8>,
     tolerance: ToleranceReport,
+    seen_processing_instruction: bool,
     common_slide_depth: Option<usize>,
     tree_depth: Option<usize>,
     seen_tree: bool,
@@ -510,6 +511,7 @@ impl<'a> Scanner<'a> {
             nodes: 0,
             parent_stack: Vec::new(),
             tolerance: ToleranceReport::default(),
+            seen_processing_instruction: false,
             common_slide_depth: None,
             tree_depth: None,
             seen_tree: false,
@@ -613,10 +615,18 @@ impl<'a> Scanner<'a> {
                         Error::Invalid("shape XML element stack became inconsistent".into())
                     })?;
                 },
-                Event::DocType(_) | Event::PI(_) => {
-                    return Err(Error::Invalid(
-                        "DOCTYPE and processing instructions are forbidden in shape XML".into(),
-                    ));
+                Event::DocType(_) => {
+                    return Err(Error::Invalid("DOCTYPE is forbidden in shape XML".into()));
+                },
+                // Processing instructions are legal XML 1.0 and carry no
+                // shape content: skip them, recording once per owner part
+                // (audit finding 6.3).
+                Event::PI(_) => {
+                    if !self.seen_processing_instruction {
+                        self.seen_processing_instruction = true;
+                        self.tolerance
+                            .record(MarkupDefect::ProcessingInstruction, 0);
+                    }
                 },
                 Event::Eof => break,
                 _ => {},

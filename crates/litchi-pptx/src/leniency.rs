@@ -178,6 +178,21 @@
 //! the opened-presentation transactions — keep the strict contract and
 //! refuse a slide list that needed a repair.
 //!
+//! # Processing instructions (audit finding 6.3)
+//!
+//! The slide-owner read surfaces skip processing instructions instead of
+//! failing the part: the shape scene, semantic slide text, the timing
+//! host scan, the layout-ID scan, and typed transition effects. The repair
+//! is recorded once per part, as [`MarkupDefect::ProcessingInstruction`],
+//! by the part's shape scene ([`crate::shape::Scene::tolerance_report`]),
+//! so a caller enumerating `shapes()` reports sees every part that carried
+//! one; the other readers of the same part skip them consistently rather
+//! than record duplicates. DOCTYPE declarations stay rejected. The remaining
+//! feature codecs (fonts, view properties, media, comments, ink, and the
+//! like) and the lossless edit planners still reject processing
+//! instructions: those readers have no report carrier yet, and skipping
+//! there without recording would swallow the defect silently.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -276,6 +291,8 @@ pub enum Defect {
     Transition(TransitionDefect),
     /// A presentation slide-list defect repaired when the package is opened.
     Presentation(PresentationDefect),
+    /// An XML-markup defect skipped by the reader.
+    Markup(MarkupDefect),
 }
 
 impl Defect {
@@ -287,6 +304,7 @@ impl Defect {
             Self::Shape(defect) => defect.repair(),
             Self::Transition(defect) => defect.repair(),
             Self::Presentation(defect) => defect.repair(),
+            Self::Markup(defect) => defect.repair(),
         }
     }
 }
@@ -480,6 +498,39 @@ impl PresentationDefect {
     }
 }
 
+/// The class of XML-markup defect a reader repairs.
+///
+/// Closed by design, and repaired under every [`Leniency`] variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum MarkupDefect {
+    /// The part contained a processing instruction (`<?target …?>`).
+    ///
+    /// Processing instructions are legal XML 1.0 (§2.6) and OOXML forbids
+    /// none; XSLT publishing pipelines, CMS re-serializers, and archival
+    /// tools inject them, and `PowerPoint` and LibreOffice skip them through
+    /// ordinary XML parsers. The reader skips them too. It is recorded once
+    /// per part, by the part's shape scene; the context is `0`. DOCTYPE
+    /// declarations remain rejected as a security posture.
+    ProcessingInstruction,
+}
+
+impl MarkupDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ProcessingInstruction => "skipped the part's processing instructions",
+        }
+    }
+}
+
+impl From<MarkupDefect> for Defect {
+    fn from(defect: MarkupDefect) -> Self {
+        Self::Markup(defect)
+    }
+}
+
 impl From<PresentationDefect> for Defect {
     fn from(defect: PresentationDefect) -> Self {
         Self::Presentation(defect)
@@ -526,7 +577,8 @@ pub struct ToleratedDefect {
     ///   otherwise;
     /// * [`Defect::Presentation`] — the slide ID (`p:sldId@id`) of the
     ///   skipped slide-list entry, or `0` for
-    ///   [`PresentationDefect::SlideListContent`].
+    ///   [`PresentationDefect::SlideListContent`];
+    /// * [`Defect::Markup`] — `0`; the part locates it.
     pub context: u32,
     /// The package part the defect was found in, such as
     /// `/ppt/slides/slide3.xml`.
@@ -741,6 +793,7 @@ mod tests {
             Defect::from(PresentationDefect::DuplicateSlideRelationship),
             Defect::from(PresentationDefect::DuplicateSlideTarget),
             Defect::from(PresentationDefect::SlideListContent),
+            Defect::from(MarkupDefect::ProcessingInstruction),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

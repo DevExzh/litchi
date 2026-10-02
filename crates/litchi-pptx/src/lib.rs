@@ -148,7 +148,7 @@ pub use error::{
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 pub use leniency::{
-    Defect, Leniency, PresentationDefect, ShapeDefect, TimingDefect, ToleranceReport,
+    Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect, TimingDefect, ToleranceReport,
     ToleratedDefect, TransitionDefect,
 };
 #[cfg(feature = "encryption")]

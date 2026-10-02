@@ -143,8 +143,8 @@ fn layout_relationship_ids(part: &dyn Part) -> Result<Vec<String>> {
                 }
                 depth -= 1;
             },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTDs and processing instructions are rejected"));
+            Event::DocType(_) => {
+                return Err(invalid("DTDs are rejected"));
             },
             Event::Eof => break,
             _ => {},
@@ -415,11 +415,10 @@ impl RawTextScan {
             Event::DocType(_) => {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
             },
-            Event::PI(_) => {
-                return Err(invalid(
-                    "processing instructions are not permitted in slide text",
-                ));
-            },
+            // A processing instruction is legal XML that carries no slide content;
+            // it is skipped (audit finding 6.3) and recorded once by the part's
+            // shape scene.
+            Event::PI(_) => {},
             Event::Decl(_) => {
                 if self.declaration_seen || !declaration_is_first || self.root_seen {
                     return Err(invalid("XML declarations must be the first document event"));
@@ -912,11 +911,10 @@ impl<'a> SemanticTextParser<'a> {
             Event::DocType(_) => {
                 return Err(invalid("DTD declarations are not permitted in slide text"));
             },
-            Event::PI(_) => {
-                return Err(invalid(
-                    "processing instructions are not permitted in slide text",
-                ));
-            },
+            // A processing instruction is legal XML that carries no slide content;
+            // it is skipped (audit finding 6.3) and recorded once by the part's
+            // shape scene.
+            Event::PI(_) => {},
             Event::Comment(comment) => {
                 let decoded = comment
                     .decode()
@@ -1582,11 +1580,10 @@ mod tests {
                 Event::DocType(_) => {
                     return Err(invalid("DTD declarations are not permitted in slide text"));
                 },
-                Event::PI(_) => {
-                    return Err(invalid(
-                        "processing instructions are not permitted in slide text",
-                    ));
-                },
+                // A processing instruction is legal XML that carries no slide content;
+                // it is skipped (audit finding 6.3) and recorded once by the part's
+                // shape scene.
+                Event::PI(_) => {},
                 Event::Decl(_) => {
                     if declaration_seen || !declaration_is_first || root_seen {
                         return Err(invalid("XML declarations must be the first document event"));

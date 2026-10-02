@@ -309,7 +309,10 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                     "typed transition effects cannot contain text".into(),
                 ));
             },
-            Event::Comment(_) | Event::CData(_) | Event::PI(_) | Event::GeneralRef(_)
+            // A processing instruction carries no effect content; it is
+            // skipped (audit finding 6.3) and recorded by the owner part's
+            // shape scene.
+            Event::Comment(_) | Event::CData(_) | Event::GeneralRef(_)
                 if capture
                     .as_ref()
                     .is_some_and(|active| matches!(active.role, Role::Known)) =>
