@@ -4757,11 +4757,12 @@ mod tests {
             .stream(&["WordDocument".to_string()])
             .expect("WordDocument stream")
             .to_vec();
-        // FIB pair 113 is owned by the public RSID reader, not by the strict
-        // body-text owner. A one-byte payload is deterministically malformed
-        // for that reader while the strict owner ignores it.
-        let pointer = 154 + 113 * 8;
-        word[pointer..pointer + 4].copy_from_slice(&0_u32.to_le_bytes());
+        // FIB pair 1 (fcStshf/lcbStshf) is owned by the public reader's
+        // stylesheet parse, not by the strict body-text owner. A one-byte
+        // stylesheet is a framing error, which stays fatal under every
+        // leniency (optional tables such as the RSID list now degrade instead,
+        // see LENIENCY_AUDIT F1.1), while the strict owner ignores it.
+        let pointer = 154 + 8;
         word[pointer + 4..pointer + 8].copy_from_slice(&1_u32.to_le_bytes());
         package
             .put_stream(&["WordDocument".to_string()], word)
