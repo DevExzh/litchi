@@ -50,6 +50,7 @@
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 use crate::error::{Error, Result};
+use crate::leniency::{RevisionDefect, ToleranceReport};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_ooxml_common::properties::time::DateTime;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -448,10 +449,34 @@ pub(crate) fn parse_revisions_with_context(
     parse_revisions_with_limits(xml_bytes, inherited_namespaces, Limits::default())
 }
 
+/// Parse revisions, applying the [`RevisionDefect`] repairs without
+/// reporting them.
+///
+/// Fragment-level accessors (paragraph, table, row, and cell revisions, and
+/// pinned source-backed views) have no report carrier; they apply the same
+/// Word-compatible repairs, and the document-level
+/// [`Document::revisions`](crate::Document::revisions) over the same part
+/// enumerates them through [`Document::tolerance_report`](crate::Document::tolerance_report).
 pub(crate) fn parse_revisions_with_limits(
     xml_bytes: &[u8],
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
     limits: Limits,
+) -> Result<SmallVec<[Revision; 4]>> {
+    parse_revisions_tolerant(
+        xml_bytes,
+        inherited_namespaces,
+        limits,
+        &mut ToleranceReport::default(),
+    )
+}
+
+/// Parse revisions, recording each [`RevisionDefect`] repair in `tolerance`
+/// with the byte offset of the revision element within `xml_bytes`.
+pub(crate) fn parse_revisions_tolerant(
+    xml_bytes: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    limits: Limits,
+    tolerance: &mut ToleranceReport,
 ) -> Result<SmallVec<[Revision; 4]>> {
     let limits = limits.validate()?;
     check("source bytes", xml_bytes.len(), limits.max_source_bytes)?;
@@ -623,26 +648,18 @@ pub(crate) fn parse_revisions_with_limits(
                     && fragment_prefix.as_ref().and_then(Option::as_deref) == Some(b"w"))
     }
 
-    fn validate_date_utc(value: &str) -> Result<()> {
+    /// Whether `value` is a bounded ASCII `xsd:dateTime` in UTC.
+    fn is_valid_date_utc(value: &str) -> bool {
         if value.len() > MAX_REVISION_DATE_UTC_BYTES || !value.is_ascii() {
-            return Err(Error::InvalidFormat(
-                "revision dateUtc must be a bounded ASCII UTC dateTime".into(),
-            ));
+            return false;
         }
-        DateTime::new(value.to_owned()).map_err(|_source_error| {
-            Error::InvalidFormat("revision dateUtc must be a valid xsd:dateTime".into())
-        })?;
+        if DateTime::new(value.to_owned()).is_err() {
+            return false;
+        }
         let normalized = collapse_xml_whitespace(value);
-        if normalized.ends_with('Z')
+        normalized.ends_with('Z')
             || normalized.ends_with("+00:00")
             || normalized.ends_with("-00:00")
-        {
-            Ok(())
-        } else {
-            Err(Error::InvalidFormat(
-                "revision dateUtc must use a UTC timezone".into(),
-            ))
-        }
     }
 
     fn collapse_xml_whitespace(value: &str) -> String {
@@ -662,25 +679,13 @@ pub(crate) fn parse_revisions_with_limits(
         output
     }
 
-    fn validate_xml_integer(value: &str) -> Result<()> {
+    fn is_xml_integer(value: &str) -> bool {
         let normalized = collapse_xml_whitespace(value);
         let digits = normalized
             .strip_prefix('+')
             .or_else(|| normalized.strip_prefix('-'))
             .unwrap_or(&normalized);
-        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(Error::InvalidFormat(
-                "revision ID must be a valid xsd:integer".into(),
-            ));
-        }
-        Ok(())
-    }
-
-    fn validate_date(value: &str) -> Result<()> {
-        DateTime::new(value.to_owned()).map_err(|_source_error| {
-            Error::InvalidFormat("revision date must be a valid xsd:dateTime".into())
-        })?;
-        Ok(())
+        !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
     }
 
     fn revision_from_element(
@@ -691,6 +696,8 @@ pub(crate) fn parse_revisions_with_limits(
         fragment_prefix: &Option<Option<Vec<u8>>>,
         limits: Limits,
         metadata_bytes: &mut usize,
+        tolerance: &mut ToleranceReport,
+        offset: u64,
     ) -> Result<Revision> {
         let mut author = None;
         let mut date = None;
@@ -739,8 +746,13 @@ pub(crate) fn parse_revisions_with_limits(
                             ));
                         }
                         let value = decode_attribute(&attr, decoder, limits, metadata_bytes)?;
-                        validate_date(&value)?;
-                        date = Some(value);
+                        if DateTime::new(value.clone()).is_ok() {
+                            date = Some(value);
+                        } else {
+                            // CT_TrackChange's date is optional; Word shows a
+                            // change with an unreadable date as undated.
+                            tolerance.record(RevisionDefect::InvalidDate, offset);
+                        }
                     },
                     b"id" => {
                         if id.is_some() {
@@ -749,7 +761,11 @@ pub(crate) fn parse_revisions_with_limits(
                             ));
                         }
                         let value = decode_attribute(&attr, decoder, limits, metadata_bytes)?;
-                        validate_xml_integer(&value)?;
+                        if !is_xml_integer(&value) {
+                            // Revision IDs only key the annotation; keep the
+                            // authored token so it still identifies it.
+                            tolerance.record(RevisionDefect::NonIntegerId, offset);
+                        }
                         id = Some(value);
                     },
                     _ => {},
@@ -761,15 +777,19 @@ pub(crate) fn parse_revisions_with_limits(
                     ));
                 }
                 let value = decode_attribute(&attr, decoder, limits, metadata_bytes)?;
-                validate_date_utc(&value)?;
-                date_utc = Some(value);
+                if is_valid_date_utc(&value) {
+                    date_utc = Some(value);
+                } else {
+                    tolerance.record(RevisionDefect::InvalidDateUtc, offset);
+                }
             }
         }
 
         if revision_type != RevisionType::TableGridChange && author.is_none() {
-            return Err(Error::InvalidFormat(
-                "tracked revision requires a Word author attribute".into(),
-            ));
+            // ECMA-376 CT_TrackChange declares `author` optional;
+            // privacy-scrubbed documents omit it and Word shows the change
+            // with an unknown author. Keep the revision unattributed.
+            tolerance.record(RevisionDefect::MissingAuthor, offset);
         }
         let id = id.ok_or_else(|| {
             Error::InvalidFormat("tracked revision requires a Word ID attribute".into())
@@ -790,6 +810,9 @@ pub(crate) fn parse_revisions_with_limits(
     let mut root_closed = false;
     let mut declaration_seen = false;
     loop {
+        // Text and comments are separate events, so the position before an
+        // element event is its `<` — the context for revision repairs.
+        let offset = reader.buffer_position();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -868,6 +891,8 @@ pub(crate) fn parse_revisions_with_limits(
                         legacy_attribute_prefix,
                         limits,
                         &mut metadata_bytes,
+                        tolerance,
+                        offset,
                     )?;
                     revisions
                         .try_reserve(1)
@@ -956,6 +981,8 @@ pub(crate) fn parse_revisions_with_limits(
                         legacy_attribute_prefix,
                         limits,
                         &mut metadata_bytes,
+                        tolerance,
+                        offset,
                     )?;
                     revisions
                         .try_reserve(1)
@@ -1535,7 +1562,20 @@ mod tests {
             </w:p>"#
         );
 
-        assert!(parse_revisions(xml.as_bytes()).is_err());
+        // A non-UTC dateUtc is dropped and recorded, never fatal (F2.5).
+        let mut report = ToleranceReport::default();
+        let revisions =
+            parse_revisions_tolerant(xml.as_bytes(), &[], Limits::default(), &mut report).unwrap();
+        assert_eq!(revisions[0].date_utc(), None);
+        assert_eq!(revisions[0].author(), Some("Alice"));
+        assert_eq!(
+            report.defects()[0].defect,
+            crate::Defect::Revision(RevisionDefect::InvalidDateUtc)
+        );
+        assert_eq!(
+            report.defects()[0].context,
+            xml.find("<w:ins").unwrap() as u64
+        );
     }
 
     #[test]

@@ -300,13 +300,21 @@ impl<'a> Document<'a> {
     /// Read recognized tracked revisions throughout the visible main document.
     /// Includes table metadata and body-final section properties, in source order.
     ///
+    /// A revision missing its optional `w:author`, or carrying an unreadable
+    /// `w:date`/`w16du:dateUtc` or a non-integer `w:id`, is kept with the
+    /// value absent (or, for the ID, the authored token) instead of failing
+    /// the listing; each repair is a [`crate::leniency::RevisionDefect`]
+    /// merged into [`Document::tolerance_report`].
+    ///
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
-        self.part.revisions()
+        self.revisions_with_limits(crate::revision::Limits::default())
     }
 
     /// Read document revisions with explicit parser and retention limits.
+    ///
+    /// Repairs are recorded as for [`Self::revisions`].
     ///
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
@@ -314,7 +322,15 @@ impl<'a> Document<'a> {
         &self,
         limits: crate::revision::Limits,
     ) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
-        self.part.revisions_with_limits(limits)
+        let mut repaired = crate::leniency::ToleranceReport::default();
+        let result = crate::revision::parse_revisions_tolerant(
+            self.part.xml_bytes(),
+            &[],
+            limits,
+            &mut repaired,
+        );
+        self.merge_tolerance(&repaired);
+        result
     }
 
     /// Get all tables in the document.

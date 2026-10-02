@@ -377,3 +377,69 @@ fn ill_formed_numbering_xml_stays_fatal() {
     ));
     assert!(package.document().expect("document").list_items().is_err());
 }
+
+// ---------------------------------------------------------------------------
+// F2.5 — tracked revision without w:author
+// ---------------------------------------------------------------------------
+
+#[test]
+fn revision_without_author_is_kept_unattributed_and_recorded() {
+    use litchi_docx::RevisionDefect;
+    use litchi_docx::source_backed::Package as SourceBackedPackage;
+    let document = document_xml(
+        r#"<w:p><w:ins w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z"><w:r><w:t>kept</w:t></w:r></w:ins><w:ins w:id="2" w:date="2026-01-02T00:00:00Z"><w:r><w:t>anon</w:t></w:r></w:ins><w:del w:id="3" w:author="Bob" w:date="yesterday"><w:r><w:delText>gone</w:delText></w:r></w:del></w:p>"#,
+    );
+    let anonymous = offset_of(&document, r#"<w:ins w:id="2""#);
+    let undated = offset_of(&document, r#"<w:del w:id="3""#);
+    let bytes = package_bytes(&document, &[]);
+
+    let package = open(&bytes);
+    let opened = package.document().expect("document");
+    let revisions = opened
+        .revisions()
+        .expect("a missing author no longer kills the listing");
+    assert_eq!(revisions.len(), 3);
+    assert_eq!(revisions[0].author(), Some("Alice"));
+    assert_eq!(revisions[1].author(), None);
+    assert_eq!(revisions[1].text(), "anon");
+    assert_eq!(revisions[2].date(), None);
+    assert_eq!(revisions[2].text(), "gone");
+    let recorded = [
+        ToleratedDefect {
+            defect: Defect::Revision(RevisionDefect::MissingAuthor),
+            context: anonymous,
+        },
+        ToleratedDefect {
+            defect: Defect::Revision(RevisionDefect::InvalidDate),
+            context: undated,
+        },
+    ];
+    assert_eq!(opened.tolerance_report().defects(), &recorded);
+
+    // The pinned source-backed view reports the same repairs.
+    let source = SourceBackedPackage::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(bytes),
+    ))
+    .expect("source package");
+    let pinned = source.document().expect("pinned document");
+    assert_eq!(pinned.revisions().expect("revisions").len(), 3);
+    assert_eq!(pinned.tolerance_report().defects(), &recorded);
+}
+
+#[test]
+fn attributed_revisions_record_nothing() {
+    let document = document_xml(
+        r#"<w:p><w:ins w:id="1" w:author="Alice" w:date="2026-01-01T00:00:00Z"><w:r><w:t>kept</w:t></w:r></w:ins></w:p>"#,
+    );
+    let package = open(&package_bytes(&document, &[]));
+    let opened = package.document().expect("document");
+    assert_eq!(opened.revisions().expect("revisions").len(), 1);
+    assert!(opened.tolerance_report().is_clean());
+}
+
+#[test]
+fn ill_formed_revision_xml_stays_fatal() {
+    let document = document_xml(r#"<w:p><w:ins w:id="1"><w:r><w:t>x</w:r></w:ins></w:p>"#);
+    let package = open(&package_bytes(&document, &[]));
+    assert!(package.document().expect("document").revisions().is_err());
+}

@@ -271,6 +271,52 @@ impl NumberingDefect {
     }
 }
 
+/// The class of tracked-revision defect the reader repairs the way Word
+/// repairs it.
+///
+/// This enumeration is closed by design. Each repair keeps the revision in
+/// the listing with the offending metadata absent, instead of failing
+/// [`Document::revisions`](crate::Document::revisions) as one batch. Each is
+/// recorded with the byte offset of the revision element's start tag within
+/// the main document XML, merged into
+/// [`Document::tolerance_report`](crate::Document::tolerance_report) (and the
+/// pinned source-backed [`Document`](crate::source_backed::Document)'s
+/// report). Fragment-level accessors (paragraph and table revisions) apply
+/// the same repairs; the document-level listing enumerates them. A missing
+/// `w:id`, duplicate attributes, ill-formed XML, and the revision resource
+/// limits stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RevisionDefect {
+    /// A tracked change has no `w:author`. ECMA-376 `CT_TrackChange` declares
+    /// the attribute optional; privacy-scrubbed documents and third-party
+    /// producers omit it, and Word shows such a change with an unknown
+    /// author. The revision is kept with
+    /// [`author`](crate::revision::Revision::author) `None`.
+    MissingAuthor,
+    /// A `w:date` is not a valid `xsd:dateTime`; the revision is kept undated.
+    InvalidDate,
+    /// A `w16du:dateUtc` is not a bounded UTC `xsd:dateTime`; the revision is
+    /// kept without it.
+    InvalidDateUtc,
+    /// A `w:id` is not an `xsd:integer`. The ID only keys the annotation, so
+    /// the authored token is kept as the revision's ID.
+    NonIntegerId,
+}
+
+impl RevisionDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::MissingAuthor => "kept the revision without an author",
+            Self::InvalidDate => "kept the revision without its unreadable date",
+            Self::InvalidDateUtc => "kept the revision without its unreadable UTC date",
+            Self::NonIntegerId => "kept the non-integer revision ID as authored",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -286,6 +332,8 @@ pub enum Defect {
     Settings(SettingsDefect),
     /// A `numbering.xml` defect degraded per item.
     Numbering(NumberingDefect),
+    /// A tracked-revision metadata defect repaired the way Word repairs it.
+    Revision(RevisionDefect),
 }
 
 impl Defect {
@@ -296,6 +344,7 @@ impl Defect {
             Self::Text(defect) => defect.repair(),
             Self::Settings(defect) => defect.repair(),
             Self::Numbering(defect) => defect.repair(),
+            Self::Revision(defect) => defect.repair(),
         }
     }
 }
@@ -315,6 +364,12 @@ impl From<SettingsDefect> for Defect {
 impl From<NumberingDefect> for Defect {
     fn from(defect: NumberingDefect) -> Self {
         Self::Numbering(defect)
+    }
+}
+
+impl From<RevisionDefect> for Defect {
+    fn from(defect: RevisionDefect) -> Self {
+        Self::Revision(defect)
     }
 }
 
@@ -496,6 +551,10 @@ mod tests {
             Defect::from(NumberingDefect::MissingAbstractDefinition),
             Defect::from(NumberingDefect::MismatchedOverrideLevel),
             Defect::from(NumberingDefect::MissingNumberingInstance),
+            Defect::from(RevisionDefect::MissingAuthor),
+            Defect::from(RevisionDefect::InvalidDate),
+            Defect::from(RevisionDefect::InvalidDateUtc),
+            Defect::from(RevisionDefect::NonIntegerId),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

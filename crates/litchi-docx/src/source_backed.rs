@@ -734,6 +734,7 @@ impl Package {
                     execution: self.execution.clone(),
                     paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                     paragraph_route,
+                    tolerance: Arc::default(),
                 })
             })();
             // The semantic/MCE stage can fail after the payload read has
@@ -3095,9 +3096,26 @@ pub struct Document {
     execution: Option<ExecutionContext>,
     paragraph_index_cache: Arc<ParagraphIndexCache>,
     paragraph_route: ParagraphIndexRoute,
+    /// Everything repaired while this pinned view was read, shared by its
+    /// clones. See `crate::leniency`.
+    tolerance: Arc<Mutex<crate::leniency::ToleranceReport>>,
 }
 
 impl Document {
+    /// A snapshot of everything repaired while this pinned view (or one of
+    /// its clones) was read, in discovery order.
+    ///
+    /// Tracked-revision repairs ([`crate::leniency::RevisionDefect`]) from
+    /// [`Self::revisions`] are recorded here; an empty report means every
+    /// read conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
+        self.tolerance
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     /// Borrow the bounded paragraph offsets for this pinned view.
     ///
     /// Managed opens fill the cell inside [`Package::document`], under the
@@ -3191,7 +3209,19 @@ impl Document {
         // admits and charges the same parser workspace as every other
         // whole-document query before it parses.
         let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
-        let result = crate::revision::parse_revisions_with_limits(self.xml.as_bytes(), &[], limits);
+        let mut repaired = crate::leniency::ToleranceReport::default();
+        let result = crate::revision::parse_revisions_tolerant(
+            self.xml.as_bytes(),
+            &[],
+            limits,
+            &mut repaired,
+        );
+        if !repaired.is_clean() {
+            self.tolerance
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .append(&repaired);
+        }
         self.check_execution()?;
         result
     }

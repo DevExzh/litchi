@@ -119,19 +119,49 @@ fn public_revision_limits_accept_exact_budgets_and_report_each_resource() {
 
 #[test]
 fn revision_metadata_requires_xsd_track_change_fields_and_values() {
+    // The required `w:id` stays mandatory.
     for xml in [
         br#"<w:p><w:ins/></w:p>"#.as_slice(),
-        br#"<w:p><w:ins w:id="1"/></w:p>"#.as_slice(),
         br#"<w:p><w:ins w:author="A"/></w:p>"#.as_slice(),
-        br#"<w:p><w:ins w:id="" w:author="A"/></w:p>"#.as_slice(),
-        br#"<w:p><w:ins w:id="not-an-integer" w:author="A"/></w:p>"#.as_slice(),
-        br#"<w:p><w:ins w:id="1" w:author="A" w:date="not-a-date"/></w:p>"#.as_slice(),
     ] {
         assert!(
             Paragraph::new(xml.to_vec()).revisions().is_err(),
             "accepted malformed revision metadata: {}",
             String::from_utf8_lossy(xml)
         );
+    }
+    // Optional or keying metadata degrades per revision (leniency F2.5): the
+    // revision is kept and the repair is recorded by the document listing.
+    for (xml, id, author, date) in [
+        (
+            br#"<w:p><w:ins w:id="1"/></w:p>"#.as_slice(),
+            "1",
+            None,
+            None,
+        ),
+        (
+            br#"<w:p><w:ins w:id="" w:author="A"/></w:p>"#.as_slice(),
+            "",
+            Some("A"),
+            None,
+        ),
+        (
+            br#"<w:p><w:ins w:id="not-an-integer" w:author="A"/></w:p>"#.as_slice(),
+            "not-an-integer",
+            Some("A"),
+            None,
+        ),
+        (
+            br#"<w:p><w:ins w:id="1" w:author="A" w:date="not-a-date"/></w:p>"#.as_slice(),
+            "1",
+            Some("A"),
+            None,
+        ),
+    ] {
+        let revisions = Paragraph::new(xml.to_vec()).revisions().unwrap();
+        assert_eq!(revisions[0].id(), id);
+        assert_eq!(revisions[0].author(), author);
+        assert_eq!(revisions[0].date(), date);
     }
 
     let revisions = Paragraph::new(

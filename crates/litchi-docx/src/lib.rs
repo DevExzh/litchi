@@ -132,7 +132,8 @@ pub use field::{
 pub use format::{ImageFormat, LineSpacing, ParagraphAlignment, TableBorderStyle, UnderlineStyle};
 pub use hyperlink::Hyperlink;
 pub use leniency::{
-    Defect, Leniency, NumberingDefect, SettingsDefect, TextDefect, ToleranceReport, ToleratedDefect,
+    Defect, Leniency, NumberingDefect, RevisionDefect, SettingsDefect, TextDefect, ToleranceReport,
+    ToleratedDefect,
 };
 /// Resource policy for package ingestion through [`Package`].
 pub use litchi_opc::ReadLimits;
