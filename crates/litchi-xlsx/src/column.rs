@@ -27,6 +27,19 @@ impl Width {
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0)
     }
+
+    /// Repair an out-of-domain read value (leniency finding 4.1).
+    ///
+    /// A width past 255 characters (including `+inf`) clamps to 255, the
+    /// Office ceiling. A negative or `NaN` width yields `None`, so the
+    /// columns read with the sheet's default width — what LibreOffice does
+    /// with a non-positive `width`.
+    pub(crate) fn clamped(value: f64) -> Option<Self> {
+        if value.is_nan() || value < 0.0 {
+            return None;
+        }
+        Self::new(value.min(255.0)).ok()
+    }
 }
 
 /// Invalid `SpreadsheetML` column width.

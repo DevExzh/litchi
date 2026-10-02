@@ -100,6 +100,13 @@
 //!   in with [`ToleranceReport::append_properties`] as
 //!   [`Defect::Properties`]. Custom properties read through
 //!   `Package::custom_props` carry their own report on the returned value.
+//! * finding 4.1 — the worksheet event parser (`raw/worksheet/codec.rs`,
+//!   with `sheetFormatPr` in `raw/worksheet/validation.rs`) records
+//!   [`WorksheetDefect::RowHeightOutOfRange`],
+//!   [`WorksheetDefect::ColumnWidthOutOfRange`], and
+//!   [`WorksheetDefect::SheetFormatDefaultOutOfRange`] at the row, column
+//!   range, or worksheet. The standalone `raw::parse_worksheet_defaults`
+//!   reader has no report and keeps its errors.
 //!
 //! Write paths stay strict: the value-only cell editor parses with repairs
 //! refused and keeps its historical errors, and commit-time readback
@@ -222,19 +229,29 @@ impl CellDefect {
 /// A worksheet-level structural-advisory defect repaired the way Excel
 /// repairs it.
 ///
-/// Every variant is a *roadmap contract* (audit findings 4.1 and 4.10): no
-/// read produces it yet.
+/// The geometry variants (audit finding 4.1) are live; the sequencing and
+/// advisory-count variants (finding 4.10) are *roadmap contracts* no read
+/// produces yet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum WorksheetDefect {
-    /// A row `ht` lies outside 0..=409 points (finding 4.1). The height is
-    /// clamped to the domain edge.
+    /// A row `ht` lies outside 0..=409 points (finding 4.1). ECMA-376 types
+    /// `ht` as a plain `xsd:double`; 409 is Excel's authoring ceiling and
+    /// LibreOffice writes taller rows. A height past 409 (including `+inf`)
+    /// clamps to 409; a negative or `NaN` height is dropped, so the row
+    /// takes the sheet default, as LibreOffice reads a negative `ht`. The
+    /// location is the row.
     RowHeightOutOfRange,
-    /// A column `width` lies outside 0..=255 characters (finding 4.1). The
-    /// width is clamped to the domain edge.
+    /// A column `width` lies outside 0..=255 characters (finding 4.1). A
+    /// width past 255 clamps to 255; a negative or `NaN` width is dropped,
+    /// so the columns take the sheet default. The location is the column
+    /// range of the `col` record.
     ColumnWidthOutOfRange,
-    /// A `sheetFormatPr` default is negative or out of range (finding 4.1).
-    /// The default is dropped, so the application default applies.
+    /// A `sheetFormatPr` default is negative, non-finite, or out of range
+    /// (finding 4.1): `defaultColWidth` and `baseColWidth` are dropped, so
+    /// the application default applies; a required `defaultRowHeight` is
+    /// replaced with Excel's 15-point default. A missing or unparseable
+    /// attribute stays a hard error.
     SheetFormatDefaultOutOfRange,
     /// `dimension`, `sheetFormatPr`, `cols`, or `mergeCells` appears out of
     /// schema order, or `dimension` is duplicated or unparseable (finding
@@ -254,9 +271,15 @@ impl WorksheetDefect {
     #[must_use]
     pub const fn repair(self) -> &'static str {
         match self {
-            Self::RowHeightOutOfRange => "clamped the row height to 0..=409 points",
-            Self::ColumnWidthOutOfRange => "clamped the column width to 0..=255 characters",
-            Self::SheetFormatDefaultOutOfRange => "dropped the out-of-range sheet format default",
+            Self::RowHeightOutOfRange => {
+                "clamped the row height to 409 points, or dropped a negative height"
+            },
+            Self::ColumnWidthOutOfRange => {
+                "clamped the column width to 255 characters, or dropped a negative width"
+            },
+            Self::SheetFormatDefaultOutOfRange => {
+                "dropped the out-of-range sheet format default; the application default applies"
+            },
             Self::MisplacedElement => "accepted the out-of-order worksheet element",
             Self::CountMismatch => "ignored the advisory count; the records are authoritative",
             Self::RowOutOfOrder => "sorted the out-of-order rows",

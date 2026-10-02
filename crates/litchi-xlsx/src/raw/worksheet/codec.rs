@@ -32,7 +32,7 @@ use crate::cell::{Store, Text};
 use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, allocation, invalid};
 use crate::layout::{self, Defaults};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Location, ToleranceReport, WorksheetDefect};
 use crate::row;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -94,6 +94,7 @@ pub(super) fn parse_processed_defaults(
                         decoder,
                         resolver,
                         descent.take(),
+                        None,
                     )?);
                     stack.push(Context::SheetFormat);
                 } else {
@@ -118,6 +119,7 @@ pub(super) fn parse_processed_defaults(
                         decoder,
                         resolver,
                         descent.take(),
+                        None,
                     )?);
                 }
             },
@@ -288,7 +290,7 @@ fn decode_cell_field(
 }
 
 impl<'c> Parser<'c> {
-    fn new(extensions: x14ac::Values) -> Self {
+    fn new(extensions: x14ac::Values, repairs: super::Repairs) -> Self {
         Self {
             cells: Vec::new(),
             lane_cells: Vec::new(),
@@ -310,6 +312,17 @@ impl<'c> Parser<'c> {
             merge_count: None,
             seen_merges: false,
             merge_window_closed: false,
+            repairs,
+            tolerance: ToleranceReport::default(),
+        }
+    }
+
+    /// The report a cataloged repair records into, or `None` when this parse
+    /// refuses repairs (the caller then keeps its historical error).
+    fn repair_sink(&mut self) -> Option<&mut ToleranceReport> {
+        match self.repairs {
+            super::Repairs::Apply => Some(&mut self.tolerance),
+            super::Repairs::Refuse => None,
         }
     }
 
@@ -325,7 +338,7 @@ impl<'c> Parser<'c> {
         let bytes = content.as_bytes();
         let mut reader = NsReader::from_reader(bytes);
         reader.config_mut().check_end_names = true;
-        let mut parser = Self::new(extensions);
+        let mut parser = Self::new(extensions, repairs);
         let mut stack = Vec::new();
         let mut closed_root = false;
 
@@ -363,7 +376,7 @@ impl<'c> Parser<'c> {
             }
         }
 
-        parser.finish_parse(strings, repairs)
+        parser.finish_parse(strings)
     }
 
     /// Feed reader events to [`Self::transition`] until end of file.
@@ -598,7 +611,7 @@ impl<'c> Parser<'c> {
         self.start_row(&element, decoder)
     }
 
-    fn finish_parse<'a, F>(mut self, strings: F, repairs: super::Repairs) -> Result<Store>
+    fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
@@ -627,9 +640,10 @@ impl<'c> Parser<'c> {
         let defaults = self.defaults;
         let merges = self.merges;
         // Cell-level recording sites (crate::leniency) thread `&mut tolerance`
-        // through materialization; the report travels inside the store.
-        let mut tolerance = ToleranceReport::default();
-        let mut sink = match repairs {
+        // through materialization, after the structural sites the event
+        // transitions recorded; the report travels inside the store.
+        let mut tolerance = std::mem::take(&mut self.tolerance);
+        let mut sink = match self.repairs {
             super::Repairs::Apply => Some(&mut tolerance),
             super::Repairs::Refuse => None,
         };
@@ -937,9 +951,20 @@ impl<'c> Parser<'c> {
             )));
         }
         self.previous_row = number;
-        let height = optional_f64(element, b"ht", decoder, "worksheet row height")?
-            .map(row::Height::new)
-            .transpose()?;
+        let height = match optional_f64(element, b"ht", decoder, "worksheet row height")? {
+            None => None,
+            Some(value) => match row::Height::new(value) {
+                Ok(height) => Some(height),
+                Err(error) => {
+                    let location = Location::Row(RowIndex::new(number - 1)?);
+                    let Some(report) = self.repair_sink() else {
+                        return Err(error.into());
+                    };
+                    report.record(WorksheetDefect::RowHeightOutOfRange, location);
+                    row::Height::clamped(value)
+                },
+            },
+        };
         let style = optional_u32(element, b"s", decoder, "worksheet row style")?;
         if style.is_some_and(|style| style > MAX_CELL_STYLE) {
             return Err(invalid(format!(
@@ -1008,11 +1033,13 @@ impl<'c> Parser<'c> {
         }
         self.seen_defaults = true;
 
+        let descent = self.extensions.defaults.take();
+        let tolerance = match self.repairs {
+            super::Repairs::Apply => Some(&mut self.tolerance),
+            super::Repairs::Refuse => None,
+        };
         self.defaults = Some(parse_defaults_element(
-            element,
-            decoder,
-            resolver,
-            self.extensions.defaults.take(),
+            element, decoder, resolver, descent, tolerance,
         )?);
         Ok(())
     }
@@ -1037,9 +1064,23 @@ impl<'c> Parser<'c> {
                 "invalid worksheet column range '{min}:{max}'"
             )));
         }
-        let width = optional_f64(element, b"width", decoder, "worksheet column width")?
-            .map(column::Width::new)
-            .transpose()?;
+        let width = match optional_f64(element, b"width", decoder, "worksheet column width")? {
+            None => None,
+            Some(value) => match column::Width::new(value) {
+                Ok(width) => Some(width),
+                Err(error) => {
+                    let location = Location::Columns {
+                        first: ColumnIndex::new(min - 1)?,
+                        last: ColumnIndex::new(max - 1)?,
+                    };
+                    let Some(report) = self.repair_sink() else {
+                        return Err(error.into());
+                    };
+                    report.record(WorksheetDefect::ColumnWidthOutOfRange, location);
+                    column::Width::clamped(value)
+                },
+            },
+        };
         let style = optional_u32(element, b"style", decoder, "worksheet column style")?;
         if style.is_some_and(|style| style > MAX_COLUMN_STYLE) {
             return Err(invalid(format!(
@@ -1482,7 +1523,7 @@ where
     // Event spans become source facts: byte offsets into `content`, whose
     // leading byte-order mark precedes reader position zero.
     let origin = ReaderOrigin::of(content);
-    let mut parser = Parser::new(x14ac::Values::default());
+    let mut parser = Parser::new(x14ac::Values::default(), repairs);
     let mut stack = Vec::new();
     let mut closed_root = false;
     let mut event_count = 0usize;
@@ -1548,5 +1589,5 @@ where
         }
     }
 
-    super::SourceParseAttempt::Complete(parser.finish_parse(strings, repairs))
+    super::SourceParseAttempt::Complete(parser.finish_parse(strings))
 }

@@ -29,6 +29,19 @@ impl Height {
     pub const fn get(self) -> f64 {
         f64::from_bits(self.0)
     }
+
+    /// Repair an out-of-domain read value (leniency finding 4.1).
+    ///
+    /// A height past 409 points (including `+inf`) clamps to 409, Excel's
+    /// row-height ceiling. A negative or `NaN` height has no meaningful edge
+    /// to clamp to: it yields `None`, so the row reads with the sheet's
+    /// default height — what LibreOffice does with a negative `ht`.
+    pub(crate) fn clamped(value: f64) -> Option<Self> {
+        if value.is_nan() || value < 0.0 {
+            return None;
+        }
+        Self::new(value.min(409.0)).ok()
+    }
 }
 
 /// Invalid `SpreadsheetML` row height.

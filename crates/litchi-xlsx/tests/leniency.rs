@@ -172,3 +172,62 @@ fn core_properties_repairs_fold_through_the_public_hand_off() {
         (Defect::Properties(_), ToleranceLocation::Part { .. })
     )));
 }
+
+fn worksheet_entries(report: &ToleranceReport) -> Vec<(Defect, Option<u32>, ToleranceLocation)> {
+    report
+        .iter()
+        .map(|entry| (entry.defect, entry.sheet, entry.location.clone()))
+        .collect()
+}
+
+/// Finding 4.1: out-of-domain row and column geometry clamps (or drops a
+/// negative value) and is recorded at the row, column range, or worksheet.
+#[test]
+fn out_of_domain_geometry_is_clamped_and_recorded() {
+    use litchi_xlsx::WorksheetDefect as W;
+
+    let bytes = patched(&[("xl/worksheets/sheet1.xml", &|text: &str| {
+        replace(r#"defaultRowHeight="13""#, r#"defaultRowHeight="-13""#)(text)
+            .replacen(
+                r#"<col min="2" max="2" width="17""#,
+                r#"<col min="2" max="2" width="-17""#,
+                1,
+            )
+            .replacen(
+                r#"customFormat="1" ht="14""#,
+                r#"customFormat="1" ht="500""#,
+                1,
+            )
+    })]);
+    let report = both_reports(&bytes);
+    let column = litchi_xlsx::ColumnIndex::new(1).unwrap();
+    assert_eq!(
+        worksheet_entries(&report),
+        [
+            (
+                Defect::Worksheet(W::SheetFormatDefaultOutOfRange),
+                Some(0),
+                ToleranceLocation::Worksheet
+            ),
+            (
+                Defect::Worksheet(W::ColumnWidthOutOfRange),
+                Some(0),
+                ToleranceLocation::Columns {
+                    first: column,
+                    last: column
+                }
+            ),
+            (
+                Defect::Worksheet(W::RowHeightOutOfRange),
+                Some(0),
+                ToleranceLocation::Row(litchi_xlsx::RowIndex::new(0).unwrap())
+            ),
+        ]
+    );
+
+    let workbook = Workbook::from_slice(&bytes).unwrap();
+    let sheet = workbook.sheet(0usize).unwrap().unwrap();
+    assert_eq!(sheet.row(0).unwrap().height().map(|h| h.get()), Some(409.0));
+    assert_eq!(sheet.column(1).unwrap().width(), None);
+    assert_eq!(sheet.defaults().unwrap().unwrap().height().get(), 15.0);
+}

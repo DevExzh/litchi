@@ -9,6 +9,7 @@ use quick_xml::name::{NamespaceResolver, ResolveResult};
 use super::model::{Context, TextTarget};
 use crate::error::{Result, invalid};
 use crate::layout::{self, Defaults};
+use crate::leniency::{Location, ToleranceReport, WorksheetDefect};
 use crate::row;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -17,35 +18,68 @@ pub(crate) fn parse_defaults_element(
     decoder: Decoder,
     resolver: &NamespaceResolver,
     descent: Option<layout::Descent>,
+    mut tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Defaults> {
     validate_defaults_attributes(element, resolver)?;
-    let base_width = optional_u32(
+    // Out-of-domain defaults (leniency finding 4.1) are dropped and recorded
+    // when `tolerance` is supplied; without it they keep their errors.
+    let mut repair = |error: crate::Error| match tolerance.as_deref_mut() {
+        Some(report) => {
+            report.record(
+                WorksheetDefect::SheetFormatDefaultOutOfRange,
+                Location::Worksheet,
+            );
+            Ok(())
+        },
+        None => Err(error),
+    };
+    let base_width = match optional_u32(
         element,
         b"baseColWidth",
         decoder,
         "worksheet base column width",
-    )?
-    .map(|value| {
-        u8::try_from(value)
-            .map_err(|_source| invalid("worksheet base column width exceeds Office maximum 255"))
-    })
-    .transpose()?;
-    let width = optional_f64(
+    )? {
+        None => None,
+        Some(value) => match u8::try_from(value) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                repair(invalid(
+                    "worksheet base column width exceeds Office maximum 255",
+                ))?;
+                None
+            },
+        },
+    };
+    let width = match optional_f64(
         element,
         b"defaultColWidth",
         decoder,
         "worksheet default column width",
-    )?
-    .map(layout::Width::new)
-    .transpose()?;
+    )? {
+        None => None,
+        Some(value) => match layout::Width::new(value) {
+            Ok(width) => Some(width),
+            Err(error) => {
+                repair(error.into())?;
+                None
+            },
+        },
+    };
     let height = optional_f64(
         element,
         b"defaultRowHeight",
         decoder,
         "worksheet default row height",
     )?
-    .ok_or_else(|| invalid("worksheet sheetFormatPr is missing defaultRowHeight"))
-    .and_then(|value| layout::Height::new(value).map_err(Into::into))?;
+    .ok_or_else(|| invalid("worksheet sheetFormatPr is missing defaultRowHeight"))?;
+    let height = match layout::Height::new(height) {
+        Ok(height) => height,
+        Err(error) => {
+            repair(error.into())?;
+            layout::Height::new(layout::DEFAULT_ROW_HEIGHT)
+                .map_err(|_| invalid("default row height constant is out of domain"))?
+        },
+    };
     let row_outline = optional_u32(
         element,
         b"outlineLevelRow",

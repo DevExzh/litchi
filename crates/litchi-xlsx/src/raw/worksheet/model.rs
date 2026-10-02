@@ -232,4 +232,9 @@ pub(super) struct Parser<'c> {
     pub(super) merge_count: Option<usize>,
     pub(super) seen_merges: bool,
     pub(super) merge_window_closed: bool,
+    /// Whether cataloged defects are repaired (read facades) or refused
+    /// (write-path admission); see `crate::leniency`.
+    pub(super) repairs: super::Repairs,
+    /// Repairs made so far; moved into the finished store.
+    pub(super) tolerance: crate::leniency::ToleranceReport,
 }

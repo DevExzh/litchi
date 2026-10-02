@@ -385,10 +385,6 @@ fn focused_defaults_enforce_root_shape_and_xml_depth() {
 fn rejects_malformed_grid_defaults_and_descent() {
     for body in [
         r#"<sheetFormatPr/>"#,
-        r#"<sheetFormatPr defaultRowHeight="-1"/>"#,
-        r#"<sheetFormatPr defaultRowHeight="NaN"/>"#,
-        r#"<sheetFormatPr defaultRowHeight="15" baseColWidth="256"/>"#,
-        r#"<sheetFormatPr defaultRowHeight="15" defaultColWidth="65536"/>"#,
         r#"<sheetFormatPr defaultRowHeight="15" outlineLevelRow="8"/>"#,
         r#"<sheetFormatPr defaultRowHeight="15" outlineLevelCol="8"/>"#,
         r#"<sheetFormatPr defaultRowHeight="15">text</sheetFormatPr>"#,
@@ -401,6 +397,22 @@ fn rejects_malformed_grid_defaults_and_descent() {
             parse(xml.as_bytes(), || Ok(None)).is_err(),
             "accepted {body}"
         );
+    }
+
+    // Out-of-domain defaults are repaired by the read parse (finding 4.1)
+    // but keep their errors in write-path admission and in the standalone
+    // defaults reader, which has no report to record into.
+    for body in [
+        r#"<sheetFormatPr defaultRowHeight="-1"/>"#,
+        r#"<sheetFormatPr defaultRowHeight="NaN"/>"#,
+        r#"<sheetFormatPr defaultRowHeight="15" baseColWidth="256"/>"#,
+        r#"<sheetFormatPr defaultRowHeight="15" defaultColWidth="65536"/>"#,
+    ] {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}<sheetData/></worksheet>"#);
+        let store = parse(xml.as_bytes(), || Ok(None)).expect("repaired default");
+        assert_eq!(store.tolerance_report().total(), 1, "{body}");
+        assert!(super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err());
+        assert!(parse_defaults(xml.as_bytes()).is_err(), "{body}");
     }
 
     for value in ["-0.1", "NaN", "inf"] {
@@ -494,8 +506,6 @@ fn rejects_malformed_column_property_records() {
         r#"<cols><col min="0" max="1"/></cols>"#,
         r#"<cols><col min="2" max="1"/></cols>"#,
         r#"<cols><col min="1" max="16385"/></cols>"#,
-        r#"<cols><col min="1" max="1" width="256"/></cols>"#,
-        r#"<cols><col min="1" max="1" width="NaN"/></cols>"#,
         r#"<cols><col min="1" max="1" style="65430"/></cols>"#,
         r#"<cols><col min="1" max="1" outlineLevel="8"/></cols>"#,
         r#"<cols><col min="1" max="1" hidden="yes"/></cols>"#,
@@ -518,11 +528,139 @@ fn rejects_malformed_dimensions_and_row_properties() {
         r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
         r#"<sheetData/><dimension ref="A1"/>"#,
         r#"<sheetData><row r="1" hidden="yes"/></sheetData>"#,
-        r#"<sheetData><row r="1" ht="NaN"/></sheetData>"#,
-        r#"<sheetData><row r="1" ht="409.1"/></sheetData>"#,
         r#"<sheetData><row r="1" s="65491"/></sheetData>"#,
         r#"<sheetData><row r="1" outlineLevel="8"/></sheetData>"#,
         r#"<sheetData><row r="1" thickTop="yes"/></sheetData>"#,
+    ] {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        assert!(
+            parse(xml.as_bytes(), || Ok(None)).is_err(),
+            "accepted {body}"
+        );
+    }
+}
+
+/// Audit finding 4.1: out-of-domain row and column geometry clamps to the
+/// domain edge (or drops a negative/`NaN` value) and is recorded; the
+/// write-path admission parse keeps the historical errors, and an
+/// unparseable lexical stays fatal everywhere.
+#[test]
+fn clamps_and_records_out_of_domain_geometry() {
+    use crate::leniency::{Defect, Location, WorksheetDefect};
+
+    let column = |index| ColumnIndex::new(index).expect("column");
+    let row = |index| RowIndex::new(index).expect("row");
+    let cases: [(&str, WorksheetDefect, Location); 9] = [
+        (
+            r#"<cols><col min="1" max="2" width="256"/></cols><sheetData/>"#,
+            WorksheetDefect::ColumnWidthOutOfRange,
+            Location::Columns {
+                first: column(0),
+                last: column(1),
+            },
+        ),
+        (
+            r#"<cols><col min="3" max="3" width="NaN"/></cols><sheetData/>"#,
+            WorksheetDefect::ColumnWidthOutOfRange,
+            Location::Columns {
+                first: column(2),
+                last: column(2),
+            },
+        ),
+        (
+            r#"<cols><col min="1" max="1" width="-4"/></cols><sheetData/>"#,
+            WorksheetDefect::ColumnWidthOutOfRange,
+            Location::Columns {
+                first: column(0),
+                last: column(0),
+            },
+        ),
+        (
+            r#"<sheetData><row r="1" ht="NaN"/></sheetData>"#,
+            WorksheetDefect::RowHeightOutOfRange,
+            Location::Row(row(0)),
+        ),
+        (
+            r#"<sheetData><row r="7" ht="409.5"/></sheetData>"#,
+            WorksheetDefect::RowHeightOutOfRange,
+            Location::Row(row(6)),
+        ),
+        (
+            r#"<sheetData><row r="2" ht="-1"/></sheetData>"#,
+            WorksheetDefect::RowHeightOutOfRange,
+            Location::Row(row(1)),
+        ),
+        (
+            r#"<sheetFormatPr defaultRowHeight="-15"/><sheetData/>"#,
+            WorksheetDefect::SheetFormatDefaultOutOfRange,
+            Location::Worksheet,
+        ),
+        (
+            r#"<sheetFormatPr defaultRowHeight="15" defaultColWidth="INF"/><sheetData/>"#,
+            WorksheetDefect::SheetFormatDefaultOutOfRange,
+            Location::Worksheet,
+        ),
+        (
+            r#"<sheetFormatPr defaultRowHeight="15" baseColWidth="300"/><sheetData/>"#,
+            WorksheetDefect::SheetFormatDefaultOutOfRange,
+            Location::Worksheet,
+        ),
+    ];
+    for (body, defect, location) in cases {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        let store =
+            parse(xml.as_bytes(), || Ok(None)).unwrap_or_else(|error| panic!("{body}: {error}"));
+        let report = store.tolerance_report();
+        assert_eq!(report.total(), 1, "{body}");
+        assert_eq!(
+            report.defects()[0].defect,
+            Defect::Worksheet(defect),
+            "{body}"
+        );
+        assert_eq!(report.defects()[0].location, location, "{body}");
+        assert!(
+            super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err(),
+            "write-path admission accepted {body}"
+        );
+    }
+
+    let repaired = |body: &str| {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        parse(xml.as_bytes(), || Ok(None)).expect("repaired geometry")
+    };
+    let store = repaired(r#"<cols><col min="1" max="2" width="1E+300"/></cols><sheetData/>"#);
+    assert_eq!(
+        store.column(column(1)).width().map(column::Width::get),
+        Some(255.0)
+    );
+    let store = repaired(r#"<cols><col min="1" max="1" width="-4"/></cols><sheetData/>"#);
+    assert_eq!(store.column(column(0)).width(), None);
+    let store = repaired(r#"<sheetData><row r="1" ht="1000"/><row r="2" ht="-1"/></sheetData>"#);
+    assert_eq!(store.tolerance_report().total(), 2);
+    assert_eq!(
+        store.row(row(0)).height().map(row::Height::get),
+        Some(409.0)
+    );
+    assert_eq!(store.row(row(1)).height(), None);
+    let store =
+        repaired(r#"<sheetFormatPr defaultRowHeight="NaN" defaultColWidth="-1"/><sheetData/>"#);
+    assert_eq!(store.tolerance_report().total(), 2);
+    let defaults = store.defaults().expect("defaults");
+    assert_eq!(defaults.height().get(), 15.0);
+    assert_eq!(defaults.width(), None);
+
+    // In-domain geometry, including both edges, repairs nothing.
+    let store = repaired(
+        r#"<sheetFormatPr defaultRowHeight="0" defaultColWidth="0"/><cols><col min="1" max="1" width="255"/></cols><sheetData><row r="1" ht="409"/><row r="2" ht="0"/></sheetData>"#,
+    );
+    assert!(store.tolerance_report().is_clean());
+
+    // An unparseable lexical is not a domain violation: it stays fatal.
+    for body in [
+        r#"<cols><col min="1" max="1" width="wide"/></cols><sheetData/>"#,
+        r#"<sheetData><row r="1" ht="tall"/></sheetData>"#,
+        r#"<sheetFormatPr defaultRowHeight="x"/><sheetData/>"#,
+        r#"<sheetFormatPr/><sheetData/>"#,
     ] {
         let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
         assert!(
