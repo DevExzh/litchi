@@ -262,6 +262,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
   enums/Boolean8 → defaults + record; keep genuine framing errors (truncated SEPX,
   negative grpprl size).
 ### 1.10 PLRSID header constants validated with exact equality — P2
+> **Status: FIXED (2026-10-02)** — a PLRSID `reserved1` other than 229 is ignored and recorded as `RsidDefect::ReservedMarker`; a wrong size field still degrades the table to absent (`AuxiliaryTableDefect::Rsids`).
+> Compound-file (litchi-cfb) repairs now lead `Document::tolerance_report()` as `Defect::Container`.
 - **Location**: `crates/litchi-doc/src/parts/rsids.rs:79-87` ("PLRSID cbRsidInFile is not
   4" :80; also `cbHeadExtraInFile != 8`, `reserved1 != 229`); fatal via package.rs:189.
 - **Check**: any deviation in the three fixed header words of the revision-save-ID table
@@ -273,6 +275,8 @@ concentrates in reserved-bit validation, fatal `?` propagation, and enum-domain 
 - **Suggested posture**: default-repair — ignore `reserved1`; treat `cbRsidInFile != 4`
   as "table unreadable → None" and record.
 ### 1.11 CHP operand strictness: Boolean8 domain, Hres mode, revision-reason codes — P2 (confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — CHP Boolean8 outside 0/1 read as POI does (0x80 keep, 0x81 flip, else false), bad Hres → normal hyphenation, undefined revision-reason → unset; recorded as
+> `ChpDefect::{Boolean, Hyphenation, RevisionReason}` (context = SPRM opcode); an unreadable CHPX run is now recorded as `ChpDefect::Run`. Missing/truncated operands stay fatal.
 - **Location**: `crates/litchi-doc/src/parts/chp/codec.rs:680` (`strict_bool8` errors on
   operand ∉ {0,1}), :670-678 (`revision_flag` same), :24-36 (hyphenation mode ∉ 1-6),
   :744-748 (`revision_reason` above max), :45 ("normal sprmCHresi requires ChHres 0x00").
@@ -335,6 +339,7 @@ against the crate's public API.
   (skip, as `extract_word_text` already does), record `SkippedForeignMarkup`. Same shape
   as litchi-pptx F6.9.
 ### 2.2 Unknown `w:compat` flag name hard-fails all settings reads — P1
+> **Status: FIXED (2026-10-02)** — unknown `w:compat` flags are skipped (Transitional-only flags in Strict parts kept), recorded as `SettingsDefect::{UnknownCompatFlag, TransitionalCompatFlagInStrict}`.
 - **Location**: `crates/litchi-docx/src/settings/document/codec.rs:352` ("invalid
   compatibility flag '{raw}'"; strict-conformance gate at :354-358).
 - **Check**: any child of `w:compat` that is neither `compatSetting` nor one of the 66
@@ -349,6 +354,7 @@ against the crate's public API.
 - **Suggested posture**: default-repair — skip unknown flag elements (record
   `UnknownCompatFlag`); transitional flags in Strict docs → tolerated deviation.
 ### 2.3 Duplicate singleton settings elements hard-fail settings parsing — P1
+> **Status: FIXED (2026-10-02)** — duplicate singleton settings/groups/flags resolve later-wins (LibreOffice assigns each occurrence in order), recorded as `SettingsDefect::DuplicateSetting`; tail append still refuses ambiguous settings.
 - **Location**: `crates/litchi-docx/src/settings/document/codec.rs` — "duplicate …
   setting" at :359-362 (compat flag), :469-472 (documentProtection), :533-536
   (attachedTemplate), :563-564 (view), :592-594 (defaultTabStop), :623-625
@@ -361,6 +367,8 @@ against the crate's public API.
 - **Suggested posture**: default-repair — last-wins (matches LO dmapper overwrite),
   record `DuplicateSetting`.
 ### 2.4 Numbering model is all-or-nothing: one bad value in numbering.xml kills `list_items()` — P1
+> **Status: FIXED (2026-10-02)** — numbering.xml degrades per item (unknown numFmt → decimal, suff → tab, LibreOffice on/off parsing, first-wins duplicates, dangling `w:num` dropped, missing numId → unnumbered),
+> recorded as `NumberingDefect`; `list_items()` no longer fails wholesale.
 - **Location**: `crates/litchi-docx/src/numbering/codec.rs:526` ("invalid numbering
   format"), :543 (suff other than tab/space/nothing), :551 (lvlRestart > 9), :907
   ("invalid on/off value"), :587/:608/:641/:657/:669/:677/:688/:699 (duplicate IDs and
@@ -380,6 +388,7 @@ against the crate's public API.
   unknown on/off → false (LO semantics); duplicate IDs → first-wins; all recorded. Fail
   only on structurally unparseable XML.
 ### 2.5 Tracked revision without `w:author` kills the entire revisions listing — P1
+> **Status: FIXED (2026-10-02)** — revisions without `w:author` are kept unattributed; invalid dates dropped, non-integer `w:id` kept as written; recorded as `RevisionDefect`. A missing `w:id` stays fatal.
 - **Location**: `crates/litchi-docx/src/revision.rs:771` ("tracked revision requires a
   Word author attribute"); same batch hard-fails on invalid `w:date` (:679-684), non-UTC
   `w16du:dateUtc` (:626-646), non-integer `w:id` (:665-677).
@@ -394,6 +403,8 @@ against the crate's public API.
   record `MissingRevisionAuthor`; degrade invalid dates to preserved-raw/None with
   record.
 ### 2.6 Paragraph `w:numPr` with only `w:ilvl` errors — and takes `style_id()` down with it — P1
+> **Status: FIXED (2026-10-02)** — an `ilvl`-only or empty `numPr` inherits the style's numbering with the level override and no longer poisons `style_id()`; recorded as `NumberingDefect::NumPrMissingNumId`.
+> (Style-level `numPr` without `numId` in styles.rs remains strict — same class, follow-up.)
 - **Location**: `crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs:181`
   ("paragraph numPr is missing numId"; empty-`numPr` fast path at :130-133).
 - **Check**: a `numPr` lacking `numId` raises `Error::InvalidFormat`; because
@@ -409,6 +420,7 @@ against the crate's public API.
   split the scan results so one property's failure cannot poison the other; record
   `NumPrMissingNumId`.
 ### 2.7 Section column without `w:w` (and column-model validation) kills section layout parsing — P1
+> **Status: FIXED (2026-10-02)** — `w:col` without `w:w` gets width 0 (LibreOffice), `w:num` clamped to 1–45, mismatched unequal columns take the `w:col` count; recorded as `SectionDefect`. Column setters stay strict.
 - **Location**: `crates/litchi-docx/src/section/codec.rs:1128` ("section column omits
   required width"); validation at :161-177 (count must be 1..=45; unequal columns require
   exactly one `w:col` per `w:num`).
@@ -423,6 +435,8 @@ against the crate's public API.
 - **Suggested posture**: default-repair — default missing width to 0/equal-share and
   record; clamp or accept out-of-range `w:num` with record.
 ### 2.8 Content-control inventory: one malformed `w:sdtPr` kills the whole `content_controls()` listing — P1 (confidence: high on code; not separately reproduced)
+> **Status: FIXED (2026-10-02)** — a malformed `w:sdtPr` degrades only its control (unknown lock → unlocked, bad/duplicate property dropped), recorded as `ContentControlDefect`; the listing survives.
+> Entity references / CDATA outside `w:t` (e.g. `w:instrText`) no longer fail text extraction (valid XML, not recorded).
 - **Location**: `crates/litchi-docx/src/content_control.rs:1418-1432` ("invalid
   content-control lock value" on unknown/missing `w:lock@val`), :1461-1469 (dataBinding
   requires `xpath` + `storeItemID`), :1509-1511, :1517-1523, :1546, :1560-1567
@@ -522,6 +536,7 @@ errors.
   cell XF), record as a new `FormattingDefect::CellXfReference`. Values untouched; only
   styling falls back, exactly as in Excel.
 ### 3.2 Unsupported CODEPAGE record value fails the entire workbook — P1
+> **Status: FIXED (2026-10-02)** — unsupported `CODEPAGE` falls back to Windows-1252 on both open paths, recorded as `EncodingDefect::UnsupportedCodePage` (record offset, raw page).
 - **Location**: `crates/litchi-xls/src/workbook/source.rs:1997-2006` and
   `workbook/codec/semantic/globals.rs:199-204`, via `records.rs:307-313`
   (`Encoding::from_codepage` → `Mbcs::require`; error text at
@@ -537,6 +552,8 @@ errors.
   record. `Encoding::Codepage` is nearly unused on the read path (records.rs:323-352), so
   the strictness buys almost nothing.
 ### 3.3 Worksheet-name rules enforced on read (BoundSheet8) — P1 (confidence: medium-high)
+> **Status: FIXED (2026-10-02, opt-in)** — under `Leniency::TolerateSheetNameDefects` / `TolerateAllDefects`, rule-breaking and case-insensitively duplicate sheet names are kept verbatim and recorded
+> as `SheetNameDefect`; the default stays a hard error.
 - **Location**: `crates/litchi-xls/src/records.rs:219-224` + `sheet_name_fault` at
   :269-287; duplicate case-insensitive names rejected at `workbook/package.rs:173` and
   `workbook/source.rs:2103-2113`.
@@ -554,6 +571,7 @@ errors.
   name verbatim, record). Duplicates: keep both (sheets addressable by index), record;
   opt-in at most.
 ### 3.4 Palette record: reserved byte, exact count, duplicate rejection — P1
+> **Status: FIXED (2026-10-02)** — Palette reserved bytes ignored, `ccv`≠56 accepted when consistent with the payload, repeated Palette last-wins; recorded as `PaletteDefect`. A length/count contradiction stays fatal.
 - **Location**: `crates/litchi-xls/src/palette.rs:155-196` (exact length :156-161,
   `color_count != 56` :162-167, reserved byte :172-177, duplicate :186-195).
 - **Check**: the `Palette` record must be exactly 226 bytes, declare exactly 56 colors,
@@ -570,6 +588,8 @@ errors.
   `2 + ccv*4`-sized payloads, fill remainder from the default palette; last-record-wins
   for duplicates with a recorded defect.
 ### 3.5 Font record scalar-field validation far beyond the tolerated defects — P1
+> **Status: FIXED (2026-10-02, opt-in)** — Font scalar defects (height, color, weight, escapement, underline, charset, name length/NUL, count) are repaired under `TolerateFormattingDefects`
+> and recorded as `FormattingDefect` variants with the font index, per the audit's posture.
 - **Location**: `crates/litchi-xls/src/font.rs:196-227` (height, Icv, weight, escapement,
   underline :221-227), charset :250-275, name length :287-291, NUL-in-name :322-324,
   `validate_font_table` ordering/count :367-384.
@@ -589,6 +609,7 @@ errors.
   0x7FFF; keep name bytes verbatim (drop the NUL check on read); index the font table
   as-read; record each.
 ### 3.6 BoundSheet8 reserved string bits, visibility value 3, unknown sheet type — P1
+> **Status: FIXED (2026-10-02)** — BoundSheet8 reserved name bits ignored, `hsState` 3 → VeryHidden, unknown `dt` → WorkSheet, trailing bytes ignored; recorded as `SheetDefect`. A short payload stays fatal.
 - **Location**: `crates/litchi-xls/src/records.rs:198-209` (reserved option bits + exact
   name-length equality), :136-138 (`hsState == 3` rejected), :162-164 (`dt ∉ {0,1,2,6}`
   rejected).
@@ -605,6 +626,7 @@ errors.
   as Format/SST); clamp `hsState` → `VeryHidden`, unknown `dt` → `WorkSheet` (recorded);
   ignore trailing payload bytes.
 ### 3.7 XF alignment / border / fill enumeration strictness — P1
+> **Status: FIXED (2026-10-02)** — undefined XF alignment/rotation/reading-order/border/fill/Icv values take defaults and are recorded as `CellFormatDefect` variants (XF index) on both paths.
 - **Location**: `crates/litchi-xls/src/alignment.rs:140-176` (valign 5–7, rotation
   181–254, reserved indent bit 0x20, "XF reading order {value} is invalid" :175);
   `crates/litchi-xls/src/border_fill.rs:44` ("reserved BIFF8 border style {value}" > 13),
@@ -623,6 +645,8 @@ errors.
   None; fill pattern > 18 → None; diagonal contradiction → keep style, derive direction;
   out-of-range Icv → 0x7F. Each recorded.
 ### 3.8 One unpaired UTF-16 surrogate (SST, Label, font name) fails the whole workbook — P1
+> **Status: FIXED (2026-10-02)** — unpaired UTF-16 surrogates in SST / ExtRst / Label / font names decode to U+FFFD, bad rich-text/phonetic runs dropped; recorded as `SharedStringDefect` /
+> `EncodingDefect::{LabelSurrogate, FontNameSurrogate}`.
 - **Location**: `crates/litchi-xls/src/records.rs:949-951` (SST via
   `String::from_utf16`), `utils.rs:99` (Label), `font.rs:309-318` (font name), ExtRst
   :1091-1092; companion refusals: formatting runs "not strictly increasing" :1010-1014,
@@ -640,6 +664,7 @@ errors.
   string index; drop offending formatting runs (or sort-and-clip to `cch`) and record.
   Every *well-formed* string and the cell grid survive.
 ### 3.9 Number-format ID cross-reference and XFCRC reserved-field strictness — P1 (XFCRC/ifnt parts P2; confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — unresolvable XF/DXF `ifmt` → General, `ifnt` 4 / > 1022 → font 0, XFCRC header/reserved fields ignored and bad `cxfs` discarded; recorded as `CellFormatDefect` variants.
 - **Location**: `crates/litchi-xls/src/number_format/codec.rs:180-199` (reserved format
   ID :184, "references missing custom number format" :193), :231-250 (DXF), :299-304
   (`Format` record's own `ifmt`), :412-414 (style XF `f123Prefix`), :462-486 (XFCRC
@@ -746,6 +771,8 @@ elements ignored.
   height and record; strict rejection only for non-finite values under an opt-in strict
   mode.
 ### 4.2 Style-index cross-reference validation kills the whole sheet — P1
+> **Status: FIXED (2026-10-02)** — litchi-xlsx gained its `ToleranceReport` carrier (open-time + per-worksheet, aggregated by `Workbook`/`SourceBackedWorkbook::tolerance_report()`); a style index
+> past `cellXfs` resolves to `cellXfs` 0 and is recorded as `CellDefect::StyleIndexOutOfRange`; `MAX_CELL_STYLE` stays fatal; edit paths stay strict.
 - **Location**: `crates/litchi-xlsx/src/workbook/source.rs:1436-1481` (`validate_styles`
   — "worksheet cell {} references shared style {}, but the workbook contains {len} cell
   formats" :1456; rows :1461-1470, columns :1472-1481), pre-check at
@@ -779,6 +806,7 @@ elements ignored.
   case-insensitively plus non-zero-numeric-is-true, demote bad `t="d"` to text; record
   each demotion.
 ### 4.4 Shared-string index out of range or missing table kills the whole sheet — P1
+> **Status: FIXED (2026-10-02)** — a `t="s"` cell with an out-of-range index or no shared-string table reads as an empty string and is recorded at the cell; non-numeric indexes and malformed XML stay fatal.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/semantic.rs:139-148` ("worksheet
   uses shared strings but the workbook has no shared-string part" :141; "shared-string
   index {index} exceeds table length {}" :143-146).
@@ -964,6 +992,8 @@ text-run/style parsing) is strict-to-fatal.
 - **Suggested posture**: default-repair — mask reserved bits (keep raw only for
   round-trip) and record, mirroring the litchi-doc `SprmDefect` model.
 ### 5.3 Text enum / ColorIndexStruct / indent-level range checks are fatal — P1 (confidence: high on propagation; medium on frequency)
+> **Status: FIXED (2026-10-02)** — undefined alignment/font-alignment/text-direction values leave the property unset, undefined tab types become left tabs, indent levels > 4 clamp to 4, undefined color
+> indexes read as unset (raw kept); recorded as `TextPropDefect` variants.
 - **Location**: `crates/litchi-ppt/src/text_run/codec.rs:328` ("invalid
   TextAlignmentEnum value"), :339, :350, :368 (font-alignment/direction/tab-type enums),
   :274 ("indent level exceeds the 0..=4 range"), :186/:311 (ColorIndexStruct indexes).
@@ -978,6 +1008,7 @@ text-run/style parsing) is strict-to-fatal.
 - **Suggested posture**: default-repair — unknown enum values → `None`/default, record;
   clamp indent level to 4 with a recorded repair.
 ### 5.4 Per-entry `SlidePersistAtom` validation fails the entire file — P1 (null/duplicate/length variants P2 on frequency)
+> **Status: FIXED (2026-10-02)** — the slide list degrades per entry (bad headers read by field offset or dropped, null IDs dropped, duplicates first-wins, text counts clamped to 8), recorded as `SlideListDefect` at open.
 - **Location**: `crates/litchi-ppt/src/slide/directory.rs:211` ("invalid SlidePersistAtom
   header or length"), :221 (null persistIdRef/slideId), :228 ("SlidePersistAtom cTexts
   exceeds 8"), :231/:236 (duplicate slideId / persistIdRef).
@@ -995,6 +1026,7 @@ text-run/style parsing) is strict-to-fatal.
   text records) and record; duplicates keep first occurrence. Directory build should
   degrade per-entry, never fail.
 ### 5.5 Slide persist ID without a directory entry, or not pointing at a SlideContainer, is file-fatal — P1 (confidence: high on LO; medium-high on frequency)
+> **Status: FIXED (2026-10-02)** — slides whose persist reference is unmapped, out of range or not a SlideContainer are skipped (LibreOffice) and recorded as `SlideListDefect::StaleSlidePersistRef`.
 - **Location**: `crates/litchi-ppt/src/slide/directory.rs:243` ("slide persist ID
   {persist_id} has no directory entry"), :251-258 ("persist ID … does not resolve to a
   SlideContainer").
@@ -1010,6 +1042,7 @@ text-run/style parsing) is strict-to-fatal.
 - **Suggested posture**: default-repair — drop the entry, record `StaleSlidePersistRef`;
   the presentation opens with the remaining slides, matching LO.
 ### 5.6 Unusable "Current User" stream or edit offset has no stream-scan fallback — P1
+> **Status: FIXED (2026-10-02)** — a missing Current User stream or unusable edit offset falls back to LibreOffice's scan for the last `UserEditAtom`, recorded as `PersistDefect`; encrypted files never use the recovered path.
 - **Location**: `crates/litchi-ppt/src/presentation/package.rs:109`
   (`Error::StreamNotFound("Current User")`), `slide/directory.rs:118` ("CurrentUser does
   not reference a valid UserEditAtom"), `embedded/object/editor/mapping/chain.rs:23`
@@ -1028,6 +1061,7 @@ text-run/style parsing) is strict-to-fatal.
   algorithm) and record the recovery; relax the recLen check to ≥ 28 (POI pads short
   reads without a 28|32 gate).
 ### 5.7 Persist-directory decoding: wrong record type, zero-count run, or duplicate ID is fatal / drops the holder — P1
+> **Status: FIXED (2026-10-02)** — on the read path, wrong-type persist pointers are ignored, zero-count entries skipped, repeated persist IDs first-wins; recorded as `PersistDefect`; the editor keeps the strict decoder.
 - **Location**: `crates/litchi-ppt/src/embedded/object/editor/mapping/directory.rs:15`
   ("invalid PersistDirectoryAtom"), :25-27 ("zero persist run");
   `persist/ptr_holder.rs:72` ("PersistDirectoryEntry has a zero entry count"), :90
@@ -1048,6 +1082,7 @@ text-run/style parsing) is strict-to-fatal.
   semantics already at directory.rs:31), record each; stop dropping the whole holder on
   one bad entry.
 ### 5.8 `CurrentUserAtom` fixed-field validation far exceeds POI and LibreOffice — P2 (username length P1)
+> **Status: PARTIALLY FIXED (2026-10-02)** — a username length > 255 or truncated reads as no username (POI), recorded as `PersistDefect::CurrentUserNameLength`; other fixed-field checks unchanged.
 - **Location**: `crates/litchi-ppt/src/current_user.rs:103` (recVer/recInstance/recType),
   :110 (fixed size != 20), :117-125 ("Invalid CurrentUser header token"), :128-132
   ("Invalid CurrentUser username length"); reached from the open path at
@@ -1064,6 +1099,7 @@ text-run/style parsing) is strict-to-fatal.
   token as unencrypted *only* when no DocumentEncryptionAtom exists (record either way).
   Keep rejecting when the token claims encryption and decryption support is compiled out.
 ### 5.9 Cyclic `UserEdit` chain hard-errors instead of breaking or repairing — P2 (confidence: high; low wild frequency)
+> **Status: FIXED (2026-10-02, opt-in)** — under `Leniency::TolerateUserEditChainDefects` (`OpenOptions::with_leniency`), a cyclic UserEdit chain is cut at the repeat and recorded as `UserEditChainDefect::Cycle`.
 - **Location**: `crates/litchi-ppt/src/embedded/object/editor/mapping/chain.rs:17`
   ("cyclic or excessive UserEdit chain").
 - **Check**: a repeated edit offset in the chain fails the whole open (the 4096-entry cap
@@ -1093,6 +1129,7 @@ text-run/style parsing) is strict-to-fatal.
   sequential scan, drop the recVer gate, skip unmappable text records, isolate
   interaction parsing per slide (record failures, yield empty interactions).
 ### 5.11 No per-shape error isolation: one bad text box kills the slide's whole shape list — P1
+> **Status: FIXED (2026-10-02)** — a shape whose content can't be read is dropped alone and recorded as `ShapeDefect::UnreadableShape`; siblings survive; host-record framing, limits and nesting bound stay fatal.
 - **Location**: `crates/litchi-ppt/src/slide/types/codec.rs:71`
   (`Self::convert_odraw_to_shape_enum(escher_shape)?` in the per-shape loop), with strict
   child parsers at `escher_textbox.rs:80` ("ClientTextbox contains multiple
@@ -1112,6 +1149,7 @@ text-run/style parsing) is strict-to-fatal.
   record; (b) relax the specific checks: keep first TextRulerAtom, drop duplicate
   round-trip atoms, unknown placeholder IDs → `None`.
 ### 5.12 `UserEditAtom` payload length restricted to exactly 28 or 32 — P2 (confidence: high; low frequency)
+> **Status: FIXED (2026-10-02)** — the newest `UserEditAtom` is accepted at ≥ 28 bytes; other lengths than 28/32 are recorded as `PersistDefect::UserEditAtomLength`; encrypted files stay strict.
 - **Location**: `crates/litchi-ppt/src/slide/directory.rs:123` ("UserEditAtom has invalid
   length").
 - **Check**: the head-of-chain UserEditAtom must have recLen 0x1C or 0x20 exactly.
@@ -1159,6 +1197,7 @@ absolutely.
   Target-existence checks that only matter for lossless rewrite can stay strict on the
   write path.
 ### 6.2 Shape scene: one malformed `a:xfrm` (missing `x`/`y`, non-numeric, negative `cx`/`cy`) fails every shape on the slide — P1 (confidence: high on code; medium on frequency)
+> **Status: FIXED (2026-10-02)** — one malformed `a:xfrm` drops only that shape's geometry, recorded as `ShapeDefect::MalformedTransform` (shape ID, part) in `Scene::tolerance_report()`.
 - **Location**: `crates/litchi-pptx/src/shape/reader.rs:1379-1413` (`parse_i64`,
   `parse_nonnegative` at :1399), invoked at :734,743-744.
 - **Check**: `<a:off>` without `x`/`y`, any non-`i64` coordinate, or any negative
@@ -1175,6 +1214,8 @@ absolutely.
   coordinates, clamp negative extents to 0 (or record raw), dropping only the offending
   shape's `Bounds`, never the scene; record each repair.
 ### 6.3 Processing instructions are hard-rejected crate-wide (108 `Event::PI` rejection sites) — P2 (confidence: high; low frequency, near-zero fix cost)
+> **Status: PARTIALLY FIXED (2026-10-02)** — processing instructions are skipped by the shape scene, slide text, animation host scan, layout-list scan and transition readers and recorded as
+> `MarkupDefect::ProcessingInstruction`; feature readers without a report carrier still reject them; DOCTYPE stays rejected.
 - **Location**: `crates/litchi-pptx/src/shape/reader.rs:551-554` (representative; also
   `parts/slide.rs:146-148,418-422,915-919`, `font/codec.rs:296-298`,
   `view_properties/codec.rs:178-180`, `media_parts/codec.rs:545`,
@@ -1193,6 +1234,7 @@ absolutely.
   `presentation/transition.rs:1014` and `source.rs:4517` already do), record once per
   part. Keep DOCTYPE rejection.
 ### 6.4 Placeholder `p:ext` owner must have exactly one attribute, exactly one child, no character data — P1
+> **Status: FIXED (2026-10-02)** — non-p232 placeholder `p:ext` children are skipped (`PlaceholderExtensionOwner` for bad uri/attributes/text); p232 violations fall back to no type extension (`PlaceholderTypeExtension`).
 - **Location**: `crates/litchi-pptx/src/shape/reader.rs:1422-1448`
   (`validate_extension_attributes`, invoked at :849), :850-854,866-872,950-958,993-998
   (child-count), :586-593 (character data).
@@ -1212,6 +1254,7 @@ absolutely.
   strict grammar for the `urn:litchi:pptx:p232:phTypeExt` URI only, and even there
   degrade to "no type extension" + record.
 ### 6.5 Wheel/wheelReverse transition `spokes` restricted to {1,2,3,4,8} — P1
+> **Status: FIXED (2026-10-02)** — wheel `spokes` outside {1,2,3,4,8} are kept as `Kind::Raw` and recorded as `TransitionDefect::SpokeCount`; the source-backed transition edit stays strict.
 - **Location**: `crates/litchi-pptx/src/transition/reader.rs:927` ("wheel transition
   spoke count '{value}' is not supported by PowerPoint").
 - **Check**: `spokes="6"` (or any value outside 1/2/3/4/8) returns `Error::Invalid`,
@@ -1226,6 +1269,7 @@ absolutely.
   counts as the nearest supported variant or `Kind::Raw` (already preserved inertly);
   record the substitution.
 ### 6.6 Transition attribute token domains (`spd`, `dir`, morph `option`, `advTm`/`dur` > i32::MAX) hard-fail — P1 (enum part P2)
+> **Status: FIXED (2026-10-02)** — bad effect tokens become `Kind::Raw` (`EffectToken`), bad transition attributes are treated as absent (`AttributeToken`), `advTm`/`dur` > i32::MAX capped (`TimeClamped`).
 - **Location**: `crates/litchi-pptx/src/transition/reader.rs:679-688` (`spd`), :735-936
   (direction enums), :906-915 (morph), :705-713 + `transition/model.rs:15` (`MAX_MS =
   i32::MAX`; "transition time {}ms exceeds the PowerPoint maximum" at :80).
@@ -1245,6 +1289,7 @@ absolutely.
   `Kind::Raw` (bytes already capturable); out-of-range times clamp/saturate to `MAX_MS`;
   each recorded.
 ### 6.7 Presentation slide list: uniqueness of slide IDs / relationship IDs / targets and child hygiene are fatal — P1
+> **Status: FIXED (2026-10-02)** — slide-list duplicate IDs / rel IDs / targets resolve first-wins and foreign list content is ignored, recorded as `PresentationDefect` at open; edit paths use `slide_references_strict()`.
 - **Location**: `crates/litchi-pptx/src/parts/presentation.rs:447-476` ("presentation
   slide reference ids must be unique" :447; relationship ids :456; targets :470),
   :188-192,248-252 (non-`sldId` child), :402-413 (any attribute on `sldIdLst`).
@@ -1262,6 +1307,7 @@ absolutely.
   each), ignore unknown children/attributes of `sldIdLst`. These checks remain appropriate
   for the lossless *edit* planners.
 ### 6.8 Shape metadata: unparseable `cNvPr@id` / `p:ph@idx` fails the entire slide scene — P2
+> **Status: FIXED (2026-10-02)** — an unparseable `cNvPr@id` becomes `None` (`InvalidShapeId`), an unparseable `p:ph@idx` becomes 0 (`InvalidPlaceholderIndex`).
 - **Location**: `crates/litchi-pptx/src/shape/reader.rs:674-679` ("invalid non-visual
   shape ID '{value}'"), :703-707 ("invalid placeholder index '{value}'").
 - **Check**: a shape whose non-visual id is non-numeric/negative, or a placeholder `idx`
@@ -1580,6 +1626,8 @@ validated at open — verification is opt-in, package.rs:2038-2052). The strictn
 concentrates in metadata parts vetoing the document, relationship-manifest conformance,
 and manifest grammar purism.
 ### 8.1 Core-properties XML body: producer-conformance rules (M4.2–M4.5) plus extra strictness fail the whole open — P1 (some triggers arguably P0)
+> **Status: FIXED (2026-10-02)** — litchi-opc/ooxml-common gained `ToleranceReport` carriers (`OpcPackage`/`SourceBackedPackage::tolerance_report()`, `properties::read_with_report`); core-properties
+> body deviations (missing/misplaced `xsi:type`, foreign attributes, duplicates, unknown elements, bad dates, non-UTF-8, dialect mismatch) are read past and recorded; writers stay strict.
 - **Location**: `crates/litchi-ooxml-common/src/properties/read.rs:573` ("OPC M4.5
   requires xsi:type on created and modified"; related :545, :550, :560), :539 ("OPC M4.4
   forbids xml:lang in core properties"), :566 (any other attribute forbidden), :591
@@ -1610,6 +1658,7 @@ and manifest grammar purism.
   drop the dialect cross-check to a recorded note), record every deviation. Lossy-decode
   non-UTF-8 core.xml. Keep M4.2 as the only candidate for hard error if desired.
 ### 8.2 Core-properties graph checks: orphaned part, dangling relationship, duplicate typed parts fail the open — P1
+> **Status: FIXED (2026-10-02)** — orphaned core part, dangling core relationship, extra core-typed parts and part-owned core relationships are read past and recorded; write/clear keep the strict graph check.
 - **Location**: `crates/litchi-ooxml-common/src/properties/graph.rs:96` (two parts with
   the core-properties content type), :104 (relationship owned by a part), :132
   ("core-properties part '{}' is orphaned"), :173 (relationship target part missing →
@@ -1627,6 +1676,7 @@ and manifest grammar purism.
   relationship → `Ok(None)`, duplicates → pick the relationship-selected part; record
   each. Degraded-but-correct: no content is invented.
 ### 8.3 Custom-properties codec: unknown `vt:*` types, missing pid/fmtid, PIs, duplicate PIDs, strict value parsing — fatal on the DOCX open path — P1 (P0 for the DOCX blast radius)
+> **Status: FIXED (2026-10-02)** — each bad custom property (unsupported `vt:*`, bad value/name/pid/fmtid, duplicates, unknown elements, PIs) is skipped and recorded instead of failing the set.
 - **Location**: `crates/litchi-ooxml-common/src/custom/codec.rs:543-547` ("unsupported
   custom-property value type" — only 9 `vt` kinds supported, custom/model.rs:124),
   :486-495 (missing name/pid/fmtid), :489 (pid < 2), :656-679 (fmtid must be braced
@@ -1652,6 +1702,7 @@ and manifest grammar purism.
   `<property>` (or read it as opaque text) and record it; never let the property set veto
   the document. Keep collection-level well-formedness errors (unclosed root) fatal.
 ### 8.4 Reserved sensitivity-label (MS-OI29500 3.11) custom properties are host- and format-validated on open — P1 (confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — reserved sensitivity-label properties scoped to another host or malformed are skipped and recorded (`ReservedProperty`) by `read_for`; `write_for` stays strict.
 - **Location**: `crates/litchi-ooxml-common/src/custom/reserved.rs:107` (property not
   valid for this host), :126 (`Sensitivity` must be a hyphenated GUID), :48-67
   (font/shape-id/location formats; `Sensitivity` name match at :48); reached from
@@ -1673,6 +1724,7 @@ and manifest grammar purism.
   per-property skips recorded in the tolerance report; never open-fatal. Host-scope
   checks should be advisory at read time (keep them for write-time validation).
 ### 8.5 Duplicate relationship `Id` rejects the entire package — P1 (confidence: high on check/references; medium on frequency)
+> **Status: FIXED (2026-10-02)** — duplicate relationship `Id`: first kept, duplicate dropped and recorded (`DuplicateId`); relationship editing APIs still reject duplicates.
 - **Location**: `crates/litchi-opc/src/pkgreader.rs:2200,2205`
   (`OpcError::DuplicateRelationshipId`); fired while parsing any reachable `.rels`
   (pkgreader.rs:1149-1176 → `load_rels_lazy`), so one duplicated rId anywhere in the
@@ -1689,6 +1741,7 @@ and manifest grammar purism.
   duplicates, record the dropped rIds (first-wins matches what most producers' r:id
   references were emitted against).
 ### 8.6 One unresolvable internal relationship target fails the whole package — P1
+> **Status: FIXED (2026-10-02)** — unresolvable internal targets stay visible but unfollowed and are recorded (`UnresolvableTarget`); OPC validation no longer errors on them.
 - **Location**: `crates/litchi-opc/src/pkgreader.rs:1879-1913` (`enqueue_target`
   propagates `target_partname()` errors with `?`), :736-756,
   `crates/litchi-opc/src/packuri.rs:120` (`from_rel_ref` rejects backslashes and absolute
@@ -1710,6 +1763,7 @@ and manifest grammar purism.
   normalization pass (percent-encode spaces, `\` → `/`) with recording would recover most
   outright.
 ### 8.7 `TargetMode` attribute parsed case-sensitively — P1 (confidence: high on code/POI; medium on frequency)
+> **Status: FIXED (2026-10-02)** — `TargetMode` matched case-insensitively (`NonCanonicalTargetMode`); any other value reads as External as POI does (`UnrecognizedTargetMode`).
 - **Location**: `crates/litchi-opc/src/rel.rs:23-28` (only exact `"Internal"`/`"External"`;
   other values → `OpcError::InvalidRelationshipTargetMode` at :27), invoked per attribute
   at `crates/litchi-opc/src/pkgreader.rs:2176`.
@@ -1726,6 +1780,7 @@ and manifest grammar purism.
   `External` (POI semantics — safer than Internal since it prevents bogus part
   resolution); record the raw value.
 ### 8.8 Missing or empty `Target` (or `Type`) attribute is fatal per relationship — P1 (confidence: high on code/LO/POI; medium on frequency)
+> **Status: FIXED (2026-10-02)** — a relationship with missing/empty `Target` or `Type` is skipped and recorded (`MissingTarget`/`MissingType`) without claiming its Id.
 - **Location**: `crates/litchi-opc/src/pkgreader.rs:2186-2188` (call sites) + :2233-2239
   (`required_relationship_attribute` rejects missing *and* empty values).
 - **Check**: `<Relationship Id="rId5" Type=".../hyperlink" TargetMode="External"/>` or
@@ -1742,6 +1797,7 @@ and manifest grammar purism.
   tolerates, pkgreader.rs:1831-1837), record it; a missing `Type` can be kept as an
   opaque empty-type relationship.
 ### 8.9 Duplicate content-type Default/Override mappings reject the package — P1 (confidence: high on code/POI/LO; medium on frequency)
+> **Status: FIXED (2026-10-02)** — duplicate content-type Default/Override mappings resolve first-wins (LibreOffice) and are recorded (`DuplicateDefault`/`DuplicateOverride`).
 - **Location**: `crates/litchi-opc/src/content_type.rs:207`
   (`DuplicateContentTypeDefault`), :219 (`DuplicateContentTypeOverride`,
   case-insensitive both).
@@ -1850,6 +1906,8 @@ duplicate-check-free `ManifestImport` tolerates them.
   strict grammar only for the offset-0 sniff fast path, with the tolerant path as fallback
   rather than `None`.
 ### 9.2 Missing (or empty-media-type) manifest "/" root entry is a fatal MIME "mismatch" — P1
+> **Status: FIXED (2026-10-02)** — a manifest with no `/` entry or an empty root media type uses the `mimetype` member's value (LibreOffice) and records `PackageDefect::ManifestRootMediaTypeMissing`;
+> conflicting non-empty values and missing/entryless manifests stay errors.
 - **Location**: `crates/litchi-odf-common/src/core/package.rs:763` ("ODF manifest root
   MIME type '{}' does not match mimetype '{}'").
 - **Check**: package open hard-fails when the manifest has no root entry — the empty
@@ -1962,6 +2020,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   recording matters): parse one nibble when the second is junk (LO semantics), substitute
   U+FFFD or skip when no nibble is valid, record `malformed-hex-escape`.
 ### 9.8 ODS: one malformed numeric/boolean cell value kills the whole spreadsheet — P1
+> **Status: FIXED (2026-10-02)** — an unreadable typed cell value keeps its text and becomes `CellValue::Unknown { kind, raw }`, recorded as `ContentDefect::CellValueUnparseable` (sheet/row/column).
 - **Location**: `crates/litchi-ods/src/worksheet/codec.rs:2125-2143` (`parse_float`),
   invoked per cell at :224-242; boolean cells; date/time cells lacking the value
   attribute error at :243-248 ("date cells require office:date-value"); `positive()` for
@@ -1982,6 +2041,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   preserved) and record `cell-value-parse-failure` with coordinates; missing date/time
   value → Empty, record.
 ### 9.9 ODS: unknown or foreign-namespace child of `table:calculation-settings` is fatal at open — P2 (confidence: high on LO posture; medium on frequency)
+> **Status: FIXED (2026-10-02)** — unknown/foreign `table:calculation-settings` children are skipped and out-of-order `null-date` accepted, recorded as `ContentDefect`; such settings become edit-refused.
 - **Location**: `crates/litchi-odf-common/src/calculation/codec.rs:507` and :549
   ("unsupported calculation settings child" — any child other than
   `table:null-date`/`table:iteration`, including elements in *any other* namespace);
@@ -1999,6 +2059,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   `unknown-calculation-settings-child`. Accept `null-date`/`iteration` in any order,
   record `calculation-settings-reordered`.
 ### 9.10 ODP: unknown animation element kills the whole presentation — P2 (confidence: high on LO posture; medium on frequency)
+> **Status: FIXED (2026-10-02)** — unknown `anim:` and foreign elements inside animations are dropped with their contents and recorded as `ContentDefect::UnknownAnimationElement` (slide index).
 - **Location**: `crates/litchi-odp/src/codec/parser/codec/xml/codec.rs:1203-1208`
   (`Element::UnknownAnimation if in_slide` → hard error); same posture recursively at
   :52 ("anim:{} contains a non-animation element") and :63-68 (disallowed child kind).
@@ -2015,6 +2076,7 @@ duplicate-check-free `ManifestImport` tolerates them.
   (depth-balanced), drop that one animation from the slide's list, record
   `unknown-animation-element` with slide index.
 ### 9.11 ODF: DOCTYPE declaration in content.xml is fatal — P2 (confidence: high on LO tolerance; medium on frequency)
+> **Status: FIXED (2026-10-02)** — a DOCTYPE before the content.xml root is blanked unprocessed (no external fetch, no entity declarations) and recorded as `ContentDefect::DoctypeDeclaration`; undeclared entities stay errors.
 - **Location**: `crates/litchi-odf-common/src/core/content_validation.rs:222`
   ("{family_name} content.xml must not contain a doctype"; driven from
   crates/litchi-odt/src/document/open_parse.rs:130 and the ODS/ODP equivalents); repeated
