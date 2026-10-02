@@ -68,7 +68,7 @@ fn assert_single(
     value: f64,
 ) {
     assert_eq!(report.total(), 1, "{:?}", report.defects());
-    let entry = report.defects()[0];
+    let entry = report.defects()[0].clone();
     assert_eq!(entry.defect(), Defect::CachedNumber(defect));
     assert_eq!(entry.record_type(), record_type.get());
     assert_eq!(entry.location(), 0);

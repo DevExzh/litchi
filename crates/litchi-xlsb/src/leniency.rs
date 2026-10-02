@@ -50,7 +50,8 @@
 //! The report travels with the object whose parse performed the repair:
 //!
 //! - [`Workbook::tolerance_report`](crate::Workbook::tolerance_report) covers
-//!   every part parsed while the workbook opens — the workbook stream
+//!   the OPC package read that admitted the workbook and every part parsed
+//!   while the workbook opens — the workbook stream
 //!   (`workbook.bin`, including `BrtCalcProp`, `BrtBundleSh`, and `BrtName`),
 //!   the styles part (`styles.bin`), and the adjunct parts parsed at open:
 //!   table parts, PivotCache definitions, and External Data Connections.
@@ -63,13 +64,30 @@
 //!   workbook's.
 //! - [`SourceBackedWorkbook::tolerance_report`](crate::SourceBackedWorkbook::tolerance_report)
 //!   returns a snapshot of the workbook-scope repairs performed so far: the
-//!   workbook stream at open, then the styles and table parts once a
+//!   OPC package read and the workbook stream at open, then the styles and table parts once a
 //!   worksheet materialization first needs them. Each lazily parsed part
 //!   contributes its repairs exactly once. Each binary-index lookup through
 //!   `SourceBackedIndexedWorksheet::cached_value` that performs a repair
 //!   records it here as well.
 //! - [`cell_values::Snapshot::tolerance_report`](crate::cell_values::Snapshot::tolerance_report)
 //!   covers the worksheet stream behind one cell-value edit snapshot.
+//!
+//! # Packaging repairs
+//!
+//! The OPC layer applies its own reference-compatible repairs while the
+//! package is read — duplicate relationship `Id`s, unresolvable internal
+//! targets, `TargetMode` casing, missing `Target`/`Type`, duplicate
+//! content-type mappings, and the manifest findings documented in
+//! `litchi_opc::leniency`. Every open path (eager [`Workbook`](crate::Workbook),
+//! validating [`Package`](crate::Package), and
+//! [`SourceBackedWorkbook`](crate::SourceBackedWorkbook), including an OPC
+//! package materialized from a source-backed one) folds that report into the
+//! workbook-scope report first, as [`Defect::Package`] entries that keep the
+//! OPC location ([`ToleratedDefect::part`], [`ToleratedDefect::item`],
+//! [`ToleratedDefect::value`]), and carries the OPC unrecorded count over.
+//! The XLSB package does not read core or custom properties at open, so no
+//! metadata report joins it. Worksheet-scope reports never repeat packaging
+//! defects.
 //!
 //! Internally, parsers receive `&mut ToleranceReport` (or own one, as the
 //! worksheet cell reader does) and call `record` at the exact point they
@@ -358,6 +376,14 @@ pub enum Defect {
     CachedNumber(CachedNumberDefect),
     /// A value-domain defect in an individual value (not yet repaired).
     ValueEncoding(ValueEncodingDefect),
+    /// A packaging defect the OPC layer repaired while the workbook's package
+    /// was read (`litchi_opc::leniency`): relationship manifests,
+    /// `[Content_Types].xml`, and the relationship graph.
+    ///
+    /// The entry's [`ToleratedDefect::part`], [`ToleratedDefect::item`], and
+    /// [`ToleratedDefect::value`] carry the package location the OPC report
+    /// recorded; its record type, location, and observed value are zero.
+    Package(litchi_opc::leniency::Defect),
 }
 
 impl Defect {
@@ -369,6 +395,7 @@ impl Defect {
             Self::Layout(defect) => defect.repair(),
             Self::CachedNumber(defect) => defect.repair(),
             Self::ValueEncoding(defect) => defect.repair(),
+            Self::Package(defect) => defect.repair(),
         }
     }
 }
@@ -397,13 +424,29 @@ impl From<ValueEncodingDefect> for Defect {
     }
 }
 
+impl From<litchi_opc::leniency::Defect> for Defect {
+    fn from(defect: litchi_opc::leniency::Defect) -> Self {
+        Self::Package(defect)
+    }
+}
+
+/// The package location of a [`Defect::Package`] entry, as the OPC report
+/// recorded it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PackageLocation {
+    part: Box<str>,
+    item: Option<Box<str>>,
+    value: Option<Box<str>>,
+}
+
 /// One repaired defect, with enough context to locate it in the workbook.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     defect: Defect,
     record_type: u16,
     location: u32,
     observed: u32,
+    package: Option<Box<PackageLocation>>,
 }
 
 impl ToleratedDefect {
@@ -443,6 +486,33 @@ impl ToleratedDefect {
     #[must_use]
     pub const fn observed(&self) -> u32 {
         self.observed
+    }
+
+    /// For a [`Defect::Package`] entry, the OPC part name the defect belongs
+    /// to: the relationship source part (`/` for package relationships) or
+    /// `/[Content_Types].xml`. `None` for every BIFF12 record defect.
+    #[must_use]
+    pub fn part(&self) -> Option<&str> {
+        self.package.as_deref().map(|location| &*location.part)
+    }
+
+    /// For a [`Defect::Package`] entry, the item within the part — a
+    /// relationship `Id`, or the extension or part name of a content-type
+    /// mapping — when the OPC report recorded one.
+    #[must_use]
+    pub fn item(&self) -> Option<&str> {
+        self.package
+            .as_deref()
+            .and_then(|location| location.item.as_deref())
+    }
+
+    /// For a [`Defect::Package`] entry, the raw value the OPC repair replaced
+    /// or discarded, when the OPC report recorded one.
+    #[must_use]
+    pub fn value(&self) -> Option<&str> {
+        self.package
+            .as_deref()
+            .and_then(|location| location.value.as_deref())
     }
 }
 
@@ -525,7 +595,36 @@ impl ToleranceReport {
             record_type: record_type.get(),
             location,
             observed,
+            package: None,
         });
+    }
+
+    /// Fold the report of the OPC read that admitted the workbook's package,
+    /// keeping its discovery order and carrying its unrecorded count over so
+    /// the merged total stays exact.
+    pub(crate) fn append_package(&mut self, package: &litchi_opc::leniency::ToleranceReport) {
+        for tolerated in package {
+            self.push(ToleratedDefect {
+                defect: Defect::Package(tolerated.defect()),
+                record_type: 0,
+                location: 0,
+                observed: 0,
+                package: Some(Box::new(PackageLocation {
+                    part: tolerated.part().into(),
+                    item: tolerated.item().map(Into::into),
+                    value: tolerated.value().map(Into::into),
+                })),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(package.unrecorded());
+    }
+
+    /// A workbook-scope report seeded with the packaging repairs of the OPC
+    /// read that admitted the workbook's package.
+    pub(crate) fn from_package(package: &litchi_opc::leniency::ToleranceReport) -> Self {
+        let mut report = Self::default();
+        report.append_package(package);
+        report
     }
 
     /// Record trailing payload bytes ignored past a record's defined layout.
@@ -557,7 +656,7 @@ impl ToleranceReport {
     /// entries that no longer fit join the unrecorded count.
     pub(crate) fn append(&mut self, other: &ToleranceReport) {
         for entry in &other.defects {
-            self.push(*entry);
+            self.push(entry.clone());
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
     }
@@ -1082,6 +1181,9 @@ mod tests {
             Defect::from(ValueEncodingDefect::ErrorCode),
             Defect::from(ValueEncodingDefect::Utf16),
             Defect::from(ValueEncodingDefect::DataValidation),
+            Defect::from(litchi_opc::leniency::Defect::from(
+                litchi_opc::leniency::RelationshipDefect::DuplicateId,
+            )),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty(), "{defect:?}");

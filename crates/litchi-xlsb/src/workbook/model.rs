@@ -75,7 +75,9 @@ impl std::fmt::Debug for Workbook {
 impl Workbook {
     /// Every repair applied while this workbook was opened.
     ///
-    /// Covers the parts parsed at open: the workbook stream (`workbook.bin`)
+    /// Covers the OPC package read that admitted the workbook (its
+    /// packaging repairs come first, as [`crate::Defect::Package`] entries)
+    /// and the parts parsed at open: the workbook stream (`workbook.bin`)
     /// and the styles part (`styles.bin`). Worksheets are parsed lazily, so
     /// their repairs are reported by [`Worksheet::tolerance_report`] on each
     /// materialized worksheet. An empty report means the parsed parts

@@ -1177,6 +1177,8 @@ impl Workbook {
         drawing_load_policy: DrawingLoadPolicy,
     ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
+        // The packaging repairs of the OPC read come first in discovery order.
+        let tolerance = ToleranceReport::from_package(package.tolerance_report());
         let mut workbook = Workbook {
             package,
             worksheets: Vec::new(),
@@ -1196,7 +1198,7 @@ impl Workbook {
             sheet_drawings: Vec::new(),
             drawing_load_policy,
             connections: None,
-            tolerance: ToleranceReport::default(),
+            tolerance,
             leniency: Leniency::Strict,
         };
 

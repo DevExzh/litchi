@@ -86,7 +86,7 @@ fn assert_single(
     observed: u32,
 ) {
     assert_eq!(report.total(), 1, "{:?}", report.defects());
-    let entry = report.defects()[0];
+    let entry = report.defects()[0].clone();
     assert_eq!(entry.defect(), defect.into());
     assert_eq!(entry.record_type(), record_type.get());
     assert_eq!(entry.observed(), observed);

@@ -471,7 +471,8 @@ impl SourceBackedWorkbook {
 
         let workbook_data = workbook_part.data()?;
         let mut records = Records::new(workbook_data.as_bytes());
-        let mut tolerance = ToleranceReport::default();
+        // The packaging repairs of the OPC read come first in discovery order.
+        let mut tolerance = ToleranceReport::from_package(package.tolerance_report());
         let info = Workbook::read_workbook(&mut records, &mut tolerance)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
@@ -721,7 +722,9 @@ impl SourceBackedWorkbook {
 
     /// A snapshot of every workbook-scope repair applied so far.
     ///
-    /// The workbook stream is parsed when the catalog opens; the styles part
+    /// The packaging repairs of the OPC read that admitted the source come
+    /// first, as [`crate::Defect::Package`] entries. The workbook stream is
+    /// parsed when the catalog opens; the styles part
     /// is parsed lazily the first time a worksheet materialization needs it,
     /// and its repairs join this report then, exactly once. Worksheet-stream
     /// repairs are reported by [`Worksheet::tolerance_report`] on each
