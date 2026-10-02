@@ -614,3 +614,118 @@ fn table_start_count_repairs_never_invent_missing_tables() {
         Err(OleError::InvalidFormat(message)) if message.contains("DIFAT start sector")
     ));
 }
+
+// --- F7.7: directory-entry field byte-exactness bundle ---
+
+#[test]
+fn meaningless_directory_entry_fields_are_ignored_and_recorded() {
+    let data = pattern(300, 15);
+    let bytes = build(&[
+        (&["Data"], &data),
+        (&["Store", "Inner"], b"inner"),
+        (&["Extra"], b"extra"),
+    ]);
+    assert!(open_report(&bytes).is_clean());
+    let (data_sid, data_entry) = entry(&bytes, "Data");
+    let (store_sid, store_entry) = entry(&bytes, "Store");
+    let (inner_sid, _) = entry(&bytes, "Inner");
+    let root = directory_offsets(&bytes)[0];
+    use crate::DirectoryDefect as D;
+
+    // An undefined node color.
+    let mut color = bytes.clone();
+    color[data_entry + 67] = 7;
+    assert_eq!(
+        recorded(&open_report(&color)),
+        [(D::NodeColor.into(), data_sid)]
+    );
+
+    // A storage carrying a start sector and size (a real producer writes
+    // FREESECT there).
+    let mut storage = bytes.clone();
+    write_u32(&mut storage, store_entry + 116, crate::consts::FREESECT);
+    write_u32(&mut storage, store_entry + 120, 77);
+    assert_eq!(
+        recorded(&open_report(&storage)),
+        [(D::StorageAllocationFields.into(), store_sid)]
+    );
+    assert_eq!(read_both(&storage, &["Store", "Inner"]), b"inner");
+
+    // A stream whose child link names another entry: never followed, so the
+    // other entry keeps its one owner and no path runs through the stream.
+    let mut child = bytes.clone();
+    write_u32(&mut child, data_entry + 76, inner_sid);
+    assert_eq!(
+        recorded(&open_report(&child)),
+        [(D::StreamChildLink.into(), data_sid)]
+    );
+    let mut file = OleFile::open(Cursor::new(child.clone())).unwrap();
+    assert!(matches!(
+        file.open_stream(&["Data", "Inner"]),
+        Err(OleError::StreamNotFound)
+    ));
+    assert_eq!(read_both(&child, &["Data"]), data);
+    assert_eq!(read_both(&child, &["Store", "Inner"]), b"inner");
+
+    // A root entry with another name and stale sibling links.
+    let mut root_fields = bytes.clone();
+    root_fields[root..root + 64].fill(0);
+    root_fields[root..root + 4].copy_from_slice(&[b'R', 0, 0, 0]);
+    root_fields[root + 64..root + 66].copy_from_slice(&4u16.to_le_bytes());
+    write_u32(&mut root_fields, root + 68, data_sid);
+    assert_eq!(
+        recorded(&open_report(&root_fields)),
+        [(D::RootEntryFields.into(), 0)]
+    );
+    assert_eq!(read_both(&root_fields, &["Data"]), data);
+
+    // An unused entry with leftover name bytes.
+    let unused = directory_offsets(&bytes)
+        .into_iter()
+        .position(|offset| bytes[offset + 66] == 0)
+        .expect("the fixture directory has an unused slot");
+    let unused_offset = directory_offsets(&bytes)[unused];
+    let mut residue = bytes.clone();
+    residue[unused_offset + 64..unused_offset + 66].copy_from_slice(&10u16.to_le_bytes());
+    residue[unused_offset..unused_offset + 8].copy_from_slice(b"o\0l\0d\0\0\0");
+    assert_eq!(
+        recorded(&open_report(&residue)),
+        [(D::EmptyEntryResidue.into(), u32::try_from(unused).unwrap())]
+    );
+}
+
+#[test]
+fn names_with_forbidden_characters_stay_readable_and_are_recorded() {
+    let data = pattern(200, 16);
+    let mut bytes = build(&[(&["Data"], &data)]);
+    let (sid, offset) = entry(&bytes, "Data");
+    // "Data" -> "D:ta"; a lone stream has no siblings to reorder.
+    bytes[offset + 2] = b':';
+    assert_eq!(
+        recorded(&open_report(&bytes)),
+        [(crate::DirectoryDefect::NameCharacters.into(), sid)]
+    );
+    assert_eq!(read_both(&bytes, &["D:ta"]), data);
+    assert_eq!(read_both(&bytes, &["d:TA"]), data);
+    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    assert_eq!(file.list_streams(), [vec!["D:ta".to_owned()]]);
+}
+
+/// The bundle never relaxes entry framing.
+#[test]
+fn directory_entry_framing_stays_fatal() {
+    let bytes = build(&[(&["Data"], b"framing")]);
+    let (_, offset) = entry(&bytes, "Data");
+    for (field, value) in [(66usize, 9u8), (64, 3), (0, 0)] {
+        let mut faulted = bytes.clone();
+        faulted[offset + field] = value;
+        if field == 0 {
+            // Clear the terminator so the name is not NUL-terminated.
+            faulted[offset + 8..offset + 10].copy_from_slice(b"x\0");
+        }
+        assert!(
+            OleFile::open(Cursor::new(faulted)).is_err(),
+            "field {field} = {value}"
+        );
+    }
+}

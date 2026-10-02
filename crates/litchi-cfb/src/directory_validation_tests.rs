@@ -25,6 +25,10 @@ fn validate(data: &[u8]) -> Result<(), crate::OleError> {
     Ok(())
 }
 
+fn report(data: &[u8]) -> crate::ToleranceReport {
+    OleFile::<Cursor<Vec<u8>>>::validate_directory(data, 512).unwrap()
+}
+
 fn read_sid(data: &[u8], entry_sid: u32, offset: usize) -> u32 {
     let start = entry_sid as usize * DIRENTRY_SIZE + offset;
     u32::from_le_bytes(data[start..start + 4].try_into().unwrap())
@@ -47,7 +51,7 @@ fn accepts_interoperable_root_color_values() {
 }
 
 #[test]
-fn rejects_invalid_names_types_and_colors() {
+fn rejects_invalid_names_and_types_and_records_invalid_colors() {
     let mut invalid_name_length = valid_directory(1);
     invalid_name_length[DIRENTRY_SIZE + 64] = 3;
     assert!(validate(&invalid_name_length).is_err());
@@ -56,9 +60,10 @@ fn rejects_invalid_names_types_and_colors() {
     invalid_type[DIRENTRY_SIZE + 66] = 3;
     assert!(validate(&invalid_type).is_err());
 
+    // An undefined color is a recorded default repair (leniency audit F7.7).
     let mut invalid_color = valid_directory(1);
     invalid_color[DIRENTRY_SIZE + 67] = 2;
-    assert!(validate(&invalid_color).is_err());
+    assert!(report(&invalid_color).contains(crate::DirectoryDefect::NodeColor));
 }
 
 #[test]
@@ -82,7 +87,7 @@ fn accepts_non_black_tree_roots_and_records_invalid_ordering() {
 }
 
 #[test]
-fn accepts_black_height_mismatch_but_rejects_stream_children() {
+fn accepts_black_height_mismatch_and_records_stream_children() {
     let mut mismatched = valid_directory(3);
     let tree_root = read_sid(&mismatched, 0, 76);
     let left = read_sid(&mismatched, tree_root, 68);
@@ -93,5 +98,6 @@ fn accepts_black_height_mismatch_but_rejects_stream_children() {
     let stream_sid = read_sid(&stream_child, 0, 76);
     let offset = stream_sid as usize * DIRENTRY_SIZE + 76;
     stream_child[offset..offset + 4].copy_from_slice(&stream_sid.to_le_bytes());
-    assert!(validate(&stream_child).is_err());
+    // A stream's child link is ignored and recorded (leniency audit F7.7).
+    assert!(report(&stream_child).contains(crate::DirectoryDefect::StreamChildLink));
 }

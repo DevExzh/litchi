@@ -166,6 +166,29 @@ fn general_simple_uppercase(character: char) -> char {
 }
 
 pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, DirectoryNameError> {
+    directory_name_data_with(name, false)
+}
+
+/// [`directory_name_data`] without the MS-CFB 2.6.1 forbidden-character
+/// rule, which constrains writers only. Reads use it to keep a stored name
+/// carrying `/`, `\`, `:`, or `!` as an opaque lookup key (leniency audit
+/// F7.7); authoring keeps the full rule.
+pub(crate) fn directory_name_data_allowing_forbidden(
+    name: &str,
+) -> Result<DirectoryNameData, DirectoryNameError> {
+    directory_name_data_with(name, true)
+}
+
+/// Whether `name` holds a character MS-CFB 2.6.1 forbids in names.
+pub(crate) fn has_forbidden_character(name: &str) -> bool {
+    name.chars()
+        .any(|character| FORBIDDEN_DIRECTORY_NAME_CHARS.contains(&character))
+}
+
+fn directory_name_data_with(
+    name: &str,
+    allow_forbidden: bool,
+) -> Result<DirectoryNameData, DirectoryNameError> {
     if name.is_empty() {
         return Err(DirectoryNameError::Empty);
     }
@@ -182,6 +205,7 @@ pub(crate) fn directory_name_data(name: &str) -> Result<DirectoryNameData, Direc
     if let Some(character) = name
         .chars()
         .find(|character| FORBIDDEN_DIRECTORY_NAME_CHARS.contains(character))
+        .filter(|_| !allow_forbidden)
     {
         return Err(DirectoryNameError::ForbiddenCharacter(character));
     }

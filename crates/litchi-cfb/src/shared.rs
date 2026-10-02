@@ -3,7 +3,7 @@
 use crate::shared_bulk::SharedOleBulkRead;
 use crate::{
     consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM},
-    directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data},
+    directory_name::{DirectoryNameData, ascii_lookup_key},
     file::{DirectoryEntry, OleError, OleFile, OleFileLimits, ParsedOleIndex},
 };
 use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
@@ -2817,10 +2817,16 @@ impl SharedOleFile {
     }
 
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
-        if let Some(target) = ascii_lookup_key(name).map_err(|_error| OleError::StreamNotFound)? {
-            return self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name));
+        match ascii_lookup_key(name) {
+            Ok(Some(target)) => {
+                return self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name));
+            },
+            Ok(None) | Err(crate::directory_name::DirectoryNameError::ForbiddenCharacter(_)) => {},
+            Err(_) => return Err(OleError::StreamNotFound),
         }
-        let target = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+        // See `OleFile::find_child_by_name` (leniency audit F7.7).
+        let target = crate::directory_name::directory_name_data_allowing_forbidden(name)
+            .map_err(|_error| OleError::StreamNotFound)?;
         self.find_child_by_name_with(sid, |entry_name| target.compare(entry_name))
     }
 
@@ -3695,6 +3701,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::directory_name::directory_name_data;
     use crate::{OleWriter, SharedOleBulkError};
     use litchi_core::{
         Budget, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,

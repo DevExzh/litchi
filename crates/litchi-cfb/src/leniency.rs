@@ -202,28 +202,36 @@ pub enum DirectoryDefect {
     UnreachableEntry,
     /// A directory node color byte was neither red nor black (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// The color only balances the tree; LibreOffice ignores it and lookup
+    /// never reads it. The entry is treated as black.
     NodeColor,
     /// A storage entry carried a nonzero start sector or size (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// Storages own no allocation, so the fields are never read; LibreOffice
+    /// does not check them.
     StorageAllocationFields,
     /// A stream entry carried a child link (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// Streams have no children; the link is cleared in memory and never
+    /// followed, as LibreOffice never checks it.
     StreamChildLink,
+    /// The root entry's name or sibling links deviated from MS-CFB 2.6.2
     /// The root entry's name or sibling links deviated from MS-CFB 2.6.2
     /// (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// SID 0 is the root by position, as LibreOffice takes it; the root has
+    /// no siblings, so its links are cleared in memory and never followed.
+    /// The context is zero.
     RootEntryFields,
     /// An unused (`STGTY_EMPTY`) entry carried leftover name bytes (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// The entry stays unused and nothing else in it is read, as LibreOffice
+    /// forces such entries empty (tdf#112399).
     EmptyEntryResidue,
     /// A directory name contained a character MS-CFB 2.6.1 forbids (F7.7).
     ///
-    /// Not yet repaired: the reader currently rejects this deviation.
+    /// The rule constrains writers and POI enforces none on read: the name
+    /// is kept as an opaque lookup key, and lookups by that exact name work.
     NameCharacters,
 }
 

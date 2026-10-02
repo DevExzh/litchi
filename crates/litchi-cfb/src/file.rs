@@ -4,7 +4,12 @@ use super::consts::{
     SECTOR_SIZE_V3, SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
     TWO_GIB_BYTES,
 };
-use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
+#[cfg(test)]
+use crate::directory_name::directory_name_data;
+use crate::directory_name::{
+    DirectoryNameData, DirectoryNameError, ascii_lookup_key,
+    directory_name_data_allowing_forbidden, has_forbidden_character,
+};
 use crate::leniency::{AllocationDefect, DirectoryDefect, HeaderDefect, ToleranceReport};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
@@ -1530,7 +1535,11 @@ impl<R: Read + Seek> OleFile<R> {
         // Parse root entry first (always at index 0)
         let mut root_entry = None;
         if num_entries > 0 {
-            let root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
+            let mut root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
+            // The root has no siblings (F7.7); validation recorded any stale
+            // links.
+            root.sid_left = NOSTREAM;
+            root.sid_right = NOSTREAM;
             let root_child_sid = root.sid_child;
             dir_entries[0] = Some(root.clone());
 
@@ -1861,7 +1870,7 @@ impl<R: Read + Seek> OleFile<R> {
             })?;
             try_push(
                 &mut entries,
-                Self::parse_validated_directory_entry(data, entry_sid, sector_size)?,
+                Self::parse_validated_directory_entry(data, entry_sid, sector_size, tolerance)?,
                 "validated directory entries",
             )?;
         }
@@ -1870,14 +1879,16 @@ impl<R: Read + Seek> OleFile<R> {
             .first()
             .and_then(Option::as_ref)
             .ok_or_else(|| OleError::CorruptedFile("CFB root entry is missing".to_string()))?;
-        if root.entry_type != STGTY_ROOT
-            || root.name != "Root Entry"
-            || root.sid_left != NOSTREAM
-            || root.sid_right != NOSTREAM
-        {
+        if root.entry_type != STGTY_ROOT {
             return Err(OleError::CorruptedFile(
                 "invalid CFB root directory entry".to_string(),
             ));
+        }
+        // LibreOffice takes SID 0 as the root by position without checking
+        // its name (`StgDirStrm::SetupEntry`), and the root has no siblings:
+        // traversal starts at its child. Record and ignore (F7.7).
+        if root.name != "Root Entry" || root.sid_left != NOSTREAM || root.sid_right != NOSTREAM {
+            tolerance.record(DirectoryDefect::RootEntryFields, 0);
         }
 
         let mut owned = CheckedBitSet::try_with_capacity(entries.len(), "directory ownership map")?;
@@ -1977,19 +1988,29 @@ impl<R: Read + Seek> OleFile<R> {
         Ok((entries, misordered))
     }
 
+    /// Validates one directory entry.
+    ///
+    /// MS-CFB 2.6 states its per-entry field rules as producer "MUST"s with
+    /// no reader behavior. The fields that carry no meaning for reading are
+    /// repaired and recorded (leniency audit F7.7), as LibreOffice
+    /// (`StgEntry::Load`) and POI do: an undefined node color, a storage's
+    /// start sector and size, a stream's child link, leftover bytes in an
+    /// unused entry, and forbidden name characters. Entry type, name length,
+    /// termination, and encoding stay fatal.
     fn parse_validated_directory_entry(
         data: &[u8],
         sid: u32,
         sector_size: usize,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Option<ValidatedDirectoryEntry>, OleError> {
         let raw = RawDirectoryEntry::read_from_bytes(data).map_err(|_err| {
             OleError::InvalidFormat("Failed to parse directory entry".to_string())
         })?;
         if raw.entry_type == STGTY_EMPTY {
+            // LibreOffice treats an unused entry as empty whatever else it
+            // holds (tdf#112399); its other fields are never read.
             if raw.name_len.get() != 0 {
-                return Err(OleError::CorruptedFile(format!(
-                    "empty CFB directory SID {sid} has a nonzero name length"
-                )));
+                tolerance.record(DirectoryDefect::EmptyEntryResidue, sid);
             }
             return Ok(None);
         }
@@ -2031,18 +2052,28 @@ impl<R: Read + Seek> OleFile<R> {
         let name = String::from_utf16(&name_utf16).map_err(|_err| {
             OleError::CorruptedFile(format!("invalid UTF-16 CFB directory name at SID {sid}"))
         })?;
-        let name_data = directory_name_data(&name)
+        let name_data = directory_name_data_allowing_forbidden(&name)
             .map_err(|error| OleError::CorruptedFile(error.to_string()))?;
+        if has_forbidden_character(&name) {
+            // POI enforces no character rules on read; the name stays an
+            // opaque lookup key.
+            tolerance.record(DirectoryDefect::NameCharacters, sid);
+        }
         if name_data.utf16.as_slice() != name_utf16.as_slice() {
             return Err(OleError::CorruptedFile(format!(
                 "CFB directory name encoding mismatch at SID {sid}"
             )));
         }
 
-        let node_color = DirectoryNodeColor::try_from(raw.node_color)?;
+        // The color only balances the tree; LibreOffice ignores the byte
+        // ("0 or 1 (tree balance?)") and lookup never reads it.
+        let node_color = DirectoryNodeColor::try_from(raw.node_color).unwrap_or_else(|_| {
+            tolerance.record(DirectoryDefect::NodeColor, sid);
+            DirectoryNodeColor::Black
+        });
         let sid_left = raw.sid_left.get();
         let sid_right = raw.sid_right.get();
-        let sid_child = raw.sid_child.get();
+        let mut sid_child = raw.sid_child.get();
         // MS-CFB 2.6.1: a version 3 file's stream size must fit in 32 bits, but
         // older writers left the high word uninitialized. The spec explicitly
         // recommends that parsers ignore those bits and treat them as zero
@@ -2061,19 +2092,26 @@ impl<R: Read + Seek> OleFile<R> {
                     "CFB root entry must have SID 0".to_string(),
                 ));
             },
-            STGTY_STORAGE
-                if sid == 0
-                    || !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN)
-                    || stream_size != 0 =>
-            {
+            STGTY_STORAGE | STGTY_STREAM if sid == 0 => {
                 return Err(OleError::CorruptedFile(format!(
-                    "invalid CFB storage fields at SID {sid}"
+                    "invalid CFB {} fields at SID {sid}",
+                    if raw.entry_type == STGTY_STORAGE {
+                        "storage"
+                    } else {
+                        "stream"
+                    }
                 )));
             },
-            STGTY_STREAM if sid == 0 || sid_child != NOSTREAM => {
-                return Err(OleError::CorruptedFile(format!(
-                    "invalid CFB stream fields at SID {sid}"
-                )));
+            // A storage has no allocation; its start and size are never read.
+            STGTY_STORAGE
+                if !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN) || stream_size != 0 =>
+            {
+                tolerance.record(DirectoryDefect::StorageAllocationFields, sid);
+            },
+            // A stream has no children; the link is never followed.
+            STGTY_STREAM if sid_child != NOSTREAM => {
+                tolerance.record(DirectoryDefect::StreamChildLink, sid);
+                sid_child = NOSTREAM;
             },
             _ => {},
         }
@@ -2213,7 +2251,12 @@ impl<R: Read + Seek> OleFile<R> {
                 let end = offset.checked_add(DIRENTRY_SIZE).ok_or_else(|| {
                     OleError::CorruptedFile("directory entry end offset overflow".to_string())
                 })?;
-                let entry = self.parse_directory_entry(&dir_data[offset..end], sid)?;
+                let mut entry = self.parse_directory_entry(&dir_data[offset..end], sid)?;
+                // A stream's child link is never followed (F7.7); validation
+                // recorded any stale value.
+                if entry.entry_type == STGTY_STREAM {
+                    entry.sid_child = NOSTREAM;
+                }
 
                 // Extract child SIDs before moving entry
                 let left_sid = entry.sid_left;
@@ -3459,12 +3502,18 @@ impl<R: Read + Seek> OleFile<R> {
     /// can descend through one branch at each node. Limit the number of visited
     /// nodes as a final defense against a malformed in-memory graph.
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
-        if let Some(target_name) =
-            ascii_lookup_key(name).map_err(|_error| OleError::StreamNotFound)?
-        {
-            return self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name));
+        match ascii_lookup_key(name) {
+            Ok(Some(target_name)) => {
+                return self
+                    .find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name));
+            },
+            Ok(None) | Err(DirectoryNameError::ForbiddenCharacter(_)) => {},
+            Err(_) => return Err(OleError::StreamNotFound),
         }
-        let target_name = directory_name_data(name).map_err(|_error| OleError::StreamNotFound)?;
+        // A stored name may carry a character MS-CFB forbids writers to use
+        // (leniency audit F7.7); such a query can only match such an entry.
+        let target_name = directory_name_data_allowing_forbidden(name)
+            .map_err(|_error| OleError::StreamNotFound)?;
         self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name))
     }
 

@@ -685,14 +685,17 @@ fn a_real_producer_stream_ending_in_the_partial_mini_sector_reads() {
     let original = std::fs::read(repository_root().join(ZVI)).unwrap();
     assert_eq!(original.len(), 51_712);
     // The producer also writes FREESECT into its storages' start sector
-    // fields, which the directory validation refuses before any stream
-    // allocation is examined (a separate question this record does not
-    // change). Normalizing those fields to ENDOFCHAIN, and nothing else,
-    // lets the file reach the mini-stream checks.
-    assert_refused(
-        "unmodified",
-        &original,
-        Some("invalid CFB storage fields at SID 2"),
+    // fields. Storages own no allocation, so the reader ignores and records
+    // them (leniency audit F7.7) and the unmodified file opens. Normalizing
+    // those fields to ENDOFCHAIN, and nothing else, gives the conformant
+    // file the checks below examine.
+    let unmodified = OleFile::open(Cursor::new(original.as_slice())).unwrap();
+    let report = unmodified.tolerance_report();
+    assert_eq!(report.total(), 11);
+    assert!(
+        report.iter().all(|tolerated| {
+            tolerated.defect == DirectoryDefect::StorageAllocationFields.into()
+        })
     );
     let mut normalized = original.clone();
     let mut storages = 0;
