@@ -995,10 +995,15 @@ fn is_cell_kind(kind_value: raw::Kind) -> bool {
 ///
 /// Formula tokens are deliberately left opaque; this helper validates the
 /// cached-result field and returns the existing source-bound cell-value model.
+///
+/// Reserved `Cell` flag bits are ignored through `tolerance`, located by the
+/// cell's zero-based `row`.
 pub(crate) fn decode_cached_value(
     kind_value: raw::Kind,
     payload: &[u8],
     limits: raw::Limits,
+    row: u32,
+    tolerance: &mut crate::leniency::Tolerance<'_>,
 ) -> Result<crate::cell_values::Value> {
     limits.validate()?;
     if payload.len() > limits.payload() {
@@ -1012,8 +1017,15 @@ pub(crate) fn decode_cached_value(
     if payload.len() < 8 {
         return Err(invalid("cell payload is shorter than its Cell header"));
     }
+    // MS-XLSB 2.5.10 Cell: the 7 reserved bits MUST be 0 and MUST be ignored.
     if payload[7] & 0xfe != 0 {
-        return Err(invalid("cell payload has reserved flag bits"));
+        tolerance.tolerate(
+            crate::leniency::ReservedFieldDefect::CellFlags,
+            kind_value,
+            row,
+            u32::from(payload[7] & 0xfe),
+            || invalid("cell payload has reserved flag bits"),
+        )?;
     }
     match kind_value {
         kind::CELL_BLANK => {
@@ -1815,12 +1827,30 @@ mod cached_value_tests {
             for value in [-0.0, f64::from_bits(1), f64::INFINITY, f64::NAN] {
                 let mut payload = vec![0; length];
                 payload[8..16].copy_from_slice(&value.to_le_bytes());
-                assert!(decode_cached_value(record_kind, &payload, raw::Limits::DEFAULT).is_err());
+                assert!(
+                    decode_cached_value(
+                        record_kind,
+                        &payload,
+                        raw::Limits::DEFAULT,
+                        0,
+                        &mut crate::leniency::Tolerance::refusing()
+                    )
+                    .is_err()
+                );
             }
             for value in [0.0_f64, 1.0, -1.0] {
                 let mut payload = vec![0; length];
                 payload[8..16].copy_from_slice(&value.to_le_bytes());
-                assert!(decode_cached_value(record_kind, &payload, raw::Limits::DEFAULT).is_ok());
+                assert!(
+                    decode_cached_value(
+                        record_kind,
+                        &payload,
+                        raw::Limits::DEFAULT,
+                        0,
+                        &mut crate::leniency::Tolerance::refusing()
+                    )
+                    .is_ok()
+                );
             }
         }
     }
@@ -1830,12 +1860,30 @@ mod cached_value_tests {
         for encoded in [0x8000_0000_u32, 4, 0x7ff0_0000] {
             let mut payload = vec![0; 8];
             payload.extend_from_slice(&encoded.to_le_bytes());
-            assert!(decode_cached_value(kind::CELL_RK, &payload, raw::Limits::DEFAULT).is_err());
+            assert!(
+                decode_cached_value(
+                    kind::CELL_RK,
+                    &payload,
+                    raw::Limits::DEFAULT,
+                    0,
+                    &mut crate::leniency::Tolerance::refusing()
+                )
+                .is_err()
+            );
         }
         for encoded in [2_u32, 6] {
             let mut payload = vec![0; 8];
             payload.extend_from_slice(&encoded.to_le_bytes());
-            assert!(decode_cached_value(kind::CELL_RK, &payload, raw::Limits::DEFAULT).is_ok());
+            assert!(
+                decode_cached_value(
+                    kind::CELL_RK,
+                    &payload,
+                    raw::Limits::DEFAULT,
+                    0,
+                    &mut crate::leniency::Tolerance::refusing()
+                )
+                .is_ok()
+            );
         }
     }
 
@@ -1851,7 +1899,13 @@ mod cached_value_tests {
                 if record_kind == kind::FMLA_STRING {
                     payload.extend_from_slice(&[0; 10]);
                 }
-                let result = decode_cached_value(record_kind, &payload, raw::Limits::DEFAULT);
+                let result = decode_cached_value(
+                    record_kind,
+                    &payload,
+                    raw::Limits::DEFAULT,
+                    0,
+                    &mut crate::leniency::Tolerance::refusing(),
+                );
                 assert_eq!(result.is_ok(), units == 32_767);
             }
         }
@@ -1863,10 +1917,24 @@ mod cached_value_tests {
         payload.extend_from_slice(&3_u32.to_le_bytes());
         payload.extend_from_slice(&[b'a', 0, b'b', 0, b'c', 0]);
         assert!(
-            decode_cached_value(kind::CELL_R_STRING, &payload, raw::Limits::new(100, 2)).is_err()
+            decode_cached_value(
+                kind::CELL_R_STRING,
+                &payload,
+                raw::Limits::new(100, 2),
+                0,
+                &mut crate::leniency::Tolerance::refusing()
+            )
+            .is_err()
         );
         assert!(
-            decode_cached_value(kind::CELL_R_STRING, &payload, raw::Limits::new(100, 3)).is_ok()
+            decode_cached_value(
+                kind::CELL_R_STRING,
+                &payload,
+                raw::Limits::new(100, 3),
+                0,
+                &mut crate::leniency::Tolerance::refusing()
+            )
+            .is_ok()
         );
 
         let mut phonetic = vec![0; 8];
@@ -1877,7 +1945,14 @@ mod cached_value_tests {
         phonetic.extend_from_slice(&[b'a', 0, b'b', 0, b'c', 0]);
         phonetic.extend_from_slice(&[0; 8]);
         assert!(
-            decode_cached_value(kind::CELL_R_STRING, &phonetic, raw::Limits::new(100, 2)).is_err()
+            decode_cached_value(
+                kind::CELL_R_STRING,
+                &phonetic,
+                raw::Limits::new(100, 2),
+                0,
+                &mut crate::leniency::Tolerance::refusing()
+            )
+            .is_err()
         );
     }
 }

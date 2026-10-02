@@ -18,7 +18,7 @@ use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
 use crate::external_link::{ExternalLinkLimits, Link};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
@@ -167,11 +167,16 @@ impl SourceBackedIndexedWorksheet {
             .lookup_record(self.worksheet.as_bytes(), row, column)?;
         let value = match record {
             Some((offset, payload)) => {
+                let mut report = ToleranceReport::default();
                 let value = crate::binary_index::decode_cached_value(
                     crate::raw::Kind::new(offset.record_kind)?,
                     payload,
                     self.limits.raw,
+                    row,
+                    &mut Tolerance::recording(&mut report),
                 )?;
+                // Every lookup that performs a repair records it.
+                self.inner.lock_tolerance().append(&report);
                 Some(self.scalar_value(value)?)
             },
             None => None,
@@ -1233,7 +1238,10 @@ impl SourceBackedWorksheet {
                 ));
             }
             let comments_data = comments_part.data()?;
-            for comment in crate::comments::read(comments_data.as_bytes())? {
+            for comment in crate::comments::read_recording(
+                comments_data.as_bytes(),
+                worksheet.tolerance_report_mut(),
+            )? {
                 worksheet.add_comment(comment);
             }
         }
@@ -1391,6 +1399,7 @@ impl SourceInner {
         let _ = preflight_package(&self.package)?;
         let tables = self.tables.get_or_try_init(|| {
             let _ = preflight_package(&self.package)?;
+            let mut report = ToleranceReport::default();
             let mut tables = Vec::new();
             tables
                 .try_reserve_exact(self.table_parts.len())
@@ -1409,6 +1418,7 @@ impl SourceInner {
                 let table = Workbook::parse_table_definition(
                     data.as_bytes(),
                     table_part.worksheet_position,
+                    &mut Tolerance::recording(&mut report),
                 );
                 postflight_package(&self.package)?;
                 let table = table?;
@@ -1445,6 +1455,8 @@ impl SourceInner {
             };
             let tables = Arc::new(tables);
             postflight_package(&self.package)?;
+            // Published only on success; see `styles`.
+            self.lock_tolerance().append(&report);
             Ok::<_, Error>(tables)
         })?;
         postflight_package(&self.package)?;

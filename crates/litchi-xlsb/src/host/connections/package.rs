@@ -42,6 +42,21 @@ pub(crate) fn load_from_workbook(
     )?))
 }
 
+/// [`load_from_workbook`], recording Excel-compatible repairs into `report`.
+pub(crate) fn load_from_workbook_recording(
+    package: &OpcPackage,
+    workbook_uri: &PackURI,
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<Option<Connections>> {
+    let Some(graph) = discover_graph(package, workbook_uri)? else {
+        return Ok(None);
+    };
+    Ok(Some(super::parse::parse_connections_part_recording(
+        package.get_part(&graph.part_name)?.blob(),
+        report,
+    )?))
+}
+
 /// Admit the inert connections owner under a caller's byte and typed-entry
 /// ceilings before the semantic parser allocates its connection vector and
 /// strings. The raw record pass borrows the owner payload and performs no

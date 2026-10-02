@@ -21,6 +21,7 @@ pub(crate) mod write;
 
 pub use model::*;
 pub use parse::{parse_table_part, parse_table_part_rel_ids};
+pub(crate) use parse::{parse_table_part_recording, parse_table_part_rel_ids_recording};
 
 #[cfg(test)]
 mod tests;

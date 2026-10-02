@@ -77,7 +77,7 @@ fn parse_direct_record(data: &[u8], definition: &PivotCacheDefinition) -> Result
 }
 
 fn parse_record_dt(
-    walker: &mut RecordWalker<'_>,
+    walker: &mut RecordWalker<'_, '_>,
     definition: &PivotCacheDefinition,
 ) -> Result<PivotCacheRecord> {
     let mut values = Vec::with_capacity(source_field_count(definition));

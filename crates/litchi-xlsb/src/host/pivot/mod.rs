@@ -22,6 +22,7 @@ mod validation;
 pub(crate) mod write;
 
 pub use model::*;
+pub(crate) use semantic::parse_pivot_cache_definition_recording;
 pub use semantic::{parse_pivot_cache_definition, parse_pivot_cache_records};
 
 #[cfg(test)]

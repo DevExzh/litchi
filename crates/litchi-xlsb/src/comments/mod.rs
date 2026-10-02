@@ -13,6 +13,7 @@ mod model;
 /// separate from the legacy BIFF12 note/comment adapter below.
 pub mod threaded;
 
+pub(crate) use codec::read_recording;
 pub use codec::{
     Error, MAX_AUTHOR_UNITS, MAX_COLUMNS, MAX_ROWS, MAX_TEXT_RUNS, MAX_TEXT_UNITS, Result,
 };

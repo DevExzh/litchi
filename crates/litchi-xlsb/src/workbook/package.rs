@@ -5,7 +5,7 @@ use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
 use crate::external_link::{Budget, ExternalLinkLimits};
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
@@ -1253,13 +1253,17 @@ impl Workbook {
                 )));
             }
             let part = self.package.get_part(&relationship.target_partname()?)?;
-            let definition = crate::package::pivot::parse_pivot_cache_definition(part.blob())?;
+            let definition = crate::package::pivot::parse_pivot_cache_definition_recording(
+                part.blob(),
+                &mut self.tolerance,
+            )?;
             pivot_cache_definitions.push((*cache_id, definition));
         }
 
-        let connections = crate::package::connections::package::load_from_workbook(
+        let connections = crate::package::connections::package::load_from_workbook_recording(
             &self.package,
             workbook_part.partname(),
+            &mut self.tolerance,
         )?;
 
         let mut tables = Vec::new();
@@ -1440,8 +1444,10 @@ impl Workbook {
                     sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
                 }
             }
-            for table_rel_id in crate::package::table::parse_table_part_rel_ids(sheet_part.blob())?
-            {
+            for table_rel_id in crate::package::table::parse_table_part_rel_ids_recording(
+                sheet_part.blob(),
+                &mut self.tolerance,
+            )? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
                     crate::package::error::Error::InvalidFormula(format!(
                         "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is missing"
@@ -1453,7 +1459,10 @@ impl Workbook {
                     )));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
-                let table = crate::package::table::parse_table_part(part.blob())?;
+                let table = crate::package::table::parse_table_part_recording(
+                    part.blob(),
+                    &mut self.tolerance,
+                )?;
                 structured_tables.push((worksheet_index, table));
             }
             for relationship in sheet_part.rels().iter().filter(|relationship| {
@@ -1468,7 +1477,15 @@ impl Workbook {
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
-                let table = Self::parse_table_definition(part.blob(), sheet_index)?;
+                // The same BrtBeginList/BrtBeginListCol records were already
+                // parsed (and any repair recorded) by the typed table parser
+                // above; this formula-context pass must not record them twice.
+                let mut already_recorded = ToleranceReport::default();
+                let table = Self::parse_table_definition(
+                    part.blob(),
+                    sheet_index,
+                    &mut Tolerance::recording(&mut already_recorded),
+                )?;
                 if tables
                     .iter()
                     .any(|existing: &TableDefinition| existing.table_id() == table.table_id())

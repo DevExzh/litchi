@@ -6,8 +6,9 @@
 //! types are ignored, and known begin/end record pairs that carry no
 //! modelled data are skipped as balanced collections.
 
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::package::error::{Error, Result};
-use crate::raw::{Kind, Record, Records, kind as rt};
+use crate::raw::{Cursor, Kind, Record, Records, kind as rt};
 
 /// Maximum number of leading future-record wrapper blocks skipped while
 /// looking for the record that opens a part stream.
@@ -21,19 +22,61 @@ pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> Error {
 }
 
 /// Wraps the shared record iterator with collection helpers.
-pub(crate) struct RecordWalker<'a> {
+///
+/// The walker also carries the parse's repair channel (see
+/// [`crate::leniency`]): [`RecordWalker::finish`] attributes trailing payload
+/// bytes to the record the walker yielded last, which is the record whose
+/// payload the caller is decoding.
+pub(crate) struct RecordWalker<'a, 't> {
     iter: Records<'a>,
+    tolerance: Tolerance<'t>,
+    current: Option<(Kind, usize)>,
 }
 
-impl<'a> RecordWalker<'a> {
+impl<'a> RecordWalker<'a, 'static> {
+    /// Walk `data`, refusing every defect (no report can carry a repair).
     pub(crate) fn new(data: &'a [u8]) -> Self {
         RecordWalker {
             iter: Records::new(data),
+            tolerance: Tolerance::refusing(),
+            current: None,
+        }
+    }
+}
+
+impl<'a, 't> RecordWalker<'a, 't> {
+    /// Walk `data`, recording Excel-compatible repairs into `report`.
+    pub(crate) fn recording(data: &'a [u8], report: &'t mut ToleranceReport) -> Self {
+        RecordWalker {
+            iter: Records::new(data),
+            tolerance: Tolerance::recording(report),
+            current: None,
         }
     }
 
     pub(crate) fn next(&mut self) -> Result<Option<Record<'a>>> {
-        Ok(self.iter.next().transpose()?)
+        let record = self.iter.next().transpose()?;
+        if let Some(record) = &record {
+            self.current = Some((record.kind(), record.offset()));
+        }
+        Ok(record)
+    }
+
+    /// Finish decoding the payload of the record yielded last.
+    ///
+    /// Trailing payload bytes past the record's defined layout are ignored
+    /// and recorded as [`crate::LayoutDefect::TrailingBytes`] (located by the
+    /// record's byte offset in its part) when the walker records repairs, and
+    /// refused otherwise.
+    pub(crate) fn finish(&mut self, cursor: &Cursor<'_>) -> Result<()> {
+        match self.current {
+            Some((record_type, offset)) => Ok(self.tolerance.finish(
+                cursor,
+                record_type,
+                u32::try_from(offset).unwrap_or(u32::MAX),
+            )?),
+            None => Ok(cursor.finish()?),
+        }
     }
 
     pub(crate) fn required(&mut self, context: &'static str) -> Result<Record<'a>> {

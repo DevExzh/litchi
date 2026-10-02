@@ -21,10 +21,11 @@
 //! They are applied in the workbook stream (`BrtCalcProp`, `BrtBundleSh`,
 //! `BrtName`), the styles part (`BrtFont`/`BrtFill` colors, `BrtBorder`,
 //! `BrtFmt`), and worksheet streams (`Cell` flags, `BrtRowHdr`, `BrtColInfo`,
-//! formula-cell `GrbitFmla` and trailing bytes). Adjunct parts (tables,
-//! PivotTables, connections, comments, …) and the binary-index point lookup
-//! behind `SourceBackedIndexedWorksheet::cached_value` keep their strict
-//! checks for now.
+//! formula-cell `GrbitFmla` and trailing bytes), to trailing payload bytes in
+//! the adjunct parts parsed with the workbook — table parts, PivotCache
+//! definitions, External Data Connections, and comments — and to `Cell` flags
+//! on the binary-index point lookup
+//! ([`SourceBackedIndexedWorksheet::cached_value`](crate::SourceBackedIndexedWorksheet::cached_value)).
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. None exists yet: the [`CachedNumberDefect`] class (MS-XLSB
@@ -47,26 +48,33 @@
 //!
 //! - [`Workbook::tolerance_report`](crate::Workbook::tolerance_report) covers
 //!   every part parsed while the workbook opens — the workbook stream
-//!   (`workbook.bin`, including `BrtCalcProp`, `BrtBundleSh`, and `BrtName`)
-//!   and the styles part (`styles.bin`).
+//!   (`workbook.bin`, including `BrtCalcProp`, `BrtBundleSh`, and `BrtName`),
+//!   the styles part (`styles.bin`), and the adjunct parts parsed at open:
+//!   table parts, PivotCache definitions, and External Data Connections.
 //! - [`Package::tolerance_report`](crate::Package::tolerance_report) is the
 //!   report of the validating open that admitted the package.
 //! - [`Worksheet::tolerance_report`](crate::Worksheet::tolerance_report)
-//!   covers one materialized worksheet stream. Worksheets are parsed lazily,
+//!   covers one materialized worksheet stream and its comments part.
+//!   Worksheets are parsed lazily,
 //!   so each materialization carries its own report instead of mutating the
 //!   workbook's.
 //! - [`SourceBackedWorkbook::tolerance_report`](crate::SourceBackedWorkbook::tolerance_report)
 //!   returns a snapshot of the workbook-scope repairs performed so far: the
-//!   workbook stream at open, then the styles part once a worksheet
-//!   materialization first needs it. Each lazily parsed part contributes its
-//!   repairs exactly once.
+//!   workbook stream at open, then the styles and table parts once a
+//!   worksheet materialization first needs them. Each lazily parsed part
+//!   contributes its repairs exactly once. Each binary-index lookup through
+//!   `SourceBackedIndexedWorksheet::cached_value` that performs a repair
+//!   records it here as well.
 //! - [`cell_values::Snapshot::tolerance_report`](crate::cell_values::Snapshot::tolerance_report)
 //!   covers the worksheet stream behind one cell-value edit snapshot.
 //!
 //! Internally, parsers receive `&mut ToleranceReport` (or own one, as the
 //! worksheet cell reader does) and call `record` at the exact point they
 //! would otherwise have returned an error, then continue with the documented
-//! substitute value. Low-level single-record codec functions that cannot carry
+//! substitute value. Parsers built on the shared record walker (tables,
+//! PivotCache definitions, connections) carry the channel in the walker,
+//! which attributes trailing bytes to the record it yielded last. Low-level
+//! single-record codec functions that cannot carry
 //! a report (for example [`styles::parse_border`](crate::styles::parse_border))
 //! remain strict, so a repair can never happen without being recorded; the
 //! write path keeps validating authored payloads strictly as well.
@@ -372,7 +380,9 @@ impl ToleratedDefect {
     /// the zero-based ordinal of the record within its collection. For
     /// `BrtBundleSh` and `BrtName` it is the zero-based ordinal of the record
     /// among records of its type. For singleton records such as
-    /// `BrtCalcProp` it is zero.
+    /// `BrtCalcProp` it is zero. For records in adjunct parts (table parts,
+    /// PivotCache definitions, connections, comments) it is the byte offset
+    /// of the record header within its part, saturated to `u32::MAX`.
     #[must_use]
     pub const fn location(&self) -> u32 {
         self.location
@@ -577,6 +587,27 @@ impl<'a> Tolerance<'a> {
                 Ok(())
             },
             None => Err(on_refusal()),
+        }
+    }
+}
+
+impl Tolerance<'_> {
+    /// Finish a payload cursor: trailing bytes past the decoded layout are
+    /// ignored and recorded as [`LayoutDefect::TrailingBytes`], or refused
+    /// with the cursor's own error when this channel cannot record.
+    pub(crate) fn finish(
+        &mut self,
+        cursor: &crate::raw::Cursor<'_>,
+        record_type: crate::raw::Kind,
+        location: u32,
+    ) -> Result<(), crate::raw::Error> {
+        let trailing = cursor.remaining();
+        match self.report.as_deref_mut() {
+            Some(report) if trailing != 0 => {
+                report.record_trailing(record_type, location, trailing);
+                Ok(())
+            },
+            Some(_) | None => cursor.finish(),
         }
     }
 }

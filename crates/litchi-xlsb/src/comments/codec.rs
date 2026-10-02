@@ -10,6 +10,7 @@
 //! from sections 2.4.31, 2.4.32, 2.4.33, and 2.4.340/2.4.387--2.4.390.
 
 use super::model::{Record, Run};
+use crate::leniency::{Tolerance, ToleranceReport};
 use crate::raw::{Cursor, Record as RawRecord, Records, Writer, kind};
 use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::Write;
@@ -72,7 +73,19 @@ pub enum Error {
 }
 
 /// Read one complete XLSB comments stream.
+///
+/// This standalone function cannot report repairs, so it refuses every
+/// defect an opened worksheet repairs and records (see [`crate::leniency`]).
 pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
+    read_with(bytes, &mut Tolerance::refusing())
+}
+
+/// Read one comments stream, recording Excel-compatible repairs into `report`.
+pub(crate) fn read_recording(bytes: &[u8], report: &mut ToleranceReport) -> Result<Vec<Record>> {
+    read_with(bytes, &mut Tolerance::recording(report))
+}
+
+fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>> {
     let records = collect_records(bytes)?;
     let mut pos = 0;
     expect(&records, &mut pos, kind::BEGIN_COMMENTS)?;
@@ -87,12 +100,22 @@ pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
         pos += 1;
         let (author, consumed) = decode_wide_string(record.payload())?;
         let length = author.encode_utf16().count();
-        if consumed != record.payload().len() || length > MAX_AUTHOR_UNITS {
+        if length > MAX_AUTHOR_UNITS {
             return Err(Error::Unrecognized {
                 typ: "BrtCommentAuthor".to_string(),
                 val: author,
             });
         }
+        let trailing = record.payload().len().saturating_sub(consumed);
+        tolerance.tolerate_trailing(
+            kind::COMMENT_AUTHOR,
+            record_location(record.offset()),
+            trailing,
+            || Error::Unrecognized {
+                typ: "BrtCommentAuthor".to_string(),
+                val: author.clone(),
+            },
+        )?;
         reserve(&mut authors, 1, "comment authors")?;
         authors.push(author);
     }
@@ -178,7 +201,11 @@ pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
         {
             let record = &records[pos];
             pos += 1;
-            let rich = RichString::parse(record.payload())?;
+            let rich = RichString::parse_with(
+                record.payload(),
+                record_location(record.offset()),
+                tolerance,
+            )?;
             if !rich.is_rich || rich.is_extended {
                 return Err(Error::Unrecognized {
                     typ: "BrtCommentText".to_string(),
@@ -313,6 +340,11 @@ pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()
     Ok(())
 }
 
+/// A record's byte offset in its part, saturated for the tolerance report.
+fn record_location(offset: usize) -> u32 {
+    u32::try_from(offset).unwrap_or(u32::MAX)
+}
+
 fn collect_records(bytes: &[u8]) -> Result<Vec<RawRecord<'_>>> {
     let mut records = Vec::new();
     for record in Records::new(bytes) {
@@ -362,7 +394,7 @@ struct RichString {
 }
 
 impl RichString {
-    fn parse(data: &[u8]) -> Result<Self> {
+    fn parse_with(data: &[u8], location: u32, tolerance: &mut Tolerance<'_>) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
                 expected: 1,
@@ -467,12 +499,13 @@ impl RichString {
             offset = end;
         }
 
-        if offset != data.len() {
-            return Err(Error::Unrecognized {
+        let trailing = data.len().saturating_sub(offset);
+        tolerance.tolerate_trailing(kind::COMMENT_TEXT, location, trailing, || {
+            Error::Unrecognized {
                 typ: "RichStr".to_string(),
-                val: format!("{} trailing bytes", data.len() - offset),
-            });
-        }
+                val: format!("{trailing} trailing bytes"),
+            }
+        })?;
         Ok(Self {
             text,
             runs,

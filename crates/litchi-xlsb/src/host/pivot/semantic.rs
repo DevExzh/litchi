@@ -9,8 +9,26 @@ use crate::package::error::Result;
 use super::model::{PivotCacheDefinition, PivotCacheRecords};
 
 /// Parse and semantically validate one `pivotCacheDefinition*.bin` part.
+///
+/// This standalone parser cannot report repairs, so it refuses every defect
+/// an opened workbook repairs and records (see [`crate::leniency`]).
 pub fn parse_pivot_cache_definition(data: &[u8]) -> Result<PivotCacheDefinition> {
-    let definition = super::parse::parse_pivot_cache_definition_binary(data)?;
+    let definition = super::parse::parse_pivot_cache_definition_binary(
+        crate::package::walker::RecordWalker::new(data),
+    )?;
+    super::validation::validate_definition(&definition)?;
+    Ok(definition)
+}
+
+/// Parse and semantically validate one `pivotCacheDefinition*.bin` part,
+/// recording Excel-compatible repairs into `report`.
+pub(crate) fn parse_pivot_cache_definition_recording(
+    data: &[u8],
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<PivotCacheDefinition> {
+    let definition = super::parse::parse_pivot_cache_definition_binary(
+        crate::package::walker::RecordWalker::recording(data, report),
+    )?;
     super::validation::validate_definition(&definition)?;
     Ok(definition)
 }

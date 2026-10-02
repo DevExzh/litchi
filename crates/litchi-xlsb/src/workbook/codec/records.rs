@@ -18,6 +18,11 @@ use crate::package::formula::{
 use crate::raw::{Records, kind};
 use litchi_core::binary;
 
+/// A record's byte offset in its part, saturated for the tolerance report.
+fn record_location(offset: usize) -> u32 {
+    u32::try_from(offset).unwrap_or(u32::MAX)
+}
+
 #[derive(Default)]
 pub(in crate::workbook) struct ParsedWorkbookInfo {
     pub(in crate::workbook) worksheet_names: Vec<String>,
@@ -395,9 +400,12 @@ impl Workbook {
         })
     }
 
+    /// Parse the formula-context view of one table part, ignoring and
+    /// recording trailing payload bytes through `tolerance`.
     pub(in crate::workbook) fn parse_table_definition(
         data: &[u8],
         sheet_index: usize,
+        tolerance: &mut Tolerance<'_>,
     ) -> Result<TableDefinition> {
         // Extension content is inert and source-owned by the XML Maps codec.
         // A fixed stack bounds adversarial nesting without allocating in this
@@ -489,7 +497,11 @@ impl Workbook {
                             "XLSB table part contains duplicate BrtBeginList".to_string(),
                         ));
                     }
-                    table_header = Some(Self::parse_table_header(record.payload())?);
+                    table_header = Some(Self::parse_table_header(
+                        record.payload(),
+                        record_location(record.offset()),
+                        tolerance,
+                    )?);
                 },
                 kind::BEGIN_LIST_COLS => {
                     let (_, _, range_columns) = table_header.as_ref().ok_or_else(|| {
@@ -521,7 +533,12 @@ impl Workbook {
                             "BrtBeginListCol occurs outside its column collection".to_string(),
                         ));
                     }
-                    columns.push(Self::parse_table_column(record.payload(), columns.len())?);
+                    columns.push(Self::parse_table_column(
+                        record.payload(),
+                        columns.len(),
+                        record_location(record.offset()),
+                        tolerance,
+                    )?);
                     in_column = true;
                     saw_xml_properties = false;
                 },
@@ -590,7 +607,11 @@ impl Workbook {
         TableDefinition::try_new(table_id, sheet_index, display_name, columns)
     }
 
-    fn parse_table_header(data: &[u8]) -> Result<(u32, String, usize)> {
+    fn parse_table_header(
+        data: &[u8],
+        location: u32,
+        tolerance: &mut Tolerance<'_>,
+    ) -> Result<(u32, String, usize)> {
         if data.len() < 64 {
             return Err(crate::package::error::Error::InvalidLength {
                 expected: 64,
@@ -629,12 +650,12 @@ impl Workbook {
             })?;
             strings.push(value);
         }
-        if offset != data.len() {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtBeginList has {} trailing bytes",
-                data.len() - offset
-            )));
-        }
+        let trailing = data.len().saturating_sub(offset);
+        tolerance.tolerate_trailing(kind::BEGIN_LIST, location, trailing, || {
+            crate::package::error::Error::InvalidFormula(format!(
+                "BrtBeginList has {trailing} trailing bytes"
+            ))
+        })?;
         let display_name = strings[1].clone().ok_or_else(|| {
             crate::package::error::Error::InvalidFormula(
                 "BrtBeginList has a NULL display name".to_string(),
@@ -647,7 +668,12 @@ impl Workbook {
         ))
     }
 
-    fn parse_table_column(data: &[u8], index: usize) -> Result<String> {
+    fn parse_table_column(
+        data: &[u8],
+        index: usize,
+        location: u32,
+        tolerance: &mut Tolerance<'_>,
+    ) -> Result<String> {
         if data.len() < 24 || binary::read_u32_le_at(data, 0)? == 0 {
             return Err(crate::package::error::Error::InvalidFormula(format!(
                 "BrtBeginListCol {index} has an invalid header"
@@ -664,12 +690,12 @@ impl Workbook {
             })?;
             strings.push(value);
         }
-        if offset != data.len() {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtBeginListCol has {} trailing bytes",
-                data.len() - offset
-            )));
-        }
+        let trailing = data.len().saturating_sub(offset);
+        tolerance.tolerate_trailing(kind::BEGIN_LIST_COL, location, trailing, || {
+            crate::package::error::Error::InvalidFormula(format!(
+                "BrtBeginListCol has {trailing} trailing bytes"
+            ))
+        })?;
         strings[0]
             .clone()
             .or_else(|| strings[1].clone())

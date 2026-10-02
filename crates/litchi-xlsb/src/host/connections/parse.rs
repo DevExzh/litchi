@@ -81,12 +81,25 @@ const PARAM_DATA_DOUBLE: u32 = 1;
 const PARAM_DATA_STRING: u32 = 2;
 const PARAM_DATA_BOOLEAN: u32 = 4;
 
-/// Parse the complete External Data Connections part.
+/// Parse the complete External Data Connections part, refusing every
+/// defect (see [`crate::leniency`]).
 pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
+    parse_connections(RecordWalker::new(data))
+}
+
+/// Parse the complete External Data Connections part, recording
+/// Excel-compatible repairs into `report`.
+pub(crate) fn parse_connections_part_recording(
+    data: &[u8],
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<Connections> {
+    parse_connections(RecordWalker::recording(data, report))
+}
+
+fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
     const CONTEXT: &str = "ExternalDataConnections";
-    let mut walker = RecordWalker::new(data);
     let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
-    Cursor::new(begin.payload(), "BrtBeginExtConnections").finish()?;
+    walker.finish(&Cursor::new(begin.payload(), "BrtBeginExtConnections"))?;
 
     let mut connections = Connections::default();
     loop {
@@ -103,7 +116,7 @@ pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
                     .push(parse_connection(&mut walker, record.payload())?);
             },
             rt::END_EXT_CONNECTIONS => {
-                Cursor::new(record.payload(), "BrtEndExtConnections").finish()?;
+                walker.finish(&Cursor::new(record.payload(), "BrtEndExtConnections"))?;
                 super::write::validate_connections(&connections)?;
                 return Ok(connections);
             },
@@ -113,22 +126,24 @@ pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
 }
 
 /// Parse one `BrtBeginExtConnection` collection through its end record.
-fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Connection> {
+fn parse_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
-    let mut connection = parse_ext_connection(data)?;
+    let mut connection = parse_ext_connection(walker, data)?;
     loop {
         let record = walker.required(CONTEXT)?;
         match record.kind() {
             rt::BEGIN_EC_DB_PROPS => {
-                connection.properties = Properties::Database(parse_db_props(record.payload())?);
+                connection.properties =
+                    Properties::Database(parse_db_props(walker, record.payload())?);
                 walker.expect_end(rt::END_EC_DB_PROPS, "BrtBeginECDbProps")?;
             },
             rt::BEGIN_EC_OLAP_PROPS => {
-                connection.properties = Properties::Olap(parse_olap_props(record.payload())?);
+                connection.properties =
+                    Properties::Olap(parse_olap_props(walker, record.payload())?);
                 walker.expect_end(rt::END_EC_OLAP_PROPS, "BrtBeginECOlapProps")?;
             },
             rt::BEGIN_EC_WEB_PROPS => {
-                connection.properties = Properties::Web(parse_web_props(record.payload())?);
+                connection.properties = Properties::Web(parse_web_props(walker, record.payload())?);
                 walker.expect_end(rt::END_EC_WEB_PROPS, "BrtBeginECWebProps")?;
             },
             rt::BEGIN_EC_PARAMS => {
@@ -144,7 +159,7 @@ fn parse_connection(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Connec
 }
 
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
-fn parse_ext_connection(data: &[u8]) -> Result<Connection> {
+fn parse_ext_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
     let mut cursor = Cursor::new(data, CONTEXT);
     let refreshed_version = cursor.read_u8()?;
@@ -197,7 +212,7 @@ fn parse_ext_connection(data: &[u8]) -> Result<Connection> {
     } else {
         None
     };
-    cursor.finish()?;
+    walker.finish(&cursor)?;
     Ok(Connection {
         connection_id,
         source_type,
@@ -226,7 +241,7 @@ fn parse_ext_connection(data: &[u8]) -> Result<Connection> {
 }
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
-fn parse_db_props(data: &[u8]) -> Result<DbProperties> {
+fn parse_db_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<DbProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECDbProps");
     let command_type = CommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
@@ -241,7 +256,7 @@ fn parse_db_props(data: &[u8]) -> Result<DbProperties> {
     } else {
         None
     };
-    cursor.finish()?;
+    walker.finish(&cursor)?;
     Ok(DbProperties {
         command_type,
         connection_string,
@@ -251,7 +266,7 @@ fn parse_db_props(data: &[u8]) -> Result<DbProperties> {
 }
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
-fn parse_olap_props(data: &[u8]) -> Result<OlapProperties> {
+fn parse_olap_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<OlapProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECOlapProps");
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
@@ -261,7 +276,7 @@ fn parse_olap_props(data: &[u8]) -> Result<OlapProperties> {
     } else {
         None
     };
-    cursor.finish()?;
+    walker.finish(&cursor)?;
     Ok(OlapProperties {
         local_connection: flags & OLAP_LOCAL_CONNECTION != 0,
         no_refresh_cube: flags & OLAP_NO_REFRESH_CUBE != 0,
@@ -276,7 +291,7 @@ fn parse_olap_props(data: &[u8]) -> Result<OlapProperties> {
 }
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
-fn parse_web_props(data: &[u8]) -> Result<WebProperties> {
+fn parse_web_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<WebProperties> {
     let mut cursor = Cursor::new(data, "BrtBeginECWebProps");
     let html_format = match cursor.read_u8()? {
         0 => HtmlFormat::None,
@@ -301,7 +316,7 @@ fn parse_web_props(data: &[u8]) -> Result<WebProperties> {
     } else {
         None
     };
-    cursor.finish()?;
+    walker.finish(&cursor)?;
     Ok(WebProperties {
         html_format,
         source_is_xml: flags & WEB_SOURCE_IS_XML != 0,
@@ -320,7 +335,7 @@ fn parse_web_props(data: &[u8]) -> Result<WebProperties> {
 }
 
 /// Parse a `BrtBeginECParams` collection into the connection.
-fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> Result<()> {
+fn parse_params(walker: &mut RecordWalker<'_, '_>, connection: &mut Connection) -> Result<()> {
     const CONTEXT: &str = "BrtBeginECParams";
     loop {
         let record = walker.required(CONTEXT)?;
@@ -329,7 +344,9 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> R
                 if connection.parameters.len() >= MAX_PARAMETERS {
                     return Err(malformed(CONTEXT, "parameter count limit exceeded"));
                 }
-                connection.parameters.push(parse_param(record.payload())?);
+                connection
+                    .parameters
+                    .push(parse_param(walker, record.payload())?);
                 walker.expect_end(rt::END_EC_PARAM, "BrtBeginECParam")?;
             },
             rt::END_EC_PARAMS => return Ok(()),
@@ -339,7 +356,7 @@ fn parse_params(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> R
 }
 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
-fn parse_param(data: &[u8]) -> Result<Parameter> {
+fn parse_param(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Parameter> {
     const CONTEXT: &str = "BrtBeginECParam";
     let mut cursor = Cursor::new(data, CONTEXT);
     let flags = cursor.read_u16()?;
@@ -386,7 +403,7 @@ fn parse_param(data: &[u8]) -> Result<Parameter> {
         },
         _ => None,
     };
-    cursor.finish()?;
+    walker.finish(&cursor)?;
     let parameter_type = match pbt {
         PBT_PROMPT => ParameterType::Prompt,
         PBT_VALUE => ParameterType::Value,
@@ -404,7 +421,7 @@ fn parse_param(data: &[u8]) -> Result<Parameter> {
 }
 
 /// Parse a `BrtBeginEcWpTables` collection into the connection.
-fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) -> Result<()> {
+fn parse_web_tables(walker: &mut RecordWalker<'_, '_>, connection: &mut Connection) -> Result<()> {
     const CONTEXT: &str = "BrtBeginEcWpTables";
     loop {
         let record = walker.required(CONTEXT)?;
@@ -423,7 +440,7 @@ fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) 
                 connection
                     .web_tables
                     .push(WebTableItem::Named(cursor.read_wide_string()?));
-                cursor.finish()?;
+                walker.finish(&cursor)?;
             },
             rt::PCDI_INDEX => {
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
@@ -433,7 +450,7 @@ fn parse_web_tables(walker: &mut RecordWalker<'_>, connection: &mut Connection) 
                 connection
                     .web_tables
                     .push(WebTableItem::Index(cursor.read_u32()?));
-                cursor.finish()?;
+                walker.finish(&cursor)?;
             },
             rt::END_EC_WP_TABLES => return Ok(()),
             other => walker.skip_unhandled(other, CONTEXT)?,

@@ -172,7 +172,9 @@ fn ordinary_table_owner_ignores_opaque_balanced_xml_map_extensions() {
     push_independent_record(&mut data, kind::END_LIST_COLS, &[]);
     push_independent_record(&mut data, kind::END_LIST, &[]);
 
-    let table = Workbook::parse_table_definition(&data, 3).unwrap();
+    let table =
+        Workbook::parse_table_definition(&data, 3, &mut crate::leniency::Tolerance::refusing())
+            .unwrap();
     assert_eq!(table.table_id(), 7);
     assert_eq!(table.sheet_index(), 3);
     assert_eq!(table.display_name(), "MappedTable");
@@ -193,5 +195,8 @@ fn ordinary_table_owner_rejects_mismatched_xml_map_extensions() {
     push_independent_record(&mut data, kind::FRT_BEGIN, &[0; 4]);
     push_independent_record(&mut data, kind::AC_END, &[]);
 
-    assert!(Workbook::parse_table_definition(&data, 0).is_err());
+    assert!(
+        Workbook::parse_table_definition(&data, 0, &mut crate::leniency::Tolerance::refusing())
+            .is_err()
+    );
 }

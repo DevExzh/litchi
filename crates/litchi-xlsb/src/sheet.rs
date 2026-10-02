@@ -189,6 +189,12 @@ impl Worksheet {
         &self.tolerance
     }
 
+    /// The report under construction, for adjunct parts (comments) parsed
+    /// after the worksheet stream itself.
+    pub(crate) fn tolerance_report_mut(&mut self) -> &mut crate::leniency::ToleranceReport {
+        &mut self.tolerance
+    }
+
     /// Attach the repairs recorded while this worksheet's stream was parsed.
     pub(crate) fn set_tolerance_report(&mut self, report: crate::leniency::ToleranceReport) {
         self.tolerance = report;

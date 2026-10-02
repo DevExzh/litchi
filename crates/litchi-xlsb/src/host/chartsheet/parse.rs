@@ -294,7 +294,11 @@ fn parse_cs_protection_iso(data: &[u8]) -> Result<(StrongProtection, bool, bool)
 }
 
 /// `BrtBeginCsViews` collection (MS-XLSB 2.4.38, 2.4.39).
-fn parse_cs_views(walker: &mut RecordWalker<'_>, data: &[u8], views: &mut Vec<View>) -> Result<()> {
+fn parse_cs_views(
+    walker: &mut RecordWalker<'_, '_>,
+    data: &[u8],
+    views: &mut Vec<View>,
+) -> Result<()> {
     if !views.is_empty() {
         return Err(malformed("BrtBeginCsViews", "duplicate collection"));
     }
