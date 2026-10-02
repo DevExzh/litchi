@@ -126,7 +126,9 @@
 //! - [`crate::Presentation::tolerance_report`] is the open-time aggregate:
 //!   the repairs made while the `UserEdit`/persist chain was located and
 //!   read ([`PersistDefect`]) and while the slide directory was built
-//!   ([`SlideListDefect`]). The open path threads one `&mut ToleranceReport`
+//!   ([`SlideListDefect`]), preceded by the compound-file repairs the
+//!   container reader applied while the OLE file was opened
+//!   ([`Defect::Container`]). The open path threads one `&mut ToleranceReport`
 //!   through each open-time parse that repairs anything.
 //! - [`crate::Presentation::collect_tolerance_report`] returns the open-time
 //!   aggregate plus the repairs of every slide's and notes page's shapes —
@@ -582,6 +584,11 @@ pub enum Defect {
     /// A `UserEdit`-chain defect repaired only under
     /// [`Leniency::TolerateUserEditChainDefects`].
     UserEditChain(UserEditChainDefect),
+    /// A compound-file (CFB) repair the container reader applied while the
+    /// presentation's OLE file was opened; see [`litchi_cfb::Defect`] for the
+    /// closed set of container repairs and their substitutions. Applied under
+    /// every [`Leniency`] variant.
+    Container(litchi_cfb::Defect),
 }
 
 impl Defect {
@@ -594,6 +601,7 @@ impl Defect {
             Self::SlideList(defect) => defect.repair(),
             Self::Persist(defect) => defect.repair(),
             Self::UserEditChain(defect) => defect.repair(),
+            Self::Container(defect) => defect.repair(),
         }
     }
 }
@@ -628,6 +636,12 @@ impl From<ShapeDefect> for Defect {
     }
 }
 
+impl From<litchi_cfb::Defect> for Defect {
+    fn from(defect: litchi_cfb::Defect) -> Self {
+        Self::Container(defect)
+    }
+}
+
 /// Where in the presentation a repaired defect was found.
 ///
 /// Each field is filled in by the parse layer that knows it; a field stays
@@ -652,8 +666,10 @@ pub struct ToleratedDefect {
     /// of the offending run within its `StyleTextPropAtom` (paragraph runs
     /// first, then character runs; a dropped tail records the index where
     /// another run would have started). The reserved-bit classes store the
-    /// raw, unmasked 16-bit flags value. Every other class documents its
-    /// context on its variant.
+    /// raw, unmasked 16-bit flags value. For a [`Defect::Container`] it is
+    /// the compound-file context (a directory SID, sector index, or header
+    /// field value — see [`litchi_cfb::ToleratedDefect::context`]). Every
+    /// other class documents its context on its variant.
     pub context: u32,
     /// The slide/notes page and shape the defect was found in.
     pub location: DefectLocation,
@@ -761,6 +777,17 @@ impl ToleranceReport {
             }
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+
+    /// Merge the repairs the compound-file reader applied while opening the
+    /// presentation's container, as [`Defect::Container`] entries in
+    /// discovery order. The container's own overflow count joins this
+    /// report's unrecorded count.
+    pub(crate) fn append_container(&mut self, container: &litchi_cfb::ToleranceReport) {
+        for tolerated in container.defects() {
+            self.record(Defect::Container(tolerated.defect), tolerated.context);
+        }
+        self.unrecorded = self.unrecorded.saturating_add(container.unrecorded());
     }
 
     /// Fill in location fields that are still unknown on every defect
@@ -972,6 +999,9 @@ mod tests {
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),
             Defect::from(ShapeDefect::UnknownRoundTripPlaceholderId),
+            Defect::from(litchi_cfb::Defect::Allocation(
+                litchi_cfb::AllocationDefect::ChainLongerThanSize,
+            )),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

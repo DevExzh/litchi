@@ -93,6 +93,9 @@ impl Presentation {
         // `tolerance` is the open-time aggregation point for repaired
         // non-structural defects (see `crate::leniency`).
         let mut tolerance = crate::leniency::ToleranceReport::default();
+        // Container repairs come first: the compound-file reader applied them
+        // while the OLE file was opened, before any record was read.
+        tolerance.append_container(ole.tolerance_report());
         let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
@@ -259,6 +262,9 @@ impl Presentation {
         // `tolerance` is the open-time aggregation point for repaired
         // non-structural defects (see `crate::leniency`).
         let mut tolerance = crate::leniency::ToleranceReport::default();
+        // Container repairs come first: the compound-file reader applied them
+        // while the OLE file was opened, before any record was read.
+        tolerance.append_container(shared.tolerance_report());
         let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]

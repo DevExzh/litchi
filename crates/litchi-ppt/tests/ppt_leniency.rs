@@ -1280,3 +1280,76 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
         .unwrap();
     assert!(control.tolerance_report().is_clean());
 }
+
+// ---------------------------------------------------------------------------
+// Compound-file (container) repairs join the open-time report.
+// ---------------------------------------------------------------------------
+
+/// `bytes` with a 5000-byte `LeniencyProbe` stream added at the root.
+fn with_probe(bytes: Vec<u8>) -> Vec<u8> {
+    let mut package = litchi_ole_common::object::Editor::open(
+        bytes,
+        litchi_ole_common::object::Targets::default(),
+        litchi_ole_common::object::Limits::default(),
+    )
+    .unwrap();
+    package
+        .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
+        .unwrap();
+    package.finish().unwrap()
+}
+
+/// Shrink the probe's declared size from 5000 to 4096 bytes, so its
+/// ten-sector chain runs two sectors past the eight the size needs.
+fn shrink_probe(mut bytes: Vec<u8>) -> Vec<u8> {
+    let name = "LeniencyProbe"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    let entry = bytes
+        .windows(name.len())
+        .position(|window| window == name.as_slice())
+        .unwrap();
+    assert_eq!(
+        u32::from_le_bytes(bytes[entry + 120..entry + 124].try_into().unwrap()),
+        5000
+    );
+    bytes[entry + 120..entry + 124].copy_from_slice(&4096u32.to_le_bytes());
+    bytes
+}
+
+/// A non-critical stream whose FAT chain runs past its declared size opens
+/// (POI and LibreOffice read exactly the declared bytes) on both open paths,
+/// and the compound-file repairs are listed as `Defect::Container` entries in
+/// the open-time report, in the container's discovery order.
+#[test]
+fn container_repairs_join_the_open_time_report() {
+    let conformant = with_probe(Deck::new(2).bytes);
+    for presentation in open_both(&conformant) {
+        assert!(presentation.tolerance_report().is_clean());
+    }
+
+    let bytes = shrink_probe(conformant);
+    let container = litchi_cfb::OleFile::open(Cursor::new(bytes.clone()))
+        .unwrap()
+        .tolerance_report()
+        .clone();
+    assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
+    let expected: Vec<_> = container
+        .defects()
+        .iter()
+        .map(|tolerated| open_time(Defect::Container(tolerated.defect), tolerated.context, None))
+        .collect();
+    for presentation in open_both(&bytes) {
+        assert_eq!(presentation.slides().unwrap().len(), 2);
+        assert_eq!(
+            presentation.tolerance_report().defects(),
+            expected.as_slice()
+        );
+        assert_eq!(presentation.tolerance_report().unrecorded(), 0);
+        assert_eq!(
+            presentation.collect_tolerance_report().unwrap().defects(),
+            expected.as_slice()
+        );
+    }
+}

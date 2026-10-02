@@ -160,7 +160,9 @@ impl Presentation {
     /// This is the open-time aggregate: the record tree, `UserEdit`/persist
     /// chain, and slide directory are parsed at open, and the chain and
     /// slide-list repairs ([`crate::PersistDefect`],
-    /// [`crate::SlideListDefect`]) made there are listed here.
+    /// [`crate::SlideListDefect`]) made there are listed here, after the
+    /// compound-file repairs the container reader applied while the OLE
+    /// file was opened ([`crate::Defect::Container`]).
     /// Text-style and shape repairs ([`crate::TextPropDefect`],
     /// [`crate::ShapeDefect`]) fire while shapes are lazily parsed; they are
     /// reported per slide by
