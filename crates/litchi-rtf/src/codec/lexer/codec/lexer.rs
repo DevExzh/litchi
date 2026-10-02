@@ -33,6 +33,11 @@ pub(crate) struct Lexer<'a> {
     pub(super) binary_destinations: Vec<BinaryDestination>,
     /// Repairs applied while tokenizing.
     pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Repair posture for opt-in lexical repairs.
+    pub(super) leniency: crate::leniency::Leniency,
+    /// Whether the input is a complete document whose root group ends the
+    /// token stream, rather than a fragment of one.
+    document: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -54,7 +59,22 @@ impl<'a> Lexer<'a> {
             total_binary_bytes: 0,
             binary_destinations: Vec::with_capacity(crate::codec::parser::MAX_GROUP_NESTING_DEPTH),
             tolerance: crate::leniency::ToleranceReport::default(),
+            leniency: crate::leniency::Leniency::Strict,
+            document: false,
         }
+    }
+
+    /// Tokenize a complete document under `leniency`.
+    ///
+    /// Reading stops at the root group's closing brace, as Word and
+    /// LibreOffice stop; anything but whitespace or NUL padding after it is
+    /// ignored and recorded as
+    /// [`SyntaxDefect::TrailingContentAfterRoot`](crate::leniency::SyntaxDefect::TrailingContentAfterRoot).
+    /// Groups still open at end of input are closed when `leniency` allows.
+    pub(crate) fn for_document(mut self, leniency: crate::leniency::Leniency) -> Self {
+        self.leniency = leniency;
+        self.document = true;
+        self
     }
 
     /// Move out the repairs applied while tokenizing.
@@ -139,6 +159,7 @@ impl<'a> Lexer<'a> {
     pub(crate) fn tokenize_with_spans(&mut self) -> RtfResult<(Vec<Token<'a>>, Vec<Range<usize>>)> {
         let mut tokens = Vec::new();
         let mut spans = Vec::new();
+        let mut opened_root = false;
 
         while self.pos < self.input.len() {
             let observed = tokens.len().saturating_add(1);
@@ -173,10 +194,76 @@ impl<'a> Lexer<'a> {
             let token = self.next_token()?;
             self.observe_group_token(&token)?;
             let end = self.pos;
+            let closes_root = opened_root
+                && matches!(token, Token::CloseBrace)
+                && self.binary_destinations.is_empty();
+            opened_root |= matches!(token, Token::OpenBrace);
             tokens.push(token);
             spans.push(start..end);
+            if self.document && closes_root {
+                self.ignore_content_after_root();
+                break;
+            }
+        }
+
+        if self.document && self.leniency.tolerates_unclosed_groups() {
+            self.close_unclosed_groups(&mut tokens, &mut spans)?;
         }
 
         Ok((tokens, spans))
+    }
+
+    /// Stop at the root group's closing brace, recording any content other
+    /// than whitespace or NUL padding that follows it.
+    fn ignore_content_after_root(&mut self) {
+        let trailing = self
+            .input
+            .get(self.pos..)
+            .unwrap_or_default()
+            .char_indices()
+            .find(|(_, character)| *character != '\0' && !character.is_whitespace());
+        if let Some((offset, _)) = trailing {
+            self.tolerance.record(
+                crate::leniency::SyntaxDefect::TrailingContentAfterRoot,
+                self.pos.saturating_add(offset),
+            );
+        }
+        self.pos = self.input.len();
+    }
+
+    /// Close every group still open at end of input with a zero-width
+    /// closing brace, recording one repair per group.
+    fn close_unclosed_groups(
+        &mut self,
+        tokens: &mut Vec<Token<'a>>,
+        spans: &mut Vec<Range<usize>>,
+    ) -> RtfResult<()> {
+        let open = self.binary_destinations.len();
+        if open == 0 {
+            return Ok(());
+        }
+        let observed = tokens.len().saturating_add(open);
+        if observed > self.limits.max_tokens() {
+            return Err(RtfError::LimitExceeded {
+                resource: "lexer tokens",
+                observed,
+                limit: self.limits.max_tokens(),
+            });
+        }
+        let allocation_failed = |_err| RtfError::AllocationFailed {
+            resource: "lexer tokens",
+            requested: observed.saturating_mul(size_of::<Token<'a>>()),
+        };
+        tokens.try_reserve(open).map_err(allocation_failed)?;
+        spans.try_reserve(open).map_err(allocation_failed)?;
+        let end = self.input.len();
+        for _ in 0..open {
+            tokens.push(Token::CloseBrace);
+            spans.push(end..end);
+            self.tolerance
+                .record(crate::leniency::SyntaxDefect::UnclosedGroup, end);
+        }
+        self.binary_destinations.clear();
+        Ok(())
     }
 }

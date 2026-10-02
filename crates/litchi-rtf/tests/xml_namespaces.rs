@@ -122,14 +122,20 @@ fn handles_bundled_libreoffice_xml_namespace_fixtures() {
 
     let malformed = fs::read(format!("{root}/sw/qa/extras/rtfexport/data/FWDP90_min.rtf")).unwrap();
     // FWDP90_min.rtf has one extra closing brace after the root group. Keep
-    // the vendored bytes untouched and assert strict trailing-token rejection.
-    assert!(
-        matches!(
-            RtfDocument::parse_bytes(&malformed),
-            Err(litchi_rtf::RtfError::MalformedDocument(message))
-                if message == "RTF document contains trailing non-whitespace tokens"
-        ),
-        "expected strict trailing-token rejection for FWDP90_min.rtf"
+    // the vendored bytes untouched.
+    // Word and LibreOffice stop reading at the root group's closing brace,
+    // so the trailing content is ignored and recorded.
+    let full = RtfDocument::parse_bytes(&malformed)
+        .unwrap_or_else(|error| panic!("failed to parse FWDP90_min.rtf: {error}"));
+    assert_eq!(
+        full.tolerance_report()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        vec![litchi_rtf::leniency::Defect::Syntax(
+            litchi_rtf::leniency::SyntaxDefect::TrailingContentAfterRoot
+        )],
+        "expected the trailing content of FWDP90_min.rtf to be ignored and recorded"
     );
     let prefix = support::first_balanced_rtf_root_prefix(&malformed)
         .expect("FWDP90_min.rtf should have a balanced first root group");

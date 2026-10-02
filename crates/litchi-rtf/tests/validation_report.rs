@@ -324,8 +324,9 @@ fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
     assert!(ValidationReport::from_str(r#"{\rtf text}"#).is_err());
     assert!(ValidationReport::from_str(r#"{\rtf2 text}"#).is_err());
     assert!(ValidationReport::from_str(r#"{\rtf1\ansi unterminated"#).is_err());
-    assert!(ValidationReport::from_str(r#"{\rtf1 text} trailing"#).is_err());
-    assert!(ValidationReport::from_str(r#"{\rtf1 text}{\rtf1 second}"#).is_err());
+    // Content after the root group is ignored, as Word and LibreOffice do.
+    assert!(ValidationReport::from_str(r#"{\rtf1 text} trailing"#).is_ok());
+    assert!(ValidationReport::from_str(r#"{\rtf1 text}{\rtf1 second}"#).is_ok());
     assert!(ValidationReport::from_str("{\\rtf1 text} \t\r\n").is_ok());
 
     let limits = litchi_rtf::read::Limits::default().with_max_source_bytes(CLEAN.len() - 1);

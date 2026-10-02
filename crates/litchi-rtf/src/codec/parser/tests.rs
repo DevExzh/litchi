@@ -31,24 +31,30 @@ fn accepts_only_nul_padding_and_unicode_whitespace_after_the_root() {
 }
 
 #[test]
-fn rejects_visible_trailing_data_and_non_rtf_roots() {
-    const TRAILING_ERROR: &str = "RTF document contains trailing non-whitespace tokens";
-
-    for suffix in [
-        b" visible".as_slice(),
-        b"\0visible",
-        b"\xa0\0visible",
-        br"\par".as_slice(),
-        br"{trailing}".as_slice(),
+fn ignores_visible_trailing_data_and_rejects_non_rtf_roots() {
+    // Word and LibreOffice stop at the root group's closing brace; visible
+    // trailing data is ignored and recorded at its first visible byte.
+    for (suffix, visible) in [
+        (b" visible".as_slice(), 1),
+        (b"\0visible", 1),
+        (b"\xa0\0visible", 2),
+        (br"\par".as_slice(), 0),
+        (br"{trailing}".as_slice(), 0),
+        (br"}".as_slice(), 0),
     ] {
         let mut source = br"{\rtf1\ansi body}".to_vec();
+        let root_len = source.len();
         source.extend_from_slice(suffix);
-        assert!(
-            matches!(
-                RtfDocument::parse_bytes(&source).err(),
-                Some(RtfError::MalformedDocument(message)) if message == TRAILING_ERROR
-            ),
-            "accepted visible trailing data {suffix:?}"
+        let document = RtfDocument::parse_bytes(&source)
+            .unwrap_or_else(|error| panic!("rejected trailing data {suffix:?}: {error}"));
+        assert_eq!(document.text(), "body");
+        assert_eq!(
+            document.tolerance_report().defects(),
+            &[crate::leniency::ToleratedDefect {
+                defect: crate::leniency::SyntaxDefect::TrailingContentAfterRoot.into(),
+                offset: (root_len + visible) as u64,
+            }],
+            "trailing data {suffix:?}"
         );
     }
 

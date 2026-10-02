@@ -43,6 +43,23 @@ pub enum Leniency {
     /// recorded in the [`ToleranceReport`].
     #[default]
     Strict,
+    /// Also close groups still open at end of input (see
+    /// [`SyntaxDefect::UnclosedGroup`]).
+    ///
+    /// Word closes the open groups of a truncated document; LibreOffice
+    /// rejects it. A missing closing brace can mean the file lost its tail,
+    /// so the repair is opt-in.
+    TolerateUnclosedGroups,
+}
+
+impl Leniency {
+    /// Whether groups still open at end of input are closed implicitly
+    /// rather than rejected.
+    #[inline]
+    #[must_use]
+    pub const fn tolerates_unclosed_groups(self) -> bool {
+        matches!(self, Self::TolerateUnclosedGroups)
+    }
 }
 
 /// A lexical or group-structure defect.
@@ -69,6 +86,13 @@ pub enum SyntaxDefect {
     /// zero). The trailing tokens are ignored. Repaired under every
     /// [`Leniency`] variant.
     TrailingContentAfterRoot,
+    /// A group was still open at end of input.
+    ///
+    /// Word closes every open group when a truncated document ends, keeping
+    /// the content read so far. One defect is recorded per group closed, at
+    /// the end-of-input offset. Repaired only under
+    /// [`Leniency::TolerateUnclosedGroups`].
+    UnclosedGroup,
 }
 
 impl SyntaxDefect {
@@ -82,6 +106,7 @@ impl SyntaxDefect {
             Self::TrailingContentAfterRoot => {
                 "ignored the content after the root group's closing brace"
             },
+            Self::UnclosedGroup => "closed the group left open at end of input",
         }
     }
 }
@@ -339,6 +364,8 @@ mod tests {
     #[test]
     fn strict_is_the_default() {
         assert_eq!(Leniency::default(), Leniency::Strict);
+        assert!(!Leniency::Strict.tolerates_unclosed_groups());
+        assert!(Leniency::TolerateUnclosedGroups.tolerates_unclosed_groups());
     }
 
     #[test]
@@ -438,6 +465,7 @@ mod tests {
         let defects = [
             Defect::from(SyntaxDefect::UnknownControlSymbol),
             Defect::from(SyntaxDefect::TrailingContentAfterRoot),
+            Defect::from(SyntaxDefect::UnclosedGroup),
             Defect::from(ParameterDefect::NonBinaryToggle),
             Defect::from(ParameterDefect::UnexpectedParameter),
             Defect::from(ParameterDefect::MissingParameter),

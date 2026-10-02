@@ -322,11 +322,17 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
 
 #[test]
 fn rejects_section_note_controls_after_the_parsed_document_group() {
-    assert!(matches!(
-        RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj"),
-        Err(litchi_rtf::RtfError::MalformedDocument(message))
-            if message.contains("trailing non-whitespace")
-    ));
+    // Controls after the root group are ignored (and recorded), so they
+    // cannot set the document's note options.
+    let trailing = RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj").unwrap();
+    assert_eq!(trailing.text(), "Body");
+    assert!(
+        trailing
+            .sections()
+            .iter()
+            .all(|section| section.properties.note_options.is_empty())
+    );
+    assert_eq!(trailing.tolerance_report().total(), 1);
 
     let document = RtfDocument::parse(r"{\rtf1\sectd\sftnbj Body}").unwrap();
     assert_eq!(document.text(), "Body");

@@ -626,7 +626,8 @@ impl<'a> RtfDocument<'a> {
         let arena = Bump::new();
 
         // Lexer phase
-        let mut lexer = Lexer::new_with_limits(input, &arena, limits);
+        let mut lexer =
+            Lexer::new_with_limits(input, &arena, limits).for_document(options.leniency());
         let (tokens, token_spans) = lexer.tokenize_with_spans()?;
         let lexer_report = lexer.take_tolerance_report();
 

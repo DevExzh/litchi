@@ -140,15 +140,20 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf"
     ));
     // LibreOffice's tdf108955 fixture has one extra closing brace after the
-    // root group. Keep the vendored bytes untouched and require the typed
-    // strict trailing-token rejection.
-    assert!(
-        matches!(
-            RtfDocument::parse_bytes(style_and_body),
-            Err(litchi_rtf::RtfError::MalformedDocument(message))
-                if message == "RTF document contains trailing non-whitespace tokens"
-        ),
-        "expected strict trailing-token rejection for tdf108955.rtf"
+    // root group. Keep the vendored bytes untouched.
+    // Word and LibreOffice stop reading at the root group's closing brace,
+    // so the trailing content is ignored and recorded.
+    let full = RtfDocument::parse_bytes(style_and_body)
+        .unwrap_or_else(|error| panic!("failed to parse tdf108955.rtf: {error}"));
+    assert_eq!(
+        full.tolerance_report()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>(),
+        vec![litchi_rtf::leniency::Defect::Syntax(
+            litchi_rtf::leniency::SyntaxDefect::TrailingContentAfterRoot
+        )],
+        "expected the trailing content of tdf108955.rtf to be ignored and recorded"
     );
     let prefix = support::first_balanced_rtf_root_prefix(style_and_body)
         .expect("tdf108955.rtf should have a balanced first root group");

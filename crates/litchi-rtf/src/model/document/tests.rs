@@ -236,16 +236,23 @@ fn rejects_excessively_nested_shape_groups() {
 }
 
 #[test]
-fn accepts_only_inert_transport_padding_after_the_root_group() {
+fn ignores_and_records_content_after_the_root_group() {
     let document = RtfDocument::parse("{\\rtf1 padded} \r\n\0\0")
         .expect("whitespace and NUL transport padding");
     assert_eq!(document.text(), "padded");
 
-    let Err(error) = RtfDocument::parse("{\\rtf1 padded} trailing") else {
-        panic!("visible trailing text must remain invalid")
-    };
-    assert!(
-        matches!(error, RtfError::MalformedDocument(message) if message.contains("trailing non-whitespace"))
+    assert!(document.tolerance_report().is_clean());
+
+    // Visible content after the root group is ignored, as Word and
+    // LibreOffice stop at the root's closing brace, and recorded.
+    let document = RtfDocument::parse("{\\rtf1 padded} trailing").expect("trailing content");
+    assert_eq!(document.text(), "padded");
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[crate::leniency::ToleratedDefect {
+            defect: crate::leniency::SyntaxDefect::TrailingContentAfterRoot.into(),
+            offset: 15,
+        }]
     );
 }
 

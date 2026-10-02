@@ -291,3 +291,69 @@ fn parameter_shapes_in_destinations_are_repaired() {
             .all(|tolerated| matches!(tolerated.defect, Defect::Parameter(_)))
     );
 }
+
+// F9.3: content after the root group is ignored by default; groups left open
+// at end of input are closed only under the named opt-in.
+#[test]
+fn content_after_the_root_group_is_ignored_and_recorded_by_default() {
+    let source = "{\\rtf1\\ansi body}\r\n{\\rtf1 second}}junk";
+    let document = Document::parse(source).unwrap();
+    assert_eq!(document.text(), "body");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(
+            Defect::Syntax(SyntaxDefect::TrailingContentAfterRoot),
+            source.find("{\\rtf1 second").unwrap() as u64
+        )]
+    );
+
+    let padded = Document::parse("{\\rtf1\\ansi body}\r\n\0\0").unwrap();
+    assert_clean(padded.tolerance_report());
+}
+
+#[test]
+fn unclosed_groups_are_rejected_by_default() {
+    for source in [
+        r"{\rtf1\ansi\pard body\par",
+        r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard{\b bold",
+    ] {
+        assert!(Document::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Document::parse_with_options(source, Options::new().with_leniency(Leniency::Strict))
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
+    let options = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
+    assert!(options.leniency().tolerates_unclosed_groups());
+
+    let source = r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard plain {\b bold";
+    let document = Document::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "plain bold");
+    let end = source.len() as u64;
+    let unclosed = Defect::Syntax(SyntaxDefect::UnclosedGroup);
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(unclosed, end), (unclosed, end)]
+    );
+    assert!(!SyntaxDefect::UnclosedGroup.repair().is_empty());
+
+    // A balanced document is unaffected by the opt-in.
+    let document = Document::parse_with_options(CONFORMANT, options).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
+    let options = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
+    // A control word cut off by end of input and a truncated binary payload
+    // are not group structure.
+    assert!(Document::parse_with_options(r"{\rtf1 text\", options).is_err());
+    assert!(Document::parse_with_options(r"{\rtf1 {\bin8 abc", options).is_err());
+    // Nesting beyond the safety limit stays fatal even when never closed.
+    let deep = format!(r"{{\rtf1 {}", "{".repeat(400));
+    assert!(Document::parse_with_options(&deep, options).is_err());
+}
