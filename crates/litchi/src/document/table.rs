@@ -595,9 +595,10 @@ mod tests {
         // This fixture uses the non-OPC
         // `officedocument/.../metadata/core-properties` relationship type.
         // Source-backed open validates the mandatory document graph and defers
-        // optional metadata, so table semantics remain readable. The metadata
-        // query must still reject the orphaned core-properties part rather than
-        // silently reading an incoherent package graph.
+        // optional metadata, so table semantics remain readable. Since
+        // leniency F8.2 the orphaned core-properties part is read past (as
+        // Word and LibreOffice do) and recorded in the package's tolerance
+        // report instead of failing the metadata query.
         let invalid_path = test_data_path().join("ooxml/docx/table-indent.docx");
         if invalid_path.exists() {
             let document = Document::open(invalid_path)
@@ -607,14 +608,9 @@ mod tests {
                 .expect("table-indent table semantics should remain readable");
             assert!(!tables.is_empty(), "table-indent should contain a table");
 
-            match document.metadata() {
-                Err(litchi_core::Error::InvalidFormat(message)) => {
-                    assert!(message.contains("core-properties part"));
-                    assert!(message.contains("is orphaned"));
-                },
-                Err(error) => panic!("unexpected table-indent metadata error: {error}"),
-                Ok(_) => panic!("table-indent metadata accepted an orphaned core part"),
-            }
+            document
+                .metadata()
+                .expect("table-indent metadata should be read past the orphaned core part");
         }
     }
 
