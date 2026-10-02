@@ -5,7 +5,7 @@ use super::super::model::{
     StyleSheetHeader,
 };
 use super::{corrupted, read_i16, read_u16, read_u32};
-use crate::leniency::{Leniency, StshifDefect, ToleranceReport};
+use crate::leniency::{Leniency, StshifDefect, StyleDefect, ToleranceReport};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::styles::semantic::{
@@ -130,7 +130,7 @@ impl StyleSheet {
             let std = data
                 .get(offset..std_end)
                 .ok_or_else(|| corrupted("STD is truncated"))?;
-            let mut definition = parse_style(std, index, cb_std, stdf_size)?;
+            let mut definition = parse_style(std, index, cb_std, stdf_size, &mut tolerance)?;
             offset = std_end;
             if cb_std % 2 != 0 {
                 definition.outer_padding = Some(
@@ -156,7 +156,13 @@ impl StyleSheet {
     }
 }
 
-fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<StyleDefinition> {
+fn parse_style(
+    std: &[u8],
+    index: u16,
+    cb_std: u16,
+    stdf_size: u16,
+    tolerance: &mut ToleranceReport,
+) -> Result<StyleDefinition> {
     let stdf_size = usize::from(stdf_size);
     if std.len() < stdf_size {
         return Err(corrupted("STD is shorter than its Stdf prefix"));
@@ -169,8 +175,11 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
         return Err(corrupted("StdfBase.bchUpe does not match LPStd.cbStd"));
     }
     let grfstd = read_u16(std, 8, "StdfBase.grfstd")?;
+    // MS-DOC 2.9.112: the reserved GRFSTD bits "MUST be 0 and MUST be
+    // ignored". The flags below decode only the defined bits, and raw_std
+    // keeps the stored word for round-trip, so only the deviation is recorded.
     if grfstd & 0xE080 != 0 {
-        return Err(corrupted("GRFSTD contains reserved flags"));
+        tolerance.record(StyleDefect::ReservedStyleFlags, index);
     }
 
     let kind = match info2 & 0x000F {
@@ -187,16 +196,18 @@ fn parse_style(std: &[u8], index: u16, cb_std: u16, stdf_size: u16) -> Result<St
 
     let post_2000 = if stdf_size == 18 {
         let post_info1 = read_u16(std, 10, "StdfPost2000.info1")?;
-        if post_info1 & 0xE000 != 0 {
-            return Err(corrupted("StdfPost2000 contains reserved flags"));
-        }
         let post_info3 = read_u16(std, 16, "StdfPost2000.info3")?;
-        if post_info3 & 0x0008 != 0 {
-            return Err(corrupted("StdfPost2000 contains an invalid unused flag"));
+        // MS-DOC 2.9.261: fSpare and the unused info3 bit "MUST be 0 and
+        // MUST be ignored"; the fields below decode only the defined bits.
+        if post_info1 & 0xE000 != 0 || post_info3 & 0x0008 != 0 {
+            tolerance.record(StyleDefect::ReservedPost2000Flags, index);
         }
-        let priority = post_info3 >> 4;
+        // iPriority only orders styles in the UI; an out-of-range value is
+        // clamped to 99, the priority Word gives styles without one.
+        let mut priority = post_info3 >> 4;
         if priority > 99 {
-            return Err(corrupted("StdfPost2000 priority exceeds 99"));
+            tolerance.record(StyleDefect::Priority, index);
+            priority = 99;
         }
         let linked = post_info1 & 0x0FFF;
         Some(StylePost2000 {

@@ -4,7 +4,8 @@ use super::codec::*;
 use super::model::*;
 use super::semantic::*;
 use crate::leniency::{
-    AuxiliaryTableDefect, Defect, Leniency, StshifDefect, ToleranceReport, ToleratedDefect,
+    AuxiliaryTableDefect, Defect, Leniency, StshifDefect, StyleDefect, ToleranceReport,
+    ToleratedDefect,
 };
 use crate::package::Result;
 
@@ -144,6 +145,77 @@ fn stshif_reserved_bits_and_fixed_count_are_ignored_and_recorded() {
             .tolerance_report()
             .is_clean()
     );
+}
+
+#[test]
+fn reserved_style_bits_and_priority_are_ignored_and_recorded() {
+    let mut normal = std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]);
+    // GRFSTD: fHidden plus fNoHtmlExport (0x0080) and fReserved (0x8000).
+    normal[8..10].copy_from_slice(&0x8082u16.to_le_bytes());
+    let normal = with_post_2000(normal, 0x2000 | 10, 7, (150 << 4) | 0x0008 | 3);
+    let font = with_post_2000(
+        std_record(65, 2, NIL_STYLE, 10, "Default Font", &[&[]]),
+        0,
+        0,
+        5 << 4,
+    );
+    let mut slots = vec![None; 15];
+    slots[0] = Some(normal);
+    slots[10] = Some(font);
+
+    let parsed = parse(&post_2000_stylesheet(slots))
+        .expect("MS-DOC marks the reserved style bits MUST be ignored");
+    let normal = parsed.get(0).unwrap();
+    assert!(normal.flags.hidden);
+    assert!(!normal.flags.auto_redefine);
+    let post = normal.post_2000.as_ref().unwrap();
+    assert_eq!(post.linked_style, Some(10));
+    assert!(!post.has_original_style);
+    assert_eq!(post.revision_id, 7);
+    assert_eq!(post.html_font_category, 3);
+    assert_eq!(post.priority, 99, "out-of-range priority clamps to 99");
+    assert_eq!(
+        parsed.get(10).unwrap().post_2000.as_ref().unwrap().priority,
+        5
+    );
+    assert_eq!(
+        parsed.tolerance_report().defects(),
+        &[
+            ToleratedDefect {
+                defect: Defect::Style(StyleDefect::ReservedStyleFlags),
+                context: 0,
+            },
+            ToleratedDefect {
+                defect: Defect::Style(StyleDefect::ReservedPost2000Flags),
+                context: 0,
+            },
+            ToleratedDefect {
+                defect: Defect::Style(StyleDefect::Priority),
+                context: 0,
+            },
+        ]
+    );
+
+    // The same records without the deviations record nothing.
+    let mut slots = vec![None; 15];
+    slots[0] = Some(with_post_2000(
+        std_record(0, 1, NIL_STYLE, 0, "Normal", &[&[], &[]]),
+        10,
+        7,
+        (99 << 4) | 3,
+    ));
+    slots[10] = Some(with_post_2000(
+        std_record(65, 2, NIL_STYLE, 10, "Default Font", &[&[]]),
+        0,
+        0,
+        5 << 4,
+    ));
+    let parsed = parse(&post_2000_stylesheet(slots)).unwrap();
+    assert_eq!(
+        parsed.get(0).unwrap().post_2000.as_ref().unwrap().priority,
+        99
+    );
+    assert!(parsed.tolerance_report().is_clean());
 }
 
 #[test]

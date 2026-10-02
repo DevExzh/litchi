@@ -11,8 +11,8 @@
 //! undefined but real producers emit anyway — bytes Word and LibreOffice read
 //! past without complaint, so rejecting them would cost the caller the entire
 //! document over metadata that cannot change what a conforming file means.
-//! Each substitutes the value documented on the corresponding [`SprmDefect`],
-//! [`StshifDefect`], or [`AuxiliaryTableDefect`] variant. The established
+//! Each substitutes the value documented on the corresponding variant of a
+//! [`Defect`] class other than [`Defect::Stylesheet`]. The established
 //! examples are masking undefined cell-border side flags out of
 //! `sprmTSetBrc80`/`sprmTSetBrc`, ignoring the Stshif reserved bits MS-DOC
 //! 2.9.274 tells readers to ignore, and degrading a malformed optional
@@ -43,16 +43,16 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 ///
 /// Structural defects — malformed FIB or piece-table framing, a broken stream
 /// grammar, or unsupported/absent decryption material — are hard errors under
-/// every variant. The Word-compatible repairs listed by [`SprmDefect`],
-/// [`StshifDefect`], and [`AuxiliaryTableDefect`] are applied and recorded
-/// under every variant, including [`Leniency::Strict`].
+/// every variant. The Word-compatible repairs listed by every [`Defect`]
+/// class other than [`Defect::Stylesheet`] are applied and recorded under
+/// every variant, including [`Leniency::Strict`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Leniency {
     /// Reject every defect whose repair requires opting in.
     ///
     /// This is the default: the [`StylesheetDefect`] classes are hard errors,
-    /// while the Word-compatible [`SprmDefect`] repairs are still applied and
-    /// recorded in the [`ToleranceReport`].
+    /// while the Word-compatible repairs (every other [`Defect`] class) are
+    /// still applied and recorded in the [`ToleranceReport`].
     #[default]
     Strict,
     /// Repair and record the defects listed by [`StylesheetDefect`].
@@ -376,12 +376,60 @@ impl AuxiliaryTableDefect {
     }
 }
 
+/// The class of style-record (`STD`) defect the reader repairs the way Word
+/// repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// per-style repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. The stylesheet is mandatory, so rejecting
+/// it over metadata bits MS-DOC tells readers to ignore would cost the whole
+/// document; LibreOffice reads `fAutoRedef`/`fHidden` and skips the rest of
+/// the word (`ww8scan.cxx:7007-7013`). The raw `STD` bytes are preserved
+/// verbatim for round-trip, so a repair only affects the decoded model. The
+/// recorded [`ToleratedDefect::context`] is the style index (`istd`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StyleDefect {
+    /// `StdfBase.grfstd` set a reserved bit (`0x0080` or `0xE000`).
+    ///
+    /// MS-DOC 2.9.112: the reserved bits "MUST be 0 and MUST be ignored".
+    /// The decoded `StyleFlags` read only the defined bits.
+    ReservedStyleFlags,
+    /// `StdfPost2000` set a reserved bit (`info1` bits 13-15 or the unused
+    /// `info3` bit 3).
+    ///
+    /// MS-DOC 2.9.261: the reserved bits "MUST be 0 and MUST be ignored".
+    /// The decoded `StylePost2000` reads only the defined bits.
+    ReservedPost2000Flags,
+    /// `StdfPost2000.iPriority` was above 99.
+    ///
+    /// The priority only orders styles in the UI, so the decoded value is
+    /// clamped to 99 — the lowest priority, which Word assigns to styles with
+    /// no explicit one.
+    Priority,
+}
+
+impl StyleDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ReservedStyleFlags => {
+                "ignored the reserved GRFSTD bits; only the defined style flags were decoded"
+            },
+            Self::ReservedPost2000Flags => {
+                "ignored the reserved StdfPost2000 bits; only the defined fields were decoded"
+            },
+            Self::Priority => "clamped the out-of-range style priority to 99",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
 /// a read may change about a document. [`Defect::Stylesheet`] classes require
-/// [`Leniency::TolerateStylesheetDefects`]; [`Defect::Sprm`],
-/// [`Defect::Stshif`], and [`Defect::AuxiliaryTable`] classes are repaired
+/// [`Leniency::TolerateStylesheetDefects`]; every other class is repaired
 /// under every [`Leniency`] variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -395,6 +443,8 @@ pub enum Defect {
     /// An optional FIB-pointed auxiliary table whose parse failure was
     /// degraded to the table's absent value.
     AuxiliaryTable(AuxiliaryTableDefect),
+    /// A style-record (`STD`) defect repaired the way Word repairs it.
+    Style(StyleDefect),
 }
 
 impl Defect {
@@ -406,6 +456,7 @@ impl Defect {
             Self::Sprm(defect) => defect.repair(),
             Self::Stshif(defect) => defect.repair(),
             Self::AuxiliaryTable(defect) => defect.repair(),
+            Self::Style(defect) => defect.repair(),
         }
     }
 }
@@ -434,6 +485,12 @@ impl From<AuxiliaryTableDefect> for Defect {
     }
 }
 
+impl From<StyleDefect> for Defect {
+    fn from(defect: StyleDefect) -> Self {
+        Self::Style(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -443,17 +500,17 @@ pub struct ToleratedDefect {
     /// a [`Defect::Stylesheet`], the SPRM opcode for a [`Defect::Sprm`], the
     /// offending 16-bit Stshif word for a [`Defect::Stshif`], and the FIB
     /// `rgFcLcb` pointer index for a [`Defect::AuxiliaryTable`] (the style
-    /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]).
+    /// index for [`AuxiliaryTableDefect::RevisionAuthorResolution`]), and
+    /// the style index (`istd`) for a [`Defect::Style`].
     pub context: u16,
 }
 
 /// Everything a read repaired, in the order the defects were found.
 ///
 /// An empty report means the document conformed and no substitution was made.
-/// After a [`Leniency::Strict`] read the report can still list
-/// [`Defect::Sprm`], [`Defect::Stshif`], and [`Defect::AuxiliaryTable`]
-/// repairs, which Word itself applies; it never lists [`Defect::Stylesheet`]
-/// repairs.
+/// After a [`Leniency::Strict`] read the report can still list every
+/// Word-compatible repair — every class other than [`Defect::Stylesheet`],
+/// which Word itself applies; it never lists [`Defect::Stylesheet`] repairs.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
@@ -629,6 +686,9 @@ mod tests {
             Defect::from(AuxiliaryTableDefect::ListTemplates),
             Defect::from(AuxiliaryTableDefect::Sections),
             Defect::from(AuxiliaryTableDefect::RevisionAuthorResolution),
+            Defect::from(StyleDefect::ReservedStyleFlags),
+            Defect::from(StyleDefect::ReservedPost2000Flags),
+            Defect::from(StyleDefect::Priority),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

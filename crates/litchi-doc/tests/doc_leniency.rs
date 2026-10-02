@@ -37,8 +37,8 @@
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::CommentEntry;
 use litchi_doc::{
-    AuxiliaryTableDefect, Defect, Leniency, OpenOptions, Package, StshifDefect, StylesheetDefect,
-    Writer,
+    AuxiliaryTableDefect, Defect, Leniency, OpenOptions, Package, StshifDefect, StyleDefect,
+    StylesheetDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -406,5 +406,75 @@ fn stylesheet_framing_stays_fatal() {
     assert!(
         package.document().is_err(),
         "stylesheet framing must stay fatal under the default contract"
+    );
+}
+
+/// Rewrite the stylesheet bytes of a DOC package in place. The closure gets
+/// the table stream and the stylesheet's offset within it.
+fn edit_stylesheet(bytes: Vec<u8>, edit: impl FnOnce(&mut [u8], usize)) -> Vec<u8> {
+    let mut package =
+        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+    let word = package
+        .stream(&["WordDocument".to_string()])
+        .expect("WordDocument stream")
+        .to_vec();
+    let stsh_offset =
+        usize::try_from(u32::from_le_bytes(word[162..166].try_into().unwrap())).unwrap();
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_path = [table_name.to_string()];
+    let mut table = package.stream(&table_path).expect("table stream").to_vec();
+    edit(&mut table, stsh_offset);
+    package
+        .put_stream(&table_path, table)
+        .expect("edited table stream");
+    package.finish().expect("edited package")
+}
+
+/// Offset of the first style record (`STD`, istd 0) within the table stream.
+fn first_std_offset(table: &[u8], stsh_offset: usize) -> usize {
+    let cb_stshi = usize::from(u16::from_le_bytes([
+        table[stsh_offset],
+        table[stsh_offset + 1],
+    ]));
+    let lpstd = stsh_offset + 2 + cb_stshi;
+    assert_ne!(
+        u16::from_le_bytes([table[lpstd], table[lpstd + 1]]),
+        0,
+        "the Writer always emits the Normal style"
+    );
+    lpstd + 2
+}
+
+/// MS-DOC 2.9.112 marks the reserved GRFSTD bits "MUST be ignored": a style
+/// carrying them opens by default with only the defined flags decoded.
+#[test]
+fn reserved_grfstd_bits_are_ignored_and_recorded() {
+    let clean = writer_document(|_| {});
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    let original_flags = original.stylesheet().unwrap().get(0).unwrap().flags;
+
+    let bytes = edit_stylesheet(clean, |table, stsh| {
+        let grfstd = first_std_offset(table, stsh) + 8;
+        let word = u16::from_le_bytes([table[grfstd], table[grfstd + 1]]) | 0xE080;
+        table[grfstd..grfstd + 2].copy_from_slice(&word.to_le_bytes());
+    });
+    let document = open_degraded(bytes);
+    let normal = document.stylesheet().unwrap().get(0).unwrap();
+    assert_eq!(
+        normal.flags, original_flags,
+        "only defined bits are decoded"
+    );
+    assert!(document.text().unwrap().contains("Body text"));
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::Style(StyleDefect::ReservedStyleFlags),
+            context: 0,
+        }]
     );
 }

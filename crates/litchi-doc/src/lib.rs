@@ -197,8 +197,8 @@ pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{
-    AuxiliaryTableDefect, Defect, Leniency, SprmDefect, StshifDefect, StylesheetDefect,
-    ToleranceReport, ToleratedDefect,
+    AuxiliaryTableDefect, Defect, Leniency, SprmDefect, StshifDefect, StyleDefect,
+    StylesheetDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
     EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, PackageOpenOptions, Password,
