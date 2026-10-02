@@ -6,6 +6,7 @@ use super::{
     keyword::{self, Item},
     time,
 };
+use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, SourceBackedPackage};
 
@@ -75,6 +76,21 @@ impl CoreProperty {
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
 pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
+    read_with_report(package, &mut ToleranceReport::default())
+}
+
+/// [`read`], appending every reference-compatible repair to `report`.
+///
+/// See [`crate::leniency`]: a conformant package appends nothing.
+///
+/// # Errors
+///
+/// Returns the errors [`read`] returns.
+pub fn read_with_report(
+    package: &OpcPackage,
+    report: &mut ToleranceReport,
+) -> Result<Option<Props>> {
+    let _ = &report;
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
         return Ok(None);
@@ -106,6 +122,20 @@ pub fn read(package: &OpcPackage) -> Result<Option<Props>> {
 /// configured bound, the source changes, execution is cancelled, or an
 /// underlying source/package operation fails.
 pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>> {
+    read_source_backed_with_report(package, &mut ToleranceReport::default())
+}
+
+/// [`read_source_backed`], appending every reference-compatible repair to
+/// `report`.
+///
+/// # Errors
+///
+/// Returns the errors [`read_source_backed`] returns.
+pub fn read_source_backed_with_report(
+    package: &SourceBackedPackage,
+    report: &mut ToleranceReport,
+) -> Result<Option<Props>> {
+    let _ = &report;
     package.check_execution()?;
     package.source_version()?;
     let graph = graph::inspect_source(package)?;

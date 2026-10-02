@@ -11,10 +11,11 @@ mod read;
 pub mod time;
 mod write;
 
-pub use read::{read, read_source_backed};
+pub use read::{read, read_source_backed, read_source_backed_with_report, read_with_report};
 pub use write::{clear, write};
 
 use crate::Result;
+use crate::leniency::ToleranceReport;
 use litchi_core::Metadata;
 use litchi_opc::OpcPackage;
 
@@ -351,6 +352,7 @@ impl From<Props> for Metadata {
 pub struct Slot {
     props: Option<Props>,
     dirty: bool,
+    report: ToleranceReport,
 }
 
 /// A package-staged properties edit tied to its originating slot.
@@ -384,10 +386,20 @@ impl Slot {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn load(package: &OpcPackage) -> Result<Self> {
+        let mut report = ToleranceReport::default();
+        let props = read_with_report(package, &mut report)?;
         Ok(Self {
-            props: read(package)?,
+            props,
             dirty: false,
+            report,
         })
+    }
+
+    /// Reference-compatible repairs applied when this slot was loaded (see
+    /// [`crate::leniency`]); empty when the core properties conformed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.report
     }
 
     /// Borrows the current value without marking it dirty.

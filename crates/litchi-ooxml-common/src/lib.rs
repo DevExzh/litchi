@@ -41,6 +41,7 @@ pub mod custom_data;
 pub mod custom_xml;
 pub mod embedded;
 pub mod external_link;
+pub mod leniency;
 pub mod mce;
 #[cfg(feature = "encryption")]
 pub mod package_encryption;

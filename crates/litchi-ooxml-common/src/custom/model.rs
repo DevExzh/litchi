@@ -1,5 +1,6 @@
 //! Typed values and bounded in-memory custom-property collections.
 
+use crate::leniency::ToleranceReport;
 use caseless::Caseless;
 use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
@@ -174,6 +175,8 @@ pub struct Props {
     pub(crate) next_pid: Option<i32>,
     pub(crate) name_bytes: usize,
     pub(crate) text_bytes: usize,
+    /// Reference-compatible repairs applied when this collection was read.
+    pub(crate) tolerance_report: ToleranceReport,
 }
 
 impl Default for Props {
@@ -192,7 +195,19 @@ impl Props {
             next_pid: Some(2),
             name_bytes: 0,
             text_bytes: 0,
+            tolerance_report: ToleranceReport::default(),
         }
+    }
+
+    /// Reference-compatible repairs applied when this collection was read
+    /// from a package (see [`crate::leniency`]).
+    ///
+    /// An empty report means the custom-properties part conformed (or the
+    /// collection was built in memory). Every skipped property is listed with
+    /// its name; editing the collection does not change the report.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance_report
     }
 
     /// Validates properties reserved by Microsoft Office for a particular host.
