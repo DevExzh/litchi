@@ -441,10 +441,43 @@ struct Active {
     placeholder_ext_has_forbidden_attribute: bool,
     placeholder_ext_has_typed_child: bool,
     placeholder_ext_uri: Option<String>,
+    /// The open `p:ext` is not the p232 owner and is skipped uninspected.
+    placeholder_ext_opaque: bool,
+    /// The open opaque `p:ext` already recorded an owner-hygiene repair.
+    placeholder_ext_owner_defect: bool,
+    /// A p232 grammar violation dropped this placeholder's type extension;
+    /// the rest of its extension list is skipped (audit finding 6.4).
+    placeholder_ext_degraded: bool,
     seen_placeholder_type_ext: bool,
     seen_placeholder_type: bool,
     seen_placeholder_variant: bool,
     placeholder_type_extension: Option<PlaceholderTypeExtension>,
+}
+
+impl Active {
+    /// Forget the placeholder-extension scan state when `p:ph` closes.
+    fn reset_placeholder_extension_scan(&mut self) {
+        self.placeholder_depth = None;
+        self.placeholder_ext_lst_depth = None;
+        self.placeholder_ext_depth = None;
+        self.seen_placeholder_ext_lst = false;
+        self.placeholder_ext_child_count = 0;
+        self.placeholder_ext_has_other_child = false;
+        self.placeholder_ext_has_forbidden_attribute = false;
+        self.placeholder_ext_has_typed_child = false;
+        self.placeholder_ext_uri = None;
+        self.placeholder_ext_opaque = false;
+        self.placeholder_ext_owner_defect = false;
+        self.placeholder_ext_degraded = false;
+    }
+}
+
+/// The shape ID recorded for a repair, `0` when the shape has none yet.
+fn shape_id(records: &[Record], index: u32) -> u32 {
+    records
+        .get(index as usize)
+        .and_then(|record| record.id)
+        .unwrap_or(0)
 }
 
 struct Scanner<'a> {
@@ -533,7 +566,9 @@ impl<'a> Scanner<'a> {
                     )?;
                 },
                 Event::Text(text) => {
-                    self.reject_placeholder_character_data(Some(text.as_ref()), false)?;
+                    let checked =
+                        self.reject_placeholder_character_data(Some(text.as_ref()), false);
+                    self.tolerate_placeholder_extension(checked)?;
                     if self
                         .active
                         .last()
@@ -548,7 +583,8 @@ impl<'a> Scanner<'a> {
                     }
                 },
                 Event::CData(text) => {
-                    self.reject_placeholder_character_data(Some(text.as_ref()), true)?;
+                    let checked = self.reject_placeholder_character_data(Some(text.as_ref()), true);
+                    self.tolerate_placeholder_extension(checked)?;
                     if self
                         .active
                         .last()
@@ -561,7 +597,8 @@ impl<'a> Scanner<'a> {
                     }
                 },
                 Event::GeneralRef(reference) => {
-                    self.reject_placeholder_character_data(None, true)?;
+                    let checked = self.reject_placeholder_character_data(None, true);
+                    self.tolerate_placeholder_extension(checked)?;
                     if self
                         .active
                         .last()
@@ -593,14 +630,71 @@ impl<'a> Scanner<'a> {
         Ok((self.records, self.strings, self.tolerance))
     }
 
+    /// Turn a placeholder-extension grammar violation into a recorded
+    /// repair (audit finding 6.4): the placeholder keeps no p232 type
+    /// extension and the rest of its extension list is skipped. Every other
+    /// error passes through unchanged.
+    fn tolerate_placeholder_extension(&mut self, result: Result<()>) -> Result<()> {
+        match result {
+            Err(Error::Invalid(_))
+                if self
+                    .active
+                    .last()
+                    .is_some_and(|active| active.placeholder_depth.is_some()) =>
+            {
+                let Some(active) = self.active.last_mut() else {
+                    return Ok(());
+                };
+                if !active.placeholder_ext_degraded {
+                    active.placeholder_ext_degraded = true;
+                    active.placeholder_type_extension = None;
+                    active.placeholder_type_ext_depth = None;
+                    active.placeholder_type_depth = None;
+                    active.placeholder_variant_depth = None;
+                    let id = shape_id(&self.records, active.index);
+                    self.tolerance
+                        .record(ShapeDefect::PlaceholderTypeExtension, id);
+                }
+                Ok(())
+            },
+            other => other,
+        }
+    }
+
+    /// Record, once per `p:ext`, an opaque extension owner that breaks
+    /// `CT_Extension`'s attribute or element-only content rules.
+    fn note_extension_owner_defect(&mut self) {
+        let Some(active) = self.active.last_mut() else {
+            return;
+        };
+        if !active.placeholder_ext_owner_defect {
+            active.placeholder_ext_owner_defect = true;
+            let id = shape_id(&self.records, active.index);
+            self.tolerance
+                .record(ShapeDefect::PlaceholderExtensionOwner, id);
+        }
+    }
+
     fn reject_placeholder_character_data(
-        &self,
+        &mut self,
         bytes: Option<&[u8]>,
         explicit_markup: bool,
     ) -> Result<()> {
         let Some(active) = self.active.last() else {
             return Ok(());
         };
+        if active.placeholder_ext_degraded {
+            return Ok(());
+        }
+        if active.placeholder_ext_opaque {
+            if active.placeholder_ext_depth == Some(self.depth)
+                && (explicit_markup
+                    || bytes.is_some_and(|value| value.iter().any(|byte| !is_xml_whitespace(byte))))
+            {
+                self.note_extension_owner_defect();
+            }
+            return Ok(());
+        }
         if active.placeholder_type_ext_depth.is_some()
             || active.placeholder_type_depth.is_some()
             || active.placeholder_variant_depth.is_some()
@@ -800,7 +894,7 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        self.scan_placeholder_extension(
+        let scanned = self.scan_placeholder_extension(
             namespace,
             element,
             local_name,
@@ -808,7 +902,8 @@ impl<'a> Scanner<'a> {
             event_depth,
             empty,
             active_offset,
-        )?;
+        );
+        self.tolerate_placeholder_extension(scanned)?;
 
         let marker = if is_dml(namespace, local_name, b"tbl") {
             TABLE
@@ -878,6 +973,16 @@ impl<'a> Scanner<'a> {
             return Ok(());
         };
         let parent_depth = event_depth.checked_sub(1);
+        // A degraded placeholder skips the rest of its extension list, and an
+        // opaque (non-p232) `p:ext` subtree is never inspected.
+        if active.placeholder_ext_degraded
+            || (active.placeholder_ext_opaque
+                && active
+                    .placeholder_ext_depth
+                    .is_some_and(|depth| event_depth > depth))
+        {
+            return Ok(());
+        }
 
         if active
             .placeholder_variant_depth
@@ -901,20 +1006,42 @@ impl<'a> Scanner<'a> {
         } else if is_pml(namespace, local_name, b"ext")
             && active.placeholder_ext_lst_depth == parent_depth
         {
-            let uri = validate_extension_attributes(element, decoder)?;
+            let owner = read_extension_owner(element, decoder)?;
+            if owner.uri.as_deref() != Some(PLACEHOLDER_TYPE_EXTENSION_URI) {
+                // `CT_Extension` content is `xsd:any processContents="lax"`
+                // with any arity: an extension this reader does not model is
+                // skipped without inspection.
+                active.placeholder_ext_owner_defect = false;
+                if !empty {
+                    active.placeholder_ext_depth = Some(event_depth);
+                    active.placeholder_ext_opaque = true;
+                    active.placeholder_ext_uri = owner.uri;
+                }
+                if !owner.conforms {
+                    let id = shape_id(&self.records, active.index);
+                    active.placeholder_ext_owner_defect = true;
+                    self.tolerance
+                        .record(ShapeDefect::PlaceholderExtensionOwner, id);
+                }
+                return Ok(());
+            }
+            if !owner.conforms {
+                return Err(Error::Invalid(
+                    "p:ext allows exactly one unqualified uri attribute".into(),
+                ));
+            }
             if empty {
                 return Err(Error::Invalid(
                     "p:ext owner requires exactly one child element".into(),
                 ));
             }
-            if !empty {
-                active.placeholder_ext_depth = Some(event_depth);
-                active.placeholder_ext_child_count = 0;
-                active.placeholder_ext_has_other_child = false;
-                active.placeholder_ext_has_forbidden_attribute = false;
-                active.placeholder_ext_has_typed_child = false;
-                active.placeholder_ext_uri = Some(uri);
-            }
+            active.placeholder_ext_depth = Some(event_depth);
+            active.placeholder_ext_opaque = false;
+            active.placeholder_ext_child_count = 0;
+            active.placeholder_ext_has_other_child = false;
+            active.placeholder_ext_has_forbidden_attribute = false;
+            active.placeholder_ext_has_typed_child = false;
+            active.placeholder_ext_uri = owner.uri;
         } else if is_p232(namespace, local_name, b"phTypeExt")
             && active.placeholder_ext_depth == parent_depth
             && active.placeholder_ext_uri.as_deref() == Some(PLACEHOLDER_TYPE_EXTENSION_URI)
@@ -1022,6 +1149,24 @@ impl<'a> Scanner<'a> {
         let Some(active) = self.active.last_mut() else {
             return Ok(());
         };
+        if active.placeholder_ext_degraded {
+            if is_pml(namespace, local_name, b"ph") && active.placeholder_depth == Some(self.depth)
+            {
+                active.reset_placeholder_extension_scan();
+            }
+            return Ok(());
+        }
+        if active.placeholder_ext_opaque {
+            if is_pml(namespace, local_name, b"ext")
+                && active.placeholder_ext_depth == Some(self.depth)
+            {
+                active.placeholder_ext_depth = None;
+                active.placeholder_ext_opaque = false;
+                active.placeholder_ext_owner_defect = false;
+                active.placeholder_ext_uri = None;
+            }
+            return Ok(());
+        }
         if is_p232(namespace, local_name, b"cameo") || is_p232(namespace, local_name, b"unknown") {
             if active.placeholder_variant_depth == Some(self.depth) {
                 active.placeholder_variant_depth = None;
@@ -1081,15 +1226,7 @@ impl<'a> Scanner<'a> {
                     "p232 placeholder type metadata is incomplete".into(),
                 ));
             }
-            active.placeholder_depth = None;
-            active.placeholder_ext_lst_depth = None;
-            active.placeholder_ext_depth = None;
-            active.seen_placeholder_ext_lst = false;
-            active.placeholder_ext_child_count = 0;
-            active.placeholder_ext_has_other_child = false;
-            active.placeholder_ext_has_forbidden_attribute = false;
-            active.placeholder_ext_has_typed_child = false;
-            active.placeholder_ext_uri = None;
+            active.reset_placeholder_extension_scan();
         }
         Ok(())
     }
@@ -1106,7 +1243,8 @@ impl<'a> Scanner<'a> {
             ));
         }
         let local_name = name.local_name().into_inner();
-        self.finish_placeholder_extension(namespace, local_name)?;
+        let finished = self.finish_placeholder_extension(namespace, local_name);
+        self.tolerate_placeholder_extension(finished)?;
         if is_dml(namespace, local_name, b"t")
             && let Some(active) = self.active.last_mut()
             && active.text_depth == Some(self.depth)
@@ -1220,6 +1358,9 @@ impl<'a> Scanner<'a> {
             placeholder_ext_has_forbidden_attribute: false,
             placeholder_ext_has_typed_child: false,
             placeholder_ext_uri: None,
+            placeholder_ext_opaque: false,
+            placeholder_ext_owner_defect: false,
+            placeholder_ext_degraded: false,
             seen_placeholder_type_ext: false,
             seen_placeholder_type: false,
             seen_placeholder_variant: false,
@@ -1465,18 +1606,31 @@ fn parse_coordinate(
         .and_then(|value| value.parse::<i64>().ok()))
 }
 
-/// Validate the generic `p:ext` owner used by `CT_Extension`.
+/// The attributes of a `p:ext` owner (`CT_Extension`).
+struct ExtensionOwner {
+    /// The `uri` attribute after the XML Schema `token` whitespace facet, or
+    /// `None` when it is absent or blank.
+    uri: Option<String>,
+    /// Whether the owner carries exactly one unqualified, nonblank `uri` and
+    /// no other non-namespace attribute.
+    conforms: bool,
+}
+
+/// Read the generic `p:ext` owner used by `CT_Extension`.
 ///
-/// The owner always carries exactly one unqualified, nonempty XML Schema
-/// `token` URI. Namespace declarations are source namespace context and are not
-/// schema attributes. The p232 owner has no normative GUID in the local
+/// A conforming owner carries exactly one unqualified, nonempty XML Schema
+/// `token` URI. Namespace declarations are source namespace context and are
+/// not schema attributes. The p232 owner has no normative GUID in the local
 /// Microsoft specification, so the reader and writer use the crate's stable
-/// `urn:litchi:pptx:p232:phTypeExt` owner contract.
-fn validate_extension_attributes(
+/// `urn:litchi:pptx:p232:phTypeExt` owner contract. Malformed attribute
+/// syntax stays an XML error; schema deviations are reported through
+/// [`ExtensionOwner::conforms`] for the caller to repair.
+fn read_extension_owner(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<String> {
+) -> Result<ExtensionOwner> {
     let uri = unqualified_attribute_value(element, b"uri", decoder)?;
+    let mut conforms = true;
     let mut seen_non_namespace = false;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -1485,19 +1639,15 @@ fn validate_extension_attributes(
             continue;
         }
         if key != b"uri" || seen_non_namespace {
-            return Err(Error::Invalid(
-                "p:ext allows exactly one unqualified uri attribute".into(),
-            ));
+            conforms = false;
         }
         seen_non_namespace = true;
     }
-    let Some(uri) = uri else {
-        return Err(Error::Invalid(
-            "p:ext is missing its required uri attribute".into(),
-        ));
-    };
-    collapse_xsd_token(&uri)
-        .ok_or_else(|| Error::Invalid("p:ext uri must be a nonempty XML Schema token".into()))
+    let uri = uri.as_deref().and_then(collapse_xsd_token);
+    Ok(ExtensionOwner {
+        conforms: conforms && uri.is_some(),
+        uri,
+    })
 }
 
 fn is_xml_whitespace(byte: &u8) -> bool {

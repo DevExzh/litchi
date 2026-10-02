@@ -451,3 +451,90 @@ fn ill_formed_shape_xml_stays_fatal() {
     });
     assert!(litchi_pptx::shape::Scene::read(&slide).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Audit finding 6.4: placeholder `p:ext` owner hygiene.
+// ---------------------------------------------------------------------------
+
+const SLIDE2: &str = "/ppt/slides/slide2.xml";
+const P232: &str = "http://schemas.microsoft.com/office/powerpoint/2023/02/main";
+const P232_OWNER: &str = "urn:litchi:pptx:p232:phTypeExt";
+
+fn second_slide_placeholders(
+    package: &Package,
+) -> (
+    Vec<(
+        Option<u32>,
+        Option<litchi_pptx::shape::PlaceholderTypeExtension>,
+    )>,
+    litchi_pptx::ToleranceReport,
+) {
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let scene = slides[1].shapes().unwrap();
+    let placeholders = scene
+        .placeholders()
+        .map(|shape| (shape.id(), shape.placeholder().unwrap().type_extension()))
+        .collect();
+    (placeholders, scene.tolerance_report().clone())
+}
+
+#[test]
+fn placeholder_extension_hygiene_is_tolerated_per_placeholder_and_recorded() {
+    let slide = patched_part(SLIDE2, |xml| {
+        xml.replace(
+            r#"<p:ph type="ctrTitle"/>"#,
+            &format!(
+                r#"<p:ph type="ctrTitle"><p:extLst><p:ext uri="{P232_OWNER}"><x:phTypeExt xmlns:x="{P232}"><x:type><x:cameo/><x:unknown/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph>"#
+            ),
+        )
+        .replace(
+            r#"<p:ph type="subTitle" idx="1"/>"#,
+            r#"<p:ph type="subTitle" idx="1"><p:extLst><p:ext><x:a xmlns:x="urn:x"/><x:b xmlns:x="urn:x"/></p:ext></p:extLst></p:ph>"#,
+        )
+    });
+    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let (placeholders, report) = second_slide_placeholders(&package);
+
+    assert_eq!(placeholders, [(Some(3), None), (Some(4), None)]);
+    assert_eq!(
+        located(&report),
+        [
+            (
+                Defect::Shape(ShapeDefect::PlaceholderTypeExtension),
+                3,
+                Some(SLIDE2)
+            ),
+            (
+                Defect::Shape(ShapeDefect::PlaceholderExtensionOwner),
+                4,
+                Some(SLIDE2)
+            ),
+        ]
+    );
+}
+
+#[test]
+fn conformant_placeholder_extensions_report_nothing() {
+    let slide = patched_part(SLIDE2, |xml| {
+        xml.replace(
+            r#"<p:ph type="ctrTitle"/>"#,
+            &format!(
+                r#"<p:ph type="ctrTitle"><p:extLst><p:ext uri="{P232_OWNER}"><x:phTypeExt xmlns:x="{P232}"><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:future"/></p:extLst></p:ph>"#
+            ),
+        )
+    });
+    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let (placeholders, report) = second_slide_placeholders(&package);
+    assert_eq!(
+        placeholders,
+        [
+            (
+                Some(3),
+                Some(litchi_pptx::shape::PlaceholderTypeExtension::Cameo)
+            ),
+            (Some(4), None)
+        ]
+    );
+    assert_clean(&report);
+}

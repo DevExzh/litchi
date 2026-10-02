@@ -99,6 +99,23 @@
 //! placement. XML well-formedness, the scene's structural grammar, and its
 //! size/depth/count limits stay hard errors.
 //!
+//! # Placeholder extension repairs (audit finding 6.4)
+//!
+//! A placeholder's `p:extLst` no longer fails the scene over extension
+//! arity. `CT_Extension` is `xsd:any processContents="lax"` with any number
+//! of children, so a `p:ext` whose URI is not the p232 type-extension owner
+//! is skipped without inspection — zero or many children are legal and
+//! record nothing. When such an opaque owner itself breaks `CT_Extension`
+//! (missing or blank `uri`, an extra attribute, direct character data) it is
+//! still skipped, and recorded once as
+//! [`ShapeDefect::PlaceholderExtensionOwner`]. The strict grammar applies
+//! only to the p232 owner URI, and even there a violation (extra owner
+//! children or attributes, character data, a missing or duplicated token, a
+//! repeated `p:extLst`) degrades to "no type extension" for that
+//! placeholder, recorded as [`ShapeDefect::PlaceholderTypeExtension`]; the
+//! placeholder, shape, and scene survive. The lossless placeholder-type
+//! *edit* planner in `master_layout` keeps its strict owner validation.
+//!
 //! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
 //! for legacy Word documents so the readers behave the same way.
 
@@ -230,6 +247,28 @@ pub enum ShapeDefect {
     /// absent ([`crate::shape::Shape::bounds`] is `None`, as for a shape that
     /// inherits its placement) and keeps the rest of the scene.
     MalformedTransform,
+    /// A placeholder extension owner (`p:ph/p:extLst/p:ext`) that this
+    /// reader does not model broke `CT_Extension`'s own rules: its `uri` was
+    /// missing or blank, it carried another non-namespace attribute, or it
+    /// held direct character data.
+    ///
+    /// `CT_Extension` content is `xsd:any processContents="lax"` with any
+    /// arity, and the Markup Compatibility model requires unrecognized
+    /// extension content to be ignorable; `PowerPoint` ignores extensions it
+    /// does not understand. The reader skips the owner without inspecting
+    /// its subtree, exactly as it skips a conforming unknown extension.
+    PlaceholderExtensionOwner,
+    /// The placeholder's p232 type extension (`p:ext` with the
+    /// `urn:litchi:pptx:p232:phTypeExt` owner URI wrapping
+    /// `p232:phTypeExt/p232:type/{cameo|unknown}`) broke its grammar: extra
+    /// owner attributes or children, character data, a missing or duplicated
+    /// token, attributes on the typed elements, or a repeated `p:extLst`.
+    ///
+    /// The placeholder itself is well defined without its type extension,
+    /// so the reader keeps the placeholder and reports no type extension
+    /// ([`crate::shape::Placeholder::type_extension`] is `None`), skipping
+    /// the rest of its extension list.
+    PlaceholderTypeExtension,
 }
 
 impl ShapeDefect {
@@ -239,6 +278,12 @@ impl ShapeDefect {
         match self {
             Self::MalformedTransform => {
                 "dropped the shape's malformed transform; its geometry is absent and the rest of the scene was kept"
+            },
+            Self::PlaceholderExtensionOwner => {
+                "skipped the malformed placeholder extension owner without inspecting it"
+            },
+            Self::PlaceholderTypeExtension => {
+                "dropped the placeholder's malformed p232 type extension; the placeholder was kept"
             },
         }
     }
@@ -469,6 +514,8 @@ mod tests {
             Defect::from(TimingDefect::OrphanedTarget),
             Defect::from(TimingDefect::DuplicateShapeId),
             Defect::from(ShapeDefect::MalformedTransform),
+            Defect::from(ShapeDefect::PlaceholderExtensionOwner),
+            Defect::from(ShapeDefect::PlaceholderTypeExtension),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

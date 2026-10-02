@@ -110,6 +110,85 @@ mod tests {
         assert!(raw.starts_with(b"<q:sp>"));
     }
 
+    /// The scene reads, shape "Broken" keeps its placeholder without a type
+    /// extension, and the one repair is recorded against shape 2.
+    fn assert_type_extension_degraded(xml: &str, label: &str) {
+        let scene = Scene::read(xml.as_bytes()).unwrap_or_else(|error| panic!("{label}: {error}"));
+        let placeholder = scene
+            .get("Broken")
+            .expect("lookup")
+            .expect("shape")
+            .placeholder()
+            .expect("placeholder kept");
+        assert_eq!(placeholder.type_extension(), None, "{label}");
+        let repaired: Vec<_> = scene
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|d| (d.defect, d.context))
+            .collect();
+        assert_eq!(
+            repaired,
+            [(
+                crate::Defect::Shape(crate::ShapeDefect::PlaceholderTypeExtension),
+                2
+            )],
+            "{label}"
+        );
+    }
+
+    #[test]
+    fn opaque_placeholder_extension_owner_hygiene_is_tolerated_and_recorded() {
+        for (label, owner) in [
+            ("missing uri", r#"<p:ext><x:future/></p:ext>"#),
+            ("blank uri", r#"<p:ext uri="  "><x:future/></p:ext>"#),
+            (
+                "extra attribute",
+                r#"<p:ext uri="urn:x" extra="1"><x:a/><x:b/></p:ext>"#,
+            ),
+            (
+                "character data",
+                r#"<p:ext uri="urn:x">junk<x:a/>more</p:ext>"#,
+            ),
+        ] {
+            let xml = format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="9" name="Owner"/><p:nvPr><p:ph type="body"><p:extLst>{owner}<p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+            );
+            let scene =
+                Scene::read(xml.as_bytes()).unwrap_or_else(|error| panic!("{label}: {error}"));
+            let placeholder = scene
+                .shape("Owner")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder");
+            // The typed sibling is unaffected by the opaque owner's defect.
+            assert_eq!(
+                placeholder.type_extension(),
+                Some(PlaceholderTypeExtension::Cameo),
+                "{label}"
+            );
+            let repaired: Vec<_> = scene
+                .tolerance_report()
+                .defects()
+                .iter()
+                .map(|d| (d.defect, d.context))
+                .collect();
+            assert_eq!(
+                repaired,
+                [(
+                    crate::Defect::Shape(crate::ShapeDefect::PlaceholderExtensionOwner),
+                    9
+                )],
+                "{label}"
+            );
+        }
+        // Ill-formed XML inside an opaque extension is still fatal.
+        let broken = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="9" name="Owner"/><p:nvPr><p:ph><p:extLst><p:ext uri="urn:x"><x:a></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        assert!(Scene::read(broken.as_bytes()).is_err());
+    }
+
     #[test]
     fn malformed_transforms_degrade_per_shape_and_extension_lists_are_not_geometry() {
         let xml = format!(
@@ -186,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_schema_token_uri_whitespace_and_requires_one_opaque_child() {
+    fn accepts_schema_token_uri_whitespace_and_any_opaque_extension_arity() {
         let xml = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph><p:extLst><p:ext uri=" \t{PLACEHOLDER_TYPE_EXTENSION_URI}
  "><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:opaque"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
@@ -216,7 +295,9 @@ mod tests {
             let malformed = format!(
                 r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst>{payload}</p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
             );
-            assert!(Scene::read(malformed.as_bytes()).is_err(), "{payload}");
+            // `CT_Extension` content is `xsd:any` with any arity: legal.
+            let scene = Scene::read(malformed.as_bytes()).expect(payload);
+            assert!(scene.tolerance_report().is_clean(), "{payload}");
         }
     }
 
@@ -293,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_malformed_p232_placeholder_type_extensions() {
+    fn degrades_malformed_p232_placeholder_type_extensions() {
         let cases = [
             r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type/></x:phTypeExt>"#,
             r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type><x:cameo/><x:unknown/></x:type></x:phTypeExt>"#,
@@ -308,12 +389,12 @@ mod tests {
             let xml = format!(
                 r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}">{extension}</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
             );
-            assert!(Scene::read(xml.as_bytes()).is_err(), "{extension}");
+            assert_type_extension_degraded(&xml, extension);
         }
     }
 
     #[test]
-    fn rejects_p232_empty_token_attributes_text_owner_uri_and_duplicate_lists() {
+    fn degrades_p232_empty_token_attributes_text_owner_uri_and_duplicate_lists() {
         let cases = [
             (
                 "token attribute",
@@ -352,7 +433,7 @@ mod tests {
             let xml = format!(
                 r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}">{extension}</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
             );
-            assert!(Scene::read(xml.as_bytes()).is_err(), "{label}");
+            assert_type_extension_degraded(&xml, label);
         }
         let owner_uri = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="urn:wrong"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
@@ -372,15 +453,15 @@ mod tests {
         let missing_owner_payload = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        assert!(Scene::read(missing_owner_payload.as_bytes()).is_err());
+        assert_type_extension_degraded(&missing_owner_payload, "missing payload");
         let empty_owner = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"/></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        assert!(Scene::read(empty_owner.as_bytes()).is_err());
+        assert_type_extension_degraded(&empty_owner, "empty owner");
         let duplicate_lists = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst/><p:extLst/></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
         );
-        assert!(Scene::read(duplicate_lists.as_bytes()).is_err());
+        assert_type_extension_degraded(&duplicate_lists, "duplicate lists");
     }
 
     #[test]
