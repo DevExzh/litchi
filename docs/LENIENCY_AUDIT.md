@@ -912,6 +912,8 @@ elements ignored.
 - **Suggested posture**: default-repair — strip one leading `=` (or tolerate and
   preserve); empty formula → `Kind::Unknown`/no-formula with a recorded note.
 ### 4.10 Worksheet sequencing and advisory-metadata strictness — P2 (confidence: high for dimension/counts; medium for out-of-order rows)
+> **Status: FIXED (2026-10-02)** — `dimension`/`sheetFormatPr`/`cols`/`mergeCells` are accepted in any position, a bad/duplicate/ref-less `dimension` is ignored, empty collections and count mismatches are
+> advisory, out-of-order rows sort and repeated rows merge last-wins; recorded as `MisplacedElement`/`CountMismatch`/`RowOutOfOrder`. Repeated collections stay fatal.
 - **Location**: `crates/litchi-xlsx/src/raw/worksheet/codec.rs:771-789` ("worksheet
   dimension appears after column or cell data" :775, "duplicate dimension elements" :779,
   `ref` required), :915-926 (duplicate/out-of-order rows → Err), :992-996/:1012-1014
@@ -931,6 +933,8 @@ elements ignored.
   count-mismatch errors (records authoritative, mirroring the crate's own sst-hint
   posture), sort-or-last-wins duplicate rows; record each repair.
 ### 4.11 Theme `clrScheme` strictness: positional slots, exactly 12, mandatory `lastClr`, strict hex — P2
+> **Status: FIXED (2026-10-02)** — `Theme::parse` matches colour slots by name; missing, unmodeled or malformed slots take the Office default and `sysClr` without `lastClr` resolves by name; recorded
+> per slot in `Theme::tolerance_report`. Also fixes an index-past-12-slots panic on `a:extLst` inside `clrScheme`. Ill-formed XML and a missing `clrScheme` stay fatal.
 - **Location**: `crates/litchi-xlsx/src/style/theme.rs:241-249` (slot must be the exact
   expected element in order — "a:clrScheme slot {} must be <a:{}>" :245), :276-296
   (`srgbClr/@val`, `sysClr/@lastClr` required, hex must be exactly 6 digits), :329-351
@@ -947,6 +951,8 @@ elements ignored.
 - **Suggested posture**: default-repair — match slots by name, default missing slots,
   missing `lastClr` → resolve-by-name-or-black, bad hex → slot-default; record each.
 ### 4.12 Shared-string rich-text micro-structure and `_xHHHH_` escape failures kill the whole table — P2 (confidence: medium-high)
+> **Status: FIXED (2026-10-02)** — mixed or repeated `<t>` in a shared-string item keeps all text in document order and unpaired `_xHHHH_` surrogates decode to U+FFFD, recorded per item; the
+> standalone `raw::shared_strings::Table` reader (run properties) stays strict.
 - **Location**: `crates/litchi-xlsx/src/raw/shared_strings.rs:300`/:475 (run without
   `<t>` → Err), :328-331/:360-366 (mixed simple+rich text, "duplicate text in
   shared-string item" :366), :347 ("duplicate shared-string run properties")/:847-853,
