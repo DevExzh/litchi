@@ -16,19 +16,19 @@
 //! silently: an empty report means the stream conformed, and a conformant
 //! stream parses exactly as before.
 //!
-//! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
-//! variants; [`StreamDefect::UnsupportedVersion`] and
-//! [`StreamDefect::SectionCount`] are planned as the first such class, since
-//! a future property-set version might need new semantics.
+//! **Opt-in repairs** would trade strictness for reach behind explicit
+//! [`Leniency`] variants; [`StreamDefect::UnsupportedVersion`] and
+//! [`StreamDefect::SectionCount`] are that class and stay rejected for now,
+//! since a future property-set version might need new semantics.
 //!
 //! **Structural corruption and resource limits stay hard errors**: byte order,
 //! descriptor and section framing that leaves the stream, offset arithmetic
 //! overflow, and every allocation or size ceiling.
 //!
 //! The defect enumerations are closed and sized to the property-set findings
-//! of the leniency audit (F7.8–F7.12). A variant whose repair has not landed
-//! yet says so in its documentation; until then the parser still rejects that
-//! deviation and the variant is never recorded.
+//! of the leniency audit (F7.8–F7.12). A variant whose repair is not applied
+//! says so in its documentation; the parser rejects that deviation and the
+//! variant is never recorded.
 //!
 //! # Merging into a format crate's report
 //!
@@ -172,19 +172,25 @@ impl PropertyDefect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum StreamDefect {
-    /// The stream version was neither 0 nor 1 (F7.12, planned opt-in).
+    /// The stream version was neither 0 nor 1 (F7.12, opt-in class).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation.
+    /// Not repaired: the parser rejects this deviation. POI rejects any
+    /// nonzero format word outright, and a newer version may carry semantics
+    /// this grammar cannot represent, so a repair would be a judgment call
+    /// for a future opt-in [`Leniency`] variant.
     UnsupportedVersion,
-    /// The section count was outside 1..=2 (F7.12, planned opt-in).
+    /// The section count was outside 1..=2 (F7.12, opt-in class).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation.
+    /// Not repaired: the parser rejects this deviation. Skipping sections
+    /// beyond the two the model represents would silently lose content, so
+    /// it is left to a future opt-in [`Leniency`] variant.
     SectionCount,
-    /// A section's size field disagreed with the range its descriptor
-    /// implies (F7.12).
+    /// A section's size field overran the range its descriptor implies: the
+    /// next section's offset, or the stream end (F7.12).
     ///
-    /// Not yet repaired: the parser currently rejects this deviation. The
-    /// repair trusts the descriptor-implied range, clamped to the stream.
+    /// Sections are located by offset, as POI and LibreOffice read them; the
+    /// size is clamped to the implied range. Duplicate and out-of-range
+    /// offsets stay fatal. The context is the section's descriptor index.
     SectionSizeMismatch,
 }
 

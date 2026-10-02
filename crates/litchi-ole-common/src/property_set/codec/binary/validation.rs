@@ -18,7 +18,7 @@ use super::wire::{
     read_guid, read_u16, read_u32, reserve_bytes, utf16_text_end,
 };
 use super::{Repairs, parse_typed_property, parse_typed_property_for_property};
-use crate::leniency::{PropertyDefect, StringDefect, ToleranceReport};
+use crate::leniency::{PropertyDefect, StreamDefect, StringDefect, ToleranceReport};
 use litchi_cfb::OleError;
 use litchi_cfb::consts::VT_I2;
 use std::collections::HashMap;
@@ -87,21 +87,35 @@ fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, O
         }
         let size = usize::try_from(read_u32(data, offset, "section size")?)
             .map_err(|_conversion_error| invalid("Property Set section size is too large"))?;
-        let end = offset
-            .checked_add(size)
-            .filter(|end| *end <= data.len())
-            .ok_or_else(|| invalid("Property Set section exceeds its stream"))?;
+        let end = offset.saturating_add(size);
         descriptors.push((format_identifier, offset, end));
     }
 
-    let mut ranges = try_vec_with_capacity(descriptors.len(), "property-set section ranges")?;
-    ranges.extend(descriptors.iter().map(|(_, start, end)| (*start, *end)));
-    ranges.sort_unstable();
-    if ranges.windows(2).any(|pair| pair[1].0 < pair[0].1) {
-        return Err(invalid("Property Set sections overlap"));
+    // The descriptor offsets, not the size fields, locate the sections: a
+    // section's implied range ends at the next section's offset or at the
+    // stream end. POI and LibreOffice read sections by offset; a size field
+    // that overruns that range (padding-aware writers round it up) is
+    // clamped to it and recorded (leniency audit F7.12). Offsets themselves
+    // stay strictly validated above.
+    let mut tolerance = ToleranceReport::default();
+    let mut starts = try_vec_with_capacity(descriptors.len(), "property-set section ranges")?;
+    starts.extend(descriptors.iter().map(|(_, start, _)| *start));
+    starts.sort_unstable();
+    for (index, (_, start, end)) in descriptors.iter_mut().enumerate() {
+        let implied_end = starts
+            .iter()
+            .copied()
+            .find(|other| *other > *start)
+            .unwrap_or(data.len());
+        if *end > implied_end {
+            *end = implied_end;
+            tolerance.record(
+                StreamDefect::SectionSizeMismatch,
+                u32::try_from(index).unwrap_or(u32::MAX),
+            );
+        }
     }
 
-    let mut tolerance = ToleranceReport::default();
     let mut sections = try_vec_with_capacity(section_count, "property-set sections")?;
     for (format_identifier, start, end) in descriptors {
         sections.push(parse_section(
@@ -509,13 +523,9 @@ fn parse_section(
     tolerance: &mut ToleranceReport,
 ) -> Result<Section, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
-    let declared_size = usize::try_from(read_u32(data, 0, "section size")?)
-        .map_err(|_conversion_error| invalid("Property Set section size is too large"))?;
-    if declared_size != data.len() {
-        return Err(invalid(
-            "Property Set section range does not match its size",
-        ));
-    }
+    // The caller derived this range from the section size field, clamped to
+    // the section's descriptor-implied range (leniency audit F7.12).
+    read_u32(data, 0, "section size")?;
     let property_count = usize::try_from(read_u32(data, 4, "property count")?)
         .map_err(|_conversion_error| invalid("Property count is too large"))?;
     if property_count > MAX_PROPERTY_COUNT {

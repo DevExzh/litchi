@@ -5,7 +5,7 @@
 //! stream without the deviation must parse with a clean report.
 
 use super::*;
-use crate::leniency::{Defect, PropertyDefect, StringDefect, ToleranceReport};
+use crate::leniency::{Defect, PropertyDefect, StreamDefect, StringDefect, ToleranceReport};
 use litchi_cfb::OleFile;
 use litchi_cfb::consts::*;
 use litchi_cfb::writer::OleWriter;
@@ -394,4 +394,82 @@ fn one_malformed_property_is_dropped_and_the_rest_stay_readable() {
             .update(Binding::SummaryInformation, |_| Ok(()))
             .is_err()
     );
+}
+
+// --- F7.12: stream header exactness ---
+
+#[test]
+fn section_size_overrunning_its_implied_range_is_clamped_and_recorded() {
+    let properties = [codepage_property(1252), (PID_TITLE, lpstr(b"Sized\0"))];
+    let clean = summary_stream(&properties);
+    let expected = Stream::parse(&clean).unwrap();
+    assert!(expected.tolerance_report().is_clean());
+
+    // A padding-aware writer rounded the section size past the stream end.
+    let mut rounded = clean.clone();
+    let size = u32::from_le_bytes(rounded[48..52].try_into().unwrap());
+    rounded[48..52].copy_from_slice(&u32le(size + 64));
+    let parsed = Stream::parse(&rounded).unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [(StreamDefect::SectionSizeMismatch.into(), 0)]
+    );
+    assert_eq!(parsed, expected);
+    assert!(parsed.tolerance_report().preserves_content());
+}
+
+#[test]
+fn first_section_size_overrunning_the_second_is_clamped_to_it() {
+    let first = section_body(&[codepage_property(1252), (PID_TITLE, lpstr(b"One\0"))]);
+    let second_id = Guid::from_bytes([0x7c; 16]);
+    let second = section_body(&[
+        codepage_property(1252),
+        (PID_TITLE, typed(VT_I4, &u32le(2))),
+    ]);
+    let build = |first_size: u32| {
+        let mut data = Vec::new();
+        data.extend_from_slice(&u16le(0xfffe));
+        data.extend_from_slice(&u16le(0));
+        data.extend_from_slice(&u32le(0));
+        data.extend_from_slice(&[0; 16]);
+        data.extend_from_slice(&u32le(2));
+        data.extend_from_slice(SUMMARY_INFORMATION_FMTID.as_bytes());
+        data.extend_from_slice(&u32le(68));
+        data.extend_from_slice(second_id.as_bytes());
+        data.extend_from_slice(&u32le(u32::try_from(68 + first.len()).unwrap()));
+        let mut body = first.clone();
+        body[0..4].copy_from_slice(&u32le(first_size));
+        data.extend_from_slice(&body);
+        data.extend_from_slice(&second);
+        data
+    };
+    let exact = u32::try_from(first.len()).unwrap();
+    let clean = Stream::parse(&build(exact)).unwrap();
+    assert!(clean.tolerance_report().is_clean());
+
+    let parsed = Stream::parse(&build(exact + 16)).unwrap();
+    assert_eq!(
+        recorded(parsed.tolerance_report()),
+        [(StreamDefect::SectionSizeMismatch.into(), 0)]
+    );
+    assert_eq!(parsed, clean);
+    assert_eq!(
+        parsed.section(second_id).unwrap().property(PID_TITLE),
+        Some(&Value::I4(2))
+    );
+}
+
+/// Version and section-count deviations stay errors: POI rejects a nonzero
+/// format word outright, and a newer version or a third section may carry
+/// semantics this grammar cannot represent, so repairing them would be a
+/// judgment call (the audit's opt-in class), not a default repair.
+#[test]
+fn unsupported_versions_and_section_counts_stay_errors() {
+    let clean = summary_stream(&[codepage_property(1252)]);
+    let mut version = clean.clone();
+    version[2..4].copy_from_slice(&u16le(2));
+    assert!(Stream::parse(&version).is_err());
+    let mut count = clean;
+    count[24..28].copy_from_slice(&u32le(3));
+    assert!(Stream::parse(&count).is_err());
 }
