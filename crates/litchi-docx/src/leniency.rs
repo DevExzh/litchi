@@ -61,6 +61,18 @@
 //!   [`content_control::Inventory`](crate::content_control::Inventory) carries
 //!   its own.
 //!
+//! - Packaging and metadata — the OPC repairs `litchi-opc` makes while the
+//!   package is opened ([`litchi_opc::leniency`]) are folded in as
+//!   [`Defect::Package`] by every open path: [`Package::document`](crate::Package::document)
+//!   (and [`Package::tolerance_report`](crate::Package::tolerance_report)),
+//!   the source-backed [`Package`](crate::source_backed::Package), and its
+//!   pinned [`Document`](crate::source_backed::Document). Core- and
+//!   custom-properties repairs ([`litchi_ooxml_common::leniency`]) are folded
+//!   in as [`Defect::Properties`] when the metadata is read: at open for the
+//!   owning package (which loads it eagerly), by
+//!   `source_backed::Package::metadata` for the source-backed one. These
+//!   entries carry a [`PartLocation`] instead of a byte offset.
+//!
 //! Fragment-level accessors without a document handle (a standalone
 //! [`Paragraph`](crate::Paragraph)'s numbering or revisions, table revisions)
 //! apply the same repairs; the document-level accessor over the same part
@@ -75,6 +87,10 @@ const MAX_RECORDED_DEFECTS: usize = 1024;
 
 /// Upper bound on the heap a single [`ToleranceReport`] can retain, for
 /// workspace estimates that must account for every owner a parse can grow.
+///
+/// Codec reports never carry a [`PartLocation`]; only the open-time packaging
+/// and metadata fold does, whose strings are bounded by the package read
+/// limits that admitted them.
 pub(crate) const MAX_REPORT_HEAP_BYTES: usize = MAX_RECORDED_DEFECTS * size_of::<ToleratedDefect>();
 
 /// How the reader treats non-structural document defects.
@@ -463,6 +479,16 @@ pub enum Defect {
     Section(SectionDefect),
     /// A content-control property defect repaired per control.
     ContentControl(ContentControlDefect),
+    /// An OPC packaging defect (relationship or content-types manifest)
+    /// repaired by `litchi-opc` while the package was opened; see
+    /// [`litchi_opc::leniency`]. Folded into the document report at open, with
+    /// its [`ToleratedDefect::location`] set.
+    Package(litchi_opc::leniency::Defect),
+    /// A core- or custom-properties defect repaired by `litchi-ooxml-common`
+    /// while the document metadata was read; see
+    /// [`litchi_ooxml_common::leniency`]. Folded in when the metadata is read,
+    /// with its [`ToleratedDefect::location`] set.
+    Properties(litchi_ooxml_common::leniency::Defect),
 }
 
 impl Defect {
@@ -476,6 +502,8 @@ impl Defect {
             Self::Revision(defect) => defect.repair(),
             Self::Section(defect) => defect.repair(),
             Self::ContentControl(defect) => defect.repair(),
+            Self::Package(defect) => defect.repair(),
+            Self::Properties(defect) => defect.repair(),
         }
     }
 }
@@ -516,15 +544,77 @@ impl From<ContentControlDefect> for Defect {
     }
 }
 
+impl From<litchi_opc::leniency::Defect> for Defect {
+    fn from(defect: litchi_opc::leniency::Defect) -> Self {
+        Self::Package(defect)
+    }
+}
+
+impl From<litchi_ooxml_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ooxml_common::leniency::Defect) -> Self {
+        Self::Properties(defect)
+    }
+}
+
+/// Where a packaging or metadata defect ([`Defect::Package`],
+/// [`Defect::Properties`]) was found, as the originating crate's report
+/// located it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PartLocation {
+    part: Box<str>,
+    item: Option<Box<str>>,
+    value: Option<Box<str>>,
+}
+
+impl PartLocation {
+    fn new(part: &str, item: Option<&str>, value: Option<&str>) -> Self {
+        Self {
+            part: part.into(),
+            item: item.map(Into::into),
+            value: value.map(Into::into),
+        }
+    }
+
+    /// The part name the defect belongs to (for relationship defects, the
+    /// relationship source; `/` for package relationships).
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &str {
+        &self.part
+    }
+
+    /// The item within the part — a relationship `Id`, a content-type key,
+    /// or a property name — when one is known.
+    #[inline]
+    #[must_use]
+    pub fn item(&self) -> Option<&str> {
+        self.item.as_deref()
+    }
+
+    /// The raw value the repair replaced or discarded, as documented on the
+    /// originating defect variant.
+    #[inline]
+    #[must_use]
+    pub fn value(&self) -> Option<&str> {
+        self.value.as_deref()
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
     /// Where the defect was found. Unless the defect variant documents a
     /// different locator, this is the byte offset of the offending element's
-    /// start tag within the part's visible XML payload.
+    /// start tag within the part's visible XML payload. Packaging and
+    /// metadata defects carry `0` here and are located by
+    /// [`location`](Self::location) instead.
     pub context: u64,
+    /// The part/item/value locator of a [`Defect::Package`] or
+    /// [`Defect::Properties`] defect; `None` for the WordprocessingML classes,
+    /// which [`context`](Self::context) locates.
+    pub location: Option<Box<PartLocation>>,
 }
 
 /// Everything a read repaired, in the order the defects were found.
@@ -570,14 +660,57 @@ impl ToleranceReport {
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
     pub(crate) fn record(&mut self, defect: impl Into<Defect>, context: u64) {
+        self.push(ToleratedDefect {
+            defect: defect.into(),
+            context,
+            location: None,
+        });
+    }
+
+    fn push(&mut self, tolerated: ToleratedDefect) {
         if self.defects.len() < MAX_RECORDED_DEFECTS {
-            self.defects.push(ToleratedDefect {
-                defect: defect.into(),
-                context,
-            });
+            self.defects.push(tolerated);
         } else {
             self.unrecorded = self.unrecorded.saturating_add(1);
         }
+    }
+
+    /// Fold the packaging repairs `litchi-opc` recorded while the package was
+    /// opened, keeping their order, locations, and unrecorded count.
+    pub(crate) fn append_package(&mut self, other: &litchi_opc::leniency::ToleranceReport) {
+        for tolerated in other {
+            self.push(ToleratedDefect {
+                defect: Defect::Package(tolerated.defect()),
+                context: 0,
+                location: Some(Box::new(PartLocation::new(
+                    tolerated.part(),
+                    tolerated.item(),
+                    tolerated.value(),
+                ))),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded());
+    }
+
+    /// Fold the core- or custom-properties repairs `litchi-ooxml-common`
+    /// recorded while the metadata was read, keeping their order, locations,
+    /// and unrecorded count.
+    pub(crate) fn append_properties(
+        &mut self,
+        other: &litchi_ooxml_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in other {
+            self.push(ToleratedDefect {
+                defect: Defect::Properties(tolerated.defect()),
+                context: 0,
+                location: Some(Box::new(PartLocation::new(
+                    tolerated.part(),
+                    tolerated.item(),
+                    tolerated.value(),
+                ))),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded());
     }
 
     /// Merge another parse's report into this one, keeping discovery order.
@@ -592,7 +725,11 @@ impl ToleranceReport {
     /// origin, translating each context with `map`.
     pub(crate) fn append_mapped(&mut self, other: &ToleranceReport, map: impl Fn(u64) -> u64) {
         for tolerated in other.defects() {
-            self.record(tolerated.defect, map(tolerated.context));
+            self.push(ToleratedDefect {
+                defect: tolerated.defect,
+                context: map(tolerated.context),
+                location: tolerated.location.clone(),
+            });
         }
         self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
     }
@@ -675,6 +812,7 @@ mod tests {
             ToleratedDefect {
                 defect: Defect::Text(TextDefect::SkippedForeignMarkup),
                 context: 7,
+                location: None,
             }
         );
 
@@ -710,6 +848,12 @@ mod tests {
             Defect::from(SectionDefect::ColumnCountMismatch),
             Defect::from(ContentControlDefect::UnknownLockValue),
             Defect::from(ContentControlDefect::InvalidProperty),
+            Defect::from(litchi_opc::leniency::Defect::from(
+                litchi_opc::leniency::RelationshipDefect::DuplicateId,
+            )),
+            Defect::from(litchi_ooxml_common::leniency::Defect::from(
+                litchi_ooxml_common::leniency::CustomPropertiesDefect::InvalidValue,
+            )),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

@@ -611,11 +611,15 @@ impl Package {
         let main = package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         package.check_execution()?;
+        // The report starts with the packaging repairs made at open; see
+        // `crate::leniency`.
+        let mut tolerance = crate::leniency::ToleranceReport::default();
+        tolerance.append_package(package.tolerance_report());
         Ok(Self {
             package,
             execution,
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
-            tolerance: Mutex::new(crate::leniency::ToleranceReport::default()),
+            tolerance: Mutex::new(tolerance),
         })
     }
 
@@ -734,7 +738,9 @@ impl Package {
                     execution: self.execution.clone(),
                     paragraph_index_cache: Arc::clone(&self.paragraph_index_cache),
                     paragraph_route,
-                    tolerance: Arc::default(),
+                    // A pinned view starts from the packaging repairs made
+                    // when its package was opened.
+                    tolerance: Arc::new(Mutex::new(self.opened_tolerance())),
                 })
             })();
             // The semantic/MCE stage can fail after the payload read has
@@ -924,13 +930,24 @@ impl Package {
         parsed.map(|()| writer.finish())
     }
 
+    /// The packaging repairs made when this package was opened, folded into
+    /// a document-level report.
+    fn opened_tolerance(&self) -> crate::leniency::ToleranceReport {
+        let mut report = crate::leniency::ToleranceReport::default();
+        report.append_package(self.package.tolerance_report());
+        report
+    }
+
     /// A snapshot of everything repaired while this package was read, in
     /// discovery order.
     ///
     /// The report is the exhaustive record of the non-structural
     /// substitutions described by [`crate::leniency`]: nothing is repaired
-    /// silently. Recording sites land with the roadmap findings; the
-    /// semantic text sink (`write_text_to`) records foreign `*:t` skips.
+    /// silently. It starts with the OPC packaging repairs made at open
+    /// ([`Defect::Package`](crate::Defect::Package)); [`Self::metadata`] adds
+    /// the core-properties repairs ([`Defect::Properties`](crate::Defect::Properties))
+    /// each time it reads them, and the semantic text sink (`write_text_to`)
+    /// records foreign `*:t` skips.
     #[must_use]
     pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
         self.tolerance
@@ -1047,10 +1064,21 @@ impl Package {
     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
         self.trim_clean_paragraph_index_for_operation();
         self.package.check_execution()?;
-        let properties = litchi_ooxml_common::properties::read_source_backed(&self.package);
+        let mut repaired = litchi_ooxml_common::leniency::ToleranceReport::default();
+        let properties = litchi_ooxml_common::properties::read_source_backed_with_report(
+            &self.package,
+            &mut repaired,
+        );
         self.package.source_version()?;
         self.package.check_execution()?;
-        Ok(properties?.map(Into::into).unwrap_or_default())
+        let properties = properties?;
+        if !repaired.is_clean() {
+            self.tolerance
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .append_properties(&repaired);
+        }
+        Ok(properties.map(Into::into).unwrap_or_default())
     }
 
     /// Inventory embedded-object and embedded-package relationships without
@@ -3114,6 +3142,8 @@ impl Document {
     /// A snapshot of everything repaired while this pinned view (or one of
     /// its clones) was read, in discovery order.
     ///
+    /// The report starts with the OPC packaging repairs made when the
+    /// package was opened ([`crate::leniency::Defect::Package`]).
     /// Tracked-revision repairs ([`crate::leniency::RevisionDefect`]) from
     /// [`Self::revisions`] and section column-model repairs
     /// ([`crate::leniency::SectionDefect`]) from the section inventory are

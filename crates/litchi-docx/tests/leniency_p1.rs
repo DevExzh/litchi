@@ -124,6 +124,7 @@ fn unknown_compat_flag_is_skipped_and_recorded() {
     let recorded = [ToleratedDefect {
         defect: Defect::Settings(SettingsDefect::UnknownCompatFlag),
         context: expected,
+        location: None,
     }];
     assert_eq!(settings.tolerance_report().defects(), &recorded);
     assert_eq!(document.tolerance_report().defects(), &recorded);
@@ -156,6 +157,7 @@ fn transitional_compat_flag_in_strict_settings_is_kept_and_recorded() {
         &[ToleratedDefect {
             defect: Defect::Settings(SettingsDefect::TransitionalCompatFlagInStrict),
             context: expected,
+            location: None,
         }]
     );
 }
@@ -206,10 +208,12 @@ fn duplicate_singleton_settings_take_the_later_value_and_are_recorded() {
         ToleratedDefect {
             defect: Defect::Settings(SettingsDefect::DuplicateSetting),
             context: second_view,
+            location: None,
         },
         ToleratedDefect {
             defect: Defect::Settings(SettingsDefect::DuplicateSetting),
             context: second_tab,
+            location: None,
         },
     ];
     assert_eq!(settings.tolerance_report().defects(), &recorded);
@@ -408,10 +412,12 @@ fn revision_without_author_is_kept_unattributed_and_recorded() {
         ToleratedDefect {
             defect: Defect::Revision(RevisionDefect::MissingAuthor),
             context: anonymous,
+            location: None,
         },
         ToleratedDefect {
             defect: Defect::Revision(RevisionDefect::InvalidDate),
             context: undated,
+            location: None,
         },
     ];
     assert_eq!(opened.tolerance_report().defects(), &recorded);
@@ -567,10 +573,12 @@ fn sparse_section_columns_are_repaired_and_recorded_in_the_inventory() {
         ToleratedDefect {
             defect: Defect::Section(SectionDefect::ColumnWidthMissing),
             context: missing_width,
+            location: None,
         },
         ToleratedDefect {
             defect: Defect::Section(SectionDefect::ColumnCountOutOfRange),
             context: out_of_range,
+            location: None,
         },
     ];
     assert_eq!(inventory.tolerance_report().defects(), &recorded);
@@ -653,10 +661,12 @@ fn malformed_sdt_properties_degrade_one_control_and_keep_the_listing() {
             ToleratedDefect {
                 defect: Defect::ContentControl(ContentControlDefect::UnknownLockValue),
                 context: lock,
+                location: None,
             },
             ToleratedDefect {
                 defect: Defect::ContentControl(ContentControlDefect::InvalidProperty),
                 context: binding,
+                location: None,
             },
         ]
     );

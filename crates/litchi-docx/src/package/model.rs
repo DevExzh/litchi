@@ -583,15 +583,34 @@ impl Package {
         )?;
 
         // Everything repaired while the document was read, in discovery
-        // order. Recording sites build their own report at the codec boundary
-        // and merge it into this aggregation with `ToleranceReport::append`,
-        // the open-time aggregation idiom litchi-doc established; the
-        // semantic text sink (`Document::write_text_to`) is the first. See
-        // `crate::leniency`.
-        let tolerance = crate::leniency::ToleranceReport::default();
+        // order. The report starts with the packaging and metadata repairs
+        // made at open; recording sites then build their own report at the
+        // codec boundary and merge it into this aggregation with
+        // `ToleranceReport::append`, the open-time aggregation idiom
+        // litchi-doc established. See `crate::leniency`.
+        let tolerance = self.tolerance_report();
 
         // Create and return Document with reference to OPC package
         Ok(Document::new(doc_part, &self.opc, tolerance))
+    }
+
+    /// A snapshot of the repairs made while this package was opened, in
+    /// discovery order: the OPC packaging repairs
+    /// ([`Defect::Package`](crate::Defect::Package)) followed by the core-
+    /// and custom-properties repairs
+    /// ([`Defect::Properties`](crate::Defect::Properties)), which the owning
+    /// package reads at open.
+    ///
+    /// [`Package::document`] starts each document's report from this one.
+    /// An empty report means the package and its metadata conformed; edits
+    /// never add to it.
+    #[must_use]
+    pub fn tolerance_report(&self) -> crate::leniency::ToleranceReport {
+        let mut report = crate::leniency::ToleranceReport::default();
+        report.append_package(self.opc.tolerance_report());
+        report.append_properties(self.properties.tolerance_report());
+        report.append_properties(self.custom_props.tolerance_report());
+        report
     }
 
     /// Discover the attached MS-OFFMACRO2 VBA project without inspecting its payloads.

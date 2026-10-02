@@ -856,6 +856,7 @@ fn omml_equation_is_skipped_and_recorded_in_both_facades() {
         &[litchi_docx::ToleratedDefect {
             defect: Defect::Text(TextDefect::SkippedForeignMarkup),
             context: expected_offset,
+            location: None,
         }]
     );
 
@@ -873,6 +874,7 @@ fn omml_equation_is_skipped_and_recorded_in_both_facades() {
         litchi_docx::ToleratedDefect {
             defect: Defect::Text(TextDefect::SkippedForeignMarkup),
             context: expected_offset,
+            location: None,
         }
     );
 }
