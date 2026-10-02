@@ -100,6 +100,12 @@
 //!   in with [`ToleranceReport::append_properties`] as
 //!   [`Defect::Properties`]. Custom properties read through
 //!   `Package::custom_props` carry their own report on the returned value.
+//! * finding 4.5 — the shared-string table parse (`raw/strings.rs`) records
+//!   [`SharedStringsDefect::CountHint`]; each workbook handle keeps the
+//!   table's report beside its write-once cache and the aggregate lists it
+//!   after the open-time entries, with no sheet. The bounded selected
+//!   dependency scan reports such a table as irregular and the read falls
+//!   back to the repairing parse.
 //! * finding 4.3 — cell materialization records
 //!   [`CellDefect::MalformedNumber`], [`CellDefect::MalformedBoolean`], and
 //!   [`CellDefect::MalformedDate`] at the cell; the selected-range scanner
@@ -340,14 +346,18 @@ impl CatalogDefect {
 
 /// A shared-string table (`xl/sharedStrings.xml`) defect.
 ///
-/// Every variant is a *roadmap contract* (audit findings 4.5 and 4.12): no
-/// read produces it yet.
+/// [`SharedStringsDefect::CountHint`] (audit finding 4.5) is live; the
+/// rich-text variants (finding 4.12) are *roadmap contracts* no read
+/// produces yet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum SharedStringsDefect {
-    /// `sst/@count` or `sst/@uniqueCount` is unparseable or out of range
-    /// (finding 4.5). The hint is ignored, as the crate's tolerant twin
-    /// parser already does.
+    /// `sst/@count` or `sst/@uniqueCount` is unparseable, negative, or past
+    /// 2³¹−1 (finding 4.5). ECMA-376 §18.4.9 makes both optional and
+    /// informational; Excel and LibreOffice ignore them. The hint is treated
+    /// as absent — the items are authoritative — as the crate's tolerant
+    /// twin parser already does. One entry per malformed hint, at
+    /// [`Location::SharedStringTable`].
     CountHint,
     /// A rich-text run lacks its `<t>`, or an item mixes simple and rich
     /// text (finding 4.12). The offending run is dropped; the item's

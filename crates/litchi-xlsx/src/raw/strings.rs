@@ -14,6 +14,7 @@ use quick_xml::reader::NsReader;
 
 use crate::cell::Text;
 use crate::error::{Result, allocation, invalid};
+use crate::leniency::{Location, SharedStringsDefect, ToleranceReport};
 use crate::raw::namespace::{
     SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE, is_spreadsheetml_name,
 };
@@ -47,17 +48,34 @@ struct Item {
 }
 
 #[derive(Debug, Default)]
-struct Parser {
+struct Parser<'r> {
     strings: Vec<Text>,
     item: Option<Item>,
     seen_text_in_run: bool,
+    /// Where cataloged repairs are recorded; `None` refuses them.
+    tolerance: Option<&'r mut ToleranceReport>,
 }
 
+/// Parse a shared-string table, refusing every cataloged defect with its
+/// historical error (write-path admission).
 pub(crate) fn parse(content: &[u8]) -> Result<Box<[Text]>> {
+    parse_with(content, None)
+}
+
+/// Parse a shared-string table for a read facade, repairing cataloged
+/// defects and recording them in `tolerance` (see `crate::leniency`).
+pub(crate) fn parse_repairing(
+    content: &[u8],
+    tolerance: &mut ToleranceReport,
+) -> Result<Box<[Text]>> {
+    parse_with(content, Some(tolerance))
+}
+
+fn parse_with(content: &[u8], tolerance: Option<&mut ToleranceReport>) -> Result<Box<[Text]>> {
     let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
     let content = std::str::from_utf8(processed.as_ref())
         .map_err(|error| invalid(format!("shared strings XML is not UTF-8: {error}")))?;
-    Parser::parse(content)
+    Parser::parse(content, tolerance)
 }
 
 /// Result of a bounded MCE-selected shared-string dependency scan.
@@ -71,6 +89,10 @@ pub(crate) struct Selected {
     /// Whether the active stream contained a rich, extension, or foreign
     /// construct that this dependency scan does not model.
     pub(crate) unsupported_rich: bool,
+    /// Whether the table carries a defect the materializing parse repairs
+    /// and records (audit finding 4.5, a malformed count hint). The caller
+    /// must fall back to that parse.
+    pub(crate) irregular: bool,
 }
 
 /// Scan one MCE-selected shared-string part without materializing its table.
@@ -120,6 +142,7 @@ struct SelectedParser<'a> {
     root_seen: bool,
     closed_root: bool,
     unsupported_rich: bool,
+    irregular: bool,
 }
 
 impl<'a> SelectedParser<'a> {
@@ -135,6 +158,7 @@ impl<'a> SelectedParser<'a> {
             root_seen: false,
             closed_root: false,
             unsupported_rich: false,
+            irregular: false,
         }
     }
 
@@ -167,7 +191,7 @@ impl<'a> SelectedParser<'a> {
                     "shared strings XML must have one SpreadsheetML sst root",
                 ));
             }
-            self.parse_root_hints(element)?;
+            self.parse_root_hints(element);
             self.root_seen = true;
             if empty {
                 self.closed_root = true;
@@ -339,14 +363,17 @@ impl<'a> SelectedParser<'a> {
         Ok(())
     }
 
-    fn parse_root_hints(&self, element: &SemanticElement<'_>) -> Result<()> {
-        if let Some(value) = root_attribute(element, "uniqueCount") {
-            parse_count_hint_value(value, b"uniqueCount")?;
+    /// Check the advisory count hints. A malformed hint is repaired and
+    /// recorded by the materializing parse (audit finding 4.5); this scan
+    /// never repairs, so it reports the table as irregular instead.
+    fn parse_root_hints(&mut self, element: &SemanticElement<'_>) {
+        for name in ["uniqueCount", "count"] {
+            if let Some(value) = root_attribute(element, name)
+                && parse_count_hint_value(value, name.as_bytes()).is_err()
+            {
+                self.irregular = true;
+            }
         }
-        if let Some(value) = root_attribute(element, "count") {
-            parse_count_hint_value(value, b"count")?;
-        }
-        Ok(())
     }
 
     fn push_context(&mut self, context: Context) -> Result<()> {
@@ -374,6 +401,7 @@ impl<'a> SelectedParser<'a> {
             count: self.count,
             requested: self.requested,
             unsupported_rich: self.unsupported_rich,
+            irregular: self.irregular,
         })
     }
 }
@@ -556,10 +584,13 @@ fn is_spreadsheetml_element_name(name: &ExpandedName, local_name: &[u8]) -> bool
         && (local_name.is_empty() || name.local_name.as_bytes() == local_name)
 }
 
-impl Parser {
-    fn parse(content: &str) -> Result<Box<[Text]>> {
+impl<'r> Parser<'r> {
+    fn parse(content: &str, tolerance: Option<&'r mut ToleranceReport>) -> Result<Box<[Text]>> {
         let mut reader = NsReader::from_reader(content.as_bytes());
-        let mut parser = Self::default();
+        let mut parser = Self {
+            tolerance,
+            ..Self::default()
+        };
         let mut stack = Vec::new();
         let mut closed_root = false;
 
@@ -644,13 +675,40 @@ impl Parser {
     }
 
     fn reserve_hint(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        let hint = count_hint(element, b"uniqueCount", decoder)?
+        let hint = self
+            .count_hint(element, b"uniqueCount", decoder)?
             .unwrap_or(0)
             .min(MAX_PREALLOCATED_STRINGS);
-        count_hint(element, b"count", decoder)?;
+        self.count_hint(element, b"count", decoder)?;
         self.strings
             .try_reserve(hint)
             .map_err(|source| allocation("shared-string table", source))
+    }
+
+    /// Read one advisory `sst` count hint.
+    ///
+    /// ECMA-376 §18.4.9 makes `count`/`uniqueCount` optional informational
+    /// attributes that Excel and LibreOffice ignore. When repairs apply, an
+    /// unparseable or out-of-range hint (audit finding 4.5) is treated as
+    /// absent and recorded; the table's items are authoritative either way.
+    fn count_hint(
+        &mut self,
+        element: &BytesStart<'_>,
+        name: &[u8],
+        decoder: Decoder,
+    ) -> Result<Option<usize>> {
+        // Attribute decoding failures are XML defects and stay fatal.
+        let Some(value) = unqualified_attribute_value(element, name, decoder)? else {
+            return Ok(None);
+        };
+        match parse_count_hint_value(&value, name) {
+            Ok(hint) => Ok(Some(hint)),
+            Err(error) => {
+                let tolerance = self.tolerance.as_deref_mut().ok_or(error)?;
+                tolerance.record(SharedStringsDefect::CountHint, Location::SharedStringTable);
+                Ok(None)
+            },
+        }
     }
 
     fn start(
@@ -762,12 +820,6 @@ fn current(stack: &[Context]) -> Result<Context> {
         .last()
         .copied()
         .ok_or_else(|| invalid("shared strings XML is missing its root context"))
-}
-
-fn count_hint(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<usize>> {
-    unqualified_attribute_value(element, name, decoder)?
-        .map(|value| parse_count_hint_value(&value, name))
-        .transpose()
 }
 
 fn parse_count_hint_value(value: &str, name: &[u8]) -> Result<usize> {
@@ -1093,11 +1145,23 @@ mod tests {
         let selected = streaming_0364_default(mismatch, &[]).expect("advisory mismatch");
         assert_eq!(selected.count, 1);
 
+        assert!(!selected.irregular);
+
+        // A malformed hint is repaired by the materializing parse (finding
+        // 4.5); the dependency scan reports the table as irregular instead.
         let invalid = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="NaN"/>"#;
-        assert!(streaming_0364_default(invalid, &[]).is_err());
+        assert!(
+            streaming_0364_default(invalid, &[])
+                .expect("scanned")
+                .irregular
+        );
 
         let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2147483648"/>"#;
-        assert!(streaming_0364_default(excessive, &[]).is_err());
+        assert!(
+            streaming_0364_default(excessive, &[])
+                .expect("scanned")
+                .irregular
+        );
     }
 
     fn streaming_0365_entries(selected: &Selected) -> Vec<(usize, &str)> {

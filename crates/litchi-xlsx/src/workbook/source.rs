@@ -85,6 +85,9 @@ struct SourceInner {
     _catalog_data: Option<PartData>,
     shared_strings_uri: Option<PackURI>,
     shared_strings: OnceLock<Box<[Text]>>,
+    /// Repairs made while the shared-string table was parsed; published
+    /// before the table itself (see `crate::leniency`).
+    shared_strings_tolerance: OnceLock<ToleranceReport>,
     styles_uri: Option<PackURI>,
     styles: OnceLock<raw::styles::Catalog>,
     flavor: Flavor,
@@ -510,6 +513,7 @@ impl SourceBackedWorkbook {
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
+                shared_strings_tolerance: OnceLock::new(),
                 styles_uri,
                 styles: OnceLock::new(),
                 flavor,
@@ -537,6 +541,9 @@ impl SourceBackedWorkbook {
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
         let mut report = self.inner.tolerance.clone();
+        if let Some(strings) = self.inner.shared_strings_tolerance.get() {
+            report.append(strings);
+        }
         for sheet in self.inner.sheets.iter() {
             if let Some(store) = sheet.cells.get() {
                 report.append_sheet(store.tolerance_report(), sheet.position);
@@ -1382,6 +1389,7 @@ impl SourceInner {
         };
 
         if selected.unsupported_rich
+            || selected.irregular
             || max_index >= selected.count
             || selected.requested.len() != requested.len()
             || selected
@@ -1437,9 +1445,13 @@ impl SourceInner {
         }
 
         let data = self.package.part(uri)?.data()?;
-        let parsed = raw::strings::parse(data.as_bytes())?;
+        let mut tolerance = ToleranceReport::default();
+        let parsed = raw::strings::parse_repairing(data.as_bytes(), &mut tolerance)?;
         self.execution_check()?;
         self.package.source_version()?;
+        // The report is published first, so a published table always has
+        // its report; a racing parse of the same bytes reports the same.
+        let _publish_result = self.shared_strings_tolerance.set(tolerance);
         let _publish_result = self.shared_strings.set(parsed);
         self.shared_strings
             .get()

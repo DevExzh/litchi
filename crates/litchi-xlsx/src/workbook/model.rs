@@ -387,6 +387,9 @@ pub(crate) struct Inner {
     pub(super) workbook_uri: PackURI,
     pub(super) shared_strings_uri: Option<PackURI>,
     pub(super) shared_strings: OnceLock<Box<[Text]>>,
+    /// Repairs made while the shared-string table was parsed; published
+    /// before the table itself (see `crate::leniency`).
+    pub(super) shared_strings_tolerance: OnceLock<ToleranceReport>,
     pub(crate) shared_string_lineage: Arc<SharedStringLineage>,
     pub(super) styles_uri: Option<PackURI>,
     pub(super) styles: OnceLock<raw::styles::Catalog>,
@@ -704,6 +707,7 @@ impl Workbook {
                 workbook_uri,
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
+                shared_strings_tolerance: OnceLock::new(),
                 shared_string_lineage,
                 styles_uri,
                 styles: OnceLock::new(),
@@ -788,6 +792,9 @@ impl Workbook {
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
         let mut report = self.inner.tolerance.clone();
+        if let Some(strings) = self.inner.shared_strings_tolerance.get() {
+            report.append(strings);
+        }
         for sheet in self.inner.sheets.iter() {
             if let Some(store) = sheet.cells.get() {
                 report.append_sheet(store.tolerance_report(), sheet.position);
@@ -1747,7 +1754,11 @@ impl Inner {
         }
 
         let part = self.package.get_part(uri)?;
-        let parsed = raw::strings::parse(part.blob())?;
+        let mut tolerance = ToleranceReport::default();
+        let parsed = raw::strings::parse_repairing(part.blob(), &mut tolerance)?;
+        // The report is published first, so a published table always has
+        // its report; a racing parse of the same bytes reports the same.
+        let _publish_result = self.shared_strings_tolerance.set(tolerance);
         let _publish_result = self.shared_strings.set(parsed);
         self.shared_strings
             .get()

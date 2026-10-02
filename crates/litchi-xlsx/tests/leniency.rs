@@ -295,3 +295,35 @@ fn malformed_value_lexicals_are_repaired_per_cell_and_recorded() {
         litchi_xlsx::cell::View::Stored(Cell::Value(Value::Text(text))) if text.as_str() == "2026-13-01"
     ));
 }
+
+/// Finding 4.5: malformed `sst` count hints are ignored and recorded at the
+/// table; a cold source-backed shared-string read falls back to the
+/// repairing parse.
+#[test]
+fn malformed_shared_string_count_hints_are_ignored_and_recorded() {
+    use litchi_xlsx::{Cell, SharedStringsDefect, SourceCellView, Value};
+
+    let bytes = patched(&[(
+        "xl/sharedStrings.xml",
+        &replace(
+            r#"count="104" uniqueCount="48""#,
+            r#"count="-1" uniqueCount="NaN""#,
+        ),
+    )]);
+
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let flags = source.sheet(0usize).unwrap().unwrap();
+    assert!(matches!(
+        flags.cell("A1").unwrap(),
+        SourceCellView::Stored(Cell::Value(Value::Text(_)))
+    ));
+
+    let report = both_reports(&bytes);
+    let hint = (
+        Defect::SharedStrings(SharedStringsDefect::CountHint),
+        None,
+        ToleranceLocation::SharedStringTable,
+    );
+    assert_eq!(worksheet_entries(&report), [hint.clone(), hint]);
+    assert_eq!(source.tolerance_report(), report);
+}
