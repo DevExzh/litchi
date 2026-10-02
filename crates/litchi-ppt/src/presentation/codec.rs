@@ -31,24 +31,46 @@ pub(super) fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<
 pub(super) fn placeholder_display_from_record(
     record: &Record,
 ) -> Result<Option<HeaderFooterDisplayText>> {
+    // The header/footer display-text projection re-parses drawings whose
+    // text-style and shape repairs (see `crate::leniency`) are enumerated by
+    // `Presentation::collect_tolerance_report`: slide drawings through each
+    // slide's shapes, main-master drawings through
+    // `record_drawing_repairs`. They are not recorded a second time here.
+    let Some(shapes) = drawing_shapes(record, &mut crate::leniency::ToleranceReport::default())?
+    else {
+        return Ok(None);
+    };
+    placeholder_display_from_shapes(&shapes)
+}
+
+/// Parse the shapes of `record`'s `PPDrawing`, recording every text-style
+/// and shape repair into `report`. `None` when the record has no drawing.
+fn drawing_shapes(
+    record: &Record,
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<Option<Vec<crate::shapes::ShapeEnum<'static>>>> {
     let Some(drawing) = record.find_child(RecordType::PPDrawing) else {
         return Ok(None);
     };
     let parsed = crate::odraw::parse(&drawing.data)?;
     let mut shapes = Vec::with_capacity(parsed.len());
     for (index, shape) in parsed.iter().enumerate() {
-        // The header/footer display-text projection applies text-style and
-        // shape repairs (see `crate::leniency`) without enumerating them; the
-        // primary slide/shape read APIs record them.
-        if let Some(converted) = Slide::<'static>::convert_odraw_to_shape_enum(
-            shape,
-            index,
-            &mut crate::leniency::ToleranceReport::default(),
-        )? {
+        if let Some(converted) =
+            Slide::<'static>::convert_odraw_to_shape_enum(shape, index, report)?
+        {
             shapes.push(converted);
         }
     }
-    placeholder_display_from_shapes(&shapes)
+    Ok(Some(shapes))
+}
+
+/// Record the text-style and shape repairs of `record`'s drawing (a main
+/// master) into `report`.
+pub(super) fn record_drawing_repairs(
+    record: &Record,
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<()> {
+    drawing_shapes(record, report).map(|_| ())
 }
 
 pub(super) fn placeholder_display_from_shapes(

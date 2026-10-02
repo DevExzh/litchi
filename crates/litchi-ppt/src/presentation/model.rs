@@ -176,9 +176,11 @@ impl Presentation {
     }
 
     /// Every non-structural defect the reader repairs when reading this whole
-    /// presentation: the open-time aggregate ([`Self::tolerance_report`])
-    /// followed by the repairs made while each slide's shapes and each
-    /// slide's speaker-notes shapes are parsed, in slide order.
+    /// presentation: the open-time aggregate ([`Self::tolerance_report`]),
+    /// then the repairs made while each main master's drawing is parsed
+    /// (by [`Self::header_footers`]), then those made while each slide's
+    /// shapes and each slide's speaker-notes shapes are parsed, in slide
+    /// order.
     ///
     /// Each entry is located by the persist ID of its slide or notes page and
     /// the shape ID of its text box (see [`crate::DefectLocation`]). An empty
@@ -193,6 +195,16 @@ impl Presentation {
     /// [`crate::Leniency`] variant.
     pub fn collect_tolerance_report(&self) -> Result<crate::leniency::ToleranceReport> {
         let mut report = self.tolerance.clone();
+        // Main-master drawings are parsed by `Self::header_footers`; their
+        // repairs are listed here, before the slides'.
+        for master in self
+            .parser
+            .find_records_ref()
+            .iter()
+            .filter(|record| record.record_type == RecordType::MainMaster)
+        {
+            super::codec::record_drawing_repairs(master, &mut report)?;
+        }
         for slide in self.slides()? {
             slide.shapes_with_report(&mut report)?;
             if let Some(notes) = slide.speaker_notes()? {
