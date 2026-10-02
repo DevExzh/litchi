@@ -211,6 +211,17 @@ pub struct AttachedGlossary {
 }
 
 impl AttachedGlossary {
+    /// Merge the Word-compatible repairs made while the glossary's own
+    /// stylesheet and paragraph bin table were parsed into `report`.
+    pub(crate) fn append_tolerance_to(&self, report: &mut crate::leniency::ToleranceReport) {
+        if let Some(stylesheet) = &self.stylesheet {
+            report.append(stylesheet.tolerance_report());
+        }
+        if let Some(table) = &self.pap_bin_table {
+            report.append(table.tolerance_report());
+        }
+    }
+
     /// `word_document` is shared so the glossary FIB reads through the same
     /// stream as the template FIB instead of copying its own suffix.
     pub(crate) fn parse(
@@ -218,7 +229,6 @@ impl AttachedGlossary {
         word_document: &Arc<Vec<u8>>,
         table_stream: &[u8],
         data_stream: Option<&[u8]>,
-        allow_papx_alignment_padding: bool,
     ) -> Result<Option<Self>> {
         let page = main_fib.next_fib_page();
         if page == 0 {
@@ -319,7 +329,6 @@ impl AttachedGlossary {
                     data_stream,
                     piece_table,
                     stylesheet.as_ref(),
-                    allow_papx_alignment_padding,
                 )?
             } else {
                 None

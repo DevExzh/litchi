@@ -315,13 +315,8 @@ impl Document {
             }
             Ok(metadata)
         });
-        let attached_glossary = AttachedGlossary::parse(
-            &fib,
-            &word_document,
-            &table_stream,
-            data_stream.as_deref(),
-            options.allows_papx_alignment_padding(),
-        );
+        let attached_glossary =
+            AttachedGlossary::parse(&fib, &word_document, &table_stream, data_stream.as_deref());
         // Section ranges feed only layout queries (`sections()`,
         // `section_at_cp()`), never structural offsets, so a malformed
         // PlcfSed degrades to the same empty table an absent one produces.
@@ -388,7 +383,6 @@ impl Document {
                 data_stream.as_deref(),
                 piece_table,
                 stylesheet.as_ref(),
-                options.allows_papx_alignment_padding(),
             )?
         } else {
             None
@@ -396,12 +390,16 @@ impl Document {
 
         // Everything repaired while the document was opened, in discovery
         // order: the optional auxiliary tables above first, then the
-        // stylesheet's repairs, then the PAPX bin-table repairs.
+        // stylesheet's repairs, then the PAPX bin-table repairs, then the
+        // attached glossary's own stylesheet and PAPX repairs.
         if let Some(parsed) = &stylesheet {
             tolerance.append(parsed.tolerance_report());
         }
         if let Some(table) = &pap_bin_table {
             tolerance.append(table.tolerance_report());
+        }
+        if let Ok(Some(glossary)) = &attached_glossary {
+            glossary.append_tolerance_to(&mut tolerance);
         }
 
         // Optional metadata readers defer semantic validation until their

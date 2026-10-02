@@ -367,12 +367,6 @@ pub struct OpenOptions {
     /// [`crate::SprmDefect`] are applied under every variant and recorded in
     /// [`crate::Document::tolerance_report`]; this field does not gate them.
     pub leniency: crate::leniency::Leniency,
-    /// Whether to accept the narrow producer PAPX alignment compatibility
-    /// profile. This is disabled by default and is independent of stylesheet
-    /// leniency. The shared SPRM parser's only relaxation is the
-    /// Word-compatible border side-flag mask recorded through
-    /// [`crate::SprmDefect`], which this flag does not control.
-    papx_alignment_padding: bool,
 }
 
 impl OpenOptions {
@@ -391,25 +385,21 @@ impl OpenOptions {
         self
     }
 
-    /// Opt into the bounded PAPX producer-compatibility profile.
+    /// Formerly opted into the bounded PAPX producer-compatibility profile.
     ///
-    /// The profile admits one zero byte after a complete odd-length paragraph
-    /// SPRM sequence when the `PapxInFkp` consumer proves that the byte is the
-    /// exact one-byte tail that the strict parser reports as an incomplete
-    /// opcode. The default remains strict because the MS-DOC whole-Prl rule
-    /// does not specify this byte as padding.
+    /// The profile — one zero byte after a complete odd-length paragraph
+    /// SPRM sequence, admitted only when the `PapxInFkp` consumer proves it
+    /// is the exact one-byte tail the strict parser reports as an incomplete
+    /// opcode — is now applied by default and recorded as
+    /// [`crate::PapxDefect::AlignmentPadding`], so this call changes
+    /// nothing. It is kept so existing callers still compile.
     #[must_use]
-    pub const fn with_papx_alignment_padding(mut self) -> Self {
-        self.papx_alignment_padding = true;
+    pub const fn with_papx_alignment_padding(self) -> Self {
         self
     }
 
     pub(crate) fn password(&self) -> Option<&str> {
         self.password.as_ref().map(Password::as_str)
-    }
-
-    pub(crate) const fn allows_papx_alignment_padding(&self) -> bool {
-        self.papx_alignment_padding
     }
 }
 

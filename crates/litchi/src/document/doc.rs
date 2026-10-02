@@ -872,10 +872,11 @@ impl Document {
 
     /// Create a document from bytes while passing explicit options to the
     /// legacy `.doc` reader.  In particular, this makes the existing
-    /// [`doc::Leniency::TolerateStylesheetDefects`] escape hatch and the
-    /// explicit `doc::OpenOptions::with_papx_alignment_padding()` producer
-    /// compatibility profile available through the unified facade. Both are
-    /// opt-in; the ordinary `from_bytes` route remains strict.
+    /// [`doc::Leniency::TolerateStylesheetDefects`] escape hatch available
+    /// through the unified facade; it is opt-in, while the ordinary
+    /// `from_bytes` route applies only the reader's recorded Word-compatible
+    /// repairs (including the PAPX producer pad formerly gated by
+    /// `doc::OpenOptions::with_papx_alignment_padding()`).
     #[cfg(feature = "doc")]
     pub fn from_bytes_with_doc_options(bytes: Vec<u8>, options: doc::OpenOptions) -> Result<Self> {
         let detected =
@@ -3823,29 +3824,24 @@ mod tests {
 
     #[test]
     #[cfg(feature = "doc")]
-    fn doc_admission_residues_keep_typed_fbkf_refusal_and_gate_papx_padding() {
+    fn doc_admission_residues_open_by_default() {
+        // A duplicate FBKF ibkl now drops only the offending bookmark, and the
+        // repeated producer PAPX pad is trimmed by default; both repairs are
+        // recorded by the legacy reader instead of refusing the document.
         let watermark = test_data_path().join("ole/doc/watermark.doc");
-        let watermark_error = match Document::open(&watermark) {
-            Ok(_) => panic!("duplicate FBKF ibkl should remain a strict refusal"),
-            Err(error) => error,
-        };
-        assert!(
-            watermark_error
-                .to_string()
-                .contains("bookmark ibkl values must be unique and in range")
-        );
+        let document = Document::open(&watermark)
+            .expect("a duplicate FBKF ibkl degrades to one dropped bookmark");
+        assert!(!document.text().expect("read watermark text").is_empty());
 
         let poi_test = test_data_path().join("poi/test-data/document/test.doc");
-        let papx_error = match Document::open(&poi_test) {
-            Ok(_) => panic!("PAPX alignment compatibility must be opt-in"),
-            Err(error) => error,
-        };
-        assert!(papx_error.to_string().contains("truncated SPRM opcode"));
+        let document =
+            Document::open(&poi_test).expect("the PAPX producer pad is admitted by default");
+        assert!(!document.text().expect("read PAPX witness text").is_empty());
 
+        // The former opt-in is kept as a no-op so existing callers compile.
         let options = doc::OpenOptions::default().with_papx_alignment_padding();
-        let document = Document::open_with_doc_options(&poi_test, options).expect(
-            "the explicit PAPX compatibility profile should admit the repeated producer shape",
-        );
+        let document = Document::open_with_doc_options(&poi_test, options)
+            .expect("the retained PAPX option still opens the producer shape");
         assert!(!document.text().expect("read PAPX witness text").is_empty());
     }
 

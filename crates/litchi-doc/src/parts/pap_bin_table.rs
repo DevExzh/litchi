@@ -14,7 +14,7 @@ use super::fkp::{PapxFkp, ParagraphHeight};
 use super::pap::ParagraphProperties;
 use super::piece_table::PieceTable;
 use super::styles::StyleSheet;
-use crate::leniency::ToleranceReport;
+use crate::leniency::{PapxDefect, ToleranceReport};
 use crate::sprm::{Sprm, parse_sprms};
 use crate::sprm_operations::{SPRM_P_HUGE_PAPX, SPRM_P_TABLE_PROPS};
 
@@ -121,13 +121,19 @@ impl PapBinTable {
     }
 
     /// Reconstruct a paragraph bin table from its page index.
+    ///
+    /// Each `PapxFkp` page and each run is independent (MS-DOC 2.4.3), so a
+    /// malformed page is skipped and a run whose `GrpPrlAndIstd` cannot be
+    /// read gets default paragraph properties — the way Word and LibreOffice
+    /// render such paragraphs — with a [`PapxDefect`] recorded instead of
+    /// failing the whole table. Only the `PlcfBtePapx` page index itself is
+    /// framing; when it is malformed the table is absent.
     pub fn parse(
         plcf_bte_papx_data: &[u8],
         word_document: &[u8],
         data_stream: Option<&[u8]>,
         piece_table: &PieceTable,
         stylesheet: Option<&StyleSheet>,
-        allow_papx_alignment_padding: bool,
     ) -> Result<Option<Self>> {
         // PlcBtePapx = (n + 1) FCs followed by n four-byte PnFkpPapx values.
         if plcf_bte_papx_data.len() < 12 || !(plcf_bte_papx_data.len() - 4).is_multiple_of(8) {
@@ -146,6 +152,7 @@ impl PapBinTable {
         let pn_array_offset = (page_count + 1) * 4;
 
         for index in 0..page_count {
+            let context = u16::try_from(index).unwrap_or(u16::MAX);
             let pn_raw =
                 read_u32_le(plcf_bte_papx_data, pn_array_offset + index * 4).map_err(|error| {
                     PackageError::Corrupted(format!("invalid PAP bin-table page: {error}"))
@@ -154,51 +161,59 @@ impl PapBinTable {
             if page_number == 0 {
                 continue;
             }
-            let page_offset = (page_number as usize)
+            let page = (page_number as usize)
                 .checked_mul(FKP_PAGE_SIZE)
-                .ok_or_else(|| {
-                    PackageError::Corrupted("PAP FKP page offset overflowed".to_string())
-                })?;
-            let page_end = page_offset.checked_add(FKP_PAGE_SIZE).ok_or_else(|| {
-                PackageError::Corrupted("PAP FKP page range overflowed".to_string())
-            })?;
-            let page = word_document.get(page_offset..page_end).ok_or_else(|| {
-                PackageError::Corrupted("PAP FKP page extends beyond WordDocument".to_string())
-            })?;
-            let fkp = PapxFkp::parse(page, data_stream.unwrap_or_default())
-                .ok_or_else(|| PackageError::Corrupted("PAP FKP page is malformed".to_string()))?;
+                .and_then(|offset| word_document.get(offset..offset.checked_add(FKP_PAGE_SIZE)?));
+            let Some(fkp) =
+                page.and_then(|page| PapxFkp::parse(page, data_stream.unwrap_or_default()))
+            else {
+                tolerance.record(PapxDefect::Page, context);
+                continue;
+            };
 
             for entry_index in 0..fkp.count() {
-                let entry = fkp.entry(entry_index).ok_or_else(|| {
-                    PackageError::Corrupted("PAP FKP entry is malformed".to_string())
-                })?;
+                let Some(entry) = fkp.entry(entry_index) else {
+                    tolerance.record(PapxDefect::Run, context);
+                    continue;
+                };
                 // The checked-in MS-DOC grammar says these bytes form a
                 // GrpPrlAndIstd of whole Prl elements and does not name a
                 // PAPX pad. A repeated producer witness nevertheless has an
                 // odd SPRM prefix plus one zero byte. Keep the shared SPRM
                 // parser strict and remove exactly that byte only when it is
                 // otherwise proven to be a final incomplete opcode.
-                let grpprl = if allow_papx_alignment_padding {
-                    Self::trim_papx_word_alignment_pad(&entry.grpprl)
-                } else {
-                    &entry.grpprl
-                };
+                let grpprl = Self::trim_papx_word_alignment_pad(&entry.grpprl);
+                if grpprl.len() != entry.grpprl.len() {
+                    tolerance.record(PapxDefect::AlignmentPadding, context);
+                }
                 for (start_cp, end_cp) in piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
                 {
                     let piece_modifier = piece_table
                         .piece_for_cp(start_cp)
                         .map(super::piece_table::TextPiece::property_modifier)
                         .unwrap_or_default();
+                    // Repairs made inside a run count only when the run is
+                    // kept; a run that still fails reports the run defect.
+                    let mut run_repairs = ToleranceReport::default();
                     let (properties, direct_grpprl, initial_style_index) =
-                        Self::parse_properties_with_direct_cached(
+                        match Self::parse_properties_with_direct_cached(
                             grpprl,
                             piece_modifier,
                             data_stream,
                             stylesheet,
                             &mut style_baseline_cache,
                             &mut visited,
-                            &mut tolerance,
-                        )?;
+                            &mut run_repairs,
+                        ) {
+                            Ok(parsed) => {
+                                tolerance.append(&run_repairs);
+                                parsed
+                            },
+                            Err(_) => {
+                                tolerance.record(PapxDefect::Run, context);
+                                (ParagraphProperties::default(), Vec::new(), None)
+                            },
+                        };
                     runs.push(ParagraphRun {
                         start_cp,
                         end_cp,

@@ -589,6 +589,52 @@ impl TableDefinitionDefect {
     }
 }
 
+/// The class of paragraph-property (`PapxFkp`) defect the reader repairs the
+/// way Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// paragraph bin-table repairs a read applies under every [`Leniency`]
+/// variant, including [`Leniency::Strict`]. MS-DOC 2.4.3 defines each
+/// `PapxFkp` page independently, so one bad page or run never costs the
+/// others; Word and LibreOffice render the affected paragraphs with default
+/// formatting. The `PlcfBtePapx` page index itself is framing. The recorded
+/// [`ToleratedDefect::context`] is the page's index in `PlcfBtePapx`
+/// (saturating at `u16::MAX`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PapxDefect {
+    /// A `PapxFkp` page lay outside the `WordDocument` stream or was
+    /// malformed. The page is skipped; its paragraphs read with default
+    /// paragraph properties.
+    Page,
+    /// One run's `PapxInFkp`/`GrpPrlAndIstd` could not be read — a
+    /// malformed entry, a SPRM sequence the parser cannot consume exactly,
+    /// or an unresolvable data indirection. The run reads with default
+    /// paragraph properties; the other runs on the page are unaffected.
+    Run,
+    /// A run's `GrpPrlAndIstd` ended in the one zero pad byte a repeated
+    /// producer emits after a complete odd-length SPRM sequence. The byte —
+    /// accepted only when the strict SPRM parser proves it is exactly one
+    /// incomplete trailing opcode byte — is dropped and the run is read.
+    AlignmentPadding,
+}
+
+impl PapxDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Page => {
+                "skipped the malformed PAPX FKP page; its paragraphs use default properties"
+            },
+            Self::Run => "read the malformed PAPX run with default paragraph properties",
+            Self::AlignmentPadding => {
+                "dropped the producer alignment pad byte after the PAPX SPRMs"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -617,6 +663,9 @@ pub enum Defect {
     /// A table-definition (`sprmTDefTable`) defect repaired the way Word
     /// repairs it.
     TableDefinition(TableDefinitionDefect),
+    /// A paragraph-property (`PapxFkp`) defect repaired the way Word
+    /// repairs it.
+    Papx(PapxDefect),
 }
 
 impl Defect {
@@ -632,6 +681,7 @@ impl Defect {
             Self::Comment(defect) => defect.repair(),
             Self::Bookmark(defect) => defect.repair(),
             Self::TableDefinition(defect) => defect.repair(),
+            Self::Papx(defect) => defect.repair(),
         }
     }
 }
@@ -684,6 +734,12 @@ impl From<TableDefinitionDefect> for Defect {
     }
 }
 
+impl From<PapxDefect> for Defect {
+    fn from(defect: PapxDefect) -> Self {
+        Self::Papx(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -697,7 +753,8 @@ pub struct ToleratedDefect {
     /// the style index (`istd`) for a [`Defect::Style`], and the comment
     /// index in `PlcfandRef` for a [`Defect::Comment`], and the bookmark
     /// index in `PlcfBkf` for a [`Defect::Bookmark`], and the cell (or
-    /// boundary) index within the row for a [`Defect::TableDefinition`].
+    /// boundary) index within the row for a [`Defect::TableDefinition`], and
+    /// the `PlcfBtePapx` page index for a [`Defect::Papx`].
     pub context: u16,
 }
 
@@ -900,6 +957,9 @@ mod tests {
             Defect::from(TableDefinitionDefect::VerticalAlignment),
             Defect::from(TableDefinitionDefect::WidthUnit),
             Defect::from(TableDefinitionDefect::NegativeWidth),
+            Defect::from(PapxDefect::Page),
+            Defect::from(PapxDefect::Run),
+            Defect::from(PapxDefect::AlignmentPadding),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

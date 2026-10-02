@@ -38,7 +38,8 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, TableDefinitionDefect, Writer,
+    PapxDefect, SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, TableDefinitionDefect,
+    Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -692,5 +693,108 @@ fn unused_tc80_encodings_are_repaired_per_cell() {
             .iter()
             .all(|(defect, _)| matches!(defect, Defect::TableDefinition(_))),
         "only the TC80 repairs are recorded: {defects:?}"
+    );
+}
+
+/// The `WordDocument` offset of the first `PapxFkp` page named by
+/// `PlcfBtePapx` (FIB pointer 13), plus that pointer's table-stream offset.
+fn first_papx_page(bytes: &[u8]) -> (usize, usize) {
+    let package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+        .expect("fixture package");
+    let word = package
+        .stream(&["WordDocument".to_string()])
+        .expect("WordDocument stream");
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table = package
+        .stream(&[table_name.to_string()])
+        .expect("table stream");
+    let bte = table_pointer(word, 13);
+    // One page: two FCs, then the page number.
+    let pn = u32::from_le_bytes(table[bte + 8..bte + 12].try_into().unwrap());
+    (usize::try_from(pn).unwrap() * 512, bte)
+}
+
+/// MS-DOC 2.4.3 defines each `PapxFkp` run independently: one run whose
+/// SPRMs cannot be read gets default paragraph properties, the way Word and
+/// LibreOffice render it, instead of failing every paragraph property.
+#[test]
+fn a_malformed_papx_run_reads_with_default_properties() {
+    let clean = writer_document(|_| {});
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+
+    let (page, _) = first_papx_page(&clean);
+    let bytes = edit_word_stream(&clean, |word| {
+        let page = &mut word[page..page + 512];
+        assert_eq!(page[511], 1, "the fixture page holds one run");
+        // Re-point the run at a PapxInFkp whose SPRM (sprmPDyaLine, 0x6412)
+        // is missing its four-byte operand.
+        page[8] = 200;
+        page[400..406].copy_from_slice(&[0, 2, 0, 0, 0x12, 0x64]);
+    });
+    let document = open_degraded(bytes);
+    assert!(document.text().unwrap().contains("Body text"));
+    assert!(!document.paragraphs().expect("paragraphs").is_empty());
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::Papx(PapxDefect::Run),
+            context: 0,
+        }]
+    );
+}
+
+/// A `PlcfBtePapx` entry naming a page outside the stream costs only that
+/// page's paragraph properties, not the document.
+#[test]
+fn an_unreachable_papx_page_is_skipped_and_recorded() {
+    let clean = writer_document(|_| {});
+    let bytes = edit_table_stream(clean, |word, table| {
+        let bte = table_pointer(word, 13);
+        table[bte + 8..bte + 12].copy_from_slice(&0x003F_FFFFu32.to_le_bytes());
+    });
+    let document = open_degraded(bytes);
+    assert!(document.text().unwrap().contains("Body text"));
+    assert_eq!(
+        document.tolerance_report().defects(),
+        &[litchi_doc::ToleratedDefect {
+            defect: Defect::Papx(PapxDefect::Page),
+            context: 0,
+        }]
+    );
+}
+
+/// The repeated producer shape — one zero pad byte after a complete
+/// odd-length PAPX SPRM sequence — now opens by default, with the trim
+/// recorded rather than gated behind an opt-in profile.
+#[test]
+fn papx_alignment_padding_is_trimmed_by_default_and_recorded() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/document/test.doc");
+    let mut package = Package::open(path).expect("container opens");
+    let document = package
+        .document()
+        .expect("the producer pad no longer needs an opt-in");
+    assert!(!document.text().expect("text").is_empty());
+    let report = document.tolerance_report();
+    assert!(
+        report
+            .defects()
+            .iter()
+            .any(|tolerated| tolerated.defect == Defect::Papx(PapxDefect::AlignmentPadding)),
+        "the trim must be recorded: {:?}",
+        report.defects()
+    );
+    assert!(
+        report
+            .defects()
+            .iter()
+            .all(|tolerated| tolerated.defect != Defect::Papx(PapxDefect::Run)),
+        "the padded runs are read, not defaulted: {:?}",
+        report.defects()
     );
 }
