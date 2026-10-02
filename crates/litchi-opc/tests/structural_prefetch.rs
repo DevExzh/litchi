@@ -24,6 +24,7 @@ use std::{io, iter};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
 };
+use litchi_opc::leniency::{Defect, RelationshipDefect};
 use litchi_opc::{
     OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy,
 };
@@ -448,28 +449,47 @@ fn a_malformed_relationship_part_keeps_its_error_anywhere_in_a_run() {
 }
 
 #[test]
-fn a_duplicate_relationship_id_keeps_its_error_anywhere_in_a_run() {
-    let mut observed = Vec::new();
+fn a_duplicate_relationship_id_keeps_its_repair_anywhere_in_a_run() {
+    // LENIENCY_AUDIT 8.5: a duplicated Id is a recorded first-wins repair,
+    // and coalescing the structural fetch must not move that verdict.
     for position in [0usize, 3, 7] {
         let bytes = run_package(8, Some((position, duplicate_id_rels())));
         let source = Recording::new(bytes);
-        let error = open(Arc::clone(&source))
-            .map(drop)
-            .expect_err("a duplicate relationship ID refuses");
-        observed.push(format!("{error:?}"));
+        let package = open(Arc::clone(&source)).expect("a duplicate relationship ID is repaired");
+        let owner = format!("/word/child{position}.xml");
+        let recorded: Vec<_> = package
+            .tolerance_report()
+            .iter()
+            .map(|tolerated| {
+                (
+                    tolerated.defect(),
+                    tolerated.part().to_owned(),
+                    tolerated.item().map(str::to_owned),
+                )
+            })
+            .collect();
+        assert_eq!(
+            recorded,
+            vec![(
+                Defect::Relationship(RelationshipDefect::DuplicateId),
+                owner.clone(),
+                Some("rDup".to_owned()),
+            )],
+            "position {position}"
+        );
+        let kept = package
+            .part(&PackURI::new(&owner).unwrap())
+            .unwrap()
+            .rels()
+            .get("rDup")
+            .map(|relationship| relationship.reltype().to_owned());
+        assert_eq!(kept.as_deref(), Some("urn:litchi:test/a"), "first wins");
 
         let bytes = run_package(8, Some((position, duplicate_id_rels())));
         let coalesced = verdict(Recording::new(bytes.clone()));
         let fallback = verdict(Recording::refusing(bytes, 0, 1024));
         assert_eq!(coalesced, fallback, "position {position}");
     }
-    assert_eq!(observed[0], observed[1]);
-    assert_eq!(observed[1], observed[2]);
-    assert!(
-        observed[0].contains("rDup"),
-        "unexpected error identity {}",
-        observed[0]
-    );
 }
 
 /// Change 0577's `e4`/`e5` pair: the same untyped member is tolerated archive

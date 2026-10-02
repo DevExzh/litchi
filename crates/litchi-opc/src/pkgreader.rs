@@ -8,7 +8,7 @@ use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
-use crate::leniency::ToleranceReport;
+use crate::leniency::{RelationshipDefect, ToleranceReport};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
 use crate::packuri::{PACKAGE_URI, PackURI};
@@ -1162,7 +1162,6 @@ impl PackageReader {
         ledger: &mut RelationshipLedger,
         report: &mut ToleranceReport,
     ) -> Result<SmallVec<[SerializedRelationship; 8]>> {
-        let _ = &report;
         let mut srels = SmallVec::new();
         let mut reader = NsReader::from_reader(rels_xml);
         reader.config_mut().trim_text(true);
@@ -1193,6 +1192,7 @@ impl PackageReader {
                         &mut root_seen,
                         limits,
                         ledger,
+                        report,
                     )?;
                     depth = next_depth;
                 },
@@ -1208,6 +1208,7 @@ impl PackageReader {
                     &mut root_seen,
                     limits,
                     ledger,
+                    report,
                 )?,
                 Event::End(_) => {
                     depth = depth.checked_sub(1).ok_or_else(|| {
@@ -2173,7 +2174,9 @@ fn inspect_relationship_element(
     root_seen: &mut bool,
     limits: ReadLimits,
     ledger: &mut RelationshipLedger,
+    report: &mut ToleranceReport,
 ) -> Result<()> {
+    let owner = source_uri.unwrap_or(base_uri);
     let correct_namespace = matches!(
         resolved_namespace,
         ResolveResult::Bound(Namespace(value))
@@ -2260,13 +2263,22 @@ fn inspect_relationship_element(
         )));
     }
     if ids.contains(&id) {
-        return Err(OpcError::DuplicateRelationshipId(id));
+        // ECMA-376 Part 2 §6.5.3.4 makes Id uniqueness a producer rule with no
+        // consumer directive. Keep the first relationship — LibreOffice
+        // resolves by first match — and record the dropped duplicate. It is
+        // still charged against the relationship budget it consumed.
+        ledger.add_relationship(limits)?;
+        report.record(
+            RelationshipDefect::DuplicateId,
+            owner,
+            Some(&id),
+            Some(&target),
+        );
+        return Ok(());
     }
     ids.try_reserve(1)
         .map_err(|source| allocation("OPC relationship IDs", source))?;
-    if !ids.insert(id.clone()) {
-        return Err(OpcError::DuplicateRelationshipId(id));
-    }
+    ids.insert(id.clone());
     if relationship_type.chars().any(char::is_whitespace)
         || relationship_type.chars().any(char::is_control)
         || target.chars().any(char::is_control)
@@ -2978,13 +2990,13 @@ mod tests {
             assert!(PackageReader::parse_rels_xml(xml.as_bytes(), "/word").is_err());
         }
 
+        // LENIENCY_AUDIT 8.5: a duplicated Id keeps the first relationship.
         let duplicate = relationships_xml(
             r#"<Relationship Id="rId1" Type="urn:a" Target="a.xml"/><Relationship Id="rId1" Type="urn:b" Target="b.xml"/>"#,
         );
-        assert!(matches!(
-            PackageReader::parse_rels_xml(duplicate.as_bytes(), "/word"),
-            Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
-        ));
+        let parsed = PackageReader::parse_rels_xml(duplicate.as_bytes(), "/word").unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].reltype, "urn:a");
     }
 
     fn read_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<PackageReader> {

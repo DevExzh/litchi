@@ -47,7 +47,7 @@
 //!
 //! The carrier is wired through every ingress path. The defect classes are
 //! the contract for findings 8.5–8.9 of `docs/LENIENCY_AUDIT.md`; recording
-//! sites land finding by finding: none yet.
+//! sites land finding by finding: 8.5 (duplicate relationship `Id`).
 //!
 //! Source-preserving edits re-read the opened manifests under the same
 //! tolerant rules, so a package that opened with recorded repairs stays
@@ -326,7 +326,6 @@ impl ToleranceReport {
     }
 
     /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
-    #[allow(dead_code, reason = "the first recording site lands with finding 8.5")]
     pub(crate) fn record(
         &mut self,
         defect: impl Into<Defect>,

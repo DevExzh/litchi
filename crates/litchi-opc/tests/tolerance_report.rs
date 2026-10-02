@@ -9,8 +9,8 @@
 //! tolerance report. A conformant control package reports clean through every
 //! ingress path.
 
-use litchi_opc::leniency::{Defect, ToleranceReport};
-use litchi_opc::{OpcPackage, SourceBackedPackage};
+use litchi_opc::leniency::{Defect, RelationshipDefect, ToleranceReport};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
@@ -87,4 +87,53 @@ fn conformant_package_reports_clean_through_every_ingress() {
 #[test]
 fn new_packages_report_clean() {
     assert!(OpcPackage::new().tolerance_report().is_clean());
+}
+
+/// A repaired package still saves, and the saved package reopens with the
+/// same repairs recorded (an untouched manifest publishes its source bytes).
+fn assert_round_trips(bytes: &[u8]) {
+    let package = OpcPackage::from_bytes(bytes).expect("open");
+    let mut saved = Vec::new();
+    package
+        .to_stream(std::io::Cursor::new(&mut saved))
+        .expect("save");
+    let reopened = OpcPackage::from_bytes(&saved).expect("reopen");
+    assert_eq!(reopened.tolerance_report(), package.tolerance_report());
+}
+
+fn relationship_type(package: &OpcPackage, source: &str, id: &str) -> Option<String> {
+    let source = PackURI::new(source).unwrap();
+    package
+        .get_part(&source)
+        .unwrap()
+        .rels()
+        .get(id)
+        .map(|relationship| relationship.reltype().to_owned())
+}
+
+const STYLES_TYPE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+
+/// LENIENCY_AUDIT 8.5: a duplicated relationship `Id` keeps the first
+/// relationship (LibreOffice's first match) and records the dropped one.
+#[test]
+fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        classes(&report),
+        vec![(
+            Defect::Relationship(RelationshipDefect::DuplicateId),
+            "/word/document.xml".to_owned(),
+            Some("rId1".to_owned()),
+        )]
+    );
+    assert_eq!(report.defects()[0].value(), Some("https://example.com/"));
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
 }
