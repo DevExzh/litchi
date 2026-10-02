@@ -48,6 +48,14 @@ impl Snapshot {
         &self.xml
     }
 
+    /// Everything repaired while the snapshot's numbering XML was decoded;
+    /// see [`Collection::tolerance_report`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        self.collection.tolerance_report()
+    }
+
     /// Borrow the typed numbering collection in source order.
     #[inline]
     #[must_use]

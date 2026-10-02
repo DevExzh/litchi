@@ -84,6 +84,11 @@ impl<'a> Document<'a> {
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.
     ///
+    /// Numbering defects degrade per item rather than failing the listing
+    /// (see [`crate::leniency::NumberingDefect`]); a paragraph whose numbering
+    /// instance does not exist is left unnumbered. Every repair is merged into
+    /// [`Document::tolerance_report`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
@@ -106,19 +111,25 @@ impl<'a> Document<'a> {
         let mut styles = self.styles()?;
         let mut counters = crate::list::ListCounterState::new();
         let mut items = Vec::new();
+        let mut repaired = crate::leniency::ToleranceReport::default();
 
-        for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
-            if let Some(item) = resolve_list_item(
-                paragraph_index,
-                paragraph,
-                &numbering,
-                &mut styles,
-                &mut counters,
-            )? {
-                items.push(item);
+        let outcome = (|| {
+            for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
+                if let Some(item) = resolve_list_item(
+                    paragraph_index,
+                    paragraph,
+                    &numbering,
+                    &mut styles,
+                    &mut counters,
+                    &mut repaired,
+                )? {
+                    items.push(item);
+                }
             }
-        }
-        Ok(items)
+            Ok(())
+        })();
+        self.merge_tolerance(&repaired);
+        outcome.map(|()| items)
     }
 
     /// Return top-level document elements paired with resolved list metadata.
@@ -138,28 +149,34 @@ impl<'a> Document<'a> {
         let mut counters = crate::list::ListCounterState::new();
         let mut paragraph_index = 0usize;
         let mut resolved = Vec::with_capacity(elements.len());
+        let mut repaired = crate::leniency::ToleranceReport::default();
 
-        for element in elements {
-            let item = match &element {
-                Element::Paragraph(paragraph) => {
-                    let item = resolve_list_item(
-                        paragraph_index,
-                        paragraph,
-                        &numbering,
-                        &mut styles,
-                        &mut counters,
-                    )?;
-                    paragraph_index = paragraph_index.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormat("document paragraph index overflow".to_owned())
-                    })?;
-                    item
-                },
-                Element::Table(_) => None,
-                Element::Unknown(_) => None,
-            };
-            resolved.push((element, item));
-        }
-        Ok(resolved)
+        let outcome = (|| {
+            for element in elements {
+                let item = match &element {
+                    Element::Paragraph(paragraph) => {
+                        let item = resolve_list_item(
+                            paragraph_index,
+                            paragraph,
+                            &numbering,
+                            &mut styles,
+                            &mut counters,
+                            &mut repaired,
+                        )?;
+                        paragraph_index = paragraph_index.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat("document paragraph index overflow".to_owned())
+                        })?;
+                        item
+                    },
+                    Element::Table(_) => None,
+                    Element::Unknown(_) => None,
+                };
+                resolved.push((element, item));
+            }
+            Ok(())
+        })();
+        self.merge_tolerance(&repaired);
+        outcome.map(|()| resolved)
     }
 
     /// Extract paragraph text with resolvable list labels prepended.
@@ -790,6 +807,7 @@ fn resolve_list_item(
     numbering: &crate::numbering::Collection,
     styles: &mut crate::styles::Styles<'_>,
     counters: &mut crate::list::ListCounterState,
+    tolerance: &mut crate::leniency::ToleranceReport,
 ) -> Result<Option<crate::list::ResolvedListItem>> {
     let direct = paragraph.numbering()?;
     let style_id = paragraph.style_id()?;
@@ -821,12 +839,16 @@ fn resolve_list_item(
                 properties.num_id
             )));
         }
-        let num = numbering.get_num(properties.num_id).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "paragraph references missing numId {}",
-                properties.num_id
-            ))
-        })?;
+        let Some(num) = numbering.get_num(properties.num_id) else {
+            // Word and LibreOffice leave a paragraph whose numId names no
+            // numbering instance unnumbered — including one dropped by a
+            // numbering repair. Do the same and record it.
+            tolerance.record(
+                crate::leniency::NumberingDefect::MissingNumberingInstance,
+                paragraph_index as u64,
+            );
+            return Ok(None);
+        };
         let abstract_num = numbering
             .get_abstract_num(num.abstract_num_id())
             .ok_or_else(|| {

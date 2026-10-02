@@ -2,6 +2,7 @@
 
 use super::*;
 
+use crate::leniency::NumberingDefect;
 use crate::{Error, Result};
 use litchi_opc::PackURI;
 use std::mem::size_of;
@@ -251,9 +252,27 @@ fn parses_picture_bullet_without_image() {
 }
 
 #[test]
-fn rejects_duplicate_picture_bullet_ids() {
+fn duplicate_picture_bullet_ids_keep_the_first() {
     let duplicate = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:numPicBullet w:numPicBulletId="1"/><w:numPicBullet w:numPicBulletId="1"/></w:numbering>"#;
-    assert!(parse(duplicate).is_err());
+    let parsed = parse(duplicate).unwrap();
+    assert_eq!(parsed.picture_bullets().len(), 1);
+    assert_defects(&parsed, &[NumberingDefect::DuplicateDefinition]);
+}
+
+/// Assert the exact sequence of numbering repairs recorded on `collection`.
+fn assert_defects(collection: &Collection, expected: &[NumberingDefect]) {
+    let recorded = collection
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| tolerated.defect)
+        .collect::<Vec<_>>();
+    let expected = expected
+        .iter()
+        .copied()
+        .map(crate::Defect::Numbering)
+        .collect::<Vec<_>>();
+    assert_eq!(recorded, expected);
 }
 
 #[test]
@@ -261,10 +280,21 @@ fn rejects_malformed_numbering_order_without_panicking() {
     for xml in [
         &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:num w:numId="2"/></w:abstractNum></w:numbering>"#[..],
         &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:num w:numId="2"/></w:lvl></w:abstractNum></w:numbering>"#[..],
-        &br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2"><w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="1"/></w:lvlOverride><w:abstractNumId w:val="1"/></w:num></w:numbering>"#[..],
     ] {
         assert_rejected_without_panicking(xml);
     }
+
+    // A mismatched override level and a dangling abstract reference degrade
+    // per item (leniency F2.4) instead of failing the part.
+    let degraded = parse(br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:num w:numId="2"><w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="1"/></w:lvlOverride><w:abstractNumId w:val="1"/></w:num></w:numbering>"#).unwrap();
+    assert!(degraded.nums().is_empty());
+    assert_defects(
+        &degraded,
+        &[
+            NumberingDefect::MismatchedOverrideLevel,
+            NumberingDefect::MissingAbstractDefinition,
+        ],
+    );
 }
 
 #[test]
@@ -313,8 +343,11 @@ fn parses_libreoffice_picture_bullet_fixture() {
 
 #[test]
 fn rejects_duplicate_levels_and_bad_level_indices() {
-    let duplicate = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"/><w:lvl w:ilvl="0"/></w:abstractNum></w:numbering>"#;
-    assert!(parse(duplicate).is_err());
+    let duplicate = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="4"/></w:lvl><w:lvl w:ilvl="0"/></w:abstractNum></w:numbering>"#;
+    let parsed = parse(duplicate).unwrap();
+    assert_eq!(parsed.abstract_nums()[0].levels().len(), 1);
+    assert_eq!(parsed.abstract_nums()[0].levels()[0].start, 4);
+    assert_defects(&parsed, &[NumberingDefect::DuplicateDefinition]);
     let bad = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="9"/></w:abstractNum></w:numbering>"#;
     assert!(parse(bad).is_err());
 }
@@ -419,7 +452,12 @@ fn strict_and_transitional_number_format_domains_are_exhaustive() {
         let xml = format!(
             r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="vendorNumbering"/></w:lvl></w:abstractNum></w:numbering>"#
         );
-        assert!(parse(xml.as_bytes()).is_err());
+        let parsed = parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            parsed.abstract_nums()[0].levels()[0].format,
+            Format::Decimal
+        );
+        assert_defects(&parsed, &[NumberingDefect::UnknownNumberFormat]);
     }
 }
 
@@ -458,7 +496,9 @@ fn multi_level_type_is_a_closed_compact_domain() {
         let xml = format!(
             r#"<w:numbering xmlns:w="{namespace}"><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="multi"/><w:lvl w:ilvl="0"/></w:abstractNum></w:numbering>"#
         );
-        assert!(parse(xml.as_bytes()).is_err());
+        let parsed = parse(xml.as_bytes()).unwrap();
+        assert_eq!(parsed.abstract_nums()[0].num_type(), None);
+        assert_defects(&parsed, &[NumberingDefect::UnknownMultiLevelType]);
     }
 }
 
@@ -512,4 +552,79 @@ fn ignorable_prefix_lists_refuse_a_repeated_prefix_at_any_length() {
     assert!(is_refusal(validation::parse_ignorable(&format!(
         "{distinct} p0"
     ))));
+}
+
+/// Leniency F2.4: each bad value degrades only its own property, and every
+/// repair is recorded with the offending element's offset.
+#[test]
+fn bad_values_degrade_per_item_and_are_recorded() {
+    let xml = numbering_xml(
+        r#"<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="two"/><w:numFmt w:val="hangulChosung"/><w:suff w:val="colon"/><w:lvlRestart w:val="12"/><w:isLgl w:val="yes"/></w:lvl><w:lvl w:ilvl="1"><w:isLgl w:val="True"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="3"><w:lvl w:ilvl="0"><w:numFmt w:val="lowerRoman"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="1"><w:abstractNumId w:val="3"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="3"/><w:abstractNumId w:val="0"/></w:num><w:num w:numId="5"><w:abstractNumId w:val="44"/></w:num><w:num w:numId="6"/>"#,
+    );
+    let parsed = parse(xml.as_bytes()).unwrap();
+    let level = &parsed.abstract_nums()[0].levels()[0];
+    assert_eq!(level.start, Level::new(0).start);
+    assert_eq!(level.format, Format::Decimal);
+    assert_eq!(level.suffix, Suffix::Tab);
+    assert_eq!(level.restart, Restart::Default);
+    assert!(!level.legal);
+    assert!(parsed.abstract_nums()[0].levels()[1].legal);
+    // First-wins: the second abstractNum 0 and the second num 1 are dropped.
+    assert_eq!(parsed.abstract_num_count(), 2);
+    assert_eq!(
+        parsed.get_abstract_num(3).unwrap().levels()[0].format,
+        Format::LowerRoman
+    );
+    assert_eq!(
+        parsed
+            .nums()
+            .iter()
+            .map(|num| (num.id, num.abstract_num_id))
+            .collect::<Vec<_>>(),
+        [(1, 0), (2, 3)]
+    );
+    assert_defects(
+        &parsed,
+        &[
+            NumberingDefect::InvalidValue,
+            NumberingDefect::UnknownNumberFormat,
+            NumberingDefect::UnknownLevelSuffix,
+            NumberingDefect::InvalidLevelRestart,
+            NumberingDefect::InvalidOnOff,
+            NumberingDefect::InvalidOnOff,
+            NumberingDefect::DuplicateDefinition,
+            NumberingDefect::DuplicateDefinition,
+            NumberingDefect::DuplicateDefinition,
+            NumberingDefect::MissingAbstractDefinition,
+            NumberingDefect::MissingAbstractDefinition,
+        ],
+    );
+    let offset = |needle: &str| xml.find(needle).unwrap() as u64;
+    let contexts = parsed
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| tolerated.context)
+        .collect::<Vec<_>>();
+    assert_eq!(contexts[0], offset(r#"<w:start w:val="two"/>"#));
+    assert_eq!(contexts[1], offset(r#"<w:numFmt w:val="hangulChosung"/>"#));
+    assert_eq!(
+        contexts[6],
+        offset(
+            r#"<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/>"#
+        )
+    );
+    // The empty `w:num` is recorded in document order, before the dangling
+    // reference found by the end-of-part pass.
+    assert_eq!(contexts[9], offset(r#"<w:num w:numId="6"/>"#));
+    assert_eq!(contexts[10], offset(r#"<w:num w:numId="5">"#));
+}
+
+#[test]
+fn conformant_numbering_records_nothing() {
+    let parsed = parse(numbering_xml(
+        r#"<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:suff w:val="space"/><w:lvlRestart w:val="0"/><w:isLgl w:val="0"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="2"/></w:lvlOverride></w:num>"#,
+    ).as_bytes())
+    .unwrap();
+    assert!(parsed.tolerance_report().is_clean());
 }

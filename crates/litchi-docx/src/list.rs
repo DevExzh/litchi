@@ -452,6 +452,7 @@ mod tests {
                 overrides: Vec::new(),
             }],
             picture_bullets: Vec::new(),
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
     }
 

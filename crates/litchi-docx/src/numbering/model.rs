@@ -12,6 +12,9 @@ pub struct Collection {
     pub abstract_nums: Vec<Definition>,
     pub nums: Vec<Instance>,
     pub picture_bullets: Vec<PictureBullet>,
+    /// Everything repaired while `numbering.xml` was decoded; see
+    /// [`crate::leniency::NumberingDefect`].
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
 }
 
 /// A picture bullet definition (`w:numPicBullet`) from `numbering.xml`.
@@ -408,7 +411,20 @@ impl Collection {
             abstract_nums: Vec::new(),
             nums: Vec::new(),
             picture_bullets: Vec::new(),
+            tolerance: crate::leniency::ToleranceReport::default(),
         }
+    }
+
+    /// Everything repaired while this numbering part was decoded, in
+    /// discovery order.
+    ///
+    /// Each entry is a [`crate::leniency::NumberingDefect`] with the byte
+    /// offset of the offending element within `numbering.xml`. The report is
+    /// empty when the part conformed, and for collections built in memory.
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
     }
 
     #[must_use]

@@ -537,7 +537,11 @@ impl Document<'_> {
             Ok(rel) => {
                 let target = rel.target_partname()?;
                 let numbering_part = self.opc.get_part(&target)?;
-                Ok(Some(parse_part(numbering_part)?))
+                let numbering = parse_part(numbering_part)?;
+                // Per-item numbering repairs ride on the collection and are
+                // merged into the document-level report as well.
+                self.merge_tolerance(numbering.tolerance_report());
+                Ok(Some(numbering))
             },
             Err(_) => {
                 // No numbering in document
@@ -565,7 +569,9 @@ impl Document<'_> {
             Ok(rel) => {
                 let target = rel.target_partname()?;
                 let numbering_part = self.opc.get_part(&target)?;
-                Ok(Some(parse_snapshot_part(numbering_part)?))
+                let snapshot = parse_snapshot_part(numbering_part)?;
+                self.merge_tolerance(snapshot.tolerance_report());
+                Ok(Some(snapshot))
             },
             Err(_) => Ok(None),
         }

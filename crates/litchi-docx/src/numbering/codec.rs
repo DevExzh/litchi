@@ -16,10 +16,11 @@
 //! this layer consumes the resulting XML bytes only.
 
 use super::model::{
-    Collection, Definition, Instance, Level, Override, PictureBullet, Restart, Suffix,
+    Collection, Definition, Format, Instance, Level, Override, PictureBullet, Restart, Suffix,
 };
 use super::transaction::Change;
 use super::validation;
+use crate::leniency::{NumberingDefect, ToleranceReport};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -43,11 +44,15 @@ const STRICT_WORDPROCESSING_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/word
 
 struct PendingDefinition {
     depth: usize,
+    /// Offset of the `w:abstractNum` start tag.
+    offset: u64,
     value: Definition,
 }
 
 struct PendingInstance {
     depth: usize,
+    /// Offset of the `w:num` start tag, the context for repairs to it.
+    offset: u64,
     id: u32,
     abstract_num_id: Option<u32>,
     overrides: Vec<Override>,
@@ -55,6 +60,8 @@ struct PendingInstance {
 
 struct PendingOverride {
     depth: usize,
+    /// Offset of the `w:lvlOverride` start tag.
+    offset: u64,
     level: u8,
     start_override: Option<i64>,
     definition: Option<Level>,
@@ -62,12 +69,16 @@ struct PendingOverride {
 
 struct PendingLevel {
     depth: usize,
+    /// Offset of the `w:lvl` start tag.
+    offset: u64,
     value: Level,
     in_override: bool,
 }
 
 struct PendingPictureBullet {
     depth: usize,
+    /// Offset of the `w:numPicBullet` start tag.
+    offset: u64,
     id: u32,
     image_relationship_id: Option<String>,
 }
@@ -90,9 +101,16 @@ impl Collection {
         let mut ignorable = Vec::<Vec<Vec<u8>>>::new();
         let mut depth = 0usize;
         let mut nodes = 0usize;
+        let mut tolerance = ToleranceReport::default();
+        // Start-tag offsets of the kept `w:num` instances, parallel to
+        // `result.nums`, for the dangling-reference pass below.
+        let mut num_offsets = Vec::<u64>::new();
 
         loop {
             let decoder = reader.decoder();
+            // Text, comments, and processing instructions are separate
+            // events, so the position before an element event is its `<`.
+            let offset = reader.buffer_position();
             let event = reader
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
@@ -131,6 +149,10 @@ impl Collection {
                         &mut level,
                         &mut picture_bullet,
                         &effective_ignorable,
+                        &mut Repairs {
+                            tolerance: &mut tolerance,
+                            offset,
+                        },
                     )?;
                     ignorable.push(effective_ignorable);
                 },
@@ -166,6 +188,10 @@ impl Collection {
                         &mut level,
                         &mut picture_bullet,
                         &effective_ignorable,
+                        &mut Repairs {
+                            tolerance: &mut tolerance,
+                            offset,
+                        },
                     )?;
                 },
                 Event::End(element) => {
@@ -185,13 +211,22 @@ impl Collection {
                                         id: pending.id,
                                         image_relationship_id: pending.image_relationship_id,
                                     },
-                                )?;
+                                    &mut Repairs {
+                                        tolerance: &mut tolerance,
+                                        offset: pending.offset,
+                                    },
+                                );
                             },
                             b"lvl" if level.as_ref().is_some_and(|value| value.depth == depth) => {
                                 let pending = level
                                     .take()
                                     .ok_or_else(|| invalid("level state missing at end"))?;
-                                finish_level(&mut abstract_num, &mut level_override, pending)?;
+                                finish_level(
+                                    &mut abstract_num,
+                                    &mut level_override,
+                                    pending,
+                                    &mut tolerance,
+                                )?;
                             },
                             b"lvlOverride"
                                 if level_override
@@ -204,7 +239,7 @@ impl Collection {
                                 let pending = level_override
                                     .take()
                                     .ok_or_else(|| invalid("override state missing at end"))?;
-                                finish_override(&mut num, pending)?;
+                                finish_override(&mut num, pending, &mut tolerance)?;
                             },
                             b"abstractNum"
                                 if abstract_num
@@ -217,7 +252,14 @@ impl Collection {
                                 let pending = abstract_num.take().ok_or_else(|| {
                                     invalid("abstract numbering state missing at end")
                                 })?;
-                                push_abstract(&mut result.abstract_nums, pending.value)?;
+                                push_abstract(
+                                    &mut result.abstract_nums,
+                                    pending.value,
+                                    &mut Repairs {
+                                        tolerance: &mut tolerance,
+                                        offset: pending.offset,
+                                    },
+                                );
                             },
                             b"num" if num.as_ref().is_some_and(|value| value.depth == depth) => {
                                 if level.is_some() || level_override.is_some() {
@@ -226,20 +268,31 @@ impl Collection {
                                 let pending = num
                                     .take()
                                     .ok_or_else(|| invalid("num state missing at end"))?;
-                                let abstract_num_id = pending.abstract_num_id.ok_or_else(|| {
-                                    invalid(&format!(
-                                        "numbering instance {} is missing abstractNumId",
-                                        pending.id
-                                    ))
-                                })?;
-                                push_num(
-                                    &mut result.nums,
-                                    Instance {
-                                        id: pending.id,
-                                        abstract_num_id,
-                                        overrides: pending.overrides,
-                                    },
-                                )?;
+                                if let Some(abstract_num_id) = pending.abstract_num_id {
+                                    if push_num(
+                                        &mut result.nums,
+                                        Instance {
+                                            id: pending.id,
+                                            abstract_num_id,
+                                            overrides: pending.overrides,
+                                        },
+                                        &mut Repairs {
+                                            tolerance: &mut tolerance,
+                                            offset: pending.offset,
+                                        },
+                                    ) {
+                                        num_offsets.push(pending.offset);
+                                    }
+                                } else {
+                                    // An instance without an abstract
+                                    // definition numbers nothing; Word and
+                                    // LibreOffice leave its paragraphs
+                                    // unnumbered.
+                                    tolerance.record(
+                                        NumberingDefect::MissingAbstractDefinition,
+                                        pending.offset,
+                                    );
+                                }
                             },
                             _ => {},
                         }
@@ -273,15 +326,36 @@ impl Collection {
             }
         }
 
-        for value in &result.nums {
-            if result.get_abstract_num(value.abstract_num_id).is_none() {
-                return Err(invalid(&format!(
-                    "numbering instance {} references missing abstractNum {}",
-                    value.id, value.abstract_num_id
-                )));
+        // An instance whose abstract definition does not exist resolves to
+        // nothing in LibreOffice (`GetAbstractList` returns null) and Word;
+        // drop it, record it, and keep every other list.
+        let mut kept = Vec::with_capacity(result.nums.len());
+        for (value, offset) in std::mem::take(&mut result.nums)
+            .into_iter()
+            .zip(num_offsets)
+        {
+            if result.get_abstract_num(value.abstract_num_id).is_some() {
+                kept.push(value);
+            } else {
+                tolerance.record(NumberingDefect::MissingAbstractDefinition, offset);
             }
         }
+        result.nums = kept;
+        result.tolerance = tolerance;
         Ok(result)
+    }
+}
+
+/// Where a numbering repair is recorded: the report plus the byte offset of
+/// the element being decoded.
+struct Repairs<'a> {
+    tolerance: &'a mut ToleranceReport,
+    offset: u64,
+}
+
+impl Repairs<'_> {
+    fn record(&mut self, defect: NumberingDefect) {
+        self.tolerance.record(defect, self.offset);
     }
 }
 
@@ -301,6 +375,7 @@ fn begin_element(
     level: &mut Option<PendingLevel>,
     picture_bullet: &mut Option<PendingPictureBullet>,
     ignorable: &[Vec<u8>],
+    repairs: &mut Repairs<'_>,
 ) -> Result<()> {
     if let Some(pending) = picture_bullet.as_mut() {
         return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
@@ -313,6 +388,7 @@ fn begin_element(
         b"numPicBullet" if abstract_num.is_none() && num.is_none() => {
             *picture_bullet = Some(PendingPictureBullet {
                 depth,
+                offset: repairs.offset,
                 id: required_u32(element, b"numPicBulletId", decoder, resolver)?,
                 image_relationship_id: None,
             });
@@ -323,6 +399,7 @@ fn begin_element(
             }
             *abstract_num = Some(PendingDefinition {
                 depth,
+                offset: repairs.offset,
                 value: Definition {
                     id: required_u32(element, b"abstractNumId", decoder, resolver)?,
                     num_type: None,
@@ -341,6 +418,7 @@ fn begin_element(
             }
             *num = Some(PendingInstance {
                 depth,
+                offset: repairs.offset,
                 id: required_u32(element, b"numId", decoder, resolver)?,
                 abstract_num_id: None,
                 overrides: Vec::new(),
@@ -354,6 +432,7 @@ fn begin_element(
         {
             *level = Some(PendingLevel {
                 depth,
+                offset: repairs.offset,
                 value: Level::new(required_level(element, decoder, resolver)?),
                 in_override: true,
             });
@@ -366,6 +445,7 @@ fn begin_element(
         {
             *level = Some(PendingLevel {
                 depth,
+                offset: repairs.offset,
                 value: Level::new(required_level(element, decoder, resolver)?),
                 in_override: false,
             });
@@ -376,6 +456,7 @@ fn begin_element(
         {
             *level_override = Some(PendingOverride {
                 depth,
+                offset: repairs.offset,
                 level: required_level(element, decoder, resolver)?,
                 start_override: None,
                 definition: None,
@@ -390,6 +471,7 @@ fn begin_element(
             num,
             level_override,
             level,
+            repairs,
         )?,
     }
     Ok(())
@@ -412,6 +494,7 @@ fn empty_element(
     level: &mut Option<PendingLevel>,
     picture_bullet: &mut Option<PendingPictureBullet>,
     ignorable: &[Vec<u8>],
+    repairs: &mut Repairs<'_>,
 ) -> Result<()> {
     if let Some(pending) = picture_bullet.as_mut() {
         return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
@@ -427,7 +510,8 @@ fn empty_element(
                     id: required_u32(element, b"numPicBulletId", decoder, resolver)?,
                     image_relationship_id: None,
                 },
-            )?;
+                repairs,
+            );
         },
         b"abstractNum" => {
             if abstract_num.is_some() || num.is_some() {
@@ -445,9 +529,15 @@ fn empty_element(
                     )?,
                     levels: Vec::new(),
                 },
-            )?;
+                repairs,
+            );
         },
-        b"num" => return Err(invalid("numbering instance is missing abstractNumId")),
+        b"num" if abstract_num.is_none() && num.is_none() => {
+            // An empty `w:num` has no `w:abstractNumId` child and numbers
+            // nothing; drop it like a dangling reference.
+            repairs.record(NumberingDefect::MissingAbstractDefinition);
+        },
+        b"num" => return Err(invalid("nested numbering definitions are invalid")),
         b"lvl"
             if level_override
                 .as_ref()
@@ -458,9 +548,11 @@ fn empty_element(
                 level_override,
                 PendingLevel {
                     depth,
+                    offset: repairs.offset,
                     value: Level::new(required_level(element, decoder, resolver)?),
                     in_override: true,
                 },
+                repairs.tolerance,
             )?;
         },
         b"lvl"
@@ -473,9 +565,11 @@ fn empty_element(
                 level_override,
                 PendingLevel {
                     depth,
+                    offset: repairs.offset,
                     value: Level::new(required_level(element, decoder, resolver)?),
                     in_override: false,
                 },
+                repairs.tolerance,
             )?;
         },
         b"lvlOverride" if num.as_ref().is_some_and(|value| depth == value.depth + 1) => {
@@ -483,10 +577,12 @@ fn empty_element(
                 num,
                 PendingOverride {
                     depth,
+                    offset: repairs.offset,
                     level: required_level(element, decoder, resolver)?,
                     start_override: None,
                     definition: None,
                 },
+                repairs.tolerance,
             )?;
         },
         _ => apply_child(
@@ -498,11 +594,18 @@ fn empty_element(
             num,
             level_override,
             level,
+            repairs,
         )?,
     }
     Ok(())
 }
 
+/// Decode one property child of a level, override, definition, or instance.
+///
+/// A property value outside its schema domain degrades only that property —
+/// to the default Word and LibreOffice substitute — and is recorded; it never
+/// fails the numbering part. A repeated singleton property keeps the first
+/// occurrence, matching LibreOffice's first-match lookups.
 #[allow(
     clippy::too_many_arguments,
     reason = "signature mirrors the corresponding OOXML record"
@@ -516,15 +619,27 @@ fn apply_child(
     num: &mut Option<PendingInstance>,
     level_override: &mut Option<PendingOverride>,
     level: &mut Option<PendingLevel>,
+    repairs: &mut Repairs<'_>,
 ) -> Result<()> {
     if let Some(value) = level.as_mut().filter(|value| depth == value.depth + 1) {
         match element.local_name().as_ref() {
-            b"start" => value.value.start = required_i64(element, b"val", decoder, resolver)?,
+            b"start" => {
+                if let Some(start) = lenient_number(element, decoder, resolver, repairs)? {
+                    value.value.start = start;
+                }
+            },
             b"numFmt" => {
-                let raw = required_string(element, b"val", decoder, resolver)?;
-                value.value.format = raw.parse().map_err(|_source_error| {
-                    invalid(&format!("invalid numbering format '{raw}'"))
-                })?;
+                match word_attribute_value(element, b"val", decoder, resolver)?
+                    .map(|raw| raw.parse())
+                {
+                    Some(Ok(format)) => value.value.format = format,
+                    // An unknown token (for example `hangulChosung`) or a
+                    // missing value: Word substitutes decimal numbering.
+                    Some(Err(_)) | None => {
+                        repairs.record(NumberingDefect::UnknownNumberFormat);
+                        value.value.format = Format::Decimal;
+                    },
+                }
                 value.value.custom_format =
                     word_attribute_value(element, b"format", decoder, resolver)?;
             },
@@ -534,31 +649,42 @@ fn apply_child(
                 );
             },
             b"suff" => {
-                value.value.suffix = match required_string(element, b"val", decoder, resolver)?
-                    .as_str()
-                {
-                    "tab" => Suffix::Tab,
-                    "space" => Suffix::Space,
-                    "nothing" => Suffix::Nothing,
-                    other => return Err(invalid(&format!("invalid numbering suffix '{other}'"))),
-                }
+                value.value.suffix =
+                    match word_attribute_value(element, b"val", decoder, resolver)?.as_deref() {
+                        Some("tab") => Suffix::Tab,
+                        Some("space") => Suffix::Space,
+                        Some("nothing") => Suffix::Nothing,
+                        // The schema default, which Word substitutes.
+                        Some(_) | None => {
+                            repairs.record(NumberingDefect::UnknownLevelSuffix);
+                            Suffix::Tab
+                        },
+                    };
             },
             b"lvlRestart" => {
-                let raw = required_u32(element, b"val", decoder, resolver)?;
-                value.value.restart = match raw {
-                    0 => Restart::Never,
-                    1..=9 => Restart::After((raw - 1) as u8),
-                    _ => return Err(invalid(&format!("invalid lvlRestart '{raw}'"))),
-                };
+                value.value.restart =
+                    match word_attribute_value(element, b"val", decoder, resolver)?
+                        .and_then(|raw| raw.parse::<u32>().ok())
+                    {
+                        Some(0) => Restart::Never,
+                        Some(raw @ 1..=9) => Restart::After((raw - 1) as u8),
+                        // No level 10 exists to restart after; ignore the
+                        // property and keep the default restart behavior.
+                        Some(_) | None => {
+                            repairs.record(NumberingDefect::InvalidLevelRestart);
+                            Restart::Default
+                        },
+                    };
             },
-            b"isLgl" => value.value.legal = on_off(element, decoder, resolver)?,
-            b"pStyle" => {
-                value.value.paragraph_style =
-                    Some(required_string(element, b"val", decoder, resolver)?);
+            b"isLgl" => value.value.legal = on_off(element, decoder, resolver, repairs)?,
+            b"pStyle" => match word_attribute_value(element, b"val", decoder, resolver)? {
+                Some(style) => value.value.paragraph_style = Some(style),
+                None => repairs.record(NumberingDefect::InvalidValue),
             },
             b"lvlPicBulletId" => {
-                value.value.picture_bullet_id =
-                    Some(required_u32(element, b"val", decoder, resolver)?);
+                if let Some(id) = lenient_number(element, decoder, resolver, repairs)? {
+                    value.value.picture_bullet_id = Some(id);
+                }
             },
             _ => {},
         }
@@ -570,9 +696,10 @@ fn apply_child(
     {
         if element.local_name().as_ref() == b"startOverride" {
             if value.start_override.is_some() {
-                return Err(invalid("duplicate startOverride"));
+                repairs.record(NumberingDefect::DuplicateDefinition);
+            } else {
+                value.start_override = lenient_number(element, decoder, resolver, repairs)?;
             }
-            value.start_override = Some(required_i64(element, b"val", decoder, resolver)?);
         }
         return Ok(());
     }
@@ -582,21 +709,36 @@ fn apply_child(
     {
         match element.local_name().as_ref() {
             b"multiLevelType" => {
-                let raw = required_string(element, b"val", decoder, resolver)?;
                 if value.value.num_type.is_some() {
-                    return Err(invalid("duplicate multiLevelType"));
+                    repairs.record(NumberingDefect::DuplicateDefinition);
+                } else {
+                    match word_attribute_value(element, b"val", decoder, resolver)?
+                        .map(|raw| raw.parse())
+                    {
+                        Some(Ok(num_type)) => value.value.num_type = Some(num_type),
+                        Some(Err(_)) | None => {
+                            repairs.record(NumberingDefect::UnknownMultiLevelType);
+                        },
+                    }
                 }
-                value.value.num_type = Some(raw.parse().map_err(|_source_error| {
-                    invalid(&format!("invalid multiLevelType '{raw}'"))
-                })?);
             },
             b"numStyleLink" => {
-                let raw = required_string(element, b"val", decoder, resolver)?;
-                set_once(&mut value.value.num_style_link, raw, "numStyleLink")?;
+                set_once(
+                    &mut value.value.num_style_link,
+                    element,
+                    decoder,
+                    resolver,
+                    repairs,
+                )?;
             },
             b"styleLink" => {
-                let raw = required_string(element, b"val", decoder, resolver)?;
-                set_once(&mut value.value.style_link, raw, "styleLink")?;
+                set_once(
+                    &mut value.value.style_link,
+                    element,
+                    decoder,
+                    resolver,
+                    repairs,
+                )?;
             },
             _ => {},
         }
@@ -605,29 +747,49 @@ fn apply_child(
         && element.local_name().as_ref() == b"abstractNumId"
     {
         if value.abstract_num_id.is_some() {
-            return Err(invalid("duplicate abstractNumId"));
+            repairs.record(NumberingDefect::DuplicateDefinition);
+        } else {
+            value.abstract_num_id = lenient_number(element, decoder, resolver, repairs)?;
         }
-        value.abstract_num_id = Some(required_u32(element, b"val", decoder, resolver)?);
     }
     Ok(())
+}
+
+/// Parse a numeric `w:val`, degrading a missing or unparseable value to
+/// `None` with a recorded [`NumberingDefect::InvalidValue`].
+fn lenient_number<T: std::str::FromStr>(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    repairs: &mut Repairs<'_>,
+) -> Result<Option<T>> {
+    let parsed =
+        word_attribute_value(element, b"val", decoder, resolver)?.and_then(|raw| raw.parse().ok());
+    if parsed.is_none() {
+        repairs.record(NumberingDefect::InvalidValue);
+    }
+    Ok(parsed)
 }
 
 fn finish_level(
     abstract_num: &mut Option<PendingDefinition>,
     level_override: &mut Option<PendingOverride>,
     pending: PendingLevel,
+    tolerance: &mut ToleranceReport,
 ) -> Result<()> {
     if pending.in_override {
         let target = level_override
             .as_mut()
             .ok_or_else(|| invalid("level outside lvlOverride"))?;
         if target.definition.is_some() {
-            return Err(invalid("duplicate override level definition"));
+            tolerance.record(NumberingDefect::DuplicateDefinition, pending.offset);
+        } else if pending.value.level != target.level {
+            // The replacement level names a different index than its
+            // override; it cannot apply to either, so drop it.
+            tolerance.record(NumberingDefect::MismatchedOverrideLevel, pending.offset);
+        } else {
+            target.definition = Some(pending.value);
         }
-        if pending.value.level != target.level {
-            return Err(invalid("override level indices do not match"));
-        }
-        target.definition = Some(pending.value);
     } else {
         let target = abstract_num
             .as_mut()
@@ -638,14 +800,19 @@ fn finish_level(
             .iter()
             .any(|value| value.level == pending.value.level)
         {
-            return Err(invalid("duplicate abstract numbering level"));
+            tolerance.record(NumberingDefect::DuplicateDefinition, pending.offset);
+        } else {
+            target.value.levels.push(pending.value);
         }
-        target.value.levels.push(pending.value);
     }
     Ok(())
 }
 
-fn finish_override(num: &mut Option<PendingInstance>, pending: PendingOverride) -> Result<()> {
+fn finish_override(
+    num: &mut Option<PendingInstance>,
+    pending: PendingOverride,
+    tolerance: &mut ToleranceReport,
+) -> Result<()> {
     let target = num
         .as_mut()
         .ok_or_else(|| invalid("lvlOverride outside num"))?;
@@ -654,7 +821,8 @@ fn finish_override(num: &mut Option<PendingInstance>, pending: PendingOverride) 
         .iter()
         .any(|value| value.level == pending.level)
     {
-        return Err(invalid("duplicate lvlOverride"));
+        tolerance.record(NumberingDefect::DuplicateDefinition, pending.offset);
+        return Ok(());
     }
     target.overrides.push(Override {
         level: pending.level,
@@ -664,45 +832,56 @@ fn finish_override(num: &mut Option<PendingInstance>, pending: PendingOverride) 
     Ok(())
 }
 
-fn set_once(slot: &mut Option<String>, value: String, name: &str) -> Result<()> {
+fn set_once(
+    slot: &mut Option<String>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    repairs: &mut Repairs<'_>,
+) -> Result<()> {
     if slot.is_some() {
-        return Err(invalid(&format!("duplicate {name}")));
+        repairs.record(NumberingDefect::DuplicateDefinition);
+        return Ok(());
     }
-    *slot = Some(value);
+    match word_attribute_value(element, b"val", decoder, resolver)? {
+        Some(value) => *slot = Some(value),
+        None => repairs.record(NumberingDefect::InvalidValue),
+    }
     Ok(())
 }
 
-fn push_abstract(values: &mut Vec<Definition>, value: Definition) -> Result<()> {
+/// Keep the first abstract definition with a given ID, as LibreOffice's
+/// first-match `GetAbstractList` lookup does; a later duplicate is recorded
+/// and dropped.
+fn push_abstract(values: &mut Vec<Definition>, value: Definition, repairs: &mut Repairs<'_>) {
     if values.iter().any(|item| item.id == value.id) {
-        return Err(invalid(&format!(
-            "duplicate abstract numbering ID {}",
-            value.id
-        )));
+        repairs.record(NumberingDefect::DuplicateDefinition);
+        return;
     }
     values.push(value);
-    Ok(())
 }
 
-fn push_num(values: &mut Vec<Instance>, value: Instance) -> Result<()> {
+/// Keep the first numbering instance with a given ID (LibreOffice's
+/// first-match `GetList`), returning whether `value` was kept.
+fn push_num(values: &mut Vec<Instance>, value: Instance, repairs: &mut Repairs<'_>) -> bool {
     if values.iter().any(|item| item.id == value.id) {
-        return Err(invalid(&format!(
-            "duplicate numbering instance ID {}",
-            value.id
-        )));
+        repairs.record(NumberingDefect::DuplicateDefinition);
+        return false;
     }
     values.push(value);
-    Ok(())
+    true
 }
 
-fn push_picture_bullet(values: &mut Vec<PictureBullet>, value: PictureBullet) -> Result<()> {
+fn push_picture_bullet(
+    values: &mut Vec<PictureBullet>,
+    value: PictureBullet,
+    repairs: &mut Repairs<'_>,
+) {
     if values.iter().any(|item| item.id() == value.id()) {
-        return Err(invalid(&format!(
-            "duplicate picture bullet ID {}",
-            value.id()
-        )));
+        repairs.record(NumberingDefect::DuplicateDefinition);
+        return;
     }
     values.push(value);
-    Ok(())
 }
 
 /// Capture the first image relationship inside a `w:numPicBullet` definition.
@@ -804,18 +983,6 @@ fn required_u32(
         .map_err(|_source_error| invalid(&format!("invalid Word numbering integer '{value}'")))
 }
 
-fn required_i64(
-    element: &BytesStart<'_>,
-    name: &[u8],
-    decoder: Decoder,
-    resolver: &NamespaceResolver,
-) -> Result<i64> {
-    let value = required_string(element, name, decoder, resolver)?;
-    value
-        .parse()
-        .map_err(|_source_error| invalid(&format!("invalid Word numbering integer '{value}'")))
-}
-
 fn required_level(
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -895,16 +1062,23 @@ fn restart_numbering_after_break(
     Ok(value)
 }
 
+/// Decode an `ST_OnOff` `w:val`. A token outside the domain follows
+/// LibreOffice (`OOXMLPropertySet.cxx`): `True`/`On` are true, anything else
+/// is false; either way the deviation is recorded.
 fn on_off(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    repairs: &mut Repairs<'_>,
 ) -> Result<bool> {
     Ok(
         match word_attribute_value(element, b"val", decoder, resolver)?.as_deref() {
             None | Some("1" | "true" | "on") => true,
             Some("0" | "false" | "off") => false,
-            Some(value) => return Err(invalid(&format!("invalid on/off value '{value}'"))),
+            Some(value) => {
+                repairs.record(NumberingDefect::InvalidOnOff);
+                matches!(value, "True" | "On")
+            },
         },
     )
 }

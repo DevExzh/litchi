@@ -175,6 +175,102 @@ impl SettingsDefect {
     }
 }
 
+/// The class of `numbering.xml` defect the reader repairs per item, the way
+/// Word and LibreOffice degrade it.
+///
+/// This enumeration is closed by design. Each repair degrades only the
+/// offending property, level, override, or definition — never the whole
+/// numbering model — so one bad value cannot take down
+/// [`Document::list_items`](crate::Document::list_items) for unrelated lists.
+/// Each is recorded with the byte offset of the offending element's start
+/// tag within `numbering.xml` and is carried by the decoded
+/// [`numbering::Collection`](crate::numbering::Collection)
+/// ([`tolerance_report`](crate::numbering::Collection::tolerance_report));
+/// [`Document::numbering`](crate::Document::numbering) and
+/// [`Document::numbering_snapshot`](crate::Document::numbering_snapshot)
+/// also merge it into the document-level report. Ill-formed XML, the
+/// resource limits, required identity attributes (`w:abstractNumId`,
+/// `w:numId`, `w:ilvl`), and nesting violations stay hard errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum NumberingDefect {
+    /// A level's `w:numFmt` value is missing or outside `ST_NumberFormat`
+    /// (for example `hangulChosung`). Word substitutes decimal numbering and
+    /// LibreOffice maps unknown tokens to a fallback; the level uses
+    /// [`Format::Decimal`](crate::numbering::Format::Decimal), keeping any
+    /// `w:format` custom pattern.
+    UnknownNumberFormat,
+    /// A level's `w:suff` value is missing or outside `ST_LevelSuffix`; the
+    /// schema default, a tab, is used.
+    UnknownLevelSuffix,
+    /// A level's `w:lvlRestart` value is not an integer in `0..=9`; the
+    /// property is ignored and the default restart behavior applies.
+    InvalidLevelRestart,
+    /// An `ST_OnOff` value (such as `w:isLgl`) is outside the lexical domain.
+    /// Following LibreOffice, `True` and `On` read as true and anything else
+    /// (for example `yes`) as false.
+    InvalidOnOff,
+    /// An abstract definition's `w:multiLevelType` value is missing or
+    /// outside `ST_MultiLevelType`; the definition is kept without a type.
+    UnknownMultiLevelType,
+    /// A numeric or string property value (`w:start`, `w:startOverride`,
+    /// `w:lvlPicBulletId`, `w:abstractNumId`, `w:pStyle`, `w:styleLink`,
+    /// `w:numStyleLink`) is missing or unparseable; that property is ignored
+    /// and its default kept.
+    InvalidValue,
+    /// An ID or a singleton appeared twice: a repeated `w:abstractNumId`,
+    /// `w:numId`, or `w:numPicBulletId`; a repeated level within one
+    /// definition; a repeated `w:lvlOverride`; or a repeated singleton
+    /// property. LibreOffice resolves IDs by first match
+    /// (`ListsManager::GetAbstractList`/`GetList`), so the first occurrence
+    /// is kept and the later one dropped.
+    DuplicateDefinition,
+    /// A `w:num` instance has no `w:abstractNumId` or references an abstract
+    /// definition that does not exist. It numbers nothing in Word or
+    /// LibreOffice, so it is dropped; paragraphs referencing it are
+    /// unnumbered.
+    MissingAbstractDefinition,
+    /// A replacement `w:lvl` inside `w:lvlOverride` names a different level
+    /// index than its override; the replacement is dropped and the override
+    /// keeps any `w:startOverride`.
+    MismatchedOverrideLevel,
+    /// A paragraph's numbering (direct, style-inherited, or through a
+    /// numbering style link) names a `w:numId` with no instance in the
+    /// numbering model — never declared, or dropped by one of the repairs
+    /// above. Word and LibreOffice show the paragraph unnumbered, so list
+    /// resolution skips it instead of failing.
+    ///
+    /// Recorded by [`Document::list_items`](crate::Document::list_items) and
+    /// the other list resolvers; the context is the zero-based index of the
+    /// paragraph in the main story, not a byte offset.
+    MissingNumberingInstance,
+}
+
+impl NumberingDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::UnknownNumberFormat => "used decimal numbering for the unknown number format",
+            Self::UnknownLevelSuffix => "used a tab for the unknown level suffix",
+            Self::InvalidLevelRestart => "ignored the out-of-range level restart",
+            Self::InvalidOnOff => "read the invalid on/off value the way LibreOffice does",
+            Self::UnknownMultiLevelType => "kept the definition without a multi-level type",
+            Self::InvalidValue => "ignored the missing or unparseable property value",
+            Self::DuplicateDefinition => "kept the first occurrence and dropped the duplicate",
+            Self::MissingAbstractDefinition => {
+                "dropped the numbering instance that has no abstract definition"
+            },
+            Self::MismatchedOverrideLevel => {
+                "dropped the override level whose index does not match its override"
+            },
+            Self::MissingNumberingInstance => {
+                "left the paragraph unnumbered because its numbering instance does not exist"
+            },
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -188,6 +284,8 @@ pub enum Defect {
     Text(TextDefect),
     /// A `settings.xml` defect repaired the way Word and LibreOffice repair it.
     Settings(SettingsDefect),
+    /// A `numbering.xml` defect degraded per item.
+    Numbering(NumberingDefect),
 }
 
 impl Defect {
@@ -197,6 +295,7 @@ impl Defect {
         match self {
             Self::Text(defect) => defect.repair(),
             Self::Settings(defect) => defect.repair(),
+            Self::Numbering(defect) => defect.repair(),
         }
     }
 }
@@ -213,13 +312,20 @@ impl From<SettingsDefect> for Defect {
     }
 }
 
+impl From<NumberingDefect> for Defect {
+    fn from(defect: NumberingDefect) -> Self {
+        Self::Numbering(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
-    /// Where the defect was found: the byte offset of the offending element
-    /// within the part's XML payload.
+    /// Where the defect was found. Unless the defect variant documents a
+    /// different locator, this is the byte offset of the offending element's
+    /// start tag within the part's visible XML payload.
     pub context: u64,
 }
 
@@ -380,6 +486,16 @@ mod tests {
             Defect::from(SettingsDefect::UnknownCompatFlag),
             Defect::from(SettingsDefect::TransitionalCompatFlagInStrict),
             Defect::from(SettingsDefect::DuplicateSetting),
+            Defect::from(NumberingDefect::UnknownNumberFormat),
+            Defect::from(NumberingDefect::UnknownLevelSuffix),
+            Defect::from(NumberingDefect::InvalidLevelRestart),
+            Defect::from(NumberingDefect::InvalidOnOff),
+            Defect::from(NumberingDefect::UnknownMultiLevelType),
+            Defect::from(NumberingDefect::InvalidValue),
+            Defect::from(NumberingDefect::DuplicateDefinition),
+            Defect::from(NumberingDefect::MissingAbstractDefinition),
+            Defect::from(NumberingDefect::MismatchedOverrideLevel),
+            Defect::from(NumberingDefect::MissingNumberingInstance),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

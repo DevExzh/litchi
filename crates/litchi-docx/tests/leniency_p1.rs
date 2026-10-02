@@ -227,3 +227,153 @@ fn singleton_settings_record_nothing() {
     assert!(settings.tolerance_report().is_clean());
     assert!(document.tolerance_report().is_clean());
 }
+
+// ---------------------------------------------------------------------------
+// F2.4 — numbering model degrades per item
+// ---------------------------------------------------------------------------
+
+const NUMBERING_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+const NUMBERING_CT: &str =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml";
+
+fn numbered_paragraph(num_id: u32, text: &str) -> String {
+    format!(
+        r#"<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="{num_id}"/></w:numPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+    )
+}
+
+const STYLES_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+const STYLES_CT: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
+
+fn styles_extra(styles: &str) -> Extra<'static> {
+    Extra {
+        path: "word/styles.xml",
+        content_type: STYLES_CT,
+        relationship: STYLES_REL,
+        xml: format!(r#"<w:styles xmlns:w="{W}">{styles}</w:styles>"#),
+    }
+}
+
+fn numbering_package(numbering_xml: &str, body: &str) -> Vec<u8> {
+    package_bytes(
+        &document_xml(body),
+        &[
+            Extra {
+                path: "word/numbering.xml",
+                content_type: NUMBERING_CT,
+                relationship: NUMBERING_REL,
+                xml: numbering_xml.to_owned(),
+            },
+            styles_extra(""),
+        ],
+    )
+}
+
+#[test]
+fn bad_numbering_values_degrade_per_item_and_list_items_still_resolve() {
+    use litchi_docx::NumberingDefect;
+    let numbering_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="hangulChosung"/><w:lvlText w:val="%1."/><w:suff w:val="colon"/><w:isLgl w:val="yes"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="upperLetter"/><w:lvlText w:val="%1)"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="3"><w:abstractNumId w:val="9"/></w:num></w:numbering>"#
+    );
+    let body = [
+        numbered_paragraph(1, "first"),
+        numbered_paragraph(2, "second"),
+        numbered_paragraph(3, "dangling"),
+        numbered_paragraph(1, "third"),
+    ]
+    .concat();
+    let package = open(&numbering_package(&numbering_xml, &body));
+    let document = package.document().expect("document");
+
+    let items = document
+        .list_items()
+        .expect("one bad numbering value no longer kills list_items");
+    let rendered = items
+        .iter()
+        .map(|item| (item.paragraph_index, item.text.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(rendered, [(0, "first"), (1, "second"), (3, "third")]);
+    assert_eq!(
+        items[0].marker,
+        litchi_docx::list::ListMarker::Text("1.".to_owned())
+    );
+    assert_eq!(
+        items[1].marker,
+        litchi_docx::list::ListMarker::Text("A)".to_owned())
+    );
+
+    let at = |needle: &str| offset_of(&numbering_xml, needle);
+    let recorded = document
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| (tolerated.defect, tolerated.context))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        recorded,
+        [
+            (
+                Defect::Numbering(NumberingDefect::UnknownNumberFormat),
+                at(r#"<w:numFmt w:val="hangulChosung"/>"#)
+            ),
+            (
+                Defect::Numbering(NumberingDefect::UnknownLevelSuffix),
+                at(r#"<w:suff w:val="colon"/>"#)
+            ),
+            (
+                Defect::Numbering(NumberingDefect::InvalidOnOff),
+                at(r#"<w:isLgl w:val="yes"/>"#)
+            ),
+            (
+                Defect::Numbering(NumberingDefect::DuplicateDefinition),
+                at(
+                    r#"<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/>"#
+                )
+            ),
+            (
+                Defect::Numbering(NumberingDefect::MissingAbstractDefinition),
+                at(r#"<w:num w:numId="3">"#)
+            ),
+            // Context: the paragraph index in the main story.
+            (
+                Defect::Numbering(NumberingDefect::MissingNumberingInstance),
+                2
+            ),
+        ]
+    );
+
+    // The snapshot accessor carries the same part-level repairs.
+    let snapshot = document
+        .numbering_snapshot()
+        .expect("numbering snapshot")
+        .expect("numbering present");
+    assert_eq!(snapshot.tolerance_report().total(), 5);
+}
+
+#[test]
+fn conformant_numbering_records_nothing() {
+    let numbering_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:suff w:val="tab"/><w:isLgl w:val="0"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>"#
+    );
+    let package = open(&numbering_package(
+        &numbering_xml,
+        &numbered_paragraph(1, "only"),
+    ));
+    let document = package.document().expect("document");
+    assert_eq!(document.list_items().expect("list items").len(), 1);
+    assert!(document.tolerance_report().is_clean());
+}
+
+#[test]
+fn ill_formed_numbering_xml_stays_fatal() {
+    let numbering_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"></w:abstractNum></w:numbering>"#
+    );
+    let package = open(&numbering_package(
+        &numbering_xml,
+        &numbered_paragraph(1, "only"),
+    ));
+    assert!(package.document().expect("document").list_items().is_err());
+}
