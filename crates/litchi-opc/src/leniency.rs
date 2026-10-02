@@ -45,10 +45,11 @@
 //!
 //! # Status
 //!
-//! Live for findings 8.5–8.9 of `docs/LENIENCY_AUDIT.md`: duplicate
+//! Live for findings 8.5–8.10 of `docs/LENIENCY_AUDIT.md`: duplicate
 //! relationship `Id` (8.5), unresolvable internal target (8.6), `TargetMode`
-//! casing and value (8.7), missing `Target`/`Type` (8.8), and duplicate
-//! content-type mappings (8.9). The P2 manifest findings 8.10–8.12 remain
+//! casing and value (8.7), missing `Target`/`Type` (8.8), duplicate
+//! content-type mappings (8.9), and a relationships part declared with
+//! another content type (8.10). The P2 manifest findings 8.11–8.12 remain
 //! strict.
 //!
 //! Source-preserving edits re-read the opened manifests under the same
@@ -160,8 +161,9 @@ impl RelationshipDefect {
 /// repair it.
 ///
 /// The recorded [`ToleratedDefect::part`] is `/[Content_Types].xml`,
-/// [`ToleratedDefect::item`] the duplicated extension or part name, and
-/// [`ToleratedDefect::value`] the content type of the dropped mapping.
+/// [`ToleratedDefect::item`] the extension or part name of the mapping
+/// concerned, and [`ToleratedDefect::value`] the raw value documented on each
+/// variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ContentTypeDefect {
@@ -177,6 +179,17 @@ pub enum ContentTypeDefect {
     /// The first mapping is kept and the later one dropped, as for
     /// [`ContentTypeDefect::DuplicateDefault`].
     DuplicateOverride,
+    /// A relationships part (`_rels/*.rels`) is mapped to a content type other
+    /// than `application/vnd.openxmlformats-package.relationships+xml`
+    /// (§9.2 fixes it as a producer rule), for example by
+    /// `<Default Extension="rels" ContentType="application/xml"/>`.
+    ///
+    /// The part is identified by its reserved name, exactly as LibreOffice
+    /// and Apache POI identify it, and is typed with the fixed relationships
+    /// content type — the same type this reader already assumes when the
+    /// mapping is missing. The item is the relationships part name, the
+    /// value the declared content type.
+    RelationshipPartType,
 }
 
 impl ContentTypeDefect {
@@ -189,6 +202,9 @@ impl ContentTypeDefect {
             },
             Self::DuplicateOverride => {
                 "kept the first Override mapping for the part name; dropped the duplicate"
+            },
+            Self::RelationshipPartType => {
+                "typed the relationships part with the fixed relationships content type"
             },
         }
     }
@@ -284,8 +300,10 @@ impl ToleratedDefect {
 /// Everything a package read repaired, in the order the defects were found.
 ///
 /// An empty report means the package conformed and no substitution was made.
-/// Content-type defects are found first, then relationship defects in the
-/// order the relationship manifests were read.
+/// Content-types manifest defects are found first, then relationship
+/// defects in the order the relationship manifests were read, then
+/// [`ContentTypeDefect::RelationshipPartType`] entries as the package's
+/// members are classified.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ToleranceReport {
     defects: Vec<ToleratedDefect>,
@@ -498,6 +516,7 @@ mod tests {
             Defect::from(RelationshipDefect::MissingType),
             Defect::from(ContentTypeDefect::DuplicateDefault),
             Defect::from(ContentTypeDefect::DuplicateOverride),
+            Defect::from(ContentTypeDefect::RelationshipPartType),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

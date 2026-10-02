@@ -8,10 +8,10 @@ use crate::constants::{content_type as ct, namespace};
 use crate::content_type::ContentTypeMap;
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
-use crate::leniency::{RelationshipDefect, ToleranceReport};
+use crate::leniency::{ContentTypeDefect, RelationshipDefect, ToleranceReport};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::members::{NonPartMember, NonPartReason, PartNameIndex, part_name_for_member};
-use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::payload::{DeferredPartSource, PartPayload};
 use crate::phys_pkg::PhysPkgReader;
 use crate::rel::{TargetMode, relationship_target_components};
@@ -1363,6 +1363,7 @@ impl PackageReader {
             non_part_members,
             limits,
             PartClassificationMode::Eager,
+            &mut ledger.report,
         )?;
 
         // Phase 4: parallel decompression of every admitted part.
@@ -1480,6 +1481,7 @@ impl PackageReader {
             non_part_members,
             limits,
             PartClassificationMode::Eager,
+            &mut ledger.report,
         )?;
 
         // The declared-size pass stays exactly where the eager reader runs it:
@@ -1538,6 +1540,7 @@ impl PackageReader {
             non_part_members,
             limits,
             PartClassificationMode::Deferred,
+            &mut ledger.report,
         )?;
 
         let mut parts = Vec::new();
@@ -1571,6 +1574,7 @@ impl PackageReader {
         non_part_members: &mut Vec<NonPartMember>,
         limits: ReadLimits,
         mode: PartClassificationMode,
+        report: &mut ToleranceReport,
     ) -> Result<AdmittedParts> {
         let mut index = PartNameIndex::try_with_capacity(archive.len())?;
         let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
@@ -1605,7 +1609,7 @@ impl PackageReader {
 
             let is_relationship_part = Self::is_relationship_member(partname.membername());
             let content_type = if is_relationship_part {
-                Self::relationship_part_content_type(content_types, &partname)?
+                Self::relationship_part_content_type(content_types, &partname, report)?
             } else {
                 match content_types.get(&partname) {
                     Ok(content_type) => content_type,
@@ -1713,6 +1717,7 @@ impl PackageReader {
             non_part_members,
             limits,
             PartClassificationMode::Deferred,
+            &mut ledger.report,
         )
         .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
 
@@ -1769,8 +1774,11 @@ impl PackageReader {
             limits.max_content_types_bytes() as u64,
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
-        let content_types =
-            ContentTypeMap::from_xml_reporting(content_types_xml.as_bytes(), limits, &mut ledger.report)?;
+        let content_types = ContentTypeMap::from_xml_reporting(
+            content_types_xml.as_bytes(),
+            limits,
+            &mut ledger.report,
+        )?;
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels = Self::load_rels_lazy(archive, &package_uri, limits, &mut ledger)?;
         let mut non_part_members = Vec::new();
@@ -1844,9 +1852,12 @@ impl PackageReader {
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
         let content_types_xml = read_structural_member(archive, content_types_member)
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let content_types =
-            ContentTypeMap::from_xml_reporting(content_types_xml.as_bytes(), limits, &mut ledger.report)
-                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let content_types = ContentTypeMap::from_xml_reporting(
+            content_types_xml.as_bytes(),
+            limits,
+            &mut ledger.report,
+        )
+        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
         let package_uri = PackURI::new(PACKAGE_URI)
             .map_err(OpcError::InvalidPackUri)
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
@@ -1898,7 +1909,13 @@ impl PackageReader {
             .try_reserve(pkg_srels.len())
             .map_err(|source| allocation("OPC relationship work queue", source))?;
         for srel in pkg_srels {
-            Self::enqueue_target(srel, &mut visited, &mut work_queue, limits, &mut ledger.report)?;
+            Self::enqueue_target(
+                srel,
+                &mut visited,
+                &mut work_queue,
+                limits,
+                &mut ledger.report,
+            )?;
         }
 
         while let Some(partname) = work_queue.pop() {
@@ -1991,20 +2008,27 @@ impl PackageReader {
     /// ECMA-376 Part 2 §9.2 fixes the content type of every Relationships part,
     /// and §9.1.2 reserves the `_rels/*.rels` naming that identifies one, so a
     /// manifest that omits the mapping leaves nothing ambiguous. A manifest that
-    /// maps a reserved relationship name onto some *other* type contradicts the
-    /// specification and is rejected.
+    /// maps a reserved relationship name onto some *other* type breaks a
+    /// producer rule only: LibreOffice and Apache POI identify relationship
+    /// parts purely by name, and the part is parsed as relationships either
+    /// way. The fixed type is substituted and the declared one recorded
+    /// (LENIENCY_AUDIT 8.10).
     fn relationship_part_content_type(
         content_types: &ContentTypeMap,
         partname: &PackURI,
+        report: &mut ToleranceReport,
     ) -> Result<String> {
         match content_types.get(partname) {
             Ok(declared) if declared == ct::OPC_RELATIONSHIPS => Ok(declared),
-            Ok(declared) => Err(OpcError::InvalidContentType {
-                value: declared,
-                reason: format!("relationship part '{partname}' must be typed {}", {
-                    ct::OPC_RELATIONSHIPS
-                }),
-            }),
+            Ok(declared) => {
+                report.record(
+                    ContentTypeDefect::RelationshipPartType,
+                    CONTENT_TYPES_URI,
+                    Some(partname.as_str()),
+                    Some(&declared),
+                );
+                Ok(ct::OPC_RELATIONSHIPS.to_string())
+            },
             Err(OpcError::ContentTypeNotFound(_)) => Ok(ct::OPC_RELATIONSHIPS.to_string()),
             Err(error) => Err(error),
         }
@@ -3009,16 +3033,15 @@ mod tests {
             .unwrap();
         ledger.retain_xml_bytes(limits, xml.len() as u64).unwrap();
         let event_start = ledger.xml_events;
-        let relationships =
-            PackageReader::parse_rels_xml_with_source(
-                xml,
-                "/",
-                Some("/"),
-                limits,
-                &mut ledger,
-                &mut ToleranceReport::default(),
-            )
-                .unwrap();
+        let relationships = PackageReader::parse_rels_xml_with_source(
+            xml,
+            "/",
+            Some("/"),
+            limits,
+            &mut ledger,
+            &mut ToleranceReport::default(),
+        )
+        .unwrap();
         let event_count = ledger.xml_events.checked_sub(event_start).unwrap();
         ledger
             .record_relationship_xml_metrics(

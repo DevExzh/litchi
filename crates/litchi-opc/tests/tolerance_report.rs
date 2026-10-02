@@ -20,7 +20,8 @@ const ROOT_RELS: &str = r#"<Relationships xmlns="http://schemas.openxmlformats.o
 const DOCUMENT_RELS: &str = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
 
 const DOCUMENT: &str = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
-const STYLES: &str = r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+const STYLES: &str =
+    r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
 
 /// Build a minimal package from the given manifests.
 fn package(content_types: &str, root_rels: &str, document_rels: &str) -> Vec<u8> {
@@ -111,7 +112,8 @@ fn relationship_type(package: &OpcPackage, source: &str, id: &str) -> Option<Str
         .map(|relationship| relationship.reltype().to_owned())
 }
 
-const STYLES_TYPE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+const STYLES_TYPE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
 
 /// LENIENCY_AUDIT 8.5: a duplicated relationship `Id` keeps the first
 /// relationship (LibreOffice's first match) and records the dropped one.
@@ -165,8 +167,19 @@ fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
     let document = package
         .get_part(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
-    assert_eq!(document.rels().len(), 5, "dangling relationships stay visible");
-    assert!(document.rels().get("rId2").unwrap().target_partname().is_err());
+    assert_eq!(
+        document.rels().len(),
+        5,
+        "dangling relationships stay visible"
+    );
+    assert!(
+        document
+            .rels()
+            .get("rId2")
+            .unwrap()
+            .target_partname()
+            .is_err()
+    );
     assert_eq!(
         relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
         Some(STYLES_TYPE)
@@ -211,10 +224,22 @@ fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
         .get_part(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
     let rels = document.rels();
-    assert_eq!(rels.get("rId1").unwrap().target_mode(), TargetMode::Internal);
-    assert_eq!(rels.get("rId2").unwrap().target_mode(), TargetMode::External);
-    assert_eq!(rels.get("rId3").unwrap().target_mode(), TargetMode::External);
-    assert_eq!(rels.get("rId4").unwrap().target_mode(), TargetMode::External);
+    assert_eq!(
+        rels.get("rId1").unwrap().target_mode(),
+        TargetMode::Internal
+    );
+    assert_eq!(
+        rels.get("rId2").unwrap().target_mode(),
+        TargetMode::External
+    );
+    assert_eq!(
+        rels.get("rId3").unwrap().target_mode(),
+        TargetMode::External
+    );
+    assert_eq!(
+        rels.get("rId4").unwrap().target_mode(),
+        TargetMode::External
+    );
     assert_round_trips(&bytes);
 }
 
@@ -309,6 +334,61 @@ fn duplicate_content_type_mappings_keep_the_first_and_are_recorded() {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
     );
     assert_eq!(content_type("/word/styles.xml"), "application/xml");
+    assert_round_trips(&bytes);
+}
+
+/// Every recorded defect as `(class, part, item, value)`.
+fn entries(report: &ToleranceReport) -> Vec<(Defect, &str, Option<&str>, Option<&str>)> {
+    report
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect(),
+                tolerated.part(),
+                tolerated.item(),
+                tolerated.value(),
+            )
+        })
+        .collect()
+}
+
+const CONTENT_TYPES_PART: &str = "/[Content_Types].xml";
+
+/// LENIENCY_AUDIT 8.10: relationships parts declared with another content
+/// type are still read as relationships (identified by name, as LibreOffice
+/// and Apache POI do) and the declaration is recorded per part.
+#[test]
+fn relationships_parts_declared_with_another_type_are_read_and_recorded() {
+    let content_types = CONTENT_TYPES.replace(
+        r#"<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>"#,
+        r#"<Default Extension="rels" ContentType="application/xml"/>"#,
+    );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    let defect = Defect::ContentType(ContentTypeDefect::RelationshipPartType);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                defect,
+                CONTENT_TYPES_PART,
+                Some("/_rels/.rels"),
+                Some("application/xml")
+            ),
+            (
+                defect,
+                CONTENT_TYPES_PART,
+                Some("/word/_rels/document.xml.rels"),
+                Some("application/xml"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
     assert_round_trips(&bytes);
 }
 

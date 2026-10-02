@@ -12,6 +12,7 @@
 //! is still reported.
 
 use litchi_opc::constants::content_type as ct;
+use litchi_opc::leniency::{ContentTypeDefect, Defect};
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::pkgreader::PackageReader;
 use litchi_opc::{NonPartReason, OpcError, OpcPackage};
@@ -180,9 +181,10 @@ fn rejects_multiple_case_equivalent_content_types_members() {
 }
 
 #[test]
-fn types_relationship_parts_from_the_reserved_name_but_rejects_contradictions() {
+fn types_relationship_parts_from_the_reserved_name_and_records_contradictions() {
     // §9.2 fixes the Relationships part content type, so an omitted mapping is
-    // fine and a conflicting one is not.
+    // fine, and a conflicting one is a producer-rule deviation that is
+    // repaired to the fixed type and recorded (LENIENCY_AUDIT 8.10).
     fn package_with_rels_default(rels_content_type: Option<&str>) -> Vec<u8> {
         let default = rels_content_type
             .map(|value| format!(r#"<Default Extension="rels" ContentType="{value}"/>"#))
@@ -206,11 +208,36 @@ fn types_relationship_parts_from_the_reserved_name_but_rejects_contradictions() 
         assert!(reader.non_part_members().is_empty());
     }
 
+    for manifest in [None, Some(ct::OPC_RELATIONSHIPS)] {
+        let bytes = package_with_rels_default(manifest);
+        assert!(read(&bytes).unwrap().tolerance_report().is_clean());
+    }
+
     let bytes = package_with_rels_default(Some("application/xml"));
-    assert!(matches!(
-        read(&bytes),
-        Err(OpcError::InvalidContentType { .. })
-    ));
+    let reader = read(&bytes).expect("a contradicting declaration must not fail the package");
+    assert_eq!(reader.pkg_srels().len(), 1);
+    assert_eq!(blob(&reader, "/word/document.xml"), b"<w:document/>");
+    let recorded = reader
+        .tolerance_report()
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect(),
+                tolerated.part(),
+                tolerated.item(),
+                tolerated.value(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        recorded,
+        vec![(
+            Defect::ContentType(ContentTypeDefect::RelationshipPartType),
+            "/[Content_Types].xml",
+            Some("/_rels/.rels"),
+            Some("application/xml"),
+        )]
+    );
 }
 
 /// OPC compares part names case-insensitively, which is why a package holding
