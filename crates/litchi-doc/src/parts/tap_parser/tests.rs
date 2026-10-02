@@ -345,8 +345,60 @@ fn rejects_malformed_modern_table_borders() {
     assert!(parse_with(0xD620, &[0; 6]).is_err());
     assert!(parse_with(0xD62F, &[2, 2, 1, 0, 0, 0, 0xFF, 8, 1, 0, 0]).is_err());
     assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 1, 8, 1, 0, 0]).is_err());
-    assert!(parse_with(0xD62F, &[0, 2, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]).is_err());
-    assert!(TapParser::parse_border_code(&[8, 0x1A, 1, 0], 0).is_err());
+}
+
+/// MS-DOC 2.9.17's brcType restriction is a writer constraint and an Ico
+/// above 16 names no color; LibreOffice reads both as no line / automatic.
+/// The read repairs each border in place and records it against the SPRM.
+#[test]
+fn repairs_undefined_border_types_and_colors() {
+    let arena = Bump::new();
+    let parser = TapParser::new(&arena);
+    let parse_with = |opcode, operand: &[u8]| {
+        let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+        append_variable_sprm(&mut grpprl, opcode, operand);
+        let mut tolerance = ToleranceReport::default();
+        let tap = parser
+            .parse_tap_with_report(&grpprl, &mut tolerance)
+            .expect("undefined border bytes are repaired, not fatal");
+        (tap, tolerance.defects().to_vec())
+    };
+    let recorded = |defect, opcode| ToleratedDefect {
+        defect: Defect::Sprm(defect),
+        context: opcode,
+    };
+
+    // Full Brc with brcType 2 (undefined) on cell 0's top side.
+    let (tap, defects) = parse_with(0xD62F, &[0, 1, 1, 0, 0, 0, 0xFF, 8, 2, 0, 0]);
+    let top = tap.cell_properties[0].borders.top.unwrap();
+    assert_eq!(top.border_type, BorderType::None);
+    assert_eq!(top.width, 8);
+    assert_eq!(defects, [recorded(SprmDefect::BorderType, 0xD62F)]);
+
+    // Legacy Brc80: brcType 0x1A is reserved for the full Brc, Ico 17 is
+    // undefined; the other fields still decode.
+    let mut borders = [0u8; 24];
+    borders[..4].copy_from_slice(&[8, 0x1A, 17, 0x20]);
+    let (tap, defects) = parse_with(0xD605, &borders);
+    let top = tap.border_top.unwrap();
+    assert_eq!(top.border_type, BorderType::None);
+    assert_eq!(top.color, None);
+    assert!(top.shadow);
+    assert_eq!(
+        defects,
+        [
+            recorded(SprmDefect::BorderType, 0xD605),
+            recorded(SprmDefect::BorderColor, 0xD605),
+        ]
+    );
+
+    // The same operands with defined values record nothing.
+    borders[..4].copy_from_slice(&[8, 1, 16, 0x20]);
+    let (tap, defects) = parse_with(0xD605, &borders);
+    assert_eq!(tap.border_top.unwrap().border_type, BorderType::Single);
+    assert!(defects.is_empty());
+    let (_, defects) = parse_with(0xD62F, &[0, 1, 1, 0, 0, 0, 0xFF, 8, 1, 0, 0]);
+    assert!(defects.is_empty());
 }
 
 /// The legacy operand defines only bits 0x01-0x08 (MS-DOC 2.9.304), but real
@@ -500,8 +552,29 @@ fn rejects_malformed_cell_border_type_prefixes() {
     };
     assert!(parse_with(&[1, 1, 1]).is_err());
     assert!(parse_with(&[1; 12]).is_err());
-    assert!(parse_with(&[2, 1, 1, 1]).is_err());
-    assert!(parse_with(&[0x1C, 1, 1, 1]).is_err());
+
+    // An undefined border type in a well-framed operand is repaired, not
+    // fatal: it reads as no line and is recorded against the SPRM.
+    let mut grpprl = table_definition_grpprl(&[2, 0, 0, 100, 0, 200, 0]);
+    append_variable_sprm(&mut grpprl, 0xD662, &[0x1C, 2, 1, 1]);
+    let mut tolerance = ToleranceReport::default();
+    let tap = parser
+        .parse_tap_with_report(&grpprl, &mut tolerance)
+        .unwrap();
+    assert_eq!(
+        tap.cell_properties[0].border_type_overrides,
+        CellBorderTypes {
+            top: Some(BorderType::None),
+            left: Some(BorderType::None),
+            bottom: Some(BorderType::Single),
+            right: Some(BorderType::Single),
+        }
+    );
+    let undefined = ToleratedDefect {
+        defect: Defect::Sprm(SprmDefect::BorderType),
+        context: 0xD662,
+    };
+    assert_eq!(tolerance.defects(), &[undefined, undefined]);
 }
 
 #[test]
@@ -1008,7 +1081,8 @@ fn rejects_malformed_visual_table_style_defaults() {
     };
     assert!(parse_border(&[0; 7]).is_err());
     assert!(parse_border(&[0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]).is_err());
-    assert!(parse_border(&full_border([0; 4], 8, 2, 0)).is_err());
+    // An undefined border type is a repaired defect, not framing.
+    assert!(parse_border(&full_border([0; 4], 8, 2, 0)).is_ok());
     assert!(parse_with(0xD687, &[0; 9]).is_err());
     assert!(parse_with(0xD687, &full_shading([0; 4], [0; 4], 99)).is_err());
 
@@ -1194,7 +1268,8 @@ fn test_border_code_parsing() {
         0x62, // 2pt spacing, shadow, and frame
     ];
 
-    let border = TapParser::parse_border_code(&data, 0).unwrap();
+    let mut tolerance = ToleranceReport::default();
+    let border = TapParser::parse_border_code(&data, 0, 0xD605, &mut tolerance).unwrap();
     assert!(border.is_some());
     let border = border.unwrap();
     assert_eq!(border.width, 8);
@@ -1205,12 +1280,16 @@ fn test_border_code_parsing() {
     assert!(border.frame);
 
     assert!(
-        TapParser::parse_border_code(&[0xFF; 4], 0)
+        TapParser::parse_border_code(&[0xFF; 4], 0, 0xD605, &mut tolerance)
             .unwrap()
             .is_none()
     );
-    assert!(TapParser::parse_border_code(&[8, 2, 1, 0], 0).is_err());
-    assert!(TapParser::parse_border_code(&[8, 1, 17, 0], 0).is_err());
+    assert!(tolerance.is_clean());
+    assert!(
+        TapParser::parse_border_code(&[8, 1, 1], 0, 0xD605, &mut tolerance)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]

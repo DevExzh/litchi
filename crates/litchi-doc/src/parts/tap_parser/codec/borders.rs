@@ -10,9 +10,14 @@ impl TapParser<'_> {
     /// - byte 1: brcType (border type)
     /// - byte 2: ico (color index)
     /// - byte 3: spacing and effect flags
+    ///
+    /// An undefined `brcType` reads as [`BorderType::None`] and an `ico`
+    /// above 16 as automatic color, each recorded against `opcode`.
     pub(in crate::parts::tap_parser) fn parse_border_code(
         data: &[u8],
         offset: usize,
+        opcode: u16,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Option<BorderStyle>> {
         if offset + 4 > data.len() {
             return Ok(None);
@@ -31,17 +36,14 @@ impl TapParser<'_> {
             return Ok(None);
         }
 
-        let btype = Self::parse_border_type(border_type, false)?;
+        let btype = Self::parse_border_type(border_type, false, opcode, tolerance);
 
-        let color = if ico == 0 {
-            None
-        } else if ico <= 16 {
-            Self::ico_to_rgb(ico)
-        } else {
-            return Err(PackageError::Corrupted(format!(
-                "Brc80 contains invalid color index {ico}"
-            )));
-        };
+        // An Ico outside 0..=16 names no color; like LibreOffice, read it as
+        // automatic (the same value as ico 0) and record the repair.
+        if ico > 16 {
+            tolerance.record(SprmDefect::BorderColor, opcode);
+        }
+        let color = Self::ico_to_rgb(ico);
 
         Ok(Some(BorderStyle {
             width,
@@ -53,11 +55,17 @@ impl TapParser<'_> {
         }))
     }
 
+    /// Decode a `brcType`. MS-DOC 2.9.17's restriction on 0x1A/0x1B in a
+    /// `Brc80` is a writer constraint; an undefined value maps to
+    /// [`BorderType::None`] — LibreOffice's `ConvertBorderStyleFromWord`
+    /// default — and is recorded against `opcode`.
     pub(in crate::parts::tap_parser) fn parse_border_type(
         border_type: u8,
         full: bool,
-    ) -> Result<BorderType> {
-        Ok(match border_type {
+        opcode: u16,
+        tolerance: &mut ToleranceReport,
+    ) -> BorderType {
+        match border_type {
             0 => BorderType::None,
             1 => BorderType::Single,
             3 => BorderType::Double,
@@ -84,12 +92,11 @@ impl TapParser<'_> {
             25 => BorderType::Engrave,
             26 if full => BorderType::Outset,
             27 if full => BorderType::Inset,
-            value => {
-                return Err(PackageError::Corrupted(format!(
-                    "DOC border contains invalid border type {value:#04x}"
-                )));
+            _ => {
+                tolerance.record(SprmDefect::BorderType, opcode);
+                BorderType::None
             },
-        })
+        }
     }
 
     /// Parse table borders (sprmTTableBorders - 0xD605).
@@ -102,6 +109,7 @@ impl TapParser<'_> {
         tap: &mut TableProperties,
         sprm: &Sprm,
         _grpprl: &[u8],
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 24 {
@@ -111,12 +119,13 @@ impl TapParser<'_> {
         }
 
         // Parse 6 border codes (each 4 bytes)
-        tap.border_top = Self::parse_border_code(operand, 0)?;
-        tap.border_left = Self::parse_border_code(operand, 4)?;
-        tap.border_bottom = Self::parse_border_code(operand, 8)?;
-        tap.border_right = Self::parse_border_code(operand, 12)?;
-        tap.border_horizontal = Self::parse_border_code(operand, 16)?;
-        tap.border_vertical = Self::parse_border_code(operand, 20)?;
+        let opcode = sprm.opcode;
+        tap.border_top = Self::parse_border_code(operand, 0, opcode, tolerance)?;
+        tap.border_left = Self::parse_border_code(operand, 4, opcode, tolerance)?;
+        tap.border_bottom = Self::parse_border_code(operand, 8, opcode, tolerance)?;
+        tap.border_right = Self::parse_border_code(operand, 12, opcode, tolerance)?;
+        tap.border_horizontal = Self::parse_border_code(operand, 16, opcode, tolerance)?;
+        tap.border_vertical = Self::parse_border_code(operand, 20, opcode, tolerance)?;
 
         Ok(())
     }
@@ -125,6 +134,7 @@ impl TapParser<'_> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 48 {
@@ -132,17 +142,20 @@ impl TapParser<'_> {
                 "DOC TableBordersOperand must contain 48 bytes".to_string(),
             ));
         }
-        tap.border_top = Self::parse_full_border(&operand[0..8])?;
-        tap.border_left = Self::parse_full_border(&operand[8..16])?;
-        tap.border_bottom = Self::parse_full_border(&operand[16..24])?;
-        tap.border_right = Self::parse_full_border(&operand[24..32])?;
-        tap.border_horizontal = Self::parse_full_border(&operand[32..40])?;
-        tap.border_vertical = Self::parse_full_border(&operand[40..48])?;
+        let opcode = sprm.opcode;
+        tap.border_top = Self::parse_full_border(&operand[0..8], opcode, tolerance)?;
+        tap.border_left = Self::parse_full_border(&operand[8..16], opcode, tolerance)?;
+        tap.border_bottom = Self::parse_full_border(&operand[16..24], opcode, tolerance)?;
+        tap.border_right = Self::parse_full_border(&operand[24..32], opcode, tolerance)?;
+        tap.border_horizontal = Self::parse_full_border(&operand[32..40], opcode, tolerance)?;
+        tap.border_vertical = Self::parse_full_border(&operand[40..48], opcode, tolerance)?;
         Ok(())
     }
 
     pub(in crate::parts::tap_parser) fn parse_full_border(
         bytes: &[u8],
+        opcode: u16,
+        tolerance: &mut ToleranceReport,
     ) -> Result<Option<BorderStyle>> {
         if bytes.len() != 8 {
             return Err(PackageError::Corrupted(
@@ -161,7 +174,7 @@ impl TapParser<'_> {
         Ok(Some(BorderStyle {
             width,
             color: Self::parse_colorref(&bytes[..4])?,
-            border_type: Self::parse_border_type(border_type, true)?,
+            border_type: Self::parse_border_type(border_type, true, opcode, tolerance),
             spacing: effects & 0x1F,
             shadow: effects & 0x20 != 0,
             frame: effects & 0x40 != 0,
@@ -242,9 +255,9 @@ impl TapParser<'_> {
             sides &= allowed_sides;
         }
         let border = if full {
-            Self::parse_full_border(&operand[3..])?
+            Self::parse_full_border(&operand[3..], sprm.opcode, tolerance)?
         } else {
-            Self::parse_border_code(&operand[3..], 0)?
+            Self::parse_border_code(&operand[3..], 0, sprm.opcode, tolerance)?
         };
         for cell in &mut tap.cell_properties[first..limit] {
             if sides & 0x01 != 0 {

@@ -184,6 +184,7 @@ impl TapParser<'_> {
         tap: &mut TableProperties,
         sprm: &Sprm,
         operation: u16,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         if operand.len() != 8 || operand[4..] == [0xFF; 4] {
@@ -191,7 +192,7 @@ impl TapParser<'_> {
                 "DOC table-style border must contain a non-nil 8-byte Brc".to_string(),
             ));
         }
-        let border = match Self::parse_full_border(operand)? {
+        let border = match Self::parse_full_border(operand, sprm.opcode, tolerance)? {
             Some(border) => TableStyleBorder::Border(border),
             None => TableStyleBorder::NoBorder,
         };
@@ -283,6 +284,7 @@ impl TapParser<'_> {
         &self,
         tap: &mut TableProperties,
         sprm: &Sprm,
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let operand = sprm.operand_bytes();
         if !operand.len().is_multiple_of(4) || operand.len() / 4 > tap.cell_properties.len() {
@@ -295,10 +297,11 @@ impl TapParser<'_> {
             .iter_mut()
             .zip(operand.as_chunks::<4>().0.iter())
         {
-            let top = Self::parse_border_type(types[0], true)?;
-            let left = Self::parse_border_type(types[1], true)?;
-            let bottom = Self::parse_border_type(types[2], true)?;
-            let right = Self::parse_border_type(types[3], true)?;
+            let opcode = sprm.opcode;
+            let top = Self::parse_border_type(types[0], true, opcode, tolerance);
+            let left = Self::parse_border_type(types[1], true, opcode, tolerance);
+            let bottom = Self::parse_border_type(types[2], true, opcode, tolerance);
+            let right = Self::parse_border_type(types[3], true, opcode, tolerance);
             let overrides = CellBorderTypes {
                 top: Some(top),
                 left: Some(left),

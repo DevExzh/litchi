@@ -116,6 +116,20 @@ pub enum SprmDefect {
     /// operand, 0x3F on the full one) and still applies the border to every
     /// side whose bit survives.
     CellBorderSideFlags,
+    /// A table or cell border (`Brc80`/`Brc`, in any table SPRM or `TC80`)
+    /// carried a `brcType` outside the defined set.
+    ///
+    /// MS-DOC 2.9.17's restriction is a writer constraint. LibreOffice maps
+    /// an unknown type to no line (`ConvertBorderStyleFromWord`'s default)
+    /// and POI stores it raw, so the reader decodes it as
+    /// `BorderType::None`, keeping the border's other fields.
+    BorderType,
+    /// A legacy table or cell border (`Brc80`) carried an `ico` color index
+    /// above 16.
+    ///
+    /// No color is defined for the index, so the border reads as automatic
+    /// color — the same value as `ico` 0 — and is otherwise applied.
+    BorderColor,
 }
 
 impl SprmDefect {
@@ -126,6 +140,8 @@ impl SprmDefect {
             Self::CellBorderSideFlags => {
                 "masked bordersToApply to the side bits the operand defines; surviving sides were still applied"
             },
+            Self::BorderType => "read the undefined border type as no line",
+            Self::BorderColor => "read the undefined border color index as automatic color",
         }
     }
 }
@@ -777,6 +793,8 @@ mod tests {
         let defects = [
             Defect::from(StylesheetDefect::DuplicateStyleName),
             Defect::from(SprmDefect::CellBorderSideFlags),
+            Defect::from(SprmDefect::BorderType),
+            Defect::from(SprmDefect::BorderColor),
             Defect::from(StshifDefect::StyleNameFlags),
             Defect::from(StshifDefect::FixedStyleCount),
             Defect::from(AuxiliaryTableDefect::Fields),

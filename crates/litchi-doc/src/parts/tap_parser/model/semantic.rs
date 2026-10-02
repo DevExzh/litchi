@@ -106,7 +106,7 @@ impl TapParser<'_> {
             },
             // sprmTTableBorders (0xD605) - Table borders
             0x05 => {
-                self.parse_table_borders(tap, sprm, grpprl)?;
+                self.parse_table_borders(tap, sprm, grpprl, tolerance)?;
             },
             // 0x06 - obsolete (Word 1.x)
             0x06 => {},
@@ -128,7 +128,7 @@ impl TapParser<'_> {
             },
             // sprmTDefTable (0xD608) - Table definition
             0x08 => {
-                self.parse_table_definition(tap, sprm, grpprl)?;
+                self.parse_table_definition(tap, sprm, grpprl, tolerance)?;
             },
             // sprmTDefTableShd80 (0xD609) - Table shading
             0x09 => {
@@ -195,7 +195,7 @@ impl TapParser<'_> {
             },
             0x12 => self.parse_full_cell_shading(tap, sprm, 0, false)?,
             // Full-color row border defaults.
-            0x13 => self.parse_full_table_borders(tap, sprm)?,
+            0x13 => self.parse_full_table_borders(tap, sprm, tolerance)?,
             0x14 => tap.preferred_width = Self::parse_fts_width(sprm, WidthUsage::Table)?,
             0x15 => tap.auto_fit = Self::parse_bool8(sprm, "sprmTFAutofit")?,
             0x16 => self.parse_full_cell_shading(tap, sprm, 22, false)?,
@@ -233,7 +233,7 @@ impl TapParser<'_> {
             // Full-color shading applied to every cell in the table row.
             0x60 => self.parse_full_table_shading(tap, sprm)?,
             0x61 => tap.preferred_indent = Self::parse_fts_width(sprm, WidthUsage::Indent)?,
-            0x62 => self.parse_cell_border_types(tap, sprm)?,
+            0x62 => self.parse_cell_border_types(tap, sprm, tolerance)?,
             // sprmTCellPadding / sprmTCellPaddingDefault
             0x32 | 0x34 => {
                 self.parse_cell_padding(tap, sprm, grpprl)?;
@@ -386,7 +386,7 @@ impl TapParser<'_> {
                         "DOC table-style border SPRMs are only valid inside sprmTCnf".to_string(),
                     ));
                 }
-                self.parse_style_border(tap, sprm, operation)?;
+                self.parse_style_border(tap, sprm, operation, tolerance)?;
             },
             0x87 => self.parse_style_shading(tap, sprm)?,
             0x88 => {

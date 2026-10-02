@@ -38,7 +38,7 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    StshifDefect, StyleDefect, StylesheetDefect, Writer,
+    SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -595,5 +595,58 @@ fn bookmark_defects_are_repaired_per_bookmark() {
             (Defect::Bookmark(BookmarkDefect::ReservedPublicFlag), 0),
             (Defect::Bookmark(BookmarkDefect::EndIndex), 1),
         ]
+    );
+}
+
+/// Locate the first TC80 of the first `sprmTDefTable` (0xD608) in the
+/// `WordDocument` stream: opcode, two-byte size, itcMac, rgdxaCenter.
+fn first_tc80_offset(word: &[u8]) -> usize {
+    let sprm = word
+        .windows(2)
+        .position(|pair| pair == [0x08, 0xD6])
+        .expect("the Writer emits sprmTDefTable for a table row");
+    let itc_mac = usize::from(word[sprm + 4]);
+    sprm + 5 + (itc_mac + 1) * 2
+}
+
+/// MS-DOC 2.9.17's brcType restriction is a writer constraint and an Ico
+/// above 16 names no color: a table border carrying either reads as no line
+/// / automatic color, the way LibreOffice reads it, instead of failing the
+/// paragraph properties and the document.
+#[test]
+fn undefined_table_border_bytes_are_repaired_and_recorded() {
+    let clean = writer_document(|writer| {
+        writer.add_table(1, 2).expect("fixture table");
+    });
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    assert_eq!(original.tables().expect("tables").len(), 1);
+
+    let bytes = edit_word_stream(&clean, |word| {
+        let brc_top = first_tc80_offset(word) + 4;
+        word[brc_top..brc_top + 4].copy_from_slice(&[8, 0x1B, 17, 0]);
+    });
+    let document = open_degraded(bytes);
+    assert_eq!(document.tables().expect("tables").len(), 1);
+    let defects = document
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| (tolerated.defect, tolerated.context))
+        .collect::<Vec<_>>();
+    for expected in [
+        (Defect::Sprm(SprmDefect::BorderType), 0xD608),
+        (Defect::Sprm(SprmDefect::BorderColor), 0xD608),
+    ] {
+        assert!(
+            defects.contains(&expected),
+            "missing {expected:?}: {defects:?}"
+        );
+    }
+    assert!(
+        defects
+            .iter()
+            .all(|(defect, _)| matches!(defect, Defect::Sprm(_))),
+        "only the border repairs are recorded: {defects:?}"
     );
 }

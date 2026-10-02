@@ -8,6 +8,7 @@ impl TapParser<'_> {
         tap: &mut TableProperties,
         sprm: &Sprm,
         _grpprl: &[u8],
+        tolerance: &mut ToleranceReport,
     ) -> Result<()> {
         let data = sprm.operand_bytes();
         if data.is_empty() {
@@ -63,7 +64,12 @@ impl TapParser<'_> {
             for i in 0..itc_mac {
                 let tc_offset = start_of_tcs + (i * 20); // Each TC is 20 bytes
                 if tc_offset + 20 <= data.len() {
-                    cell_props.push(self.parse_table_cell_descriptor(data, tc_offset)?);
+                    cell_props.push(self.parse_table_cell_descriptor(
+                        data,
+                        tc_offset,
+                        sprm.opcode,
+                        tolerance,
+                    )?);
                 } else {
                     cell_props.push(CellProperties::default());
                 }
@@ -91,6 +97,8 @@ impl TapParser<'_> {
         &self,
         data: &[u8],
         offset: usize,
+        opcode: u16,
+        tolerance: &mut ToleranceReport,
     ) -> Result<CellProperties> {
         let mut props = CellProperties::default();
 
@@ -184,10 +192,10 @@ impl TapParser<'_> {
         };
 
         // Read borders (4 bytes each)
-        props.borders.top = Self::parse_border_code(data, offset + 4)?;
-        props.borders.left = Self::parse_border_code(data, offset + 8)?;
-        props.borders.bottom = Self::parse_border_code(data, offset + 12)?;
-        props.borders.right = Self::parse_border_code(data, offset + 16)?;
+        props.borders.top = Self::parse_border_code(data, offset + 4, opcode, tolerance)?;
+        props.borders.left = Self::parse_border_code(data, offset + 8, opcode, tolerance)?;
+        props.borders.bottom = Self::parse_border_code(data, offset + 12, opcode, tolerance)?;
+        props.borders.right = Self::parse_border_code(data, offset + 16, opcode, tolerance)?;
         props.direct_style.border_top = data[offset + 4..offset + 8] != [0xFF; 4];
         props.direct_style.border_left = data[offset + 8..offset + 12] != [0xFF; 4];
         props.direct_style.border_bottom = data[offset + 12..offset + 16] != [0xFF; 4];
