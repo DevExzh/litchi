@@ -297,6 +297,203 @@ fn style_atom_framing_corruption_stays_fatal() {
 }
 
 // ---------------------------------------------------------------------------
+// F5.3: text enumeration / ColorIndexStruct / indent-level range checks.
+// ---------------------------------------------------------------------------
+
+use litchi_ppt::writer::text_format::{
+    TabAlign, TabStop, TextAlign, TextDirection, TextFontAlign, TextRun,
+};
+use litchi_ppt::{ParagraphAlignment, ParagraphFontAlignment, ParagraphTabAlignment};
+
+/// One paragraph property selected by the `TextPFRun` mask; its first value
+/// word sits at payload offset 10, right after the run header.
+fn single_paragraph_property(paragraph: Paragraph, mask: [u8; 4], value: &[u8]) -> Fixture {
+    let mut prefix = vec![5, 0, 0, 0, 0, 0];
+    prefix.extend_from_slice(&mask);
+    prefix.extend_from_slice(value);
+    Fixture::new(paragraph, &prefix)
+}
+
+#[test]
+fn f5_3_conformant_controls_report_nothing() {
+    let fixtures = [
+        single_paragraph_property(
+            Paragraph::new(TEXT).align(TextAlign::Center),
+            [0, 8, 0, 0],
+            &[1, 0],
+        ),
+        single_paragraph_property(
+            Paragraph::new(TEXT).font_alignment(TextFontAlign::Hanging),
+            [0, 0, 1, 0],
+            &[1, 0],
+        ),
+        single_paragraph_property(
+            Paragraph::new(TEXT).text_direction(TextDirection::RightToLeft),
+            [0, 0, 32, 0],
+            &[1, 0],
+        ),
+        single_paragraph_property(
+            Paragraph::new(TEXT).tab_stops(vec![TabStop::new(360, TabAlign::Center)]),
+            [0, 0, 16, 0],
+            &[1, 0, 0x68, 0x01, 1, 0],
+        ),
+        single_paragraph_property(
+            Paragraph::new(TEXT).bullet_color_scheme(3),
+            [36, 0, 0, 0],
+            &[4, 0, 0, 0, 0, 3],
+        ),
+        scheme_colored_run(),
+    ];
+    for fixture in fixtures {
+        let read = assert_repaired(&fixture, |_| Vec::new());
+        assert!(read.collected.is_clean());
+    }
+}
+
+#[test]
+fn undefined_text_alignment_is_left_unset_and_recorded() {
+    let fixture = single_paragraph_property(
+        Paragraph::new(TEXT).align(TextAlign::Center),
+        [0, 8, 0, 0],
+        &[1, 0],
+    )
+    .patch_u16(10, 9);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(read, TextPropDefect::UnknownTextAlignment, 9)]
+    });
+    assert_eq!(read.paragraph.alignment, None);
+
+    let control = single_paragraph_property(
+        Paragraph::new(TEXT).align(TextAlign::Center),
+        [0, 8, 0, 0],
+        &[1, 0],
+    );
+    assert_eq!(
+        assert_repaired(&control, |_| Vec::new())
+            .paragraph
+            .alignment,
+        Some(ParagraphAlignment::Center)
+    );
+}
+
+#[test]
+fn undefined_font_alignment_is_left_unset_and_recorded() {
+    let control = single_paragraph_property(
+        Paragraph::new(TEXT).font_alignment(TextFontAlign::Hanging),
+        [0, 0, 1, 0],
+        &[1, 0],
+    );
+    assert_eq!(
+        assert_repaired(&control, |_| Vec::new())
+            .paragraph
+            .font_alignment,
+        Some(ParagraphFontAlignment::Hanging)
+    );
+
+    let fixture = control.patch_u16(10, 7);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(read, TextPropDefect::UnknownFontAlignment, 7)]
+    });
+    assert_eq!(read.paragraph.font_alignment, None);
+}
+
+#[test]
+fn undefined_text_direction_is_left_unset_and_recorded() {
+    let fixture = single_paragraph_property(
+        Paragraph::new(TEXT).text_direction(TextDirection::RightToLeft),
+        [0, 0, 32, 0],
+        &[1, 0],
+    )
+    .patch_u16(10, 5);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(read, TextPropDefect::UnknownTextDirection, 5)]
+    });
+    assert_eq!(read.paragraph.text_direction, None);
+}
+
+#[test]
+fn undefined_tab_type_keeps_a_left_tab_and_is_recorded() {
+    // Tab count at 10, first tab position at 12, its type at 14.
+    let fixture = single_paragraph_property(
+        Paragraph::new(TEXT).tab_stops(vec![TabStop::new(360, TabAlign::Center)]),
+        [0, 0, 16, 0],
+        &[1, 0, 0x68, 0x01, 1, 0],
+    )
+    .patch_u16(14, 6);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(read, TextPropDefect::UnknownTabType, 6)]
+    });
+    let tabs = read.paragraph.tab_stops.expect("tab stops");
+    assert_eq!(tabs.len(), 1);
+    assert_eq!(tabs[0].position, 360);
+    assert_eq!(tabs[0].alignment, ParagraphTabAlignment::Left);
+}
+
+#[test]
+fn out_of_range_indent_level_is_clamped_and_recorded() {
+    let fixture = Fixture::plain().patch_u16(4, 7);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(read, TextPropDefect::IndentLevelOutOfRange, 7)]
+    });
+    assert_eq!(read.paragraph.indent_level, 4);
+}
+
+#[test]
+fn undefined_bullet_color_index_reads_as_unset_and_is_recorded() {
+    // bulletFlags at 10, bullet ColorIndexStruct at 12 (index byte at 15).
+    let fixture = single_paragraph_property(
+        Paragraph::new(TEXT).bullet_color_scheme(3),
+        [36, 0, 0, 0],
+        &[4, 0, 0, 0, 0, 3],
+    )
+    .patch_u32(12, 0x0900_0000);
+    let read = assert_repaired(&fixture, |read| {
+        vec![located(
+            read,
+            TextPropDefect::InvalidColorIndex,
+            0x0900_0000,
+        )]
+    });
+    assert_eq!(read.paragraph.bullet_color, None);
+    assert_eq!(read.paragraph.bullet_scheme_color, None);
+    assert_eq!(read.paragraph.bullet_color_raw, Some(0x0900_0000));
+}
+
+/// A run colored with scheme slot 3: one empty `TextPFRun` (10 bytes), then
+/// a `TextCFRun` whose mask selects font index, size, and color; the color
+/// `ColorIndexStruct` sits at payload offset 22.
+fn scheme_colored_run() -> Fixture {
+    Fixture::new(
+        Paragraph::with_runs(vec![TextRun::new(TEXT).color_scheme(3)]),
+        &[
+            5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 7, 0, 0, 0, 18, 0, 0, 0, 0, 3,
+        ],
+    )
+}
+
+#[test]
+fn undefined_text_color_index_reads_as_unset_and_is_recorded() {
+    let fixture = scheme_colored_run().patch_u32(22, 0x0A00_0000);
+    assert_repaired(&fixture, |read| {
+        vec![located(
+            read,
+            TextPropDefect::InvalidColorIndex,
+            0x0A00_0000,
+        )]
+    });
+    let presentation = fixture.open();
+    let slides = presentation.slides().unwrap();
+    let shapes = slides[0].shapes().unwrap();
+    let ShapeEnum::TextBox(textbox) = &shapes[0] else {
+        panic!("expected a text box");
+    };
+    let run = &textbox.runs()[0];
+    assert_eq!(run.formatting.font_color, None);
+    assert_eq!(run.formatting.font_scheme_color, None);
+    assert_eq!(run.formatting.font_color_raw, Some(0x0A00_0000));
+}
+
+// ---------------------------------------------------------------------------
 // F5.11: per-shape error isolation.
 // ---------------------------------------------------------------------------
 

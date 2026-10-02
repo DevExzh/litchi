@@ -44,6 +44,16 @@
 //!   [`TextPropDefect::ReservedWrapFlagBits`]) — reserved
 //!   `BulletFlags`/`PFWrapFlags` bits are masked to the defined set instead
 //!   of rejecting the paragraph; the defined bits are still applied.
+//! - **F5.3** ([`TextPropDefect::UnknownTextAlignment`],
+//!   [`TextPropDefect::UnknownFontAlignment`],
+//!   [`TextPropDefect::UnknownTextDirection`],
+//!   [`TextPropDefect::UnknownTabType`],
+//!   [`TextPropDefect::IndentLevelOutOfRange`],
+//!   [`TextPropDefect::InvalidColorIndex`]) — undefined text enumeration
+//!   values leave the property unset (a tab stop keeps its position as a
+//!   left tab), indent levels above 4 clamp to 4, and an undefined
+//!   `ColorIndexStruct` index reads as an unset color, instead of rejecting
+//!   the text box.
 //! - **F5.11** ([`ShapeDefect`]) — shape conversion is isolated per shape:
 //!   a shape whose content cannot be read is dropped and recorded
 //!   ([`ShapeDefect::UnreadableShape`]) while its siblings are kept, a
@@ -127,7 +137,7 @@ pub enum Leniency {
 /// means.
 ///
 /// Each variant implements one finding of `docs/LENIENCY_AUDIT.md` (F5.1,
-/// F5.2) and is recorded by the text-box read path.
+/// F5.2, F5.3) and is recorded by the text-box read path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextPropDefect {
@@ -166,6 +176,37 @@ pub enum TextPropDefect {
     /// `wrapFlags` down to 0x0007 and still applies every defined bit that
     /// survives.
     ReservedWrapFlagBits,
+    /// A `TextPFRun`'s `textAlignment` was outside `TextAlignmentEnum`
+    /// (MS-PPT 2.13, values 0–6); the alignment is left unset, so the
+    /// inherited/default alignment applies (finding F5.3).
+    ///
+    /// Newer and non-Microsoft producers emit values PowerPoint does not
+    /// define; PowerPoint opens such text with default formatting,
+    /// LibreOffice branches only on values it knows (`svdfppt.cxx`), and POI
+    /// leaves unknown values uninterpreted. The context is the raw value.
+    UnknownTextAlignment,
+    /// A `TextPFRun`'s `fontAlign` was outside `TextFontAlignmentEnum`
+    /// (MS-PPT 2.13, values 0–3); the property is left unset (finding
+    /// F5.3). The context is the raw value.
+    UnknownFontAlignment,
+    /// A `TextPFRun`'s `textDirection` was outside `TextDirectionEnum`
+    /// (MS-PPT 2.13, values 0–1); the property is left unset (finding
+    /// F5.3). The context is the raw value.
+    UnknownTextDirection,
+    /// A `TabStop`'s `type` was outside `TextTabTypeEnum` (MS-PPT 2.13,
+    /// values 0–3); the tab stop keeps its position with left alignment, the
+    /// default tab type (finding F5.3). The context is the raw value.
+    UnknownTabType,
+    /// A `TextPFRun`'s `indentLevel` exceeded the 0–4 range MS-PPT 2.2.13
+    /// allows; it is clamped to 4 (finding F5.3). The context is the raw
+    /// level.
+    IndentLevelOutOfRange,
+    /// A text or bullet `ColorIndexStruct` carried an index other than the
+    /// scheme slots 0x00–0x07, RGB (0xFE), or undefined (0xFF) that MS-PPT
+    /// defines; the color is treated as unset and the raw value is
+    /// kept for round-trip (finding F5.3). The context is the raw 32-bit
+    /// `ColorIndexStruct`.
+    InvalidColorIndex,
 }
 
 impl TextPropDefect {
@@ -181,6 +222,18 @@ impl TextPropDefect {
             },
             Self::ReservedWrapFlagBits => {
                 "masked wrapFlags to the bits MS-PPT 2.9.25 defines (0x0007); defined bits were still applied"
+            },
+            Self::UnknownTextAlignment => {
+                "left an undefined TextAlignmentEnum value unset so the default alignment applies"
+            },
+            Self::UnknownFontAlignment => "left an undefined TextFontAlignmentEnum value unset",
+            Self::UnknownTextDirection => "left an undefined TextDirectionEnum value unset",
+            Self::UnknownTabType => {
+                "kept a tab stop with an undefined TextTabTypeEnum value as a left tab"
+            },
+            Self::IndentLevelOutOfRange => "clamped a paragraph indent level above 4 to 4",
+            Self::InvalidColorIndex => {
+                "treated a ColorIndexStruct with an undefined index as an unset color; the raw value was kept"
             },
         }
     }
@@ -612,6 +665,12 @@ mod tests {
             Defect::from(TextPropDefect::StyleTextPropCoverage),
             Defect::from(TextPropDefect::ReservedBulletFlagBits),
             Defect::from(TextPropDefect::ReservedWrapFlagBits),
+            Defect::from(TextPropDefect::UnknownTextAlignment),
+            Defect::from(TextPropDefect::UnknownFontAlignment),
+            Defect::from(TextPropDefect::UnknownTextDirection),
+            Defect::from(TextPropDefect::UnknownTabType),
+            Defect::from(TextPropDefect::IndentLevelOutOfRange),
+            Defect::from(TextPropDefect::InvalidColorIndex),
             Defect::from(ShapeDefect::UnreadableShape),
             Defect::from(ShapeDefect::DuplicateTextRuler),
             Defect::from(ShapeDefect::DuplicateRoundTripAtom),

@@ -40,7 +40,9 @@ impl TextRunExtractor {
     /// exactly (clamped, per POI/LibreOffice), and
     /// [`TextPropDefect::ReservedBulletFlagBits`] /
     /// [`TextPropDefect::ReservedWrapFlagBits`] when a `TextPFRun` carries
-    /// reserved flag bits (masked to the defined set).
+    /// reserved flag bits (masked to the defined set), and the F5.3 classes
+    /// when a text enumeration value, indent level, or `ColorIndexStruct`
+    /// index is out of range (left unset or clamped).
     ///
     /// # Errors
     ///
@@ -155,7 +157,7 @@ impl TextRunExtractor {
             }
 
             let text = remaining[..byte_count].to_string();
-            let formatting = formatting_from_style(char_style)?;
+            let formatting = formatting_from_style(char_style, report)?;
             self.runs.push(TextRun::with_formatting(
                 text,
                 source_run.start_index + character_offset,
@@ -216,15 +218,26 @@ impl TextRunExtractor {
     }
 }
 
+/// Whether a `ColorIndexStruct` names a scheme slot (0x00–0x07), an RGB
+/// color (0xFE), or "undefined" (0xFF), the only indexes MS-PPT defines.
+fn is_defined_color_index(raw: u32) -> bool {
+    matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)
+}
+
+/// Record an undefined `ColorIndexStruct` index (finding F5.3). The color is
+/// treated as unset; the raw value is kept for round-trip.
+fn tolerate_color_index(raw: Option<u32>, report: &mut ToleranceReport) {
+    if let Some(raw) = raw.filter(|raw| !is_defined_color_index(*raw)) {
+        report.record(TextPropDefect::InvalidColorIndex, raw);
+    }
+}
+
 pub(super) fn formatting_from_style(
     style: &crate::text_prop::TextPropCollection,
+    report: &mut ToleranceReport,
 ) -> Result<TextRunFormatting> {
     let font_color_raw = style.get_value("font.color").map(i32::cast_unsigned);
-    if font_color_raw.is_some_and(|raw| !matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)) {
-        return Err(Error::Corrupted(
-            "TextCFRun has an invalid ColorIndexStruct index".to_string(),
-        ));
-    }
+    tolerate_color_index(font_color_raw, report);
     let (font_color, font_scheme_color) =
         font_color_raw.map_or((None, None), decode_color_index_struct);
     let font_size = style
@@ -309,11 +322,16 @@ pub(super) fn paragraph_formatting_from_style(
     style: &crate::text_prop::TextPropCollection,
     report: &mut ToleranceReport,
 ) -> Result<ParagraphRunFormatting> {
-    if style.indent_level > 4 {
-        return Err(Error::Corrupted(
-            "TextPFRun indent level exceeds the 0..=4 range".to_string(),
-        ));
-    }
+    // MS-PPT 2.2.13 caps IndentLevel at 4; PowerPoint clamps deeper levels.
+    let indent_level = if style.indent_level > 4 {
+        report.record(
+            TextPropDefect::IndentLevelOutOfRange,
+            u32::from(style.indent_level),
+        );
+        4
+    } else {
+        style.indent_level
+    };
     let property_mask = style.property_mask;
     let u16_property = |name: &str| -> Result<Option<u16>> {
         style
@@ -348,75 +366,72 @@ pub(super) fn paragraph_formatting_from_style(
     };
 
     let bullet_color_raw = style.get_value("bullet.color").map(i32::cast_unsigned);
-    if bullet_color_raw.is_some_and(|raw| !matches!((raw >> 24) as u8, 0x00..=0x07 | 0xFE | 0xFF)) {
-        return Err(Error::Corrupted(
-            "TextPFRun has an invalid bullet ColorIndexStruct index".to_string(),
-        ));
-    }
+    tolerate_color_index(bullet_color_raw, report);
     let (bullet_color, bullet_scheme_color) =
         bullet_color_raw.map_or((None, None), decode_color_index_struct);
 
-    let alignment = style
-        .get_value("alignment")
-        .map(|value| match value {
-            0 => Ok(ParagraphAlignment::Left),
-            1 => Ok(ParagraphAlignment::Center),
-            2 => Ok(ParagraphAlignment::Right),
-            3 => Ok(ParagraphAlignment::Justify),
-            4 => Ok(ParagraphAlignment::Distributed),
-            5 => Ok(ParagraphAlignment::ThaiDistributed),
-            6 => Ok(ParagraphAlignment::JustifyLow),
-            _ => Err(Error::Corrupted(
-                "TextPFRun has an invalid TextAlignmentEnum value".to_string(),
-            )),
-        })
-        .transpose()?;
-    let font_alignment = style
-        .get_value("fontAlignment")
-        .map(|value| match value {
-            0 => Ok(ParagraphFontAlignment::Roman),
-            1 => Ok(ParagraphFontAlignment::Hanging),
-            2 => Ok(ParagraphFontAlignment::Center),
-            3 => Ok(ParagraphFontAlignment::UpholdFixed),
-            _ => Err(Error::Corrupted(
-                "TextPFRun has an invalid TextFontAlignmentEnum value".to_string(),
-            )),
-        })
-        .transpose()?;
-    let text_direction = style
-        .get_value("textDirection")
-        .map(|value| match value {
-            0 => Ok(ParagraphTextDirection::LeftToRight),
-            1 => Ok(ParagraphTextDirection::RightToLeft),
-            _ => Err(Error::Corrupted(
-                "TextPFRun has an invalid TextDirectionEnum value".to_string(),
-            )),
-        })
-        .transpose()?;
+    // Values outside an MS-PPT 2.13 enumeration come from newer or
+    // non-Microsoft producers; PowerPoint opens them with default formatting
+    // and LibreOffice branches only on values it knows. Leave the property
+    // unset and record it (finding F5.3).
+    let mut enumerated = |name: &str, defect: TextPropDefect, max: i32| {
+        let value = style.get_value(name)?;
+        if (0..=max).contains(&value) {
+            Some(value)
+        } else {
+            report.record(defect, value.cast_unsigned());
+            None
+        }
+    };
+    let alignment =
+        enumerated("alignment", TextPropDefect::UnknownTextAlignment, 6).map(|value| match value {
+            0 => ParagraphAlignment::Left,
+            1 => ParagraphAlignment::Center,
+            2 => ParagraphAlignment::Right,
+            3 => ParagraphAlignment::Justify,
+            4 => ParagraphAlignment::Distributed,
+            5 => ParagraphAlignment::ThaiDistributed,
+            _ => ParagraphAlignment::JustifyLow,
+        });
+    let font_alignment = enumerated("fontAlignment", TextPropDefect::UnknownFontAlignment, 3).map(
+        |value| match value {
+            0 => ParagraphFontAlignment::Roman,
+            1 => ParagraphFontAlignment::Hanging,
+            2 => ParagraphFontAlignment::Center,
+            _ => ParagraphFontAlignment::UpholdFixed,
+        },
+    );
+    let text_direction =
+        enumerated("textDirection", TextPropDefect::UnknownTextDirection, 1).map(|value| {
+            if value == 0 {
+                ParagraphTextDirection::LeftToRight
+            } else {
+                ParagraphTextDirection::RightToLeft
+            }
+        });
 
     let tab_stops = if property_mask & 0x0010_0000 != 0 {
         Some(
             style
                 .tab_stops
                 .iter()
-                .map(|tab| {
-                    let tab_alignment = match tab.alignment {
+                .map(|tab| ParagraphTabStop {
+                    position: tab.position,
+                    alignment: match tab.alignment {
                         0 => ParagraphTabAlignment::Left,
                         1 => ParagraphTabAlignment::Center,
                         2 => ParagraphTabAlignment::Right,
                         3 => ParagraphTabAlignment::Decimal,
-                        _ => {
-                            return Err(Error::Corrupted(
-                                "TextPFRun has an invalid TextTabTypeEnum value".to_string(),
-                            ));
+                        // An undefined TextTabTypeEnum keeps the tab stop's
+                        // position with the default (left) alignment
+                        // (finding F5.3).
+                        raw => {
+                            report.record(TextPropDefect::UnknownTabType, u32::from(raw));
+                            ParagraphTabAlignment::Left
                         },
-                    };
-                    Ok(ParagraphTabStop {
-                        position: tab.position,
-                        alignment: tab_alignment,
-                    })
+                    },
                 })
-                .collect::<Result<Vec<_>>>()?,
+                .collect(),
         )
     } else {
         None
@@ -436,7 +451,7 @@ pub(super) fn paragraph_formatting_from_style(
 
     Ok(ParagraphRunFormatting {
         property_mask,
-        indent_level: style.indent_level,
+        indent_level,
         bullet_flags_raw,
         bullet_enabled: bullet_flag(0x0001, 0x0001),
         bullet_font_enabled: bullet_flag(0x0002, 0x0002),

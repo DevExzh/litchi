@@ -265,28 +265,80 @@ fn exposes_complete_paragraph_runs_with_utf16_coverage() {
     assert_eq!(second.formatting.alignment, Some(ParagraphAlignment::Right));
 }
 
+fn recorded(report: &crate::leniency::ToleranceReport) -> Vec<(crate::Defect, u32)> {
+    report
+        .defects()
+        .iter()
+        .map(|defect| (defect.defect, defect.context))
+        .collect()
+}
+
+/// Undefined paragraph enumeration values degrade to unset (or the default
+/// tab type) and out-of-range indent levels clamp, each recorded (F5.3).
 #[test]
-fn rejects_invalid_paragraph_enumerations() {
+fn repairs_invalid_paragraph_enumerations() {
+    use crate::{Defect, TextPropDefect};
+
     let mut style = super::super::text_prop::TextPropCollection::new(
         1,
         super::super::text_prop::TextPropType::Paragraph,
     );
     style.property_mask = 0x0010_0000;
     style.tab_stops.push(super::super::text_prop::TextTabStop {
-        position: 0,
+        position: 360,
         alignment: 4,
     });
-
-    let tab_error =
-        paragraph_formatting_from_style(&style, &mut crate::leniency::ToleranceReport::default())
-            .unwrap_err();
-    assert!(tab_error.to_string().contains("TextTabTypeEnum"));
-
+    for (name, value) in [("alignment", 7), ("fontAlignment", 4), ("textDirection", 2)] {
+        let mut property = super::super::text_prop::TextProp::new(name, 2, 0);
+        property.value = value;
+        style.properties.push(property);
+    }
     style.indent_level = 5;
-    let indent_error =
-        paragraph_formatting_from_style(&style, &mut crate::leniency::ToleranceReport::default())
-            .unwrap_err();
-    assert!(indent_error.to_string().contains("indent level"));
+
+    let mut report = crate::leniency::ToleranceReport::default();
+    let formatting = paragraph_formatting_from_style(&style, &mut report).unwrap();
+    assert_eq!(formatting.alignment, None);
+    assert_eq!(formatting.font_alignment, None);
+    assert_eq!(formatting.text_direction, None);
+    assert_eq!(formatting.indent_level, 4);
+    assert_eq!(
+        formatting.tab_stops,
+        Some(vec![ParagraphTabStop {
+            position: 360,
+            alignment: ParagraphTabAlignment::Left,
+        }])
+    );
+    assert_eq!(
+        recorded(&report),
+        [
+            (Defect::TextProp(TextPropDefect::IndentLevelOutOfRange), 5),
+            (Defect::TextProp(TextPropDefect::UnknownTextAlignment), 7),
+            (Defect::TextProp(TextPropDefect::UnknownFontAlignment), 4),
+            (Defect::TextProp(TextPropDefect::UnknownTextDirection), 2),
+            (Defect::TextProp(TextPropDefect::UnknownTabType), 4),
+        ]
+    );
+
+    // A bullet ColorIndexStruct with an undefined index reads as unset.
+    let mut bullet = super::super::text_prop::TextPropCollection::new(
+        1,
+        super::super::text_prop::TextPropType::Paragraph,
+    );
+    let mut color = super::super::text_prop::TextProp::new("bullet.color", 4, 0x0010);
+    color.value = 0x0812_3456;
+    bullet.properties.push(color);
+    let mut report = crate::leniency::ToleranceReport::default();
+    let formatting = paragraph_formatting_from_style(&bullet, &mut report).unwrap();
+    assert_eq!(formatting.bullet_color, None);
+    assert_eq!(formatting.bullet_scheme_color, None);
+    assert_eq!(formatting.bullet_color_raw, Some(0x0812_3456));
+    assert_eq!(
+        recorded(&report),
+        [(
+            Defect::TextProp(TextPropDefect::InvalidColorIndex),
+            0x0812_3456
+        )]
+    );
 }
 
 #[test]
@@ -377,7 +429,7 @@ fn rejects_invalid_text_cf_font_sizes() {
 }
 
 #[test]
-fn rejects_invalid_text_cf_color_and_baseline_values() {
+fn repairs_invalid_text_cf_color_and_rejects_invalid_baseline_values() {
     let mut invalid_color = super::super::text_prop::TextPropCollection::new(
         1,
         super::super::text_prop::TextPropType::Character,
@@ -385,7 +437,19 @@ fn rejects_invalid_text_cf_color_and_baseline_values() {
     let mut color = super::super::text_prop::TextProp::new("font.color", 4, 0x40000);
     color.value = 0x0800_0000;
     invalid_color.properties.push(color);
-    assert!(formatting_from_style(&invalid_color).is_err());
+    // An undefined ColorIndexStruct index degrades to an unset color (F5.3).
+    let mut report = crate::leniency::ToleranceReport::default();
+    let formatting = formatting_from_style(&invalid_color, &mut report).unwrap();
+    assert_eq!(formatting.font_color, None);
+    assert_eq!(formatting.font_scheme_color, None);
+    assert_eq!(formatting.font_color_raw, Some(0x0800_0000));
+    assert_eq!(
+        recorded(&report),
+        [(
+            crate::Defect::TextProp(crate::TextPropDefect::InvalidColorIndex),
+            0x0800_0000
+        )]
+    );
 
     let mut invalid_position = super::super::text_prop::TextPropCollection::new(
         1,
@@ -394,5 +458,11 @@ fn rejects_invalid_text_cf_color_and_baseline_values() {
     let mut position = super::super::text_prop::TextProp::new("superscript", 2, 0x80000);
     position.value = 101;
     invalid_position.properties.push(position);
-    assert!(formatting_from_style(&invalid_position).is_err());
+    assert!(
+        formatting_from_style(
+            &invalid_position,
+            &mut crate::leniency::ToleranceReport::default()
+        )
+        .is_err()
+    );
 }
