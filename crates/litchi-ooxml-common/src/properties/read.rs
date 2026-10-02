@@ -95,7 +95,7 @@ pub fn read_with_report(
     package: &OpcPackage,
     report: &mut ToleranceReport,
 ) -> Result<Option<Props>> {
-    let graph = graph::inspect(package)?;
+    let graph = graph::inspect_tolerant(package, report)?;
     let Some(part_name) = graph.part else {
         return Ok(None);
     };
@@ -198,7 +198,7 @@ pub fn read_source_backed_with_report(
 ) -> Result<Option<Props>> {
     package.check_execution()?;
     package.source_version()?;
-    let graph = graph::inspect_source(package)?;
+    let graph = graph::inspect_source(package, report)?;
     let Some(part_name) = graph.part else {
         package.check_execution()?;
         package.source_version()?;
@@ -1003,12 +1003,26 @@ mod tests {
             br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
         );
 
-        for package in [&external, &dangling, &wrong] {
+        for package in [&external, &wrong] {
             let eager = read(package).unwrap_err();
             let source = source_package(package);
             let deferred = read_source_backed(&source).unwrap_err();
             assert_eq!(error_family(&eager), error_family(&deferred));
         }
+
+        // LENIENCY_AUDIT 8.2: both readers repair a dangling relationship the
+        // same way and record the same defect.
+        let mut eager_report = ToleranceReport::default();
+        assert!(read_with_report(&dangling, &mut eager_report).unwrap().is_none());
+        let source = source_package(&dangling);
+        let mut source_report = ToleranceReport::default();
+        assert!(
+            read_source_backed_with_report(&source, &mut source_report)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(eager_report, source_report);
+        assert_eq!(eager_report.total(), 1);
     }
 
     #[test]
@@ -1019,7 +1033,24 @@ mod tests {
 
         let mut dangling = OpcPackage::new();
         dangling.relate_to("missing.xml", rt::CORE_PROPERTIES);
-        assert!(matches!(read(&dangling), Err(Error::Missing(_))));
+        let mut report = ToleranceReport::default();
+        assert!(read_with_report(&dangling, &mut report).unwrap().is_none());
+        assert_eq!(
+            report
+                .iter()
+                .map(|t| (t.defect(), t.part(), t.value()))
+                .collect::<Vec<_>>(),
+            vec![(
+                CorePropertiesDefect::DanglingRelationship.into(),
+                "/",
+                Some("missing.xml")
+            )]
+        );
+        // The writer still refuses to act on the dangling graph.
+        assert!(matches!(
+            super::super::write(&mut dangling, Props::new().title("T")),
+            Err(Error::Missing(_))
+        ));
 
         let wrong = package_with_core(
             "/core.xml",
@@ -1027,6 +1058,63 @@ mod tests {
             br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
         );
         assert!(matches!(read(&wrong), Err(Error::ContentType { .. })));
+    }
+
+    /// LENIENCY_AUDIT 8.2: an orphaned part, a second core-typed part, and a
+    /// relationship owned by a part are read past and recorded.
+    #[test]
+    fn orphaned_duplicate_and_misplaced_graph_anomalies_are_recorded() {
+        let xml = br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Selected</dc:title></cp:coreProperties>"#;
+        let mut orphan = OpcPackage::new();
+        orphan.add_part(Box::new(BlobPart::new(
+            PackURI::new("/docProps/core.xml").unwrap(),
+            ct::OPC_CORE_PROPERTIES.to_owned(),
+            xml.to_vec(),
+        )));
+        let mut report = ToleranceReport::default();
+        assert!(read_with_report(&orphan, &mut report).unwrap().is_none());
+        assert_eq!(
+            report.iter().map(|t| (t.defect(), t.part())).collect::<Vec<_>>(),
+            vec![(CorePropertiesDefect::OrphanedPart.into(), "/docProps/core.xml")]
+        );
+        assert!(read(&orphan).unwrap().is_none());
+
+        let mut duplicate = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, xml);
+        duplicate.add_part(Box::new(BlobPart::new(
+            PackURI::new("/docProps/core2.xml").unwrap(),
+            ct::OPC_CORE_PROPERTIES.to_owned(),
+            xml.to_vec(),
+        )));
+        let owner = PackURI::new("/docProps/core2.xml").unwrap();
+        duplicate
+            .get_part_mut(&owner)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                rt::CORE_PROPERTIES.to_owned(),
+                "core.xml".to_owned(),
+                "rIdX".to_owned(),
+                false,
+            );
+        let mut report = ToleranceReport::default();
+        let props = read_with_report(&duplicate, &mut report).unwrap().unwrap();
+        assert_eq!(props.title.as_deref(), Some("Selected"));
+        let mut recorded: Vec<_> = report
+            .iter()
+            .map(|t| (t.defect(), t.part().to_owned(), t.item().map(str::to_owned)))
+            .collect();
+        recorded.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(&b.2)));
+        assert!(recorded.contains(&(
+            CorePropertiesDefect::DuplicatePart.into(),
+            "/docProps/core2.xml".to_owned(),
+            None
+        )));
+        assert!(recorded.contains(&(
+            CorePropertiesDefect::MisplacedRelationship.into(),
+            "/docProps/core2.xml".to_owned(),
+            Some("rIdX".to_owned())
+        )));
+        assert_eq!(recorded.len(), 2);
     }
 
     #[test]

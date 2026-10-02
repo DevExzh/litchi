@@ -1,5 +1,7 @@
 use super::{Dialect, STRICT_CORE_PROPERTIES_RELATIONSHIP};
+use crate::leniency::{CorePropertiesDefect, ToleranceReport};
 use crate::{Error, Result};
+use litchi_opc::packuri::PACKAGE_URI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartMetadata, PartView, Relationships, SourceBackedPackage,
@@ -11,8 +13,24 @@ pub(super) struct Graph {
     pub(super) dialect: Option<Dialect>,
 }
 
+/// Inspect the graph strictly, as the writer needs it: every anomaly is an
+/// error, so a write never acts on an ambiguous graph.
 pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
-    inspect_parts(|| package.iter_parts(), package.rels(), || Ok(()))
+    inspect_parts(|| package.iter_parts(), package.rels(), || Ok(()), None)
+}
+
+/// Inspect the graph for a read, repairing and recording the anomalies of
+/// LENIENCY_AUDIT 8.2 into `report`.
+pub(super) fn inspect_tolerant(
+    package: &OpcPackage,
+    report: &mut ToleranceReport,
+) -> Result<Graph> {
+    inspect_parts(
+        || package.iter_parts(),
+        package.rels(),
+        || Ok(()),
+        Some(report),
+    )
 }
 
 /// Inspect the same core-properties graph over the metadata-only
@@ -20,12 +38,16 @@ pub(super) fn inspect(package: &OpcPackage) -> Result<Graph> {
 /// metadata-only part projection is deliberately fed through the same graph
 /// implementation as the eager package path so strict OPC edge rules cannot
 /// drift between ingress modes.
-pub(super) fn inspect_source(package: &SourceBackedPackage) -> Result<Graph> {
+pub(super) fn inspect_source(
+    package: &SourceBackedPackage,
+    report: &mut ToleranceReport,
+) -> Result<Graph> {
     package.source_version()?;
     let result = inspect_parts(
         || package.iter_parts(),
         package.rels(),
         || Ok(package.check_execution()?),
+        Some(report),
     );
     package.source_version()?;
     result
@@ -79,10 +101,21 @@ impl GraphPart for PartView<'_> {
     }
 }
 
+/// Locate the relationship-selected core-properties part.
+///
+/// With a `report`, the graph anomalies Word, LibreOffice and POI read past
+/// (LENIENCY_AUDIT 8.2) are repaired and recorded instead of failing: a
+/// core-properties relationship owned by a part is ignored, a second
+/// core-typed part is dead weight beside the relationship-selected one, an
+/// orphaned part means no core properties, and a dangling relationship means
+/// no core properties. Without one (the writer) they stay errors. An
+/// external, query/fragment or wrongly typed target, and more than one
+/// package-level relationship (OPC M4.1), are errors either way.
 fn inspect_parts<F, I, P, C>(
     parts: F,
     package_relationships: &Relationships,
     mut check: C,
+    mut report: Option<&mut ToleranceReport>,
 ) -> Result<Graph>
 where
     F: Fn() -> I,
@@ -91,23 +124,37 @@ where
     C: FnMut() -> Result<()>,
 {
     let mut core_part = None;
+    // Further core-typed parts, tolerated only on the read path.
+    let mut extra_core_parts = Vec::new();
     for part in parts() {
         check()?;
         if part.graph_content_type() == ct::OPC_CORE_PROPERTIES {
             if core_part.is_some() {
-                return Err(Error::Invalid(
-                    "package contains multiple core-properties parts".to_owned(),
-                ));
+                if report.is_none() {
+                    return Err(Error::Invalid(
+                        "package contains multiple core-properties parts".to_owned(),
+                    ));
+                }
+                extra_core_parts.push(part.graph_partname().clone());
+            } else {
+                core_part = Some(part.graph_partname().clone());
             }
-            core_part = Some(part.graph_partname().clone());
         }
         for relationship in part.graph_rels().iter() {
             check()?;
             if is_core_relationship(relationship.reltype()) {
-                return Err(Error::Relationship(format!(
-                    "core-properties relationship must be package-level, not owned by '{}'",
-                    part.graph_partname().as_str()
-                )));
+                let Some(report) = report.as_deref_mut() else {
+                    return Err(Error::Relationship(format!(
+                        "core-properties relationship must be package-level, not owned by '{}'",
+                        part.graph_partname().as_str()
+                    )));
+                };
+                report.record(
+                    CorePropertiesDefect::MisplacedRelationship,
+                    part.graph_partname().as_str(),
+                    Some(relationship.r_id()),
+                    Some(relationship.target_ref()),
+                );
             }
         }
     }
@@ -128,10 +175,15 @@ where
 
     let Some(relationship) = core_relationship else {
         if let Some(part) = core_part {
-            return Err(Error::Relationship(format!(
-                "core-properties part '{}' is orphaned",
-                part.as_str()
-            )));
+            let Some(report) = report else {
+                return Err(Error::Relationship(format!(
+                    "core-properties part '{}' is orphaned",
+                    part.as_str()
+                )));
+            };
+            for orphan in std::iter::once(&part).chain(&extra_core_parts) {
+                report.record(CorePropertiesDefect::OrphanedPart, orphan.as_str(), None, None);
+            }
         }
         return Ok(Graph {
             part: None,
@@ -170,13 +222,35 @@ where
         actual = Some(part.graph_partname().clone());
         break;
     }
-    let actual = actual.ok_or_else(|| {
-        Error::Missing(format!(
-            "core-properties relationship target '{}' does not exist",
-            requested.as_str()
-        ))
-    })?;
-    if core_part
+    let Some(actual) = actual else {
+        let Some(report) = report else {
+            return Err(Error::Missing(format!(
+                "core-properties relationship target '{}' does not exist",
+                requested.as_str()
+            )));
+        };
+        report.record(
+            CorePropertiesDefect::DanglingRelationship,
+            PACKAGE_URI,
+            Some(relationship.r_id()),
+            Some(relationship.target_ref()),
+        );
+        for orphan in core_part.iter().chain(&extra_core_parts) {
+            report.record(CorePropertiesDefect::OrphanedPart, orphan.as_str(), None, None);
+        }
+        return Ok(Graph {
+            part: None,
+            relationship_id: None,
+            dialect: None,
+        });
+    };
+    if let Some(report) = report {
+        for extra in core_part.iter().chain(&extra_core_parts) {
+            if !same_name(extra, &actual) {
+                report.record(CorePropertiesDefect::DuplicatePart, extra.as_str(), None, None);
+            }
+        }
+    } else if core_part
         .as_ref()
         .is_some_and(|candidate| !same_name(candidate, &actual))
     {
