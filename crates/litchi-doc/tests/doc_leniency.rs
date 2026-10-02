@@ -38,8 +38,8 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    PapxDefect, SprmDefect, StshifDefect, StyleDefect, StylesheetDefect, TableDefinitionDefect,
-    Writer,
+    PapxDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect, StylesheetDefect,
+    TableDefinitionDefect, Writer,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -796,5 +796,65 @@ fn papx_alignment_padding_is_trimmed_by_default_and_recorded() {
             .all(|tolerated| tolerated.defect != Defect::Papx(PapxDefect::Run)),
         "the padded runs are read, not defaulted: {:?}",
         report.defects()
+    );
+}
+
+/// MS-DOC 2.9.17 marks the Brc80 reserved bit "MUST be ignored", and an Ico
+/// above 16 names no color: a section page border carrying either reads with
+/// the bit masked and automatic color, recorded against the SPRM, instead of
+/// losing the whole section table.
+#[test]
+fn section_page_border_defects_are_repaired_and_recorded() {
+    use litchi_doc::{Border, Borders, Color, Style};
+
+    let border = Border {
+        style: Style::Single,
+        width_eighth_points: 8,
+        color: Color::Red,
+        spacing_points: 4,
+        shadow: false,
+        frame: false,
+    };
+    let clean = writer_document(|writer| {
+        writer
+            .set_section_page_borders(Borders {
+                top: Some(border),
+                ..Borders::default()
+            })
+            .expect("fixture borders");
+    });
+    let original = open_degraded(clean.clone());
+    assert!(original.tolerance_report().is_clean());
+    assert_eq!(original.sections()[0].page_borders.top, Some(border));
+
+    let bytes = edit_word_stream(&clean, |word| {
+        // sprmSBrcTop80 (0x702B): width, brcType, ico, effects.
+        let sprm = word
+            .windows(4)
+            .position(|bytes| bytes == [0x2B, 0x70, 8, 0x01])
+            .expect("the Writer emits sprmSBrcTop80");
+        word[sprm + 4] = 0x11; // ico 17
+        word[sprm + 5] |= 0x80; // reserved effect bit
+    });
+    let document = open_degraded(bytes);
+    assert_eq!(document.sections().len(), 1, "the section table survives");
+    assert_eq!(
+        document.sections()[0].page_borders.top,
+        Some(Border {
+            color: Color::Automatic,
+            ..border
+        })
+    );
+    assert_eq!(
+        document
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect::<Vec<_>>(),
+        vec![
+            (Defect::Section(SectionDefect::BorderColor), 0x702B),
+            (Defect::Section(SectionDefect::ReservedBits), 0x702B),
+        ]
     );
 }

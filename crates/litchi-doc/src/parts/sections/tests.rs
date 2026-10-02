@@ -1,4 +1,5 @@
 use super::SectionsTable;
+use crate::leniency::{Defect, SectionDefect, ToleratedDefect};
 use crate::package::Result;
 use crate::parts::numbering::NumberFormat;
 use crate::parts::revisions::RevisionAuthorTable;
@@ -266,16 +267,9 @@ fn parses_section_page_line_and_note_numbering() {
 #[test]
 fn rejects_invalid_section_numbering_operands() {
     for grpprl in [
-        fixed_sprm(0x3000, &[5]),
-        fixed_sprm(0x3001, &[10]),
-        fixed_sprm(0x300E, &[60]),
-        fixed_sprm(0x3013, &[3]),
         fixed_sprm(0x5015, &101u16.to_le_bytes()),
         fixed_sprm(0x501B, &32_767u16.to_le_bytes()),
-        fixed_sprm(0x303B, &[0]),
-        fixed_sprm(0x303E, &[2]),
         fixed_sprm(0x503F, &16_384u16.to_le_bytes()),
-        fixed_sprm(0x5040, &0x0100u16.to_le_bytes()),
         fixed_sprm(0x7044, &2_147_483_647u32.to_le_bytes()),
     ] {
         assert!(parse_synthetic(&[Some(grpprl)]).is_err());
@@ -308,11 +302,74 @@ fn parses_section_behavior_and_paper_settings() {
     assert_eq!(section.paper.requested_paper_kind, Some(42));
 }
 
+/// Section enumerations are defined-value lists with no reader-side
+/// rejection rule: an undefined value keeps the property's default and is
+/// recorded against the SPRM opcode; the rest of the SEPX still applies.
 #[test]
-fn rejects_invalid_section_behavior_booleans() {
-    for opcode in [0x3006, 0x300A, 0x3228, 0x322A, 0x3239] {
-        assert!(parse_synthetic(&[Some(fixed_sprm(opcode, &[2]))]).is_err());
+fn repairs_undefined_section_enumerations_and_booleans() {
+    let authors = RevisionAuthorTable::from_authors(&["Unknown", "Editor"]);
+    let parse = |grpprl: Vec<u8>| {
+        let (data, word_document) = build_section_data(&[Some(grpprl)]);
+        SectionsTable::parse_data_recording(&data, &word_document, &authors)
+            .expect("undefined section values are repaired, not fatal")
+    };
+    let defaults = parse_synthetic(&[None]).unwrap().sections()[0].clone();
+    for (opcode, operand) in [
+        (0x3000, vec![5]),
+        (0x3001, vec![10]),
+        (0x3009, vec![5]),
+        (0x300E, vec![60]),
+        (0x3013, vec![3]),
+        (0x301A, vec![4]),
+        (0x301D, vec![0]),
+        (0x303B, vec![0]),
+        (0x303E, vec![2]),
+        (0x5032, 4u16.to_le_bytes().to_vec()),
+        (0x5033, 6u16.to_le_bytes().to_vec()),
+        (0x5040, 0x0100u16.to_le_bytes().to_vec()),
+        (0x5042, 60u16.to_le_bytes().to_vec()),
+    ] {
+        let mut grpprl = fixed_sprm(opcode, &operand);
+        grpprl.extend(fixed_sprm(0x301D, &[2])); // later SPRMs still apply
+        let (parsed, report) = parse(grpprl);
+        let section = &parsed.sections()[0];
+        assert_eq!(section.page.orientation, PageOrientation::Landscape);
+        assert_eq!(
+            report.defects(),
+            &[ToleratedDefect {
+                defect: Defect::Section(SectionDefect::EnumValue),
+                context: opcode,
+            }],
+            "opcode {opcode:#06x}"
+        );
+        let mut expected = defaults.clone();
+        expected.page.orientation = PageOrientation::Landscape;
+        assert_eq!(*section, expected, "opcode {opcode:#06x} keeps its default");
     }
+
+    for opcode in [0x3006, 0x300A, 0x3228, 0x322A, 0x3239] {
+        let (parsed, report) = parse(fixed_sprm(opcode, &[2]));
+        let behavior = &parsed.sections()[0].behavior;
+        assert!(
+            behavior.different_first_page
+                || behavior.right_to_left
+                || behavior.right_to_left_gutter
+                || behavior.preserve_properties_for_revision
+                || behavior.protection == Protection::Unprotected,
+            "opcode {opcode:#06x} reads as true"
+        );
+        assert_eq!(
+            report.defects(),
+            &[ToleratedDefect {
+                defect: Defect::Section(SectionDefect::Boolean),
+                context: opcode,
+            }]
+        );
+    }
+
+    // A defined value records nothing.
+    let (_, report) = parse(fixed_sprm(0x3009, &[2]));
+    assert!(report.is_clean());
 }
 
 #[test]
@@ -338,8 +395,6 @@ fn rejects_malformed_tables_properties_and_columns() {
     assert!(SectionsTable::parse_data(&duplicate_cps, &word_document, &authors).is_err());
 
     for grpprl in [
-        fixed_sprm(0x3009, &[5]),
-        fixed_sprm(0x301D, &[0]),
         fixed_sprm(0xB01F, &143u16.to_le_bytes()),
         fixed_sprm(0x500B, &44u16.to_le_bytes()),
         fixed_sprm(0x9023, &i16::MIN.to_le_bytes()),
@@ -437,27 +492,63 @@ fn page_border_defaults_and_later_operands_win() {
 
 #[test]
 fn rejects_malformed_page_border_operands() {
-    for border in [
-        fixed_sprm(0x702B, &[8, 0x02, 0, 0]),
-        fixed_sprm(0x702B, &[8, 0x1A, 0, 0]),
-        fixed_sprm(0x702B, &[8, 0x1B, 0, 0]),
-        fixed_sprm(0x702B, &[8, 0xE4, 0, 0]),
-        fixed_sprm(0x702B, &[8, 0x01, 0x11, 0]),
-        fixed_sprm(0x702B, &[8, 0x00, 0x11, 0]),
-        fixed_sprm(0x702B, &[8, 0x01, 0, 0x80]),
-    ] {
-        assert!(parse_synthetic(&[Some(border)]).is_err());
+    // Operand framing stays fatal.
+    assert!(parse_synthetic(&[Some(fixed_sprm(0x522F, &[0]))]).is_err());
+    assert!(parse_synthetic(&[Some(fixed_sprm(0x702B, &[8, 1, 0]))]).is_err());
+}
+
+/// MS-DOC 2.9.17 marks the Brc80 reserved bit "MUST be ignored"; undefined
+/// border types, colors, and SPgbProp values read with defaults. Each is
+/// recorded against the SPRM opcode instead of failing the section table.
+#[test]
+fn repairs_page_border_reserved_bits_and_undefined_values() {
+    let authors = RevisionAuthorTable::from_authors(&["Unknown"]);
+    let parse = |grpprl: Vec<u8>| {
+        let (data, word_document) = build_section_data(&[Some(grpprl)]);
+        let (parsed, report) = SectionsTable::parse_data_recording(&data, &word_document, &authors)
+            .expect("page-border defects are repaired, not fatal");
+        let defects = report
+            .defects()
+            .iter()
+            .map(|tolerated| tolerated.defect)
+            .collect::<Vec<_>>();
+        (parsed.sections()[0].page_borders, defects)
+    };
+    let section = |defect| Defect::Section(defect);
+
+    for code in [0x02, 0x1A, 0x1B, 0xE4] {
+        let (borders, defects) = parse(fixed_sprm(0x702B, &[8, code, 0, 0]));
+        assert_eq!(borders.top, None, "brcType {code:#04x} reads as no border");
+        assert_eq!(defects, [section(SectionDefect::BorderType)]);
     }
 
-    for properties in [
-        fixed_sprm(0x522F, &[0x03, 0]),
-        fixed_sprm(0x522F, &[0x10, 0]),
-        fixed_sprm(0x522F, &[0x40, 0]),
-        fixed_sprm(0x522F, &[0, 1]),
-        fixed_sprm(0x522F, &[0]),
-    ] {
-        assert!(parse_synthetic(&[Some(properties)]).is_err());
-    }
+    let (borders, defects) = parse(fixed_sprm(0x702B, &[8, 0x01, 0x11, 0]));
+    assert_eq!(borders.top.unwrap().color, borders::Color::Automatic);
+    assert_eq!(borders.top.unwrap().style, borders::Style::Single);
+    assert_eq!(defects, [section(SectionDefect::BorderColor)]);
+
+    let (borders, defects) = parse(fixed_sprm(0x702B, &[8, 0x01, 6, 0xA3]));
+    let top = borders.top.unwrap();
+    assert_eq!(
+        (top.color, top.spacing_points, top.shadow),
+        (borders::Color::Red, 3, true)
+    );
+    assert_eq!(defects, [section(SectionDefect::ReservedBits)]);
+
+    let (borders, defects) = parse(fixed_sprm(0x522F, &[0x21, 1]));
+    assert_eq!(borders.apply_to, borders::ApplyTo::FirstPage);
+    assert_eq!(borders.offset_from, borders::Offset::PageEdge);
+    assert_eq!(defects, [section(SectionDefect::ReservedBits)]);
+
+    let (borders, defects) = parse(fixed_sprm(0x522F, &[0x03 | 0x10 | 0x40, 0]));
+    assert_eq!(borders.apply_to, Borders::default().apply_to);
+    assert_eq!(borders.depth, Borders::default().depth);
+    assert_eq!(borders.offset_from, Borders::default().offset_from);
+    assert_eq!(defects, [section(SectionDefect::EnumValue); 3]);
+
+    // Defined operands record nothing.
+    let (_, defects) = parse(fixed_sprm(0x702B, &[8, 0x01, 6, 0x23]));
+    assert!(defects.is_empty());
 }
 
 #[test]
@@ -510,8 +601,6 @@ fn rejects_malformed_page_grid_and_text_flow_operands() {
         fixed_sprm(0x7030, &6_488_065i32.to_le_bytes()),
         fixed_sprm(0x9031, &0u16.to_le_bytes()),
         fixed_sprm(0x9031, &31_681u16.to_le_bytes()),
-        fixed_sprm(0x5032, &4u16.to_le_bytes()),
-        fixed_sprm(0x5033, &6u16.to_le_bytes()),
         fixed_sprm(0x7030, &[0, 0, 0]),
         fixed_sprm(0x9031, &[1]),
     ] {

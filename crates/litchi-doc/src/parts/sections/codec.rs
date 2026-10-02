@@ -2,6 +2,7 @@
 
 use super::model::{Properties, SectionsTable, parse_revision, read_i32, read_u32};
 use super::validation;
+use crate::leniency::ToleranceReport;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::revisions::RevisionAuthorTable;
@@ -13,6 +14,7 @@ pub(super) fn parse(
     table_stream: &[u8],
     word_document: &[u8],
     authors: &RevisionAuthorTable,
+    tolerance: &mut ToleranceReport,
 ) -> Result<SectionsTable> {
     let Some((offset, length)) = fib.get_table_pointer(6) else {
         return Ok(SectionsTable::default());
@@ -30,18 +32,34 @@ pub(super) fn parse(
     let data = table_stream.get(start..end).ok_or_else(|| {
         PackageError::Corrupted("PlcfSed extends beyond the table stream".to_string())
     })?;
-    parse_data(data, word_document, authors)
+    parse_data(data, word_document, authors, tolerance)
 }
 
 impl SectionsTable {
     /// Parse the section PLC and every referenced SEPX once.
+    ///
+    /// Word-compatible per-SPRM repairs are applied but their record is
+    /// discarded; use [`Self::parse_recording`] to enumerate them.
     pub fn parse(
         fib: &FileInformationBlock,
         table_stream: &[u8],
         word_document: &[u8],
         authors: &RevisionAuthorTable,
     ) -> Result<Self> {
-        parse(fib, table_stream, word_document, authors)
+        Self::parse_recording(fib, table_stream, word_document, authors).map(|(table, _)| table)
+    }
+
+    /// Parse the section PLC, returning the repairs
+    /// [`crate::SectionDefect`] lists alongside the table.
+    pub(crate) fn parse_recording(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        word_document: &[u8],
+        authors: &RevisionAuthorTable,
+    ) -> Result<(Self, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
+        let table = parse(fib, table_stream, word_document, authors, &mut tolerance)?;
+        Ok((table, tolerance))
     }
 
     #[cfg(test)]
@@ -50,7 +68,23 @@ impl SectionsTable {
         word_document: &[u8],
         authors: &RevisionAuthorTable,
     ) -> Result<Self> {
-        parse_data(data, word_document, authors)
+        parse_data(
+            data,
+            word_document,
+            authors,
+            &mut ToleranceReport::default(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(super) fn parse_data_recording(
+        data: &[u8],
+        word_document: &[u8],
+        authors: &RevisionAuthorTable,
+    ) -> Result<(Self, ToleranceReport)> {
+        let mut tolerance = ToleranceReport::default();
+        let table = parse_data(data, word_document, authors, &mut tolerance)?;
+        Ok((table, tolerance))
     }
 }
 
@@ -58,6 +92,7 @@ fn parse_data(
     data: &[u8],
     word_document: &[u8],
     authors: &RevisionAuthorTable,
+    tolerance: &mut ToleranceReport,
 ) -> Result<SectionsTable> {
     if data.len() < 20 || !(data.len() - 4).is_multiple_of(16) {
         return Err(PackageError::Corrupted(
@@ -125,9 +160,10 @@ fn parse_data(
 
             for sprm in &sprms {
                 if sprm.opcode == 0xD243 {
-                    revision = parse_revision(sprm, cps[index], cps[index + 1], authors)?;
+                    revision =
+                        parse_revision(sprm, cps[index], cps[index + 1], authors, tolerance)?;
                 } else {
-                    properties.apply(sprm)?;
+                    properties.apply(sprm, tolerance)?;
                 }
             }
         }

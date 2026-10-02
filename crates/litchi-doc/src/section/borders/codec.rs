@@ -1,11 +1,21 @@
 //! Word 97 `Brc80` and `SPgbProp` codecs for section page borders.
 
 use super::model::{ApplyTo, Art, Border, Borders, Color, Depth, Error, Offset, Style};
+use crate::leniency::{SectionDefect, ToleranceReport};
 use crate::package::{Error as PackageError, Result};
 use crate::sprm::Sprm;
 
 /// Decode one fixed-size `Brc80` section-border operand.
-pub(crate) fn decode_brc80(sprm: &Sprm, name: &str) -> Result<Option<Border>> {
+///
+/// Only an operand of the wrong size is fatal. An undefined `brcType` reads
+/// as no border (LibreOffice's default), an `ico` above 16 as automatic
+/// color, and the reserved effect bit (MS-DOC 2.9.17: "MUST be zero, and
+/// MUST be ignored") is masked; each is recorded as a [`SectionDefect`].
+pub(crate) fn decode_brc80(
+    sprm: &Sprm,
+    name: &str,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<Border>> {
     let operand = sprm.operand_bytes();
     if operand.len() != 4 {
         return corrupted(&format!("{name} operand must contain exactly 4 bytes"));
@@ -36,11 +46,14 @@ pub(crate) fn decode_brc80(sprm: &Sprm, name: &str) -> Result<Option<Border>> {
         0x17 => Some(Style::DashDotStroked),
         0x18 => Some(Style::ThreeDEmboss),
         0x19 => Some(Style::ThreeDEngrave),
-        code => Some(Style::Art(Art::try_from(code).map_err(|error| {
-            PackageError::Corrupted(format!(
-                "{name} contains invalid Brc80 border type {code:#04x}: {error}"
-            ))
-        })?)),
+        code => {
+            if let Ok(art) = Art::try_from(code) {
+                Some(Style::Art(art))
+            } else {
+                tolerance.record(SectionDefect::BorderType, sprm.opcode);
+                None
+            }
+        },
     };
 
     let color = match operand[2] {
@@ -61,19 +74,15 @@ pub(crate) fn decode_brc80(sprm: &Sprm, name: &str) -> Result<Option<Border>> {
         0x0E => Color::DarkYellow,
         0x0F => Color::DarkGray,
         0x10 => Color::LightGray,
-        invalid => {
-            return corrupted(&format!(
-                "{name} contains invalid Ico color index {invalid:#04x}"
-            ));
+        _ => {
+            tolerance.record(SectionDefect::BorderColor, sprm.opcode);
+            Color::Automatic
         },
     };
 
     let effects = operand[3];
     if effects & 0x80 != 0 {
-        return corrupted(&format!(
-            "{name} contains reserved Brc80 effect bits {:#04x}",
-            effects & 0x80
-        ));
+        tolerance.record(SectionDefect::ReservedBits, sprm.opcode);
     }
     let Some(style) = style else {
         return Ok(None);
@@ -89,30 +98,39 @@ pub(crate) fn decode_brc80(sprm: &Sprm, name: &str) -> Result<Option<Border>> {
 }
 
 /// Decode the two-byte `SPgbProp` section-border placement operand.
-pub(crate) fn decode_pgb_prop(borders: &mut Borders, sprm: &Sprm) -> Result<()> {
+///
+/// Only an operand of the wrong size is fatal. A non-zero reserved byte is
+/// ignored, and an undefined value in one of the three placement fields
+/// leaves that field at its current (default) value; each is recorded as a
+/// [`SectionDefect`].
+pub(crate) fn decode_pgb_prop(
+    borders: &mut Borders,
+    sprm: &Sprm,
+    tolerance: &mut ToleranceReport,
+) -> Result<()> {
     let operand = sprm.operand_bytes();
     if operand.len() != 2 {
         return corrupted("sprmSPgbProp operand must contain exactly 2 bytes");
     }
     if operand[1] != 0 {
-        return corrupted("sprmSPgbProp reserved byte must be zero");
+        tolerance.record(SectionDefect::ReservedBits, sprm.opcode);
     }
-    borders.apply_to = match operand[0] & 0x07 {
-        0 => ApplyTo::AllPages,
-        1 => ApplyTo::FirstPage,
-        2 => ApplyTo::AllButFirstPage,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbApplyTo value"),
-    };
-    borders.depth = match (operand[0] >> 3) & 0x03 {
-        0 => Depth::InFront,
-        1 => Depth::Behind,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbPageDepth value"),
-    };
-    borders.offset_from = match (operand[0] >> 5) & 0x07 {
-        0 => Offset::Text,
-        1 => Offset::PageEdge,
-        _ => return corrupted("sprmSPgbProp contains an invalid PgbOffsetFrom value"),
-    };
+    match operand[0] & 0x07 {
+        0 => borders.apply_to = ApplyTo::AllPages,
+        1 => borders.apply_to = ApplyTo::FirstPage,
+        2 => borders.apply_to = ApplyTo::AllButFirstPage,
+        _ => tolerance.record(SectionDefect::EnumValue, sprm.opcode),
+    }
+    match (operand[0] >> 3) & 0x03 {
+        0 => borders.depth = Depth::InFront,
+        1 => borders.depth = Depth::Behind,
+        _ => tolerance.record(SectionDefect::EnumValue, sprm.opcode),
+    }
+    match (operand[0] >> 5) & 0x07 {
+        0 => borders.offset_from = Offset::Text,
+        1 => borders.offset_from = Offset::PageEdge,
+        _ => tolerance.record(SectionDefect::EnumValue, sprm.opcode),
+    }
     Ok(())
 }
 

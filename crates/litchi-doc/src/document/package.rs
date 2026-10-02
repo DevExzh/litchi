@@ -320,8 +320,8 @@ impl Document {
         // Section ranges feed only layout queries (`sections()`,
         // `section_at_cp()`), never structural offsets, so a malformed
         // PlcfSed degrades to the same empty table an absent one produces.
-        let sections = auxiliary_or_default(
-            SectionsTable::parse(&fib, &table_stream, &word_document, &revision_authors),
+        let sections = auxiliary_recorded(
+            SectionsTable::parse_recording(&fib, &table_stream, &word_document, &revision_authors),
             AuxiliaryTableDefect::Sections,
             &mut tolerance,
         );

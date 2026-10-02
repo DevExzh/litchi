@@ -1,5 +1,6 @@
 //! Section range, layout, and property-revision parsing for Word 97+ documents.
 
+use crate::leniency::{SectionDefect, ToleranceReport};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::numbering::NumberFormat;
 use crate::parts::revisions::RevisionAuthorTable;
@@ -107,7 +108,13 @@ impl Default for Properties {
 }
 
 impl Properties {
-    pub(super) fn apply(&mut self, sprm: &Sprm) -> Result<()> {
+    /// Apply one SEPX SPRM.
+    ///
+    /// Operand framing (an operand of the wrong size) stays a hard error.
+    /// An undefined enumeration value, a Boolean8 other than 0 or 1, and the
+    /// border reserved bits are repaired the way Word repairs them and
+    /// recorded as a [`SectionDefect`] against the SPRM opcode.
+    pub(super) fn apply(&mut self, sprm: &Sprm, tolerance: &mut ToleranceReport) -> Result<()> {
         match sprm.opcode {
             0x3000 => {
                 self.page_numbering.chapter_separator = match byte_operand(sprm, "sprmScnsPgn")? {
@@ -116,7 +123,10 @@ impl Properties {
                     2 => ChapterNumberSeparator::Colon,
                     3 => ChapterNumberSeparator::EmDash,
                     4 => ChapterNumberSeparator::EnDash,
-                    _ => return corrupted("sprmScnsPgn contains an invalid CNS value"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x3001 => {
@@ -124,7 +134,10 @@ impl Properties {
                     match byte_operand(sprm, "sprmSiHeadingPgn")? {
                         0 => None,
                         level @ 1..=9 => Some(level),
-                        _ => return corrupted("sprmSiHeadingPgn must be in [0, 9]"),
+                        _ => {
+                            undefined_value(sprm, tolerance);
+                            return Ok(());
+                        },
                     };
             },
             0xF203 => {
@@ -141,9 +154,9 @@ impl Properties {
                 }
                 self.column_spacings[index] = Some(value);
             },
-            0x3005 => self.evenly_spaced = bool_operand(sprm, "sprmSFEvenlySpaced")?,
+            0x3005 => self.evenly_spaced = bool_operand(sprm, "sprmSFEvenlySpaced", tolerance)?,
             0x3006 => {
-                self.behavior.protection = if bool_operand(sprm, "sprmSFProtected")? {
+                self.behavior.protection = if bool_operand(sprm, "sprmSFProtected", tolerance)? {
                     Protection::Unprotected
                 } else {
                     Protection::Protected
@@ -162,11 +175,15 @@ impl Properties {
                     2 => BreakKind::NewPage,
                     3 => BreakKind::EvenPage,
                     4 => BreakKind::OddPage,
-                    _ => return corrupted("sprmSBkc contains an invalid section break kind"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x300A => {
-                self.behavior.different_first_page = bool_operand(sprm, "sprmSFTitlePage")?;
+                self.behavior.different_first_page =
+                    bool_operand(sprm, "sprmSFTitlePage", tolerance)?;
             },
             0x500B => {
                 let count_minus_one = word_operand(sprm, "sprmSCcolumns")?;
@@ -179,20 +196,26 @@ impl Properties {
                 self.column_spacing_twips = non_negative_twips(sprm, "sprmSDxaColumns")?;
             },
             0x300E => {
-                self.page_numbering.number_format = number_format8(sprm, "sprmSNfcPgn")?;
+                if let Some(format) = number_format8(sprm, "sprmSNfcPgn", tolerance)? {
+                    self.page_numbering.number_format = format;
+                }
             },
             0x3011 => {
-                self.page_numbering.restart = bool_operand(sprm, "sprmSFPgnRestart")?;
+                self.page_numbering.restart = bool_operand(sprm, "sprmSFPgnRestart", tolerance)?;
             },
             0x3012 => {
-                self.notes.show_endnotes_at_section_end = bool_operand(sprm, "sprmSFEndnote")?;
+                self.notes.show_endnotes_at_section_end =
+                    bool_operand(sprm, "sprmSFEndnote", tolerance)?;
             },
             0x3013 => {
                 self.line_numbering.restart = match byte_operand(sprm, "sprmSLnc")? {
                     0 => LineNumberRestart::EachPage,
                     1 => LineNumberRestart::EachSection,
                     2 => LineNumberRestart::Continuous,
-                    _ => return corrupted("sprmSLnc contains an invalid SLncOperand"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x5015 => {
@@ -213,14 +236,17 @@ impl Properties {
                 self.page.footer_distance_twips =
                     bounded_word(sprm, "sprmSDyaHdrBottom", MAX_NON_NEGATIVE_TWIPS)?;
             },
-            0x3019 => self.line_between = bool_operand(sprm, "sprmSLBetween")?,
+            0x3019 => self.line_between = bool_operand(sprm, "sprmSLBetween", tolerance)?,
             0x301A => {
                 self.page.vertical_justification = match byte_operand(sprm, "sprmSVjc")? {
                     0 => VerticalJustification::Top,
                     1 => VerticalJustification::Center,
                     2 => VerticalJustification::Justified,
                     3 => VerticalJustification::Bottom,
-                    _ => return corrupted("sprmSVjc contains an invalid Vjc value"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x501B => {
@@ -241,7 +267,10 @@ impl Properties {
                 self.page.orientation = match byte_operand(sprm, "sprmSBOrientation")? {
                     1 => PageOrientation::Portrait,
                     2 => PageOrientation::Landscape,
-                    _ => return corrupted("sprmSBOrientation contains an invalid orientation"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0xB01F => {
@@ -271,25 +300,28 @@ impl Properties {
                 self.paper.requested_paper_kind = Some(word_operand(sprm, "sprmSDmPaperReq")?);
             },
             0x3228 => {
-                self.behavior.right_to_left = bool_operand(sprm, "sprmSFBiDi")?;
+                self.behavior.right_to_left = bool_operand(sprm, "sprmSFBiDi", tolerance)?;
             },
             0x322A => {
-                self.behavior.right_to_left_gutter = bool_operand(sprm, "sprmSFRTLGutter")?;
+                self.behavior.right_to_left_gutter =
+                    bool_operand(sprm, "sprmSFRTLGutter", tolerance)?;
             },
             0x702B => {
-                self.page_borders.top = borders::decode_brc80(sprm, "sprmSBrcTop80")?;
+                self.page_borders.top = borders::decode_brc80(sprm, "sprmSBrcTop80", tolerance)?;
             },
             0x702C => {
-                self.page_borders.left = borders::decode_brc80(sprm, "sprmSBrcLeft80")?;
+                self.page_borders.left = borders::decode_brc80(sprm, "sprmSBrcLeft80", tolerance)?;
             },
             0x702D => {
-                self.page_borders.bottom = borders::decode_brc80(sprm, "sprmSBrcBottom80")?;
+                self.page_borders.bottom =
+                    borders::decode_brc80(sprm, "sprmSBrcBottom80", tolerance)?;
             },
             0x702E => {
-                self.page_borders.right = borders::decode_brc80(sprm, "sprmSBrcRight80")?;
+                self.page_borders.right =
+                    borders::decode_brc80(sprm, "sprmSBrcRight80", tolerance)?;
             },
             0x522F => {
-                borders::decode_pgb_prop(&mut self.page_borders, sprm)?;
+                borders::decode_pgb_prop(&mut self.page_borders, sprm, tolerance)?;
             },
             0x7030 => {
                 let value = dword_operand(sprm, "sprmSDxtCharSpace")? as i32;
@@ -311,7 +343,10 @@ impl Properties {
                     1 => PageGridMode::CharactersAndLines,
                     2 => PageGridMode::LinesOnly,
                     3 => PageGridMode::EnforceCharacterGrid,
-                    _ => return corrupted("sprmSClm contains an invalid SClmOperand value"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x5033 => {
@@ -322,11 +357,15 @@ impl Properties {
                     3 => TextFlow::TopToBottomNonAsian,
                     4 => TextFlow::HorizontalAsian,
                     5 => TextFlow::VerticalNonAsian,
-                    _ => return corrupted("sprmSTextFlow contains an invalid MSOTXFL value"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x3239 => {
-                self.behavior.preserve_properties_for_revision = bool_operand(sprm, "sprmSWall")?;
+                self.behavior.preserve_properties_for_revision =
+                    bool_operand(sprm, "sprmSWall", tolerance)?;
             },
             0x703A => {
                 self.behavior.revision_save_id = Some(dword_operand(sprm, "sprmSRsid")?);
@@ -335,14 +374,21 @@ impl Properties {
                 self.notes.footnote_position = match byte_operand(sprm, "sprmSFpc")? {
                     1 => FootnotePosition::BottomOfPage,
                     2 => FootnotePosition::BeneathText,
-                    _ => return corrupted("sprmSFpc contains an invalid SFpcOperand"),
+                    _ => {
+                        undefined_value(sprm, tolerance);
+                        return Ok(());
+                    },
                 };
             },
             0x303C => {
-                self.notes.footnote_restart = note_restart(sprm, "sprmSRncFtn", true)?;
+                if let Some(restart) = note_restart(sprm, "sprmSRncFtn", true, tolerance)? {
+                    self.notes.footnote_restart = restart;
+                }
             },
             0x303E => {
-                self.notes.endnote_restart = note_restart(sprm, "sprmSRncEdn", false)?;
+                if let Some(restart) = note_restart(sprm, "sprmSRncEdn", false, tolerance)? {
+                    self.notes.endnote_restart = restart;
+                }
             },
             0x503F => {
                 let value = word_operand(sprm, "sprmSNFtn")?;
@@ -352,7 +398,9 @@ impl Properties {
                 self.notes.footnote_offset_operand = value;
             },
             0x5040 => {
-                self.notes.footnote_number_format = number_format16(sprm, "sprmSNfcFtnRef")?;
+                if let Some(format) = number_format16(sprm, "sprmSNfcFtnRef", tolerance)? {
+                    self.notes.footnote_number_format = format;
+                }
             },
             0x5041 => {
                 let value = word_operand(sprm, "sprmSNEdn")?;
@@ -362,7 +410,9 @@ impl Properties {
                 self.notes.endnote_offset_operand = value;
             },
             0x5042 => {
-                self.notes.endnote_number_format = number_format16(sprm, "sprmSNfcEdnRef")?;
+                if let Some(format) = number_format16(sprm, "sprmSNfcEdnRef", tolerance)? {
+                    self.notes.endnote_number_format = format;
+                }
             },
             0x7044 => {
                 let start = dword_operand(sprm, "sprmSPgnStart")?;
@@ -447,6 +497,7 @@ pub(super) fn parse_revision(
     start: u32,
     end: u32,
     authors: &RevisionAuthorTable,
+    tolerance: &mut ToleranceReport,
 ) -> Result<Option<SectionRevisionMark>> {
     let operand = sprm.operand_bytes();
     if operand.len() != 7 {
@@ -454,7 +505,11 @@ pub(super) fn parse_revision(
     }
     match operand[0] {
         0 => Ok(None),
-        1 => {
+        flag => {
+            // fPropRMark is a Boolean8: any non-zero byte marks the revision.
+            if flag != 1 {
+                tolerance.record(SectionDefect::Boolean, sprm.opcode);
+            }
             let signed_author = i16::from_le_bytes([operand[1], operand[2]]);
             let author_index = u16::try_from(signed_author).map_err(|_| {
                 PackageError::Corrupted("sprmSPropRMark author index is negative".to_string())
@@ -473,7 +528,6 @@ pub(super) fn parse_revision(
                 timestamp: decode_dttm(timestamp)?,
             }))
         },
-        _ => corrupted("sprmSPropRMark must begin with a Boolean8 value"),
     }
 }
 
@@ -484,12 +538,23 @@ fn byte_operand(sprm: &Sprm, name: &str) -> Result<u8> {
     Ok(sprm.operand_bytes()[0])
 }
 
-fn bool_operand(sprm: &Sprm, name: &str) -> Result<bool> {
+/// Read a Boolean8 operand. A byte other than 0 or 1 reads as true — the
+/// way Word and LibreOffice test the byte against zero — and is recorded.
+fn bool_operand(sprm: &Sprm, name: &str, tolerance: &mut ToleranceReport) -> Result<bool> {
     match byte_operand(sprm, name)? {
         0 => Ok(false),
         1 => Ok(true),
-        _ => corrupted(&format!("{name} must contain a Boolean8 value")),
+        _ => {
+            tolerance.record(SectionDefect::Boolean, sprm.opcode);
+            Ok(true)
+        },
     }
+}
+
+/// Record an undefined enumeration value; the caller keeps the property's
+/// current (default) value.
+fn undefined_value(sprm: &Sprm, tolerance: &mut ToleranceReport) {
+    tolerance.record(SectionDefect::EnumValue, sprm.opcode);
 }
 
 fn word_operand(sprm: &Sprm, name: &str) -> Result<u16> {
@@ -506,28 +571,52 @@ fn dword_operand(sprm: &Sprm, name: &str) -> Result<u32> {
     Ok(u32::from_le_bytes(sprm.operand_bytes().try_into().unwrap()))
 }
 
-fn number_format8(sprm: &Sprm, name: &str) -> Result<NumberFormat> {
+/// Read an 8-bit MSONFC; an unknown code is recorded and yields `None`.
+fn number_format8(
+    sprm: &Sprm,
+    name: &str,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<NumberFormat>> {
     let raw = byte_operand(sprm, name)?;
-    NumberFormat::try_from(raw)
-        .map_err(|_| PackageError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
-}
-
-fn number_format16(sprm: &Sprm, name: &str) -> Result<NumberFormat> {
-    let raw = word_operand(sprm, name)?;
-    let value = u8::try_from(raw).map_err(|_| {
-        PackageError::Corrupted(format!("{name} contains invalid 16-bit MSONFC {raw:#06x}"))
-    })?;
-    NumberFormat::try_from(value)
-        .map_err(|_| PackageError::Corrupted(format!("{name} contains unknown MSONFC {raw:#04x}")))
-}
-
-fn note_restart(sprm: &Sprm, name: &str, allow_each_page: bool) -> Result<NoteNumberRestart> {
-    match byte_operand(sprm, name)? {
-        0 => Ok(NoteNumberRestart::Continuous),
-        1 => Ok(NoteNumberRestart::EachSection),
-        2 if allow_each_page => Ok(NoteNumberRestart::EachPage),
-        _ => corrupted(&format!("{name} contains an invalid Rnc value")),
+    let format = NumberFormat::try_from(raw).ok();
+    if format.is_none() {
+        undefined_value(sprm, tolerance);
     }
+    Ok(format)
+}
+
+/// Read a 16-bit MSONFC; an unknown code is recorded and yields `None`.
+fn number_format16(
+    sprm: &Sprm,
+    name: &str,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<NumberFormat>> {
+    let raw = word_operand(sprm, name)?;
+    let format = u8::try_from(raw)
+        .ok()
+        .and_then(|value| NumberFormat::try_from(value).ok());
+    if format.is_none() {
+        undefined_value(sprm, tolerance);
+    }
+    Ok(format)
+}
+
+/// Read an Rnc operand; an undefined value is recorded and yields `None`.
+fn note_restart(
+    sprm: &Sprm,
+    name: &str,
+    allow_each_page: bool,
+    tolerance: &mut ToleranceReport,
+) -> Result<Option<NoteNumberRestart>> {
+    Ok(match byte_operand(sprm, name)? {
+        0 => Some(NoteNumberRestart::Continuous),
+        1 => Some(NoteNumberRestart::EachSection),
+        2 if allow_each_page => Some(NoteNumberRestart::EachPage),
+        _ => {
+            undefined_value(sprm, tolerance);
+            None
+        },
+    })
 }
 
 fn signed_word_operand(sprm: &Sprm, name: &str) -> Result<i16> {

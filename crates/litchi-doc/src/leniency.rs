@@ -635,6 +635,57 @@ impl PapxDefect {
     }
 }
 
+/// The class of section-property (`SEPX`) defect the reader repairs the way
+/// Word repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// per-SPRM section repairs a read applies under every [`Leniency`] variant,
+/// including [`Leniency::Strict`]. MS-DOC's section enumerations are
+/// defined-value lists with no reader-side rejection rule, and Word reads
+/// past undefined bytes with defaults. SEPX framing — a truncated SEPX, a
+/// negative grpprl size, an operand of the wrong size, or a SPRM sequence
+/// that does not fill the SEPX — stays a hard error, as do numeric range
+/// checks. The recorded [`ToleratedDefect::context`] is the SPRM opcode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SectionDefect {
+    /// A page border's reserved `Brc80` effect bit was set, or the
+    /// `sprmSPgbProp` reserved byte was non-zero.
+    ///
+    /// MS-DOC 2.9.17: the Brc80 reserved bit "MUST be zero, and MUST be
+    /// ignored". The bits carry no information; the rest of the operand is
+    /// decoded unchanged.
+    ReservedBits,
+    /// A page border (`sprmSBrc*80`) carried a `brcType` that names neither a
+    /// line style nor a border art. The side reads as having no border, as
+    /// LibreOffice reads it.
+    BorderType,
+    /// A page border carried an `ico` above 16. The border reads with
+    /// automatic color.
+    BorderColor,
+    /// A section SPRM (or one `sprmSPgbProp` placement field) carried a value
+    /// outside its defined enumeration. The property keeps its default (or
+    /// previously applied) value, as Word does.
+    EnumValue,
+    /// A section Boolean8 operand was neither 0 nor 1. It reads as true, the
+    /// way Word and LibreOffice test the byte against zero.
+    Boolean,
+}
+
+impl SectionDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ReservedBits => "ignored the reserved page-border bits",
+            Self::BorderType => "read the undefined page-border type as no border",
+            Self::BorderColor => "read the undefined page-border color index as automatic color",
+            Self::EnumValue => "kept the property's default for the undefined section value",
+            Self::Boolean => "read the non-0/1 Boolean8 section operand as true",
+        }
+    }
+}
+
 /// One class of defect repaired while a document was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -666,6 +717,8 @@ pub enum Defect {
     /// A paragraph-property (`PapxFkp`) defect repaired the way Word
     /// repairs it.
     Papx(PapxDefect),
+    /// A section-property (`SEPX`) defect repaired the way Word repairs it.
+    Section(SectionDefect),
 }
 
 impl Defect {
@@ -682,6 +735,7 @@ impl Defect {
             Self::Bookmark(defect) => defect.repair(),
             Self::TableDefinition(defect) => defect.repair(),
             Self::Papx(defect) => defect.repair(),
+            Self::Section(defect) => defect.repair(),
         }
     }
 }
@@ -740,6 +794,12 @@ impl From<PapxDefect> for Defect {
     }
 }
 
+impl From<SectionDefect> for Defect {
+    fn from(defect: SectionDefect) -> Self {
+        Self::Section(defect)
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -754,7 +814,8 @@ pub struct ToleratedDefect {
     /// index in `PlcfandRef` for a [`Defect::Comment`], and the bookmark
     /// index in `PlcfBkf` for a [`Defect::Bookmark`], and the cell (or
     /// boundary) index within the row for a [`Defect::TableDefinition`], and
-    /// the `PlcfBtePapx` page index for a [`Defect::Papx`].
+    /// the `PlcfBtePapx` page index for a [`Defect::Papx`], and the SPRM
+    /// opcode for a [`Defect::Section`].
     pub context: u16,
 }
 
@@ -960,6 +1021,11 @@ mod tests {
             Defect::from(PapxDefect::Page),
             Defect::from(PapxDefect::Run),
             Defect::from(PapxDefect::AlignmentPadding),
+            Defect::from(SectionDefect::ReservedBits),
+            Defect::from(SectionDefect::BorderType),
+            Defect::from(SectionDefect::BorderColor),
+            Defect::from(SectionDefect::EnumValue),
+            Defect::from(SectionDefect::Boolean),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());
