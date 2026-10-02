@@ -289,6 +289,12 @@ impl Package {
         if let Ok(custom) = Props::read_for(&opc, Host::PowerPoint) {
             tolerance.append_properties(custom.tolerance_report());
         }
+        // Presentation properties (`presProps.xml`) back
+        // `Package::math_properties`, a lazy read that re-reads them without
+        // a report; their repairs are recorded here, advisorily, like the
+        // metadata above.
+        let _deferred_presentation_properties_error =
+            crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
         Ok(Self {
             opc,
             mutable_pres: None,

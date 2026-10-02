@@ -1039,6 +1039,9 @@ impl Package {
 
     /// Read the typed document-level math defaults from presentation properties.
     ///
+    /// The presentation-properties repairs this read applies were recorded
+    /// when the package was opened ([`Self::tolerance_report`]).
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.

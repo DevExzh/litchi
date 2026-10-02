@@ -46,7 +46,9 @@
 //!   both open-time reports as [`Defect::Package`]. [`crate::Package`] also
 //!   reads the core and custom properties at open — advisorily, a part they
 //!   reject stays its accessor's error — and appends their repairs
-//!   (`litchi_ooxml_common`, findings 8.1–8.4) as [`Defect::Properties`].
+//!   (`litchi_ooxml_common`, findings 8.1–8.4) as [`Defect::Properties`],
+//!   followed by the presentation-properties (`presProps.xml`) repairs that
+//!   back the lazy [`crate::Package::math_properties`] read.
 //!   [`crate::SourceBackedPresentation`] reads only the presentation root at
 //!   open, so its core-properties repairs are collected by
 //!   [`crate::SourceBackedPresentation::properties_with_tolerance`]. A folded
@@ -1072,7 +1074,11 @@ impl ToleranceReport {
 
     /// Fold a core- or custom-properties report into this one, keeping its
     /// discovery order, locations, and unrecorded count.
-    pub(crate) fn append_properties(
+    ///
+    /// Callers that read package metadata alongside a presentation (for
+    /// example through `litchi_ooxml_common::properties::read_with_report`)
+    /// use this to keep one report for the whole document.
+    pub fn append_properties(
         &mut self,
         properties: &litchi_ooxml_common::leniency::ToleranceReport,
     ) {
