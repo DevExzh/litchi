@@ -16,6 +16,11 @@ pub struct Package {
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
+    /// Every non-structural defect repaired while the package was opened, in
+    /// discovery order. Empty until an open-time recording site lands; repairs
+    /// a lazy slide parse performs surface at that parse's own entry point.
+    /// See [`crate::leniency`].
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
     /// Payload digests of `opc`'s parts, refreshed at every
     /// opened-presentation publication and offered as the parent memo of the
     /// next one.
@@ -41,6 +46,18 @@ pub struct Package {
 }
 
 impl Package {
+    /// Every non-structural defect the reader repaired while opening this
+    /// package, in discovery order.
+    ///
+    /// An empty report means the package conformed; see
+    /// [`crate::ToleranceReport`]. Slide payloads parse lazily at accessor
+    /// time, so repairs a lazy parse performs are reported by that parse's
+    /// own entry point rather than here; see [`crate::leniency`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.tolerance
+    }
+
     /// Read the package's inert custom document properties.
     ///
     /// A package without a custom-properties part returns an empty collection.

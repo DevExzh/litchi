@@ -115,6 +115,11 @@ pub(super) struct SourceInner {
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: ReadLimits,
+    /// Every non-structural defect repaired while the source was opened, in
+    /// discovery order. Empty until an open-time recording site lands; repairs
+    /// a deferred slide read performs surface at that read's own entry point.
+    /// See [`crate::leniency`].
+    pub(super) tolerance: crate::leniency::ToleranceReport,
 }
 
 struct SourceCatalog {
@@ -1155,8 +1160,22 @@ impl SourceBackedPresentation {
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
                 limits,
+                tolerance: crate::leniency::ToleranceReport::default(),
             }),
         })
+    }
+
+    /// Every non-structural defect the reader repaired while opening this
+    /// presentation, in discovery order.
+    ///
+    /// An empty report means the presentation conformed; see
+    /// [`crate::ToleranceReport`]. Slide payloads stay deferred until a
+    /// selected [`SourceSlide`] is read, so repairs a deferred read performs
+    /// are reported by that read's own entry point rather than here; see
+    /// [`crate::leniency`].
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        &self.inner.tolerance
     }
 
     /// Number of logical slides in presentation order.

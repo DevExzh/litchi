@@ -25,7 +25,7 @@ pub use model::{
     TimeCondition, TimeFilter, TimeNodeType, TimePoint, TimingChild, TimingNode, TimingNodeKind,
     TimingTree, Trigger,
 };
-pub use package::parse_package_slide;
+pub use package::{parse_package_slide, parse_package_slide_with_tolerance};
 
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())

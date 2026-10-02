@@ -278,11 +278,10 @@ mod integration_tests {
     }
 
     #[test]
-    fn rejects_malformed_missing_duplicate_spoofed_and_off_slide_targets() {
+    fn rejects_malformed_missing_duplicate_and_spoofed_targets() {
         let cases = [
             effect("0", 10, "entr", "clickEffect", "indefinite", 0, 500),
             effect("nope", 10, "entr", "clickEffect", "indefinite", 0, 500),
-            effect("99", 10, "entr", "clickEffect", "indefinite", 0, 500),
             effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
                 .replace("<p:spTgt spid=\"3\"/>", ""),
         ];
@@ -304,6 +303,179 @@ mod integration_tests {
         );
         let timing = format!("<p:timing><p:tnLst>{spoofed}</p:tnLst></p:timing>");
         assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+    }
+
+    /// Stale cross-references that used to fail the whole timing tree are
+    /// skipped per entry and recorded (leniency-audit finding 6.1).
+    #[test]
+    fn repairs_and_records_stale_and_unhostable_targets() {
+        use crate::leniency::{Defect, TimingDefect};
+
+        let orphan = Defect::Timing(TimingDefect::OrphanedTarget);
+        let valid_chart = graphic_timing("5", "88", "", "<p:bldSub><a:bldChart/></p:bldSub>");
+        let chart_marker =
+            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#;
+        let valid_diagram = graphic_timing("6", "88", "", "<p:bldSub><a:bldDgm/></p:bldSub>");
+        let diagram_marker =
+            r#"<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#;
+        let valid_ole_chart = ole_chart_timing("5", "91", "");
+        // (slide XML, shape ID each skipped entry is recorded against)
+        let cases: Vec<(String, Vec<u32>)> = vec![
+            (
+                slide(&format!(
+                    "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
+                    effect("99", 10, "entr", "clickEffect", "indefinite", 0, 500)
+                )),
+                vec![99],
+            ),
+            (
+                slide(&format!(
+                    "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
+                    interactive_effect("99", "cancelBubble")
+                )),
+                vec![99],
+            ),
+            (slide(&grouped_timing("99", "42")), vec![99]),
+            (slide_with_ole(&diagram_timing("99", "77", "")), vec![99]),
+            // A diagram build aimed at a frame without an OLE host.
+            (slide(&diagram_timing("5", "77", "")), vec![5]),
+            (slide_with_ole(&diagram_timing("3", "77", "")), vec![3]),
+            (
+                slide_with_ole(&diagram_timing("5", "77", ""))
+                    .replace(r"<p:oleObj/>", r#"<x:oleObj xmlns:x="urn:foreign"/>"#),
+                vec![5],
+            ),
+            // Graphic builds whose build type the host cannot play.
+            (
+                slide_with_graphic_hosts(&graphic_timing(
+                    "6",
+                    "88",
+                    "",
+                    "<p:bldSub><a:bldChart/></p:bldSub>",
+                )),
+                vec![6],
+            ),
+            (
+                slide_with_graphic_hosts(&graphic_timing(
+                    "5",
+                    "88",
+                    "",
+                    "<p:bldSub><a:bldDgm/></p:bldSub>",
+                )),
+                vec![5],
+            ),
+            (
+                slide_with_graphic_hosts(&graphic_timing("3", "88", "", "<p:bldAsOne/>")),
+                vec![3],
+            ),
+            (
+                slide_with_graphic_hosts(&valid_chart)
+                    .replace(chart_marker, r#"<x:chart xmlns:x="urn:foreign"/>"#),
+                vec![5],
+            ),
+            (
+                slide_with_graphic_hosts(&valid_chart)
+                    .replace(chart_marker, &format!(r"<a:ext>{chart_marker}</a:ext>")),
+                vec![5],
+            ),
+            (
+                slide_with_graphic_hosts(&valid_diagram)
+                    .replace(diagram_marker, &format!(r"<a:ext>{diagram_marker}</a:ext>")),
+                vec![6],
+            ),
+            // OLE chart builds aimed at non-chart or absent OLE hosts.
+            (
+                slide_with_ole_chart(&ole_chart_timing("99", "91", "")),
+                vec![99, 99],
+            ),
+            (slide(&valid_ole_chart), vec![5]),
+            (
+                slide_with_ole_chart(&ole_chart_timing("3", "91", "")),
+                vec![3],
+            ),
+            (
+                slide_with_ole_chart(&valid_ole_chart).replace(
+                    r#"<p:oleObj progId="MSGraph.Chart.8"/>"#,
+                    r#"<p:oleObj progId="Word.Document.12"/>"#,
+                ),
+                vec![5],
+            ),
+        ];
+        for (xml, skipped) in cases {
+            let sequence = Sequence::parse_slide_xml(xml.as_bytes())
+                .unwrap_or_else(|error| panic!("stale target must repair: {error}\n{xml}"));
+            let recorded: Vec<_> = sequence
+                .tolerance_report()
+                .defects()
+                .iter()
+                .map(|tolerated| (tolerated.defect, tolerated.context, tolerated.part()))
+                .collect();
+            let expected: Vec<_> = skipped.iter().map(|id| (orphan, *id, None)).collect();
+            assert_eq!(recorded, expected, "{xml}");
+            assert!(sequence.preserved_timing_xml().is_none());
+            assert!(Sequence::parse_slide_xml_strict(xml.as_bytes()).is_err());
+        }
+    }
+
+    #[test]
+    fn duplicate_shape_ids_resolve_first_wins_and_are_recorded() {
+        use crate::leniency::{Defect, TimingDefect};
+
+        let timing = format!(
+            "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
+            effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
+        );
+        let xml = slide(&timing).replace(r#"<p:cNvPr id="4" "#, r#"<p:cNvPr id="3" "#);
+        let sequence = Sequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        assert_eq!(sequence.animations.len(), 1);
+        assert_eq!(sequence.animations[0].shape_id, 3);
+        // Nothing was skipped, so the verbatim subtree still round-trips.
+        assert!(sequence.preserved_timing_xml().is_some());
+        let recorded: Vec<_> = sequence
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect();
+        assert_eq!(
+            recorded,
+            [(Defect::Timing(TimingDefect::DuplicateShapeId), 3)]
+        );
+
+        // A graphic frame reusing an earlier shape's ID cannot host the
+        // build: the first shape (a plain `p:sp`) owns the ID.
+        let chart = graphic_timing("5", "88", "", "<p:bldSub><a:bldChart/></p:bldSub>");
+        let xml = slide_with_graphic_hosts(&chart).replace(
+            r#"<p:cNvPr id="3" name="A"/>"#,
+            r#"<p:cNvPr id="5" name="A"/>"#,
+        );
+        let sequence = Sequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        assert!(sequence.graphic_builds.is_empty());
+        let recorded: Vec<_> = sequence
+            .tolerance_report()
+            .defects()
+            .iter()
+            .map(|tolerated| (tolerated.defect, tolerated.context))
+            .collect();
+        assert_eq!(
+            recorded,
+            [
+                (Defect::Timing(TimingDefect::DuplicateShapeId), 5),
+                (Defect::Timing(TimingDefect::OrphanedTarget), 5),
+            ]
+        );
+    }
+
+    #[test]
+    fn conformant_slide_timing_records_nothing() {
+        let timing = format!(
+            "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
+            effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
+        );
+        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        assert!(sequence.tolerance_report().is_clean());
+        assert!(sequence.preserved_timing_xml().is_some());
+        assert!(Sequence::parse_slide_xml_strict(slide(&timing).as_bytes()).is_ok());
     }
 
     #[test]
@@ -582,10 +754,6 @@ mod integration_tests {
             ),
             format!(
                 "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
-                interactive_effect("99", "cancelBubble")
-            ),
-            format!(
-                "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
                 interactive_effect("4", "cancelBubble").replace(
                     r#"<p:spTgt spid="4"/>"#,
                     r#"<p:spTgt spid="4"/><p:spTgt spid="5"/>"#,
@@ -645,11 +813,10 @@ mod integration_tests {
     }
 
     #[test]
-    fn rejects_malformed_dangling_duplicate_or_off_slide_build_groups() {
+    fn rejects_malformed_dangling_and_duplicate_build_groups() {
         let cases = [
             grouped_timing("3", "-1"),
             grouped_timing("3", "4294967296"),
-            grouped_timing("99", "42"),
             grouped_timing("3", "42").replace(
                 r#" grpId="42" nodeType="clickEffect""#,
                 r#" nodeType="clickEffect""#,
@@ -906,13 +1073,10 @@ mod integration_tests {
     }
 
     #[test]
-    fn rejects_invalid_diagram_builds_and_non_ole_or_spoofed_targets() {
+    fn rejects_invalid_diagram_builds_and_malformed_build_entries() {
         let cases = [
             slide_with_ole(&diagram_timing("5", "77", r#" bld="sideways""#)),
             slide_with_ole(&diagram_timing("5", "77", r#" uiExpand="yes""#)),
-            slide_with_ole(&diagram_timing("99", "77", "")),
-            slide(&diagram_timing("5", "77", "")),
-            slide_with_ole(&diagram_timing("3", "77", "")),
             slide_with_ole(&diagram_timing("5", "77", "").replace(
                 r#"<p:bldDgm spid="5" grpId="77"/>"#,
                 r#"<p:bldDgm spid="5"/>"#,
@@ -933,8 +1097,6 @@ mod integration_tests {
                 r#"<p:bldDgm spid="5" grpId="77"/>"#,
                 r#"<x:bldDgm xmlns:x="urn:foreign" spid="5" grpId="77"/>"#,
             )),
-            slide_with_ole(&diagram_timing("5", "77", ""))
-                .replace(r"<p:oleObj/>", r#"<x:oleObj xmlns:x="urn:foreign"/>"#),
         ];
         for xml in cases {
             assert!(Sequence::parse_slide_xml(xml.as_bytes()).is_err());
@@ -1046,7 +1208,7 @@ mod integration_tests {
     }
 
     #[test]
-    fn rejects_hostile_graphic_build_grammar_namespaces_and_host_mismatches() {
+    fn rejects_hostile_graphic_build_grammar_and_marker_ambiguity() {
         let valid_chart = graphic_timing("5", "88", "", "<p:bldSub><a:bldChart/></p:bldSub>");
         let cases = [
             graphic_timing("5", "88", "", ""),
@@ -1096,9 +1258,6 @@ mod integration_tests {
                 "<p:bldSub><a:bldChart animBg=\"yes\"/></p:bldSub>",
             ),
             graphic_timing("5", "88", r#" uiExpand="yes""#, "<p:bldAsOne/>"),
-            graphic_timing("6", "88", "", "<p:bldSub><a:bldChart/></p:bldSub>"),
-            graphic_timing("5", "88", "", "<p:bldSub><a:bldDgm/></p:bldSub>"),
-            graphic_timing("3", "88", "", "<p:bldAsOne/>"),
             valid_chart.replace(r#" spid="5" grpId="88""#, r#" spid="5""#),
             valid_chart.replace(r#" spid="5" grpId="88""#, r#" grpId="88""#),
         ];
@@ -1108,26 +1267,8 @@ mod integration_tests {
             );
         }
 
-        let spoofed_host = slide_with_graphic_hosts(&valid_chart).replace(
-            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#,
-            r#"<x:chart xmlns:x="urn:foreign"/>"#,
-        );
-        assert!(Sequence::parse_slide_xml(spoofed_host.as_bytes()).is_err());
-
         let chart_marker =
             r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#;
-        let marker_elsewhere = slide_with_graphic_hosts(&valid_chart)
-            .replace(chart_marker, "")
-            .replace(
-                r#"</p:nvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#,
-                &format!(r#"</p:nvGraphicFramePr>{chart_marker}<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">"#),
-            );
-        assert!(Sequence::parse_slide_xml(marker_elsewhere.as_bytes()).is_err());
-
-        let nested_marker = slide_with_graphic_hosts(&valid_chart)
-            .replace(chart_marker, &format!(r"<a:ext>{chart_marker}</a:ext>"));
-        assert!(Sequence::parse_slide_xml(nested_marker.as_bytes()).is_err());
-
         let duplicate_marker = slide_with_graphic_hosts(&valid_chart)
             .replace(chart_marker, &format!(r"{chart_marker}{chart_marker}"));
         assert!(Sequence::parse_slide_xml(duplicate_marker.as_bytes()).is_err());
@@ -1137,13 +1278,6 @@ mod integration_tests {
             &format!(r#"{chart_marker}<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#),
         );
         assert!(Sequence::parse_slide_xml(ambiguous_marker.as_bytes()).is_err());
-
-        let valid_diagram = graphic_timing("6", "88", "", "<p:bldSub><a:bldDgm/></p:bldSub>");
-        let diagram_marker =
-            r#"<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#;
-        let nested_diagram_marker = slide_with_graphic_hosts(&valid_diagram)
-            .replace(diagram_marker, &format!(r"<a:ext>{diagram_marker}</a:ext>"));
-        assert!(Sequence::parse_slide_xml(nested_diagram_marker.as_bytes()).is_err());
 
         let duplicate = valid_chart.replace(
             "</p:bldLst>",
@@ -1221,15 +1355,12 @@ mod integration_tests {
     }
 
     #[test]
-    fn rejects_hostile_invalid_and_non_chart_ole_builds() {
+    fn rejects_hostile_and_invalid_ole_chart_build_grammar() {
         let valid = ole_chart_timing("5", "91", "");
         let cases = [
             slide_with_ole_chart(&ole_chart_timing("5", "91", r#" bld="rows""#)),
             slide_with_ole_chart(&ole_chart_timing("5", "91", r#" uiExpand="yes""#)),
             slide_with_ole_chart(&ole_chart_timing("5", "91", r#" animBg="yes""#)),
-            slide_with_ole_chart(&ole_chart_timing("99", "91", "")),
-            slide(&valid),
-            slide_with_ole_chart(&ole_chart_timing("3", "91", "")),
             slide_with_ole_chart(&valid).replace(
                 r#"<p:bldOleChart spid="5" grpId="91"/>"#,
                 r#"<p:bldOleChart spid="5"/>"#,
@@ -1245,18 +1376,6 @@ mod integration_tests {
             slide_with_ole_chart(&valid).replace(
                 r#"<p:bldOleChart spid="5" grpId="91"/>"#,
                 r#"<x:bldOleChart xmlns:x="urn:foreign" spid="5" grpId="91"/>"#,
-            ),
-            slide_with_ole_chart(&valid).replace(
-                r#"<p:oleObj progId="MSGraph.Chart.8"/>"#,
-                r#"<p:oleObj progId="Word.Document.12"/>"#,
-            ),
-            slide_with_ole_chart(&valid).replace(
-                r#"<p:oleObj progId="MSGraph.Chart.8"/>"#,
-                r#"<x:oleObj xmlns:x="urn:foreign" progId="MSGraph.Chart.8"/>"#,
-            ),
-            slide_with_ole_chart(&valid).replace(
-                r#"<a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole"><p:oleObj progId="MSGraph.Chart.8"/></a:graphicData>"#,
-                r#"<p:oleObj progId="MSGraph.Chart.8"/><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole"/>"#,
             ),
             slide_with_ole_chart(&valid).replace(
                 r#"<p:oleObj progId="MSGraph.Chart.8"/>"#,

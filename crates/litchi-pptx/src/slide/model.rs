@@ -90,6 +90,27 @@ impl<'a> Slide<'a> {
         codec::slide_shapes(&self.part)
     }
 
+    /// Parse this slide's animation timing tree and build list.
+    ///
+    /// Stale cross-references are repaired the way `PowerPoint` repairs them:
+    /// an animation, interactive trigger, or build entry whose target shape
+    /// no longer exists on the slide (or cannot host the entry) is skipped
+    /// while the rest of the tree plays, and a shape ID carried by two shapes
+    /// resolves to the first one. Each repair is recorded, with this slide's
+    /// part name and the shape ID, in the returned sequence's
+    /// [`crate::animations::Sequence::tolerance_report`]; an empty report
+    /// means the timing tree conformed. A slide without `p:timing` yields an
+    /// empty sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the slide XML is malformed, exceeds a read limit,
+    /// or carries a structurally invalid timing tree, or if a surviving build
+    /// entry's host relationship cannot be resolved inside the package.
+    pub fn animations(&self) -> Result<crate::animations::Sequence> {
+        crate::animations::parse_package_slide(self.package, self.part.part().partname())
+    }
+
     /// Read the optional direct programmable-tag list attached to this slide.
     ///
     /// # Errors

@@ -86,6 +86,7 @@ pub mod font;
 pub mod format;
 pub mod hyperlinks;
 pub mod laser;
+pub mod leniency;
 pub mod media_parts;
 pub mod model3d;
 pub mod modern_comments;
@@ -146,6 +147,7 @@ pub use error::{
 };
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+pub use leniency::{Defect, Leniency, TimingDefect, ToleranceReport, ToleratedDefect};
 #[cfg(feature = "encryption")]
 pub use litchi_crypto::ooxml as encryption;
 #[cfg(feature = "encryption")]

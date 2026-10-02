@@ -3,6 +3,7 @@
 use super::{
     DiagramBuild, EffectInstance, GraphicBuild, OleChartBuild, ParagraphBuild, TimingTree,
 };
+use crate::leniency::ToleranceReport;
 
 /// `EffectInstance` sequence for a slide.
 #[derive(Debug, Clone, Default)]
@@ -25,6 +26,10 @@ pub struct Sequence {
     pub(in crate::animations) source_graphic_builds: Option<Box<[GraphicBuild]>>,
     pub(in crate::animations) source_ole_chart_builds: Option<Box<[OleChartBuild]>>,
     pub(in crate::animations) source_timing_tree: Option<Box<TimingTree>>,
+    /// Repairs the parse that produced this sequence performed, in discovery
+    /// order. Empty for a conformant slide and for a programmatically built
+    /// sequence.
+    pub(in crate::animations) tolerance: ToleranceReport,
 }
 
 impl PartialEq for Sequence {
@@ -85,6 +90,10 @@ impl Sequence {
     }
 
     /// Return the preserved source timing subtree, when this sequence was parsed.
+    ///
+    /// The preservation is dropped when a parse repaired stale targets,
+    /// because it still contains the skipped entries; [`Self::to_xml`] then
+    /// regenerates from the repaired model.
     #[must_use]
     pub fn preserved_timing_xml(&self) -> Option<&str> {
         self.source_timing_xml.as_deref()
@@ -93,5 +102,16 @@ impl Sequence {
     #[must_use]
     pub fn timing_tree(&self) -> Option<&TimingTree> {
         self.timing_tree.as_ref()
+    }
+
+    /// Every non-structural defect the parse of this sequence repaired, in
+    /// discovery order.
+    ///
+    /// An empty report means the slide's timing tree conformed; see
+    /// [`crate::ToleranceReport`]. A programmatically built sequence carries
+    /// an empty report.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
     }
 }

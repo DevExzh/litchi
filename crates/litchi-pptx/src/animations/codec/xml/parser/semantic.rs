@@ -17,6 +17,7 @@ use super::validation::{
     parse_build_auto_advance, parse_group_id, parse_progress, parse_shape_id, parse_timing_value,
     parse_xml_bool,
 };
+use crate::leniency::{TimingDefect, ToleranceReport};
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -63,6 +64,21 @@ pub(super) struct TimingParser {
     require_valid_targets: bool,
     timing_start: Option<usize>,
     timing_range: Option<Range<usize>>,
+    /// Repairs performed while reading the timing tree: duplicated shape IDs
+    /// noticed during the event stream and orphaned targets skipped by
+    /// [`TimingParser::repair_orphaned_targets`] at the end of it.
+    tolerance: ToleranceReport,
+}
+
+/// Outcome of [`TimingParser::repair_orphaned_targets`] when it skipped at
+/// least one entry.
+#[derive(Default)]
+struct OrphanRepair {
+    dropped: bool,
+    /// Group IDs carried by a skipped entry. Their effect/build pairing was
+    /// broken by the stale reference itself, so the group-pairing check
+    /// leaves them out.
+    dropped_groups: HashSet<GroupId>,
 }
 
 impl TimingParser {
@@ -106,6 +122,7 @@ impl TimingParser {
             require_valid_targets,
             timing_start: None,
             timing_range: None,
+            tolerance: ToleranceReport::default(),
         }
     }
 
@@ -149,13 +166,16 @@ impl TimingParser {
             let id = parse_shape_id(&value)?;
             if self.graphic_frame_depth.is_some() {
                 if self.graphic_frame_shape_id.is_none() {
-                    self.graphic_frame_shape_id = Some(id);
-                    if !self.shape_ids.insert(id) {
-                        return Err(invalid("duplicate shape ID in slide"));
+                    if self.shape_ids.insert(id) {
+                        self.graphic_frame_shape_id = Some(id);
+                    } else {
+                        // The first shape carrying the ID wins, so the frame's
+                        // host-kind markers must not register for it again.
+                        self.tolerance.record(TimingDefect::DuplicateShapeId, id);
                     }
                 }
             } else if !self.shape_ids.insert(id) {
-                return Err(invalid("duplicate shape ID in slide"));
+                self.tolerance.record(TimingDefect::DuplicateShapeId, id);
             }
         }
 
@@ -1066,6 +1086,90 @@ impl TimingParser {
         Ok(())
     }
 
+    /// Skip timing entries no shape on the slide can host, the way PowerPoint
+    /// plays the rest of the tree past them, recording each skipped entry.
+    ///
+    /// A skipped entry covers both a target no shape carries and a target
+    /// whose shape cannot host it — the entry is equally unplayable. Returns
+    /// the repair outcome, or `None` when nothing was dropped.
+    fn repair_orphaned_targets(&mut self) -> Option<OrphanRepair> {
+        let mut repair = OrphanRepair::default();
+        let shape_ids = &self.shape_ids;
+        let ole_diagram_shape_ids = &self.ole_diagram_shape_ids;
+        let chart_shape_ids = &self.chart_shape_ids;
+        let graphical_diagram_shape_ids = &self.graphical_diagram_shape_ids;
+        let ole_chart_shape_ids = &self.ole_chart_shape_ids;
+        let tolerance = &mut self.tolerance;
+        let sequence = &mut self.sequence;
+        let mut drop_entry = |shape_id: u32, group_id: Option<GroupId>| {
+            tolerance.record(TimingDefect::OrphanedTarget, shape_id);
+            repair.dropped = true;
+            repair.dropped_groups.extend(group_id);
+        };
+        sequence.animations.retain(|animation| {
+            let orphaned = if shape_ids.contains(&animation.shape_id) {
+                match &animation.sequence_context {
+                    SequenceContext::Interactive {
+                        trigger_shape_id, ..
+                    } if !shape_ids.contains(trigger_shape_id) => Some(*trigger_shape_id),
+                    _ => None,
+                }
+            } else {
+                Some(animation.shape_id)
+            };
+            if let Some(shape_id) = orphaned {
+                drop_entry(shape_id, animation.group_id);
+            }
+            orphaned.is_none()
+        });
+        sequence.paragraph_builds.retain(|build| {
+            let keep = shape_ids.contains(&build.shape_id);
+            if !keep {
+                drop_entry(build.shape_id, Some(build.group_id));
+            }
+            keep
+        });
+        sequence.diagram_builds.retain(|build| {
+            let keep = ole_diagram_shape_ids.contains(&build.shape_id);
+            if !keep {
+                drop_entry(build.shape_id, Some(build.group_id));
+            }
+            keep
+        });
+        sequence.graphic_builds.retain(|build| {
+            let keep = match build.mode {
+                GraphicBuildMode::AsOne => {
+                    chart_shape_ids.contains(&build.shape_id)
+                        || graphical_diagram_shape_ids.contains(&build.shape_id)
+                },
+                GraphicBuildMode::Diagram { .. } => {
+                    graphical_diagram_shape_ids.contains(&build.shape_id)
+                },
+                GraphicBuildMode::Chart { .. } => chart_shape_ids.contains(&build.shape_id),
+            };
+            if !keep {
+                drop_entry(build.shape_id, Some(build.group_id));
+            }
+            keep
+        });
+        sequence.ole_chart_builds.retain(|build| {
+            let keep = ole_chart_shape_ids.contains(&build.shape_id);
+            if !keep {
+                drop_entry(build.shape_id, Some(build.group_id));
+            }
+            keep
+        });
+        if !repair.dropped {
+            return None;
+        }
+        // `Sequence::add` keeps click order contiguous; keep the repaired
+        // sequence on the same invariant.
+        for (index, animation) in sequence.animations.iter_mut().enumerate() {
+            animation.order = u32::try_from(index + 1).unwrap_or(u32::MAX);
+        }
+        Some(repair)
+    }
+
     pub(super) fn finish(mut self, xml: &[u8]) -> Result<Sequence> {
         if !self.pending.is_empty()
             || !self.time_nodes.is_empty()
@@ -1083,12 +1187,7 @@ impl TimingParser {
         {
             return Err(invalid("incomplete animation timing tree"));
         }
-        if self.timing_group_ids != self.build_group_ids {
-            return Err(invalid(
-                "animation cTn group IDs and build-list group IDs do not match",
-            ));
-        }
-        for (build_index, level, range) in self.template_ranges {
+        for (build_index, level, range) in std::mem::take(&mut self.template_ranges) {
             let raw = xml
                 .get(range)
                 .ok_or_else(|| invalid("paragraph template range is outside slide XML"))?;
@@ -1114,68 +1213,38 @@ impl TimingParser {
                 ));
             }
         }
-        if self.require_valid_targets {
-            for animation in &self.sequence.animations {
-                if !self.shape_ids.contains(&animation.shape_id) {
-                    return Err(invalid(format!(
-                        "animation target {} is not a shape on the current slide",
-                        animation.shape_id
-                    )));
-                }
-                if let SequenceContext::Interactive {
-                    trigger_shape_id, ..
-                } = &animation.sequence_context
-                    && !self.shape_ids.contains(trigger_shape_id)
-                {
-                    return Err(invalid(format!(
-                        "interactive animation trigger {trigger_shape_id} is not a shape on the current slide"
-                    )));
-                }
-            }
-            for (_, shape_id, _) in &self.build_pairs {
-                if !self.shape_ids.contains(shape_id) {
-                    return Err(invalid(format!(
-                        "animation build target {shape_id} is not a shape on the current slide"
-                    )));
-                }
-            }
-            for (kind, shape_id, _) in &self.build_pairs {
-                if *kind == 2 && !self.ole_diagram_shape_ids.contains(shape_id) {
-                    return Err(invalid(format!(
-                        "diagram build target {shape_id} is not an OLE graphic-frame shape"
-                    )));
-                }
-            }
-            for build in &self.sequence.graphic_builds {
-                let valid = match build.mode {
-                    GraphicBuildMode::AsOne => {
-                        self.chart_shape_ids.contains(&build.shape_id)
-                            || self.graphical_diagram_shape_ids.contains(&build.shape_id)
-                    },
-                    GraphicBuildMode::Diagram { .. } => {
-                        self.graphical_diagram_shape_ids.contains(&build.shape_id)
-                    },
-                    GraphicBuildMode::Chart { .. } => {
-                        self.chart_shape_ids.contains(&build.shape_id)
-                    },
-                };
-                if !valid {
-                    return Err(invalid(format!(
-                        "graphical-object build target {} does not match its chart/diagram build type",
-                        build.shape_id
-                    )));
-                }
-            }
-            for build in &self.sequence.ole_chart_builds {
-                if !self.ole_chart_shape_ids.contains(&build.shape_id) {
-                    return Err(invalid(format!(
-                        "OLE chart build target {} is not an embedded chart graphic-frame shape",
-                        build.shape_id
-                    )));
-                }
-            }
+        // Stale shape cross-references are skipped the way PowerPoint skips
+        // them, never failed on; each skip is recorded in the report.
+        let repair = if self.require_valid_targets {
+            self.repair_orphaned_targets()
+        } else {
+            None
+        };
+        let dropped_targets = repair.is_some();
+        // A group a skipped entry carried lost its pairing to the stale
+        // reference itself and is left out of the check; every other group
+        // must still pair an effect time node with a build-list entry.
+        let groups_match = match &repair {
+            None => self.timing_group_ids == self.build_group_ids,
+            Some(repair) => {
+                self.timing_group_ids
+                    .difference(&repair.dropped_groups)
+                    .collect::<HashSet<_>>()
+                    == self
+                        .build_group_ids
+                        .difference(&repair.dropped_groups)
+                        .collect::<HashSet<_>>()
+            },
+        };
+        if !groups_match {
+            return Err(invalid(
+                "animation cTn group IDs and build-list group IDs do not match",
+            ));
         }
-        if let Some(range) = self.timing_range {
+        // A repaired sequence cannot round-trip its preserved timing subtree
+        // verbatim: the preservation still contains the skipped entries, so
+        // the repaired model regenerates instead.
+        if !dropped_targets && let Some(range) = self.timing_range {
             let raw = xml
                 .get(range)
                 .ok_or_else(|| invalid("timing subtree range is outside slide XML"))?;
@@ -1201,6 +1270,7 @@ impl TimingParser {
             self.sequence.timing_tree = Some(timing_tree);
             self.sequence.source_timing_xml = Some(raw.to_string().into_boxed_str());
         }
+        self.sequence.tolerance = std::mem::take(&mut self.tolerance);
         Ok(self.sequence)
     }
 }

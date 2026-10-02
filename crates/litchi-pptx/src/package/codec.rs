@@ -163,6 +163,7 @@ impl Package {
             mutable_pres: Some(MutablePresentation::new()),
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: false,
+            tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]
@@ -274,6 +275,7 @@ impl Package {
             mutable_pres: None,
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance,
+            tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]

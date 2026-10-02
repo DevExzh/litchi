@@ -9,6 +9,7 @@ use super::xml::{
     parse_processed_timing, parse_recursive_timing_tree, write_animation_xml, write_timing_child,
 };
 use crate::Result;
+use crate::leniency::ToleranceReport;
 
 impl TemplateTimeNode {
     /// Validate and store one bounded `p:par` template time node.
@@ -76,6 +77,18 @@ impl Sequence {
         parse_processed_timing(xml.as_bytes(), false)
     }
 
+    /// Parse the timing tree of a slide, repairing stale cross-references the
+    /// way `PowerPoint` does.
+    ///
+    /// Animations, interactive-sequence triggers, and build-list entries whose
+    /// shape ID no shape on the slide carries — or whose shape cannot host the
+    /// entry — are skipped while the rest of the timing tree is kept, and a
+    /// shape ID carried by two shapes resolves to the first one. Every repair
+    /// is recorded and enumerable through [`Self::tolerance_report`]; an empty
+    /// report means the slide conformed. Structural corruption — malformed
+    /// XML, an unbalanced or oversized timing tree, invalid attribute values —
+    /// remains a hard error.
+    ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
@@ -83,6 +96,59 @@ impl Sequence {
         check_xml_size(xml.len())?;
         parse_processed_timing(xml, true)
     }
+
+    /// [`Self::parse_slide_xml`], additionally merging every repair the parse
+    /// performed into `tolerance`.
+    ///
+    /// This is the aggregation form for callers reading several slides into
+    /// one deck-level report. The returned sequence still carries its own
+    /// copy of the report through [`Self::tolerance_report`]; merge through
+    /// exactly one of the two paths so repairs are not counted twice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse_slide_xml_with_tolerance(
+        xml: &[u8],
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Self> {
+        let sequence = Self::parse_slide_xml(xml)?;
+        tolerance.append(sequence.tolerance_report());
+        Ok(sequence)
+    }
+
+    /// Parse the timing tree of a slide, rejecting every cross-reference
+    /// defect [`Self::parse_slide_xml`] would repair.
+    ///
+    /// This is the verification form for callers that must prove a slide's
+    /// timing tree is fully self-consistent — every animation, trigger, and
+    /// build target names exactly one shape able to host it — before relying
+    /// on a lossless rewrite. Readers should use [`Self::parse_slide_xml`],
+    /// which opens the same slide the way `PowerPoint` does.
+    ///
+    /// # Errors
+    ///
+    /// Returns every error [`Self::parse_slide_xml`] returns, and
+    /// [`crate::Error::Invalid`] naming the first defect when the parse had to
+    /// repair an orphaned target or a duplicated shape ID.
+    pub fn parse_slide_xml_strict(xml: &[u8]) -> Result<Self> {
+        let sequence = Self::parse_slide_xml(xml)?;
+        if let Some(first) = sequence.tolerance_report().defects().first() {
+            return Err(crate::Error::Invalid(format!(
+                "slide timing tree is not self-consistent at shape ID {} ({} defect(s)); a lenient read would have {}",
+                first.context,
+                sequence.tolerance_report().total(),
+                first.defect.repair(),
+            )));
+        }
+        if sequence.tolerance_report().unrecorded() > 0 {
+            return Err(crate::Error::Invalid(
+                "slide timing tree is not self-consistent".to_owned(),
+            ));
+        }
+        Ok(sequence)
+    }
+
     /// Generate timing XML for a slide.
     #[must_use]
     pub fn to_xml(&self) -> String {

@@ -1,4 +1,5 @@
 use super::model::{GraphicBuildMode, Sequence};
+use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::count_up_to;
@@ -103,6 +104,14 @@ struct AlternateState {
     fallback_seen: bool,
 }
 
+/// Parse one slide's timing tree, repairing stale shape cross-references the
+/// way `PowerPoint` does, and validate the surviving build targets' package
+/// relationships.
+///
+/// The repairs [`Sequence::parse_slide_xml`] applies are recorded in the
+/// returned sequence, each naming `slide_part_name` as its part, and are
+/// enumerable through [`Sequence::tolerance_report`].
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
@@ -113,8 +122,30 @@ pub fn parse_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> R
             "animation package validation requires a presentation slide part",
         );
     }
-    let sequence = Sequence::parse_slide_xml(slide.blob())?;
+    let mut sequence = Sequence::parse_slide_xml(slide.blob())?;
+    sequence.tolerance.locate_in_part(slide_part_name.as_str());
     validate_build_relationships(package, slide, slide.blob(), &sequence)?;
+    Ok(sequence)
+}
+
+/// [`parse_package_slide`], additionally merging every repair the parse
+/// performed into `tolerance`.
+///
+/// This is the aggregation form for callers reading several slides into one
+/// deck-level report. The returned sequence still carries its own copy of
+/// the report through [`Sequence::tolerance_report`]; merge through exactly
+/// one of the two paths so repairs are not counted twice.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn parse_package_slide_with_tolerance(
+    package: &OpcPackage,
+    slide_part_name: &PackURI,
+    tolerance: &mut ToleranceReport,
+) -> Result<Sequence> {
+    let sequence = parse_package_slide(package, slide_part_name)?;
+    tolerance.append(sequence.tolerance_report());
     Ok(sequence)
 }
 
@@ -574,9 +605,11 @@ fn inspect_end(
                 .ok_or_else(|| animation_relationship_error("graphic-frame state is missing"))?;
             if completed.enabled
                 && let (Some(shape_id), Some(host)) = (completed.shape_id, completed.host)
-                && hosts.insert(shape_id, host).is_some()
             {
-                return invalid_relationship("duplicate package-resolvable graphic-frame shape ID");
+                // A shape ID carried by two graphic frames resolves to the
+                // first one, matching the timing parser, which records the
+                // duplicate as `TimingDefect::DuplicateShapeId`.
+                hosts.entry(shape_id).or_insert(host);
             }
         }
     }
@@ -731,11 +764,32 @@ impl Sequence {
     /// requires internal existing target parts with matching relationship/content types, and
     /// never reads or executes embedded target bytes.
     ///
+    /// Stale shape cross-references are repaired the way `PowerPoint` repairs
+    /// them; the repairs are enumerable through [`Self::tolerance_report`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Self> {
         parse_package_slide(package, slide_part_name)
+    }
+
+    /// [`Self::from_package_slide`], additionally merging every repair the
+    /// parse performed into `tolerance`.
+    ///
+    /// The returned sequence still carries its own copy of the report through
+    /// [`Self::tolerance_report`]; merge through exactly one of the two paths
+    /// so repairs are not counted twice.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_package_slide_with_tolerance(
+        package: &OpcPackage,
+        slide_part_name: &PackURI,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Self> {
+        parse_package_slide_with_tolerance(package, slide_part_name, tolerance)
     }
 }
 
