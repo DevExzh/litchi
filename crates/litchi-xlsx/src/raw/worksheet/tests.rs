@@ -54,6 +54,18 @@ fn materialized_answer(xml: &str) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
+/// Require write-path admission to refuse `xml` with exactly `expected`
+/// while the read parse repairs it (audit finding 4.10).
+#[track_caller]
+fn assert_admission_refusal(xml: &str, expected: &str) {
+    match super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)) {
+        Err(actual) => assert_eq!(actual.to_string(), expected),
+        Ok(_) => panic!("expected {expected:?} from write-path admission, got acceptance"),
+    }
+    let store = parse(xml.as_bytes(), || Ok(None)).expect("the read parse repairs");
+    assert!(!store.tolerance_report().is_clean());
+}
+
 /// Require the materialized parser to refuse `xml` with exactly `expected`.
 #[track_caller]
 fn assert_materialized_refusal(xml: &str, expected: &str) {
@@ -202,9 +214,6 @@ fn parses_sparse_merges_and_rejects_ambiguous_merge_markup() {
 
     for malformed in [
         format!(
-            r#"<worksheet xmlns="{S}"><sheetData/><mergeCells count="2"><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#
-        ),
-        format!(
             r#"<worksheet xmlns="{S}"><sheetData/><mergeCells><mergeCell ref="A1:C3"/><mergeCell ref="C3:D4"/></mergeCells></worksheet>"#
         ),
         format!(
@@ -214,9 +223,6 @@ fn parses_sparse_merges_and_rejects_ambiguous_merge_markup() {
             r#"<worksheet xmlns="{S}"><sheetData/><mergeCells><future/></mergeCells></worksheet>"#
         ),
         format!(r#"<worksheet xmlns="{S}"><sheetData/><mergeCell ref="A1:B2"/></worksheet>"#),
-        format!(
-            r#"<worksheet xmlns="{S}"><sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#
-        ),
     ] {
         assert!(parse(malformed.as_bytes(), || Ok(None)).is_err());
     }
@@ -499,8 +505,6 @@ fn resolves_complete_last_matching_column_records() {
 #[test]
 fn rejects_malformed_column_property_records() {
     for body in [
-        "<cols/>",
-        "<cols></cols>",
         r#"<cols><col max="1"/></cols>"#,
         r#"<cols><col min="1"/></cols>"#,
         r#"<cols><col min="0" max="1"/></cols>"#,
@@ -523,10 +527,6 @@ fn rejects_malformed_column_property_records() {
 #[test]
 fn rejects_malformed_dimensions_and_row_properties() {
     for body in [
-        "<dimension/><sheetData/>",
-        r#"<dimension ref="A0"/><sheetData/>"#,
-        r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
-        r#"<sheetData/><dimension ref="A1"/>"#,
         r#"<sheetData><row r="1" hidden="yes"/></sheetData>"#,
         r#"<sheetData><row r="1" s="65491"/></sheetData>"#,
         r#"<sheetData><row r="1" outlineLevel="8"/></sheetData>"#,
@@ -775,13 +775,161 @@ fn repairs_and_records_broken_shared_formula_groups() {
     assert!(store.tolerance_report().is_clean());
 }
 
+/// Audit finding 4.10: schema-sequence violations and advisory counts are
+/// repaired and recorded; write-path admission keeps the errors.
+#[test]
+fn repairs_and_records_worksheet_sequencing_and_advisory_metadata() {
+    use crate::leniency::{Defect, Location, WorksheetDefect as W};
+
+    let row = |index| Location::Row(RowIndex::new(index).expect("row"));
+    let cases: Vec<(&str, Vec<(W, Location)>)> = vec![
+        (
+            r#"<dimension/><sheetData/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<dimension ref="A0"/><sheetData/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><dimension ref="A1:B2"/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><sheetFormatPr defaultRowHeight="15"/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><cols><col min="1" max="1" width="9"/></cols>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<mergeCells><mergeCell ref="A1:B2"/></mergeCells><sheetData/>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B2"/></mergeCells>"#,
+            vec![(W::MisplacedElement, Location::Worksheet)],
+        ),
+        (
+            r#"<cols/><sheetData/>"#,
+            vec![(W::CountMismatch, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><mergeCells></mergeCells>"#,
+            vec![(W::CountMismatch, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData/><mergeCells count="2"><mergeCell ref="A1:B2"/></mergeCells>"#,
+            vec![(W::CountMismatch, Location::Worksheet)],
+        ),
+        (
+            r#"<sheetData><row r="2"/><row r="1"/></sheetData>"#,
+            vec![(W::RowOutOfOrder, row(0))],
+        ),
+        (
+            r#"<sheetData><row r="1"/><row r="1"/></sheetData>"#,
+            vec![(W::RowOutOfOrder, row(0))],
+        ),
+    ];
+    for (body, expected) in cases {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        let store =
+            parse(xml.as_bytes(), || Ok(None)).unwrap_or_else(|error| panic!("{body}: {error}"));
+        let recorded = store
+            .tolerance_report()
+            .iter()
+            .map(|entry| (entry.defect, entry.location.clone()))
+            .collect::<Vec<_>>();
+        let expected = expected
+            .into_iter()
+            .map(|(defect, location)| (Defect::Worksheet(defect), location))
+            .collect::<Vec<_>>();
+        assert_eq!(recorded, expected, "{body}");
+        assert!(
+            super::parse_refusing_repairs(xml.as_bytes(), || Ok(None)).is_err(),
+            "write-path admission accepted {body}"
+        );
+    }
+
+    let read = |body: &str| {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        parse(xml.as_bytes(), || Ok(None)).expect("repaired")
+    };
+    // A late dimension still declares the extent; an unusable one is
+    // ignored.
+    let store = read(r#"<sheetData/><dimension ref="A1:B2"/>"#);
+    assert_eq!(
+        store.extents().declared(),
+        Some(Rect::from_a1("A1:B2").expect("rect"))
+    );
+    assert_eq!(
+        read(r#"<dimension ref="A0"/><sheetData/>"#)
+            .extents()
+            .declared(),
+        None
+    );
+    // A late cols record and a misplaced merge still apply.
+    let store = read(r#"<sheetData/><cols><col min="1" max="1" width="9"/></cols>"#);
+    assert_eq!(
+        store
+            .column(ColumnIndex::new(0).expect("A"))
+            .width()
+            .map(column::Width::get),
+        Some(9.0)
+    );
+    let store = read(r#"<mergeCells><mergeCell ref="A1:B2"/></mergeCells><sheetData/>"#);
+    assert_eq!(store.merge_ranges().len(), 1);
+
+    // Out-of-order rows sort; a repeated row merges last-wins.
+    let store = read(
+        r#"<sheetData><row r="3"><c r="A3"><v>3</v></c></row><row r="1" ht="20"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row><row r="1" ht="30"><c r="A1"><v>9</v></c></row></sheetData>"#,
+    );
+    assert!(matches!(
+        store.get(Address::from_a1("A1").expect("A1")),
+        Some(Cell::Value(Value::Number(number))) if number.as_str() == "9"
+    ));
+    assert!(matches!(
+        store.get(Address::from_a1("B1").expect("B1")),
+        Some(Cell::Value(Value::Number(number))) if number.as_str() == "2"
+    ));
+    assert!(matches!(
+        store.get(Address::from_a1("A3").expect("A3")),
+        Some(Cell::Value(Value::Number(number))) if number.as_str() == "3"
+    ));
+    assert_eq!(
+        store
+            .row(RowIndex::new(0).expect("row"))
+            .height()
+            .map(row::Height::get),
+        Some(30.0)
+    );
+    assert_eq!(store.tolerance_report().total(), 2);
+
+    // Duplicate collections stay fatal.
+    for body in [
+        r#"<sheetData/><sheetData/>"#,
+        r#"<sheetData/><mergeCells><mergeCell ref="A1:B2"/></mergeCells><mergeCells><mergeCell ref="C1:D2"/></mergeCells>"#,
+        r#"<cols><col min="1" max="1"/></cols><cols><col min="2" max="2"/></cols><sheetData/>"#,
+    ] {
+        let xml = format!(r#"<worksheet xmlns="{S}">{body}</worksheet>"#);
+        assert!(
+            parse(xml.as_bytes(), || Ok(None)).is_err(),
+            "accepted {body}"
+        );
+    }
+}
+
 #[test]
 fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
     for body in [
         r#"<row r="1048577"/>"#,
         r#"<row r="1"><c r="XFE1"/></row>"#,
         r#"<row r="1"><c r="A1"/><c r="A1"/></row>"#,
-        r#"<row r="2"/><row r="1"/>"#,
         r#"<row r="1"><c r="A1" s="65491"/></row>"#,
         r#"<row r="1"><c r="A1" cm="0"/></row>"#,
         r#"<row r="1"><c r="A1" vm="2147483648"/></row>"#,
@@ -1921,8 +2069,10 @@ mod streaming_0362_selected_tests {
         );
         assert_not_eligible(&decreasing_cells, "A1", NotEligibleReason::Ordering);
 
+        // A repeated row is repaired last-wins by the materialized parser
+        // (leniency finding 4.10); the scanner defers to it.
         let duplicate_row = worksheet(r#"<sheetData><row r="1"/><row r="1"/></sheetData>"#);
-        assert!(scan_xml(&duplicate_row, "A1").is_err());
+        assert_not_eligible(&duplicate_row, "A1", NotEligibleReason::Ordering);
 
         let duplicate_cell =
             worksheet(r#"<sheetData><row r="1"><c r="A1"/><c r="A1"/></row></sheetData>"#);
@@ -3146,7 +3296,11 @@ mod streaming_0365_range_tests {
     fn streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors() {
         let duplicate_row =
             worksheet(r#"<sheetData><row r="1"/><row r="2"/><row r="2"/></sheetData>"#);
-        assert!(scan_range_xml(&duplicate_row, "A1").is_err());
+        // Repaired last-wins by the materialized parser (leniency 4.10).
+        assert!(matches!(
+            scan_range_xml(&duplicate_row, "A1"),
+            Ok(RangeScanOutcome::NotEligible(NotEligibleReason::Ordering))
+        ));
 
         let duplicate_cell = worksheet(
             r#"<sheetData><row r="1"/><row r="2"><c r="B2"/><c r="B2"/></row></sheetData>"#,
@@ -3468,12 +3622,20 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::Eligible(_))
         ));
 
+        // Repaired and recorded by the read parse (leniency finding 4.10);
+        // the scan defers to it.
         let empty = worksheet(r#"<sheetData/><mergeCells count="0"/>"#);
-        assert!(scan_xml(&empty, "A1").is_err());
+        assert!(matches!(
+            scan_xml(&empty, "A1"),
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::MergeSemantics))
+        ));
 
         let mismatch =
             worksheet(r#"<sheetData/><mergeCells count="2"><mergeCell ref="A1:B1"/></mergeCells>"#);
-        assert!(scan_xml(&mismatch, "A1").is_err());
+        assert!(matches!(
+            scan_xml(&mismatch, "A1"),
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::MergeSemantics))
+        ));
     }
 
     #[test]
@@ -3491,7 +3653,6 @@ mod streaming_0367_merge_tests {
                 r#"<sheetData/><mergeCells><mergeCell ref="A1:B2"/><mergeCell ref="B2:C3"/></mergeCells>"#,
             ),
             worksheet(r#"<sheetData/><mergeCells><mergeCell ref="A1"/></mergeCells>"#),
-            worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#),
             worksheet(r#"<sheetData/><mergeCells><mergeCell ref="XFE1:XFF1"/></mergeCells>"#),
             worksheet(r#"<sheetData/><mergeCells><mergeCell/></mergeCells>"#),
         ];
@@ -3514,7 +3675,7 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
             other => panic!("expected the unsupported-structure verdict, got {other:?}"),
         }
-        super::assert_materialized_refusal(
+        super::assert_admission_refusal(
             &after_successor,
             "invalid XLSX structure: worksheet mergeCells appears after a schema successor",
         );
@@ -3558,7 +3719,7 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
             other => panic!("expected the unsupported-structure verdict, got {other:?}"),
         }
-        super::assert_materialized_refusal(
+        super::assert_admission_refusal(
             &after_successor,
             "invalid XLSX structure: worksheet mergeCells appears after a schema successor",
         );
@@ -3570,36 +3731,32 @@ mod streaming_0367_merge_tests {
             Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
             other => panic!("expected the style fallback verdict, got {other:?}"),
         }
+        // The read parse repairs the late `<cols>` (leniency finding 4.10)
+        // and then refuses the duplicate `<mergeCells>`; write-path
+        // admission refuses the late `<cols>` first.
         super::assert_materialized_refusal(
             &duplicate,
-            "invalid XLSX structure: worksheet cols appears after sheetData",
+            "invalid XLSX structure: worksheet has duplicate mergeCells elements",
+        );
+        assert_eq!(
+            super::super::parse_refusing_repairs(duplicate.as_bytes(), || Ok(None))
+                .expect_err("write-path admission")
+                .to_string(),
+            "invalid XLSX structure: worksheet cols appears after sheetData"
         );
 
-        // A genuinely early `<mergeCells>` on an unmarked worksheet is still
-        // refused by the scan itself, with its established message.
+        // A genuinely early `<mergeCells>` on an unmarked worksheet is
+        // repaired by the read parse (leniency finding 4.10), so the scan
+        // defers to it.
         let early = worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#);
-        assert_scanner_message(
-            scan_xml(&early, "A1"),
-            "worksheet mergeCells appears before sheetData",
-        );
-        super::assert_materialized_refusal(
+        match scan_xml(&early, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::MergeSemantics)) => {},
+            other => panic!("expected the merge-semantics verdict, got {other:?}"),
+        }
+        super::assert_admission_refusal(
             &early,
             "invalid XLSX structure: worksheet mergeCells appears before sheetData",
         );
-    }
-
-    /// Require the scanner's own typed message, not just any failure.
-    fn assert_scanner_message<T: Debug>(result: StreamResult<T>, expected: &str) {
-        match result {
-            Err(error) => match error.as_ref() {
-                StreamError::Callback {
-                    raw_error: None,
-                    active_error: Some(crate::Error::Invalid(actual)),
-                } => assert_eq!(actual, expected),
-                other => panic!("expected {expected:?} from the scanner, got {other:?}"),
-            },
-            other => panic!("expected {expected:?} from the scanner, got {other:?}"),
-        }
     }
 
     #[test]
@@ -4263,7 +4420,9 @@ mod streaming_0400_numeric_scratch_tests {
     }
 
     #[test]
-    fn streaming_0400_dimension_rejects_malformed_duplicate_and_late_metadata() {
+    fn streaming_0400_dimension_defers_malformed_duplicate_and_late_metadata() {
+        // The read parse repairs and records each (leniency finding 4.10);
+        // the scan never repairs, so it defers.
         for xml in [
             worksheet(r#"<dimension/><sheetData/>"#),
             worksheet(r#"<dimension ref="A0"/><sheetData/>"#),
@@ -4272,10 +4431,7 @@ mod streaming_0400_numeric_scratch_tests {
             worksheet(r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#),
             worksheet(r#"<sheetData/><dimension ref="A1"/>"#),
         ] {
-            assert!(
-                scan_xml(&xml, "A1").is_err(),
-                "accepted invalid dimension: {xml}"
-            );
+            assert_not_eligible(&xml, NotEligibleReason::UnsupportedStructure);
         }
     }
 
@@ -4455,7 +4611,8 @@ mod change_0658_ineligibility_gate_tests {
                     r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
                 ),
                 NotEligibleReason::Ordering,
-                Some("invalid XLSX structure: worksheet row 1 appears after row 2"),
+                // The read parse sorts the rows (leniency finding 4.10).
+                None,
             ),
             (
                 "general-reference",
@@ -4524,20 +4681,20 @@ mod change_0658_ineligibility_gate_tests {
     /// A refusal raised while the marking event is processed still wins.
     #[test]
     fn a_refusal_on_the_marking_event_outranks_the_verdict() {
-        // `<dimension>` carries an unmodelled attribute, which marks the
-        // worksheet, and an invalid `ref`, which the same call refuses. The
-        // refusal is returned, not the verdict.
-        let xml = padded(r#"<dimension ref="not-a-range" futureAttr="1"/><sheetData/>"#);
+        // `<row>` carries a style, which marks the worksheet, and an invalid
+        // `r`, which the same call refuses. The refusal is returned, not the
+        // verdict.
+        let xml = padded(r#"<sheetData><row r="0" s="1"/></sheetData>"#);
         let (outcome, _) = scan_counting(&xml, "A1");
         match outcome {
             Err(error) => {
                 let text = format!("{error}");
                 assert!(
-                    text.contains("invalid worksheet dimension 'not-a-range'"),
+                    text.contains("worksheet row 0 exceeds the grid"),
                     "unexpected refusal: {text}"
                 );
             },
-            other => panic!("expected the dimension refusal, got {other:?}"),
+            other => panic!("expected the row refusal, got {other:?}"),
         }
     }
 }

@@ -3896,9 +3896,8 @@ mod tests {
             let overlap = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:B2"/><mergeCell ref="B2:C3"/></mergeCells>"#,
             );
-            let count = worksheet_xml(
-                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:B1"/></mergeCells>"#,
-            );
+            // A merge count disagreeing with its records is repaired and
+            // recorded (leniency finding 4.10), so it is not listed here.
             let out_of_grid = worksheet_xml(
                 r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="XFE1:XFF1"/></mergeCells>"#,
             );
@@ -3907,7 +3906,7 @@ mod tests {
                 "<tail>",
             );
 
-            for worksheet in [malformed, overlap, count, out_of_grid, tail] {
+            for worksheet in [malformed, overlap, out_of_grid, tail] {
                 assert_zero_callbacks(dependency_xlsx(&worksheet, None, None));
             }
         }

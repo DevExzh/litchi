@@ -237,4 +237,7 @@ pub(super) struct Parser<'c> {
     pub(super) repairs: super::Repairs,
     /// Repairs made so far; moved into the finished store.
     pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Whether a row index repeated (repaired last-wins when the parse
+    /// finishes; audit finding 4.10).
+    pub(super) duplicate_rows: bool,
 }

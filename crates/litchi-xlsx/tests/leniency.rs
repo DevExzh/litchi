@@ -507,3 +507,58 @@ fn leading_equals_and_empty_formulas_are_repaired_and_recorded() {
         ]
     );
 }
+
+/// Finding 4.10: schema-sequence violations and advisory counts are
+/// repaired and recorded; rows out of order sort and a repeated row merges
+/// last-wins.
+#[test]
+fn worksheet_sequencing_and_advisory_metadata_are_repaired_and_recorded() {
+    use litchi_xlsx::{Cell, SourceCellView, Value, WorksheetDefect as W};
+
+    let bytes = patched(&[("xl/worksheets/sheet1.xml", &|text: &str| {
+        replace(r#"<dimension ref="A1:C4"/>"#, "")(text).replacen(
+                "</row></sheetData>",
+                r#"</row><row r="2"><c r="D2"><v>5</v></c></row></sheetData><mergeCells count="3"><mergeCell ref="E1:F1"/></mergeCells><dimension ref="A1:D4"/>"#,
+                1,
+            )
+    })]);
+
+    let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
+    assert!(matches!(
+        source.sheet(0usize).unwrap().unwrap().cell("D2").unwrap(),
+        SourceCellView::Stored(Cell::Value(Value::Number(number))) if number.as_str() == "5"
+    ));
+
+    assert_eq!(
+        worksheet_entries(&both_reports(&bytes)),
+        [
+            (
+                Defect::Worksheet(W::RowOutOfOrder),
+                Some(0),
+                ToleranceLocation::Row(litchi_xlsx::RowIndex::new(1).unwrap())
+            ),
+            (
+                Defect::Worksheet(W::CountMismatch),
+                Some(0),
+                ToleranceLocation::Worksheet
+            ),
+            (
+                Defect::Worksheet(W::MisplacedElement),
+                Some(0),
+                ToleranceLocation::Worksheet
+            ),
+        ]
+    );
+
+    let workbook = Workbook::from_slice(&bytes).unwrap();
+    let flags = workbook.sheet(0usize).unwrap().unwrap();
+    // The repeated row 2 merges last-wins: its earlier cells survive.
+    assert!(matches!(
+        flags.cell("A2").unwrap(),
+        litchi_xlsx::cell::View::Stored(Cell::Value(Value::Text(_)))
+    ));
+    assert_eq!(
+        flags.extents().unwrap().declared(),
+        Some(litchi_xlsx::Rect::from_a1("A1:D4").unwrap())
+    );
+}

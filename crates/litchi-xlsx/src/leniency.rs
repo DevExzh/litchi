@@ -114,6 +114,11 @@
 //!   [`CatalogDefect::SheetNameRules`] (finding 4.8, opt-in). The standalone
 //!   `raw::parse_catalog` and the feature snapshots that re-read the
 //!   catalog for editing keep the historical errors.
+//! * finding 4.10 — the worksheet event parser records
+//!   [`WorksheetDefect::MisplacedElement`],
+//!   [`WorksheetDefect::CountMismatch`], and
+//!   [`WorksheetDefect::RowOutOfOrder`]; the selected-range scanner defers
+//!   such a worksheet to it.
 //! * finding 4.9 — the worksheet event parser records
 //!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
 //!   at the cell; the selected-range scanner defers such a cell to it.
@@ -286,9 +291,8 @@ impl CellDefect {
 /// A worksheet-level structural-advisory defect repaired the way Excel
 /// repairs it.
 ///
-/// The geometry variants (audit finding 4.1) are live; the sequencing and
-/// advisory-count variants (finding 4.10) are *roadmap contracts* no read
-/// produces yet.
+/// Every variant is live: the geometry variants (audit finding 4.1) and the
+/// sequencing and advisory-count variants (finding 4.10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum WorksheetDefect {
@@ -311,15 +315,24 @@ pub enum WorksheetDefect {
     /// attribute stays a hard error.
     SheetFormatDefaultOutOfRange,
     /// `dimension`, `sheetFormatPr`, `cols`, or `mergeCells` appears out of
-    /// schema order, or `dimension` is duplicated or unparseable (finding
-    /// 4.10). The element is accepted position-independently; an unusable
-    /// `dimension` is ignored.
+    /// schema order, or `dimension` is repeated, lacks `ref`, or has an
+    /// unparseable `ref` (finding 4.10). ECMA-376 §18.3.1.35 makes
+    /// `dimension` informational and Excel and LibreOffice recompute it. The
+    /// element is accepted position-independently; the first `dimension`
+    /// wins and an unusable one is ignored. A repeated `sheetData`, `cols`,
+    /// `sheetFormatPr`, or `mergeCells` stays fatal. Located at
+    /// [`Location::Worksheet`].
     MisplacedElement,
-    /// An advisory count disagrees with the records it describes, or a
-    /// collection is empty (finding 4.10). The records are authoritative.
+    /// `mergeCells/@count` disagrees with its records, or `cols` /
+    /// `mergeCells` is empty (finding 4.10). The counts are informational
+    /// (§18.3.1.55); the records are authoritative, as for the
+    /// shared-string hints. Located at [`Location::Worksheet`].
     CountMismatch,
-    /// Rows appear out of ascending order or a row index repeats (finding
-    /// 4.10). Rows are sorted; a duplicate's cells merge last-wins.
+    /// A row appears after a higher-numbered row, or a row index repeats
+    /// (finding 4.10). Rows are sorted; a repeated row merges last-wins —
+    /// its later properties and cells replace earlier ones at the same
+    /// index — as Apache POI's sorted row map does. A cell repeated within
+    /// one row stays fatal. Located at the row.
     RowOutOfOrder,
 }
 

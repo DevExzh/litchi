@@ -314,7 +314,21 @@ impl<'c> Parser<'c> {
             merge_window_closed: false,
             repairs,
             tolerance: ToleranceReport::default(),
+            duplicate_rows: false,
         }
+    }
+
+    /// Repair one worksheet-level defect at `location`, or refuse it with
+    /// `error` when this parse refuses repairs.
+    fn tolerate(
+        &mut self,
+        defect: WorksheetDefect,
+        location: Location,
+        error: crate::Error,
+    ) -> Result<()> {
+        let report = self.repair_sink().ok_or(error)?;
+        report.record(defect, location);
+        Ok(())
     }
 
     /// The report a cataloged repair records into, or `None` when this parse
@@ -615,6 +629,9 @@ impl<'c> Parser<'c> {
     where
         F: FnOnce() -> Result<Option<&'a [Text]>>,
     {
+        if self.duplicate_rows {
+            self.merge_duplicate_rows();
+        }
         let repairs = self.repairs;
         resolve_shared_formulas(
             &mut self.cells,
@@ -664,6 +681,32 @@ impl<'c> Parser<'c> {
             Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)?;
         store.set_tolerance_report(tolerance);
         Ok(store)
+    }
+
+    /// Merge repeated rows last-wins (audit finding 4.10): a later record
+    /// of a row replaces the earlier row properties, and a later cell at an
+    /// address replaces the earlier cell. Lane cells precede reader cells in
+    /// document order.
+    fn merge_duplicate_rows(&mut self) {
+        fn keep_last<T>(
+            items: &mut Vec<T>,
+            seen: &mut HashSet<(u32, u32)>,
+            key: impl Fn(&T) -> (u32, u32),
+        ) {
+            let mut kept = std::mem::take(items);
+            kept.reverse();
+            kept.retain(|item| seen.insert(key(item)));
+            kept.reverse();
+            *items = kept;
+        }
+        let address = |address: &Address| (address.row().get(), address.column().get());
+        let mut seen = HashSet::new();
+        keep_last(&mut self.cells, &mut seen, |cell| address(&cell.address));
+        keep_last(&mut self.lane_cells, &mut seen, |cell| {
+            address(&cell.address)
+        });
+        let mut seen = HashSet::new();
+        keep_last(&mut self.rows, &mut seen, |row| (row.index.get(), 0));
     }
 
     /// Advance the ordinary worksheet parser by one XML event.
@@ -803,22 +846,43 @@ impl<'c> Parser<'c> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"dimension")
         {
+            // `dimension` is informational (ECMA-376 §18.3.1.35) and endemic
+            // garbage; Excel and LibreOffice recompute it (audit finding
+            // 4.10). It is accepted in any position, the first one wins, and
+            // an unusable `ref` is ignored.
             if self.seen_columns || self.seen_sheet_data {
-                return Err(invalid(
-                    "worksheet dimension appears after column or cell data",
-                ));
+                self.tolerate(
+                    WorksheetDefect::MisplacedElement,
+                    Location::Worksheet,
+                    invalid("worksheet dimension appears after column or cell data"),
+                )?;
             }
             if self.seen_dimension {
-                return Err(invalid("worksheet has duplicate dimension elements"));
+                self.tolerate(
+                    WorksheetDefect::MisplacedElement,
+                    Location::Worksheet,
+                    invalid("worksheet has duplicate dimension elements"),
+                )?;
+                return Ok(Context::Other);
             }
             self.seen_dimension = true;
-            let reference = unqualified_attribute_value(element, b"ref", decoder)?
-                .ok_or_else(|| invalid("worksheet dimension is missing ref"))?;
-            self.declared_extent = Some(Rect::from_a1(&reference).map_err(|error| {
-                invalid(format!(
-                    "invalid worksheet dimension '{reference}': {error}"
-                ))
-            })?);
+            match unqualified_attribute_value(element, b"ref", decoder)? {
+                None => self.tolerate(
+                    WorksheetDefect::MisplacedElement,
+                    Location::Worksheet,
+                    invalid("worksheet dimension is missing ref"),
+                )?,
+                Some(reference) => match Rect::from_a1(&reference) {
+                    Ok(extent) => self.declared_extent = Some(extent),
+                    Err(error) => self.tolerate(
+                        WorksheetDefect::MisplacedElement,
+                        Location::Worksheet,
+                        invalid(format!(
+                            "invalid worksheet dimension '{reference}': {error}"
+                        )),
+                    )?,
+                },
+            }
             return Ok(Context::Other);
         }
         if parent == Context::Worksheet
@@ -848,16 +912,24 @@ impl<'c> Parser<'c> {
         if parent == Context::Worksheet
             && is_spreadsheetml_name(namespace, element.name(), b"mergeCells")
         {
-            if !self.seen_sheet_data {
-                return Err(invalid("worksheet mergeCells appears before sheetData"));
-            }
             if self.seen_merges {
                 return Err(invalid("worksheet has duplicate mergeCells elements"));
             }
+            // Merges are collected position-independently (audit finding
+            // 4.10).
+            if !self.seen_sheet_data {
+                self.tolerate(
+                    WorksheetDefect::MisplacedElement,
+                    Location::Worksheet,
+                    invalid("worksheet mergeCells appears before sheetData"),
+                )?;
+            }
             if self.merge_window_closed {
-                return Err(invalid(
-                    "worksheet mergeCells appears after a schema successor",
-                ));
+                self.tolerate(
+                    WorksheetDefect::MisplacedElement,
+                    Location::Worksheet,
+                    invalid("worksheet mergeCells appears after a schema successor"),
+                )?;
             }
             self.seen_merges = true;
             self.merge_count =
@@ -948,14 +1020,27 @@ impl<'c> Parser<'c> {
         self.seen_rows
             .try_reserve(1)
             .map_err(|source| allocation("worksheet parser row index set", source))?;
+        // Rows out of order or repeated (audit finding 4.10) are accepted:
+        // the store sorts rows, and a repeated row's cells and properties
+        // merge last-wins when the parse finishes, as Apache POI's sorted
+        // row map does.
+        let location = Location::Row(RowIndex::new(number - 1)?);
         if !self.seen_rows.insert(number) {
-            return Err(invalid(format!("duplicate worksheet row {number}")));
-        }
-        if self.previous_row != 0 && number < self.previous_row {
-            return Err(invalid(format!(
-                "worksheet row {number} appears after row {}",
-                self.previous_row
-            )));
+            self.tolerate(
+                WorksheetDefect::RowOutOfOrder,
+                location,
+                invalid(format!("duplicate worksheet row {number}")),
+            )?;
+            self.duplicate_rows = true;
+        } else if self.previous_row != 0 && number < self.previous_row {
+            self.tolerate(
+                WorksheetDefect::RowOutOfOrder,
+                location,
+                invalid(format!(
+                    "worksheet row {number} appears after row {}",
+                    self.previous_row
+                )),
+            )?;
         }
         self.previous_row = number;
         let height = match optional_f64(element, b"ht", decoder, "worksheet row height")? {
@@ -1034,9 +1119,11 @@ impl<'c> Parser<'c> {
             return Err(invalid("worksheet has duplicate sheetFormatPr elements"));
         }
         if self.seen_columns || self.seen_sheet_data {
-            return Err(invalid(
-                "worksheet sheetFormatPr appears after column or cell data",
-            ));
+            self.tolerate(
+                WorksheetDefect::MisplacedElement,
+                Location::Worksheet,
+                invalid("worksheet sheetFormatPr appears after column or cell data"),
+            )?;
         }
         self.seen_defaults = true;
 
@@ -1056,7 +1143,11 @@ impl<'c> Parser<'c> {
             return Err(invalid("worksheet has duplicate cols elements"));
         }
         if self.seen_sheet_data {
-            return Err(invalid("worksheet cols appears after sheetData"));
+            self.tolerate(
+                WorksheetDefect::MisplacedElement,
+                Location::Worksheet,
+                invalid("worksheet cols appears after sheetData"),
+            )?;
         }
         self.seen_columns = true;
         self.columns = Some(Assignments::new());
@@ -1388,23 +1479,32 @@ impl<'c> Parser<'c> {
             Context::Value => Ok(()),
             Context::Cell => self.finish_cell(),
             Context::Row => self.finish_row(),
-            Context::Columns if self.column_records == 0 => {
-                Err(invalid("worksheet cols contains no col records"))
-            },
+            // Empty collections and advisory counts that disagree with their
+            // records (audit finding 4.10): the records are authoritative.
+            Context::Columns if self.column_records == 0 => self.tolerate(
+                WorksheetDefect::CountMismatch,
+                Location::Worksheet,
+                invalid("worksheet cols contains no col records"),
+            ),
             Context::MergeCells => {
                 if self.merges.is_empty() {
-                    return Err(invalid(
-                        "worksheet mergeCells contains no mergeCell records",
-                    ));
-                }
-                if self
+                    self.tolerate(
+                        WorksheetDefect::CountMismatch,
+                        Location::Worksheet,
+                        invalid("worksheet mergeCells contains no mergeCell records"),
+                    )?;
+                } else if self
                     .merge_count
                     .is_some_and(|count| count != self.merges.len())
                 {
-                    return Err(invalid(format!(
-                        "worksheet merged-range count differs from {} records",
-                        self.merges.len()
-                    )));
+                    self.tolerate(
+                        WorksheetDefect::CountMismatch,
+                        Location::Worksheet,
+                        invalid(format!(
+                            "worksheet merged-range count differs from {} records",
+                            self.merges.len()
+                        )),
+                    )?;
                 }
                 Ok(())
             },

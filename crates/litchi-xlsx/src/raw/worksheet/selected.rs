@@ -1241,20 +1241,17 @@ impl<'a> Scanner<'a> {
                 "selected worksheet record count lost synchronization",
             ));
         }
-        if self.seen_merge_cells && self.merges.is_empty() {
-            return Err(invalid(
-                "worksheet mergeCells contains no mergeCell records",
-            ));
-        }
-        if let Some(count) = self.merge_count
-            && count
-                != u32::try_from(self.merges.len())
-                    .map_err(|_source| invalid("worksheet merged-range count does not fit u32"))?
+        if (self.seen_merge_cells && self.merges.is_empty())
+            || self
+                .merge_count
+                .is_some_and(|count| usize::try_from(count).ok() != Some(self.merges.len()))
         {
-            return Err(invalid(format!(
-                "worksheet merged-range count differs from {} records",
-                self.merges.len()
-            )));
+            // Repaired and recorded by the materialized parser (audit
+            // finding 4.10).
+            return Ok((
+                RangeScanOutcome::NotEligible(NotEligibleReason::MergeSemantics),
+                None,
+            ));
         }
         let index = crate::merge::Index::new(self.merges)?;
         let covering_merge = if self.requested.rows() == 1 && self.requested.columns() == 1 {
@@ -1401,9 +1398,12 @@ impl<'a> Scanner<'a> {
             return Ok(Some(Frame::SheetData));
         }
         if is_spreadsheetml_element(element, "mergeCells") {
-            self.validate_merge_cells_placement()?;
-            self.seen_merge_cells = true;
-            return self.start_merge_cells(element);
+            if self.validate_merge_cells_placement()? {
+                self.seen_merge_cells = true;
+                return self.start_merge_cells(element);
+            }
+            self.mark(NotEligibleReason::MergeSemantics);
+            return Ok(None);
         }
         if is_spreadsheetml_element(element, "mergeCell") {
             return Err(invalid(
@@ -1425,34 +1425,27 @@ impl<'a> Scanner<'a> {
         Ok(None)
     }
 
+    /// A misplaced, repeated, or unusable `dimension` is repaired and
+    /// recorded by the materialized parser (audit finding 4.10); this scanner
+    /// never repairs, so it defers such a worksheet.
     fn start_dimension(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
-        self.validate_dimension_placement()?;
+        if self.seen_sheet_data || self.seen_dimension {
+            self.mark(NotEligibleReason::UnsupportedStructure);
+            return Ok(None);
+        }
         self.seen_dimension = true;
         self.validate_attributes(element, &["ref"], false)?;
-        let reference = unqualified_attribute(element, "ref")
-            .ok_or_else(|| invalid("worksheet dimension is missing ref"))?;
-        Rect::from_a1(reference).map_err(|error| {
-            invalid(format!(
-                "invalid worksheet dimension '{reference}': {error}"
-            ))
-        })?;
+        if unqualified_attribute(element, "ref")
+            .is_none_or(|reference| Rect::from_a1(reference).is_err())
+        {
+            self.mark(NotEligibleReason::UnsupportedStructure);
+            return Ok(None);
+        }
         if self.not_eligible.is_some() {
             Ok(None)
         } else {
             Ok(Some(Frame::Dimension))
         }
-    }
-
-    fn validate_dimension_placement(&self) -> Result<()> {
-        if self.seen_sheet_data {
-            return Err(invalid(
-                "worksheet dimension appears after column or cell data",
-            ));
-        }
-        if self.seen_dimension {
-            return Err(invalid("worksheet has duplicate dimension elements"));
-        }
-        Ok(())
     }
 
     fn start_dimension_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
@@ -1545,19 +1538,14 @@ impl<'a> Scanner<'a> {
         Ok(Some(Frame::MergeCells))
     }
 
-    fn validate_merge_cells_placement(&self) -> Result<()> {
-        if !self.seen_sheet_data {
-            return Err(invalid("worksheet mergeCells appears before sheetData"));
-        }
+    /// Whether `mergeCells` sits where the schema puts it. A duplicate is
+    /// fatal; a misplaced one is repaired and recorded by the materialized
+    /// parser (audit finding 4.10), so the caller defers the worksheet.
+    fn validate_merge_cells_placement(&self) -> Result<bool> {
         if self.seen_merge_cells {
             return Err(invalid("worksheet has duplicate mergeCells elements"));
         }
-        if self.merge_window_closed {
-            return Err(invalid(
-                "worksheet mergeCells appears after a schema successor",
-            ));
-        }
-        Ok(())
+        Ok(self.seen_sheet_data && !self.merge_window_closed)
     }
 
     fn start_merge_cells_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
@@ -1649,7 +1637,10 @@ impl<'a> Scanner<'a> {
                 return Ok(None);
             }
             if number == self.previous_row {
-                return Err(invalid(format!("duplicate worksheet row {number}")));
+                // Repaired last-wins by the materialized parser (audit
+                // finding 4.10).
+                self.mark(NotEligibleReason::Ordering);
+                return Ok(None);
             }
         }
         self.previous_row = number;
@@ -1793,7 +1784,7 @@ impl<'a> Scanner<'a> {
             Frame::Worksheet => self.root_closed = true,
             Frame::Dimension => {},
             Frame::SheetData => {},
-            Frame::MergeCells => self.finish_merge_cells()?,
+            Frame::MergeCells => self.finish_merge_cells(),
             Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
@@ -1807,7 +1798,7 @@ impl<'a> Scanner<'a> {
             Frame::Worksheet => self.root_closed = true,
             Frame::Dimension => {},
             Frame::SheetData => {},
-            Frame::MergeCells => self.finish_merge_cells()?,
+            Frame::MergeCells => self.finish_merge_cells(),
             Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
@@ -1824,22 +1815,17 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
-    fn finish_merge_cells(&self) -> Result<()> {
-        if self.merges.is_empty() {
-            return Err(invalid(
-                "worksheet mergeCells contains no mergeCell records",
-            ));
-        }
-        if self
-            .merge_count
-            .is_some_and(|count| usize::try_from(count).ok() != Some(self.merges.len()))
+    /// An empty `mergeCells` or a count disagreeing with its records is
+    /// repaired and recorded by the materialized parser (audit finding
+    /// 4.10); this scanner defers the worksheet.
+    fn finish_merge_cells(&mut self) {
+        if self.merges.is_empty()
+            || self
+                .merge_count
+                .is_some_and(|count| usize::try_from(count).ok() != Some(self.merges.len()))
         {
-            return Err(invalid(format!(
-                "worksheet merged-range count differs from {} records",
-                self.merges.len()
-            )));
+            self.mark(NotEligibleReason::MergeSemantics);
         }
-        Ok(())
     }
 
     fn finish_cell(&mut self) -> Result<()> {
