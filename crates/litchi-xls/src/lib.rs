@@ -672,7 +672,7 @@ pub use interface_records::{InterfaceEnd, InterfaceHdr};
 pub use layout::{Column, Row};
 pub use leniency::{
     CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, PaletteDefect,
-    SheetNameDefect, ToleranceReport, ToleratedDefect,
+    SheetDefect, SheetNameDefect, ToleranceReport, ToleratedDefect,
 };
 pub use list_object::{
     CachedDiskHeader, ExternalTableField, ExternalTableMetadata, ExternalTableVersion,

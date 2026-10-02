@@ -18,7 +18,7 @@
 //! them would cost the caller a whole worksheet over metadata that cannot
 //! change what a conforming workbook means. Each substitutes the value
 //! documented on the corresponding [`CellFormatDefect`], [`EncodingDefect`],
-//! or [`PaletteDefect`] variant.
+//! [`PaletteDefect`], or [`SheetDefect`] variant.
 //!
 //! **Opt-in repairs** trade strictness for reach behind explicit [`Leniency`]
 //! variants. The defects enumerated by [`FormattingDefect`] — cosmetic
@@ -404,6 +404,54 @@ impl PaletteDefect {
 /// `Palette` (MS-XLS 2.4.188).
 const PALETTE_RECORD: u16 = 0x0092;
 
+/// The class of `BoundSheet8` defect the reader repairs the way Excel and
+/// LibreOffice repair it.
+///
+/// Repaired and recorded under every [`Leniency`] variant. Worksheet-name
+/// rule violations are a separate, opt-in class: see [`SheetNameDefect`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SheetDefect {
+    /// Reserved `stName` option bits (MS-XLS 2.5.294 `ShortXLUnicodeString`)
+    /// were set.
+    ///
+    /// The bits are ignored, as the specification directs and as the
+    /// `Format` and `SST` parsers already ignore the identical bits.
+    ReservedNameFlags,
+    /// `hsState` (MS-XLS 2.4.28) was 3, outside the visibility enumeration.
+    ///
+    /// Repaired to very hidden — the most restrictive state — so a sheet the
+    /// producer meant to hide is never surfaced.
+    Visibility,
+    /// `dt` (MS-XLS 2.4.28) was outside the sheet-type enumeration.
+    ///
+    /// Repaired to worksheet, as LibreOffice reads it.
+    SheetType,
+    /// The record's payload continued past the sheet name.
+    ///
+    /// The trailing bytes are ignored, as POI and LibreOffice ignore them.
+    TrailingBytes,
+}
+
+impl SheetDefect {
+    /// The BIFF record type whose payload carried the defect: `BoundSheet8`.
+    #[must_use]
+    pub fn record_type(self) -> u16 {
+        BOUND_SHEET_RECORD
+    }
+
+    /// A stable, allocation-free description of the defect class.
+    #[must_use]
+    pub fn description(self) -> &'static str {
+        match self {
+            SheetDefect::ReservedNameFlags => "BoundSheet8 name has reserved option bits set",
+            SheetDefect::Visibility => "BoundSheet8 visibility is outside the enumeration",
+            SheetDefect::SheetType => "BoundSheet8 sheet type is outside the enumeration",
+            SheetDefect::TrailingBytes => "BoundSheet8 payload continues past the sheet name",
+        }
+    }
+}
+
 /// One class of defect repaired while a workbook was read.
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of what
@@ -425,6 +473,8 @@ pub enum Defect {
     Encoding(EncodingDefect),
     /// A `Palette` defect repaired the way Excel repairs it.
     Palette(PaletteDefect),
+    /// A `BoundSheet8` defect repaired the way Excel repairs it.
+    Sheet(SheetDefect),
     /// A worksheet-name defect repaired by the opt-in [`Leniency`] variant.
     SheetName(SheetNameDefect),
 }
@@ -442,6 +492,7 @@ impl Defect {
             Defect::CellFormat(defect) => defect.record_type(),
             Defect::Encoding(defect) => defect.record_type(),
             Defect::Palette(defect) => Some(defect.record_type()),
+            Defect::Sheet(defect) => Some(defect.record_type()),
             Defect::SheetName(defect) => Some(defect.record_type()),
         }
     }
@@ -454,6 +505,7 @@ impl Defect {
             Defect::CellFormat(defect) => defect.description(),
             Defect::Encoding(defect) => defect.description(),
             Defect::Palette(defect) => defect.description(),
+            Defect::Sheet(defect) => defect.description(),
             Defect::SheetName(defect) => defect.description(),
         }
     }
@@ -474,6 +526,12 @@ impl From<CellFormatDefect> for Defect {
 impl From<SheetNameDefect> for Defect {
     fn from(defect: SheetNameDefect) -> Self {
         Self::SheetName(defect)
+    }
+}
+
+impl From<SheetDefect> for Defect {
+    fn from(defect: SheetDefect) -> Self {
+        Self::Sheet(defect)
     }
 }
 
@@ -518,7 +576,7 @@ impl ToleratedDefect {
     /// cell or `ROW` record, or the first column of the `COLINFO` record.
     /// For [`EncodingDefect::UnsupportedCodePage`] it is the byte offset of
     /// the `CODEPAGE` record within the Workbook stream. For every
-    /// [`SheetNameDefect`] it is the zero-based workbook sheet index of the
+    /// [`SheetNameDefect`] and [`SheetDefect`] it is the zero-based workbook sheet index of the
     /// `BoundSheet8` record. For every [`PaletteDefect`] it is the byte
     /// offset of the `Palette` record within the Workbook stream.
     #[must_use]
@@ -549,7 +607,10 @@ impl ToleratedDefect {
     /// [`PaletteDefect::ReservedByte`] it is the number of entries whose
     /// reserved byte was nonzero; for [`PaletteDefect::ColorCount`] the
     /// declared `ccv`; for [`PaletteDefect::Duplicate`] the one-based count
-    /// of `Palette` records seen so far.
+    /// of `Palette` records seen so far. For [`SheetDefect::ReservedNameFlags`]
+    /// it is the `stName` option byte, for [`SheetDefect::Visibility`] the
+    /// `hsState` byte, for [`SheetDefect::SheetType`] the `dt` byte, and for
+    /// [`SheetDefect::TrailingBytes`] the number of bytes ignored.
     #[must_use]
     pub fn observed(&self) -> u32 {
         self.observed

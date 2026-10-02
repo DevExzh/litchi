@@ -5,7 +5,7 @@
 //! data including cell values, formatting, formulas, and metadata.
 
 use crate::error::{Error, Result};
-use crate::leniency::{Leniency, SheetNameDefect, ToleranceLog};
+use crate::leniency::{Leniency, SheetDefect, SheetNameDefect, ToleranceLog};
 use crate::utils;
 use litchi_biff::RecordRef;
 use litchi_codepage::{Mbcs, Page};
@@ -193,6 +193,12 @@ impl BoundSheetRecord {
     /// Parse the `sheet_index`th `BoundSheet8` record, letting `tolerance`
     /// decide whether a name that breaks the [MS-XLS] 2.4.28 rules is kept
     /// verbatim (and recorded) or refused.
+    ///
+    /// The Excel-compatible [`SheetDefect`] repairs are applied and recorded
+    /// under every policy: reserved `stName` option bits are ignored, an
+    /// `hsState` of 3 reads as very hidden, an unknown `dt` as a worksheet,
+    /// and payload bytes after the name are ignored. A payload too short for
+    /// its name stays a framing error.
     pub(crate) fn parse_checked(
         data: &[u8],
         encoding: &Encoding,
@@ -209,25 +215,47 @@ impl BoundSheetRecord {
         let character_count = usize::from(data[6]);
         let string_flags = data[7];
         if string_flags & 0xfe != 0 {
-            return Err(Error::InvalidRecord {
-                record_type: 0x0085,
-                message: "BoundSheet8 name has reserved string option bits".to_string(),
-            });
+            // [MS-XLS] 2.5.294: "reserved (7 bits): MUST be zero, and MUST be
+            // ignored" — the Format and SST parsers ignore the same bits.
+            tolerance.report_mut().record(
+                SheetDefect::ReservedNameFlags,
+                sheet_index,
+                u32::from(string_flags),
+            );
         }
         let character_width = if string_flags & 1 != 0 { 2 } else { 1 };
-        if data.len() != 8 + character_count * character_width {
+        let name_end = 8 + character_count * character_width;
+        if data.len() < name_end {
             return Err(Error::InvalidRecord {
                 record_type: 0x0085,
                 message: "BoundSheet8 name length does not match its payload".to_string(),
             });
         }
+        if data.len() > name_end {
+            tolerance.report_mut().record(
+                SheetDefect::TrailingBytes,
+                sheet_index,
+                u32::try_from(data.len() - name_end).unwrap_or(u32::MAX),
+            );
+        }
 
         let position = binary::read_u32_le_at(data, 0)?;
-        let visible = SheetVisible::from_u8(data[4])?;
-        let sheet_type = SheetType::from_u8(data[5])?;
+        let visible = SheetVisible::from_u8(data[4]).unwrap_or_else(|_| {
+            tolerance
+                .report_mut()
+                .record(SheetDefect::Visibility, sheet_index, u32::from(data[4]));
+            SheetVisible::VeryHidden
+        });
+        let sheet_type = SheetType::from_u8(data[5]).unwrap_or_else(|_| {
+            tolerance
+                .report_mut()
+                .record(SheetDefect::SheetType, sheet_index, u32::from(data[5]));
+            SheetType::WorkSheet
+        });
 
-        // Skip 2 bytes and parse the name
-        let name_data = &data[6..];
+        // Skip 2 bytes and parse the name; trailing payload bytes are ignored.
+        // `parse_short_string` reads only the `fHighByte` option bit.
+        let name_data = &data[6..name_end];
         let name = utils::parse_short_string(name_data, encoding)?;
         if let Some(fault) = sheet_name_fault(&name) {
             let (defect, observed) = match fault {

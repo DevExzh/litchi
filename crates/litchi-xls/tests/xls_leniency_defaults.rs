@@ -15,7 +15,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::Cell as _;
 use litchi_xls::{
-    Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions, PaletteDefect,
+    Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions, PaletteDefect, SheetDefect,
     SheetNameDefect, SourceBackedOptions, SourceBackedWorkbook, ToleranceReport, ToleratedDefect,
     Workbook, Writer,
 };
@@ -593,4 +593,68 @@ fn conforming_fonts_record_nothing_under_the_opt_in() {
         &Stream::simple().package(),
         Leniency::TolerateFormattingDefects,
     );
+}
+
+// ---------------------------------------------------------------------------
+// F3.6: BoundSheet8 reserved bits, visibility 3, unknown type, trailing bytes
+// ---------------------------------------------------------------------------
+
+/// The two-sheet fixture with the second `BoundSheet8` payload edited.
+fn with_second_bound_sheet(edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
+    let mut stream = two_sheets();
+    edit(stream.payload_mut(BOUND_SHEET, 1));
+    stream.package()
+}
+
+#[test]
+fn reserved_sheet_name_option_bits_are_ignored_and_recorded() {
+    let package = with_second_bound_sheet(|payload| payload[7] |= 0xF0);
+    let workbook = assert_repairs(
+        &package,
+        &[(Defect::Sheet(SheetDefect::ReservedNameFlags), 1, 0xF0)],
+    );
+    assert_eq!(workbook.sheets()[1].name(), "Other");
+}
+
+#[test]
+fn visibility_three_reads_as_very_hidden_and_is_recorded() {
+    let package = with_second_bound_sheet(|payload| payload[4] = 3);
+    let workbook = assert_repairs(&package, &[(Defect::Sheet(SheetDefect::Visibility), 1, 3)]);
+    assert_eq!(
+        workbook.sheets()[1].visibility(),
+        litchi_xls::SheetVisibility::VeryHidden
+    );
+}
+
+#[test]
+fn an_unknown_sheet_type_reads_as_a_worksheet_and_is_recorded() {
+    let package = with_second_bound_sheet(|payload| payload[5] = 9);
+    let workbook = assert_repairs(&package, &[(Defect::Sheet(SheetDefect::SheetType), 1, 9)]);
+    assert_eq!(
+        workbook
+            .xls_worksheet(1)
+            .unwrap()
+            .get_cell(0, 0)
+            .unwrap()
+            .value(),
+        &litchi_core::sheet::CellValue::Float(2.0)
+    );
+}
+
+#[test]
+fn trailing_bound_sheet_bytes_are_ignored_and_recorded() {
+    let package = with_second_bound_sheet(|payload| payload.extend_from_slice(&[0xAA; 3]));
+    let workbook = assert_repairs(
+        &package,
+        &[(Defect::Sheet(SheetDefect::TrailingBytes), 1, 3)],
+    );
+    assert_eq!(workbook.sheets()[1].name(), "Other");
+}
+
+#[test]
+fn a_bound_sheet_too_short_for_its_name_is_still_refused() {
+    let package = with_second_bound_sheet(|payload| {
+        payload.pop();
+    });
+    assert_refused(&package, Leniency::default(), "BoundSheet8");
 }
