@@ -4,6 +4,7 @@
 //! including internal and external relationships.
 
 use crate::error::{OpcError, Result};
+use crate::leniency::RelationshipDefect;
 use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
 use std::collections::{HashMap, hash_map::Entry};
@@ -20,11 +21,21 @@ pub enum TargetMode {
 }
 
 impl TargetMode {
-    pub(crate) fn parse(value: &str) -> Result<Self> {
+    /// Read a source `TargetMode` value the way Apache POI does (LENIENCY_AUDIT
+    /// 8.7): ASCII case-insensitively, with any other value read as
+    /// `External` so it can never cause part resolution. The second element
+    /// names the repair applied, if any.
+    pub(crate) fn parse_tolerant(value: &str) -> (Self, Option<RelationshipDefect>) {
         match value {
-            "Internal" => Ok(Self::Internal),
-            "External" => Ok(Self::External),
-            _ => Err(OpcError::InvalidRelationshipTargetMode(value.to_string())),
+            "Internal" => (Self::Internal, None),
+            "External" => (Self::External, None),
+            _ if value.eq_ignore_ascii_case("Internal") => {
+                (Self::Internal, Some(RelationshipDefect::NonCanonicalTargetMode))
+            },
+            _ if value.eq_ignore_ascii_case("External") => {
+                (Self::External, Some(RelationshipDefect::NonCanonicalTargetMode))
+            },
+            _ => (Self::External, Some(RelationshipDefect::UnrecognizedTargetMode)),
         }
     }
 

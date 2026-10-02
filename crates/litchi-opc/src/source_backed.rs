@@ -898,7 +898,9 @@ fn inspect_relationship_append_child(
             b"Type" if type_attribute.is_none() => type_attribute = Some(value),
             b"Target" if target_attribute.is_none() => target_attribute = Some(value),
             b"TargetMode" if !target_mode_seen => {
-                target_mode = TargetMode::parse(&value)?;
+                // Read exactly as package ingress read it (LENIENCY_AUDIT
+                // 8.7), so the source manifest still matches its catalog.
+                target_mode = TargetMode::parse_tolerant(&value).0;
                 target_mode_seen = true;
             },
             name if decoder

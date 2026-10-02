@@ -10,7 +10,7 @@
 //! ingress path.
 
 use litchi_opc::leniency::{Defect, RelationshipDefect, ToleranceReport};
-use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
@@ -171,5 +171,49 @@ fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
         relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
         Some(STYLES_TYPE)
     );
+    assert_round_trips(&bytes);
+}
+
+/// LENIENCY_AUDIT 8.7: `TargetMode` is matched case-insensitively (recorded
+/// when non-canonical); any other value reads as `External` (Apache POI) so
+/// it can never resolve to a part, and is recorded.
+#[test]
+fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" TargetMode="internal"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="EXTERNAL"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="Remote"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.net/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::NonCanonicalTargetMode),
+                Some("rId1"),
+                Some("internal"),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::NonCanonicalTargetMode),
+                Some("rId2"),
+                Some("EXTERNAL"),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::UnrecognizedTargetMode),
+                Some("rId3"),
+                Some("Remote"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    let rels = document.rels();
+    assert_eq!(rels.get("rId1").unwrap().target_mode(), TargetMode::Internal);
+    assert_eq!(rels.get("rId2").unwrap().target_mode(), TargetMode::External);
+    assert_eq!(rels.get("rId3").unwrap().target_mode(), TargetMode::External);
+    assert_eq!(rels.get("rId4").unwrap().target_mode(), TargetMode::External);
     assert_round_trips(&bytes);
 }

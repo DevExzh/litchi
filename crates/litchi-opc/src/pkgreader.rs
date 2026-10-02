@@ -2236,7 +2236,7 @@ fn inspect_relationship_element(
     let mut id_attribute = None;
     let mut type_attribute = None;
     let mut target_attribute = None;
-    let mut target_mode = TargetMode::Internal;
+    let mut target_mode_attribute = None;
     for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| {
             OpcError::InvalidRelationshipsManifest(format!(
@@ -2265,7 +2265,7 @@ fn inspect_relationship_element(
             b"Id" => id_attribute = Some(value),
             b"Type" => type_attribute = Some(value),
             b"Target" => target_attribute = Some(value),
-            b"TargetMode" => target_mode = TargetMode::parse(&value)?,
+            b"TargetMode" => target_mode_attribute = Some(value),
             b"xmlns" => {},
             name if name.starts_with(b"xmlns:") => {},
             _ => {
@@ -2305,6 +2305,16 @@ fn inspect_relationship_element(
     ids.try_reserve(1)
         .map_err(|source| allocation("OPC relationship IDs", source))?;
     ids.insert(id.clone());
+    let target_mode = match target_mode_attribute {
+        None => TargetMode::Internal,
+        Some(value) => {
+            let (mode, repair) = TargetMode::parse_tolerant(&value);
+            if let Some(defect) = repair {
+                report.record(defect, owner, Some(&id), Some(&value));
+            }
+            mode
+        },
+    };
     if relationship_type.chars().any(char::is_whitespace)
         || relationship_type.chars().any(char::is_control)
         || target.chars().any(char::is_control)
@@ -3018,10 +3028,23 @@ mod tests {
             r#"<Relationship Id="rId1" Type="urn:test"/>"#,
             r#"<Relationship Id="1bad" Type="urn:test" Target="part.xml"/>"#,
             r#"<Relationship Id="r:id" Type="urn:test" Target="part.xml"/>"#,
-            r#"<Relationship Id="rId1" Type="urn:test" Target="part.xml" TargetMode="external"/>"#,
         ] {
             let xml = relationships_xml(child);
             assert!(PackageReader::parse_rels_xml(xml.as_bytes(), "/word").is_err());
+        }
+
+        // LENIENCY_AUDIT 8.7: TargetMode is read case-insensitively, and an
+        // unrecognized value is read as External.
+        for (mode, expected) in [
+            ("external", TargetMode::External),
+            ("INTERNAL", TargetMode::Internal),
+            ("bogus", TargetMode::External),
+        ] {
+            let xml = relationships_xml(&format!(
+                r#"<Relationship Id="rId1" Type="urn:test" Target="part.xml" TargetMode="{mode}"/>"#
+            ));
+            let parsed = PackageReader::parse_rels_xml(xml.as_bytes(), "/word").unwrap();
+            assert_eq!(parsed[0].target_mode, expected, "{mode}");
         }
 
         // LENIENCY_AUDIT 8.5: a duplicated Id keeps the first relationship.
