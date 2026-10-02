@@ -1,5 +1,6 @@
-//! Hand-built ZIP fixtures for the ODF `mimetype` container repairs
-//! (LENIENCY_AUDIT F9.1).
+//! Hand-built ZIP fixtures for the ODF leniency repairs (LENIENCY_AUDIT
+//! F9.1 `mimetype` container layouts, and member rewrites of corpus files for
+//! the later F9.x findings).
 //!
 //! The builder writes every byte of the local headers, central directory, and
 //! end record itself, so each fixture carries exactly one controlled
@@ -209,6 +210,16 @@ pub(crate) fn minimal_package_with_mimetype_content(
 /// Re-zip a conforming package's members, writing its `mimetype` member in
 /// `layout` and every other member stored, in their original order.
 pub(crate) fn rezip(conforming: &[u8], layout: MimetypeLayout) -> Vec<u8> {
+    rezip_with(conforming, layout, |_name, data| data)
+}
+
+/// [`rezip`], passing every non-`mimetype` member through `transform` (given
+/// the member name and its decoded bytes) before it is written.
+pub(crate) fn rezip_with(
+    conforming: &[u8],
+    layout: MimetypeLayout,
+    mut transform: impl FnMut(&str, Vec<u8>) -> Vec<u8>,
+) -> Vec<u8> {
     let source = litchi_odf_common::OwnedPackage::from_bytes(conforming.to_vec())
         .expect("conforming fixture must open");
     let mimetype = source.get_file("mimetype").expect("fixture has a mimetype");
@@ -218,6 +229,7 @@ pub(crate) fn rezip(conforming: &[u8], layout: MimetypeLayout) -> Vec<u8> {
         .filter(|name| name.as_str() != "mimetype" && !name.ends_with('/'))
         .map(|name| {
             let data = source.get_file(name).expect("fixture member is readable");
+            let data = transform(name, data);
             (name.clone(), data)
         })
         .collect::<Vec<_>>();
@@ -226,4 +238,84 @@ pub(crate) fn rezip(conforming: &[u8], layout: MimetypeLayout) -> Vec<u8> {
         .map(|(name, data)| (name.as_str(), data.as_slice()))
         .collect::<Vec<_>>();
     package(&mimetype, &members, layout)
+}
+
+/// Rewrite one UTF-8 XML member of a conforming package with `edit`, keeping
+/// every other member and the conforming `mimetype` layout.
+pub(crate) fn edit_member(
+    conforming: &[u8],
+    member: &str,
+    edit: impl Fn(&str) -> String,
+) -> Vec<u8> {
+    let mut edited = false;
+    let bytes = rezip_with(conforming, MimetypeLayout::CONFORMING, |name, data| {
+        if name != member {
+            return data;
+        }
+        edited = true;
+        let text = String::from_utf8(data).expect("edited member is UTF-8");
+        let rewritten = edit(&text);
+        assert_ne!(rewritten, text, "the edit must change {member}");
+        rewritten.into_bytes()
+    });
+    assert!(edited, "fixture has no {member} member");
+    bytes
+}
+
+/// Remove the manifest's `/` root `file-entry` element (LENIENCY_AUDIT F9.2).
+pub(crate) fn without_manifest_root(manifest: &str) -> String {
+    let (start, end) = manifest_root_span(manifest);
+    format!("{}{}", &manifest[..start], &manifest[end..])
+}
+
+/// Blank the `media-type` of the manifest's `/` root entry (LENIENCY_AUDIT
+/// F9.2).
+pub(crate) fn with_empty_manifest_root_media_type(manifest: &str) -> String {
+    let (start, end) = manifest_root_span(manifest);
+    let element = &manifest[start..end];
+    let attribute = element
+        .find("media-type=\"")
+        .expect("root entry declares a media type")
+        + "media-type=\"".len();
+    let close = element[attribute..]
+        .find('"')
+        .expect("media type is quoted")
+        + attribute;
+    format!(
+        "{}{}{}{}",
+        &manifest[..start],
+        &element[..attribute],
+        &element[close..],
+        &manifest[end..]
+    )
+}
+
+/// Replace the manifest root entry's media type with `media_type`.
+pub(crate) fn with_manifest_root_media_type(manifest: &str, media_type: &str) -> String {
+    let blank = with_empty_manifest_root_media_type(manifest);
+    let (start, end) = manifest_root_span(&blank);
+    let element = &blank[start..end];
+    let attribute =
+        element.find("media-type=\"\"").expect("blanked media type") + "media-type=\"".len();
+    format!(
+        "{}{}{media_type}{}{}",
+        &blank[..start],
+        &element[..attribute],
+        &element[attribute..],
+        &blank[end..]
+    )
+}
+
+/// Byte span of the self-closing `file-entry` element whose full path is `/`.
+fn manifest_root_span(manifest: &str) -> (usize, usize) {
+    let mut search = 0;
+    while let Some(found) = manifest[search..].find("<manifest:file-entry") {
+        let start = search + found;
+        let end = start + manifest[start..].find("/>").expect("file entry closes") + 2;
+        if manifest[start..end].contains("full-path=\"/\"") {
+            return (start, end);
+        }
+        search = end;
+    }
+    panic!("manifest has no root file entry");
 }

@@ -17,7 +17,11 @@
 //! open path (owned, positional source-backed, and the prepared detection
 //! handoff) accepts a compressed, extra-field-carrying, or relocated
 //! `mimetype` member, reads it by name, validates its content exactly, and
-//! records the deviation. A conforming package yields an empty report.
+//! records the deviation. It also covers the manifest root-entry fallback of
+//! LENIENCY_AUDIT F9.2: a manifest without a `/` entry, or whose `/` entry
+//! has an empty media type, adopts the `mimetype` member's value, exactly as
+//! LibreOffice's media-type fallback does; two non-empty values that disagree
+//! stay a hard error. A conforming package yields an empty report.
 //!
 //! **Opt-in repairs** trade strict conformance for reach and stay gated by
 //! [`Leniency`] variants. No ODF repair currently requires a judgment call,
@@ -74,11 +78,13 @@ pub enum Leniency {
 /// layouts ODF 1.2 Part 3 §3.3 constrains only for producers, so applying it
 /// never changes what a conforming document means.
 ///
-/// The variants are the `mimetype`-member grammar repairs of LENIENCY_AUDIT
-/// F9.1. One package can record several of them (for example a deflated
-/// member that is also not first), in the order listed here. Everything else
-/// about the member stays strict: its content must name the expected MIME
-/// type exactly, and an encrypted or unreadable member is a hard error.
+/// The `Mimetype*` variants are the `mimetype`-member grammar repairs of
+/// LENIENCY_AUDIT F9.1. One package can record several of them (for example a
+/// deflated member that is also not first), in the order listed here.
+/// Everything else about the member stays strict: its content must name the
+/// expected MIME type exactly, and an encrypted or unreadable member is a hard
+/// error. [`PackageDefect::ManifestRootMediaTypeMissing`] is the manifest
+/// root-entry fallback of LENIENCY_AUDIT F9.2.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PackageDefect {
@@ -112,6 +118,20 @@ pub enum PackageDefect {
     /// name like any other member. The repair reads the member by name from
     /// the central directory. The defect context is 0.
     MimetypeNotFirst,
+    /// The manifest had no `/` root entry, or its root entry declared an
+    /// empty `manifest:media-type`, so the package media type came from the
+    /// `mimetype` member alone.
+    ///
+    /// ODF 1.2 Part 3 §4.2 says the manifest *should* describe the root;
+    /// minimal third-party writers omit it. LibreOffice treats an empty root
+    /// media type as a fallback, not a conflict: it adopts the `mimetype`
+    /// stream value (`m_bMediaTypeFallbackUsed`, `ZipPackage::parseManifest`
+    /// in ZipPackage.cxx) and throws only when both values are non-empty and
+    /// differ. The repair adopts the `mimetype` member's value as the
+    /// manifest root media type; a non-empty conflicting root stays a hard
+    /// error. The defect context is 0 when the root entry is absent and 1
+    /// when it is present with an empty media type.
+    ManifestRootMediaTypeMissing,
 }
 
 impl PackageDefect {
@@ -127,6 +147,9 @@ impl PackageDefect {
             },
             Self::MimetypeNotFirst => {
                 "located the mimetype member by name in the central directory instead of requiring the offset-0 local header"
+            },
+            Self::ManifestRootMediaTypeMissing => {
+                "adopted the mimetype member's value as the package media type because the manifest root entry was absent or had an empty media type"
             },
         }
     }
@@ -166,7 +189,9 @@ pub struct ToleratedDefect {
     /// Which defect class was repaired.
     pub defect: Defect,
     /// Where the defect was found: the declared ZIP compression method ID for
-    /// [`PackageDefect::MimetypeDeflated`], 0 for the other
+    /// [`PackageDefect::MimetypeDeflated`]; 0 (root entry absent) or 1 (root
+    /// entry with an empty media type) for
+    /// [`PackageDefect::ManifestRootMediaTypeMissing`]; 0 for the other
     /// [`Defect::Package`] classes.
     pub context: u16,
 }
@@ -336,6 +361,7 @@ mod tests {
             Defect::from(PackageDefect::MimetypeDeflated),
             Defect::from(PackageDefect::MimetypeExtraField),
             Defect::from(PackageDefect::MimetypeNotFirst),
+            Defect::from(PackageDefect::ManifestRootMediaTypeMissing),
         ];
         for defect in defects {
             assert!(!defect.repair().is_empty());

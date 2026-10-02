@@ -61,6 +61,10 @@ pub struct Package<'data> {
     manifest: super::manifest::Manifest,
     mimetype: String,
     password: Option<&'data str>,
+    /// The LENIENCY_AUDIT F9.2 root media-type fallback this view adopted,
+    /// as the [`crate::leniency::PackageDefect::ManifestRootMediaTypeMissing`]
+    /// context.
+    manifest_root_fallback: Option<u16>,
 }
 
 /// Owned version of [`Package`] that owns the data buffer.
@@ -773,11 +777,12 @@ impl SourceBackedPackage {
                 "No manifest.xml found in ODF package".to_string(),
             ));
         };
-        let manifest = prefer_current(
+        let mut manifest = prefer_current(
             source.as_ref(),
             source_version,
             super::manifest::Manifest::parse(&manifest_xml),
         )?;
+        adopt_manifest_root_fallback(&mut manifest, &mimetype, &mut tolerance);
         let mime_result = if manifest.mimetype == mimetype {
             Ok(())
         } else {
@@ -1421,6 +1426,41 @@ pub(crate) fn mimetype_member_facts<R: ZipReaderAt>(
     })
 }
 
+/// Classify a manifest whose root media type is empty: 0 when the `/` entry
+/// is absent, 1 when it is present with an empty `manifest:media-type`.
+///
+/// Returns `None` when the root media type is present, when the `mimetype`
+/// member is itself empty so there is nothing to fall back to, or when the
+/// manifest lists no `manifest:file-entry` at all. A document without a
+/// single entry is not a manifest that merely omits its root — it is a
+/// missing or foreign manifest, which stays a hard error.
+fn manifest_root_fallback(manifest: &super::manifest::Manifest, mimetype: &str) -> Option<u16> {
+    if !manifest.mimetype.is_empty() || mimetype.is_empty() || manifest.entries.is_empty() {
+        return None;
+    }
+    Some(u16::from(manifest.get_media_type("/").is_some()))
+}
+
+/// Adopt the `mimetype` member's value as the manifest root media type when
+/// the manifest leaves it empty (LENIENCY_AUDIT F9.2), recording the repair.
+///
+/// This is LibreOffice's media-type fallback (`ZipPackage::parseManifest`):
+/// an absent or empty root is not a conflict. Two non-empty values that
+/// differ are left untouched for the caller's hard conflict check.
+fn adopt_manifest_root_fallback(
+    manifest: &mut super::manifest::Manifest,
+    mimetype: &str,
+    tolerance: &mut ToleranceReport,
+) {
+    if let Some(context) = manifest_root_fallback(manifest, mimetype) {
+        tolerance.record(
+            crate::leniency::PackageDefect::ManifestRootMediaTypeMissing,
+            context,
+        );
+        mimetype.clone_into(&mut manifest.mimetype);
+    }
+}
+
 /// Record each tolerated `mimetype` container deviation, in the order the
 /// [`crate::leniency::PackageDefect`] declares them.
 pub(crate) fn record_mimetype_deviations(
@@ -2043,7 +2083,7 @@ impl OwnedPackage {
         }) {
             record_mimetype_deviations(&mut tolerance, facts);
         }
-        Ok(Self {
+        let mut package = Self {
             data,
             index,
             password: None,
@@ -2053,7 +2093,23 @@ impl OwnedPackage {
                 soapberry_zip::office::ArchiveValidationPolicy::StrictPackage
             ),
             tolerance,
-        })
+        };
+        // A manifest without a usable root media type falls back to the
+        // `mimetype` member (LENIENCY_AUDIT F9.2); every borrowed view adopts
+        // it in `Package::from_archive`, and the open records it once here.
+        // A package whose manifest cannot be read is left for the borrowed
+        // view to reject exactly as before.
+        let root_fallback = package
+            .package()
+            .ok()
+            .and_then(|borrowed| borrowed.manifest_root_fallback);
+        if let Some(context) = root_fallback {
+            package.tolerance.record(
+                crate::leniency::PackageDefect::ManifestRootMediaTypeMissing,
+                context,
+            );
+        }
+        Ok(package)
     }
 
     pub(crate) fn from_shared_bytes_with_strict_policy_and_limits(
@@ -2359,16 +2415,24 @@ impl<'data> Package<'data> {
             .to_string();
 
         // Parse the manifest
-        let manifest = super::manifest::Manifest::parse(
+        let mut manifest = super::manifest::Manifest::parse(
             &archive
                 .read_manifest_xml_with_limit(limits.max_manifest_bytes, "ODF manifest bytes")?,
         )?;
+        // An absent or empty manifest root media type falls back to the
+        // `mimetype` member (LENIENCY_AUDIT F9.2). The owning
+        // `OwnedPackage` records the repair once at open.
+        let root_fallback = manifest_root_fallback(&manifest, &mimetype);
+        if root_fallback.is_some() {
+            manifest.mimetype.clone_from(&mimetype);
+        }
 
         Ok(Self {
             archive,
             manifest,
             mimetype,
             password,
+            manifest_root_fallback: root_fallback,
         })
     }
 
