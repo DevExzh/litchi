@@ -562,3 +562,46 @@ fn worksheet_sequencing_and_advisory_metadata_are_repaired_and_recorded() {
         Some(litchi_xlsx::Rect::from_a1("A1:D4").unwrap())
     );
 }
+
+/// Finding 4.11: the theme parser (a public API, not on the workbook-open
+/// path) repairs color-scheme deviations in the fixture's own theme part and
+/// records each at its slot; the unmodified part reports clean.
+#[test]
+fn theme_color_scheme_deviations_are_repaired_and_recorded() {
+    use litchi_xlsx::ThemeDefect;
+    use litchi_xlsx::style::theme::{Theme, ThemeColorSlot};
+
+    let reader = ArchiveReader::new(BASE).unwrap();
+    let xml = String::from_utf8(reader.read("xl/theme/theme1.xml").unwrap()).unwrap();
+    assert!(Theme::parse(&xml).unwrap().tolerance_report().is_clean());
+
+    let defective = xml
+        .replacen(
+            r#"<a:sysClr val="windowText" lastClr="000000"/>"#,
+            r#"<a:sysClr val="windowText"/>"#,
+            1,
+        )
+        .replacen(
+            r#"<a:srgbClr val="C0504D"/>"#,
+            r#"<a:srgbClr val="red"/>"#,
+            1,
+        );
+    let theme = Theme::parse(&defective).unwrap();
+    assert_eq!(theme.rgb(ThemeColorSlot::Dk1), [0, 0, 0]);
+    assert_eq!(theme.rgb(ThemeColorSlot::Accent2), [0xC0, 0x50, 0x4D]);
+    assert_eq!(
+        worksheet_entries(theme.tolerance_report()),
+        [
+            (
+                Defect::Theme(ThemeDefect::MissingLastColor),
+                None,
+                ToleranceLocation::ColorSchemeSlot(0)
+            ),
+            (
+                Defect::Theme(ThemeDefect::MalformedColor),
+                None,
+                ToleranceLocation::ColorSchemeSlot(5)
+            ),
+        ]
+    );
+}

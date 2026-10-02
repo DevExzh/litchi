@@ -114,6 +114,8 @@
 //!   [`CatalogDefect::SheetNameRules`] (finding 4.8, opt-in). The standalone
 //!   `raw::parse_catalog` and the feature snapshots that re-read the
 //!   catalog for editing keep the historical errors.
+//! * finding 4.11 — `style::theme::Theme::parse` records [`ThemeDefect`]s
+//!   in the parsed theme's own report; no workbook handle parses the theme.
 //! * finding 4.10 — the worksheet event parser records
 //!   [`WorksheetDefect::MisplacedElement`],
 //!   [`WorksheetDefect::CountMismatch`], and
@@ -441,19 +443,27 @@ impl SharedStringsDefect {
 
 /// A theme color-scheme (`a:clrScheme`) defect.
 ///
-/// Every variant is a *roadmap contract* (audit finding 4.11): no read
-/// produces it yet. The theme parser is not on the workbook-open path.
+/// Recorded by `style::theme::Theme::parse` (audit finding 4.11) into the
+/// parsed theme's own report (`Theme::tolerance_report`), at
+/// [`Location::ColorSchemeSlot`]. The theme parser is not on the
+/// workbook-open path. LibreOffice dispatches color-scheme children by name,
+/// order-independently, and leaves defaults for missing slots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ThemeDefect {
-    /// Color-scheme slots appear out of order. Slots are matched by name.
+    /// A color-scheme slot appears after a later schema slot, or repeats.
+    /// Slots are matched by name; a repeated slot's first occurrence wins.
     MisorderedSlot,
-    /// A color-scheme slot is missing. The slot takes its default.
+    /// A color-scheme slot is missing, or carries a color form this reader
+    /// does not model (for example `a:prstClr`). The slot takes the Office
+    /// theme's value.
     MissingSlot,
-    /// `a:sysClr` lacks the optional `lastClr`. The color resolves by name,
-    /// else black.
+    /// `a:sysClr` lacks `lastClr`, which CT_SystemColor makes optional. The
+    /// color resolves by name (`window` is white), else black.
     MissingLastColor,
-    /// `a:srgbClr/@val` is not six hex digits. The slot takes its default.
+    /// `a:srgbClr/@val` is missing or not six hex digits, or `a:sysClr`
+    /// lacks `val`: the slot takes the Office theme's value. A malformed
+    /// `a:sysClr/@lastClr` resolves by name instead.
     MalformedColor,
 }
 
